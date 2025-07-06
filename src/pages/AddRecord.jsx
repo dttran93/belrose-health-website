@@ -1,4 +1,3 @@
-// Main AddRecord.jsx component
 import React, { useState, useEffect } from 'react';
 import { useFileUpload } from '@/components/AddRecord/hooks/useFileUpload';
 import { useFHIRConversion } from '@/components/AddRecord/hooks/useFHIRConversion';
@@ -9,11 +8,12 @@ import { ProgressSteps } from '@/components/AddRecord/components/ProgressSteps';
 import { StatusBanner } from '@/components/AddRecord/components/StatusBanner';
 import { FileUploadSection } from '@/components/AddRecord/components/FileUploadSection';
 import { FHIRConversionSection } from '@/components/AddRecord/components/FHIRConversionSection';
+import DataReviewSection from '@/components/AddRecord/components/DataReviewSection';
 import { CompletionScreen } from '@/components/AddRecord/components/CompletionScreen';
 import { StatsPanel } from '@/components/AddRecord/components/StatsPanel';
 
 const AddRecord = () => {
-    const [currentStep, setCurrentStep] = useState('upload');
+    const [currentStep, setCurrentStep] = useState('upload'); // 'upload' -> 'convert' -> 'review' -> 'complete'
     
     // File upload hook
     const {
@@ -31,8 +31,12 @@ const AddRecord = () => {
     // FHIR conversion hook
     const {
         fhirData,
+        reviewedData, 
         handleFHIRConverted,
+        handleDataConfirmed, 
+        handleDataRejected, 
         isAllFilesConverted,
+        isAllFilesReviewed,
         getFHIRStats,
         reset: resetFHIR
     } = useFHIRConversion(processedFiles, firestoreData, updateFirestoreRecord);
@@ -40,15 +44,18 @@ const AddRecord = () => {
     // Export service
     const exportService = new ExportService();
 
-    // Step management effect
+    // Step management effect with new review step
     useEffect(() => {
         if (processedFiles.length > 0 && currentStep === 'upload') {
             setCurrentStep('convert');
         }
         if (isAllFilesConverted() && currentStep === 'convert') {
-            setCurrentStep('complete');
+            setCurrentStep('review');
         }
-    }, [processedFiles.length, isAllFilesConverted(), currentStep]);
+        if (isAllFilesReviewed() && currentStep === 'review') {
+            setCurrentStep('complete'); 
+        }
+    }, [processedFiles.length, isAllFilesConverted(), isAllFilesReviewed(), currentStep]);
 
     // Reset everything
     const resetProcess = () => {
@@ -80,7 +87,7 @@ const AddRecord = () => {
                         Add Medical Record
                     </h1>
                     <p className="text-lg text-gray-600">
-                        Upload documents, extract text, convert to FHIR, and save to your medical records
+                        Upload documents, extract text, convert to FHIR, review data, and save to your medical records
                     </p>
                 </div>
 
@@ -89,6 +96,7 @@ const AddRecord = () => {
                     currentStep={currentStep} 
                     processedFiles={processedFiles} 
                     fhirData={fhirData}
+                    reviewedData={reviewedData}
                 />
 
                 {/* Status Banner */}
@@ -97,17 +105,33 @@ const AddRecord = () => {
                     savingCount={savingCount} 
                 />
 
-                {/* Main Content - Upload and Conversion Sections */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <FileUploadSection 
-                        onFilesProcessed={handleFilesProcessed}
-                    />
+                {/* Conditional rendering based on current step */}
+                
+                {/* Upload and Conversion Steps */}
+                {(currentStep === 'upload' || currentStep === 'convert') && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                        <FileUploadSection 
+                            onFilesProcessed={handleFilesProcessed}
+                        />
 
-                    <FHIRConversionSection
-                        processedFiles={processedFiles}
-                        onFHIRConverted={handleFHIRConverted}
-                    />
-                </div>
+                        <FHIRConversionSection
+                            processedFiles={processedFiles}
+                            onFHIRConverted={handleFHIRConverted}
+                        />
+                    </div>
+                )}
+
+                {/* Review Step */}
+                {currentStep === 'review' && (
+                    <div className="mb-8">
+                        <DataReviewSection
+                            processedFiles={processedFiles}
+                            fhirData={fhirData}
+                            onDataConfirmed={handleDataConfirmed}
+                            onDataRejected={handleDataRejected}
+                        />
+                    </div>
+                )}
 
                 {/* Completion Screen */}
                 {currentStep === 'complete' && (
@@ -120,7 +144,7 @@ const AddRecord = () => {
                 {/* Statistics Panel */}
                 <StatsPanel
                     processedFiles={processedFiles}
-                    savedToFirestoreCount={savedToFirestoreCount}
+                    savedToFirestoreCount={reviewedData.size}
                     fhirData={fhirData}
                     totalFhirResources={getFHIRStats()}
                 />

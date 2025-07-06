@@ -1,4 +1,3 @@
-// Updated useFHIRConversion hook
 import { useState } from 'react';
 import { getFirestore, doc, setDoc } from 'firebase/firestore';
 import { useAuthContext } from '@/components/auth/AuthContext';
@@ -7,6 +6,7 @@ const db = getFirestore();
 
 export const useFHIRConversion = (processedFiles, firestoreData, updateFirestoreRecord) => {
     const [fhirData, setFhirData] = useState(new Map());
+    const [reviewedData, setReviewedData] = useState(new Map()); // NEW: Track reviewed files
     const { user } = useAuthContext();
 
     // Map FHIR data to HealthRecordCard format
@@ -47,13 +47,13 @@ export const useFHIRConversion = (processedFiles, firestoreData, updateFirestore
                 clinicNotes: clinicalNotes,
                 attachments: [{
                     name: fileName,
-                    size: "N/A", // You can get this from your file processing
+                    size: "N/A",
                     url: '#'
                 }],
                 isBlockchainVerified: false,
                 createdAt: new Date().toISOString(),
                 lastModified: new Date().toISOString(),
-                originalFhirData: fhirData // Keep original for reference
+                originalFhirData: fhirData
             };
         } catch (error) {
             console.error('Error mapping FHIR data:', error);
@@ -187,17 +187,23 @@ export const useFHIRConversion = (processedFiles, firestoreData, updateFirestore
         return null;
     };
 
-    // Updated handleFHIRConverted function
+    // MODIFIED: handleFHIRConverted now only stores data, doesn't auto-save
     const handleFHIRConverted = async (fileId, fhirJsonData) => {
         console.log('FHIR converted for file:', fileId, fhirJsonData);
         
-        // Ensure fileId is a string
-        const recordId = String(fileId).replace(/[^a-zA-Z0-9_-]/g, '_');
-        console.log('Using record ID:', recordId);
-        
-        // Store raw FHIR data
+        // Store raw FHIR data but don't save to Firestore yet
         setFhirData(prev => new Map([...prev, [fileId, fhirJsonData]]));
+        
+        console.log('FHIR data stored for review, not yet saved to Firestore');
+    };
 
+    // NEW: Handle user-confirmed data from DataReviewSection
+    const handleDataConfirmed = async (fileId, editedData) => {
+        console.log('Data confirmed for file:', fileId, editedData);
+        
+        // Mark as reviewed
+        setReviewedData(prev => new Map([...prev, [fileId, editedData]]));
+        
         // Get the original file info
         const originalFile = processedFiles.find(f => f.id === fileId);
         if (!originalFile) {
@@ -205,20 +211,20 @@ export const useFHIRConversion = (processedFiles, firestoreData, updateFirestore
             return;
         }
 
-        // Map FHIR data to HealthRecordCard format
-        const healthRecord = mapFHIRToHealthRecord(fhirJsonData, originalFile.name, recordId);
+        // Create health record from edited data
+        const healthRecord = createHealthRecordFromEditedData(editedData, fileId);
         
         if (!healthRecord) {
-            console.error('Failed to map FHIR data to health record format');
+            console.error('Failed to create health record from edited data');
             return;
         }
 
         // Save health record to Firestore
         if (user?.uid) {
             try {
-                console.log('Saving health record to Firestore:', healthRecord);
+                console.log('Saving confirmed health record to Firestore:', healthRecord);
                 
-                // Save to the health-records collection for the Activity page to read
+                const recordId = String(fileId).replace(/[^a-zA-Z0-9_-]/g, '_');
                 const healthRecordRef = doc(db, `users/${user.uid}/health-records`, recordId);
                 await setDoc(healthRecordRef, healthRecord);
                 
@@ -228,27 +234,70 @@ export const useFHIRConversion = (processedFiles, firestoreData, updateFirestore
                 if (updateFirestoreRecord) {
                     updateFirestoreRecord(fileId, {
                         ...healthRecord,
-                        fhirData: fhirJsonData // Include raw FHIR data too
+                        fhirData: editedData.originalFhirData // Include raw FHIR data too
                     });
                 }
                 
             } catch (error) {
                 console.error('Error saving health record to Firestore:', error);
-                console.error('Error details:', {
-                    userId: user?.uid,
-                    recordId: recordId,
-                    fileId: fileId,
-                    originalFileId: originalFile?.id
-                });
             }
         } else {
             console.error('No user found, cannot save to Firestore');
         }
     };
 
+    // Create health record from user-edited data
+    const createHealthRecordFromEditedData = (editedData, fileId) => {
+        try {
+            return {
+                id: fileId,
+                subject: editedData.documentType || 'Medical Record',
+                provider: editedData.provider || 'Unknown Provider',
+                institutionName: editedData.institution || 'Unknown Institution', 
+                institutionAddress: 'Address not specified',
+                date: editedData.documentDate || new Date().toISOString().split('T')[0],
+                clinicNotes: editedData.clinicalNotes || '',
+                patientName: editedData.patientName || '',
+                patientId: editedData.patientId || '',
+                birthDate: editedData.birthDate || '',
+                gender: editedData.gender || '',
+                attachments: [{
+                    name: editedData.documentTitle || 'Document',
+                    size: "N/A",
+                    url: '#'
+                }],
+                isBlockchainVerified: false,
+                createdAt: new Date().toISOString(),
+                lastModified: new Date().toISOString(),
+                originalFhirData: editedData.originalFhirData
+            };
+        } catch (error) {
+            console.error('Error creating health record from edited data:', error);
+            return null;
+        }
+    };
+
+    //Handle user rejection of data
+    const handleDataRejected = (fileId) => {
+        console.log('Data rejected for file:', fileId);
+        // Remove from FHIR data map
+        setFhirData(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(fileId);
+            return newMap;
+        });
+    };
+
+    // Check if all files are converted AND reviewed
     const isAllFilesConverted = () => {
         const completedFiles = processedFiles.filter(f => f.status === 'completed' && f.extractedText);
         return completedFiles.length > 0 && completedFiles.every(f => fhirData.has(f.id));
+    };
+
+    //Check if all files are reviewed and ready for completion
+    const isAllFilesReviewed = () => {
+        const completedFiles = processedFiles.filter(f => f.status === 'completed' && f.extractedText);
+        return completedFiles.length > 0 && completedFiles.every(f => reviewedData.has(f.id));
     };
 
     const getFHIRStats = () => {
@@ -261,12 +310,17 @@ export const useFHIRConversion = (processedFiles, firestoreData, updateFirestore
 
     const reset = () => {
         setFhirData(new Map());
+        setReviewedData(new Map()); 
     };
 
     return {
         fhirData,
+        reviewedData, 
         handleFHIRConverted,
+        handleDataConfirmed, 
+        handleDataRejected, 
         isAllFilesConverted,
+        isAllFilesReviewed, 
         getFHIRStats,
         reset
     };

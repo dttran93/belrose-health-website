@@ -1,11 +1,11 @@
 import React from 'react';
-import { ArrowRight, Cloud, Zap, Database } from 'lucide-react';
+import { ArrowRight, Cloud, Zap, Eye, Database } from 'lucide-react';
 import { StepIndicator } from './StepIndicator';
 
-export const ProgressSteps = ({ currentStep, processedFiles, fhirData }) => {
+export const ProgressSteps = ({ currentStep, processedFiles, fhirData, reviewedData = new Map() }) => {
     return (
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
                 <StepIndicator
                     step="upload"
                     title="Upload & Save"
@@ -14,6 +14,7 @@ export const ProgressSteps = ({ currentStep, processedFiles, fhirData }) => {
                     currentStep={currentStep}
                     processedFiles={processedFiles}
                     fhirData={fhirData}
+                    reviewedData={reviewedData}
                 />
                 
                 <div className="hidden md:flex items-center justify-center">
@@ -28,6 +29,23 @@ export const ProgressSteps = ({ currentStep, processedFiles, fhirData }) => {
                     currentStep={currentStep}
                     processedFiles={processedFiles}
                     fhirData={fhirData}
+                    reviewedData={reviewedData}
+                />
+                
+                <div className="hidden md:flex items-center justify-center">
+                    <ArrowRight className="w-6 h-6 text-gray-400" />
+                </div>
+                
+                {/* NEW: Review Step */}
+                <StepIndicator
+                    step="review"
+                    title="Review & Edit"
+                    description="Review and edit extracted data before saving"
+                    icon={Eye}
+                    currentStep={currentStep}
+                    processedFiles={processedFiles}
+                    fhirData={fhirData}
+                    reviewedData={reviewedData}
                 />
                 
                 <div className="hidden md:flex items-center justify-center">
@@ -42,6 +60,7 @@ export const ProgressSteps = ({ currentStep, processedFiles, fhirData }) => {
                     currentStep={currentStep}
                     processedFiles={processedFiles}
                     fhirData={fhirData}
+                    reviewedData={reviewedData}
                 />
             </div>
         </div>
