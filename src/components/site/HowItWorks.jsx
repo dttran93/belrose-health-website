@@ -1,6 +1,6 @@
 import React from 'react';
-import { Badge } from '../ui/Badge';
-import HowItWorksCard from '../ui/HowItWorksCard';
+import { Badge } from './ui/Badge';
+import HowItWorksCard from './ui/HowItWorksCard';
 import {ClipboardPenLine, Combine, Server, CheckCircle } from 'lucide-react';
 
 const HowItWorks = () => {

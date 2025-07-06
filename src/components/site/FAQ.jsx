@@ -5,7 +5,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Badge } from "@/components/ui/Badge";
+import { Badge } from "@/components/site/ui/Badge";
 import { Button } from "@/components/ui/Button";
 
 const FAQ = () => {

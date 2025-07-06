@@ -1,5 +1,5 @@
 import React from 'react';
-import ValuesCard from '../ui/ValuesCard.jsx';
+import ValuesCard from './ui/ValuesCard.jsx';
 import { Shield, Users, Handshake } from 'lucide-react';
 
 const Values = () => {

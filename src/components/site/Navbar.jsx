@@ -3,7 +3,7 @@ import {useNavigate} from 'react-router-dom';
 import { Button } from "@/components/ui/Button";
 import {Users, Hospital, Microscope, CircleCheckBig, BriefcaseBusiness, Mailbox, ChevronDown} from "lucide-react";
 import DropdownMenu from '@/components/ui/DropdownMenu';
-import NavCard from "@/components/ui/NavCard";
+import NavCard from "@/components/site/ui/NavCard";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);

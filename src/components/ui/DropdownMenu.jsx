@@ -1,5 +1,5 @@
 import React from 'react';
-import NavCard from "@/components/ui/NavCard";
+import NavCard from "@/components/site/ui/NavCard";
 
 const DropdownMenu = ({ 
   name, 

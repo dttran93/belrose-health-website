@@ -1,6 +1,6 @@
 import React from 'react';
 import { Zap } from 'lucide-react';
-import FHIRConverter from '@/components/ui/FHIRConverter';
+import FHIRConverter from '@/components/AddRecord/components/FHIRConverter';
 
 export const FHIRConversionSection = ({ processedFiles, onFHIRConverted }) => {
     return (

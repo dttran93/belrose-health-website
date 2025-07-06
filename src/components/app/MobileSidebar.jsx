@@ -1,5 +1,5 @@
 import { X, Bot, User } from "lucide-react";
-import NavItem from "../ui/NavItem";
+import NavItem from "../site/ui/NavItem";
 import UserMenuButton from "../ui/UserMenuButton";
 
 function MobileSidebar({ isOpen, onClose, user, onToggleAI, isAIOpen, healthRecords, healthCategories, onLogout, onSettings, onHelp, }) {

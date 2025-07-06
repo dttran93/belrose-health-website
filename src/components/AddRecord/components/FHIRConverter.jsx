@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Zap, CheckCircle, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
-import { convertToFHIR } from '../../services/fhirConversionService';
+import { convertToFHIR } from '@/services/fhirConversionService';
 
 /**
  * FHIR Converter Component - Handles conversion of extracted text to FHIR format

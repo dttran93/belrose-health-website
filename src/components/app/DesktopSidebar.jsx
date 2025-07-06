@@ -1,6 +1,6 @@
 import { PanelLeft, ArrowLeftToLine, ArrowRightToLine } from "lucide-react";
 import UserMenuButton from "@/components/ui/UserMenuButton";
-import NavItem from "../ui/NavItem";
+import NavItem from "../site/ui/NavItem";
 
 function DesktopSidebar({ isCollapsed, onToggle, user, onLogout, healthRecords, healthCategories, onSettings, onHelp }) {
   return (

@@ -1,6 +1,6 @@
 import React from 'react';
 import { FileText } from 'lucide-react';
-import DocumentUploader from '@/components/ui/DocumentUploader';
+import DocumentUploader from '@/components/AddRecord/components/DocumentUploader';
 
 export const FileUploadSection = ({ onFilesProcessed }) => {
     return (
