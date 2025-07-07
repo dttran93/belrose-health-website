@@ -4,7 +4,8 @@ import { useAuthContext } from '@/components/auth/AuthContext';
 
 const db = getFirestore();
 
-export const useFHIRConversion = (processedFiles, firestoreData, updateFirestoreRecord) => {
+export const useFHIRConversion = (processedFiles, firestoreData, updateFirestoreRecord, uploadFiles) => {
+    
     const [fhirData, setFhirData] = useState(new Map());
     const [reviewedData, setReviewedData] = useState(new Map()); // NEW: Track reviewed files
     const { user } = useAuthContext();
@@ -198,18 +199,46 @@ export const useFHIRConversion = (processedFiles, firestoreData, updateFirestore
     };
 
     // NEW: Handle user-confirmed data from DataReviewSection
-    const handleDataConfirmed = async (fileId, editedData) => {
-        console.log('Data confirmed for file:', fileId, editedData);
-        
-        // Mark as reviewed
-        setReviewedData(prev => new Map([...prev, [fileId, editedData]]));
-        
-        // Get the original file info
-        const originalFile = processedFiles.find(f => f.id === fileId);
-        if (!originalFile) {
-            console.error('Original file not found for fileId:', fileId);
-            return;
+const handleDataConfirmed = async (fileId, editedData) => {
+    console.log('Data confirmed for file:', fileId, editedData);
+
+    // ADD THIS DEBUGGING SECTION HERE:
+    console.log('=== DEBUGGING UPLOAD ===');
+    console.log('uploadFiles type:', typeof uploadFiles);
+    console.log('uploadFiles function:', uploadFiles);
+    console.log('firestoreData:', firestoreData);
+    console.log('fileId:', fileId);
+    console.log('firestoreData.has(fileId):', firestoreData.has(fileId));
+    console.log('========================');
+
+    // Mark as reviewed
+    setReviewedData(prev => new Map([...prev, [fileId, editedData]]));
+    
+    // Get the original file info
+    const originalFile = processedFiles.find(f => f.id === fileId);
+    if (!originalFile) {
+        console.error('Original file not found for fileId:', fileId);
+        return;
+    }
+
+    console.log('originalFile found:', originalFile);
+
+    // REPLACE THIS ENTIRE UPLOAD SECTION:
+    // Upload the file if uploadFiles function is available
+    if (uploadFiles) {
+        console.log('✅ uploadFiles exists - attempting upload');
+        console.log('Uploading file to Firebase storage...');
+        try {
+            console.log('Calling uploadFiles with:', [originalFile]);
+            await uploadFiles([originalFile]);
+            console.log('✅ Upload completed successfully');
+        } catch (error) {
+            console.error('❌ Error uploading file:', error);
         }
+    } else {
+        console.log('❌ uploadFiles is not available');
+        console.log('uploadFiles value:', uploadFiles);
+    }
 
         // Create health record from edited data
         const healthRecord = createHealthRecordFromEditedData(editedData, fileId);

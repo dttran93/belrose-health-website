@@ -12,7 +12,7 @@ const DOCUMENT_TYPE_OPTIONS = [
 ];
 
 const DocumentInfoSection = ({ data, onChange }) => (
-    <div className="bg-green-50 p-4 rounded-lg">
+    <div className="bg-chart-3/50 p-4 rounded-lg">
         <h4 className="font-medium text-gray-900 mb-3 flex items-center">
             <FileText className="w-4 h-4 mr-2" />
             Document Information

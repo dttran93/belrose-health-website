@@ -1,19 +1,18 @@
 // src/components/AddRecord/components/DataReviewSection.jsx
 import React, { useState } from 'react';
-import { Eye, Edit3, FileText, Stethoscope } from 'lucide-react';
+import { Eye, Edit3, FileText, Stethoscope, Check, X } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 
 // Custom hooks
 import { useDataReview } from '../hooks/useDataReview';
 
 // Form components
-import PatientInfoSection from './PatientInfoSection';
 import DocumentInfoSection from './DocumentInfoSection';
-import ProviderInfoSection from './PatientInfoSection';
+import ProviderInfoSection from './ProviderInfoSection';
 import ClinicalNotesSection from './ClinicalNotesSection';
 
 // UI components
 import { TabNavigation } from './TabNavigation';
-import { ActionButtons } from './ActionButtons';
 
 const TABS = [
     { id: 'extracted', label: 'Extracted Text' },
@@ -253,15 +252,24 @@ const FhirDataView = ({ fhirData }) => (
 
 const EditablePreview = ({ data, onChange, onConfirm, onReject, isLoading }) => (
     <div className="space-y-6">
-        <PatientInfoSection data={data} onChange={onChange} />
         <DocumentInfoSection data={data} onChange={onChange} />
         <ProviderInfoSection data={data} onChange={onChange} />
         <ClinicalNotesSection data={data} onChange={onChange} />
-        <ActionButtons 
-            onConfirm={onConfirm} 
-            onCancel={onReject} 
-            isLoading={isLoading} 
-        />
+        <div className = "flex justify-end space-x-3">
+        <Button
+            variant="outline"
+            onClick={onReject}
+            disabled={isLoading}>
+            <X className="w-4 h-4" />
+            <span>Cancel</span>
+        </Button>
+        <Button
+            onClick={onConfirm}
+            disabled={isLoading}>
+            <Check className="w-4 h-4" />
+            <span>{isLoading ? 'Saving...' : 'Confirm & Save'}</span> 
+        </Button>
+        </div>
     </div>
 );
 

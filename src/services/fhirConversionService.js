@@ -1,7 +1,6 @@
 export const convertToFHIR = async (documentText, documentType = 'medical_record') => {
   try {
     // Calls your Firebase Function instead of Anthropic directly
-    // Replace 'your-project-id' with your actual Firebase project ID
     const functionUrl = 'https://us-central1-belrose-757fe.cloudfunctions.net/convertToFHIR';
     
     const response = await fetch(functionUrl, {

@@ -25,7 +25,8 @@ const AddRecord = () => {
         reset: resetFileUpload,
         savedToFirestoreCount,
         savingCount,
-        deduplicationService
+        deduplicationService,
+        uploadFiles
     } = useFileUpload();
 
     // FHIR conversion hook
@@ -39,7 +40,7 @@ const AddRecord = () => {
         isAllFilesReviewed,
         getFHIRStats,
         reset: resetFHIR
-    } = useFHIRConversion(processedFiles, firestoreData, updateFirestoreRecord);
+    } = useFHIRConversion(processedFiles, firestoreData, updateFirestoreRecord, uploadFiles);
 
     // Export service
     const exportService = new ExportService();
@@ -77,6 +78,7 @@ const AddRecord = () => {
         const filename = `medical-records-export-${new Date().toISOString().split('T')[0]}.json`;
         exportService.downloadData(exportData, filename);
     };
+
 
     return (
         <div className="min-h-screen bg-gray-50 py-8">

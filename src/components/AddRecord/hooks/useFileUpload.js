@@ -63,11 +63,6 @@ export const useFileUpload = () => {
                 return [...prev, ...uniqueNewFiles];
             });
 
-            // Upload new files
-            if (newFiles.length > 0) {
-                await uploadFiles(newFiles);
-            }
-
         } catch (error) {
             console.error('Error processing files:', error);
         } finally {
@@ -78,7 +73,7 @@ export const useFileUpload = () => {
         }
     }, []);
 
-    const uploadFiles = async (filesToUpload) => {
+    const uploadFiles = useCallback(async (filesToUpload) => {
         const uploadPromises = filesToUpload.map(fileObj => uploadFile(fileObj));
         const results = await Promise.allSettled(uploadPromises);
         
@@ -89,7 +84,7 @@ export const useFileUpload = () => {
                 deduplicationService.current.releaseProcessingLock(fileObj.id, fileObj.fileHash);
             }
         });
-    };
+    }, [firestoreData]);
 
     const uploadFile = async (fileObj) => {
         const fileId = fileObj.id;
@@ -159,6 +154,7 @@ export const useFileUpload = () => {
         savingToFirestore,
         
         // Actions
+        uploadFiles,
         handleFilesProcessed,
         updateFirestoreRecord,
         reset,
