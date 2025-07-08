@@ -6,7 +6,7 @@ import { ExportService } from '@/components/AddRecord/services/exportService';
 // Import all components
 import { ProgressSteps } from '@/components/AddRecord/components/ProgressSteps';
 import { StatusBanner } from '@/components/AddRecord/components/StatusBanner';
-import { FileUploadSection } from '@/components/AddRecord/components/FileUploadSection';
+import CombinedUploadFHIR from '@/components/AddRecord/components/CombinedUploadFHIR';
 import { FHIRConversionSection } from '@/components/AddRecord/components/FHIRConversionSection';
 import DataReviewSection from '@/components/AddRecord/components/DataReviewSection';
 import { CompletionScreen } from '@/components/AddRecord/components/CompletionScreen';
@@ -111,14 +111,12 @@ const AddRecord = () => {
                 
                 {/* Upload and Conversion Steps */}
                 {(currentStep === 'upload' || currentStep === 'convert') && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                        <FileUploadSection 
+                    <div className="grid grid-cols-1 gap-8 mb-8">
+                        <CombinedUploadFHIR
+                            onFHIRResult={handleFHIRConverted}
                             onFilesProcessed={handleFilesProcessed}
-                        />
-
-                        <FHIRConversionSection
-                            processedFiles={processedFiles}
-                            onFHIRConverted={handleFHIRConverted}
+                            maxFiles={5}
+                            maxSizeBytes={10 * 1024 * 1024} // 10 MB
                         />
                     </div>
                 )}
