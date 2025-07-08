@@ -1,15 +1,14 @@
 // src/components/AddRecord/components/DataReviewSection.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, Edit3, FileText, Stethoscope, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { useNavigate } from 'react-router-dom';
 
 // Custom hooks
 import { useDataReview } from '../hooks/useDataReview';
 
-// Form components
-import DocumentInfoSection from './DocumentInfoSection';
-import ProviderInfoSection from './ProviderInfoSection';
-import ClinicalNotesSection from './ClinicalNotesSection';
+// Form component
+import UploadEditForms from './UploadEditForms';
 
 // UI components
 import { TabNavigation } from './TabNavigation';
@@ -25,9 +24,11 @@ export const DataReviewSection = ({
     fhirData = new Map(),
     onDataConfirmed,
     onDataRejected,
+    onResetAll,
     className = ''
 }) => {
     const [isLoading, setIsLoading] = useState(false);
+    const navigate = useNavigate();
     
     const {
         editingFile,
@@ -39,6 +40,16 @@ export const DataReviewSection = ({
         handleFieldChange,
         handleCancelEdit
     } = useDataReview(processedFiles, fhirData);
+
+    useEffect(() => {
+    if (reviewableFiles.length === 0) {
+        console.log('No files available for review, navigating back to AddRecord');
+        if(onResetAll) {
+            onResetAll();
+        }
+        navigate('/dashboard/addrecord', { replace: true });
+    }
+    }, [reviewableFiles.length, navigate, onResetAll]);
 
     const handleConfirmData = async (fileId) => {
         setIsLoading(true);
@@ -66,10 +77,6 @@ export const DataReviewSection = ({
     const createFieldChangeHandler = (fileId) => (fieldName, value) => {
         handleFieldChange(fileId, fieldName, value);
     };
-
-    if (reviewableFiles.length === 0) {
-        return <EmptyState className={className} />;
-    }
 
     return (
         <div className={`space-y-6 ${className}`}>
@@ -100,13 +107,6 @@ export const DataReviewSection = ({
 };
 
 // Supporting Components
-const EmptyState = ({ className }) => (
-    <div className={`p-6 text-center text-gray-500 border-2 border-dashed border-gray-200 rounded-lg ${className}`}>
-        <Eye className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-        <p>No files ready for review</p>
-        <p className="text-sm">Complete document upload and FHIR conversion first</p>
-    </div>
-);
 
 const SectionHeader = () => (
     <div className="p-4 border-b">
@@ -252,9 +252,7 @@ const FhirDataView = ({ fhirData }) => (
 
 const EditablePreview = ({ data, onChange, onConfirm, onReject, isLoading }) => (
     <div className="space-y-6">
-        <DocumentInfoSection data={data} onChange={onChange} />
-        <ProviderInfoSection data={data} onChange={onChange} />
-        <ClinicalNotesSection data={data} onChange={onChange} />
+        <UploadEditForms data={data} onChange={onChange} />
         <div className = "flex justify-end space-x-3">
         <Button
             variant="outline"

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { getFirestore, doc, setDoc } from 'firebase/firestore';
 import { useAuthContext } from '@/components/auth/AuthContext';
+import { toast } from 'sonner';
 
 const db = getFirestore();
 
@@ -202,15 +203,6 @@ export const useFHIRConversion = (processedFiles, firestoreData, updateFirestore
 const handleDataConfirmed = async (fileId, editedData) => {
     console.log('Data confirmed for file:', fileId, editedData);
 
-    // ADD THIS DEBUGGING SECTION HERE:
-    console.log('=== DEBUGGING UPLOAD ===');
-    console.log('uploadFiles type:', typeof uploadFiles);
-    console.log('uploadFiles function:', uploadFiles);
-    console.log('firestoreData:', firestoreData);
-    console.log('fileId:', fileId);
-    console.log('firestoreData.has(fileId):', firestoreData.has(fileId));
-    console.log('========================');
-
     // Mark as reviewed
     setReviewedData(prev => new Map([...prev, [fileId, editedData]]));
     
@@ -314,6 +306,11 @@ const handleDataConfirmed = async (fileId, editedData) => {
             const newMap = new Map(prev);
             newMap.delete(fileId);
             return newMap;
+        });
+
+        toast.info('Document processing cancelled', {
+            description: 'The document has been rejected and removed from processing.',
+            duration: 3000,
         });
     };
 

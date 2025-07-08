@@ -131,6 +131,7 @@ const AddRecord = () => {
                             fhirData={fhirData}
                             onDataConfirmed={handleDataConfirmed}
                             onDataRejected={handleDataRejected}
+                            onResetAll={resetProcess}
                         />
                     </div>
                 )}
