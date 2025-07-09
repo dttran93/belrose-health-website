@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowRight, Cloud, Zap, Eye, Database } from 'lucide-react';
-import { StepIndicator } from './StepIndicator';
+import { StepIndicator } from './ui/StepIndicator';
 
 export const ProgressSteps = ({ currentStep, processedFiles, fhirData, reviewedData = new Map() }) => {
     return (

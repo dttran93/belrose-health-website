@@ -1,6 +1,6 @@
 import React from 'react';
 import { FileText, Building, Stethoscope } from 'lucide-react';
-import { InputField, SelectField, TextAreaField } from './FormField';
+import { InputField, SelectField, TextAreaField } from './ui/FormField';
 
 const DOCUMENT_TYPE_OPTIONS = [
     { value: 'Medical Record', label: 'Medical Record' },
@@ -11,7 +11,7 @@ const DOCUMENT_TYPE_OPTIONS = [
     { value: 'Imaging Report', label: 'Imaging Report' }
 ];
 
-const DocumentInfoSection = ({ data, onChange }) => (
+const UploadEditForms = ({ data, onChange }) => (
     <div className="space-y-6">
         <div className="bg-chart-3/50 p-4 rounded-lg">
             <h4 className="font-medium text-gray-900 mb-3 flex items-center">
@@ -77,4 +77,4 @@ const DocumentInfoSection = ({ data, onChange }) => (
     </div>
 );
 
-export default DocumentInfoSection;
+export default UploadEditForms;

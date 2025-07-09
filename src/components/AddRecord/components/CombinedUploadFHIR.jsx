@@ -4,7 +4,7 @@ import * as pdfjsLib from 'pdfjs-dist/build/pdf';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import Tesseract from 'tesseract.js';
 import mammoth from 'mammoth';
-import { convertToFHIR } from '@/services/fhirConversionService';
+import { convertToFHIR } from '@/components/AddRecord/services/fhirConversionService';
 
 // Set up PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;

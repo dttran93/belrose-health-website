@@ -7,7 +7,6 @@ import { ExportService } from '@/components/AddRecord/services/exportService';
 import { ProgressSteps } from '@/components/AddRecord/components/ProgressSteps';
 import { StatusBanner } from '@/components/AddRecord/components/StatusBanner';
 import CombinedUploadFHIR from '@/components/AddRecord/components/CombinedUploadFHIR';
-import { FHIRConversionSection } from '@/components/AddRecord/components/FHIRConversionSection';
 import DataReviewSection from '@/components/AddRecord/components/DataReviewSection';
 import { CompletionScreen } from '@/components/AddRecord/components/CompletionScreen';
 import { StatsPanel } from '@/components/AddRecord/components/StatsPanel';

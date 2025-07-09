@@ -11,7 +11,7 @@ import { useDataReview } from '../hooks/useDataReview';
 import UploadEditForms from './UploadEditForms';
 
 // UI components
-import { TabNavigation } from './TabNavigation';
+import { TabNavigation } from './ui/TabNavigation';
 
 const TABS = [
     { id: 'extracted', label: 'Extracted Text' },
