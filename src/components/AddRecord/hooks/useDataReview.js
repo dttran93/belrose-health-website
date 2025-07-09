@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
 export const useDataReview = (processedFiles, fhirData) => {
     const [editingFile, setEditingFile] = useState(null);
@@ -13,6 +13,18 @@ export const useDataReview = (processedFiles, fhirData) => {
             fhirData.has(file.id)
         );
     }, [processedFiles, fhirData]);
+
+    //Auto-edit effect for single file
+    /* Only auto-edit if
+    1. There's exactly one reviewable file
+    2. No file is currently being edited
+    3. No data has been edited yet for this file */
+    useEffect(() => {
+        if (reviewableFiles.length === 1 && !editingFile && !editedData[reviewableFiles[0].id]){
+            const singleFile = reviewableFiles[0];
+            handleEditFile(singleFile);    
+        }
+    }, [reviewableFiles.length, editingFile, editedData]);
 
     // Extract editable fields from FHIR data
     const extractEditableFields = (fhirJsonData, originalFile) => {

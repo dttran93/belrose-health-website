@@ -1,4 +1,3 @@
-// src/components/AddRecord/components/DataReviewSection.jsx
 import React, { useState, useEffect } from 'react';
 import { Eye, Edit3, FileText, Stethoscope, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -78,10 +77,20 @@ export const DataReviewSection = ({
         handleFieldChange(fileId, fieldName, value);
     };
 
+    const isSingleFileMode = processedFiles.length === 1;
+    console.log('Debug isSingleFileMode:', {
+    processedFilesLength: processedFiles.length,
+    editingFile,
+    isSingleFileMode });
+
     return (
         <div className={`space-y-6 ${className}`}>
             <div className="bg-white rounded-lg shadow-sm border">
-                <SectionHeader />
+                <SectionHeader 
+                    isSingleFileMode={isSingleFileMode}
+                    fileName={isSingleFileMode ? reviewableFiles[0]?.name : null}
+                    onBackToList={isSingleFileMode ? handleCancelEdit : null}
+                />
                 
                 <div className="p-6">
                     {reviewableFiles.map((file) => (
@@ -98,6 +107,7 @@ export const DataReviewSection = ({
                             onConfirm={() => handleConfirmData(file.id)}
                             onReject={() => handleRejectData(file.id)}
                             isLoading={isLoading}
+                            isSingleFileMode={isSingleFileMode}
                         />
                     ))}
                 </div>
@@ -131,14 +141,17 @@ const FileReviewCard = ({
     onTabChange,
     onConfirm,
     onReject,
-    isLoading
+    isLoading,
+    isSingleFileMode = false
 }) => (
-    <div className="border rounded-lg p-4 mb-4">
+    <div className={isSingleFileMode ? "" : "border rounded-lg p-4 mb-4"}>
+        {(!isSingleFileMode) && (
         <FileHeader 
             file={file} 
             isEditing={isEditing} 
             onEditFile={() => onEditFile(file)} 
-        />
+        /> 
+        )}
         
         {isEditing ? (
             <EditingView
@@ -198,8 +211,8 @@ const EditingView = ({
         />
         
         <div className="mt-4">
-            {activeTab === 'extracted' && <ExtractedTextView file={file} />}
-            {activeTab === 'fhir' && <FhirDataView fhirData={fhirData} />}
+            {activeTab === 'extracted' && <ExtractedTextView file={file} onReject={onReject} isLoading={isLoading} />}
+            {activeTab === 'fhir' && <FhirDataView fhirData={fhirData} onReject={onReject} isLoading={isLoading} />}
             {activeTab === 'preview' && editedData && (
                 <EditablePreview 
                     data={editedData} 
@@ -222,8 +235,8 @@ const ReadOnlyView = ({ file, fhirData }) => (
     </div>
 );
 
-const ExtractedTextView = ({ file }) => (
-    <div className="bg-gray-50 p-4 rounded-lg">
+const ExtractedTextView = ({ file, onReject, isLoading }) => (
+    <div className="bg-supplement-4/30 p-4 rounded-lg space-y-6">
         <h4 className="font-medium text-gray-900 mb-2 flex items-center">
             <FileText className="w-4 h-4 mr-2" />
             Extracted Text
@@ -233,11 +246,20 @@ const ExtractedTextView = ({ file }) => (
                 {file.extractedText}
             </pre>
         </div>
+        <div className = "flex justify-end space-x-3">
+        <Button
+            variant="outline"
+            onClick={onReject}
+            disabled={isLoading}>
+            <X className="w-4 h-4" />
+            <span>Cancel</span>
+        </Button>
+        </div>
     </div>
 );
 
-const FhirDataView = ({ fhirData }) => (
-    <div className="bg-purple-50 p-4 rounded-lg">
+const FhirDataView = ({ fhirData, onReject, isLoading }) => (
+    <div className="bg-card p-4 rounded-lg space-y-6">
         <h4 className="font-medium text-gray-900 mb-2 flex items-center">
             <Stethoscope className="w-4 h-4 mr-2" />
             FHIR Data
@@ -246,6 +268,15 @@ const FhirDataView = ({ fhirData }) => (
             <pre className="whitespace-pre-wrap text-xs text-gray-700">
                 {JSON.stringify(fhirData, null, 2)}
             </pre>
+        </div>
+        <div className = "flex justify-end space-x-3">
+        <Button
+            variant="outline"
+            onClick={onReject}
+            disabled={isLoading}>
+            <X className="w-4 h-4" />
+            <span>Cancel</span>
+        </Button>
         </div>
     </div>
 );

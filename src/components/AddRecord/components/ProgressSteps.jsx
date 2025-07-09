@@ -8,8 +8,8 @@ export const ProgressSteps = ({ currentStep, processedFiles, fhirData, reviewedD
             <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
                 <StepIndicator
                     step="upload"
-                    title="Upload & Save"
-                    description="Upload documents and save to cloud storage"
+                    title="Upload & Extract"
+                    description="Upload documents and extract text"
                     icon={Cloud}
                     currentStep={currentStep}
                     processedFiles={processedFiles}
@@ -36,7 +36,6 @@ export const ProgressSteps = ({ currentStep, processedFiles, fhirData, reviewedD
                     <ArrowRight className="w-6 h-6 text-gray-400" />
                 </div>
                 
-                {/* NEW: Review Step */}
                 <StepIndicator
                     step="review"
                     title="Review & Edit"
