@@ -44,7 +44,7 @@ const AddRecord = () => {
     // Export service
     const exportService = new ExportService();
 
-    // Step management effect with new review step
+    // Step management effect
     useEffect(() => {
         if (processedFiles.length > 0 && currentStep === 'upload') {
             setCurrentStep('convert');
