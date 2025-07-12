@@ -46,19 +46,19 @@ const UploadEditForms = ({ data, onChange }) => (
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <InputField
-                        label="Provider/Doctor"
+                        label="Provider Name"
                         value={data.provider}
                         onChange={(value) => onChange('provider', value)}
                     />
                     <InputField
-                        label="Institution/Hospital"
+                        label="Medical Institution"
                         value={data.institution}
                         onChange={(value) => onChange('institution', value)}
                     />
                      <InputField
-                        label="Institution/Hospital Address"
-                        value={data.institutionAddress}
-                        onChange={(value) => onChange('institution', value)}
+                        label="Provider Address"
+                        value={data.providerAddress}
+                        onChange={(value) => onChange('providerAddress', value)}
                     />
                 </div>
             </div>

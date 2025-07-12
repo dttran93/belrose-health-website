@@ -21,6 +21,7 @@ const TABS = [
 export const DataReviewSection = ({
     processedFiles = [],
     fhirData = new Map(),
+    originalUploadCount = 0,
     onDataConfirmed,
     onDataRejected,
     onResetAll,
@@ -38,7 +39,7 @@ export const DataReviewSection = ({
         handleEditFile,
         handleFieldChange,
         handleCancelEdit
-    } = useDataReview(processedFiles, fhirData);
+    } = useDataReview(processedFiles, fhirData, originalUploadCount);
 
     useEffect(() => {
     if (reviewableFiles.length === 0) {
@@ -77,8 +78,9 @@ export const DataReviewSection = ({
         handleFieldChange(fileId, fieldName, value);
     };
 
-    const isSingleFileMode = processedFiles.length === 1;
+    const isSingleFileMode = originalUploadCount === 1;
     console.log('Debug isSingleFileMode:', {
+    originalUploadCount,
     processedFilesLength: processedFiles.length,
     editingFile,
     isSingleFileMode });

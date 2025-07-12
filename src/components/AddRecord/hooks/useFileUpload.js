@@ -7,6 +7,7 @@ export const useFileUpload = () => {
     const [processedFiles, setProcessedFiles] = useState([]);
     const [firestoreData, setFirestoreData] = useState(new Map());
     const [savingToFirestore, setSavingToFirestore] = useState(new Set());
+    const [originalUploadCount, setOriginalUploadCount] = useState(0);
     
     const deduplicationService = useRef(new DeduplicationService());
     const fileUploadService = useRef(new FileUploadService());
@@ -23,6 +24,12 @@ export const useFileUpload = () => {
         
         if (alreadyProcessing) {
             return;
+        }
+
+        // TRACK ORIGINAL UPLOAD COUNT: If this is the first batch of files, set the original count
+        if (processedFiles.length === 0) {
+            console.log('Setting original upload count:', incomingFiles.length);
+            setOriginalUploadCount(incomingFiles.length);
         }
 
         // Mark files as processing
@@ -71,7 +78,7 @@ export const useFileUpload = () => {
                 fileSignatures.forEach(sig => processingFiles.current.delete(sig));
             }, 1000);
         }
-    }, []);
+    }, [processedFiles.length, firestoreData]);
 
     const uploadFiles = useCallback(async (filesToUpload) => {
         const uploadPromises = filesToUpload.map(fileObj => uploadFile(fileObj));
@@ -143,6 +150,7 @@ export const useFileUpload = () => {
         setProcessedFiles([]);
         setFirestoreData(new Map());
         setSavingToFirestore(new Set());
+        setOriginalUploadCount(0); // FIXED: Reset originalUploadCount
         processingFiles.current.clear();
         deduplicationService.current.clear();
     };
@@ -152,6 +160,7 @@ export const useFileUpload = () => {
         processedFiles,
         firestoreData,
         savingToFirestore,
+        originalUploadCount,
         
         // Actions
         uploadFiles,

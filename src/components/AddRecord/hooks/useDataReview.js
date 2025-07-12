@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 
-export const useDataReview = (processedFiles, fhirData) => {
+export const useDataReview = (processedFiles, fhirData, originalUploadCount = 0) => {
     const [editingFile, setEditingFile] = useState(null);
     const [editedData, setEditedData] = useState({});
     const [activeTab, setActiveTab] = useState('extracted');
@@ -126,7 +126,7 @@ export const useDataReview = (processedFiles, fhirData) => {
             baseFields.originalFhirData = fhirJsonData;
         }
 
-        return baseFields; // FIXED: Added missing return statement
+        return baseFields; 
     };
 
     //Auto-edit effect for single file
@@ -135,11 +135,23 @@ export const useDataReview = (processedFiles, fhirData) => {
     2. No file is currently being edited
     3. No data has been edited yet for this file */
     useEffect(() => {
-        if (reviewableFiles.length === 1 && !editingFile && !editedData[reviewableFiles[0].id]){
+        console.log('Auto-edit effect check:', {
+            originalUploadCount,
+            reviewableFilesLength: reviewableFiles.length,
+            editingFile,
+            hasEditedData: reviewableFiles.length > 0 ? !!editedData[reviewableFiles[0]?.id] : false
+        });
+
+        if (originalUploadCount === 1 && 
+            reviewableFiles.length === 1 && 
+            !editingFile && 
+            !editedData[reviewableFiles[0].id]) {
+            
+            console.log('Auto-editing single file:', reviewableFiles[0].name);
             const singleFile = reviewableFiles[0];
             handleEditFile(singleFile);    
         }
-    }, [reviewableFiles.length, editingFile, editedData]); // FIXED: Added missing dependency
+    }, [originalUploadCount, reviewableFiles.length, editingFile, editedData]);
 
     const handleEditFile = (file) => {
         const fhirJsonData = fhirData.get(file.id);

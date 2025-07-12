@@ -25,7 +25,8 @@ const AddRecord = () => {
         savedToFirestoreCount,
         savingCount,
         deduplicationService,
-        uploadFiles
+        uploadFiles,
+        originalUploadCount
     } = useFileUpload();
 
     // FHIR conversion hook
@@ -40,6 +41,8 @@ const AddRecord = () => {
         getFHIRStats,
         reset: resetFHIR
     } = useFHIRConversion(processedFiles, firestoreData, updateFirestoreRecord, uploadFiles);
+
+    console.log('DataReviewSection received originalUploadCount:', originalUploadCount, typeof originalUploadCount);
 
     // Export service
     const exportService = new ExportService();
@@ -126,6 +129,7 @@ const AddRecord = () => {
                         <DataReviewSection
                             processedFiles={processedFiles}
                             fhirData={fhirData}
+                            originalUploadCount={originalUploadCount}
                             onDataConfirmed={handleDataConfirmed}
                             onDataRejected={handleDataRejected}
                             onResetAll={resetProcess}
