@@ -10,7 +10,6 @@ import Layout from "./components/app/Layout.jsx";
 import Dashboard from "./pages/Dashboard";
 import Activity from "./pages/Activity";
 import ProtectedRoute from "./components/auth/ProtectedRoute.jsx";
-import HealthDataTest from "./components/HealthDataTest";
 import AddRecord from "./pages/AddRecord.jsx";
 import './App.css'
 import { AuthProvider } from "./components/auth/AuthContext.jsx";
@@ -38,7 +37,6 @@ const App = () => {
                   <Route index element= {<Dashboard />}/>
                     <Route path="activity" element={<Activity />}/>
                     <Route path="addrecord" element={<AddRecord />}/>
-                    <Route path="test" element={<HealthDataTest />}/>
                 </Routes>
               </Layout>
               </ProtectedRoute>
