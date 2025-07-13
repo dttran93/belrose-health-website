@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, FileText, Stethoscope, Check, X, AlertCircle } from 'lucide-react';
+import { FileText, Check, X, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 // Custom hooks
@@ -215,7 +215,6 @@ const DataReviewSection = ({
                                         )}
                                     </div>
                                     
-                                    {/* NEW: Use DynamicFHIRForm instead of UploadEditForms */}
                                     <DynamicFHIRForm
                                         fhirData={currentFhirData.get(file.id) || fhirData.get(file.id)}
                                         originalFile={file}

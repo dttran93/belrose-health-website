@@ -4,7 +4,7 @@ export const healthRecords = [
   { title: "Overview", url: "/dashboard", icon: Activity },
   { title: "Activity", url: "/dashboard/activity", icon: Clipboard },
   { title: "Add Record", url: "/dashboard/addrecord", icon: FilePlus2 },
-  { title: "Testing", url: "/dashboard/test", icon: BookOpenCheck },
+  { title: "Testing", url: "/dashboard/fhirtesting", icon: BookOpenCheck },
 ];
 
 export const healthCategories = [

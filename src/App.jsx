@@ -13,6 +13,7 @@ import ProtectedRoute from "./components/auth/ProtectedRoute.jsx";
 import AddRecord from "./pages/AddRecord.jsx";
 import './App.css'
 import { AuthProvider } from "./components/auth/AuthContext.jsx";
+import MockFHIRFormTester from "./pages/MockFHIRFormTester.jsx";
 
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ const App = () => {
                   <Route index element= {<Dashboard />}/>
                     <Route path="activity" element={<Activity />}/>
                     <Route path="addrecord" element={<AddRecord />}/>
+                    <Route path="fhirtesting" element={<MockFHIRFormTester />} />
                 </Routes>
               </Layout>
               </ProtectedRoute>
