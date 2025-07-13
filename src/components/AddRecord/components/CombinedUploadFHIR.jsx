@@ -85,11 +85,6 @@ function CombinedUploadFHIR({
                             {/* Summary Statistics */}
                             <div className="text-sm text-gray-500 text-center bg-gray-50 p-3 rounded mt-4">
                                 {stats.processedFiles} of {stats.totalFiles} files successfully converted to FHIR
-                                {stats.totalFiles - stats.processedFiles - stats.medicalFiles > 0 && (
-                                    <span className="ml-2 text-yellow-600">
-                                        ({stats.totalFiles - stats.processedFiles - stats.medicalFiles} detected as non-medical)
-                                    </span>
-                                )}
                                 {stats.processingFiles > 0 && (
                                     <span className="ml-2 text-blue-600">
                                         ({stats.processingFiles} processing)

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, Edit3, FileText, Stethoscope, Check, X } from 'lucide-react';
+import { Eye, FileText, Stethoscope, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 // Custom hooks

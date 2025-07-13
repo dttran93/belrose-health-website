@@ -23,12 +23,20 @@ function useFileUpload() {
     const fileUploadService = useRef(new FileUploadService());
     const processingFiles = useRef(new Set());
     
-    // FHIR conversion callback ref
+    // Callback refs
     const onFHIRConvertedRef = useRef(null);
+    const onResetProcessRef = useRef(null);
 
-    // Method to set the FHIR conversion callback
+    //AbortController
+    const activeOperations = useRef(new Map());
+
+    // Methods to set the callbacks
     const setFHIRConversionCallback = useCallback((callback) => {
         onFHIRConvertedRef.current = callback;
+    }, []);
+
+    const setResetProcessCallback = useCallback((callback) => {
+        onResetProcessRef.current = callback;
     }, []);
 
     // ==================== FILE UPLOAD & VALIDATION ====================
@@ -112,9 +120,20 @@ function useFileUpload() {
 
             processingFiles.current.add(fileSignature);
 
+            // Create abort controller for processing operation
+            const abortController = new AbortController();
+            activeOperations.current.set(fileId, abortController);
+
             // Start the async processing
             (async () => {
                 try {
+                    
+                    // Check if cancelled beore each major step
+                       if (abortController.signal.aborted) {
+                        console.log('🚫 Processing cancelled for:', fileItem.name);
+                        return;
+                    }
+
                     // Update status to processing
                     updateFileStatus(fileId, 'processing');
 
@@ -125,6 +144,12 @@ function useFileUpload() {
                         compressionThreshold: 2 * 1024 * 1024 // 2MB
                     });
 
+                    // Check if cancelled after processing
+                    if (abortController.signal.aborted) {
+                        console.log('🚫 Processing cancelled after document processing:', fileItem.name);
+                        return;
+                    }
+
                     if (!processingResult.success) {
                         throw new Error(processingResult.error);
                     }
@@ -134,6 +159,12 @@ function useFileUpload() {
 
                     console.log('✅ File processing completed:', fileItem.name);
 
+                    //Check if cancelled beforeFHIR conversion
+                    if (abortController.signal.aborted) {
+                    console.log('🚫 FHIR conversion cancelled for:', fileItem.name);
+                    return;
+                }
+
                     // Auto-convert to FHIR if medical content detected
                     if (processingResult.medicalDetection?.isMedical && 
                         processingResult.medicalDetection?.confidence >= 0.3) {
@@ -142,15 +173,19 @@ function useFileUpload() {
                         await convertToFHIR(
                             fileId, 
                             processingResult.extractedText, 
-                            processingResult.medicalDetection.documentType
+                            processingResult.medicalDetection.documentType,
+                            abortController.signal
                         );
                     }
 
                 } catch (error) {
-                    console.error('❌ Error processing file:', error);
-                    handleProcessingError(fileId, error);
+                    if(!abortController.signal.aborted) {
+                        console.error('❌ Error processing file:', error);
+                        handleProcessingError(fileId, error);
+                    }
                 } finally {
                     processingFiles.current.delete(fileSignature);
+                    activeOperations.current.delete(fileId);
                 }
             })();
 
@@ -220,13 +255,25 @@ function useFileUpload() {
     /**
      * Convert file to FHIR
      */
-    const convertToFHIR = useCallback(async (fileId, extractedText, documentType) => {
+    const convertToFHIR = useCallback(async (fileId, extractedText, documentType, abortSignal) => {
+        //Check if cancelled before starting
+         if (abortSignal?.aborted) {
+            console.log('🚫 FHIR conversion cancelled before starting for:', fileId);
+            return;
+        }
+
         updateFileStatus(fileId, 'converting');
 
         try {
             // Import here to avoid circular dependencies
             const { convertToFHIR: fhirConverter } = await import('@/components/AddRecord/services/fhirConversionService');
             const fhirData = await fhirConverter(extractedText, documentType || 'medical_record');
+
+            //Check if cancelled after completing
+            if (abortSignal?.aborted) {
+                console.log('🚫 FHIR conversion cancelled after processing for:', fileId);
+                return;
+            }
             
             // Update file status to completed
             updateFileStatus(fileId, 'completed');
@@ -236,14 +283,16 @@ function useFileUpload() {
             console.log('🎯 FHIR conversion completed for file:', fileId);
             
             // We'll add a callback prop for this
-            if (onFHIRConvertedRef.current) {
+            if (onFHIRConvertedRef.current && !abortSignal?.aborted) {
                 onFHIRConvertedRef.current(fileId, fhirData);
             }
 
         } catch (fhirError) {
+            if (!abortSignal?.aborted) { 
             console.error('❌ FHIR conversion failed:', fhirError);
             updateFileStatus(fileId, 'fhir_error', { error: fhirError.message });
             toast.error(`FHIR conversion failed: ${fhirError.message}`);
+            }
         }
     }, [updateFileStatus]);
 
@@ -254,6 +303,14 @@ function useFileUpload() {
      */
     const removeFile = useCallback((fileId) => {
         console.log('🗑️ Removing file:', fileId);
+
+        const abortController = activeOperations.current.get(fileId);
+        if (abortController) {
+            console.log('🛑 Aborting active operation for file:', fileId);
+            abortController.abort();
+            activeOperations.current.delete(fileId);
+        }
+
         setFiles(prev => prev.filter(f => f.id !== fileId));
         
         // Clean up related data
@@ -275,6 +332,13 @@ function useFileUpload() {
             const fileSignature = `${fileItem.name}-${fileItem.size}-${fileItem.file?.lastModified}`;
             processingFiles.current.delete(fileSignature);
         }
+
+        // If this was the last file, do a full reset
+        const remainingFiles = files.filter(f => f.id !== fileId);
+        if (remainingFiles.length === 0 && onResetProcessRef.current) {
+            console.log('🔄 Last file removed, triggering full reset');
+            onResetProcessRef.current();
+        }
     }, [files]);
 
     /**
@@ -293,6 +357,13 @@ function useFileUpload() {
      */
     const clearAll = useCallback(() => {
         console.log('🧹 Clearing all files');
+
+        activeOperations.current.forEach((abortController, fileId) => {
+            console.log('🚫 Cancelling operation for file:', fileId);
+            abortController.abort();
+        });
+        activeOperations.current.clear();
+
         setFiles([]);
         setFirestoreData(new Map());
         setSavingToFirestore(new Set());
@@ -440,6 +511,7 @@ function useFileUpload() {
         
         // FHIR integration
         setFHIRConversionCallback,
+        setResetProcessCallback,
         
         // Status updates
         updateFileStatus,

@@ -32,6 +32,7 @@ const AddRecord = () => {
         savingCount,
         deduplicationService,
         setFHIRConversionCallback,
+        setResetProcessCallback,
         reset: resetFileUpload
     } = useFileUpload();
 
@@ -48,10 +49,18 @@ const AddRecord = () => {
         reset: resetFHIR
     } = useFHIRConversion(processedFiles, firestoreData, updateFirestoreRecord, uploadFiles);
 
+    // Reset everything
+    const resetProcess = () => {
+        resetFileUpload();
+        resetFHIR();
+        setCurrentStep('upload');
+    };
+
     // Connect the FHIR conversion callback
     useEffect(() => {
         setFHIRConversionCallback(handleFHIRConverted);
-    }, [setFHIRConversionCallback, handleFHIRConverted]);
+        setResetProcessCallback(resetProcess);
+    }, [setFHIRConversionCallback, setResetProcessCallback, handleFHIRConverted, resetProcess]);
 
     console.log('📊 AddRecord state:', {
         currentStep,
@@ -83,13 +92,6 @@ const AddRecord = () => {
             setCurrentStep('complete'); 
         }
     }, [processedFiles.length, isAllFilesConverted(), isAllFilesReviewed(), currentStep]);
-
-    // Reset everything
-    const resetProcess = () => {
-        resetFileUpload();
-        resetFHIR();
-        setCurrentStep('upload');
-    };
 
     // Download all data
     const downloadAllData = () => {
