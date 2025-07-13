@@ -129,30 +129,6 @@ export const useDataReview = (processedFiles, fhirData, originalUploadCount = 0)
         return baseFields; 
     };
 
-    //Auto-edit effect for single file
-    /* Only auto-edit if
-    1. There's exactly one reviewable file
-    2. No file is currently being edited
-    3. No data has been edited yet for this file */
-    useEffect(() => {
-        console.log('Auto-edit effect check:', {
-            originalUploadCount,
-            reviewableFilesLength: reviewableFiles.length,
-            editingFile,
-            hasEditedData: reviewableFiles.length > 0 ? !!editedData[reviewableFiles[0]?.id] : false
-        });
-
-        if (originalUploadCount === 1 && 
-            reviewableFiles.length === 1 && 
-            !editingFile && 
-            !editedData[reviewableFiles[0].id]) {
-            
-            console.log('Auto-editing single file:', reviewableFiles[0].name);
-            const singleFile = reviewableFiles[0];
-            handleEditFile(singleFile);    
-        }
-    }, [originalUploadCount, reviewableFiles.length, editingFile, editedData]);
-
     const handleEditFile = (file) => {
         const fhirJsonData = fhirData.get(file.id);
         const fields = extractEditableFields(fhirJsonData, file);

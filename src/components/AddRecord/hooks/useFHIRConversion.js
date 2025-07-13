@@ -5,8 +5,8 @@ import { toast } from 'sonner';
 
 const db = getFirestore();
 
-export const useFHIRConversion = (processedFiles, firestoreData, updateFirestoreRecord, uploadFiles) => {
-    
+export const useFHIRConversion = (processedFiles, firestoreData, updateFirestoreRecord, uploadFiles, removeProcessedFile) => {
+
     const [fhirData, setFhirData] = useState(new Map());
     const [reviewedData, setReviewedData] = useState(new Map()); // NEW: Track reviewed files
     const { user } = useAuthContext();
@@ -200,7 +200,7 @@ export const useFHIRConversion = (processedFiles, firestoreData, updateFirestore
     };
 
     // NEW: Handle user-confirmed data from DataReviewSection
-const handleDataConfirmed = async (fileId, editedData) => {
+    const handleDataConfirmed = async (fileId, editedData) => {
     console.log('Data confirmed for file:', fileId, editedData);
 
     // Mark as reviewed
@@ -215,7 +215,18 @@ const handleDataConfirmed = async (fileId, editedData) => {
 
     console.log('originalFile found:', originalFile);
 
-    // REPLACE THIS ENTIRE UPLOAD SECTION:
+     // 🔍 ADD THIS DEBUG LOG:
+    console.log('🔍 originalFile structure:', {
+        id: originalFile.id,
+        name: originalFile.name,
+        hasFileProperty: !!originalFile.file,
+        filePropertyStructure: originalFile.file ? {
+            name: originalFile.file.name,
+            size: originalFile.file.size,
+            type: originalFile.file.type
+        } : 'No file property'
+    });
+
     // Upload the file if uploadFiles function is available
     if (uploadFiles) {
         console.log('✅ uploadFiles exists - attempting upload');
@@ -301,12 +312,17 @@ const handleDataConfirmed = async (fileId, editedData) => {
     //Handle user rejection of data
     const handleDataRejected = (fileId) => {
         console.log('Data rejected for file:', fileId);
+        console.log('🔍 removeProcessedFile function exists:', !!removeProcessedFile);
         // Remove from FHIR data map
         setFhirData(prev => {
             const newMap = new Map(prev);
             newMap.delete(fileId);
             return newMap;
         });
+
+        if (removeProcessedFile) {
+            removeProcessedFile(fileId);
+        }
 
         toast.info('Document processing cancelled', {
             description: 'The document has been rejected and removed from processing.',
@@ -315,9 +331,26 @@ const handleDataConfirmed = async (fileId, editedData) => {
     };
 
     // Check if all files are converted AND reviewed
-    const isAllFilesConverted = () => {
-        const completedFiles = processedFiles.filter(f => f.status === 'completed' && f.extractedText);
-        return completedFiles.length > 0 && completedFiles.every(f => fhirData.has(f.id));
+    const isAllFilesConverted = () => {     
+        // Get files that are ready for FHIR conversion (have extracted text)
+        const eligibleFiles = processedFiles.filter(f => {
+            // Include files that have extracted text and are in a processed state
+            const hasExtractedText = !!f.extractedText;
+            const isProcessed = ['completed', 'medical_detected', 'non_medical_detected'].includes(f.status);
+            
+            console.log(`📄 File ${f.name}: status=${f.status}, hasText=${hasExtractedText}, isProcessed=${isProcessed}`);
+            
+            return hasExtractedText && isProcessed;
+        });
+        
+        // Check if we have eligible files and all have FHIR data
+        const result = eligibleFiles.length > 0 && eligibleFiles.every(f => {
+            const hasFhir = fhirData.has(f.id);
+            console.log(`📋 File ${f.name} has FHIR: ${hasFhir}`);
+            return hasFhir;
+        });
+        
+        return result;
     };
 
     //Check if all files are reviewed and ready for completion

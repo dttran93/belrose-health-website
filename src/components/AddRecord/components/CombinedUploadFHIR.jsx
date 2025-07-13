@@ -1,43 +1,25 @@
-// components/CombinedUploadFHIR.jsx
 import { FileText } from 'lucide-react';
 import FileUploadZone from './ui/FileUploadZone';
 import { FileListItem } from './ui/FileListItem';
-import { useFileUploadManager } from '@/components/AddRecord/hooks/useFileUploadManager';
 
-/**
- * Streamlined Document Upload & FHIR Conversion Component
- * 
- * This component is now focused purely on orchestration and layout,
- * with all complex logic extracted into services and hooks.
- */
 function CombinedUploadFHIR({
-    onFHIRResult,
-    onFilesProcessed,
+    // File management props (passed from parent)
+    files,
+    addFiles,
+    removeFile,
+    retryFile,
+    getStats,
+    
+    // Configuration props
     acceptedTypes = ['.pdf', '.docx', '.doc', '.txt', '.jpg', '.jpeg', '.png'],
     maxFiles = 5,
     maxSizeBytes = 10 * 1024 * 1024, // 10MB
     className = ''
 }) {
-    // Use our custom hook for all file management
-    const {
-        files,
-        fhirResults,
-        addFiles,
-        removeFile,
-        retryFile,
-        forceConvertFile,
-        getStats
-    } = useFileUploadManager({
-        maxFiles,
-        maxSizeBytes,
-        onFilesProcessed,
-        onFHIRResult
-    });
-
     // Handle file selection with error handling
     const handleFilesSelected = (fileList) => {
         try {
-            addFiles(fileList);
+            addFiles(fileList, { maxFiles, maxSizeBytes });
         } catch (error) {
             alert(error.message);
         }
@@ -79,10 +61,8 @@ function CombinedUploadFHIR({
                                 <FileListItem
                                     key={fileItem.id}
                                     fileItem={fileItem}
-                                    fhirResult={fhirResults.get(fileItem.id)}
                                     onRemove={removeFile}
                                     onRetry={retryFile}
-                                    onForceConvert={forceConvertFile}
                                     showFHIRResults={true}
                                 />
                             ))}
@@ -104,20 +84,20 @@ function CombinedUploadFHIR({
 
                             {/* Summary Statistics */}
                             <div className="text-sm text-gray-500 text-center bg-gray-50 p-3 rounded mt-4">
-                                {stats.completed} of {stats.total} files successfully converted to FHIR
-                                {stats.nonMedical > 0 && (
+                                {stats.processedFiles} of {stats.totalFiles} files successfully converted to FHIR
+                                {stats.totalFiles - stats.processedFiles - stats.medicalFiles > 0 && (
                                     <span className="ml-2 text-yellow-600">
-                                        ({stats.nonMedical} detected as non-medical)
+                                        ({stats.totalFiles - stats.processedFiles - stats.medicalFiles} detected as non-medical)
                                     </span>
                                 )}
-                                {stats.processing > 0 && (
+                                {stats.processingFiles > 0 && (
                                     <span className="ml-2 text-blue-600">
-                                        ({stats.processing} processing)
+                                        ({stats.processingFiles} processing)
                                     </span>
                                 )}
-                                {stats.errors > 0 && (
+                                {stats.errorFiles > 0 && (
                                     <span className="ml-2 text-red-600">
-                                        ({stats.errors} errors)
+                                        ({stats.errorFiles} errors)
                                     </span>
                                 )}
                             </div>

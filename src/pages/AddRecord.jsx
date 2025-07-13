@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useFileUpload } from '@/components/AddRecord/hooks/useFileUpload';
+import useFileUpload from '@/components/AddRecord/hooks/useFileUpload';
 import { useFHIRConversion } from '@/components/AddRecord/hooks/useFHIRConversion';
 import { ExportService } from '@/components/AddRecord/services/exportService';
 
@@ -14,22 +14,28 @@ import { StatsPanel } from '@/components/AddRecord/components/StatsPanel';
 const AddRecord = () => {
     const [currentStep, setCurrentStep] = useState('upload'); // 'upload' -> 'convert' -> 'review' -> 'complete'
     
-    // File upload hook
+    // CONSOLIDATED FILE MANAGEMENT: Single source of truth for all file operations
     const {
+        files,
         processedFiles,
         firestoreData,
         savingToFirestore,
-        handleFilesProcessed,
+        addFiles,
+        removeFile,
+        retryFile,
+        clearAll,
+        processFile,
+        uploadFiles,
         updateFirestoreRecord,
-        reset: resetFileUpload,
+        getStats,
         savedToFirestoreCount,
         savingCount,
         deduplicationService,
-        uploadFiles,
-        originalUploadCount
+        setFHIRConversionCallback,
+        reset: resetFileUpload
     } = useFileUpload();
 
-    // FHIR conversion hook
+    // FHIR conversion hook (now receives processedFiles from the consolidated manager)
     const {
         fhirData,
         reviewedData, 
@@ -42,13 +48,31 @@ const AddRecord = () => {
         reset: resetFHIR
     } = useFHIRConversion(processedFiles, firestoreData, updateFirestoreRecord, uploadFiles);
 
-    console.log('DataReviewSection received originalUploadCount:', originalUploadCount, typeof originalUploadCount);
+    // Connect the FHIR conversion callback
+    useEffect(() => {
+        setFHIRConversionCallback(handleFHIRConverted);
+    }, [setFHIRConversionCallback, handleFHIRConverted]);
+
+    console.log('📊 AddRecord state:', {
+        currentStep,
+        filesCount: files.length,
+        processedFilesCount: processedFiles.length,
+        fhirDataSize: fhirData.size,
+        reviewedDataSize: reviewedData.size
+    });
 
     // Export service
     const exportService = new ExportService();
 
     // Step management effect
     useEffect(() => {
+        console.log('🔄 Step management useEffect triggered:', {
+            currentStep,
+            processedFilesLength: processedFiles.length,
+            isAllFilesConverted: isAllFilesConverted(),
+            isAllFilesReviewed: isAllFilesReviewed()
+        });
+
         if (processedFiles.length > 0 && currentStep === 'upload') {
             setCurrentStep('convert');
         }
@@ -80,7 +104,6 @@ const AddRecord = () => {
         const filename = `medical-records-export-${new Date().toISOString().split('T')[0]}.json`;
         exportService.downloadData(exportData, filename);
     };
-
 
     return (
         <div className="min-h-screen bg-gray-50 py-8">
@@ -115,8 +138,14 @@ const AddRecord = () => {
                 {(currentStep === 'upload' || currentStep === 'convert') && (
                     <div className="grid grid-cols-1 gap-8 mb-8">
                         <CombinedUploadFHIR
-                            onFHIRResult={handleFHIRConverted}
-                            onFilesProcessed={handleFilesProcessed}
+                            // Pass file management functions directly
+                            files={files}
+                            addFiles={addFiles}
+                            removeFile={removeFile}
+                            retryFile={retryFile}
+                            getStats={getStats}
+                            
+                            // Configuration
                             maxFiles={5}
                             maxSizeBytes={10 * 1024 * 1024} // 10 MB
                         />
@@ -129,7 +158,6 @@ const AddRecord = () => {
                         <DataReviewSection
                             processedFiles={processedFiles}
                             fhirData={fhirData}
-                            originalUploadCount={originalUploadCount}
                             onDataConfirmed={handleDataConfirmed}
                             onDataRejected={handleDataRejected}
                             onResetAll={resetProcess}

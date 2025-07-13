@@ -2,85 +2,317 @@ import { useState, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { DeduplicationService } from '../services/deduplicationService';
 import { FileUploadService } from '@/components/AddRecord/services/fileUploadService';
+import DocumentProcessorService from '@/components/AddRecord/services/documentProcessorService';
 
-export const useFileUpload = () => {
-    const [processedFiles, setProcessedFiles] = useState([]);
+/**
+ * Consolidated file management hook that handles:
+ * - File upload and validation
+ * - File processing (text extraction, medical detection)
+ * - FHIR conversion coordination
+ * - Firestore upload
+ * - State management for the entire file lifecycle
+ */
+function useFileUpload() {
+    // Core file state
+    const [files, setFiles] = useState([]);
     const [firestoreData, setFirestoreData] = useState(new Map());
     const [savingToFirestore, setSavingToFirestore] = useState(new Set());
-    const [originalUploadCount, setOriginalUploadCount] = useState(0);
     
+    // Services
     const deduplicationService = useRef(new DeduplicationService());
     const fileUploadService = useRef(new FileUploadService());
     const processingFiles = useRef(new Set());
+    
+    // FHIR conversion callback ref
+    const onFHIRConvertedRef = useRef(null);
 
-    const handleFilesProcessed = useCallback(async (incomingFiles) => {
-        if (!incomingFiles || incomingFiles.length === 0) {
-            return;
-        }
+    // Method to set the FHIR conversion callback
+    const setFHIRConversionCallback = useCallback((callback) => {
+        onFHIRConvertedRef.current = callback;
+    }, []);
 
-        // GUARD: Check if these exact files are already being processed
-        const fileSignatures = incomingFiles.map(f => `${f.name}-${f.size}-${f.lastModified}`);
-        const alreadyProcessing = fileSignatures.some(sig => processingFiles.current.has(sig));
+    // ==================== FILE UPLOAD & VALIDATION ====================
+
+    /**
+     * Add new files with validation and auto-processing
+     */
+    const addFiles = useCallback((fileList, options = {}) => {
+        const {
+            maxFiles = 5,
+            maxSizeBytes = 10 * 1024 * 1024,
+            autoProcess = true
+        } = options;
+
+        const selectedFiles = Array.from(fileList);
         
-        if (alreadyProcessing) {
-            return;
+        if (files.length + selectedFiles.length > maxFiles) {
+            throw new Error(`Maximum ${maxFiles} files allowed`);
         }
 
-        // TRACK ORIGINAL UPLOAD COUNT: If this is the first batch of files, set the original count
-        if (processedFiles.length === 0) {
-            console.log('Setting original upload count:', incomingFiles.length);
-            setOriginalUploadCount(incomingFiles.length);
+        const newFiles = selectedFiles.map(file => {
+            const validation = DocumentProcessorService.validateFile(file);
+            return {
+                id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                file,
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                status: validation.valid ? 'ready' : 'error',
+                error: validation.valid ? null : validation.error,
+                addedAt: new Date().toISOString(),
+                // Additional properties for compatibility
+                extractedText: '',
+                wordCount: 0,
+                medicalDetection: null,
+                processingMethod: null,
+                processingTime: null,
+                extractedAt: null
+            };
+        });
+
+        setFiles(prev => [...prev, ...newFiles]);
+        
+        // Auto-process valid files
+        if (autoProcess) {
+            setTimeout(() => {
+                newFiles.forEach(fileItem => {
+                    if (fileItem.status === 'ready') {
+                        processFile(fileItem.id);
+                    }
+                });
+            }, 0);
         }
 
-        // Mark files as processing
-        fileSignatures.forEach(sig => processingFiles.current.add(sig));
+        console.log('🚀 Added files:', newFiles.map(f => ({ id: f.id, name: f.name })));
+        return newFiles;
+    }, [files.length]);
+
+    // ==================== FILE PROCESSING ====================
+
+    /**
+     * Process a single file (extract text, detect medical content)
+     */
+    const processFile = useCallback(async (fileId) => {
+        // Get the current file from state at the time of processing
+        setFiles(currentFiles => {
+            const fileItem = currentFiles.find(f => f.id === fileId);
+            if (!fileItem) {
+                console.error('❌ File not found for processing:', fileId);
+                return currentFiles;
+            }
+
+            console.log('🔄 Processing file:', fileItem.name);
+            
+            // GUARD: Check if already processing
+            const fileSignature = `${fileItem.name}-${fileItem.size}-${fileItem.file?.lastModified}`;
+            if (processingFiles.current.has(fileSignature)) {
+                console.log('⚠️ File already being processed:', fileItem.name);
+                return currentFiles;
+            }
+
+            processingFiles.current.add(fileSignature);
+
+            // Start the async processing
+            (async () => {
+                try {
+                    // Update status to processing
+                    updateFileStatus(fileId, 'processing');
+
+                    // Use DocumentProcessorService for processing
+                    const processingResult = await DocumentProcessorService.processDocument(fileItem.file, {
+                        enableMedicalDetection: true,
+                        enableVisionAI: true,
+                        compressionThreshold: 2 * 1024 * 1024 // 2MB
+                    });
+
+                    if (!processingResult.success) {
+                        throw new Error(processingResult.error);
+                    }
+
+                    // Update file with processing results
+                    updateFileWithProcessingResult(fileId, processingResult);
+
+                    console.log('✅ File processing completed:', fileItem.name);
+
+                    // Auto-convert to FHIR if medical content detected
+                    if (processingResult.medicalDetection?.isMedical && 
+                        processingResult.medicalDetection?.confidence >= 0.3) {
+                        
+                        console.log('🔄 Auto-converting to FHIR for medical file:', fileItem.name);
+                        await convertToFHIR(
+                            fileId, 
+                            processingResult.extractedText, 
+                            processingResult.medicalDetection.documentType
+                        );
+                    }
+
+                } catch (error) {
+                    console.error('❌ Error processing file:', error);
+                    handleProcessingError(fileId, error);
+                } finally {
+                    processingFiles.current.delete(fileSignature);
+                }
+            })();
+
+            return currentFiles;
+        });
+    }, []);
+
+    /**
+     * Update file with processing results
+     */
+    const updateFileWithProcessingResult = useCallback((fileId, processingResult) => {
+        setFiles(prev => prev.map(f => {
+            if (f.id === fileId) {
+                const updatedFile = {
+                    ...f,
+                    status: processingResult.medicalDetection?.isMedical ? 'medical_detected' : 'non_medical_detected',
+                    extractedText: processingResult.extractedText,
+                    wordCount: processingResult.wordCount,
+                    medicalDetection: processingResult.medicalDetection,
+                    processingMethod: processingResult.processingMethod,
+                    processingTime: processingResult.processingTime,
+                    extractedAt: new Date().toISOString()
+                };
+                
+                console.log('🔍 Updated file with processing result:', {
+                    fileId,
+                    name: updatedFile.name,
+                    status: updatedFile.status,
+                    hasText: !!updatedFile.extractedText,
+                    wordCount: updatedFile.wordCount
+                });
+                
+                return updatedFile;
+            }
+            return f;
+        }));
+    }, []);
+
+    /**
+     * Update file status and additional data
+     */
+    const updateFileStatus = useCallback((fileId, status, additionalData = {}) => {
+        setFiles(prev => prev.map(f => 
+            f.id === fileId ? { ...f, status, ...additionalData } : f
+        ));
+    }, []);
+
+    /**
+     * Handle processing errors
+     */
+    const handleProcessingError = useCallback((fileId, error) => {
+        const errorMessage = error.message || 'Unknown error occurred';
+        
+        let status = 'processing_error';
+        if (errorMessage.includes('extract') || errorMessage.includes('text')) {
+            status = 'extraction_error';
+        } else if (errorMessage.includes('detect') || errorMessage.includes('medical')) {
+            status = 'detection_error';
+        }
+
+        updateFileStatus(fileId, status, { error: errorMessage });
+        toast.error(`Failed to process file: ${errorMessage}`);
+    }, [updateFileStatus]);
+
+    // ==================== FHIR CONVERSION ====================
+
+    /**
+     * Convert file to FHIR
+     */
+    const convertToFHIR = useCallback(async (fileId, extractedText, documentType) => {
+        updateFileStatus(fileId, 'converting');
 
         try {
-            const newFiles = [];
-            const duplicateFiles = [];
+            // Import here to avoid circular dependencies
+            const { convertToFHIR: fhirConverter } = await import('@/components/AddRecord/services/fhirConversionService');
+            const fhirData = await fhirConverter(extractedText, documentType || 'medical_record');
+            
+            // Update file status to completed
+            updateFileStatus(fileId, 'completed');
 
-            // Process each file for deduplication
-            for (const fileObj of incomingFiles) {
-                try {
-                    const fileHash = await deduplicationService.current.generateFileHash(fileObj.file);
-                    
-                    if (deduplicationService.current.isFileAlreadyProcessed(fileHash, fileObj.id, firestoreData)) {
-                        duplicateFiles.push(fileObj);
-                        continue;
-                    }
-                    
-                    deduplicationService.current.markFileAsProcessing(fileHash, fileObj.id);
-                    newFiles.push({ ...fileObj, fileHash });
-                    
-                } catch (error) {
-                    console.error('Error hashing file:', error);
-                    toast.error(`Error processing ${fileObj.name}: ${error.message}`);
-                }
+            // Pass the FHIR data to the parent component for further processing
+            // This would typically go to useFHIRConversion hook
+            console.log('🎯 FHIR conversion completed for file:', fileId);
+            
+            // We'll add a callback prop for this
+            if (onFHIRConvertedRef.current) {
+                onFHIRConvertedRef.current(fileId, fhirData);
             }
 
-            // Report duplicates
-            if (duplicateFiles.length > 0) {
-                toast.warning(`Skipped ${duplicateFiles.length} duplicate file(s)`);
-            }
-
-            // Update processed files state
-            setProcessedFiles(prev => {
-                const existingIds = new Set(prev.map(f => f.id));
-                const uniqueNewFiles = newFiles.filter(f => !existingIds.has(f.id));
-                return [...prev, ...uniqueNewFiles];
-            });
-
-        } catch (error) {
-            console.error('Error processing files:', error);
-        } finally {
-            // Remove from processing set when done
-            setTimeout(() => {
-                fileSignatures.forEach(sig => processingFiles.current.delete(sig));
-            }, 1000);
+        } catch (fhirError) {
+            console.error('❌ FHIR conversion failed:', fhirError);
+            updateFileStatus(fileId, 'fhir_error', { error: fhirError.message });
+            toast.error(`FHIR conversion failed: ${fhirError.message}`);
         }
-    }, [processedFiles.length, firestoreData]);
+    }, [updateFileStatus]);
 
+    // ==================== FILE MANAGEMENT ACTIONS ====================
+
+    /**
+     * Remove a file
+     */
+    const removeFile = useCallback((fileId) => {
+        console.log('🗑️ Removing file:', fileId);
+        setFiles(prev => prev.filter(f => f.id !== fileId));
+        
+        // Clean up related data
+        setFirestoreData(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(fileId);
+            return newMap;
+        });
+        
+        setSavingToFirestore(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(fileId);
+            return newSet;
+        });
+        
+        // Release any processing locks
+        const fileItem = files.find(f => f.id === fileId);
+        if (fileItem) {
+            const fileSignature = `${fileItem.name}-${fileItem.size}-${fileItem.file?.lastModified}`;
+            processingFiles.current.delete(fileSignature);
+        }
+    }, [files]);
+
+    /**
+     * Retry processing a file
+     */
+    const retryFile = useCallback((fileId) => {
+        const fileItem = files.find(f => f.id === fileId);
+        if (fileItem) {
+            updateFileStatus(fileId, 'ready');
+            processFile(fileId);
+        }
+    }, [files, processFile, updateFileStatus]);
+
+    /**
+     * Clear all files
+     */
+    const clearAll = useCallback(() => {
+        console.log('🧹 Clearing all files');
+        setFiles([]);
+        setFirestoreData(new Map());
+        setSavingToFirestore(new Set());
+        processingFiles.current.clear();
+        deduplicationService.current.clear();
+    }, []);
+
+    // ==================== FIRESTORE OPERATIONS ====================
+
+    /**
+     * Upload files to Firestore
+     */
     const uploadFiles = useCallback(async (filesToUpload) => {
+        if (!filesToUpload || filesToUpload.length === 0) {
+            console.log('📤 No files to upload');
+            return;
+        }
+
+        console.log('📤 Uploading files to Firestore:', filesToUpload.map(f => f.name));
+        
         const uploadPromises = filesToUpload.map(fileObj => uploadFile(fileObj));
         const results = await Promise.allSettled(uploadPromises);
         
@@ -91,9 +323,12 @@ export const useFileUpload = () => {
                 deduplicationService.current.releaseProcessingLock(fileObj.id, fileObj.fileHash);
             }
         });
-    }, [firestoreData]);
+    }, []);
 
-    const uploadFile = async (fileObj) => {
+    /**
+     * Upload a single file to Firestore
+     */
+    const uploadFile = useCallback(async (fileObj) => {
         const fileId = fileObj.id;
 
         try {
@@ -134,8 +369,11 @@ export const useFileUpload = () => {
                 return newSet;
             });
         }
-    };
+    }, [firestoreData]);
 
+    /**
+     * Update Firestore record
+     */
     const updateFirestoreRecord = useCallback((fileId, updates) => {
         setFirestoreData(prev => {
             const current = prev.get(fileId);
@@ -146,33 +384,82 @@ export const useFileUpload = () => {
         });
     }, []);
 
-    const reset = () => {
-        setProcessedFiles([]);
-        setFirestoreData(new Map());
-        setSavingToFirestore(new Set());
-        setOriginalUploadCount(0); // FIXED: Reset originalUploadCount
-        processingFiles.current.clear();
-        deduplicationService.current.clear();
-    };
+    // ==================== COMPUTED VALUES & STATS ====================
+
+    /**
+     * Get file statistics
+     */
+    const getStats = useCallback(() => {
+        const totalFiles = files.length;
+        const processedFiles = files.filter(f => 
+            f.status === 'medical_detected' || f.status === 'non_medical_detected'
+        ).length;
+        const medicalFiles = files.filter(f => f.status === 'medical_detected').length;
+        const errorFiles = files.filter(f => 
+            f.status.includes('error') || f.status === 'processing_error'
+        ).length;
+        const processingFiles = files.filter(f => f.status === 'processing').length;
+
+        return {
+            totalFiles,
+            processedFiles,
+            medicalFiles,
+            errorFiles,
+            processingFiles,
+            completionPercentage: totalFiles > 0 ? (processedFiles / totalFiles) * 100 : 0
+        };
+    }, [files]);
+
+    // ==================== COMPATIBILITY LAYER ====================
+    // These provide compatibility with existing code that expects the old interface
+
+    /**
+     * Get files in the format expected by other parts of the app
+     */
+    const processedFiles = files.filter(f => 
+        f.status === 'medical_detected' || 
+        f.status === 'non_medical_detected' ||
+        f.status === 'completed'
+    );
+
+    // ==================== RETURN INTERFACE ====================
 
     return {
-        // State
+        // Core state (for compatibility)
+        files,
         processedFiles,
         firestoreData,
         savingToFirestore,
-        originalUploadCount,
         
-        // Actions
+        // File management actions
+        addFiles,
+        removeFile,
+        retryFile,
+        clearAll,
+        processFile,
+        
+        // FHIR integration
+        setFHIRConversionCallback,
+        
+        // Status updates
+        updateFileStatus,
+        updateFileWithProcessingResult,
+        
+        // Firestore operations
         uploadFiles,
-        handleFilesProcessed,
         updateFirestoreRecord,
-        reset,
         
         // Computed values
+        getStats,
         savedToFirestoreCount: firestoreData.size,
         savingCount: savingToFirestore.size,
         
         // Services (for other hooks to use)
-        deduplicationService: deduplicationService.current
+        deduplicationService: deduplicationService.current,
+        
+        // Reset function
+        reset: clearAll
     };
-};
+}
+
+export default useFileUpload;
