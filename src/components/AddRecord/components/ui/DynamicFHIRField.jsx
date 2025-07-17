@@ -210,8 +210,8 @@ const UrlInput = ({ field, value, onChange, error }) => (
   </FieldWrapper>
 );
 
-// Main DynamicFHIRForm component that chooses the right input type
-const DynamicFHIRForm = ({ field, value, onChange, error }) => {
+// Main DynamicFHIRField component that chooses the right input type
+const DynamicFHIRField = ({ field, value, onChange, error }) => {
   // Add safety check for field parameter
   if (!field) {
     console.error('DynamicFHIRField: field prop is required');
@@ -267,4 +267,4 @@ const DynamicFHIRForm = ({ field, value, onChange, error }) => {
   }
 };
 
-export default DynamicFHIRForm;
+export default DynamicFHIRField;

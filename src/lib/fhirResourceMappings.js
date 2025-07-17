@@ -5,6 +5,21 @@
  * This file contains definitive mappings for FHIR R4 resources and their field types
  */
 
+export const FIELD_CATEGORIES = {
+  DOCUMENT_INFO: 'Document Information',
+  PATIENT_INFO: 'Patient Information',
+  PROVIDER_INFO: 'Provider Information',
+  CLINICAL_DATA: 'Clinical Notes/Observations'
+};
+
+export const FIELD_PRIORITY = {
+  REQUIRED: 'required', //Always show, must be updated
+  HIGH: 'high', //Always show, optional but important
+  MEDIUM: 'medium', //Show by default, but can be collapsed
+  LOW: 'low' //hidden by default, show on "expand"
+};
+
+
 export const FIELD_TYPES = {
   TEXT: 'text',
   NUMBER: 'number',
@@ -16,10 +31,111 @@ export const FIELD_TYPES = {
   PHONE: 'tel',
   CHECKBOX: 'checkbox',
   URL: 'url'
-};
+}
+
+// Base field configurations that are common across all documents
+export const BASE_FIELD_CONFIGS = {
+  // Document Information Fields
+  documentTitle: {
+    key: 'documentTitle',
+    type: FIELD_TYPES.TEXT,
+    label: 'Document Title',
+    category: FIELD_CATEGORIES.DOCUMENT_INFO,
+    priority: FIELD_PRIORITY.REQUIRED,
+    required: true,
+    placeholder: 'Enter document title',
+    help: 'A descriptive title for this medical document'
+  },
+  
+  documentType: {
+    key: 'documentType',
+    type: FIELD_TYPES.SELECT,
+    label: 'Document Type',
+    category: FIELD_CATEGORIES.DOCUMENT_INFO,
+    priority: FIELD_PRIORITY.REQUIRED,
+    required: true,
+    options: [
+      { value: 'prescription', label: 'Prescription' },
+      { value: 'lab_result', label: 'Lab Result' },
+      { value: 'medical_record', label: 'Medical Record' },
+      { value: 'insurance_card', label: 'Insurance Card' },
+      { value: 'visit_summary', label: 'Visit Summary' },
+      { value: 'imaging_report', label: 'Imaging Report' },
+      { value: 'discharge_summary', label: 'Discharge Summary' }
+    ]
+  },
+  
+  documentDate: {
+    key: 'documentDate',
+    type: FIELD_TYPES.DATE,
+    label: 'Document Date',
+    category: FIELD_CATEGORIES.DOCUMENT_INFO,
+    priority: FIELD_PRIORITY.REQUIRED,
+    required: true,
+    help: 'Date this document was created or the visit occurred'
+  },
+
+  // Patient Information Fields
+  patientFirstName: {
+    key: 'patientFirstName',
+    type: FIELD_TYPES.TEXT,
+    label: 'First Name',
+    category: FIELD_CATEGORIES.PATIENT_INFO,
+    priority: FIELD_PRIORITY.REQUIRED,
+    required: true,
+    placeholder: 'First name',
+    layout: {
+      groupWith: 'patientLastName',
+      width: '1/2'
+    }
+  },
+  
+  patientLastName: {
+    key: 'patientLastName',
+    type: FIELD_TYPES.TEXT,
+    label: 'Last Name',
+    category: FIELD_CATEGORIES.PATIENT_INFO,
+    priority: FIELD_PRIORITY.REQUIRED,
+    required: true,
+    placeholder: 'Last name',
+    layout: {
+      groupWith: 'patientFirstName',
+      width: '1/2'
+    }
+  },
+
+
+  // Provider Information Fields
+  providerFirstName: {
+    key: 'providerFirstName',
+    type: FIELD_TYPES.TEXT,
+    label: 'Provider First Name',
+    category: FIELD_CATEGORIES.PROVIDER_INFO,
+    priority: FIELD_PRIORITY.HIGH,
+    placeholder: 'First name',
+    layout: {
+      groupWith: 'providerLastName',
+      width: '1/2'
+    }
+  },
+  
+  providerLastName: {
+    key: 'providerLastName',
+    type: FIELD_TYPES.TEXT,
+    label: 'Provider Last Name',
+    category: FIELD_CATEGORIES.PROVIDER_INFO,
+    priority: FIELD_PRIORITY.HIGH,
+    placeholder: 'Last name',
+    layout: {
+      groupWith: 'providerFirstName',
+      width: '1/2'
+    }
+  },
+}
+
 
 // Comprehensive FHIR Resource Field Mappings
-// Format: 'resourceType.fieldPath': { type, options?, required?, readOnly?, etc. }
+// Format: 'resourceType.fieldPath': { type, category, priority, label, placeholder, help, layout: {groupWith: 'partnerFieldKey' width:}}
 export const FHIR_RESOURCE_FIELD_MAPPINGS = {
   
   // =========================
@@ -31,8 +147,8 @@ export const FHIR_RESOURCE_FIELD_MAPPINGS = {
   'Patient.active': { type: FIELD_TYPES.CHECKBOX },
   
   // Patient name fields
-  'Patient.name.given': { type: FIELD_TYPES.TEXT, required: true },
-  'Patient.name.family': { type: FIELD_TYPES.TEXT, required: true },
+  'Patient.name.given': { type: FIELD_TYPES.TEXT, category: FIELD_CATEGORIES.PATIENT_INFO, priority: FIELD_PRIORITY.REQUIRED, label: 'First Name', placeholder: 'Enter patient first name', help: "provide the patients' first or given name(s)", layout:'' },
+  'Patient.name[].family': { type: FIELD_TYPES.TEXT, required: true },
   'Patient.name.prefix': { type: FIELD_TYPES.TEXT },
   'Patient.name.suffix': { type: FIELD_TYPES.TEXT },
   'Patient.name.use': { 
