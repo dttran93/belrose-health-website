@@ -1,5 +1,6 @@
 import React from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, HelpCircle } from 'lucide-react';
+import * as Tooltip from '@radix-ui/react-tooltip'
 
 /**
  * Dynamic field component that renders different input types based on field configuration
@@ -15,16 +16,38 @@ const FieldWrapper = ({ field, error, children }) => (
       {field.unit && (
         <span className="text-gray-500 text-xs ml-1">({field.unit})</span>
       )}
+    
+    {/* Tooltip for help text */}
+    {field.help && (
+      <Tooltip.Root>
+        <Tooltip.Trigger asChild>
+          <button
+            type="button"
+            className="inline-flex items-center justify-center ml-1 w-4 h-4 text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="More information">
+            <HelpCircle className="w-4 h-4"/>
+          </button>
+        </Tooltip.Trigger>
+        <Tooltip.Portal>
+          <Tooltip.Content 
+            className="max-w-xs px-3 py-2 text-sm text-white bg-gray-900 rounded-md shadow-lg z-50"
+            sideOffset={5}
+          >
+            {field.help}
+            <Tooltip.Arrow className="fill-gray-900"/>
+          </Tooltip.Content>
+        </Tooltip.Portal>
+      </Tooltip.Root>
+    )}
     </label>
+
     {children}
+
     {error && (
       <div className="flex items-center text-red-600 text-sm mt-1">
         <AlertCircle className="w-4 h-4 mr-1" />
         {error}
       </div>
-    )}
-    {field.help && (
-      <p className="text-xs text-gray-500">{field.help}</p>
     )}
   </div>
 );

@@ -21,52 +21,93 @@ const DynamicFHIRForm = ({ fhirData, originalFile, onFHIRUpdate, onValidationCha
     try {
       console.log(`    🔍 Extracting path "${path}" from:`, obj);
       
-      // Handle array notation like "name[0].given" or "name.given"
-      const normalizedPath = path.replace(/\[(\d+)\]/g, '.$1');
-      const keys = normalizedPath.split('.');
-      
-      let current = obj;
-      for (const key of keys) {
-        if (current === null || current === undefined) {
-          console.log(`    ⚪ Path stopped at key "${key}" - value is null/undefined`);
+      // SPECIAL HANDLING FOR ARRAY PATHS with [] notation FIRST
+      if (path.includes('[]')) {
+        console.log(`    🔄 Detected array path with [] notation: "${path}"`);
+        
+        // For paths like "lensSpecification[].eye", we need to handle arrays
+        const pathParts = path.split('[]');
+        const arrayPath = pathParts[0]; // "lensSpecification"
+        const remainingPath = pathParts[1]; // ".eye"
+        
+        console.log(`    🔄 Array path: "${arrayPath}", Remaining: "${remainingPath}"`);
+        
+        // Get the array first
+        const arrayValue = obj[arrayPath];
+        console.log(`    📋 Array value:`, arrayValue);
+        
+        if (!Array.isArray(arrayValue) || arrayValue.length === 0) {
+          console.log(`    ⚪ No array found or empty array at "${arrayPath}"`);
           return undefined;
         }
         
-        // Handle numeric array indices
-        if (/^\d+$/.test(key)) {
-          current = current[parseInt(key)];
-          console.log(`    📍 Array index [${key}]:`, current);
-        } else {
-          current = current[key];
-          console.log(`    📍 Property "${key}":`, current);
-        }
-      }
-      
-      // Handle arrays - join them or take first element
-      if (Array.isArray(current)) {
-        if (current.length === 0) {
-          console.log(`    📋 Empty array found at path "${path}"`);
-          return undefined;
+        // For now, take the first element (we can enhance this later for multiple elements)
+        const firstElement = arrayValue[0];
+        console.log(`    📍 First array element:`, firstElement);
+        
+        if (remainingPath) {
+          // Remove leading dot and get the property
+          const property = remainingPath.startsWith('.') ? remainingPath.slice(1) : remainingPath;
+          const finalValue = getNestedValue(firstElement, property);
+          console.log(`    ✅ Final value from array element: "${finalValue}"`);
+          return finalValue;
         }
         
-        // For arrays of strings, join them
-        if (typeof current[0] === 'string') {
-          const joined = current.join(' ');
-          console.log(`    📋 Joined string array: "${joined}"`);
-          return joined;
-        }
-        
-        // For arrays of objects, take the first one for now
-        console.log(`    📋 Taking first element from object array:`, current[0]);
-        return current[0];
+        return firstElement;
       }
       
-      console.log(`    ✅ Final value: "${current}"`);
-      return current;
+      // Regular path handling (no arrays)
+      return getNestedValue(obj, path);
+      
     } catch (error) {
       console.log(`    ❌ Error extracting path "${path}":`, error);
       return undefined;
     }
+  };
+
+  // Helper function to get nested values without array notation
+  const getNestedValue = (obj, path) => {
+    if (!path) return obj;
+    
+    const keys = path.split('.');
+    let current = obj;
+    
+    for (const key of keys) {
+      if (current === null || current === undefined) {
+        console.log(`    ⚪ Path stopped at key "${key}" - value is null/undefined`);
+        return undefined;
+      }
+      
+      // Handle numeric array indices
+      if (/^\d+$/.test(key)) {
+        current = current[parseInt(key)];
+        console.log(`    📍 Array index [${key}]:`, current);
+      } else {
+        current = current[key];
+        console.log(`    📍 Property "${key}":`, current);
+      }
+    }
+    
+    // Handle arrays - join them or take first element
+    if (Array.isArray(current)) {
+      if (current.length === 0) {
+        console.log(`    📋 Empty array found`);
+        return undefined;
+      }
+      
+      // For arrays of strings, join them
+      if (typeof current[0] === 'string') {
+        const joined = current.join(' ');
+        console.log(`    📋 Joined string array: "${joined}"`);
+        return joined;
+      }
+      
+      // For arrays of objects, take the first one for now
+      console.log(`    📋 Taking first element from object array:`, current[0]);
+      return current[0];
+    }
+    
+    return current;
   };
 
   // Auto-categorization function - FALLBACK ONLY when no mapping category exists
@@ -144,12 +185,93 @@ const DynamicFHIRForm = ({ fhirData, originalFile, onFHIRUpdate, onValidationCha
     return FIELD_PRIORITY.MEDIUM;
   };
 
+  // New function to extract all values from array paths
+  const getAllValuesFromArrayPath = (obj, path) => {
+    try {
+      console.log(`    🔄 Extracting all values from array path "${path}"`);
+      
+      if (!path.includes('[]')) {
+        // Not an array path, return single value as array
+        const value = getValueFromPath(obj, path);
+        return value !== undefined ? [value] : [];
+      }
+      
+      // For paths like "lensSpecification[].eye", we need to handle arrays
+      const pathParts = path.split('[]');
+      const arrayPath = pathParts[0]; // "lensSpecification"
+      const remainingPath = pathParts[1]; // ".eye"
+      
+      console.log(`    🔄 Array path: "${arrayPath}", Remaining: "${remainingPath}"`);
+      
+      // Get the array directly (without auto-extracting first element)
+      const arrayValue = obj[arrayPath]; // Direct property access for simple paths
+      console.log(`    📋 Array value:`, arrayValue);
+      
+      if (!Array.isArray(arrayValue) || arrayValue.length === 0) {
+        console.log(`    ⚪ No array found or empty array at "${arrayPath}"`);
+        return [];
+      }
+      
+      // Extract the property from each array element
+      const values = [];
+      arrayValue.forEach((element, index) => {
+        console.log(`    📍 Processing array element ${index}:`, element);
+        
+        if (remainingPath && remainingPath.trim() !== '') {
+          // Remove leading dot and get the property
+          const property = remainingPath.startsWith('.') ? remainingPath.slice(1) : remainingPath;
+          const elementValue = getNestedValue(element, property);
+          console.log(`    ✅ Extracted "${property}" from element ${index}: "${elementValue}"`);
+          values.push(elementValue);
+        } else {
+          values.push(element);
+        }
+      });
+      
+      console.log(`    🎯 Total values extracted: ${values.length}`, values);
+      return values;
+      
+    } catch (error) {
+      console.log(`    ❌ Error extracting array path "${path}":`, error);
+      return [];
+    }
+  };
+
+  // Simple label generation for array elements - no special handling needed
+  const generateArrayElementLabel = (fieldPath, value, arrayIndex) => {
+    // Just use the base label since grouping provides the context
+    return generateFieldLabel(fieldPath.replace('[]', ''));
+  };
+
+  // Keep the existing generateFieldLabel function for non-array fields
+  const generateFieldLabel = (fieldPath) => {
+    return fieldPath
+      .split('.')
+      .pop()
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .replace(/\[\]/g, '');
+  };
+
   // Helper function to extract all mappable fields from a FHIR resource
   const extractFieldsFromResource = (resource, resourceIndex = 0) => {
     const fields = [];
     const resourceType = resource.resourceType;
     
     console.log(`🗂️ Extracting fields from ${resourceType} using FHIR mappings...`);
+
+    // SPECIAL DEBUG FOR VISION PRESCRIPTION
+    if (resourceType === 'VisionPrescription') {
+      console.log(`👁️ VisionPrescription DEBUG - Full resource structure:`, resource);
+      console.log(`👁️ lensSpecification exists:`, !!resource.lensSpecification);
+      console.log(`👁️ lensSpecification array length:`, resource.lensSpecification?.length);
+      if (resource.lensSpecification) {
+        resource.lensSpecification.forEach((lens, idx) => {
+          console.log(`👁️ Lens ${idx}:`, lens);
+          console.log(`👁️ Lens ${idx} keys:`, Object.keys(lens));
+        });
+      }
+    }
 
     // Get all possible field paths for this resource type from our mappings
     const resourceMappings = Object.keys(FHIR_RESOURCE_FIELD_MAPPINGS)
@@ -189,68 +311,120 @@ const DynamicFHIRForm = ({ fhirData, originalFile, onFHIRUpdate, onValidationCha
     const allMappings = [...new Map(resourceMappings.map(m => [m.fullPath, m])).values()]; // Deduplicate
 
     allMappings.forEach(mapping => {
-      const value = getValueFromPath(resource, mapping.fieldPath);
-      
-      if (value !== undefined && value !== null && value !== '') {
-        console.log(`  ✅ Found value for ${mapping.fullPath}: "${value}"`);
-        console.log(`    📋 Mapping config:`, mapping.config);
+      // Check if this is an array path that needs multiple element extraction
+      if (mapping.fieldPath.includes('[]')) {
+        console.log(`🔄 Processing array path: ${mapping.fieldPath}`);
         
-        // Generate field key - make unique per resource instance
-        const fieldKey = `${resourceType.toLowerCase()}_${resourceIndex}_${mapping.fieldPath.replace(/[\[\]\.]/g, '_')}`;
+        // Extract all elements from the array, not just the first one
+        const allValues = getAllValuesFromArrayPath(resource, mapping.fieldPath);
         
-        const fieldConfig = {
-          ...mapping.config,
-          key: fieldKey,
-          value: value,
-          // Add helpful metadata
-          _fhirPath: mapping.fullPath,
-          _resourceType: resourceType,
-          _resourceIndex: resourceIndex
-        };
+        if (allValues && allValues.length > 0) {
+          console.log(`  ✅ Found ${allValues.length} values for ${mapping.fullPath}:`, allValues);
+          
+          // Create a field for each array element
+          allValues.forEach((value, arrayIndex) => {
+            if (value !== undefined && value !== null && value !== '') {
+              console.log(`    📋 Creating field for array element ${arrayIndex}: "${value}"`);
+              
+              // Generate unique field key for each array element
+              const fieldKey = `${resourceType.toLowerCase()}_${resourceIndex}_${mapping.fieldPath.replace(/[\[\]\.]/g, '_')}_${arrayIndex}`;
+              
+              // Create enhanced label that includes array context
+              const enhancedLabel = generateArrayElementLabel(mapping.fieldPath, value, arrayIndex);
+              
+              const fieldConfig = {
+                ...mapping.config,
+                key: fieldKey,
+                value: value,
+                label: enhancedLabel,
+                // SOLUTION 5: Simple dynamic grouping - append array index to existing group
+                layout: mapping.config.layout?.group ? {
+                  ...mapping.config.layout,
+                  group: `${mapping.config.layout.group}_${arrayIndex}`
+                } : mapping.config.layout,
+                // Add helpful metadata
+                _fhirPath: mapping.fullPath,
+                _resourceType: resourceType,
+                _resourceIndex: resourceIndex,
+                _arrayIndex: arrayIndex,
+                _isArrayElement: true
+              };
 
-        // Category hierarchy: mapping category > auto-category
-        if (fieldConfig.category) {
-          console.log(`    🏷️ Using mapping category: ${fieldConfig.category}`);
+              // Apply categorization and prioritization as before
+              if (fieldConfig.category) {
+                console.log(`      🏷️ Using mapping category: ${fieldConfig.category}`);
+              } else {
+                fieldConfig.category = categorizeFHIRField(resourceType, mapping.fieldPath);
+                console.log(`      🏷️ No mapping category found, auto-categorized as: ${fieldConfig.category}`);
+              }
+
+              if (fieldConfig.priority) {
+                console.log(`      🎯 Using mapping priority: ${fieldConfig.priority}`);
+              } else {
+                fieldConfig.priority = assignFieldPriority(resourceType, mapping.fieldPath, fieldConfig.required);
+                console.log(`      🎯 No mapping priority found, auto-assigned priority: ${fieldConfig.priority}`);
+              }
+
+              console.log(`      🔧 Final array field config:`, fieldConfig);
+              fields.push(fieldConfig);
+            }
+          });
         } else {
-          fieldConfig.category = categorizeFHIRField(resourceType, mapping.fieldPath);
-          console.log(`    🏷️ No mapping category found, auto-categorized as: ${fieldConfig.category}`);
+          console.log(`  ⚪ No values found for array path ${mapping.fullPath}`);
         }
-
-        // Priority hierarchy: mapping priority > auto-priority > default
-        if (fieldConfig.priority) {
-          console.log(`    🎯 Using mapping priority: ${fieldConfig.priority}`);
-        } else {
-          fieldConfig.priority = assignFieldPriority(resourceType, mapping.fieldPath, fieldConfig.required);
-          console.log(`    🎯 No mapping priority found, auto-assigned priority: ${fieldConfig.priority}`);
-        }
-
-        // Label hierarchy: mapping label > generated label
-        if (fieldConfig.label) {
-          console.log(`    🏷️ Using mapping label: ${fieldConfig.label}`);
-        } else {
-          fieldConfig.label = generateFieldLabel(mapping.fieldPath);
-          console.log(`    🏷️ No mapping label found, generated label: ${fieldConfig.label}`);
-        }
-
-        console.log(`    🔧 Final field config:`, fieldConfig);
-        fields.push(fieldConfig);
       } else {
-        console.log(`  ⚪ No value found for ${mapping.fullPath}`);
+        // Regular single-value field extraction (existing logic)
+        const value = getValueFromPath(resource, mapping.fieldPath);
+        
+        if (value !== undefined && value !== null && value !== '') {
+          console.log(`  ✅ Found value for ${mapping.fullPath}: "${value}"`);
+          console.log(`    📋 Mapping config:`, mapping.config);
+          
+          // Generate field key - make unique per resource instance
+          const fieldKey = `${resourceType.toLowerCase()}_${resourceIndex}_${mapping.fieldPath.replace(/[\[\]\.]/g, '_')}`;
+          
+          const fieldConfig = {
+            ...mapping.config,
+            key: fieldKey,
+            value: value,
+            // Add helpful metadata
+            _fhirPath: mapping.fullPath,
+            _resourceType: resourceType,
+            _resourceIndex: resourceIndex
+          };
+
+          // Apply categorization and prioritization (existing logic)
+          if (fieldConfig.category) {
+            console.log(`    🏷️ Using mapping category: ${fieldConfig.category}`);
+          } else {
+            fieldConfig.category = categorizeFHIRField(resourceType, mapping.fieldPath);
+            console.log(`    🏷️ No mapping category found, auto-categorized as: ${fieldConfig.category}`);
+          }
+
+          if (fieldConfig.priority) {
+            console.log(`    🎯 Using mapping priority: ${fieldConfig.priority}`);
+          } else {
+            fieldConfig.priority = assignFieldPriority(resourceType, mapping.fieldPath, fieldConfig.required);
+            console.log(`    🎯 No mapping priority found, auto-assigned priority: ${fieldConfig.priority}`);
+          }
+
+          if (fieldConfig.label) {
+            console.log(`    🏷️ Using mapping label: ${fieldConfig.label}`);
+          } else {
+            fieldConfig.label = generateFieldLabel(mapping.fieldPath);
+            console.log(`    🏷️ No mapping label found, generated label: ${fieldConfig.label}`);
+          }
+
+          console.log(`    🔧 Final field config:`, fieldConfig);
+          fields.push(fieldConfig);
+        } else {
+          console.log(`  ⚪ No value found for ${mapping.fullPath}`);
+        }
       }
     });
 
     console.log(`  🎯 Extracted ${fields.length} fields from ${resourceType}`);
     return fields;
-  };
-
-  // Generate user-friendly labels from field paths
-  const generateFieldLabel = (fieldPath) => {
-    return fieldPath
-      .split('.')
-      .pop()
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/^./, str => str.toUpperCase())
-      .replace(/\[\]/g, '');
   };
 
   // Dynamic FHIR field generation
@@ -408,21 +582,29 @@ const DynamicFHIRForm = ({ fhirData, originalFile, onFHIRUpdate, onValidationCha
     return filtered;
   };
 
-  // Helper to get CSS classes for layout widths
+  // Helper to get CSS classes for layout widths (enhanced for groups)
   const getLayoutWidthClass = (width) => {
     const widthMap = {
       '1/2': 'w-1/2',
       '1/3': 'w-1/3', 
       '2/3': 'w-2/3',
       '1/4': 'w-1/4',
+      '2/4': 'w-2/4', // Same as 1/2 but more explicit
       '3/4': 'w-3/4',
-      'full': 'w-full'
+      '1/5': 'w-1/5',
+      '2/5': 'w-2/5',
+      '3/5': 'w-3/5',
+      '4/5': 'w-4/5',
+      '1/6': 'w-1/6',
+      '5/6': 'w-5/6',
+      'full': 'w-full',
+      'auto': 'w-auto'
     };
     
     return widthMap[width] || 'flex-1';
   };
 
-  // Render fields with layout grouping and category styling
+  // Render fields with layout grouping and category styling (supports both pairs and groups)
   const renderFieldsWithLayout = (fields, category) => {
     console.log('🎨 Rendering', fields.length, 'fields with layout grouping...');
     
@@ -432,28 +614,100 @@ const DynamicFHIRForm = ({ fhirData, originalFile, onFHIRUpdate, onValidationCha
     let singleCount = 0;
     const fieldCategoryClass = getFieldCategoryClass(category);
 
+    // First, handle multi-field groups (3+ fields)
+    const groupedFields = {};
+    fields.forEach(field => {
+      if (field.layout?.group) {
+        if (!groupedFields[field.layout.group]) {
+          groupedFields[field.layout.group] = [];
+        }
+        groupedFields[field.layout.group].push(field);
+      }
+    });
+
+    // Sort grouped fields by groupOrder and render
+    Object.entries(groupedFields).forEach(([groupName, groupFields]) => {
+      if (groupFields.length > 1) {
+        console.log(`🔗 Rendering group "${groupName}" with ${groupFields.length} fields`);
+        
+        // Sort by groupOrder
+        const sortedFields = groupFields.sort((a, b) => 
+          (a.layout?.groupOrder || 0) - (b.layout?.groupOrder || 0)
+        );
+        
+        // Mark all as processed
+        sortedFields.forEach(field => processedFields.add(field.key));
+        groupedCount += sortedFields.length;
+        
+        console.log(`  🔗 Group order: ${sortedFields.map(f => `"${f.label}" (${f.layout?.width || 'auto'})`).join(' + ')}`);
+        
+        renderedFields.push(
+          <div key={groupName} className={`flex gap-2 ${fieldCategoryClass}`}>
+            {sortedFields.map(field => (
+              <div key={field.key} className={getLayoutWidthClass(field.layout?.width || `1/${sortedFields.length}`)}>
+                <DynamicFHIRField 
+                  field={{ ...field, _categoryClass: fieldCategoryClass }}
+                  value={formData[field.key] || ''} 
+                  onChange={(value) => handleFieldChange(field.key, value)}
+                  error={errors[field.key]}
+                />
+              </div>
+            ))}
+          </div>
+        );
+      }
+    });
+
+    // Then handle pairs (legacy groupWith system)
     fields.forEach(field => {
       if (processedFields.has(field.key)) return;
 
-      // Check if this field has a layout partner
-      const partner = fields.find(f => 
-        field.layout?.groupWith === f.key ||
-        f.layout?.groupWith === field.key
-      );
+      // Check if this field has a layout partner (and not already in a group)
+      if (!field.layout?.group) {
+        const partner = fields.find(f => 
+          !f.layout?.group && // Don't pair with group fields
+          (field.layout?.groupWith === f.key || f.layout?.groupWith === field.key)
+        );
 
-      if (partner && !processedFields.has(partner.key)) {
-        // Mark both fields as processed
-        processedFields.add(field.key);
-        processedFields.add(partner.key);
-        groupedCount += 2;
+        if (partner && !processedFields.has(partner.key)) {
+          // Mark both fields as processed
+          processedFields.add(field.key);
+          processedFields.add(partner.key);
+          groupedCount += 2;
 
-        console.log(`🔗 Grouping fields: "${field.label}" + "${partner.label}" 
-          (${field.layout?.width || '1/2'} + ${partner.layout?.width || '1/2'})`);
+          console.log(`🔗 Pairing fields: "${field.label}" + "${partner.label}" 
+            (${field.layout?.width || '1/2'} + ${partner.layout?.width || '1/2'})`);
 
-        // Render grouped fields with category styling
-        renderedFields.push(
-          <div key={`${field.key}-${partner.key}`} className={`flex gap-3 ${fieldCategoryClass}`}>
-            <div className={getLayoutWidthClass(field.layout?.width || '1/2')}>
+          // Render paired fields with category styling
+          renderedFields.push(
+            <div key={`${field.key}-${partner.key}`} className={`flex gap-3 ${fieldCategoryClass}`}>
+              <div className={getLayoutWidthClass(field.layout?.width || '1/2')}>
+                <DynamicFHIRField 
+                  field={{ ...field, _categoryClass: fieldCategoryClass }}
+                  value={formData[field.key] || ''} 
+                  onChange={(value) => handleFieldChange(field.key, value)}
+                  error={errors[field.key]}
+                />
+              </div>
+              <div className={getLayoutWidthClass(partner.layout?.width || '1/2')}>
+                <DynamicFHIRField 
+                  field={{ ...partner, _categoryClass: fieldCategoryClass }}
+                  value={formData[partner.key] || ''} 
+                  onChange={(value) => handleFieldChange(partner.key, value)}
+                  error={errors[partner.key]}
+                />
+              </div>
+            </div>
+          );
+        } else if (!processedFields.has(field.key)) {
+          // Single field
+          processedFields.add(field.key);
+          singleCount++;
+          
+          console.log(`📄 Rendering single field: "${field.label}" (${field.type}) ${field._fhirPath ? `[${field._fhirPath}]` : ''}`);
+          
+          renderedFields.push(
+            <div key={field.key} className={fieldCategoryClass}>
               <DynamicFHIRField 
                 field={{ ...field, _categoryClass: fieldCategoryClass }}
                 value={formData[field.key] || ''} 
@@ -461,37 +715,13 @@ const DynamicFHIRForm = ({ fhirData, originalFile, onFHIRUpdate, onValidationCha
                 error={errors[field.key]}
               />
             </div>
-            <div className={getLayoutWidthClass(partner.layout?.width || '1/2')}>
-              <DynamicFHIRField 
-                field={{ ...partner, _categoryClass: fieldCategoryClass }}
-                value={formData[partner.key] || ''} 
-                onChange={(value) => handleFieldChange(partner.key, value)}
-                error={errors[partner.key]}
-              />
-            </div>
-          </div>
-        );
-      } else if (!processedFields.has(field.key)) {
-        // Single field
-        processedFields.add(field.key);
-        singleCount++;
-        
-        console.log(`📄 Rendering single field: "${field.label}" (${field.type}) ${field._fhirPath ? `[${field._fhirPath}]` : ''}`);
-        
-        renderedFields.push(
-          <div key={field.key} className={fieldCategoryClass}>
-            <DynamicFHIRField 
-              field={{ ...field, _categoryClass: fieldCategoryClass }}
-              value={formData[field.key] || ''} 
-              onChange={(value) => handleFieldChange(field.key, value)}
-              error={errors[field.key]}
-            />
-          </div>
-        );
+          );
+        }
       }
     });
 
-    console.log(`🎨 Layout rendering complete: ${groupedCount} grouped fields, ${singleCount} single fields`);
+    const groupCount = Object.keys(groupedFields).length;
+    console.log(`🎨 Layout rendering complete: ${groupCount} groups, ${groupedCount} grouped fields, ${singleCount} single fields`);
     return renderedFields;
   };
 
@@ -499,24 +729,24 @@ const DynamicFHIRForm = ({ fhirData, originalFile, onFHIRUpdate, onValidationCha
   const getCategoryStyles = (category) => {
     const categoryStyles = {
       [FIELD_CATEGORIES.DOCUMENT_INFO]: {
-        containerClass: 'border-chart-2 bg-chart-2/10',
-        headerClass: 'border-chart-2',
-        accentClass: 'border-l-4 border-l-chart-2'
+        containerClass: 'border-blue-200 bg-blue-50',
+        headerClass: 'text-blue-900 border-blue-200',
+        accentClass: 'border-l-4 border-l-blue-500'
       },
       [FIELD_CATEGORIES.PATIENT_INFO]: {
-        containerClass: 'border-chart-3 bg-chart-3/10',
-        headerClass: 'border-chart-3',
-        accentClass: 'border-l-4 border-l-chart-3'
+        containerClass: 'border-green-200 bg-green-50',
+        headerClass: 'text-green-900 border-green-200',
+        accentClass: 'border-l-4 border-l-green-500'
       },
       [FIELD_CATEGORIES.PROVIDER_INFO]: {
-        containerClass: 'border-purple-200 bg-chart-5/10',
-        headerClass: 'border-chart-5',
-        accentClass: 'border-l-4 border-l-chart-5'
+        containerClass: 'border-purple-200 bg-purple-50',
+        headerClass: 'text-purple-900 border-purple-200',
+        accentClass: 'border-l-4 border-l-purple-500'
       },
       [FIELD_CATEGORIES.CLINICAL_DATA]: {
-        containerClass: 'border-chart-4 bg-chart-4/10',
-        headerClass: 'border-chart-4',
-        accentClass: 'border-l-4 border-l-chart-4'
+        containerClass: 'border-orange-200 bg-orange-50',
+        headerClass: 'text-orange-900 border-orange-200',
+        accentClass: 'border-l-4 border-l-orange-500'
       }
     };
 

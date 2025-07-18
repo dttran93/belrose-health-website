@@ -1,5 +1,7 @@
 // src/utils/fhirResourceMappings.js
 
+import { PlaneLanding } from "lucide-react";
+
 /**
  * Comprehensive FHIR Resource Field Mappings
  * This file contains definitive mappings for FHIR R4 resources and their field types
@@ -18,7 +20,6 @@ export const FIELD_PRIORITY = {
   MEDIUM: 'medium', //Show by default, but can be collapsed
   LOW: 'low' //hidden by default, show on "expand"
 };
-
 
 export const FIELD_TYPES = {
   TEXT: 'text',
@@ -147,7 +148,7 @@ export const FHIR_RESOURCE_FIELD_MAPPINGS = {
   'Patient.active': { type: FIELD_TYPES.CHECKBOX },
   
   // Patient name fields
-  'Patient.name.given': { type: FIELD_TYPES.TEXT, category: FIELD_CATEGORIES.PATIENT_INFO, priority: FIELD_PRIORITY.REQUIRED, label: 'First Name', placeholder: 'Enter patient first name', help: "provide the patients' first or given name(s)", layout:'' },
+  'Patient.name[].given': { type: FIELD_TYPES.TEXT, category: FIELD_CATEGORIES.PATIENT_INFO, priority: FIELD_PRIORITY.REQUIRED, label: 'First Name', placeholder: 'Enter patient first name', help: "provide the patients' first or given name(s)", layout:'' },
   'Patient.name[].family': { type: FIELD_TYPES.TEXT, required: true },
   'Patient.name.prefix': { type: FIELD_TYPES.TEXT },
   'Patient.name.suffix': { type: FIELD_TYPES.TEXT },
@@ -536,29 +537,55 @@ export const FHIR_RESOURCE_FIELD_MAPPINGS = {
 
   'VisionPrescription.id': { 
   type: FIELD_TYPES.TEXT, 
-  readOnly: true,
-  label: 'Prescription ID'
+  category: FIELD_CATEGORIES.PROVIDER_INFO, 
+  priority: FIELD_PRIORITY.MEDIUM,
+  label: 'Prescription ID', 
+  placeholder: 'Business Identifier for Vision prescription',
+  help: "A unique identifier assigned to this vision prescription. 	This is a business identifier, not a resource identifier. Allows vision prescriptions to be distinguished and referenced.",
+  layout:'' 
+},
+
+  'VisionPrescription.basedOn': { 
+  type: FIELD_TYPES.TEXT, 
+  category: FIELD_CATEGORIES.CLINICAL_DATA, 
+  priority: FIELD_PRIORITY.LOW,
+  label: 'Based On', 
+  placeholder: 'What prescription fulfills',
+  help: "Plan/proposal/order/request fulfilled by this prescription.",
+  layout:'' 
 },
 
 'VisionPrescription.status': {
   type: FIELD_TYPES.SELECT,
-  label: 'Prescription Status',
   options: [
     { value: 'active', label: 'Active' },
     { value: 'cancelled', label: 'Cancelled' },
     { value: 'draft', label: 'Draft' },
     { value: 'entered-in-error', label: 'Entered in Error' }
-  ]
+  ],
+  category: FIELD_CATEGORIES.CLINICAL_DATA,
+  label: 'Prescription Status',
+  placeholder: 'The status of the prescription',
+  help: '',
+  layout:'',
 },
 
 'VisionPrescription.created': { 
   type: FIELD_TYPES.DATETIME,
-  label: 'Created Date'
+  category: FIELD_CATEGORIES.CLINICAL_DATA,
+  label: 'Date Created',
+  placeholder: '',
+  help: '',
+  layout:'',
 },
 
 'VisionPrescription.dateWritten': { 
   type: FIELD_TYPES.DATE,
-  label: 'Date Written'
+  category: FIELD_CATEGORIES.CLINICAL_DATA,
+  label: 'Date Written',
+  placeholder:'',
+  help: '',
+  layout: '',
 },
 
 'VisionPrescription.patient.reference': { 
@@ -576,47 +603,77 @@ export const FHIR_RESOURCE_FIELD_MAPPINGS = {
 // LENS SPECIFICATION FIELDS (with proper array notation)
 'VisionPrescription.lensSpecification[].product': {
   type: FIELD_TYPES.SELECT,
+  category: FIELD_CATEGORIES.CLINICAL_DATA,
   label: 'Product Type',
   options: [
     { value: 'lens', label: 'Lens' },
     { value: 'contact', label: 'Contact Lens' }
-  ]
+  ],
+  placeholder: '',
+  help: '',
+  layout: {
+    groupWith: ""
+  },
 },
 
 'VisionPrescription.lensSpecification[].eye': { 
   type: FIELD_TYPES.SELECT,
+  category: FIELD_CATEGORIES.CLINICAL_DATA,
   label: 'Eye',
   options: [
     { value: 'right', label: 'Right Eye (OD)' },
     { value: 'left', label: 'Left Eye (OS)' }
-  ]
+  ],
+  layout: {
+    group: 'vision_measurements',
+    groupOrder: 1,
+    width: "1/4",
+  }
 },
 
 'VisionPrescription.lensSpecification[].sphere': { 
   type: FIELD_TYPES.NUMBER, 
+  category: FIELD_CATEGORIES.CLINICAL_DATA,
   label: 'Sphere (SPH)',
   step: 0.25,
   min: -20,
   max: 20,
-  unit: 'D'
+  unit: 'D',
+  layout: {
+    group: 'vision_measurements',
+    groupOrder: 2,
+    width: "1/4"
+  }
 },
 
 'VisionPrescription.lensSpecification[].cylinder': { 
   type: FIELD_TYPES.NUMBER, 
+  category: FIELD_CATEGORIES.CLINICAL_DATA,
   label: 'Cylinder (CYL)',
   step: 0.25,
   min: -6,
   max: 6,
-  unit: 'D'
+  unit: 'D',
+  layout: {
+    group: 'vision_measurements',
+    groupOrder:3,
+    width:"1/4",
+  }
 },
 
 'VisionPrescription.lensSpecification[].axis': { 
   type: FIELD_TYPES.NUMBER, 
+  category: FIELD_CATEGORIES.CLINICAL_DATA,
   label: 'Axis',
   step: 1,
   min: 1,
   max: 180,
-  unit: '°'
+  unit: '°',
+  layout: {
+    group: 'vision_measurements',
+    groupOrder:4,
+    width: "1/4",
+  }
 },
 
 'VisionPrescription.lensSpecification[].add': { 
@@ -703,6 +760,36 @@ export const FHIR_RESOURCE_FIELD_MAPPINGS = {
   label: 'Notes',
   rows: 3
 },
+
+'Encounter.id' : {
+  type: FIELD_TYPES.TEXT,
+  category: FIELD_CATEGORIES.CLINICAL_DATA,
+  label: 'Encounter ID',
+  placeholder: 'Identifier(s) by which this encounter is known.',
+  help: 'This is a business identifier, not a resource identifier'
+},
+
+'Encounter.status' : {
+  type: FIELD_TYPES.SELECT,
+  category: FIELD_CATEGORIES.CLINICAL_DATA,
+  label: 'Encounter Status',
+  options: [
+    {value: "planned", label: "Planned"},
+    {value: "in-progress", label: "In-Progress"},
+    {value: "on-hold", label: "On-Hold"},
+    {value: "discharged", label: "Discharged"},
+    {value: "completed", label: "Completed"},
+    {value: "finished", label: "Completed"},
+    {value: "cancelled", label: "Cancelled"},
+    {value: "discontinued", label: "Discontinued"},
+    {value: "entered-in-error", label: "Entered-in-Error"},
+    {value: "unknown", label: "Unknown"},
+  ],
+  placeholder:'Select One',
+},
+
+
+
 
   // =========================
   // ADD MORE RESOURCES HERE AS NEEDED
