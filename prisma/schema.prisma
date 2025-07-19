@@ -1,0 +1,71 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model FhirMapping {
+  id              Int            @id @default(autoincrement())
+  resourceType    String         @map("resource_type") @db.VarChar(50)
+  fhirPath        String         @map("fhir_path") @db.VarChar(500)
+  parameterName   String?        @map("parameter_name") @db.VarChar(100)
+  fieldType       String         @map("field_type") @db.VarChar(50)
+  label           String?        @db.VarChar(200)
+  category        String?        @db.VarChar(50)
+  priority        Int?
+  required        Boolean        @default(false)
+  readOnly        Boolean        @default(false) @map("read_only")
+  placeholder     String?
+  helpText        String?        @map("help_text")
+  step            Decimal?       @db.Decimal(10, 4)
+  minValue        Decimal?       @map("min_value") @db.Decimal(10, 4)
+  maxValue        Decimal?       @map("max_value") @db.Decimal(10, 4)
+  unit            String?        @db.VarChar(20)
+  rows            Int?
+  validationRules Json?          @map("validation_rules")
+  layoutConfig    Json?          @map("layout_config")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  
+  // Relations
+  fieldOptions    FieldOption[]
+  parameter       Parameter?     @relation(fields: [parameterName], references: [parameterName])
+  
+  @@unique([resourceType, fhirPath])
+  @@map("fhir_mappings")
+}
+
+model FieldOption {
+  id          Int         @id @default(autoincrement())
+  mappingId   Int         @map("mapping_id")
+  optionValue String      @map("option_value") @db.VarChar(100)
+  optionLabel String      @map("option_label") @db.VarChar(200)
+  sortOrder   Int         @default(0) @map("sort_order")
+  
+  // Relations
+  mapping     FhirMapping @relation(fields: [mappingId], references: [id], onDelete: Cascade)
+  
+  @@map("field_options")
+}
+
+model Parameter {
+  id               Int           @id @default(autoincrement())
+  parameterName    String        @unique @map("parameter_name") @db.VarChar(100)
+  displayLabel     String        @map("display_label") @db.VarChar(200)
+  description      String?
+  dataType         String        @map("data_type") @db.VarChar(50)
+  category         String?       @db.VarChar(50)
+  isCoreParameter  Boolean       @default(false) @map("is_core_parameter")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  
+  // Relations
+  mappings         FhirMapping[]
+  
+  @@map("parameters")
+}

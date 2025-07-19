@@ -10,20 +10,22 @@ import * as Tooltip from '@radix-ui/react-tooltip'
 // Base field wrapper with label and error handling
 const FieldWrapper = ({ field, error, children }) => (
   <div className="space-y-1">
+    <div className="flex justify-center items-center">
     <label className="block text-sm font-medium text-gray-700">
       {field.label}
       {field.required && <span className="text-red-500 ml-1">*</span>}
       {field.unit && (
         <span className="text-gray-500 text-xs ml-1">({field.unit})</span>
       )}
-    
+    </label>
+
     {/* Tooltip for help text */}
     {field.help && (
       <Tooltip.Root>
         <Tooltip.Trigger asChild>
           <button
             type="button"
-            className="inline-flex items-center justify-center ml-1 w-4 h-4 text-gray-400 hover:text-gray-600 transition-colors"
+            className="inline-flex items-center justify-center m-1 w-4 h-4 text-gray-400 hover:text-gray-600 transition-colors"
             aria-label="More information">
             <HelpCircle className="w-4 h-4"/>
           </button>
@@ -39,7 +41,7 @@ const FieldWrapper = ({ field, error, children }) => (
         </Tooltip.Portal>
       </Tooltip.Root>
     )}
-    </label>
+   </div> 
 
     {children}
 
