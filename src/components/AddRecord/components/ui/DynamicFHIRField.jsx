@@ -2,6 +2,29 @@ import React from 'react';
 import { AlertCircle, HelpCircle } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip'
 
+// Add this helper function at the top of DynamicFHIRField
+const normalizeDateTime = (value) => {
+  if (!value) return '';
+  
+  console.log('🕐 Normalizing datetime value:', value);
+  
+  // If it's already a full datetime, return as-is
+  if (value.includes('T') || value.includes(' ')) {
+    console.log('✅ Already datetime format');
+    return value;
+  }
+  
+  // If it's date-only (YYYY-MM-DD), append default time
+  if (value.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    const normalized = `${value}T00:00:00`;
+    console.log('📅 Converted date to datetime:', normalized);
+    return normalized;
+  }
+  
+  console.log('⚠️ Unknown format, returning as-is');
+  return value;
+};
+
 /**
  * Dynamic field component that renders different input types based on field configuration
  * This replaces the static form fields with a flexible system that adapts to FHIR data
@@ -102,11 +125,17 @@ const NumberInput = ({ field, value, onChange, error }) => (
 );
 
 // Date input field
-const DateInput = ({ field, value, onChange, error }) => (
+const DateInput = ({ field, value, onChange, error }) => { 
+  //Normalize datetime values if its a datetime field
+  const normalizedValue = field.type === 'datetime' || field.type === 'datetime-local'
+    ? normalizeDateTime(field.value || value)
+    : (field.value || value);
+
+  return (
   <FieldWrapper field={field} error={error}>
     <input
-      type={field.type} // 'date' or 'datetime-local'
-      value={value}
+      type={field.type === 'datetime' ? 'datetime-local' : field.type} // Convert 'datetime' to 'datetime-local'
+      value={normalizedValue}
       onChange={(e) => onChange(e.target.value)}
       readOnly={field.readOnly}
       className={`
@@ -117,6 +146,7 @@ const DateInput = ({ field, value, onChange, error }) => (
     />
   </FieldWrapper>
 );
+};
 
 // Select dropdown field
 const SelectInput = ({ field, value, onChange, error }) => (
@@ -265,6 +295,7 @@ const DynamicFHIRField = ({ field, value, onChange, error }) => {
       return <NumberInput field={field} value={value} onChange={onChange} error={error} />;
       
     case 'date':
+    case 'datetime':
     case 'datetime-local':
       return <DateInput field={field} value={value} onChange={onChange} error={error} />;
       
