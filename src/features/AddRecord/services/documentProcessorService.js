@@ -1,6 +1,6 @@
 import TextExtractionService from './textExtractionService';
 import VisionExtractionService from './visionExtractionService';
-import { aiMedicalDetectionService } from '@/components/AddRecord/services/aiMedicalDetectionService';
+import { aiMedicalDetectionService } from '@/features/AddRecord/services/aiMedicalDetectionService';
 
 /**
  * Process a document file through the complete pipeline

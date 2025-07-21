@@ -1,4 +1,4 @@
-import { aiImageService } from '@/components/AddRecord/services/aiImageService';
+import { aiImageService } from '@/features/AddRecord/services/aiImageService';
 import { extractImageTextOCR } from './textExtractionService';
 
 /**

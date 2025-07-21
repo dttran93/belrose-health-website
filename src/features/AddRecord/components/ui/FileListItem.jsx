@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { FileText, Image, File, X, AlertCircle, CheckCircle, Loader2, Zap, Eye, EyeOff, AlertTriangle } from 'lucide-react';
-import { EnhancedFHIRResults } from '@/components/AddRecord/components/FHIRValidation';
+import { EnhancedFHIRResults } from '@/features/AddRecord/components/FHIRValidation';
 
 /**
  * Individual file list item with processing status and expandable details

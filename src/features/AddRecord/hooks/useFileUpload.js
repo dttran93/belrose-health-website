@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { DeduplicationService } from '../services/deduplicationService';
-import { FileUploadService } from '@/components/AddRecord/services/fileUploadService';
-import DocumentProcessorService from '@/components/AddRecord/services/documentProcessorService';
+import { FileUploadService } from '@/features/AddRecord/services/fileUploadService';
+import DocumentProcessorService from '@/features/AddRecord/services/documentProcessorService';
 
 /**
  * Consolidated file management hook that handles:
@@ -266,7 +266,7 @@ function useFileUpload() {
 
         try {
             // Import here to avoid circular dependencies
-            const { convertToFHIR: fhirConverter } = await import('@/components/AddRecord/services/fhirConversionService');
+            const { convertToFHIR: fhirConverter } = await import('@/features/AddRecord/services/fhirConversionService');
             const fhirData = await fhirConverter(extractedText, documentType || 'medical_record');
 
             //Check if cancelled after completing

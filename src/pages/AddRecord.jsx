@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import useFileUpload from '@/components/AddRecord/hooks/useFileUpload';
-import { useFHIRConversion } from '@/components/AddRecord/hooks/useFHIRConversion';
-import { ExportService } from '@/components/AddRecord/services/exportService';
+import useFileUpload from '@/features/AddRecord/hooks/useFileUpload';
+import { useFHIRConversion } from '@/features/AddRecord/hooks/useFHIRConversion';
+import { ExportService } from '@/features/AddRecord/services/exportService';
 
 // Import all components
-import { ProgressSteps } from '@/components/AddRecord/components/ProgressSteps';
-import { StatusBanner } from '@/components/AddRecord/components/StatusBanner';
-import CombinedUploadFHIR from '@/components/AddRecord/components/CombinedUploadFHIR';
-import DataReviewSection from '@/components/AddRecord/components/DataReviewSection';
-import { CompletionScreen } from '@/components/AddRecord/components/CompletionScreen';
-import { StatsPanel } from '@/components/AddRecord/components/StatsPanel';
+import { ProgressSteps } from '@/features/AddRecord/components/ProgressSteps';
+import { StatusBanner } from '@/features/AddRecord/components/StatusBanner';
+import CombinedUploadFHIR from '@/features/AddRecord/components/CombinedUploadFHIR';
+import DataReviewSection from '@/features/AddRecord/components/DataReviewSection';
+import { CompletionScreen } from '@/features/AddRecord/components/CompletionScreen';
+import { StatsPanel } from '@/features/AddRecord/components/StatsPanel';
 
 const AddRecord = () => {
     const [currentStep, setCurrentStep] = useState('upload'); // 'upload' -> 'convert' -> 'review' -> 'complete'

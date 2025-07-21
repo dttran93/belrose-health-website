@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { FileText, Upload, TestTube, Eye, AlertCircle } from 'lucide-react';
 
-import DynamicFHIRForm from '@/components/AddRecord/components/DynamicFHIRForm';
-import { TabNavigation } from '@/components/AddRecord/components/ui/TabNavigation';
+import DynamicFHIRForm from '@/features/AddRecord/components/DynamicFHIRForm';
+import { TabNavigation } from '@/features/AddRecord/components/ui/TabNavigation';
 import { Button } from '@/components/ui/Button';
 
 // Predefined FHIR test documents (enhanced with more examples)
