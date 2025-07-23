@@ -31,12 +31,7 @@ export const extractFieldsFromResource = async (resource, resourceIndex = 0) => 
     const resourceMappings = await FhirMappingService.getMappingsForResource(resourceType);
     console.log(`  📋 Found ${resourceMappings.length} mappings for ${resourceType}`);
 
-    if (resourceMappings.length === 0) {
-      console.log(`  ⚠️ No mappings found for ${resourceType} in database`);
-      return fields;
-    }
-
-    // Also try enhanced lookup for top-level keys not in mappings
+    //Enhanced lookup for top-level keys not in mappings
     const enhancedMappings = await getEnhancedMappings(resource, resourceType, resourceMappings);
     
     if (enhancedMappings.length > 0) {
@@ -56,12 +51,138 @@ export const extractFieldsFromResource = async (resource, resourceIndex = 0) => 
       }
     }
 
+    // NEW: Add fallback extraction for unmapped fields
+    if (resourceMappings.length === 0) {
+      console.log(`  🔧 No mappings found - applying fallback extraction for all fields`);
+      await extractUnmappedFields(resource, resourceType, resourceIndex, fields);
+    } else {
+      console.log(`  🔧 Checking for unmapped fields not covered by existing mappings`);
+      await extractUnmappedFields(resource, resourceType, resourceIndex, fields, resourceMappings);
+    }
+
   } catch (error) {
     console.error(`Error extracting fields from ${resourceType}:`, error);
   }
 
   console.log(`  🎯 Extracted ${fields.length} fields from ${resourceType}`);
   return fields;
+};
+
+/**
+ * Extract fields that don't have database mappings
+ * @param {Object} resource - The FHIR resource
+ * @param {string} resourceType - The resource type
+ * @param {number} resourceIndex - Index of this resource
+ * @param {Array} existingFields - Already extracted fields
+ * @param {Array} existingMappings - Existing mappings to avoid duplicates
+ */
+const extractUnmappedFields = async (resource, resourceType, resourceIndex, existingFields, existingMappings = []) => {
+  console.log(`  🔍 Searching for unmapped fields in ${resourceType}...`);
+  
+  const existingPaths = new Set(existingMappings.map(m => m.fhirPath));
+  const existingKeys = new Set(existingFields.map(f => f.key));
+  
+  // Recursively extract all possible field paths from the resource
+  const allFieldPaths = extractAllFieldPaths(resource);
+  console.log(`    📋 Found ${allFieldPaths.length} potential field paths in resource`);
+  
+  for (const fieldPath of allFieldPaths) {
+    // Skip if we already have a mapping for this path
+    if (existingPaths.has(fieldPath)) {
+      continue;
+    }
+    
+    // Generate unique field key
+    const fieldKey = `${resourceType.toLowerCase()}_${resourceIndex}_${fieldPath.replace(/[\[\]\.]/g, '_')}`;
+    
+    // Skip if we already have this field
+    if (existingKeys.has(fieldKey)) {
+      continue;
+    }
+    
+    // Extract the value
+    const value = getValueFromPath(resource, fieldPath);
+    
+    // Only create field if value exists and is meaningful
+    if (value !== undefined && value !== null && value !== '') {
+      console.log(`    ➕ Creating fallback field for unmapped path: ${fieldPath} = "${value}"`);
+      
+      // Create a basic field configuration with defaults
+      const fieldConfig = {
+        key: fieldKey,
+        fhirPath: fieldPath,
+        label: generateFieldLabel(fieldPath),
+        value: value,
+        type: 'text', // Default field type
+        category: 'Clinical', // Default category
+        priority: 3, // Default priority (MEDIUM)
+        // Add helpful metadata
+        _fhirPath: `${resourceType}.${fieldPath}`,
+        _resourceType: resourceType,
+        _resourceIndex: resourceIndex,
+        _isUnmapped: true // Flag to identify fallback fields
+      };
+      
+      console.log(`      🔧 Created fallback field:`, {
+        key: fieldConfig.key,
+        type: fieldConfig.type,
+        category: fieldConfig.category,
+        priority: fieldConfig.priority,
+        label: fieldConfig.label,
+        value: fieldConfig.value
+      });
+      
+      existingFields.push(fieldConfig);
+      existingKeys.add(fieldKey);
+    }
+  }
+  
+  console.log(`    ✅ Added fallback fields, total now: ${existingFields.length}`);
+};
+
+/**
+ * Recursively extract all possible field paths from a FHIR resource
+ * @param {Object} obj - The object to extract paths from
+ * @param {string} prefix - Current path prefix
+ * @param {Array} paths - Accumulated paths
+ * @param {number} maxDepth - Maximum recursion depth
+ * @returns {Array} Array of field paths
+ */
+const extractAllFieldPaths = (obj, prefix = '', paths = [], maxDepth = 3) => {
+  if (maxDepth <= 0 || obj === null || obj === undefined) {
+    return paths;
+  }
+  
+  if (typeof obj === 'object' && !Array.isArray(obj)) {
+    // Handle regular objects
+    for (const [key, value] of Object.entries(obj)) {
+      const currentPath = prefix ? `${prefix}.${key}` : key;
+      
+      // Skip system fields that aren't useful for forms
+      if (key === 'resourceType' || key === 'meta' || key === 'extension') {
+        continue;
+      }
+      
+      if (typeof value === 'object' && value !== null) {
+        if (Array.isArray(value)) {
+          // Handle arrays - add array notation
+          paths.push(`${currentPath}[]`);
+          // Also recurse into first element if it exists
+          if (value.length > 0) {
+            extractAllFieldPaths(value[0], `${currentPath}[]`, paths, maxDepth - 1);
+          }
+        } else {
+          // Recurse into nested objects
+          extractAllFieldPaths(value, currentPath, paths, maxDepth - 1);
+        }
+      } else {
+        // Add primitive values
+        paths.push(currentPath);
+      }
+    }
+  }
+  
+  return paths;
 };
 
 /**
@@ -250,6 +371,11 @@ const applyFallbackClassification = (fieldConfig, resourceType, fhirPath) => {
   if (!fieldConfig.priority) {
     fieldConfig.priority = assignFieldPriority(resourceType, fhirPath);
     console.log(`    🎯 Auto-assigned priority: ${fieldConfig.priority}`);
+  }
+
+  if (!fieldConfig.type) {
+    fieldConfig.type = 'text'; // Default to text field type
+    console.log(`    🔧 Auto-assigned field type: text (default)`);
   }
 };
 
