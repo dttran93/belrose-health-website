@@ -139,7 +139,7 @@ function useFileUpload() {
 
                     // Use DocumentProcessorService for processing
                     const processingResult = await DocumentProcessorService.processDocument(fileItem.file, {
-                        enableMedicalDetection: true,
+                        enableMedicalDetection: false,
                         enableVisionAI: true,
                         compressionThreshold: 2 * 1024 * 1024 // 2MB
                     });

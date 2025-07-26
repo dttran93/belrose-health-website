@@ -14,6 +14,7 @@ import AddRecord from "./pages/AddRecord.jsx";
 import './App.css'
 import { AuthProvider } from "./components/auth/AuthContext.jsx";
 import MockFHIRFormTester from "./pages/MockFHIRFormTester.jsx";
+import MockDataReviewTester from "@/pages/MockDataReviewTester.jsx";
 
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ const App = () => {
                     <Route path="activity" element={<Activity />}/>
                     <Route path="addrecord" element={<AddRecord />}/>
                     <Route path="fhirtesting" element={<MockFHIRFormTester />} />
+                    <Route path="datareviewtesting" element={<MockDataReviewTester />} />
                 </Routes>
               </Layout>
               </ProtectedRoute>

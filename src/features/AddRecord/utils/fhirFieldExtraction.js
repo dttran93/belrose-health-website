@@ -115,7 +115,7 @@ const extractUnmappedFields = async (resource, resourceType, resourceIndex, exis
         value: value,
         type: 'text', // Default field type
         category: 'Clinical', // Default category
-        priority: 3, // Default priority (MEDIUM)
+        priority: 4, // Default priority (LOW)
         // Add helpful metadata
         _fhirPath: `${resourceType}.${fieldPath}`,
         _resourceType: resourceType,

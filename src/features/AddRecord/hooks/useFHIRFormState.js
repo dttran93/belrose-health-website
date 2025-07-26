@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+// src/features/AddRecord/hooks/useFHIRFormState.js
+
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
  * Custom hook to manage FHIR form state
@@ -20,6 +22,10 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
   const [expandedSections, setExpandedSections] = useState({});
   const [showLowPriority, setShowLowPriority] = useState(false);
 
+  // Use refs to track if we've already called validation callbacks to prevent loops
+  const hasCalledInitialValidation = useRef(false);
+  const lastValidationState = useRef(null);
+
   /**
    * Initialize form data when field configurations change
    */
@@ -35,9 +41,49 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
     setFormData(initialData);
     setIsDirty(false);
     setErrors({}); // Clear any existing errors when reinitializing
+    hasCalledInitialValidation.current = false; // Reset validation flag
     
     console.log('✅ Form data initialized with', Object.keys(initialData).length, 'fields');
   }, [fieldConfigs]);
+
+  /**
+   * Call validation callback only when needed, with loop prevention
+   */
+  const callValidationCallback = useCallback((validationState) => {
+    if (!onValidationChange) return;
+
+    // Prevent calling with the same state repeatedly
+    const stateString = JSON.stringify(validationState);
+    if (lastValidationState.current === stateString) {
+      return;
+    }
+
+    lastValidationState.current = stateString;
+    console.log('📊 Calling validation callback:', validationState);
+    onValidationChange(validationState);
+  }, [onValidationChange]);
+
+  /**
+   * Set initial validation state when form is ready
+   */
+  useEffect(() => {
+    if (fieldConfigs.length > 0 && !hasCalledInitialValidation.current) {
+      hasCalledInitialValidation.current = true;
+      
+      const initialValidationState = {
+        isValid: true,
+        isDirty: false,
+        hasErrors: false,
+        errors: {},
+        errorCount: 0,
+        changes: {},
+        formData: {}
+      };
+
+      console.log('🎯 Setting initial validation state');
+      callValidationCallback(initialValidationState);
+    }
+  }, [fieldConfigs.length, callValidationCallback]);
 
   /**
    * Validate a single field
@@ -67,7 +113,7 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
         }
         break;
         
-      case 'phone':
+      case 'tel':
         // Basic phone validation - at least 10 digits
         const phoneRegex = /\d{10,}/;
         if (!phoneRegex.test(value.replace(/\D/g, ''))) {
@@ -75,60 +121,60 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
         }
         break;
         
-      case 'date':
-        // Validate date format and reasonableness
-        const date = new Date(value);
-        if (isNaN(date.getTime())) {
-          return 'Please enter a valid date';
-        }
-        // Check if date is in reasonable range (not too far in future/past)
-        const now = new Date();
-        const hundredYearsAgo = new Date(now.getFullYear() - 100, now.getMonth(), now.getDate());
-        const tenYearsFromNow = new Date(now.getFullYear() + 10, now.getMonth(), now.getDate());
-        
-        if (date < hundredYearsAgo || date > tenYearsFromNow) {
-          return 'Date seems unreasonable - please check';
+      case 'url':
+        try {
+          new URL(value);
+        } catch {
+          return 'Please enter a valid URL';
         }
         break;
         
       case 'number':
-        if (isNaN(Number(value))) {
+        if (isNaN(value)) {
           return 'Please enter a valid number';
+        }
+        if (field.min !== undefined && parseFloat(value) < field.min) {
+          return `Value must be at least ${field.min}`;
+        }
+        if (field.max !== undefined && parseFloat(value) > field.max) {
+          return `Value must be no more than ${field.max}`;
         }
         break;
         
-      case 'select':
-        // Validate that selection is from allowed options
-        if (field.options && !field.options.some(option => option.value === value)) {
-          return 'Please select a valid option';
+      case 'date':
+        const dateValue = new Date(value);
+        if (isNaN(dateValue.getTime())) {
+          return 'Please enter a valid date';
         }
         break;
     }
     
-    // Custom validation if provided
-    if (field.validate && typeof field.validate === 'function') {
-      try {
-        const customValidationResult = field.validate(value, formData);
-        if (customValidationResult !== true && customValidationResult) {
-          return customValidationResult; // Return custom error message
-        }
-      } catch (error) {
-        console.error(`Custom validation error for ${field.key}:`, error);
-        return 'Validation error occurred';
+    // Length validation
+    if (field.minLength && value.length < field.minLength) {
+      return `Must be at least ${field.minLength} characters`;
+    }
+    if (field.maxLength && value.length > field.maxLength) {
+      return `Must be no more than ${field.maxLength} characters`;
+    }
+    
+    // Pattern validation
+    if (field.pattern) {
+      const regex = new RegExp(field.pattern);
+      if (!regex.test(value)) {
+        return field.patternMessage || 'Invalid format';
       }
     }
     
-    return null; // No errors
-  }, [formData]);
+    return null;
+  }, []);
 
   /**
-   * Validate all fields and update error state
+   * Validate all fields in the form
    */
   const validateAllFields = useCallback(() => {
-    console.log('🔍 Validating all fields...');
+    console.log('🧪 Validating all fields...');
     
     const newErrors = {};
-    let hasErrors = false;
     
     fieldConfigs.forEach(field => {
       const value = formData[field.key];
@@ -136,27 +182,32 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
       
       if (error) {
         newErrors[field.key] = error;
-        hasErrors = true;
       }
     });
     
     setErrors(newErrors);
+    
+    const hasErrors = Object.keys(newErrors).length > 0;
     setIsValid(!hasErrors);
     
-    console.log(`✅ Validation complete: ${hasErrors ? 'INVALID' : 'VALID'}`);
+    console.log(`📋 Validation completed: ${hasErrors ? 'INVALID' : 'VALID'}`);
     console.log('Errors:', newErrors);
     
-    // Notify parent component of validation changes
-    if (onValidationChange) {
-      onValidationChange({
-        isValid: !hasErrors,
-        errors: newErrors,
-        errorCount: Object.keys(newErrors).length
-      });
-    }
+    // Call validation callback after updating state
+    const validationState = {
+      isValid: !hasErrors,
+      isDirty,
+      hasErrors,
+      errors: newErrors,
+      errorCount: Object.keys(newErrors).length,
+      changes: isDirty ? formData : {},
+      formData: formData
+    };
+    
+    callValidationCallback(validationState);
     
     return !hasErrors;
-  }, [fieldConfigs, formData, validateField, onValidationChange]);
+  }, [fieldConfigs, formData, validateField, isDirty, callValidationCallback]);
 
   /**
    * Handle field value changes
@@ -197,10 +248,25 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
         }
         
         console.log(`🧹 ${error ? 'Set' : 'Cleared'} error for field: ${fieldKey}`);
+        
+        // Call validation callback with updated errors
+        const hasErrors = Object.keys(newErrors).length > 0;
+        const validationState = {
+          isValid: !hasErrors,
+          isDirty: true,
+          hasErrors,
+          errors: newErrors,
+          errorCount: Object.keys(newErrors).length,
+          changes: formData,
+          formData: { ...formData, [fieldKey]: value }
+        };
+        
+        callValidationCallback(validationState);
+        
         return newErrors;
       });
     }
-  }, [fieldConfigs, validateField, onFHIRUpdate]);
+  }, [fieldConfigs, validateField, onFHIRUpdate, formData, callValidationCallback]);
 
   /**
    * Reset form to initial state
@@ -217,6 +283,7 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
     setErrors({});
     setIsDirty(false);
     setIsValid(true);
+    hasCalledInitialValidation.current = false;
   }, [fieldConfigs]);
 
   /**
@@ -234,70 +301,32 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
       filledFields,
       errorCount,
       completionPercentage: totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : 0,
-      isDirty,
-      isValid
+      isValid,
+      isDirty
     };
-  }, [fieldConfigs.length, formData, errors, isDirty, isValid]);
+  }, [formData, errors, fieldConfigs.length, isValid, isDirty]);
 
-  /**
-   * Toggle section expansion
-   */
-  const toggleSection = useCallback((sectionKey) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [sectionKey]: !prev[sectionKey]
-    }));
-  }, []);
-
-  /**
-   * Update form data programmatically (useful for bulk updates)
-   */
-  const updateFormData = useCallback((updates) => {
-    console.log('🔄 Bulk updating form data:', Object.keys(updates));
-    
-    setFormData(prev => {
-      const newData = { ...prev, ...updates };
-      
-      if (onFHIRUpdate) {
-        onFHIRUpdate(newData);
-      }
-      
-      return newData;
-    });
-    
-    setIsDirty(true);
-  }, [onFHIRUpdate]);
-
-  // Return all form state and handlers
   return {
-    // Core form state
+    // Form data
     formData,
-    setFormData,
     errors,
     isDirty,
     isValid,
+    errorCount: Object.keys(errors).length,
     
     // UI state
     expandedSections,
+    setExpandedSections,
     showLowPriority,
     setShowLowPriority,
     
-    // Form actions
+    // Actions
     handleFieldChange,
     validateAllFields,
     resetForm,
-    updateFormData,
-    toggleSection,
     
     // Utilities
     getFormSummary,
-    validateField,
-    
-    // Computed values
-    hasErrors: Object.keys(errors).length > 0,
-    errorCount: Object.keys(errors).length,
-    filledFieldCount: Object.values(formData).filter(value => 
-      value !== null && value !== undefined && value.toString().trim() !== ''
-    ).length
+    validateField
   };
 };

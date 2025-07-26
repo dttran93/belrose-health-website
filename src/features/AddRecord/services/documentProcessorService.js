@@ -10,7 +10,7 @@ import { aiMedicalDetectionService } from '@/features/AddRecord/services/aiMedic
  */
 async function processDocument(file, options = {}) {
   const {
-    enableMedicalDetection = true,
+    enableMedicalDetection = false, //Set as false for testing. Save on API
     enableVisionAI = true,
     compressionThreshold = 2 * 1024 * 1024 // 2MB
   } = options;
