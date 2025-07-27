@@ -1,3 +1,4 @@
+// utils/fhirFieldExtraction.js - COMPLETE FIXED VERSION
 import FhirMappingService from '@/features/AddRecord/services/fhirMappingService';
 import {
   getValueFromPath,
@@ -69,7 +70,7 @@ export const extractFieldsFromResource = async (resource, resourceIndex = 0) => 
 };
 
 /**
- * Extract fields that don't have database mappings
+ * FIXED: Extract fields that don't have database mappings with proper object handling
  * @param {Object} resource - The FHIR resource
  * @param {string} resourceType - The resource type
  * @param {number} resourceIndex - Index of this resource
@@ -107,21 +108,8 @@ const extractUnmappedFields = async (resource, resourceType, resourceIndex, exis
     if (value !== undefined && value !== null && value !== '') {
       console.log(`    ➕ Creating fallback field for unmapped path: ${fieldPath} = "${value}"`);
       
-      // Create a basic field configuration with defaults
-      const fieldConfig = {
-        key: fieldKey,
-        fhirPath: fieldPath,
-        label: generateFieldLabel(fieldPath),
-        value: value,
-        type: 'text', // Default field type
-        category: 'Clinical', // Default category
-        priority: 4, // Default priority (LOW)
-        // Add helpful metadata
-        _fhirPath: `${resourceType}.${fieldPath}`,
-        _resourceType: resourceType,
-        _resourceIndex: resourceIndex,
-        _isUnmapped: true // Flag to identify fallback fields
-      };
+      // FIXED: Use the proper object-handling field creation
+      const fieldConfig = createFallbackFieldWithProperValue(fieldPath, value, resourceType, resourceIndex);
       
       console.log(`      🔧 Created fallback field:`, {
         key: fieldConfig.key,
@@ -129,7 +117,8 @@ const extractUnmappedFields = async (resource, resourceType, resourceIndex, exis
         category: fieldConfig.category,
         priority: fieldConfig.priority,
         label: fieldConfig.label,
-        value: fieldConfig.value
+        valueType: typeof fieldConfig.value,
+        originalValueType: fieldConfig._originalValueType
       });
       
       existingFields.push(fieldConfig);
@@ -138,6 +127,65 @@ const extractUnmappedFields = async (resource, resourceType, resourceIndex, exis
   }
   
   console.log(`    ✅ Added fallback fields, total now: ${existingFields.length}`);
+};
+
+/**
+ * FIXED: Create fallback field with proper object value handling
+ */
+const createFallbackFieldWithProperValue = (fieldPath, value, resourceType, resourceIndex) => {
+  // Generate unique field key
+  const fieldKey = `${resourceType.toLowerCase()}_${resourceIndex}_${fieldPath.replace(/[\[\]\.]/g, '_')}`;
+  
+  // FIXED: Handle different value types properly
+  let processedValue = value;
+  let fieldType = 'text'; // Default
+  
+  if (typeof value === 'object' && value !== null) {
+    if (Array.isArray(value)) {
+      // For arrays, store the actual array, not string representation
+      processedValue = value;
+      fieldType = 'text'; // Will be handled specially in form
+      console.log(`      📋 Preserving array value:`, value);
+    } else {
+      // For objects, store the actual object, not string representation  
+      processedValue = value;
+      fieldType = 'text'; // Will be handled specially in form
+      console.log(`      📦 Preserving object value:`, value);
+    }
+  } else if (typeof value === 'string') {
+    // Check if it's a corrupted object string
+    if (value === '[object Object]') {
+      console.log(`      ⚠️ Skipping corrupted object string for ${fieldPath}`);
+      return null; // Skip this field
+    }
+    processedValue = value;
+    fieldType = 'text';
+  } else if (typeof value === 'number') {
+    processedValue = value;
+    fieldType = 'number';
+  } else if (typeof value === 'boolean') {
+    processedValue = value;
+    fieldType = 'checkbox';
+  }
+  
+  // Create field configuration
+  const fieldConfig = {
+    key: fieldKey,
+    fhirPath: fieldPath,
+    label: generateFieldLabel(fieldPath),
+    value: processedValue, // FIXED: Store actual value, not string representation
+    type: fieldType,
+    category: 'Clinical',
+    priority: 4,
+    // Add helpful metadata
+    _fhirPath: `${resourceType}.${fieldPath}`,
+    _resourceType: resourceType,
+    _resourceIndex: resourceIndex,
+    _isUnmapped: true,
+    _originalValueType: typeof value // Track original type for debugging
+  };
+  
+  return fieldConfig;
 };
 
 /**

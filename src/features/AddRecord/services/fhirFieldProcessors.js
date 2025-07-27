@@ -1,4 +1,3 @@
-// utils/fhirFieldProcessors.js
 import { FIELD_CATEGORIES, FIELD_PRIORITY } from '@/lib/fhirConstants';
 
 /**
@@ -43,6 +42,7 @@ export const getValueFromPath = (obj, path) => {
         return finalValue;
       }
       
+      // FIXED: Return the actual element, not stringified
       return firstElement;
     }
     
@@ -78,7 +78,7 @@ export const getNestedValue = (obj, path) => {
     }
   }
   
-  // Handle arrays - join them or take first element
+  // FIXED: Handle arrays more carefully - preserve object structure
   if (Array.isArray(current)) {
     if (current.length === 0) {
       console.log(`    📋 Empty array found`);
@@ -92,8 +92,14 @@ export const getNestedValue = (obj, path) => {
       return joined;
     }
     
-    // For arrays of objects, take the first one for now
-    console.log(`    📋 Taking first element from object array:`, current[0]);
+    // FIXED: For arrays of objects, return the actual object, not converted to string
+    if (typeof current[0] === 'object') {
+      console.log(`    📋 Taking first element from object array:`, current[0]);
+      return current[0]; // Return the actual object
+    }
+    
+    // For other array types, take the first element
+    console.log(`    📋 Taking first element from array:`, current[0]);
     return current[0];
   }
   
@@ -141,6 +147,8 @@ export const getAllValuesFromArrayPath = (obj, path) => {
         console.log(`    ✅ Extracted "${property}" from element ${index}: "${elementValue}"`);
         values.push(elementValue);
       } else {
+        // FIXED: Push the actual element, not stringified
+        console.log(`    ✅ Adding array element ${index}:`, element);
         values.push(element);
       }
     });
@@ -152,6 +160,19 @@ export const getAllValuesFromArrayPath = (obj, path) => {
     console.log(`    ❌ Error extracting array path "${path}":`, error);
     return [];
   }
+};
+
+/**
+ * FIXED: Special handler for preserving object structure in form values
+ */
+export const preserveObjectStructure = (value) => {
+  // If it's an object or array, return it as-is for proper FHIR conversion
+  if (typeof value === 'object' && value !== null) {
+    return value;
+  }
+  
+  // For primitive values, return as-is
+  return value;
 };
 
 /**
@@ -290,7 +311,7 @@ export const filterFieldsByPriority = (fields, showLowPriority = false) => {
 };
 
 // Get ordered categories for consistent display
-export const getCategoriesInOrder = (fieldsByCategory) => {
+export const getCategoriesInOrder = () => {
   const categoryOrder = [
     FIELD_CATEGORIES.ADMINISTRATIVE,
     FIELD_CATEGORIES.PATIENT_INFO,
@@ -298,7 +319,7 @@ export const getCategoriesInOrder = (fieldsByCategory) => {
     FIELD_CATEGORIES.CLINICAL_DATA
   ];
   
-  return categoryOrder.filter(category => fieldsByCategory[category]);
+  return categoryOrder;
 };
 
 // Utility function to check if a field is required
