@@ -1,5 +1,5 @@
 // utils/fhirFieldExtraction.js - COMPLETE FIXED VERSION
-import FhirMappingService from '@/features/AddRecord/services/fhirMappingService';
+import FhirMappingService from '@/features/EditRecord/services/fhirMappingService';
 import {
   getValueFromPath,
   getAllValuesFromArrayPath,
@@ -7,7 +7,7 @@ import {
   generateArrayElementLabel,
   categorizeFHIRField,
   assignFieldPriority
-} from '@/features/AddRecord/services/fhirFieldProcessors';
+} from '@/features/EditRecord/utils/fhirFieldProcessors';
 
 /**
  * FHIR Field Extraction Service

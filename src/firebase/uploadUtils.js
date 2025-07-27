@@ -1,17 +1,44 @@
-
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getFirestore, collection, addDoc, doc, updateDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
-export async function uploadUserFile(file) {
+export async function uploadUserFile(fileObj) {
+  console.log('📄 uploadUserFile received:', {
+    hasFile: !!fileObj.file,
+    hasFileProperty: 'file' in fileObj,
+    fileName: fileObj.name,
+    isVirtual: fileObj.isVirtual,
+    extractedText: !!fileObj.extractedText,
+    allKeys: Object.keys(fileObj)
+  });
+
   const storage = getStorage();
   const auth = getAuth();
   const user = auth.currentUser;
   
   if (!user) throw new Error("User not authenticated");
 
+  // Handle virtual files (no actual file to upload)
+  if (fileObj.isVirtual) {
+    console.log('🎯 Processing virtual file - skipping file upload');
+    
+    // For virtual files, we just save metadata without uploading to storage
+    return {
+      downloadURL: null, // No file was uploaded
+      filePath: null,
+      isVirtual: true
+    };
+  }
+
+  // Handle regular files
+  const file = fileObj.file;
+  if (!file) {
+    throw new Error("No file found in fileObj. Expected fileObj.file to contain the File object.");
+  }
+
   // Organize files by user ID
-  const filePath = `users/${user.uid}/uploads/${Date.now()}_${file.name}`;
+  const fileName = fileObj.name || file.name;
+  const filePath = `users/${user.uid}/uploads/${Date.now()}_${fileName}`;
   const fileRef = ref(storage, filePath);
 
   // Add metadata (e.g., content type, custom fields)
@@ -19,7 +46,7 @@ export async function uploadUserFile(file) {
     contentType: file.type,
     customMetadata: {
       uploadedBy: user.uid,
-      originalFilename: file.name,
+      originalFilename: fileName,
       description: "User upload"
     }
   };
@@ -38,7 +65,7 @@ export async function uploadUserFile(file) {
   }
 }
 
-export async function saveFileMetadataToFirestore({ downloadURL, filePath, file }) {
+export async function saveFileMetadataToFirestore({ downloadURL, filePath, fileObj }) {
   const db = getFirestore();
   const auth = getAuth();
   const user = auth.currentUser;
@@ -46,15 +73,50 @@ export async function saveFileMetadataToFirestore({ downloadURL, filePath, file 
   if (!user) throw new Error("User not authenticated");
 
   try {
-    const docRef = await addDoc(collection(db, "users", user.uid, "files"), {
-      fileName: file.name,
+    // Handle both regular files and file wrapper objects
+    const file = fileObj.file || fileObj; // Support both formats
+    const fileName = fileObj.name || file.name;
+    const fileSize = fileObj.size || file.size;
+    const fileType = fileObj.type || file.type;
+
+    const documentData = {
+      fileName: fileName,
       downloadURL,
       storagePath: filePath,
       uploadedBy: user.uid,
       uploadedAt: new Date(),
-      fileType: file.type,
-      fileSize: file.size,
-    });
+      fileType: fileType,
+      fileSize: fileSize,
+    };
+
+    // Add additional metadata for processed files
+    if (fileObj.extractedText) {
+      documentData.extractedText = fileObj.extractedText;
+    }
+    if (fileObj.wordCount) {
+      documentData.wordCount = fileObj.wordCount;
+    }
+    if (fileObj.documentType) {
+      documentData.documentType = fileObj.documentType;
+    }
+    if (fileObj.extractedAt) {
+      documentData.extractedAt = fileObj.extractedAt;
+    }
+    if (fileObj.processingStatus) {
+      documentData.processingStatus = fileObj.processingStatus;
+    }
+    if (fileObj.fileHash) {
+      documentData.fileHash = fileObj.fileHash;
+    }
+    if (fileObj.isVirtual) {
+      documentData.isVirtual = fileObj.isVirtual;
+      documentData.virtualFileType = 'fhir_input';
+    }
+    if (fileObj.fhirData) {
+      documentData.fhirData = fileObj.fhirData;
+    }
+
+    const docRef = await addDoc(collection(db, "users", user.uid, "files"), documentData);
 
     return docRef.id; // Return the document ID for reference
   } catch (error) {
@@ -64,7 +126,6 @@ export async function saveFileMetadataToFirestore({ downloadURL, filePath, file 
 }
 
 export const updateFirestoreWithFHIR = async (documentId, fhirData) => {
-
   console.log("documentID received:", documentId, "type:", typeof documentId);
 
   const db = getFirestore();
@@ -73,7 +134,7 @@ export const updateFirestoreWithFHIR = async (documentId, fhirData) => {
 
   if(!user) throw new Error ("User not authenticated");
 
-    if (!documentId) {
+  if (!documentId) {
     console.error("Document ID is undefined, null, or empty");
     throw new Error("Document ID is required");
   }
@@ -92,16 +153,16 @@ export const updateFirestoreWithFHIR = async (documentId, fhirData) => {
 };
 
 // Combined function for complete file upload workflow
-export async function uploadFileComplete(file) {
+export async function uploadFileComplete(fileObj) {
   try {
-    // Upload file to storage
-    const { downloadURL, filePath } = await uploadUserFile(file);
+    // Upload file to storage (or handle virtual files)
+    const { downloadURL, filePath } = await uploadUserFile(fileObj);
     
     // Save metadata to Firestore
     const documentId = await saveFileMetadataToFirestore({
       downloadURL,
       filePath,
-      file
+      fileObj // Pass the whole fileObj instead of just file
     });
 
     return { documentId, downloadURL, filePath };

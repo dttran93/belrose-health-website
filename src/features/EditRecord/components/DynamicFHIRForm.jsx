@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import DynamicFHIRField from './ui/DynamicFHIRField';
-import { FIELD_CATEGORIES, FIELD_PRIORITY } from '@/lib/fhirConstants'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import DynamicFHIRField from './DynamicFHIRField';
+import { FIELD_CATEGORIES, FIELD_PRIORITY } from '@/lib/fhirConstants';
 import { useFHIRFormState } from '@/features/AddRecord/hooks/useFHIRFormState';
-import { generateFieldConfigurations } from '@/features/AddRecord/utils/fhirFieldExtraction';
+import { generateFieldConfigurations } from '@/features/EditRecord/utils/fhirFieldExtraction';
 import {
   getFieldsByCategory,
   filterFieldsByPriority,
   getCategoriesInOrder
-} from '@/features/AddRecord/services/fhirFieldProcessors';
+} from '@/features/EditRecord/utils/fhirFieldProcessors';
 
 const DynamicFHIRForm = ({ 
   fhirData, 
@@ -20,14 +20,19 @@ const DynamicFHIRForm = ({
   // Simple local state for field configurations and loading
   const [fieldConfigs, setFieldConfigs] = useState([]);
   const [loading, setLoading] = useState(false);
+  const initializedOnce = useRef(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
+  const [isFormLocked, setIsFormLocked] = useState(false);
+  const justSaved = useRef(false);
+  const lastFhirDataHash = useRef('');
+  const lastFileString = useRef('');
 
-  // CRITICAL FIX 1: Memoize fieldConfigs to prevent infinite loops
+  // Memoize fieldConfigs to prevent infinite loops
   const memoizedFieldConfigs = useMemo(() => {
-    // Deep clone to ensure stability and prevent mutations
     return fieldConfigs.map(config => ({ ...config }));
   }, [fieldConfigs]);
 
-  // CRITICAL FIX 2: Memoize callbacks to prevent re-creation on every render
+  // Memoize callbacks to prevent re-creation on every render
   const memoizedOnFHIRUpdate = useCallback((data) => {
     if (onFHIRUpdate) {
       onFHIRUpdate(data);
@@ -55,18 +60,18 @@ const DynamicFHIRForm = ({
     getFormSummary,
     errorCount,
     saveFHIRData,
-    discardChanges
+    discardChanges,
+    isSaving,
   } = useFHIRFormState(
-    memoizedFieldConfigs, // Use memoized version
-    memoizedOnFHIRUpdate,  // Use memoized callback
-    memoizedOnValidationChange, // Use memoized callback
+    memoizedFieldConfigs,
+    memoizedOnFHIRUpdate,
+    memoizedOnValidationChange,
     fhirData
   );
 
-  // CRITICAL FIX 3: Memoize the initialization effect dependencies
+  // Memoize the initialization effect dependencies
   const fhirDataString = useMemo(() => {
     if (!fhirData) return null;
-    // Create a stable string representation for comparison
     return JSON.stringify({
       entryLength: fhirData.entry?.length || 0,
       resourceType: fhirData.resourceType,
@@ -76,56 +81,76 @@ const DynamicFHIRForm = ({
 
   const originalFileString = useMemo(() => {
     if (!originalFile) return null;
-    // Create a stable string representation for comparison
-    return `${originalFile.name}-${originalFile.size}-${originalFile.lastModified}`;
-  }, [originalFile]);
+    // CRITICAL: Use more stable file identification - use a static timestamp if lastModified is undefined
+    const timestamp = originalFile.lastModified || Date.now();
+    const fileId = originalFile.name + '-' + originalFile.size + '-' + timestamp;
+    console.log('📄 File string created:', fileId);
+    return fileId;
+  }, [originalFile?.name, originalFile?.size, originalFile?.lastModified]);
 
   // Initialize field configurations when FHIR data changes
   useEffect(() => {
-    const initializeForm = async () => {
-      console.log('🚀 DynamicFHIRForm: Initializing form data (manual save mode)');
-      console.log('FHIR data provided:', !!fhirData);
-      console.log('FHIR entries:', fhirData?.entry?.length || 0);
+      // Calculate a hash of the FHIR data to detect real changes
+      const currentFhirDataHash = fhirData ? JSON.stringify({
+        entryCount: fhirData.entry?.length || 0,
+        resourceTypes: fhirData.entry?.map(e => e.resource?.resourceType).join(',') || '',
+        patientId: fhirData.entry?.find(e => e.resource?.resourceType === 'Patient')?.resource?.id || '',
+        firstEntryId: fhirData.entry?.[0]?.resource?.id || ''
+      }) : '';
       
-      setLoading(true);
+      // CRITICAL: Skip ALL reinitializations if form is locked or just saved
+      if (isFormLocked || justSaved.current) {
+        console.log('🔒 Skipping reinitialization - form is locked or just saved');
+        return;
+      }
       
-      try {
-        const fieldConfigurations = await generateFieldConfigurations(fhirData, originalFile);
-        console.log('✅ Generated field configurations:', fieldConfigurations.length);
+      // CRITICAL: Only initialize if this is genuinely new/different data
+      if (hasInitialized && currentFhirDataHash === lastFhirDataHash.current) {
+        console.log('🚫 Skipping reinitialization - data unchanged');
+        return;
+      }
+      
+      // CRITICAL: Don't reinitialize if we already have field configs unless data actually changed
+      if (fieldConfigs.length > 0 && hasInitialized && currentFhirDataHash === lastFhirDataHash.current) {
+        console.log('🚫 Skipping reinitialization - already has configs and data unchanged');
+        return;
+      }
+
+      const initializeForm = async () => {
+        console.log('🚀 DynamicFHIRForm: Initializing form data (bulletproof mode)');
+        console.log('FHIR data provided:', !!fhirData);
+        console.log('FHIR entries:', fhirData?.entry?.length || 0);
         
-        // CRITICAL FIX 4: Only update if configurations actually changed
-        setFieldConfigs(prev => {
-          const prevLength = prev.length;
-          const newLength = fieldConfigurations.length;
+        setLoading(true);
+        
+        try {
+          const fieldConfigurations = await generateFieldConfigurations(fhirData, originalFile);
+          console.log('✅ Generated field configurations:', fieldConfigurations.length);
           
-          // Quick comparison to avoid unnecessary updates
-          if (prevLength === newLength && prevLength > 0) {
-            console.log('🔄 Field configurations unchanged, skipping update');
-            return prev;
-          }
+          setFieldConfigs(fieldConfigurations);
+          setHasInitialized(true);
+          lastFhirDataHash.current = currentFhirDataHash;
           
-          console.log('📝 Updating field configurations:', { prevLength, newLength });
-          return fieldConfigurations;
-        });
-      } catch (error) {
-        console.error('❌ Error initializing form:', error);
+          console.log('✅ Form initialization complete and locked');
+        } catch (error) {
+          console.error('❌ Error initializing form:', error);
+          setFieldConfigs([]);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      if (fhirData || originalFile) {
+        initializeForm();
+      } else {
+        console.log('⚠️ No FHIR data or original file provided');
         setFieldConfigs([]);
-      } finally {
         setLoading(false);
       }
-    };
-    
-    if (fhirData || originalFile) {
-      initializeForm();
-    } else {
-      console.log('⚠️ No FHIR data or original file provided');
-      setFieldConfigs([]);
-      setLoading(false);
-    }
-  }, [fhirDataString, originalFileString]); // Use memoized strings instead of objects
+  }, [fhirDataString, originalFileString, isFormLocked, hasInitialized]);
 
-  // Handle manual save
-  const handleSave = useCallback(() => {
+  // SIMPLIFIED: Handle manual save without timing issues
+  const handleSave = useCallback(async () => {
     console.log('💾 Save button clicked');
     
     if (!isValid) {
@@ -138,13 +163,48 @@ const DynamicFHIRForm = ({
       return;
     }
     
-    const success = saveFHIRData();
-    if (success) {
-      console.log('✅ Form saved successfully');
-    } else {
-      console.log('❌ Save failed');
+    // LOCK the form to prevent any reinitializations
+    console.log('🔒 LOCKING FORM to prevent reinitialization');
+    setIsFormLocked(true);
+    justSaved.current = true;
+
+    try {
+      const success = saveFHIRData();
+      if (success) {
+        console.log('✅ Form saved successfully - keeping form locked');
+        // Keep the form locked for a short period to ensure no reinitializations
+        setTimeout(() => {
+          console.log('🔓 Unlocking form after successful save');
+          setIsFormLocked(false);
+          justSaved.current = false;
+        }, 1000); // 1 second delay to ensure stability
+      } else {
+        console.log('❌ Save failed - unlocking form');
+        setIsFormLocked(false);
+        justSaved.current = false;
+      }
+    } catch (error) {
+      console.error('❌ Save error:', error);
+      setIsFormLocked(false);
+      justSaved.current = false;
     }
-  }, [isValid, hasUnsavedChanges, saveFHIRData]);
+}, [isValid, hasUnsavedChanges, saveFHIRData]);
+
+// CRITICAL FIX: This is the effect that was causing your problem!
+useEffect(() => {
+    // Only reset if the file actually changed (not just props updated)
+    const newFileString = originalFile ? `${originalFile.name}-${originalFile.size}-${originalFile.lastModified}` : null;
+    
+    // THIS WAS YOUR BUG: You were comparing to lastFhirDataHash instead of lastFileString!
+    if (newFileString !== lastFileString.current) {
+      console.log('📄 File changed - resetting form state');
+      setHasInitialized(false);
+      setIsFormLocked(false);
+      justSaved.current = false;
+      lastFhirDataHash.current = '';
+      lastFileString.current = newFileString;
+    }
+}, [originalFileString]);
 
   // Handle field blur with optional auto-save
   const handleFieldBlurWithAutoSave = useCallback((fieldKey) => {
@@ -156,7 +216,7 @@ const DynamicFHIRForm = ({
     }
   }, [handleFieldBlur, autoSaveOnBlur, isValid, hasUnsavedChanges, saveFHIRData]);
 
-  // Helper to get CSS classes for layout widths (enhanced for groups)
+  // Helper to get CSS classes for layout widths
   const getLayoutWidthClass = useCallback((width) => {
     const widthMap = {
       '1/2': 'w-1/2',
@@ -210,7 +270,7 @@ const DynamicFHIRForm = ({
     };
   }, []);
 
-  // Helper to get field-level category styling for individual fields
+  // Helper to get field-level category styling
   const getFieldCategoryClass = useCallback((category) => {
     const fieldStyles = {
       [FIELD_CATEGORIES.ADMINISTRATIVE]: 'ring-blue-500/20 focus-within:ring-blue-500/40',
@@ -222,7 +282,7 @@ const DynamicFHIRForm = ({
     return fieldStyles[category] || 'ring-gray-500/20 focus-within:ring-gray-500/40';
   }, []);
 
-  // CRITICAL FIX 5: Memoize expensive field processing
+  // Memoize expensive field processing
   const processedFields = useMemo(() => {
     if (memoizedFieldConfigs.length === 0) {
       return {
@@ -273,12 +333,10 @@ const DynamicFHIRForm = ({
     Object.entries(groupedFields).forEach(([groupName, groupFields]) => {
       console.log(`🔗 Rendering group "${groupName}" with ${groupFields.length} fields`);
       
-      // Sort by groupOrder
       const sortedFields = groupFields.sort((a, b) => 
         (a.layout?.groupOrder || 0) - (b.layout?.groupOrder || 0)
       );
       
-      // Mark all as processed
       sortedFields.forEach(field => processedFields.add(field.key));
       groupedCount += sortedFields.length;
       
@@ -356,7 +414,7 @@ const DynamicFHIRForm = ({
 
   const { filteredFields, fieldsByCategory, orderedCategories, lowPriorityCount } = processedFields;
 
-  // CRITICAL FIX 6: Only log essential information, reduce console spam
+  // Log essential information
   console.log('📊 Form summary:', {
     totalFields: memoizedFieldConfigs.length,
     filteredFields: filteredFields.length,
@@ -366,7 +424,16 @@ const DynamicFHIRForm = ({
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6">      
+      {isFormLocked && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+          <div className="flex items-center text-blue-800">
+            <div className="animate-spin w-4 h-4 border border-blue-600 border-t-transparent rounded-full mr-2"></div>
+            <span className="text-sm font-medium">Saving changes...</span>
+          </div>
+        </div>
+      )}
+
       {/* Manual Save Controls */}
       {showSaveButton && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
@@ -405,6 +472,13 @@ const DynamicFHIRForm = ({
                     {errorCount} error{errorCount !== 1 ? 's' : ''}
                   </div>
                 )}
+                
+                {isSaving && (
+                  <div className="flex items-center text-blue-600">
+                    <div className="animate-spin w-3 h-3 border border-blue-600 border-t-transparent rounded-full mr-2"></div>
+                    Saving...
+                  </div>
+                )}
               </div>
             </div>
             
@@ -414,7 +488,8 @@ const DynamicFHIRForm = ({
                 <button
                   type="button"
                   onClick={discardChanges}
-                  className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors"
+                  disabled={isSaving}
+                  className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50"
                 >
                   Discard Changes
                 </button>
@@ -423,16 +498,16 @@ const DynamicFHIRForm = ({
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={!hasUnsavedChanges || !isValid}
+                disabled={!hasUnsavedChanges || !isValid || isSaving}
                 className={`
                   px-4 py-2 text-sm font-medium rounded-md transition-colors
-                  ${hasUnsavedChanges && isValid
+                  ${hasUnsavedChanges && isValid && !isSaving
                     ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   }
                 `}
               >
-                {hasUnsavedChanges ? 'Save Changes' : 'No Changes'}
+                {isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save Changes' : 'No Changes'}
               </button>
             </div>
           </div>
@@ -552,9 +627,12 @@ const DynamicFHIRForm = ({
             <div><strong>Is Dirty:</strong> {isDirty ? 'Yes' : 'No'}</div>
             <div><strong>Is Valid:</strong> {isValid ? 'Yes' : 'No'}</div>
             <div><strong>Has Unsaved Changes:</strong> {hasUnsavedChanges ? 'Yes' : 'No'}</div>
-            <div><strong>Can Save:</strong> {(hasUnsavedChanges && isValid) ? 'Yes' : 'No'}</div>
+            <div><strong>Is Saving:</strong> {isSaving ? 'Yes' : 'No'}</div>
+            <div><strong>Can Save:</strong> {(hasUnsavedChanges && isValid && !isSaving) ? 'Yes' : 'No'}</div>
             <div><strong>FHIR Entries:</strong> {fhirData?.entry?.length || 0}</div>
-            <div><strong>Save Mode:</strong> Manual Save Only</div>
+            <div><strong>Save Mode:</strong> Manual Save with flushSync</div>
+            <div><strong>Form Locked:</strong> {isFormLocked ? 'Yes' : 'No'}</div>
+            <div><strong>Just Saved:</strong> {justSaved.current ? 'Yes' : 'No'}</div>
           </div>
         </div>
       )}

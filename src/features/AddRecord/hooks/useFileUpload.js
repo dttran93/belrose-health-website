@@ -60,7 +60,7 @@ function useFileUpload() {
         const newFiles = selectedFiles.map(file => {
             const validation = DocumentProcessorService.validateFile(file);
             return {
-                id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                id: crypto.randomUUID(),
                 file,
                 name: file.name,
                 size: file.size,
@@ -139,7 +139,7 @@ function useFileUpload() {
 
                     // Use DocumentProcessorService for processing
                     const processingResult = await DocumentProcessorService.processDocument(fileItem.file, {
-                        enableMedicalDetection: false,
+                        enableMedicalDetection: true,
                         enableVisionAI: true,
                         compressionThreshold: 2 * 1024 * 1024 // 2MB
                     });
@@ -379,21 +379,62 @@ function useFileUpload() {
     const uploadFiles = useCallback(async (filesToUpload) => {
         if (!filesToUpload || filesToUpload.length === 0) {
             console.log('📤 No files to upload');
-            return;
+            return [];
         }
 
         console.log('📤 Uploading files to Firestore:', filesToUpload.map(f => f.name));
+
+            // 🔍 ADD THIS DEBUG LOG
+            console.log('🔍 DEBUG: Files being uploaded:', filesToUpload.map(f => ({
+                id: f.id,
+                name: f.name,
+                isVirtual: f.isVirtual,
+                hasExtractedText: !!f.extractedText,
+                type: f.type,
+                allKeys: Object.keys(f)
+            })));
         
-        const uploadPromises = filesToUpload.map(fileObj => uploadFile(fileObj));
+            const uploadPromises = filesToUpload.map(fileObj => {
+        // 🔍 ADD THIS DEBUG LOG
+        console.log('🔍 DEBUG: About to call uploadFile with:', {
+            id: fileObj.id,
+            name: fileObj.name,
+            isVirtual: fileObj.isVirtual,
+            allKeys: Object.keys(fileObj)
+        });
+        return uploadFile(fileObj);
+    });
         const results = await Promise.allSettled(uploadPromises);
         
+        // Process results and return success data
+        const uploadResults = [];
+        
         results.forEach((result, index) => {
-            if (result.status === 'rejected') {
-                const fileObj = filesToUpload[index];
-                console.error(`Upload failed for ${fileObj.name}:`, result.reason);
+            const fileObj = filesToUpload[index];
+            
+            if (result.status === 'fulfilled') {
+                // Extract the result data (should include documentId)
+                uploadResults.push({
+                    fileId: fileObj.id,
+                    fileName: fileObj.name,
+                    documentId: result.value?.firestoreId, // Note: it's firestoreId from the service
+                    downloadURL: result.value?.downloadURL,
+                    success: true
+                });
+                console.log(`✅ Upload succeeded for ${fileObj.name} with documentId: ${result.value?.firestoreId}`);
+            } else {
+                console.error(`❌ Upload failed for ${fileObj.name}:`, result.reason);
                 deduplicationService.current.releaseProcessingLock(fileObj.id, fileObj.fileHash);
+                uploadResults.push({
+                    fileId: fileObj.id,
+                    fileName: fileObj.name,
+                    success: false,
+                    error: result.reason
+                });
             }
         });
+        
+        return uploadResults;
     }, []);
 
     /**
@@ -406,7 +447,8 @@ function useFileUpload() {
             // Double check if already uploaded during concurrent operations
             if (firestoreData.has(fileId)) {
                 deduplicationService.current.releaseProcessingLock(fileId, fileObj.fileHash);
-                return;
+                // Return the existing data if already uploaded
+                return firestoreData.get(fileId);
             }
 
             setSavingToFirestore(prev => new Set([...prev, fileId]));
@@ -428,6 +470,9 @@ function useFileUpload() {
             deduplicationService.current.addFirestoreDocId(result.firestoreId);
             
             toast.success(`${fileObj.name} uploaded successfully!`);
+
+            // ✅ Return the result so uploadFiles can access the documentId
+            return result;
 
         } catch (error) {
             toast.error(`Failed to upload ${fileObj.name}: ${error.message}`);
@@ -481,6 +526,84 @@ function useFileUpload() {
         };
     }, [files]);
 
+    // ==================== VIRTUAL FILE SUPPORT ===================
+    /**
+ * Add a virtual file (for direct FHIR input, API imports, etc.)
+ */
+const addVirtualFile = useCallback((virtualFileData) => {
+    console.log('📄 Adding virtual file:', virtualFileData.name);
+    
+    // Ensure virtual file has all required properties
+    const virtualFile = {
+        id: virtualFileData.id || crypto.randomUUID(),
+        name: virtualFileData.name,
+        size: virtualFileData.size || 0,
+        type: virtualFileData.type || 'application/fhir+json',
+        status: 'completed', // Virtual files skip processing
+        addedAt: new Date().toISOString(),
+        extractedText: virtualFileData.extractedText || '',
+        wordCount: virtualFileData.wordCount || 0,
+        medicalDetection: virtualFileData.medicalDetection || {
+            isMedical: true,
+            confidence: 1.0,
+            documentType: 'fhir_resource'
+        },
+        processingMethod: 'virtual_input',
+        processingTime: 0,
+        extractedAt: new Date().toISOString(),
+        // Mark as virtual for special handling
+        isVirtual: true,
+        ...virtualFileData // Allow overrides
+    };
+
+    setFiles(prev => [...prev, virtualFile]);
+    
+    console.log('✅ Virtual file added successfully');
+    return virtualFile;
+}, []);
+
+/**
+ * Create and add a virtual file from FHIR data
+ */
+const addFhirAsVirtualFile = useCallback(async (fhirData, options = {}) => {
+    console.log('🎯 Creating virtual file from FHIR data');
+    
+    const fhirString = JSON.stringify(fhirData, null, 2);
+    const fileId = options.id || crypto.randomUUID();
+    
+    const virtualFile = addVirtualFile({
+        id: fileId,
+        name: options.name || `FHIR Input - ${fhirData.resourceType}`,
+        size: fhirString.length,
+        type: 'application/fhir+json',
+        extractedText: fhirString,
+        wordCount: fhirString.split(/\s+/).length,
+        medicalDetection: {
+            isMedical: true,
+            confidence: 1.0,
+            documentType: options.documentType || 'fhir_resource'
+        },
+        // Store the actual FHIR data for immediate use
+        fhirData: fhirData,
+        ...options
+    });
+
+    // Immediately trigger FHIR conversion callback since we already have FHIR data
+    if (onFHIRConvertedRef.current) {
+        try {
+            await onFHIRConvertedRef.current(fileId, fhirData);
+            console.log('✅ Virtual FHIR file processed through conversion pipeline');
+        } catch (error) {
+            console.error('❌ Error processing virtual FHIR file:', error);
+            // Remove the virtual file if processing fails
+            removeFile(fileId);
+            throw error;
+        }
+    }
+
+    return { fileId, virtualFile };
+}, [addVirtualFile, removeFile]);
+
     // ==================== COMPATIBILITY LAYER ====================
     // These provide compatibility with existing code that expects the old interface
 
@@ -528,6 +651,10 @@ function useFileUpload() {
         
         // Services (for other hooks to use)
         deduplicationService: deduplicationService.current,
+
+        // VirtualFile Support
+        addVirtualFile,
+        addFhirAsVirtualFile,
         
         // Reset function
         reset: clearAll

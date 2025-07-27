@@ -201,111 +201,101 @@ export const useFHIRConversion = (processedFiles, firestoreData, updateFirestore
 
     // NEW: Handle user-confirmed data from DataReviewSection
     const handleDataConfirmed = async (fileId, editedData) => {
-    console.log('Data confirmed for file:', fileId, editedData);
+        console.log('Data confirmed for file:', fileId, editedData);
 
-    // Mark as reviewed
-    setReviewedData(prev => new Map([...prev, [fileId, editedData]]));
-    
-    // Get the original file info
-    const originalFile = processedFiles.find(f => f.id === fileId);
-    if (!originalFile) {
-        console.error('Original file not found for fileId:', fileId);
-        return;
-    }
-
-    console.log('originalFile found:', originalFile);
-
-     // 🔍 ADD THIS DEBUG LOG:
-    console.log('🔍 originalFile structure:', {
-        id: originalFile.id,
-        name: originalFile.name,
-        hasFileProperty: !!originalFile.file,
-        filePropertyStructure: originalFile.file ? {
-            name: originalFile.file.name,
-            size: originalFile.file.size,
-            type: originalFile.file.type
-        } : 'No file property'
-    });
-
-    // Upload the file if uploadFiles function is available
-    if (uploadFiles) {
-        console.log('✅ uploadFiles exists - attempting upload');
-        console.log('Uploading file to Firebase storage...');
-        try {
-            console.log('Calling uploadFiles with:', [originalFile]);
-            await uploadFiles([originalFile]);
-            console.log('✅ Upload completed successfully');
-        } catch (error) {
-            console.error('❌ Error uploading file:', error);
-        }
-    } else {
-        console.log('❌ uploadFiles is not available');
-        console.log('uploadFiles value:', uploadFiles);
-    }
-
-        // Create health record from edited data
-        const healthRecord = createHealthRecordFromEditedData(editedData, fileId);
+        // Mark as reviewed
+        setReviewedData(prev => new Map([...prev, [fileId, editedData]]));
         
-        if (!healthRecord) {
-            console.error('Failed to create health record from edited data');
+        // Get the original file info
+        const originalFile = processedFiles.find(f => f.id === fileId);
+        if (!originalFile) {
+            console.error('Original file not found for fileId:', fileId);
             return;
         }
 
-        // Save health record to Firestore
-        if (user?.uid) {
+        console.log('originalFile found:', originalFile);
+
+        let documentId = null;
+
+        // Step 1: Upload the file to Firebase Storage and get documentId
+        if (uploadFiles) {
+            console.log('✅ uploadFiles exists - attempting upload');
+            console.log('Uploading file to Firebase storage...');
             try {
-                console.log('Saving confirmed health record to Firestore:', healthRecord);
+                console.log('Calling uploadFiles with:', [originalFile]);
+                const uploadResults = await uploadFiles([originalFile]);
+                console.log('✅ Upload completed successfully:', uploadResults);
                 
-                const recordId = String(fileId).replace(/[^a-zA-Z0-9_-]/g, '_');
-                const healthRecordRef = doc(db, `users/${user.uid}/health-records`, recordId);
-                await setDoc(healthRecordRef, healthRecord);
+                // Get the document ID from the first (and only) upload result
+                if (uploadResults && uploadResults.length > 0 && uploadResults[0].success) {
+                    documentId = uploadResults[0].documentId;
+                    console.log('📄 Document ID from upload:', documentId);
+                } else {
+                    console.error('❌ Upload succeeded but no documentId returned:', uploadResults);
+                    return;
+                }
                 
-                console.log('Health record saved successfully to Firestore');
+            } catch (error) {
+                console.error('❌ Error uploading file:', error);
+                return; // Don't continue if file upload fails
+            }
+        } else {
+            console.log('❌ uploadFiles is not available');
+            return;
+        }
+
+        // Step 2: Prepare FHIR data for storage
+        const fhirDataToSave = editedData.fhirData; // This is your FHIR Bundle
+        
+        if (!fhirDataToSave) {
+            console.error('❌ No FHIR data found in editedData');
+            return;
+        }
+
+        // Optional: Add metadata to track processing
+        const fhirWithMetadata = {
+            ...fhirDataToSave,
+            _metadata: {
+                fileId: fileId,
+                fileName: originalFile.name,
+                uploadedAt: new Date().toISOString(),
+                processedAt: new Date().toISOString(),
+                userId: user?.uid,
+                validationState: editedData.validationState
+            }
+        };
+
+        // Step 3: Save FHIR data directly to Firestore
+        if (user?.uid && documentId) {
+            try {
+                console.log('💾 Saving FHIR data to Firestore document:', documentId);
                 
-                // Also update the firestoreData if you're still using it elsewhere
+                // Import the updateFirestoreWithFHIR function
+                const { updateFirestoreWithFHIR } = await import('@/firebase/uploadUtils');
+                
+                // Save the FHIR data directly (no conversion to legacy format)
+                await updateFirestoreWithFHIR(documentId, fhirWithMetadata);
+                
+                console.log('✅ FHIR data saved successfully to document:', documentId);
+                
+                // Update the firestoreData Map to reflect this save
                 if (updateFirestoreRecord) {
-                    updateFirestoreRecord(fileId, {
-                        ...healthRecord,
-                        fhirData: editedData.originalFhirData // Include raw FHIR data too
+                    updateFirestoreRecord(fileId, { 
+                        documentId, 
+                        fhirData: fhirWithMetadata,
+                        status: 'saved' 
                     });
                 }
                 
             } catch (error) {
-                console.error('Error saving health record to Firestore:', error);
+                console.error('❌ Error saving FHIR data to Firestore:', error);
+                // You might want to show a user-friendly error message here
             }
         } else {
-            console.error('No user found, cannot save to Firestore');
-        }
-    };
-
-    // Create health record from user-edited data
-    const createHealthRecordFromEditedData = (editedData, fileId) => {
-        try {
-            return {
-                id: fileId,
-                subject: editedData.documentType || 'Medical Record',
-                provider: editedData.provider || 'Unknown Provider',
-                institutionName: editedData.institution || 'Unknown Institution', 
-                institutionAddress: 'Address not specified',
-                date: editedData.documentDate || new Date().toISOString().split('T')[0],
-                clinicNotes: editedData.clinicalNotes || '',
-                patientName: editedData.patientName || '',
-                patientId: editedData.patientId || '',
-                birthDate: editedData.birthDate || '',
-                gender: editedData.gender || '',
-                attachments: [{
-                    name: editedData.documentTitle || 'Document',
-                    size: "N/A",
-                    url: '#'
-                }],
-                isBlockchainVerified: false,
-                createdAt: new Date().toISOString(),
-                lastModified: new Date().toISOString(),
-                originalFhirData: editedData.originalFhirData
-            };
-        } catch (error) {
-            console.error('Error creating health record from edited data:', error);
-            return null;
+            console.error('❌ Cannot save FHIR data: missing user or documentId', {
+                hasUser: !!user?.uid,
+                documentId
+            });
         }
     };
 
@@ -332,9 +322,7 @@ export const useFHIRConversion = (processedFiles, firestoreData, updateFirestore
 
     // Check if all files are converted AND reviewed
     const isAllFilesConverted = () => {     
-        // Get files that are ready for FHIR conversion (have extracted text)
         const eligibleFiles = processedFiles.filter(f => {
-            // Include files that have extracted text and are in a processed state
             const hasExtractedText = !!f.extractedText;
             const isProcessed = ['completed', 'medical_detected', 'non_medical_detected'].includes(f.status);
             
@@ -343,10 +331,13 @@ export const useFHIRConversion = (processedFiles, firestoreData, updateFirestore
             return hasExtractedText && isProcessed;
         });
         
-        // Check if we have eligible files and all have FHIR data
+        // 🔍 ADD THIS DEBUG LOGGING
+        console.log('🔍 FHIR Data Map contents:', Array.from(fhirData.keys()));
+        console.log('🔍 Eligible files:', eligibleFiles.map(f => ({ id: f.id, name: f.name })));
+        
         const result = eligibleFiles.length > 0 && eligibleFiles.every(f => {
             const hasFhir = fhirData.has(f.id);
-            console.log(`📋 File ${f.name} has FHIR: ${hasFhir}`);
+            console.log(`📋 File ${f.name} (${f.id}) has FHIR: ${hasFhir}`);
             return hasFhir;
         });
         

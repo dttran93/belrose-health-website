@@ -1,6 +1,5 @@
-// FIXED VERSION: useFHIRFormState.js with infinite loop prevention
-
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 
 /**
  * Custom hook to manage FHIR form state
@@ -18,25 +17,25 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
   const [errors, setErrors] = useState({});
   const [isDirty, setIsDirty] = useState(false);
   const [isValid, setIsValid] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   
   // UI state for form sections
   const [expandedSections, setExpandedSections] = useState({});
   const [showLowPriority, setShowLowPriority] = useState(false);
 
-  // Use refs to track if we've already called validation callbacks to prevent loops
+  // Refs for tracking state and preventing loops
   const hasCalledInitialValidation = useRef(false);
   const lastValidationState = useRef(null);
   const isInitializing = useRef(false);
-
-  // CRITICAL FIX 1: Create stable reference for fieldConfigs comparison
   const stableFieldConfigsRef = useRef([]);
+
+  // Memoize fieldConfigs hash for comparison
   const fieldConfigsHash = useMemo(() => {
     if (!fieldConfigs || fieldConfigs.length === 0) return '';
-    // Create a simple hash based on field keys and values
     return fieldConfigs.map(f => `${f.key}:${f.value || ''}`).join('|');
   }, [fieldConfigs]);
 
-  // CRITICAL FIX 2: Memoize callbacks to prevent re-creation
+  // Memoized callbacks
   const memoizedOnFHIRUpdate = useCallback((data) => {
     if (onFHIRUpdate && !isInitializing.current) {
       console.log('📤 Calling onFHIRUpdate with data:', Object.keys(data).length, 'fields');
@@ -50,7 +49,6 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
   const callValidationCallback = useCallback((validationState) => {
     if (!onValidationChange || isInitializing.current) return;
 
-    // CRITICAL FIX 3: Use shallow comparison instead of JSON.stringify
     const currentStateKey = `${validationState.isValid}-${validationState.isDirty}-${validationState.hasErrors}-${validationState.errorCount}`;
     
     if (lastValidationState.current === currentStateKey) {
@@ -71,7 +69,6 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
    * Initialize form data when field configurations change
    */
   useEffect(() => {
-    // CRITICAL FIX 4: Only initialize if configs actually changed
     if (fieldConfigsHash === stableFieldConfigsRef.current.hash) {
       console.log('🔄 Field configs unchanged, skipping initialization');
       return;
@@ -79,15 +76,13 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
 
     console.log('🔄 Initializing form data with', fieldConfigs.length, 'field configurations');
     
-    isInitializing.current = true; // Prevent callbacks during initialization
+    isInitializing.current = true;
     
     const initialData = {};
     fieldConfigs.forEach(field => {
-      // Use the field's default value, or empty string as fallback
       initialData[field.key] = field.value || field.defaultValue || '';
     });
     
-    // Update stable reference
     stableFieldConfigsRef.current = {
       hash: fieldConfigsHash,
       configs: [...fieldConfigs]
@@ -95,13 +90,12 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
     
     setFormData(initialData);
     setIsDirty(false);
-    setErrors({}); // Clear any existing errors when reinitializing
+    setErrors({});
     setIsValid(true);
-    hasCalledInitialValidation.current = false; // Reset validation flag
+    hasCalledInitialValidation.current = false;
     
     console.log('✅ Form data initialized with', Object.keys(initialData).length, 'fields');
     
-    // Allow callbacks after a brief delay
     setTimeout(() => {
       isInitializing.current = false;
     }, 100);
@@ -134,9 +128,6 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
 
   /**
    * Validate a single field
-   * @param {Object} field - Field configuration
-   * @param {*} value - Field value to validate
-   * @returns {string|null} Error message or null if valid
    */
   const validateField = useCallback((field, value) => {
     console.log(`🔍 Validating field ${field.key}:`, { 
@@ -170,7 +161,6 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
           return `${field.label || field.key} must be a valid number`;
         }
         
-        // Check min/max constraints
         if (field.min !== undefined && numValue < field.min) {
           return `${field.label || field.key} must be at least ${field.min}`;
         }
@@ -195,7 +185,7 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
         break;
     }
     
-    return null; // Field is valid
+    return null;
   }, []);
 
   /**
@@ -223,9 +213,7 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
     setIsValid(!hasErrors);
     
     console.log(`🧪 Validation complete: ${hasErrors ? 'INVALID' : 'VALID'}`);
-    console.log('Errors:', newErrors);
     
-    // CRITICAL FIX 5: Only call validation callback if not initializing
     if (!isInitializing.current) {
       const validationState = {
         isValid: !hasErrors,
@@ -244,71 +232,67 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
   }, [fieldConfigs, formData, validateField, isDirty, callValidationCallback]);
 
   /**
-   * Handle field value changes
+   * FINAL FIX: Handle field value changes with flushSync for immediate state updates
    */
   const handleFieldChange = useCallback((fieldKey, value) => {
     if (isInitializing.current) return;
     
     console.log(`✏️ Field changed: ${fieldKey} = "${typeof value === 'string' ? value.substring(0, 50) : value}"`);
     
-    // Find the field configuration
     const field = fieldConfigs.find(f => f.key === fieldKey);
     
-    setFormData(prev => {
-      const newData = {
-        ...prev,
-        [fieldKey]: value
-      };
+    // CRITICAL FIX: Use flushSync to force synchronous state updates
+    flushSync(() => {
+      setFormData(prev => ({ ...prev, [fieldKey]: value }));
+      setIsDirty(true);
       
-      // CRITICAL FIX: Don't call onFHIRUpdate on every field change
-      // Only call it when explicitly saving via saveFHIRData()
-      // This prevents the FHIR data from being corrupted with flat form data
-      
-      return newData;
+      // Validate the changed field immediately
+      if (field && !isInitializing.current) {
+        const error = validateField(field, value);
+        
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          
+          if (error) {
+            newErrors[fieldKey] = error;
+          } else {
+            delete newErrors[fieldKey];
+          }
+          
+          console.log(`🧹 ${error ? 'Set' : 'Cleared'} error for field: ${fieldKey}`);
+          
+          const hasErrors = Object.keys(newErrors).length > 0;
+          setIsValid(!hasErrors);
+          
+          return newErrors;
+        });
+      }
     });
 
-    setIsDirty(true);
-
-    // Validate the changed field immediately
+    // Now call validation callback with the updated state (happens after flushSync)
     if (field && !isInitializing.current) {
-      const error = validateField(field, value);
+      // Get the current state (which is now updated due to flushSync)
+      const currentErrors = Object.keys(errors).length > 0;
       
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        
-        if (error) {
-          newErrors[fieldKey] = error;
-        } else {
-          delete newErrors[fieldKey]; // Clear error if field is now valid
-        }
-        
-        console.log(`🧹 ${error ? 'Set' : 'Cleared'} error for field: ${fieldKey}`);
-        
-        // Call validation callback with updated errors - but only if not initializing
+      const validationState = {
+        isValid: !currentErrors,
+        isDirty: true,
+        hasErrors: currentErrors,
+        errors: errors,
+        errorCount: Object.keys(errors).length,
+        changes: formData,
+        formData: { ...formData, [fieldKey]: value },
+        hasUnsavedChanges: true
+      };
+      
+      // Small delay to ensure all state updates are complete
+      setTimeout(() => {
         if (!isInitializing.current) {
-          const hasErrors = Object.keys(newErrors).length > 0;
-          const validationState = {
-            isValid: !hasErrors,
-            isDirty: true,
-            hasErrors,
-            errors: newErrors,
-            errorCount: Object.keys(newErrors).length,
-            changes: formData,
-            formData: { ...formData, [fieldKey]: value }
-          };
-          
-          // Debounce validation callback
-          setTimeout(() => {
-            if (!isInitializing.current) {
-              callValidationCallback(validationState);
-            }
-          }, 100);
+          callValidationCallback(validationState);
         }
-        
-        return newErrors;
-      });
+      }, 0);
     }
-  }, [fieldConfigs, validateField, formData, callValidationCallback]);
+  }, [fieldConfigs, validateField, callValidationCallback, formData, errors]);
 
   /**
    * Handle field blur events
@@ -318,70 +302,137 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
     
     console.log(`👁️ Field blurred: ${fieldKey}`);
     
-    // Re-validate the field on blur
     const field = fieldConfigs.find(f => f.key === fieldKey);
     if (field) {
-      const value = formData[fieldKey];
+      const value = formData[field.key];
       const error = validateField(field, value);
       
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        
-        if (error) {
-          newErrors[fieldKey] = error;
-        } else {
-          delete newErrors[fieldKey];
-        }
-        
-        return newErrors;
+      flushSync(() => {
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          
+          if (error) {
+            newErrors[fieldKey] = error;
+          } else {
+            delete newErrors[fieldKey];
+          }
+          
+          return newErrors;
+        });
       });
     }
   }, [fieldConfigs, formData, validateField]);
 
   /**
-   * Manual save functionality - returns FHIR data
+   * FINAL FIX: Manual save functionality with flushSync and proper async handling
    */
-  const saveFHIRData = useCallback(() => {
-    if (!isValid || !isDirty) {
-      console.log('⚠️ Cannot save: form invalid or not dirty');
-      return false;
-    }
+  const saveFHIRData = useCallback(async () => {
+    // Use flushSync to ensure we have the most current state
+    let currentFormData, currentIsDirty, currentErrors;
+    
+    flushSync(() => {
+      setIsSaving(true);
+    });
+    
+    // Now read the current state
+    currentFormData = formData;
+    currentIsDirty = isDirty;
+    currentErrors = errors;
     
     console.log('💾 Saving FHIR data...');
+    console.log('📊 Current state:', { 
+      isDirty: currentIsDirty, 
+      isValid: Object.keys(currentErrors).length === 0, 
+      formDataKeys: Object.keys(currentFormData).length 
+    });
     
-    try {
-      // Import your existing form-to-FHIR converter
-      import('@/features/AddRecord/utils/formtoFhirConverter').then(({ convertFormDataToFHIR }) => {
-        // Convert form data back to proper FHIR structure using your existing converter
-        const reconstructedFHIR = convertFormDataToFHIR(formData, fieldConfigs, fhirData);
-        
-        if (!reconstructedFHIR) {
-          console.error('❌ Failed to reconstruct FHIR data from form');
-          return false;
-        }
-        
-        console.log('✅ Successfully reconstructed FHIR data:', {
-          entries: reconstructedFHIR.entry?.length || 0,
-          resourceTypes: reconstructedFHIR.entry?.map(e => e.resource?.resourceType) || []
-        });
-        
-        // Call the update callback with reconstructed FHIR data
-        memoizedOnFHIRUpdate(reconstructedFHIR);
-        
-        // Mark as clean
-        setIsDirty(false);
-        
-        console.log('✅ FHIR data saved successfully');
-      }).catch(error => {
-        console.error('❌ Error importing or using convertFormDataToFHIR:', error);
-      });
-      
-      return true;
-    } catch (error) {
-      console.error('❌ Error saving FHIR data:', error);
+    // Check if we have changes and data
+    if (!currentIsDirty) {
+      console.log('⚠️ Cannot save: no changes made');
+      flushSync(() => setIsSaving(false));
       return false;
     }
-  }, [isValid, isDirty, formData, fieldConfigs, memoizedOnFHIRUpdate, fhirData]);
+    
+    if (Object.keys(currentFormData).length === 0) {
+      console.log('⚠️ Cannot save: no form data');
+      flushSync(() => setIsSaving(false));
+      return false;
+    }
+    
+    if (Object.keys(currentErrors).length > 0) {
+      console.log('⚠️ Cannot save: form has validation errors');
+      flushSync(() => setIsSaving(false));
+      return false;
+    }
+    
+    try {
+      // CRITICAL FIX: Use async/await instead of .then() for proper timing
+      const { convertFormDataToFHIR } = await import('@/features/EditRecord/utils/formtoFhirConverter');
+      
+      // DEBUG: Log field configs to check for missing metadata
+      console.log('🔍 Checking field configs for missing metadata...');
+      const fieldsWithoutMetadata = fieldConfigs.filter(f => 
+        !f._resourceType || f._resourceIndex === undefined
+      );
+      
+      if (fieldsWithoutMetadata.length > 0) {
+        console.warn('⚠️ Found fields without resource metadata:', 
+          fieldsWithoutMetadata.map(f => ({ key: f.key, _resourceType: f._resourceType, _resourceIndex: f._resourceIndex }))
+        );
+      }
+      
+      // Convert form data back to proper FHIR structure
+      const reconstructedFHIR = convertFormDataToFHIR(currentFormData, fieldConfigs, fhirData);
+      
+      if (!reconstructedFHIR) {
+        console.error('❌ Failed to reconstruct FHIR data from form');
+        flushSync(() => setIsSaving(false));
+        return false;
+      }
+      
+      console.log('✅ Successfully reconstructed FHIR data:', {
+        entries: reconstructedFHIR.entry?.length || 0,
+        resourceTypes: reconstructedFHIR.entry?.map(e => e.resource?.resourceType) || []
+      });
+      
+      // DEBUG: Compare original vs reconstructed to see what changed
+      console.log('🔍 Comparing original vs reconstructed FHIR data...');
+      if (fhirData?.entry && reconstructedFHIR?.entry) {
+        fhirData.entry.forEach((originalEntry, index) => {
+          const reconstructedEntry = reconstructedFHIR.entry[index];
+          if (originalEntry?.resource && reconstructedEntry?.resource) {
+            const original = JSON.stringify(originalEntry.resource, null, 2);
+            const reconstructed = JSON.stringify(reconstructedEntry.resource, null, 2);
+            if (original !== reconstructed) {
+              console.log(`📝 Resource ${index} (${originalEntry.resource.resourceType}) was modified`);
+              // Log specific field that changed for the field we're tracking
+              if (originalEntry.resource.resourceType === 'Patient' && 
+                  originalEntry.resource.name?.[0]?.given !== reconstructedEntry.resource.name?.[0]?.given) {
+                console.log(`🎯 Patient name.given changed: "${originalEntry.resource.name?.[0]?.given}" → "${reconstructedEntry.resource.name?.[0]?.given}"`);
+              }
+            }
+          }
+        });
+      }
+      
+      // Call the update callback with reconstructed FHIR data
+      memoizedOnFHIRUpdate(reconstructedFHIR);
+      
+      // Mark as clean AFTER successful conversion
+      flushSync(() => {
+        setIsDirty(false);
+        setIsSaving(false);
+      });
+      
+      console.log('✅ FHIR data saved successfully');
+      return true;
+      
+    } catch (error) {
+      console.error('❌ Error saving FHIR data:', error);
+      flushSync(() => setIsSaving(false));
+      return false;
+    }
+  }, [formData, isDirty, errors, fieldConfigs, fhirData, memoizedOnFHIRUpdate]);
 
   /**
    * Discard unsaved changes
@@ -389,16 +440,17 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
   const discardChanges = useCallback(() => {
     console.log('🗑️ Discarding unsaved changes');
     
-    // Reset to initial field values
     const initialData = {};
     fieldConfigs.forEach(field => {
       initialData[field.key] = field.value || field.defaultValue || '';
     });
     
-    setFormData(initialData);
-    setIsDirty(false);
-    setErrors({});
-    setIsValid(true);
+    flushSync(() => {
+      setFormData(initialData);
+      setIsDirty(false);
+      setErrors({});
+      setIsValid(true);
+    });
   }, [fieldConfigs]);
 
   /**
@@ -414,10 +466,13 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
       initialData[field.key] = field.value || field.defaultValue || '';
     });
     
-    setFormData(initialData);
-    setErrors({});
-    setIsDirty(false);
-    setIsValid(true);
+    flushSync(() => {
+      setFormData(initialData);
+      setErrors({});
+      setIsDirty(false);
+      setIsValid(true);
+    });
+    
     hasCalledInitialValidation.current = false;
     
     setTimeout(() => {
@@ -445,7 +500,7 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
     };
   }, [formData, errors, fieldConfigs.length, isValid, isDirty]);
 
-  // CRITICAL FIX 7: Compute hasUnsavedChanges efficiently
+  // Compute hasUnsavedChanges efficiently
   const hasUnsavedChanges = useMemo(() => {
     return isDirty && Object.keys(formData).length > 0;
   }, [isDirty, formData]);
@@ -458,6 +513,7 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
     isValid,
     hasUnsavedChanges,
     errorCount: Object.keys(errors).length,
+    isSaving,
     
     // UI state
     expandedSections,

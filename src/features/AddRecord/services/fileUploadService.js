@@ -2,18 +2,13 @@ import { saveFileMetadataToFirestore, uploadUserFile } from '@/firebase/uploadUt
 
 export class FileUploadService {
     async uploadSingleFile(fileObj) {
-        const { downloadURL, filePath } = await uploadUserFile(fileObj.file);
+        // Pass the entire fileObj to uploadUserFile
+        const { downloadURL, filePath } = await uploadUserFile(fileObj);
         
         const firestoreDoc = await saveFileMetadataToFirestore({
             downloadURL,
             filePath,
-            file: fileObj.file,
-            extractedText: fileObj.extractedText,
-            wordCount: fileObj.wordCount,
-            documentType: fileObj.documentType || 'unknown',
-            extractedAt: fileObj.extractedAt,
-            processingStatus: 'text_extracted',
-            fileHash: fileObj.fileHash
+            fileObj: fileObj // Pass the entire fileObj
         });
 
         return {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertCircle, HelpCircle } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { isFieldRequired } from '../../services/fhirFieldProcessors';
+import { isFieldRequired } from '../utils/fhirFieldProcessors';
 
 // Add this helper function at the top of DynamicFHIRField
 const normalizeDateTime = (value) => {

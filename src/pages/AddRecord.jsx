@@ -1,19 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import useFileUpload from '@/features/AddRecord/hooks/useFileUpload';
-import { useFHIRConversion } from '@/features/AddRecord/hooks/useFHIRConversion';
 import { ExportService } from '@/features/AddRecord/services/exportService';
 
-// Import all components
-import { ProgressSteps } from '@/features/AddRecord/components/ProgressSteps';
-import { StatusBanner } from '@/features/AddRecord/components/StatusBanner';
+// Import components
 import CombinedUploadFHIR from '@/features/AddRecord/components/CombinedUploadFHIR';
-import DataReviewSection from '@/features/AddRecord/components/DataReviewSection';
-import { CompletionScreen } from '@/features/AddRecord/components/CompletionScreen';
 import { StatsPanel } from '@/features/AddRecord/components/StatsPanel';
 
 const AddRecord = () => {
-    const [currentStep, setCurrentStep] = useState('upload'); // 'upload' -> 'convert' -> 'review' -> 'complete'
-    
     // CONSOLIDATED FILE MANAGEMENT: Single source of truth for all file operations
     const {
         files,
@@ -24,164 +17,165 @@ const AddRecord = () => {
         removeFile,
         retryFile,
         clearAll,
-        processFile,
         uploadFiles,
         updateFirestoreRecord,
         getStats,
         savedToFirestoreCount,
         savingCount,
         deduplicationService,
-        setFHIRConversionCallback,
-        setResetProcessCallback,
+        addFhirAsVirtualFile, // NEW: For direct FHIR input
         reset: resetFileUpload
     } = useFileUpload();
 
-    // FHIR conversion hook (now receives processedFiles from the consolidated manager)
-    const {
-        fhirData,
-        reviewedData, 
-        handleFHIRConverted,
-        handleDataConfirmed, 
-        handleDataRejected, 
-        isAllFilesConverted,
-        isAllFilesReviewed,
-        getFHIRStats,
-        reset: resetFHIR
-    } = useFHIRConversion(processedFiles, firestoreData, updateFirestoreRecord, uploadFiles);
-
-    // Reset everything
-    const resetProcess = () => {
-        resetFileUpload();
-        resetFHIR();
-        setCurrentStep('upload');
-    };
-
-    // Connect the FHIR conversion callback
-    useEffect(() => {
-        setFHIRConversionCallback(handleFHIRConverted);
-        setResetProcessCallback(resetProcess);
-    }, [setFHIRConversionCallback, setResetProcessCallback, handleFHIRConverted, resetProcess]);
-
     console.log('📊 AddRecord state:', {
-        currentStep,
         filesCount: files.length,
         processedFilesCount: processedFiles.length,
-        fhirDataSize: fhirData.size,
-        reviewedDataSize: reviewedData.size
+        savedToFirestoreCount,
+        savingCount
     });
 
     // Export service
     const exportService = new ExportService();
 
-    // Step management effect
-    useEffect(() => {
-        console.log('🔄 Step management useEffect triggered:', {
-            currentStep,
-            processedFilesLength: processedFiles.length,
-            isAllFilesConverted: isAllFilesConverted(),
-            isAllFilesReviewed: isAllFilesReviewed()
-        });
-
-        if (processedFiles.length > 0 && currentStep === 'upload') {
-            setCurrentStep('convert');
-        }
-        if (isAllFilesConverted() && currentStep === 'convert') {
-            setCurrentStep('review');
-        }
-        if (isAllFilesReviewed() && currentStep === 'review') {
-            setCurrentStep('complete'); 
-        }
-    }, [processedFiles.length, isAllFilesConverted(), isAllFilesReviewed(), currentStep]);
-
     // Download all data
     const downloadAllData = () => {
         const deduplicationStats = deduplicationService.getStats();
-        const exportData = exportService.generateExportData(
-            processedFiles, 
-            fhirData, 
-            firestoreData, 
-            deduplicationStats
-        );
         
-        const filename = `medical-records-export-${new Date().toISOString().split('T')[0]}.json`;
-        exportService.downloadData(exportData, filename);
+        const exportData = {
+            files: processedFiles,
+            firestoreData: Object.fromEntries(firestoreData),
+            stats: {
+                files: getStats(),
+                deduplication: deduplicationStats
+            },
+            exportedAt: new Date().toISOString()
+        };
+
+        exportService.downloadJson(exportData, 'belrose-health-records');
+    };
+
+    // Reset everything
+    const resetAll = () => {
+        resetFileUpload();
+        window.location.reload(); // Fresh start
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 py-8">
-            <div className="max-w-6xl mx-auto px-4">
+        <div className="min-h-screen bg-gray-50">
+            <div className="max-w-7xl mx-auto px-4 py-8">
                 {/* Header */}
-                <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                        Add Medical Record
-                    </h1>
-                    <p className="text-lg text-gray-600">
-                        Upload documents, extract text, convert to FHIR, review data, and save to your medical records
-                    </p>
+                <div className="mb-8">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-900">Add Health Records</h1>
+                            <p className="text-gray-600 mt-2">
+                                Upload medical documents or input FHIR data - everything gets saved automatically
+                            </p>
+                        </div>
+                        
+                        <div className="flex items-center space-x-4">
+                            {(files.length > 0 || savedToFirestoreCount > 0) && (
+                                <>
+                                    <button
+                                        onClick={downloadAllData}
+                                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                                    >
+                                        📥 Download Data
+                                    </button>
+                                    <button
+                                        onClick={resetAll}
+                                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                                    >
+                                        🔄 Reset
+                                    </button>
+                                </>
+                            )}
+                            
+                            <a 
+                                href="/edit-fhir"
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                                ✏️ Edit Records
+                            </a>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Progress Steps */}
-                <ProgressSteps 
-                    currentStep={currentStep} 
-                    processedFiles={processedFiles} 
-                    fhirData={fhirData}
-                    reviewedData={reviewedData}
-                />
-
-                {/* Status Banner */}
-                <StatusBanner 
-                    savedToFirestoreCount={savedToFirestoreCount} 
-                    savingCount={savingCount} 
-                />
-
-                {/* Conditional rendering based on current step */}
-                
-                {/* Upload and Conversion Steps */}
-                {(currentStep === 'upload' || currentStep === 'convert') && (
-                    <div className="grid grid-cols-1 gap-8 mb-8">
-                        <CombinedUploadFHIR
-                            // Pass file management functions directly
-                            files={files}
-                            addFiles={addFiles}
-                            removeFile={removeFile}
-                            retryFile={retryFile}
-                            getStats={getStats}
+                {/* Upload Status */}
+                {(savedToFirestoreCount > 0 || savingCount > 0) && (
+                    <div className="mb-6 bg-white border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="font-medium text-gray-900">Cloud Storage Status</h3>
+                                <p className="text-sm text-gray-600 mt-1">
+                                    {savedToFirestoreCount} records saved to cloud
+                                    {savingCount > 0 && (
+                                        <span className="text-blue-600 ml-2">
+                                            ({savingCount} uploading...)
+                                        </span>
+                                    )}
+                                </p>
+                            </div>
                             
-                            // Configuration
-                            maxFiles={5}
-                            maxSizeBytes={10 * 1024 * 1024} // 10 MB
-                        />
+                            {savedToFirestoreCount > 0 && (
+                                <div className="text-green-600 flex items-center">
+                                    <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                                    <span className="text-sm font-medium">Synced</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
 
-                {/* Review Step */}
-                {currentStep === 'review' && (
-                    <div className="mb-8">
-                        <DataReviewSection
-                            processedFiles={processedFiles}
-                            fhirData={fhirData}
-                            onDataConfirmed={handleDataConfirmed}
-                            onDataRejected={handleDataRejected}
-                            onResetAll={resetProcess}
-                        />
-                    </div>
-                )}
-
-                {/* Completion Screen */}
-                {currentStep === 'complete' && (
-                    <CompletionScreen 
-                        onDownload={downloadAllData}
-                        onReset={resetProcess}
-                    />
-                )}
-
-                {/* Statistics Panel */}
-                <StatsPanel
-                    processedFiles={processedFiles}
-                    savedToFirestoreCount={reviewedData.size}
-                    fhirData={fhirData}
-                    totalFhirResources={getFHIRStats()}
+                {/* Main Upload Interface */}
+                <CombinedUploadFHIR
+                    files={files}
+                    addFiles={addFiles}
+                    removeFile={removeFile}
+                    retryFile={retryFile}
+                    getStats={getStats}
+                    addFhirAsVirtualFile={addFhirAsVirtualFile} // NEW: Direct FHIR support
+                    uploadFiles={uploadFiles} // NEW: Direct upload support
                 />
+
+                {/* Stats Panel */}
+                {files.length > 0 && (
+                    <div className="mt-8">
+                        <StatsPanel 
+                            processedFiles={processedFiles}
+                            savedToFirestoreCount={savedToFirestoreCount}
+                            fhirData={new Map()} // Empty since we're not using review flow
+                            totalFhirResources={0}
+                        />
+                    </div>
+                )}
+
+                {/* Success State */}
+                {files.length === 0 && savedToFirestoreCount > 0 && (
+                    <div className="mt-8 text-center">
+                        <div className="text-6xl mb-4">✅</div>
+                        <h2 className="text-2xl font-semibold text-gray-900 mb-3">
+                            All Records Uploaded!
+                        </h2>
+                        <p className="text-gray-600 mb-6">
+                            {savedToFirestoreCount} health record{savedToFirestoreCount !== 1 ? 's' : ''} successfully saved to your cloud storage.
+                        </p>
+                        <div className="flex justify-center space-x-4">
+                            <button
+                                onClick={resetAll}
+                                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                                Upload More Records
+                            </button>
+                            <a 
+                                href="/edit-fhir"
+                                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                            >
+                                Edit Records
+                            </a>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

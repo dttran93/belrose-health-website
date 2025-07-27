@@ -6,6 +6,7 @@ export const healthRecords = [
   { title: "Add Record", url: "/dashboard/addrecord", icon: FilePlus2 },
   { title: "FHIR Testing", url: "/dashboard/fhirtesting", icon: BookOpenCheck },
   { title: "DataReview Testing", url: "/dashboard/datareviewtesting", icon: BookOpenCheck },
+  { title: "Edit FHIR", url: "/dashboard/EditFhir", icon: BookOpenCheck },
 ];
 
 export const healthCategories = [

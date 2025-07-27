@@ -3,13 +3,13 @@ import { FileText, Check, X, AlertCircle, Save } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 // Custom hooks
-import { useDataReview } from '../hooks/useDataReview';
+import { useDataReview } from '@/features/EditRecord/hooks/useDataReview';
 
 // Import DynamicFHIRForm
 import DynamicFHIRForm from './DynamicFHIRForm';
 
 // UI components
-import { TabNavigation } from './ui/TabNavigation';
+import { TabNavigation } from '../../AddRecord/components/ui/TabNavigation';
 
 const TABS = [
     { id: 'extracted', label: 'Extracted Text' },
@@ -84,7 +84,7 @@ const DataReviewSection = ({
 
         // Update our reference
         lastInitializedFhirData.current = new Map(fhirData);
-    }, [fhirData, editedFiles, currentFhirData]);
+    }, [fhirData, editedFiles]);
 
     useEffect(() => {
         if (reviewableFiles.length === 0) {
@@ -104,6 +104,8 @@ const DataReviewSection = ({
         
         // Mark this file as edited to prevent overwriting
         setEditedFiles(prev => new Set([...prev, fileId]));
+
+        lastInitializedFhirData.current.set(fileId, updatedFhirData);
         
         console.log(`🔒 File ${fileId} marked as edited and saved`);
     };
