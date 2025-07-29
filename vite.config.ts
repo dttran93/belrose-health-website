@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 export default defineConfig({
-  optimizeDeps:{
+  optimizeDeps: {
     exclude: ['pdfjs-dist/build/pdf.worker.mjs']
   },
   plugins: [react()],
