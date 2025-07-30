@@ -1,4 +1,20 @@
+import type {
+  AnalysisRequest,
+  AnalysisType,
+  FullAnalysisResult,
+  MedicalDetectionResult,
+  ApiErrorResponse,
+  SupportedImageType
+} from './aiImageService.type';
+
+import {
+  SUPPORTED_IMAGE_TYPES,
+  MEDICAL_FILE_EXTENSIONS
+} from './aiImageService.type';
+
 export class AiImageService {
+  private readonly apiUrl: string;
+
   constructor() {
     this.apiUrl = 'https://us-central1-belrose-757fe.cloudfunctions.net/analyzeImageWithAI';
   }
@@ -6,14 +22,26 @@ export class AiImageService {
   /**
    * Convert file to base64 for AI Vision API
    */
-  async fileToBase64(file) {
-    return new Promise((resolve, reject) => {
+  async fileToBase64(file: File): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = reader.result.split(',')[1]; // Remove data:image/jpeg;base64, prefix
-        resolve(base64);
+      reader.onload = (): void => {
+        const result = reader.result;
+        if (typeof result === 'string' && result.includes(',')) {
+          // Find the comma and extract everything after it
+          const commaIndex = result.indexOf(',');
+          const base64Data = result.substring(commaIndex + 1);
+          
+          if (base64Data.length > 0) {
+            resolve(base64Data);
+          } else {
+            reject(new Error('Empty base64 data'));
+          }
+        } else {
+          reject(new Error('Failed to read file as data URL or invalid format'));
+        }
       };
-      reader.onerror = reject;
+      reader.onerror = (error) => reject(error);
       reader.readAsDataURL(file);
     });
   }
@@ -21,8 +49,8 @@ export class AiImageService {
   /**
    * Get media type for API
    */
-  getMediaType(fileType) {
-    const mimeTypeMap = {
+  getMediaType(fileType: string): string {
+    const mimeTypeMap: Record<string, string> = {
       'image/jpeg': 'image/jpeg',
       'image/jpg': 'image/jpeg', 
       'image/png': 'image/png',
@@ -35,48 +63,50 @@ export class AiImageService {
   /**
    * Analyze image with AI Vision for medical content detection and text extraction
    */
-  async analyzeImage(file, analysisType = 'full') {
+  async analyzeImage(file: File, analysisType: AnalysisType = 'full'): Promise<FullAnalysisResult> {
     try {
       const base64Image = await this.fileToBase64(file);
       const mediaType = this.getMediaType(file.type);
+
+      const requestBody: AnalysisRequest = {
+        image: {
+          base64: base64Image,
+          mediaType: mediaType
+        },
+        fileName: file.name,
+        fileType: file.type,
+        analysisType: analysisType
+      };
 
       const response = await fetch(this.apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          image: {
-            base64: base64Image,
-            mediaType: mediaType
-          },
-          fileName: file.name,
-          fileType: file.type,
-          analysisType: analysisType // 'detection', 'extraction', 'full'
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData: ApiErrorResponse = await response.json();
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
-      const result = await response.json();
+      const result: FullAnalysisResult = await response.json();
       return result;
 
     } catch (error) {
       console.error('AI Vision analysis error:', error);
-      throw new Error(`Failed to analyze image: ${error.message}`);
+      throw new Error(`Failed to analyze image: ${(error as Error).message}`);
     }
   }
 
   /**
    * Extract text from image using AI Vision
    */
-  async extractTextFromImage(file) {
+  async extractTextFromImage(file: File): Promise<string> {
     try {
       const result = await this.analyzeImage(file, 'extraction');
-      return result.extractedText || '';
+      return result.extractedText ?? ''; // Use nullish coalescing instead of ||
     } catch (error) {
       console.error('Error extracting text with AI Vision:', error);
       // Fallback to Tesseract if AI fails
@@ -87,7 +117,7 @@ export class AiImageService {
   /**
    * Detect if image contains medical content
    */
-  async detectMedicalContent(file) {
+  async detectMedicalContent(file: File): Promise<MedicalDetectionResult> {
     try {
       const result = await this.analyzeImage(file, 'detection');
       return {
@@ -106,7 +136,7 @@ export class AiImageService {
   /**
    * Full analysis: detection + text extraction + classification
    */
-  async analyzeImageFull(file) {
+  async analyzeImageFull(file: File): Promise<FullAnalysisResult> {
     try {
       const result = await this.analyzeImage(file, 'full');
       return {
@@ -137,12 +167,11 @@ export class AiImageService {
   /**
    * Check if file is a medical imaging format
    */
-  isMedicalImageFile(fileName, fileType) {
+  isMedicalImageFile(fileName: string, fileType: string): boolean {
     const lowerFileName = fileName.toLowerCase();
     const lowerFileType = fileType.toLowerCase();
     
-    const medicalExtensions = ['.dcm', '.dicom', '.nii', '.nii.gz', '.mha', '.mhd'];
-    const hasMedialExtension = medicalExtensions.some(ext => lowerFileName.endsWith(ext));
+    const hasMedialExtension = MEDICAL_FILE_EXTENSIONS.some((ext: string) => lowerFileName.endsWith(ext));
     const isMedicalMimeType = lowerFileType.includes('dicom') || lowerFileType.includes('medical');
     
     return hasMedialExtension || isMedicalMimeType;

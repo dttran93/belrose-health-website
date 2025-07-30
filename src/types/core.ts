@@ -7,7 +7,7 @@ export interface User {
 
 export interface FileObject {
   id: string;
-  file: File;
+  file?: File;
   name: string;
   size: number;
   type: string;
@@ -18,6 +18,9 @@ export interface FileObject {
   fileHash?: string;
   documentType?: string;
   lastModified?: number;
+  isVirtual?: boolean;
+  fhirData?: any;
+  [key: string]: any;
 }
 
 export type FileStatus = 
@@ -51,4 +54,8 @@ export interface MedicalDetectionResult {
   confidence: number;
   detectedTerms: string[];
   reasoning?: string;
+  documentType?: string;
+  suggestion?: string;
+  source?: 'ai_vision' | 'text_analysis' | 'hybrid';
+  medicalSpecialty?: string;
 }

@@ -1,21 +1,52 @@
 import fhirpath from 'fhirpath';
 import fhirpathR4Model from 'fhirpath/fhir-context/r4';
 
-export const convertToFHIR = async (documentText, documentType = 'medical_record') => {
+import type {
+  FHIRConversionRequest,
+  ValidationResult,
+  ValidationIssue,
+  ValidationCheck,
+  ValidationStatusUI,
+  FHIRWithValidation,
+  ExistingFHIRValidationResult,
+  FHIRResource,
+  FHIRBundle,
+  FHIRBundleEntry,
+  FHIRPatient,
+  FHIRObservation,
+  FHIRPractitioner,
+  ObservationStatus
+} from './fhirConversionService.type';
+
+import {
+  VALID_OBSERVATION_STATUSES
+} from './fhirConversionService.type';
+import { PractitionerName } from './fhirConversionService.type';
+
+/**
+ * Convert document text to FHIR format using AI
+ */
+export const convertToFHIR = async (
+  documentText: string, 
+  documentType: string = 'medical_record'
+): Promise<FHIRWithValidation> => {
   try {
     // Calls your Firebase Function instead of Anthropic directly
     const functionUrl = 'https://us-central1-belrose-757fe.cloudfunctions.net/convertToFHIR';
     
     console.log('🔄 Starting AI FHIR conversion...');
+    
+    const requestBody: FHIRConversionRequest = {
+      documentText,
+      documentType
+    };
+
     const response = await fetch(functionUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        documentText,
-        documentType
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
@@ -23,7 +54,7 @@ export const convertToFHIR = async (documentText, documentType = 'medical_record
       throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
     }
 
-    const fhirData = await response.json();
+    const fhirData: FHIRResource = await response.json();
     console.log('✅ AI conversion completed');
 
     // Step 2: Validate FHIR Data Structure using FHIRPath
@@ -43,7 +74,7 @@ export const convertToFHIR = async (documentText, documentType = 'medical_record
     }
 
     // Step 3: Add validation metadata to the response
-    return {
+    const result: FHIRWithValidation = {
       ...fhirData,
       _validation: {
         isValid: validationResult.isValid,
@@ -57,21 +88,25 @@ export const convertToFHIR = async (documentText, documentType = 'medical_record
       }
     };
 
+    return result;
+
   } catch (error) {
     console.error('❌ FHIR conversion/validation error:', error);
-    throw new Error(`Failed to convert to FHIR: ${error.message}`);
+    throw new Error(`Failed to convert to FHIR: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };
 
-// Main validation function using FHIRPath
-const validateWithFHIRPath = async (fhirResource) => {
-  const errors = [];
-  const warnings = [];
-  const info = [];
+/**
+ * Main validation function using FHIRPath
+ */
+const validateWithFHIRPath = async (fhirResource: FHIRResource): Promise<ValidationResult> => {
+  const errors: ValidationIssue[] = [];
+  const warnings: ValidationIssue[] = [];
+  const info: ValidationIssue[] = [];
 
   try {
     // Basic structure validation using FHIRPath expressions
-    const validationChecks = [
+    const validationChecks: ValidationCheck[] = [
       // Check if it's a Bundle
       {
         expression: "resourceType",
@@ -93,61 +128,32 @@ const validateWithFHIRPath = async (fhirResource) => {
         severity: "info",
         message: "Bundle should have an ID"
       },
-      // Validate that entries have resources
+      // Check if Bundle has a type
       {
-        expression: "entry.all(resource.exists())",
-        expected: true,
-        severity: "error",
-        message: "All Bundle entries must contain a resource"
-      },
-      // Check for Patient resources
-      {
-        expression: "entry.resource.where(resourceType = 'Patient').exists()",
-        expected: true,
-        severity: "info",
-        message: "Bundle typically contains Patient information"
-      },
-      // Validate Patient resources have names
-      {
-        expression: "entry.resource.where(resourceType = 'Patient').all(name.exists())",
+        expression: "type.exists()",
         expected: true,
         severity: "warning",
-        message: "Patient resources should have names"
-      },
-      // Validate Observation resources have codes
-      {
-        expression: "entry.resource.where(resourceType = 'Observation').all(code.exists())",
-        expected: true,
-        severity: "error",
-        message: "Observation resources must have codes"
-      },
-      // Validate Observation resources have values or components
-      {
-        expression: "entry.resource.where(resourceType = 'Observation').all((value.exists() or component.exists()))",
-        expected: true,
-        severity: "warning",
-        message: "Observation resources should have values or components"
+        message: "Bundle should have a type"
       }
     ];
 
-    // Run each validation check
+    // Run basic validation checks
     for (const check of validationChecks) {
       try {
-        const result = fhirpath.evaluate(fhirResource, check.expression, null, fhirpathR4Model);
+        const result = fhirpath.evaluate(fhirResource, check.expression, undefined, fhirpathR4Model);
         
-        let isValid = false;
+        let passed = false;
         if (typeof check.expected === 'boolean') {
-          isValid = Boolean(result && result.length > 0) === check.expected;
-        } else if (typeof check.expected === 'string') {
-          isValid = result && result[0] === check.expected;
+          passed = Array.isArray(result) ? result.length > 0 : !!result;
+        } else {
+          passed = Array.isArray(result) ? result.includes(check.expected) : result === check.expected;
         }
 
-        if (!isValid) {
-          const issue = {
+        if (!passed) {
+          const issue: ValidationIssue = {
             message: check.message,
-            expression: check.expression,
             severity: check.severity,
-            location: 'root'
+            location: check.expression
           };
 
           switch (check.severity) {
@@ -162,123 +168,113 @@ const validateWithFHIRPath = async (fhirResource) => {
               break;
           }
         }
-      } catch (pathError) {
+      } catch (error) {
+        console.error(`Error running validation check: ${check.expression}`, error);
         errors.push({
-          message: `FHIRPath evaluation error: ${pathError.message}`,
-          expression: check.expression,
+          message: `Validation check failed: ${check.message}`,
           severity: 'error',
-          location: 'root'
+          location: check.expression
         });
       }
     }
 
-    // Additional deep validation for specific resource types
-    if (fhirResource.entry) {
-      for (let i = 0; i < fhirResource.entry.length; i++) {
-        const entry = fhirResource.entry[i];
-        const entryValidation = validateEntry(entry, i);
-        
-        errors.push(...entryValidation.errors);
-        warnings.push(...entryValidation.warnings);
-        info.push(...entryValidation.info);
+    // If it's a Bundle, validate each entry
+    if (fhirResource.resourceType === 'Bundle') {
+      const bundle = fhirResource as FHIRBundle;
+      if (bundle.entry && Array.isArray(bundle.entry)) {
+        bundle.entry.forEach((entry: FHIRBundleEntry, index: number) => {
+          if (entry.resource) {
+            validateResourceByType(entry.resource, `entry[${index}]`, errors, warnings, info);
+          } else {
+            warnings.push({
+              message: `Bundle entry ${index} is missing resource`,
+              severity: 'warning',
+              location: `entry[${index}]`
+            });
+          }
+        });
       }
+    } else {
+      // Single resource validation
+      validateResourceByType(fhirResource, 'resource', errors, warnings, info);
     }
 
-  } catch (error) {
-    errors.push({
-      message: `Validation system error: ${error.message}`,
-      expression: 'global',
-      severity: 'error',
-      location: 'root'
-    });
-  }
+    return {
+      isValid: errors.length === 0,
+      hasErrors: errors.length > 0,
+      hasWarnings: warnings.length > 0,
+      errors,
+      warnings,
+      info
+    };
 
-  return {
-    isValid: errors.length === 0,
-    hasErrors: errors.length > 0,
-    hasWarnings: warnings.length > 0,
-    errors: errors,
-    warnings: warnings,
-    info: info,
-    totalIssues: errors.length + warnings.length + info.length
-  };
+  } catch (error) {
+    console.error('❌ FHIRPath validation error:', error);
+    errors.push({
+      message: `Validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      severity: 'error'
+    });
+
+    return {
+      isValid: false,
+      hasErrors: true,
+      hasWarnings: false,
+      errors,
+      warnings,
+      info
+    };
+  }
 };
 
-// Validate individual Bundle entries
-const validateEntry = (entry, index) => {
-  const errors = [];
-  const warnings = [];
-  const info = [];
-  const location = `entry[${index}]`;
-
-  try {
-    if (!entry.resource) {
-      errors.push({
-        message: 'Bundle entry must contain a resource',
-        severity: 'error',
-        location: location
+/**
+ * Validate specific resource types
+ */
+const validateResourceByType = (
+  resource: FHIRResource, 
+  location: string, 
+  errors: ValidationIssue[], 
+  warnings: ValidationIssue[], 
+  info: ValidationIssue[]
+): void => {
+  switch (resource.resourceType) {
+    case 'Patient':
+      validatePatientResource(resource as FHIRPatient, location, errors, warnings, info);
+      break;
+    case 'Observation':
+      validateObservationResource(resource as FHIRObservation, location, errors, warnings, info);
+      break;
+    case 'Practitioner':
+      validatePractitionerResource(resource as FHIRPractitioner, location, errors, warnings, info);
+      break;
+    default:
+      info.push({
+        message: `Resource type ${resource.resourceType} validation not implemented`,
+        severity: 'info',
+        location: `${location}.resource`
       });
-      return { errors, warnings, info };
-    }
-
-    const resource = entry.resource;
-    const resourceType = resource.resourceType;
-
-    // Resource type specific validation
-    switch (resourceType) {
-      case 'Patient':
-        validatePatientResource(resource, location, errors, warnings, info);
-        break;
-      case 'Observation':
-        validateObservationResource(resource, location, errors, warnings, info);
-        break;
-      case 'Practitioner':
-        validatePractitionerResource(resource, location, errors, warnings, info);
-        break;
-      default:
-        info.push({
-          message: `Encountered resource type: ${resourceType}`,
-          severity: 'info',
-          location: location
-        });
-    }
-
-  } catch (error) {
-    errors.push({
-      message: `Error validating entry: ${error.message}`,
-      severity: 'error',
-      location: location
-    });
   }
-
-  return { errors, warnings, info };
 };
 
-// Patient resource validation
-const validatePatientResource = (patient, location, errors, warnings, info) => {
-  // Patient must have an identifier or name
-  if (!patient.identifier && !patient.name) {
-    errors.push({
-      message: 'Patient must have either an identifier or name',
-      severity: 'error',
+/**
+ * Patient resource validation
+ */
+const validatePatientResource = (
+  patient: FHIRPatient, 
+  location: string, 
+  errors: ValidationIssue[], 
+  warnings: ValidationIssue[], 
+  info: ValidationIssue[]
+): void => {
+  // Should have a name
+  if (!patient.name || patient.name.length === 0) {
+    warnings.push({
+      message: 'Patient should have a name',
+      severity: 'warning',
       location: `${location}.resource`
     });
   }
 
-  // Name validation
-  if (patient.name) {
-    patient.name.forEach((name, index) => {
-      if (!name.family && !name.given) {
-        warnings.push({
-          message: 'Patient name should have either family or given name',
-          severity: 'warning',
-          location: `${location}.resource.name[${index}]`
-        });
-      }
-    });
-  }
-
-  // Birth date format validation
+  // Check birthDate format if present
   if (patient.birthDate && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(patient.birthDate)) {
     errors.push({
       message: 'Patient birthDate must be in YYYY, YYYY-MM, or YYYY-MM-DD format',
@@ -288,8 +284,16 @@ const validatePatientResource = (patient, location, errors, warnings, info) => {
   }
 };
 
-// Observation resource validation
-const validateObservationResource = (observation, location, errors, warnings, info) => {
+/**
+ * Observation resource validation
+ */
+const validateObservationResource = (
+  observation: FHIRObservation, 
+  location: string, 
+  errors: ValidationIssue[], 
+  warnings: ValidationIssue[], 
+  info: ValidationIssue[]
+): void => {
   // Must have a code
   if (!observation.code) {
     errors.push({
@@ -307,8 +311,7 @@ const validateObservationResource = (observation, location, errors, warnings, in
       location: `${location}.resource`
     });
   } else {
-    const validStatuses = ['registered', 'preliminary', 'final', 'amended', 'corrected', 'cancelled', 'entered-in-error', 'unknown'];
-    if (!validStatuses.includes(observation.status)) {
+    if (!VALID_OBSERVATION_STATUSES.includes(observation.status as ObservationStatus)) {
       errors.push({
         message: `Observation status '${observation.status}' is not valid`,
         severity: 'error',
@@ -318,8 +321,11 @@ const validateObservationResource = (observation, location, errors, warnings, in
   }
 
   // Should have a value or component
-  if (!observation.value && !observation.valueQuantity && !observation.valueString && 
-      !observation.component && !observation.dataAbsentReason) {
+  if (!observation.value && 
+      !observation.valueQuantity && 
+      !observation.valueString && 
+      !observation.component && 
+      !observation.dataAbsentReason) {
     warnings.push({
       message: 'Observation should have a value, component, or dataAbsentReason',
       severity: 'warning',
@@ -328,8 +334,16 @@ const validateObservationResource = (observation, location, errors, warnings, in
   }
 };
 
-// Practitioner resource validation
-const validatePractitionerResource = (practitioner, location, errors, warnings, info) => {
+/**
+ * Practitioner resource validation
+ */
+const validatePractitionerResource = (
+  practitioner: FHIRPractitioner, 
+  location: string, 
+  errors: ValidationIssue[], 
+  warnings: ValidationIssue[], 
+  info: ValidationIssue[]
+): void => {
   // Should have a name
   if (!practitioner.name || practitioner.name.length === 0) {
     warnings.push({
@@ -341,7 +355,7 @@ const validatePractitionerResource = (practitioner, location, errors, warnings, 
 
   // Check name structure
   if (practitioner.name) {
-    practitioner.name.forEach((name, index) => {
+    practitioner.name.forEach((name: PractitionerName, index: number) => {
       if (!name.family && !name.given && !name.text) {
         warnings.push({
           message: 'Practitioner name should have family, given, or text',
@@ -353,8 +367,10 @@ const validatePractitionerResource = (practitioner, location, errors, warnings, 
   }
 };
 
-// Utility function to get validation status for UI display (unchanged)
-export const getValidationStatusForUI = (fhirData) => {
+/**
+ * Utility function to get validation status for UI display
+ */
+export const getValidationStatusForUI = (fhirData: FHIRWithValidation | null): ValidationStatusUI => {
   const validation = fhirData?._validation;
   
   if (!validation) {
@@ -381,7 +397,7 @@ export const getValidationStatusForUI = (fhirData) => {
       color: 'yellow',
       icon: '⚠️',
       message: `Valid FHIR (${validation.warnings.length} warnings)`,
-      details: validation.warnings.map(w => w.message)
+      details: validation.warnings.map((w: ValidationIssue) => w.message)
     };
   }
 
@@ -391,7 +407,7 @@ export const getValidationStatusForUI = (fhirData) => {
       color: 'red',
       icon: '❌',
       message: `Invalid FHIR (${validation.errors.length} errors)`,
-      details: validation.errors.map(e => e.message)
+      details: validation.errors.map((e: ValidationIssue) => e.message)
     };
   }
 
@@ -403,8 +419,10 @@ export const getValidationStatusForUI = (fhirData) => {
   };
 };
 
-// Utility function to validate existing FHIR data (for testing)
-export const validateExistingFHIR = async (fhirResource) => {
+/**
+ * Utility function to validate existing FHIR data (for testing)
+ */
+export const validateExistingFHIR = async (fhirResource: FHIRResource): Promise<ExistingFHIRValidationResult> => {
   try {
     console.log('🔍 Validating existing FHIR resource...');
     
@@ -422,18 +440,20 @@ export const validateExistingFHIR = async (fhirResource) => {
     console.error('❌ Validation error:', error);
     return {
       isValid: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : 'Unknown error',
       validatedAt: new Date().toISOString()
     };
   }
 };
 
-// Helper function to run custom FHIRPath expressions for advanced validation
-export const runFHIRPathQuery = (fhirResource, expression) => {
+/**
+ * Helper function to run custom FHIRPath expressions for advanced validation
+ */
+export const runFHIRPathQuery = (fhirResource: FHIRResource, expression: string): any => {
   try {
-    return fhirpath.evaluate(fhirResource, expression, null, fhirpathR4Model);
+    return fhirpath.evaluate(fhirResource, expression, undefined, fhirpathR4Model);
   } catch (error) {
     console.error('FHIRPath query error:', error);
-    throw new Error(`FHIRPath query failed: ${error.message}`);
+    throw new Error(`FHIRPath query failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };

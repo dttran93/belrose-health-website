@@ -1,33 +1,47 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 
+import type {
+  FieldConfiguration,
+  FormErrors,
+  FormData,
+  ValidationState,
+  FormSummary,
+  ExpandedSections,
+  StableFieldConfigsRef,
+  FHIRFormStateHookParams,
+  FHIRFormStateHookReturn,
+  FieldType
+} from './useFHIRFormState.type';
+
+import type { FHIRWithValidation } from '../services/fhirConversionService.type';
+
 /**
  * Custom hook to manage FHIR form state
  * Handles form data, errors, validation, and change tracking
- * 
- * @param {Array} fieldConfigs - Array of field configuration objects
- * @param {Function} onFHIRUpdate - Callback when form data changes (optional)
- * @param {Function} onValidationChange - Callback when validation state changes (optional)
- * @param {Object} fhirData - Original FHIR data for reference
- * @returns {Object} Form state and handlers
  */
-export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationChange, fhirData) => {
+export const useFHIRFormState = ({
+  fieldConfigs = [],
+  onFHIRUpdate,
+  onValidationChange,
+  fhirData
+}: FHIRFormStateHookParams): FHIRFormStateHookReturn => {
   // Core form state
-  const [formData, setFormData] = useState({});
-  const [errors, setErrors] = useState({});
-  const [isDirty, setIsDirty] = useState(false);
-  const [isValid, setIsValid] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [formData, setFormData] = useState<FormData>({});
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [isDirty, setIsDirty] = useState<boolean>(false);
+  const [isValid, setIsValid] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   
   // UI state for form sections
-  const [expandedSections, setExpandedSections] = useState({});
-  const [showLowPriority, setShowLowPriority] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<ExpandedSections>({});
+  const [showLowPriority, setShowLowPriority] = useState<boolean>(false);
 
   // Refs for tracking state and preventing loops
-  const hasCalledInitialValidation = useRef(false);
-  const lastValidationState = useRef(null);
-  const isInitializing = useRef(false);
-  const stableFieldConfigsRef = useRef([]);
+  const hasCalledInitialValidation = useRef<boolean>(false);
+  const lastValidationState = useRef<string | null>(null);
+  const isInitializing = useRef<boolean>(false);
+  const stableFieldConfigsRef = useRef<StableFieldConfigsRef>({ hash: '', configs: [] });
 
   // Memoize fieldConfigs hash for comparison
   const fieldConfigsHash = useMemo(() => {
@@ -36,7 +50,7 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
   }, [fieldConfigs]);
 
   // Memoized callbacks
-  const memoizedOnFHIRUpdate = useCallback((data) => {
+  const memoizedOnFHIRUpdate = useCallback((data: FHIRWithValidation) => {
     if (onFHIRUpdate && !isInitializing.current) {
       console.log('📤 Calling onFHIRUpdate with data:', Object.keys(data).length, 'fields');
       onFHIRUpdate(data);
@@ -46,7 +60,7 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
   /**
    * Call validation callback only when needed, with loop prevention
    */
-  const callValidationCallback = useCallback((validationState) => {
+  const callValidationCallback = useCallback((validationState: ValidationState) => {
     if (!onValidationChange || isInitializing.current) return;
 
     const currentStateKey = `${validationState.isValid}-${validationState.isDirty}-${validationState.hasErrors}-${validationState.errorCount}`;
@@ -78,7 +92,7 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
     
     isInitializing.current = true;
     
-    const initialData = {};
+    const initialData: FormData = {};
     fieldConfigs.forEach(field => {
       initialData[field.key] = field.value || field.defaultValue || '';
     });
@@ -111,7 +125,7 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
       
       hasCalledInitialValidation.current = true;
       
-      const initialValidationState = {
+      const initialValidationState: ValidationState = {
         isValid: true,
         isDirty: false,
         hasErrors: false,
@@ -129,7 +143,7 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
   /**
    * Validate a single field
    */
-  const validateField = useCallback((field, value) => {
+  const validateField = useCallback((field: FieldConfiguration, value: any): string | null => {
     console.log(`🔍 Validating field ${field.key}:`, { 
       value: typeof value === 'string' ? value.substring(0, 50) : value, 
       required: field.required, 
@@ -191,12 +205,12 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
   /**
    * Validate all fields in the form
    */
-  const validateAllFields = useCallback(() => {
+  const validateAllFields = useCallback((): boolean => {
     if (isInitializing.current) return true;
     
     console.log('🧪 Validating all fields...');
     
-    const newErrors = {};
+    const newErrors: FormErrors = {};
     let hasErrors = false;
     
     fieldConfigs.forEach(field => {
@@ -215,7 +229,7 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
     console.log(`🧪 Validation complete: ${hasErrors ? 'INVALID' : 'VALID'}`);
     
     if (!isInitializing.current) {
-      const validationState = {
+      const validationState: ValidationState = {
         isValid: !hasErrors,
         isDirty,
         hasErrors,
@@ -232,16 +246,16 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
   }, [fieldConfigs, formData, validateField, isDirty, callValidationCallback]);
 
   /**
-   * FINAL FIX: Handle field value changes with flushSync for immediate state updates
+   * Handle field value changes with flushSync for immediate state updates
    */
-  const handleFieldChange = useCallback((fieldKey, value) => {
+  const handleFieldChange = useCallback((fieldKey: string, value: any): void => {
     if (isInitializing.current) return;
     
     console.log(`✏️ Field changed: ${fieldKey} = "${typeof value === 'string' ? value.substring(0, 50) : value}"`);
     
     const field = fieldConfigs.find(f => f.key === fieldKey);
     
-    // CRITICAL FIX: Use flushSync to force synchronous state updates
+    // Use flushSync to force synchronous state updates
     flushSync(() => {
       setFormData(prev => ({ ...prev, [fieldKey]: value }));
       setIsDirty(true);
@@ -269,12 +283,12 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
       }
     });
 
-    // Now call validation callback with the updated state (happens after flushSync)
+    // Now call validation callback with the updated state
     if (field && !isInitializing.current) {
       // Get the current state (which is now updated due to flushSync)
       const currentErrors = Object.keys(errors).length > 0;
       
-      const validationState = {
+      const validationState: ValidationState = {
         isValid: !currentErrors,
         isDirty: true,
         hasErrors: currentErrors,
@@ -297,7 +311,7 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
   /**
    * Handle field blur events
    */
-  const handleFieldBlur = useCallback((fieldKey) => {
+  const handleFieldBlur = useCallback((fieldKey: string): void => {
     if (isInitializing.current) return;
     
     console.log(`👁️ Field blurred: ${fieldKey}`);
@@ -324,11 +338,13 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
   }, [fieldConfigs, formData, validateField]);
 
   /**
-   * FINAL FIX: Manual save functionality with flushSync and proper async handling
+   * Manual save functionality with flushSync and proper async handling
    */
-  const saveFHIRData = useCallback(async () => {
+  const saveFHIRData = useCallback(async (): Promise<boolean> => {
     // Use flushSync to ensure we have the most current state
-    let currentFormData, currentIsDirty, currentErrors;
+    let currentFormData: FormData;
+    let currentIsDirty: boolean;
+    let currentErrors: FormErrors;
     
     flushSync(() => {
       setIsSaving(true);
@@ -366,7 +382,7 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
     }
     
     try {
-      // CRITICAL FIX: Use async/await instead of .then() for proper timing
+      // Use async/await for proper timing
       const { convertFormDataToFHIR } = await import('@/features/EditRecord/utils/formtoFhirConverter');
       
       // DEBUG: Log field configs to check for missing metadata
@@ -392,14 +408,14 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
       
       console.log('✅ Successfully reconstructed FHIR data:', {
         entries: reconstructedFHIR.entry?.length || 0,
-        resourceTypes: reconstructedFHIR.entry?.map(e => e.resource?.resourceType) || []
+        resourceTypes: reconstructedFHIR.entry?.map((e: any) => e.resource?.resourceType) || []
       });
       
       // DEBUG: Compare original vs reconstructed to see what changed
       console.log('🔍 Comparing original vs reconstructed FHIR data...');
       if (fhirData?.entry && reconstructedFHIR?.entry) {
-        fhirData.entry.forEach((originalEntry, index) => {
-          const reconstructedEntry = reconstructedFHIR.entry[index];
+        fhirData.entry.forEach((originalEntry: any, index: number) => {
+          const reconstructedEntry = reconstructedFHIR.entry?.[index];
           if (originalEntry?.resource && reconstructedEntry?.resource) {
             const original = JSON.stringify(originalEntry.resource, null, 2);
             const reconstructed = JSON.stringify(reconstructedEntry.resource, null, 2);
@@ -437,10 +453,10 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
   /**
    * Discard unsaved changes
    */
-  const discardChanges = useCallback(() => {
+  const discardChanges = useCallback((): void => {
     console.log('🗑️ Discarding unsaved changes');
     
-    const initialData = {};
+    const initialData: FormData = {};
     fieldConfigs.forEach(field => {
       initialData[field.key] = field.value || field.defaultValue || '';
     });
@@ -456,12 +472,12 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
   /**
    * Reset form to initial state
    */
-  const resetForm = useCallback(() => {
+  const resetForm = useCallback((): void => {
     console.log('🔄 Resetting form to initial state');
     
     isInitializing.current = true;
     
-    const initialData = {};
+    const initialData: FormData = {};
     fieldConfigs.forEach(field => {
       initialData[field.key] = field.value || field.defaultValue || '';
     });
@@ -483,7 +499,7 @@ export const useFHIRFormState = (fieldConfigs = [], onFHIRUpdate, onValidationCh
   /**
    * Get form summary for debugging/status
    */
-  const getFormSummary = useCallback(() => {
+  const getFormSummary = useCallback((): FormSummary => {
     const totalFields = fieldConfigs.length;
     const filledFields = Object.values(formData).filter(value => 
       value !== null && value !== undefined && value.toString().trim() !== ''
