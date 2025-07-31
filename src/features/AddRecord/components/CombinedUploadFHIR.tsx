@@ -111,6 +111,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
       console.log('🚀 Auto-uploading completed file:', fileItem.name);      
       await uploadFiles([fileItem.id]);
       console.log('✅ File auto-uploaded:', fileItem.name);
+      removeFile(fileItem.id);
     } catch (error) {
       console.error('❌ Auto-upload error:', error);
     }
