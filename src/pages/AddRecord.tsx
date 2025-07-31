@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import useFileUpload from '@/features/AddRecord/hooks/useFileUpload';
 import { ExportService } from '@/features/AddRecord/services/exportService';
 
@@ -6,7 +6,46 @@ import { ExportService } from '@/features/AddRecord/services/exportService';
 import CombinedUploadFHIR from '@/features/AddRecord/components/CombinedUploadFHIR';
 import { StatsPanel } from '@/features/AddRecord/components/StatsPanel';
 
-const AddRecord = () => {
+// ==================== TYPE DEFINITIONS ====================
+
+/**
+ * Props for the AddRecord component (currently none, but good for future extensibility)
+ */
+interface AddRecordProps {
+  className?: string;
+}
+
+/**
+ * Shape of the export data that gets downloaded
+ */
+interface ExportData {
+  files: any[]; // Using any[] since processedFiles type varies
+  firestoreData: Record<string, any>;
+  stats: {
+    files: any; // Return type from getStats()
+    deduplication: any; // Return type from deduplicationService.getStats()
+  };
+  exportedAt: string;
+}
+
+// ==================== COMPONENT ====================
+
+/**
+ * AddRecord Component
+ * 
+ * Main page component for uploading and managing health records.
+ * Handles both file uploads and direct FHIR input, with automatic
+ * cloud storage and export capabilities.
+ * 
+ * Key Features:
+ * - File drag & drop upload
+ * - Direct FHIR data input
+ * - Automatic cloud storage
+ * - Export all data as JSON
+ * - Real-time upload status
+ * - Deduplication service
+ */
+const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
     // CONSOLIDATED FILE MANAGEMENT: Single source of truth for all file operations
     const {
         files,
@@ -34,14 +73,19 @@ const AddRecord = () => {
         savingCount
     });
 
-    // Export service
+    // Export service instance
     const exportService = new ExportService();
 
-    // Download all data
-    const downloadAllData = () => {
+    // ==================== EVENT HANDLERS ====================
+
+    /**
+     * Download all processed data as JSON
+     * Includes files, firestore data, and statistics
+     */
+    const downloadAllData = (): void => {
         const deduplicationStats = deduplicationService.getStats();
         
-        const exportData = {
+        const exportData: ExportData = {
             files: processedFiles,
             firestoreData: Object.fromEntries(firestoreData),
             stats: {
@@ -51,17 +95,30 @@ const AddRecord = () => {
             exportedAt: new Date().toISOString()
         };
 
-        exportService.downloadJson(exportData, 'belrose-health-records');
+        exportService.downloadData(exportData, 'belrose-health-records');
     };
 
-    // Reset everything
-    const resetAll = () => {
+    /**
+     * Reset everything and refresh the page
+     * Provides a clean slate for new uploads
+     */
+    const resetAll = (): void => {
         resetFileUpload();
         window.location.reload(); // Fresh start
     };
 
+    // ==================== COMPUTED VALUES ====================
+
+    // Check if we have any data to show download/reset buttons
+    const hasData = files.length > 0 || savedToFirestoreCount > 0;
+
+    // Check if we're in a success state (no files left, but some saved)
+    const isSuccessState = files.length === 0 && savedToFirestoreCount > 0;
+
+    // ==================== RENDER JSX ====================
+
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className={`min-h-screen bg-gray-50 ${className || ''}`}>
             <div className="max-w-7xl mx-auto px-4 py-8">
                 {/* Header */}
                 <div className="mb-8">
@@ -74,29 +131,24 @@ const AddRecord = () => {
                         </div>
                         
                         <div className="flex items-center space-x-4">
-                            {(files.length > 0 || savedToFirestoreCount > 0) && (
+                            {hasData && (
                                 <>
                                     <button
                                         onClick={downloadAllData}
-                                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                        type="button"
                                     >
                                         📥 Download Data
                                     </button>
                                     <button
                                         onClick={resetAll}
-                                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                                        type="button"
                                     >
                                         🔄 Reset
                                     </button>
                                 </>
                             )}
-                            
-                            <a 
-                                href="/edit-fhir"
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                            >
-                                ✏️ Edit Records
-                            </a>
                         </div>
                     </div>
                 </div>
@@ -108,7 +160,7 @@ const AddRecord = () => {
                             <div>
                                 <h3 className="font-medium text-gray-900">Cloud Storage Status</h3>
                                 <p className="text-sm text-gray-600 mt-1">
-                                    {savedToFirestoreCount} records saved to cloud
+                                    {savedToFirestoreCount} record{savedToFirestoreCount !== 1 ? 's' : ''} saved to cloud
                                     {savingCount > 0 && (
                                         <span className="text-blue-600 ml-2">
                                             ({savingCount} uploading...)
@@ -119,7 +171,7 @@ const AddRecord = () => {
                             
                             {savedToFirestoreCount > 0 && (
                                 <div className="text-green-600 flex items-center">
-                                    <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                                    <span className="w-2 h-2 bg-green-500 rounded-full mr-2" aria-hidden="true"></span>
                                     <span className="text-sm font-medium">Synced</span>
                                 </div>
                             )}
@@ -151,9 +203,9 @@ const AddRecord = () => {
                 )}
 
                 {/* Success State */}
-                {files.length === 0 && savedToFirestoreCount > 0 && (
+                {isSuccessState && (
                     <div className="mt-8 text-center">
-                        <div className="text-6xl mb-4">✅</div>
+                        <div className="text-6xl mb-4" role="img" aria-label="Success">✅</div>
                         <h2 className="text-2xl font-semibold text-gray-900 mb-3">
                             All Records Uploaded!
                         </h2>
@@ -163,13 +215,14 @@ const AddRecord = () => {
                         <div className="flex justify-center space-x-4">
                             <button
                                 onClick={resetAll}
-                                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                type="button"
                             >
                                 Upload More Records
                             </button>
                             <a 
                                 href="/edit-fhir"
-                                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                             >
                                 Edit Records
                             </a>

@@ -59,3 +59,11 @@ export interface MedicalDetectionResult {
   source?: 'ai_vision' | 'text_analysis' | 'hybrid';
   medicalSpecialty?: string;
 }
+
+export interface DuplicateInfo {
+  existingFileId?: string;
+  confidence: number;
+  matchedOn: ('name' | 'size' | 'lastModified' | 'hash')[];
+  canRetry: boolean;
+  userMessage?: string;
+}

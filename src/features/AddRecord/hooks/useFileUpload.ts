@@ -31,6 +31,7 @@ interface VirtualFileData {
   medicalDetection?: MedicalDetectionResult;
   documentType?: string;
   fhirData?: any;
+  isVirtual?: boolean;
   [key: string]: any; // Allow additional properties
 }
 
@@ -134,52 +135,6 @@ function useFileUpload(): UseFileUploadReturn {
         onResetProcessRef.current = callback;
     }, []);
 
-    // ==================== FILE UPLOAD & VALIDATION ====================
-
-    /**
-     * Add new files with validation and auto-processing
-     */
-    const addFiles = useCallback((fileList: FileList, options: AddFilesOptions = {}): void => {
-        const {
-            maxFiles = 5,
-            maxSizeBytes = 10 * 1024 * 1024,
-            autoProcess = true
-        } = options;
-
-        const selectedFiles = Array.from(fileList);
-        
-        if (files.length + selectedFiles.length > maxFiles) {
-            throw new Error(`Maximum ${maxFiles} files allowed`);
-        }
-
-        const newFiles: FileObject[] = selectedFiles.map(file => {
-            const validation: FileValidationResult = DocumentProcessorService.validateFile(file);
-            return {
-                id: crypto.randomUUID(),
-                file,
-                name: file.name,
-                size: file.size,
-                type: file.type,
-                status: validation.valid ? 'ready' : 'error',
-                error: validation.valid ? undefined : validation.error,
-                lastModified: file.lastModified
-            };
-        });
-
-        setFiles(prev => [...prev, ...newFiles]);
-
-        // Auto-process if enabled
-        if (autoProcess) {
-            newFiles.forEach(fileObj => {
-                if (fileObj.status === 'ready') {
-                    processFile(fileObj.id);
-                }
-            });
-        }
-
-        console.log(`📁 Added ${newFiles.length} files, total: ${files.length + newFiles.length}`);
-    }, [files.length]);
-
     // ==================== FILE PROCESSING ====================
 
     /**
@@ -209,58 +164,81 @@ function useFileUpload(): UseFileUploadReturn {
         });
     }, [updateFileStatus]);
 
-    /**
-     * Process a single file through the document processing pipeline
-     */
-    const processFile = useCallback(async (fileId: string): Promise<void> => {
-        const fileItem = files.find(f => f.id === fileId);
-        if (!fileItem || !fileItem.file) {
-            console.error('❌ File not found for processing:', fileId);
-            return;
-        }
+/**
+ * Process a single file through the document processing pipeline
+ */
+const processFile = useCallback(async (fileId: string): Promise<void> => {
+    const fileItem = files.find(f => f.id === fileId);
+    if (!fileItem || !fileItem.file) {
+        console.error('❌ File not found for processing:', fileId);
+        return;
+    }
 
-        // Check for duplicate processing
-        const fileSignature = `${fileItem.name}-${fileItem.size}-${fileItem.file.lastModified}`;
-        if (processingFiles.current.has(fileSignature)) {
-            console.log('⏭️ File already being processed, skipping:', fileItem.name);
-            return;
-        }
+    // Check if we should process this file using deduplication service
+    const processingDecision = deduplicationService.current.shouldProcessFile(fileId);
+    if (!processingDecision.shouldProcess) {
+        console.log(`⏭️ Skipping processing for ${fileItem.name}: ${processingDecision.reason}`);
+        updateFileStatus(fileId, 'error', { 
+            error: processingDecision.reason,
+            canRetry: processingDecision.canRetry 
+        });
+        return;
+    }
 
-        // Mark as processing
-        processingFiles.current.add(fileSignature);
+    // NEW: Increment attempt counter BEFORE processing
+    const attempts = deduplicationService.current.incrementUploadAttempt(fileId);
+    console.log(`🔄 Processing attempt ${attempts} for ${fileItem.name}`);
+
+    // Create abort controller for this operation
+    const abortController = new AbortController();
+    activeOperations.current.set(fileId, abortController);
+
+    try {
         updateFileStatus(fileId, 'processing');
-
-        // Setup abort controller
-        const abortController = new AbortController();
-        activeOperations.current.set(fileId, abortController);
-
-        try {
-            console.log('🔄 Processing file:', fileItem.name);
-            
-            const result: DocumentProcessingResult = await DocumentProcessorService.processDocument(fileItem.file, {
-                enableMedicalDetection: true,
-                signal: abortController.signal
+        
+        // NEW: Generate hash and mark as processing in deduplication service
+        const fileHash = await deduplicationService.current.generateFileHash(fileItem.file);
+        deduplicationService.current.markFileAsProcessing(fileHash, fileId);
+        
+        // NEW: Double-check if another instance processed this file while we were generating the hash
+        if (deduplicationService.current.isFileAlreadyProcessed(fileHash, fileId, firestoreData)) {
+            console.log('⏭️ File already processed by another instance, skipping');
+            updateFileStatus(fileId, 'completed', { 
+                error: 'File already processed by another upload',
+                hash: fileHash 
             });
-
-            if (!abortController.signal.aborted) {
-                updateFileWithProcessingResult(fileId, result);
-                
-                // Continue with FHIR conversion if we have extracted text
-                if (result.success && result.extractedText) {
-                    await handleFHIRConversion(fileId, abortController.signal);
-                }
-            }
-        } catch (error: any) {
-            if (!abortController.signal.aborted) {
-                console.error('❌ File processing failed:', error);
-                updateFileStatus(fileId, 'error', { error: error.message });
-                toast.error(`Processing failed: ${error.message}`);
-            }
-        } finally {
-            processingFiles.current.delete(fileSignature);
-            activeOperations.current.delete(fileId);
+            return;
         }
-    }, [files, updateFileStatus, updateFileWithProcessingResult]);
+        
+        console.log('🔄 Processing file:', fileItem.name);
+        
+        // Continue with normal document processing
+        const result: DocumentProcessingResult = await DocumentProcessorService.processDocument(fileItem.file, {
+            enableMedicalDetection: true,
+            signal: abortController.signal
+        });
+
+        if (!abortController.signal.aborted) {
+            updateFileWithProcessingResult(fileId, result);
+            
+            // Continue with FHIR conversion if we have extracted text
+            if (result.success && result.extractedText) {
+                await handleFHIRConversion(fileId, abortController.signal);
+            }
+        }
+        
+    } catch (error: any) {
+        if (!abortController.signal.aborted) {
+            console.error('❌ File processing failed:', error);
+            updateFileStatus(fileId, 'error', { error: error.message });
+            toast.error(`Processing failed: ${error.message}`);
+        }
+    } finally {
+        // NEW: Clean up deduplication service processing lock
+        deduplicationService.current.releaseProcessingLock(fileId);
+        activeOperations.current.delete(fileId);
+    }
+}, [files, firestoreData, updateFileStatus, updateFileWithProcessingResult]);
 
     /**
      * Handle FHIR conversion for a processed file
@@ -362,6 +340,86 @@ function useFileUpload(): UseFileUploadReturn {
         
         toast.success('All files cleared');
     }, []);
+
+    // ==================== FILE UPLOAD & VALIDATION ====================
+
+    /**
+     * Add new files with validation and auto-processing
+     */
+    const addFiles = useCallback((fileList: FileList, options: AddFilesOptions = {}): void => {
+        const {
+            maxFiles = 5,
+            maxSizeBytes = 10 * 1024 * 1024,
+            autoProcess = true
+        } = options;
+
+        const selectedFiles = Array.from(fileList);
+        
+        if (files.length + selectedFiles.length > maxFiles) {
+            throw new Error(`Maximum ${maxFiles} files allowed`);
+        }
+
+        const newFiles: FileObject[] = selectedFiles.map(file => {
+            const validation: FileValidationResult = DocumentProcessorService.validateFile(file);
+            const fileId = crypto.randomUUID();
+
+            const duplicateCheck = deduplicationService.current.checkForDuplicate(file, fileId);
+
+            let initialStatus: FileStatus = 'ready';
+            let initialError: string | undefined;
+
+            if (!validation.valid) {
+                initialStatus = 'error';
+                initialError = validation.error;
+            } else if (duplicateCheck.isDuplicate) {
+                initialStatus = 'ready';
+                initialError = duplicateCheck.userMessage;
+            }
+
+            deduplicationService.current.addFile(file,fileId);     
+            
+            return {
+                id: fileId,
+                file,
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                status: initialStatus,
+                error: initialError,
+                validation,
+                lastModified: file.lastModified,
+                // NEW: Store duplicate info for UI
+                duplicateInfo: duplicateCheck.isDuplicate ? {
+                    existingFileId: duplicateCheck.existingFileId,
+                    confidence: duplicateCheck.confidence,
+                    matchedOn: duplicateCheck.matchedOn,
+                    canRetry: duplicateCheck.canRetry,
+                    userMessage: duplicateCheck.userMessage
+                } : undefined
+            };
+        });
+
+        setFiles(prev => [...prev, ...newFiles]);
+
+        // Only auto-process files that should be processed
+        if (autoProcess) {
+            newFiles.forEach(fileObj => {
+            const processingDecision = deduplicationService.current.shouldProcessFile(fileObj.id);
+            if (processingDecision.shouldProcess) {
+                processFile(fileObj.id);
+            } else if (!processingDecision.shouldProcess) {
+                console.log(`⏭️ Skipping processing for ${fileObj.name}: ${processingDecision.reason}`);
+                updateFileStatus(fileObj.id, 'error', 
+                    { 
+                        error: processingDecision.reason,
+                        canRetry: processingDecision.canRetry 
+                    });
+                }
+            });
+        }
+
+        console.log(`📁 Added ${newFiles.length} files, total: ${files.length + newFiles.length}`);
+    }, [files, processFile, updateFileStatus]);
 
     // ==================== FIRESTORE OPERATIONS ====================
 
@@ -476,6 +534,7 @@ function useFileUpload(): UseFileUploadReturn {
             wordCount: virtualFileData.wordCount || 0,
             lastModified: Date.now(),
             // Cast the additional properties
+            isVirtual: true,
             ...(virtualFileData as any)
         };
 

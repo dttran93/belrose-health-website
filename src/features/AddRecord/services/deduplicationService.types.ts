@@ -29,6 +29,16 @@ export interface DuplicateCheckResult {
   existingFileId?: string;
   confidence: number;
   matchedOn: ('name' | 'size' | 'lastModified' | 'hash')[];
+  shouldShowInUI: boolean;
+  canRetry: boolean;
+  userMessage?: string; 
+}
+
+export interface ProcessingDecision {
+  shouldProcess: boolean;
+  reason: string;
+  canRetry: boolean;
+  blockedBy?: 'duplicate' | 'max_attempts' | 'currently_processing' | 'validation_error';
 }
 
 // ==================== SERVICE INTERFACE ====================
@@ -52,6 +62,9 @@ export interface IDeduplicationService {
   generateFileHash(file: File): Promise<string>;
   getStats(): DeduplicationStats;
   clear(): void;
+
+  // Enhanced duplicate checking
+  shouldProcessFile(fileId: string): ProcessingDecision;
   
   // Enhanced methods
   getFileInfo(fileId: string): { signature?: FileSignature; hash?: string; isProcessing: boolean };

@@ -3,7 +3,8 @@ import {
   FileSignature, 
   DuplicateCheckResult, 
   IDeduplicationService,
-  DeduplicationConfig 
+  DeduplicationConfig,
+  ProcessingDecision,
 } from './deduplicationService.types';
 
 /**
@@ -126,7 +127,10 @@ export class DeduplicationService implements IDeduplicationService {
           isDuplicate: true,
           existingFileId: existingId,
           confidence,
-          matchedOn
+          matchedOn,
+          shouldShowInUI: true,
+          canRetry: true,
+          userMessage: `Similar to "${existingSignature.name}" (${Math.round(confidence * 100)}% match)`,
         };
       }
     }
@@ -134,7 +138,9 @@ export class DeduplicationService implements IDeduplicationService {
     return {
       isDuplicate: false,
       confidence: 0,
-      matchedOn: []
+      matchedOn: [],
+      shouldShowInUI: true,
+      canRetry: true
     };
   }
 
@@ -293,4 +299,45 @@ export class DeduplicationService implements IDeduplicationService {
   getCurrentlyProcessingFiles(): string[] {
     return Array.from(this.processingLocks);
   }
+
+  shouldProcessFile(fileId: string): ProcessingDecision {
+  // Check if already processing
+  if (this.isProcessing(fileId)) {
+    return {
+      shouldProcess: false,
+      reason: 'File is currently being processed',
+      canRetry: false,
+      blockedBy: 'currently_processing'
+    };
+  }
+  
+  // Check upload attempts
+  const attempts = this.uploadAttempts.get(fileId) || 0;
+  if (attempts >= 3) {
+    return {
+      shouldProcess: false,
+      reason: 'Maximum retry attempts reached (3/3)',
+      canRetry: false,
+      blockedBy: 'max_attempts'
+    };
+  }
+  
+  // Check if hash already processed
+  const fileHash = this.fileHashMapping.get(fileId);
+  if (fileHash && this.processedFileHashes.has(fileHash)) {
+    return {
+      shouldProcess: false,
+      reason: 'File with identical content already processed',
+      canRetry: true, // User can force retry if they want
+      blockedBy: 'duplicate'
+    };
+  }
+  
+  return {
+    shouldProcess: true,
+    reason: 'Ready to process',
+    canRetry: true
+  };
+}
+
 }

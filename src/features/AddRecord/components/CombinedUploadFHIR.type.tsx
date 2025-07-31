@@ -84,15 +84,26 @@ export interface FHIRValidation {
 }
 
 // ============================================================================
-// FILE MANAGEMENT TYPES
+// FILE MANAGEMENT TYPES - UPDATED TO MATCH HOOK
 // ============================================================================
 
+/**
+ * File statistics interface matching useFileUpload hook exactly
+ */
 export interface FileStats {
-  totalFiles: number;
-  processedFiles: number;
-  processingFiles: number;
+  total: number;
+  pending: number;
+  processing: number;
+  completed: number;
+  errors: number;
+  medical: number;
+  nonMedical: number;
+  percentComplete: number;
 }
 
+/**
+ * Simplified upload result - we rely on hook state instead of return values
+ */
 export interface UploadResult {
   success: boolean;
   documentId?: string;
@@ -125,24 +136,30 @@ export interface VirtualFileResult {
 export type TabType = 'upload' | 'fhir';
 
 // ============================================================================
-// COMPONENT PROPS (FIXED FUNCTION SIGNATURES)
+// COMPONENT PROPS - UPDATED TO MATCH HOOK INTERFACE
 // ============================================================================
 
 export interface CombinedUploadFHIRProps {
-  // File management props - FIXED to match actual usage
+  // File management props - UPDATED to match hook exactly
   files: FileItem[];
   addFiles: (fileList: FileList, options?: AddFilesOptions) => void;
   removeFile: (fileId: string) => void;
-  retryFile: (fileId: string) => void;  // ← This should be fileId: string based on your hook
+  
+  // Updated: Hook provides Promise<void>, takes fileId: string
+  retryFile: (fileId: string) => Promise<void>;
+  
+  // Updated: Hook provides the full FileStats interface
   getStats: () => FileStats;
   
-  // Direct upload functions
+  // Direct upload functions - UPDATED to match hook
   addFhirAsVirtualFile: (
     fhirData: FHIRWithValidation, 
     options?: VirtualFileOptions
   ) => Promise<VirtualFileResult>;
   
-  uploadFiles: (files: FileItem[]) => Promise<UploadResult[]>;
+  // Updated: Hook takes fileIds array, returns Promise<void>
+  // Component should extract IDs from files and rely on state updates
+  uploadFiles: (fileIds?: string[]) => Promise<void>;
   
   // Configuration props
   acceptedTypes?: string[];
@@ -152,7 +169,7 @@ export interface CombinedUploadFHIRProps {
 }
 
 // ============================================================================
-// FILE LIST ITEM PROPS (MATCHING YOUR TYPESCRIPT VERSION)
+// FILE LIST ITEM PROPS - UPDATED FOR CONSISTENCY
 // ============================================================================
 
 export interface FileListItemProps {
@@ -163,9 +180,12 @@ export interface FileListItemProps {
     error?: string;
   };
   onRemove: (fileId: string) => void;
-  onRetry: (fileItem: FileItem) => void;          // ← FileListItem expects full object
+  
+  // Updated: FileListItem should pass FileItem, but retryFile expects fileId
+  // We'll handle the conversion in the component
+  onRetry: (fileItem: FileItem) => void;
   onForceConvert?: (fileItem: FileItem) => void;
-  onComplete?: (fileItem: FileItem) => void;      // ← Can be async
+  onComplete?: (fileItem: FileItem) => void;
   showFHIRResults?: boolean;
 }
 
