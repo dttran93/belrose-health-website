@@ -7,12 +7,15 @@ import { FileObject } from '@/types/core';
 export interface UploadResult {
   documentId?: string;    // For new uploads
   firestoreId?: string;   // Legacy field name for compatibility
-  downloadURL: string | null;
-  filePath: string | null;
-  uploadedAt: Date;
-  fileSize: number;
+  downloadURL?: string | null;
+  filePath?: string | null;
+  uploadedAt?: Date;
+  fileSize?: number;
   savedAt?: string;       // Legacy field for compatibility
   fileHash?: string;      // Legacy field for compatibility
+  success: boolean;
+  fileId?: string;
+  error?: string;
 }
 
 export interface UploadProgress {

@@ -79,7 +79,7 @@ interface UseFileUploadReturn {
   updateFileWithProcessingResult: (fileId: string, result: ProcessingResult) => void;
   
   // Firestore operations
-  uploadFiles: (fileIds?: string[]) => Promise<void>;
+  uploadFiles: (fileIds?: string[]) => Promise<UploadResult[]>;
   updateFirestoreRecord: (fileId: string, data: any) => Promise<void>;
   
   // Computed values

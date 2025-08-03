@@ -26,14 +26,18 @@ export interface FileObject {
 export type FileStatus = 
   | 'ready' 
   | 'processing' 
-  | 'completed' 
-  | 'error'
   | 'medical_detected'
   | 'non_medical_detected'
+  | 'converting'
+  | 'completed' 
+  | 'uploading'
+  | 'uploaded'
   | 'extraction_error'
   | 'detection_error'
-  | 'converting'
-  | 'uploading';
+  | 'fhir_error'
+  | 'processing_error'
+  | 'uploading'
+  | 'error';
 
 export interface ProcessingResult {
   fileName: string;

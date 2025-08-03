@@ -11,6 +11,8 @@ export type FileStatus =
   | 'non_medical_detected'
   | 'converting'
   | 'completed' 
+  | 'uploading'
+  | 'uploaded'
   | 'extraction_error'
   | 'detection_error'
   | 'fhir_error'
@@ -105,11 +107,17 @@ export interface FileStats {
  * Simplified upload result - we rely on hook state instead of return values
  */
 export interface UploadResult {
+  documentId?: string;    // For new uploads
+  firestoreId?: string;   // Legacy field name for compatibility
+  downloadURL?: string | null;
+  filePath?: string | null;
+  uploadedAt?: Date;
+  fileSize?: number;
+  savedAt?: string;       // Legacy field for compatibility
+  fileHash?: string;      // Legacy field for compatibility
   success: boolean;
-  documentId?: string;
-  downloadURL?: string;
-  error?: string;
   fileId?: string;
+  error?: string;
 }
 
 export interface AddFilesOptions {
@@ -133,7 +141,7 @@ export interface VirtualFileResult {
 // TAB TYPES
 // ============================================================================
 
-export type TabType = 'upload' | 'fhir';
+export type TabType = 'upload' | 'text' | 'fhir';
 
 // ============================================================================
 // COMPONENT PROPS - UPDATED TO MATCH HOOK INTERFACE
@@ -150,6 +158,8 @@ export interface CombinedUploadFHIRProps {
   
   // Updated: Hook provides the full FileStats interface
   getStats: () => FileStats;
+
+  updateFileStatus: (fileId: string, status: FileStatus, additionalData?: Partial<FileItem>) => void;
   
   // Direct upload functions - UPDATED to match hook
   addFhirAsVirtualFile: (
@@ -159,13 +169,15 @@ export interface CombinedUploadFHIRProps {
   
   // Updated: Hook takes fileIds array, returns Promise<void>
   // Component should extract IDs from files and rely on state updates
-  uploadFiles: (fileIds?: string[]) => Promise<void>;
+  uploadFiles: (fileIds?: string[]) => Promise<UploadResult[]>;
   
   // Configuration props
   acceptedTypes?: string[];
   maxFiles?: number;
   maxSizeBytes?: number;
   className?: string;
+  
+  convertTextToFHIR?: (text: string, patientName?: string) => Promise<FHIRWithValidation>;
 }
 
 // ============================================================================
