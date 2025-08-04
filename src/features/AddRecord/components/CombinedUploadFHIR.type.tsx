@@ -1,76 +1,5 @@
 import type { FHIRWithValidation } from '../services/fhirConversionService.type';
-
-// ============================================================================
-// SHARED FILE STATUS TYPE (must match both components)
-// ============================================================================
-
-export type FileStatus = 
-  | 'ready' 
-  | 'processing' 
-  | 'medical_detected'
-  | 'non_medical_detected'
-  | 'converting'
-  | 'completed' 
-  | 'uploading'
-  | 'uploaded'
-  | 'extraction_error'
-  | 'detection_error'
-  | 'fhir_error'
-  | 'processing_error'
-  | 'uploading'
-  | 'error';
-
-// ============================================================================
-// MEDICAL DETECTION RESULT TYPE
-// ============================================================================
-
-export interface MedicalDetectionResult {
-  isMedical: boolean;
-  confidence: number;
-  documentType?: string;  // Made optional to match usage
-  reasoning?: string;     // Made optional to match usage
-  detectedTerms?: string[];
-}
-
-// ============================================================================
-// UNIFIED FILE ITEM TYPE (combining both versions)
-// ============================================================================
-
-export interface FileItem {
-  id: string;
-  name: string;
-  size: number;
-  type: string;
-  status: FileStatus;
-  file?: File;            // Original file object (optional for virtual files)
-  
-  // Processing results
-  extractedText?: string;
-  wordCount?: number;
-  processingTime?: number;
-  processingMethod?: string;
-  
-  // Medical detection
-  medicalDetection?: MedicalDetectionResult;
-  
-  // FHIR conversion - using your project's type
-  fhirData?: FHIRWithValidation;
-  
-  // Upload tracking
-  documentId?: string;
-  uploadedAt?: string;
-  documentType?: string;
-  
-  // Error handling
-  error?: string;
-  
-  // File metadata
-  fileHash?: string;
-  lastModified?: number;
-  
-  // Allow additional properties for flexibility
-  [key: string]: any;
-}
+import { FileObject, FileStatus, MedicalDetectionResult } from '@/types/core';
 
 // ============================================================================
 // FHIR VALIDATION TYPES
@@ -94,7 +23,6 @@ export interface FHIRValidation {
  */
 export interface FileStats {
   total: number;
-  pending: number;
   processing: number;
   completed: number;
   errors: number;
@@ -134,7 +62,7 @@ export interface VirtualFileOptions {
 
 export interface VirtualFileResult {
   fileId: string;
-  virtualFile: FileItem;
+  virtualFile: FileObject;
 }
 
 // ============================================================================
@@ -149,7 +77,7 @@ export type TabType = 'upload' | 'text' | 'fhir';
 
 export interface CombinedUploadFHIRProps {
   // File management props - UPDATED to match hook exactly
-  files: FileItem[];
+  files: FileObject[];
   addFiles: (fileList: FileList, options?: AddFilesOptions) => void;
   removeFile: (fileId: string) => void;
   
@@ -159,7 +87,7 @@ export interface CombinedUploadFHIRProps {
   // Updated: Hook provides the full FileStats interface
   getStats: () => FileStats;
 
-  updateFileStatus: (fileId: string, status: FileStatus, additionalData?: Partial<FileItem>) => void;
+  updateFileStatus: (fileId: string, status: FileStatus, additionalData?: Partial<FileObject>) => void;
   
   // Direct upload functions - UPDATED to match hook
   addFhirAsVirtualFile: (
@@ -185,7 +113,7 @@ export interface CombinedUploadFHIRProps {
 // ============================================================================
 
 export interface FileListItemProps {
-  fileItem: FileItem;
+  fileItem: FileObject;
   fhirResult?: {
     success: boolean;
     fhirData?: FHIRWithValidation;
@@ -195,9 +123,9 @@ export interface FileListItemProps {
   
   // Updated: FileListItem should pass FileItem, but retryFile expects fileId
   // We'll handle the conversion in the component
-  onRetry: (fileItem: FileItem) => void;
-  onForceConvert?: (fileItem: FileItem) => void;
-  onComplete?: (fileItem: FileItem) => void;
+  onRetry: (fileItem: FileObject) => void;
+  onForceConvert?: (fileItem: FileObject) => void;
+  onComplete?: (fileItem: FileObject) => void;
   showFHIRResults?: boolean;
 }
 

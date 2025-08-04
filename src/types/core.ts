@@ -13,7 +13,7 @@ export interface FileObject {
   type: string;
   status: FileStatus;
   error?: string;
-  extractedText?: string;
+  extractedText?: string | null;
   wordCount?: number;
   fileHash?: string;
   documentType?: string;
@@ -24,20 +24,21 @@ export interface FileObject {
 }
 
 export type FileStatus = 
-  | 'ready' 
-  | 'processing' 
-  | 'medical_detected'
-  | 'non_medical_detected'
-  | 'converting'
-  | 'completed' 
-  | 'uploading'
-  | 'uploaded'
-  | 'extraction_error'
-  | 'detection_error'
-  | 'fhir_error'
-  | 'processing_error'
-  | 'uploading'
-  | 'error';
+  | 'ready'              // File uploaded, ready for processing
+  | 'extracting'         // Extracting text from file  
+  | 'analyzing_image'    // AI analyzing image content
+  | 'processing'         // General processing state
+  | 'detecting_medical'  // Checking if content is medical
+  | 'medical_detected'   // Confirmed as medical content
+  | 'non_medical_detected' // Confirmed as non-medical
+  | 'converting'         // Converting to FHIR format
+  | 'uploading'          // Uploading to Firestore
+  | 'completed'          // Fully processed and uploaded
+  | 'extraction_error'   // Failed during text extraction
+  | 'detection_error'    // Failed during medical detection  
+  | 'fhir_error'         // Failed during FHIR conversion
+  | 'processing_error'   // General processing failure
+  | 'error';             // Generic error state
 
 export interface ProcessingResult {
   fileName: string;

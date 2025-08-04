@@ -3,16 +3,17 @@ import { FileText, Upload, Code, MessageSquare, AlertCircle, CheckCircle, Extern
 import FileUploadZone from './ui/FileUploadZone';
 import { FileListItem } from './ui/FileListItem';
 
+
 // Import the fixed types
 import type {
   CombinedUploadFHIRProps,
-  FileItem,
   FHIRValidation,
   TabType,
-  UploadResult
+  UploadResult,
 } from './CombinedUploadFHIR.type';
 
 import type { FHIRWithValidation } from '../services/fhirConversionService.type';
+import { FileObject } from '@/types/core';
 
 const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   // File management props
@@ -21,6 +22,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   removeFile,
   retryFile,
   getStats,
+  updateFileStatus,
   
   // Direct upload functions
   addFhirAsVirtualFile,
@@ -105,15 +107,27 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   };
 
   // Submit FHIR data and immediately upload to Firestore
- const handleFileComplete = async (fileItem: FileItem): Promise<void> => {
-  if (fileItem.status === 'completed' && fileItem.extractedText && !fileItem.documentId) {
+ const handleFileComplete = async (fileItem: FileObject): Promise<void> => {
+  if (fileItem.status === 'completed' && fileItem.extractedText) {
     try {
+      updateFileStatus(fileItem.id, 'uploading');
       console.log('🚀 Auto-uploading completed file:', fileItem.name);      
-      await uploadFiles([fileItem.id]);
-      console.log('✅ File auto-uploaded:', fileItem.name);
-      removeFile(fileItem.id);
+      const uploadResults: UploadResult[] =  await uploadFiles([fileItem.id]);
+
+      if (uploadResults && uploadResults[0]?.success) {
+        console.log('✅ File auto-uploaded successfully:', fileItem.name);
+        // Set to uploaded status to show success state
+        updateFileStatus(fileItem.id, 'completed', {
+          documentId: uploadResults[0].documentId,
+          uploadedAt: new Date().toISOString()
+        });
+      } else {
+        throw new Error('Upload failed - no success result')
+      }
     } catch (error) {
-      console.error('❌ Auto-upload error:', error);
+      updateFileStatus(fileItem.id, 'completed', {
+        error: `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
     }
   }
 };
@@ -221,7 +235,7 @@ const handleFhirSubmit = async (): Promise<void> => {
 };
 
 
-const handleRetryFile = (fileItem: FileItem): void => {
+const handleRetryFile = (fileItem: FileObject): void => {
   retryFile(fileItem.id);
 };
 
@@ -254,7 +268,7 @@ const canAddMore = files.length < maxFiles;
 
           <div className="p-4 space-y-4 max-h-96 overflow-y-auto">
             {/* File List - Always visible when files exist */}
-            {files.map((fileItem: FileItem) => (
+            {files.map((fileItem: FileObject) => (
               <FileListItem
                 key={fileItem.id}
                 fileItem={fileItem}

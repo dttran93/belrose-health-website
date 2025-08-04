@@ -15,10 +15,8 @@ import {
 import { EnhancedFHIRResults } from '@/features/AddRecord/components/FHIRValidation';
 
 // Import the unified types instead of defining your own
+import { FileObject, FileStatus, MedicalDetectionResult } from '@/types/core';
 import type { 
-  FileItem, 
-  FileStatus, 
-  MedicalDetectionResult,
   FileListItemProps 
 } from '../CombinedUploadFHIR.type';
 
