@@ -1,11 +1,10 @@
 // src/features/AddRecord/hooks/useFileUpload.types.ts
 
-import { FileObject, FileStatus, MedicalDetectionResult } from '@/types/core';
+import { FileObject, FileStatus, MedicalDetectionResult, UploadResult } from '@/types/core';
 
 // Import service types
 import { FileValidationResult, ProcessingOptions, DocumentProcessingResult } from '../services/documentProcessorService.types';
 import { DeduplicationStats } from '../services/deduplicationService.types';
-import { UploadResult } from '../services/fileUploadService.types';
 
 // ==================== TYPE ALIASES ====================
 
@@ -67,7 +66,7 @@ export interface UseFileUploadReturn {
   removeFile: (fileId: string) => void;
   retryFile: (fileId: string) => Promise<void>;
   clearAll: () => void;
-  processFile: (fileId: string) => Promise<void>;
+  processFile: (fileObj: FileObject) => Promise<void>;
   
   // FHIR integration
   setFHIRConversionCallback: (callback: FHIRConversionCallback) => void;

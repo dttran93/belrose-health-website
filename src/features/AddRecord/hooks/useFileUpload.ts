@@ -14,7 +14,7 @@ import {
   ResetProcessCallback,
   UseFileUploadReturn,
   ProcessingResult
-} from './useFileupload.type';
+} from './useFileUpload.type';
 
 /**
  * A comprehensive file upload hook that handles:
@@ -40,7 +40,7 @@ export function useFileUpload(): UseFileUploadReturn {
     const fhirConversionCallback = useRef<FHIRConversionCallback | null>(null);
     const resetProcessCallback = useRef<ResetProcessCallback | null>(null);
 
-    // ==================== UTILITY FUNCTIONS ====================
+    // ==================== UTILITY/FACTORY FUNCTIONS ====================
     
     const generateId = () => `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
@@ -106,7 +106,7 @@ export function useFileUpload(): UseFileUploadReturn {
         // Auto-process if enabled
         if (autoProcess) {
             newFiles.forEach(fileObj => {
-                processFile(fileObj.id);
+                processFile(fileObj);
             });
         }
     }, []);
@@ -136,7 +136,7 @@ export function useFileUpload(): UseFileUploadReturn {
         
         console.log(`🔄 Retrying file: ${file.name}`);
         updateFileStatus(fileId, 'processing');
-        await processFile(fileId);
+        await processFile(file);
     }, [files]);
 
     const clearAll = useCallback(() => {
@@ -153,22 +153,21 @@ export function useFileUpload(): UseFileUploadReturn {
 
     // ==================== FILE PROCESSING ====================
     
-    const processFile = useCallback(async (fileId: string) => {
-        const fileObj = files.find(f => f.id === fileId);
+    const processFile = useCallback(async (fileObj: FileObject) => {
         if (!fileObj || !fileObj.file) {
-            console.error(`❌ File not found or invalid: ${fileId}`);
+            console.error(`❌ File not found or invalid: ${fileObj.id}`);
             return;
         }
         
         console.log(`🔄 Processing file: ${fileObj.name}`);
-        updateFileStatus(fileId, 'processing');
+        updateFileStatus(fileObj.id, 'processing');
         
         try {
             // Check for duplicates first
-            const duplicateResult = await deduplicationService.current.checkForDuplicate(fileObj.file, fileId);
+            const duplicateResult = await deduplicationService.current.checkForDuplicate(fileObj.file, fileObj.id);
             if (duplicateResult.isDuplicate) {
                 console.log(`⚠️  Duplicate detected: ${fileObj.name}`, duplicateResult);
-                updateFileStatus(fileId, 'error', { 
+                updateFileStatus(fileObj.id, 'error', { 
                     error: `This file appears to be a duplicate of another file (${Math.round(duplicateResult.confidence * 100)} % match).`
                 });
                 return;
@@ -178,13 +177,13 @@ export function useFileUpload(): UseFileUploadReturn {
             const result = await DocumentProcessorService.processDocument(fileObj.file);
             console.log(`✅ Processing complete for: ${fileObj.name}`, result);
             
-            updateFileWithProcessingResult(fileId, result);
+            updateFileWithProcessingResult(fileObj.id, result);
             
         } catch (error: any) {
             console.error(`💥 Processing failed for ${fileObj.name}:`, error);
-            updateFileStatus(fileId, 'error', { error: error.message });
+            updateFileStatus(fileObj.id, 'error', { error: error.message });
         }
-    }, [files]);
+    }, []);
 
     // ==================== STATUS UPDATES ====================
     

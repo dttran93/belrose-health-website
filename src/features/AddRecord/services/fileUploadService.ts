@@ -67,7 +67,8 @@ export class FileUploadService implements IFileUploadService {
       uploadedAt: new Date(),
       savedAt: new Date().toISOString(), // Legacy compatibility
       fileSize: fileObj.size,
-      fileHash: fileObj.fileHash // Legacy compatibility
+      fileHash: fileObj.fileHash, // Legacy compatibility
+      success: true
     };
   }
 
@@ -103,7 +104,8 @@ export class FileUploadService implements IFileUploadService {
       uploadedAt: new Date(),
       savedAt: new Date().toISOString(), // Legacy compatibility
       fileSize: fileObj.size,
-      fileHash: fileObj.fileHash // Legacy compatibility
+      fileHash: fileObj.fileHash, // Legacy compatibility
+      success: true
     };
   }
 
