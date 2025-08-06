@@ -177,7 +177,11 @@ export function useFileUpload(): UseFileUploadReturn {
             const result = await DocumentProcessorService.processDocument(fileObj.file);
             console.log(`✅ Processing complete for: ${fileObj.name}`, result);
             
-            updateFileWithProcessingResult(fileObj.id, result);
+            const status: FileStatus = result.success ? 'completed' : 'error';
+            updateFileStatus(fileObj.id, status, {
+                extractedText: result.extractedText,
+                wordCount: result.wordCount,
+            });
             
         } catch (error: any) {
             console.error(`💥 Processing failed for ${fileObj.name}:`, error);
@@ -195,26 +199,12 @@ export function useFileUpload(): UseFileUploadReturn {
         ));
     }, []);
 
-    const updateFileWithProcessingResult = useCallback((fileId: string, result: ProcessingResult) => {
-        const isMedical = result.medicalDetection?.isMedical ?? false;
-        const status: FileStatus = result.success
-            ? (isMedical ? 'medical_detected' : 'non_medical_detected')
-            : 'error';
-        
-        updateFileStatus(fileId, status, {
-            extractedText: result.extractedText,
-            wordCount: result.wordCount,
-            medicalDetection: result.medicalDetection,
-            documentType: result.medicalDetection?.documentType,
-        });
-    }, [updateFileStatus]);
-
     // ==================== FIRESTORE OPERATIONS ====================
     
     const uploadFiles = useCallback(async (fileIds?: string[]): Promise<UploadResult[]> => {
         const filesToUpload = fileIds 
             ? files.filter(f => fileIds.includes(f.id))
-            : files.filter(f => f.status === 'medical_detected' || f.status === 'non_medical_detected');
+            : files.filter(f => f.status === 'completed');
         
         if (filesToUpload.length === 0) {
             console.log('📤 No files ready for upload');
@@ -300,7 +290,7 @@ export function useFileUpload(): UseFileUploadReturn {
             name: virtualData.name || `Virtual File ${fileId}`,
             size: virtualData.size || 0,
             type: virtualData.type || 'application/json',
-            status: virtualData.medicalDetection?.isMedical ? 'medical_detected' : 'non_medical_detected',
+            status: 'completed',
             uploadedAt: new Date().toISOString(),
             extractedText: virtualData.extractedText || '',
             wordCount: virtualData.wordCount || 0,
@@ -375,8 +365,6 @@ export function useFileUpload(): UseFileUploadReturn {
         const processing = files.filter(f => f.status === 'processing').length;
         const completed = files.filter(f => f.status === 'completed').length;
         const errors = files.filter(f => f.status === 'error').length;
-        const medical = files.filter(f => f.status === 'medical_detected' || (f.status === 'completed' && f.medicalDetection?.isMedical)).length;
-        const nonMedical = files.filter(f => f.status === 'non_medical_detected' || (f.status === 'completed' && !f.medicalDetection?.isMedical)).length;
         const percentComplete = total > 0 ? Math.round((completed / total) * 100) : 0;
         
         return {
@@ -384,8 +372,6 @@ export function useFileUpload(): UseFileUploadReturn {
             processing,
             completed,
             errors,
-            medical,
-            nonMedical,
             percentComplete
         };
     }, [files]);
@@ -394,8 +380,6 @@ export function useFileUpload(): UseFileUploadReturn {
      * Get files in the format expected by other parts of the app
      */
     const processedFiles = files.filter(f => 
-        f.status === 'medical_detected' || 
-        f.status === 'non_medical_detected' ||
         f.status === 'completed'
     );
 
@@ -421,7 +405,6 @@ export function useFileUpload(): UseFileUploadReturn {
         
         // Status updates
         updateFileStatus,
-        updateFileWithProcessingResult,
         
         // Firestore operations
         uploadFiles,

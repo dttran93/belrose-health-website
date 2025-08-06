@@ -1,9 +1,5 @@
-// src/features/AddRecord/services/documentProcessorService.ts
-
 import TextExtractionService from './textExtractionService';
 import VisionExtractionService from './visionExtractionService';
-import { aiMedicalDetectionService } from '@/features/AddRecord/services/aiMedicalDetectionService';
-import { MedicalDetectionResult } from '@/types/core';
 import { 
   FileValidationResult, 
   ProcessingOptions, 
@@ -18,17 +14,16 @@ import {
 import type { VisionAnalysisResult, TextExtractionResult } from './visionExtractService.types';
 
 /**
- * Service for processing documents through text extraction and medical detection
+ * Simplified service for processing documents through text extraction only
  * Handles both regular documents (PDF, Word) and images (JPG, PNG) with OCR
  */
 class DocumentProcessorService implements IDocumentProcessorService {
   
   /**
-   * Process a document file through the complete pipeline
+   * Process a document file through the simplified pipeline
    */
   async processDocument(file: File, options: ProcessingOptions = {}): Promise<DocumentProcessingResult> {
     const {
-      enableMedicalDetection = false, // Set as false for testing. Save on API
       enableVisionAI = true,
       compressionThreshold = 2 * 1024 * 1024, // 2MB
       signal
@@ -44,7 +39,6 @@ class DocumentProcessorService implements IDocumentProcessorService {
         processingSteps: [],
         extractedText: null,
         wordCount: 0,
-        medicalDetection: null,
         processingMethod: null,
         success: false,
         error: null,
@@ -56,7 +50,7 @@ class DocumentProcessorService implements IDocumentProcessorService {
         throw new Error('Processing cancelled');
       }
 
-      // Step 1: Text Extraction
+      // Text Extraction
       result.processingSteps.push('text_extraction_started');
       
       if (file.type.startsWith('image/')) {
@@ -68,17 +62,6 @@ class DocumentProcessorService implements IDocumentProcessorService {
       // Check for cancellation after text extraction
       if (signal?.aborted) {
         throw new Error('Processing cancelled after text extraction');
-      }
-
-      // Step 2: Medical Detection (if enabled and text was extracted)
-      if (enableMedicalDetection && result.extractedText) {
-        result.processingSteps.push('medical_detection_started');
-        result = await this.performMedicalDetection(file, result, signal);
-      }
-
-      // Check for cancellation after medical detection
-      if (signal?.aborted) {
-        throw new Error('Processing cancelled after medical detection');
       }
 
       // Calculate final metrics
@@ -101,7 +84,6 @@ class DocumentProcessorService implements IDocumentProcessorService {
         processingSteps: ['processing_failed'],
         extractedText: null,
         wordCount: 0,
-        medicalDetection: null,
         processingMethod: null,
         success: false,
         error: error.message,
@@ -206,7 +188,6 @@ class DocumentProcessorService implements IDocumentProcessorService {
             processingSteps: ['processing_failed'],
             extractedText: null,
             wordCount: 0,
-            medicalDetection: null,
             processingMethod: null,
             success: false,
             error: result.reason?.message || 'Unknown error',
@@ -224,7 +205,6 @@ class DocumentProcessorService implements IDocumentProcessorService {
             processingSteps: ['processing_failed'],
             extractedText: null,
             wordCount: 0,
-            medicalDetection: null,
             processingMethod: null,
             success: false,
             error: 'Batch processing failed',
@@ -257,18 +237,12 @@ class DocumentProcessorService implements IDocumentProcessorService {
           throw new Error('Processing cancelled');
         }
 
-        // Try full AI Vision analysis first
+        // Try AI Vision text extraction
         result.processingSteps.push('ai_vision_analysis');
         const visionResult: VisionAnalysisResult = await VisionExtractionService.analyzeImageFull(file) as VisionAnalysisResult;
         
         result.extractedText = visionResult.extractedText;
-        result.medicalDetection = {
-          isMedical: visionResult.isMedical,
-          confidence: visionResult.confidence,
-          detectedTerms: [], // Vision service might not provide this
-          reasoning: visionResult.reasoning
-        };
-        result.processingMethod = 'ai_vision_full';
+        result.processingMethod = 'ai_vision_text_only';
         result.processingSteps.push('ai_vision_completed');
         
         return result;
@@ -278,7 +252,7 @@ class DocumentProcessorService implements IDocumentProcessorService {
       }
     }
 
-    // Fallback to text extraction only
+    // Fallback to basic text extraction
     result.processingSteps.push('image_text_extraction');
     
     // Compress if needed
@@ -316,50 +290,6 @@ class DocumentProcessorService implements IDocumentProcessorService {
     result.processingSteps.push('document_text_completed');
     
     return result;
-  }
-
-  /**
-   * Perform medical content detection
-   */
-  private async performMedicalDetection(
-    file: File, 
-    result: DocumentProcessingResult,
-    signal?: AbortSignal
-  ): Promise<DocumentProcessingResult> {
-    
-    try {
-      // Check for cancellation
-      if (signal?.aborted) {
-        throw new Error('Processing cancelled');
-      }
-
-      const detection = await aiMedicalDetectionService.detectMedicalRecord(
-        result.extractedText!,
-        file.name,
-        file.type
-      );
-
-      result.medicalDetection = {
-        isMedical: detection.isMedical,
-        confidence: detection.confidence,
-        detectedTerms: detection.detectedTerms || [],
-        reasoning: detection.reasoning
-      };
-      result.processingSteps.push('medical_detection_completed');
-      
-      return result;
-    } catch (error: any) {
-      console.error('Medical detection failed:', error);
-      result.medicalDetection = {
-        isMedical: false,
-        confidence: 0,
-        detectedTerms: [],
-        reasoning: `Detection failed: ${error.message}`
-      };
-      result.processingSteps.push('medical_detection_failed');
-      
-      return result;
-    }
   }
 
   /**

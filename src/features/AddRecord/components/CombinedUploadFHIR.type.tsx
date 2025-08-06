@@ -1,5 +1,5 @@
 import type { FHIRWithValidation } from '../services/fhirConversionService.type';
-import { FileObject, FileStatus, MedicalDetectionResult } from '@/types/core';
+import { FileObject, FileStatus, UploadResult } from '@/types/core';
 
 // ============================================================================
 // FHIR VALIDATION TYPES
@@ -26,26 +26,7 @@ export interface FileStats {
   processing: number;
   completed: number;
   errors: number;
-  medical: number;
-  nonMedical: number;
   percentComplete: number;
-}
-
-/**
- * Simplified upload result - we rely on hook state instead of return values
- */
-export interface UploadResult {
-  documentId?: string;    // For new uploads
-  firestoreId?: string;   // Legacy field name for compatibility
-  downloadURL?: string | null;
-  filePath?: string | null;
-  uploadedAt?: Date;
-  fileSize?: number;
-  savedAt?: string;       // Legacy field for compatibility
-  fileHash?: string;      // Legacy field for compatibility
-  success: boolean;
-  fileId?: string;
-  error?: string;
 }
 
 export interface AddFilesOptions {

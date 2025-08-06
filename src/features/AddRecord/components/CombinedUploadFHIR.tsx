@@ -9,11 +9,10 @@ import type {
   CombinedUploadFHIRProps,
   FHIRValidation,
   TabType,
-  UploadResult,
 } from './CombinedUploadFHIR.type';
 
 import type { FHIRWithValidation } from '../services/fhirConversionService.type';
-import { FileObject } from '@/types/core';
+import { FileObject, UploadResult } from '@/types/core';
 
 const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   // File management props
@@ -375,21 +374,6 @@ const canAddMore = files.length < maxFiles;
                 title="Drop medical documents here or click to upload"
                 subtitle="Files will be processed and automatically saved to your cloud storage"
               />
-              
-              {/* Add More Files Option - only show if we have files and can add more */}
-              {hasFiles && canAddMore && (
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <FileUploadZone
-                    onFilesSelected={handleFilesSelected}
-                    acceptedTypes={acceptedTypes}
-                    maxFiles={maxFiles - files.length}
-                    maxSizeBytes={maxSizeBytes}
-                    title="Add more files"
-                    subtitle={`${maxFiles - files.length} more files allowed`}
-                    compact={true}
-                  />
-                </div>
-              )}
             </div>
           )}
 
