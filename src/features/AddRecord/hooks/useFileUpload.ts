@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
-import { DeduplicationService } from '../services/deduplicationService';
 import { FileUploadService } from '@/features/AddRecord/services/fileUploadService';
 import DocumentProcessorService from '@/features/AddRecord/services/documentProcessorService';
 import { FileObject, FileStatus, UploadResult } from '@/types/core';
@@ -23,19 +22,11 @@ import {
  * - Medical content detection
  * - Firestore uploads
  * - FHIR data integration
- * - Deduplication
  * - Virtual file support
  */
 export function useFileUpload(): UseFileUploadReturn {
     
-    //DEBUG LOGGING
-    console.log('🔄 useFileUpload hook executing/recreating');
-
-    
-
-
-    // ==================== STATE MANAGEMENT ====================
-    
+    // ==================== STATE MANAGEMENT ====================    
     const [files, setFiles] = useState<FileObject[]>(() => {
         // Try to restore from sessionStorage on mount
         if (typeof window !== 'undefined' && window.sessionStorage) {
@@ -71,7 +62,6 @@ export function useFileUpload(): UseFileUploadReturn {
     // ==================== REFS & SERVICES ====================
     
     const fileUploadService = useRef(new FileUploadService());
-    const deduplicationService = useRef(new DeduplicationService());
     const fhirConversionCallback = useRef<FHIRConversionCallback | null>(null);
     const resetProcessCallback = useRef<ResetProcessCallback | null>(null);
 
@@ -202,17 +192,7 @@ export function useFileUpload(): UseFileUploadReturn {
         console.log(`🔄 Processing file: ${fileObj.name}`);
         updateFileStatus(fileObj.id, 'processing');
         
-        try {
-            // Check for duplicates first
-            const duplicateResult = await deduplicationService.current.checkForDuplicate(fileObj.file, fileObj.id);
-            if (duplicateResult.isDuplicate) {
-                console.log(`⚠️  Duplicate detected: ${fileObj.name}`, duplicateResult);
-                updateFileStatus(fileObj.id, 'error', { 
-                    error: `This file appears to be a duplicate of another file (${Math.round(duplicateResult.confidence * 100)} % match).`
-                });
-                return;
-            }
-            
+        try {          
             // Process with document processor
             const result = await DocumentProcessorService.processDocument(fileObj.file);
             console.log(`✅ Processing complete for: ${fileObj.name}`, result);
@@ -460,9 +440,6 @@ export function useFileUpload(): UseFileUploadReturn {
         getStats,
         savedToFirestoreCount: firestoreData.size,
         savingCount: savingToFirestore.size,
-        
-        // Services (for other hooks to use)
-        deduplicationService: deduplicationService.current,
 
         // VirtualFile Support
         addVirtualFile,

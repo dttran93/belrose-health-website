@@ -110,7 +110,6 @@ export const useFHIRConversion = (
             }
 
             console.log('🎉 FHIR data stored in state for fileId:', fileId);
-            console.log('🎯 About to show toast...');
 
             toast.success(`⚡ FHIR conversion completed for ${targetFile.name}`, {
                 description: 'Medical data has been converted to FHIR format',
