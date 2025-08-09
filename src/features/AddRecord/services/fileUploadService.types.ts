@@ -70,7 +70,6 @@ export interface IFileUploadService {
   uploadFile(fileObj: FileObject, options?: UploadOptions): Promise<UploadResult>;
   updateRecord(fileId: string, data: Partial<FirestoreFileMetadata>): Promise<void>;
   deleteFile(fileId: string): Promise<void>;
-  getUploadProgress(fileId: string): UploadProgress | null;
   
   // FHIR specific methods
   updateWithFHIR(documentId: string, fhirData: any): Promise<void>;

@@ -1,14 +1,7 @@
 import React from 'react';
-import { 
-  AlertCircle, 
-  CheckCircle, 
-  AlertTriangle, 
-  Info,
-  Loader2,
-  Eye
-} from 'lucide-react';
-
-import type { ValidationIssue, ValidationMetadata, FHIRWithValidation } from '../services/fhirConversionService.type';
+import { AlertCircle, CheckCircle, AlertTriangle, Info, Loader2} from 'lucide-react';
+import { FileStatus } from '@/types/core';
+import type { ValidationIssue, FHIRWithValidation } from '../services/fhirConversionService.type';
 import type { LucideIcon } from 'lucide-react';
 
 export interface ValidationStatusProps {
@@ -40,20 +33,6 @@ export interface FileItem {
   status: FileStatus;
   [key: string]: any;
 }
-
-export type FileStatus = 
-  | 'extracting'
-  | 'analyzing_image'
-  | 'detecting_medical'
-  | 'medical_detected'
-  | 'non_medical_detected'
-  | 'converting'
-  | 'completed'
-  | 'extraction_error'
-  | 'detection_error'
-  | 'fhir_error'
-  | 'processing_error'
-  | 'error';
 
 export interface ValidationStatusIconProps {
   fileItem: FileItem;
@@ -216,17 +195,7 @@ export const EnhancedFHIRResults: React.FC<EnhancedFHIRResultsProps> = ({ fhirRe
 export const getEnhancedStatusIcon = (fileItem: FileItem, fhirResult?: FHIRResult): React.ReactNode => {
   // Your existing status icons for processing states
   switch (fileItem.status) {
-    case 'extracting':
-      return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />;
-    case 'analyzing_image':
-      return <Eye className="w-4 h-4 animate-pulse text-purple-500" />;
-    case 'detecting_medical':
-      return <Loader2 className="w-4 h-4 animate-spin text-orange-500" />;
-    case 'medical_detected':
-      return <CheckCircle className="w-4 h-4 text-green-500" />;
-    case 'non_medical_detected':
-      return <AlertCircle className="w-4 h-4 text-yellow-500" />;
-    case 'converting':
+    case 'processing':
       return <Loader2 className="w-4 h-4 animate-spin text-purple-500" />;
     case 'completed':
       // Show validation status for completed files
@@ -241,10 +210,6 @@ export const getEnhancedStatusIcon = (fileItem: FileItem, fhirResult?: FHIRResul
         }
       }
       return <CheckCircle className="w-4 h-4 text-green-500" />;
-    case 'extraction_error':
-    case 'detection_error':
-    case 'fhir_error':
-    case 'processing_error':
     case 'error':
       return <AlertCircle className="w-4 h-4 text-red-500" />;
     default:

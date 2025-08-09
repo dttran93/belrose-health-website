@@ -1,10 +1,9 @@
 // src/features/AddRecord/hooks/useFileUpload.types.ts
 
-import { FileObject, FileStatus, MedicalDetectionResult, UploadResult } from '@/types/core';
+import { FileObject, FileStatus, UploadResult } from '@/types/core';
 
 // Import service types
 import { FileValidationResult, ProcessingOptions, DocumentProcessingResult } from '../services/documentProcessorService.types';
-import { DeduplicationStats } from '../services/deduplicationService.types';
 
 // ==================== TYPE ALIASES ====================
 
@@ -26,7 +25,6 @@ export interface VirtualFileData {
   type?: string;
   extractedText?: string;
   wordCount?: number;
-  medicalDetection?: MedicalDetectionResult;
   documentType?: string;
   fhirData?: any;
   [key: string]: any; // Allow additional properties
@@ -42,8 +40,6 @@ export interface FileStats {
   processing: number;
   completed: number;
   errors: number;
-  medical: number;
-  nonMedical: number;
   percentComplete: number;
 }
 
@@ -64,8 +60,13 @@ export interface UseFileUploadReturn {
   // File management actions
   addFiles: (fileList: FileList, options?: AddFilesOptions) => void;
   removeFile: (fileId: string) => void;
+  removeFileFromLocal: (fileId: string) => void;
+  deleteFileFromFirebase: (documentId: string) => Promise<void>;
+  cancelFileUpload: (fileId: string) => void;
+  removeFileComplete: (fileId: string) => Promise<void>;
   retryFile: (fileId: string) => Promise<void>;
   clearAll: () => void;
+  enhancedClearAll: () => Promise<void>;   
   processFile: (fileObj: FileObject) => Promise<void>;
   
   // FHIR integration
@@ -74,7 +75,6 @@ export interface UseFileUploadReturn {
   
   // Status updates
   updateFileStatus: (fileId: string, status: FileStatus, additionalData?: Partial<FileObject>) => void;
-  updateFileWithProcessingResult: (fileId: string, result: ProcessingResult) => void;
   
   // Firestore operations
   uploadFiles: (fileIds?: string[]) => Promise<UploadResult[]>;
@@ -84,9 +84,6 @@ export interface UseFileUploadReturn {
   getStats: () => FileStats;
   savedToFirestoreCount: number;
   savingCount: number;
-  
-  // Services (for other hooks to use)
-  deduplicationService: any; // You might want to type this more specifically
   
   // Virtual file support
   addVirtualFile: (virtualData: VirtualFileData) => string;

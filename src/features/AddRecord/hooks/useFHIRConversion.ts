@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { getFirestore, doc, setDoc } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore';
 import { useAuthContext } from '@/components/auth/AuthContext';
 import { toast } from 'sonner';
 import { FileObject } from '@/types/core';

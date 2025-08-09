@@ -454,33 +454,20 @@ return (
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Patient Name (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={patientName}
-                    onChange={(e) => setPatientName(e.target.value)}
-                    placeholder="Enter patient name..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={submittingText}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Medical Note or Description
                   </label>
                   <textarea
                     value={plainText}
                     onChange={(e) => setPlainText(e.target.value)}
-                    placeholder={`Describe what happened during the medical visit...
+                    placeholder={
+                      `Describe what happened during the medical visit...
 
-Examples:
-• "Had routine checkup with Dr. Smith. Blood pressure was 120/80. Everything looks normal."
-• "Visited urgent care for sore throat. Prescribed amoxicillin 500mg, take twice daily for 10 days."
-• "Follow-up appointment for diabetes. HbA1c improved to 7.2%. Continue current medication."
-• "Annual physical exam completed. All vitals within normal range. Recommended yearly mammogram."`}
-                    className="w-full h-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+  Examples:
+  • "Had routine checkup with Dr. Smith. Blood pressure was 120/80. Everything looks normal."
+  • "Visited urgent care for sore throat. Prescribed amoxicillin 500mg, take twice daily for 10 days."
+  • "Follow-up appointment for diabetes. HbA1c improved to 7.2%. Continue current medication."
+  • "Annual physical exam completed. All vitals within normal range. Recommended yearly mammogram."`}
+                    className="w-full bg-background h-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                     disabled={submittingText}
                   />
                 </div>

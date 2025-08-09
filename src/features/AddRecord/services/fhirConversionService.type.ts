@@ -175,13 +175,6 @@ export interface FHIRWithValidation extends FHIRResource {
   _validation: ValidationMetadata;
 }
 
-export interface ExistingFHIRValidationResult {
-  isValid: boolean;
-  summary?: ValidationResult;
-  error?: string;
-  validatedAt: string;
-}
-
 /**
  * Constants for validation
  */

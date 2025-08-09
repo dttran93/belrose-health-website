@@ -1,5 +1,5 @@
 import React from 'react';
-import useFileUpload from '@/features/AddRecord/hooks/useFileUpload';
+import useFileUpload from '@/features/AddRecord/hooks/useFileManager';
 import { useFHIRConversion } from '@/features/AddRecord/hooks/useFHIRConversion';
 import { ExportService } from '@/features/AddRecord/services/exportService';
 
@@ -59,9 +59,11 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
         savingToFirestore,
         addFiles,
         removeFile,
+        removeFileComplete,
         retryFile,
         updateFileStatus,
         clearAll,
+        enhancedClearAll,
         uploadFiles,
         updateFirestoreRecord,
         getStats,
@@ -167,16 +169,16 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
                 <CombinedUploadFHIR
                     files={files}
                     addFiles={addFiles}
-                    removeFile={removeFile}
+                    removeFile={removeFileComplete}
                     retryFile={retryFile}
                     getStats={getStats}
                     updateFileStatus={updateFileStatus}
-                    addFhirAsVirtualFile={addFhirAsVirtualFile} // NEW: Direct FHIR support
-                    uploadFiles={uploadFiles} // NEW: Direct upload support
+                    addFhirAsVirtualFile={addFhirAsVirtualFile}
+                    uploadFiles={uploadFiles}
                     fhirData={fhirData}
                     onFHIRConverted={handleFHIRConverted}
                 />
-                
+
             </div>
         </div>
     );

@@ -13,7 +13,7 @@ import {
   FHIRConversionCallback,
   ResetProcessCallback,
   UseFileUploadReturn,
-} from './useFileUpload.type';
+} from './useFileManager.type';
 
 /**
  * A comprehensive file upload hook that handles:
@@ -192,7 +192,6 @@ export function useFileUpload(): UseFileUploadReturn {
         }
     };
 
-
     const processFile = useCallback(async (fileObj: FileObject) => {
         if (!fileObj || !fileObj.file) {
             console.error(`❌ File not found or invalid: ${fileObj.id}`);
@@ -267,6 +266,173 @@ export function useFileUpload(): UseFileUploadReturn {
             });
         }
     }, []);
+
+    // ================ FILE DELETION =========================
+
+      /**
+     * Remove file from local state only
+     * Pure local state cleanup - no Firebase operations
+     */
+    const removeFileFromLocal = useCallback((fileId: string) => {
+        console.log(`🧹 Removing file from local state: ${fileId}`);
+        
+        setFiles(prev => {
+            const filtered = prev.filter(f => f.id !== fileId);
+            console.log(`📊 Files before removal: ${prev.length}, after: ${filtered.length}`);
+            return filtered;
+        });
+        
+        setFirestoreData(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(fileId);
+            return newMap;
+        });
+        
+        setSavingToFirestore(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(fileId);
+            return newSet;
+        });
+        
+        console.log('✅ File removed from local state:', fileId);
+    }, []);
+
+    /**
+     * Delete file from Firebase
+     * Pure Firebase operation wrapper - delegates to service
+     */
+    const deleteFileFromFirebase = useCallback(async (documentId: string): Promise<void> => {
+        console.log(`🔥 Deleting file from Firebase: ${documentId}`);
+        
+        try {
+            await fileUploadService.current.deleteFile(documentId);
+            console.log('✅ File deleted from Firebase:', documentId);
+        } catch (error: any) {
+            console.error('❌ Firebase deletion failed:', error);
+            throw error; // Let caller handle the error
+        }
+    }, []);
+
+    /**
+     * Cancel upload operations for a file
+     * Service operation wrapper
+     */
+    const cancelFileUpload = useCallback((fileId: string) => {
+        console.log(`🛑 Cancelling upload operations for: ${fileId}`);
+        
+        try {
+            fileUploadService.current.cancelUpload(fileId);
+            console.log('✅ Upload operations cancelled for:', fileId);
+        } catch (error: any) {
+            console.warn('⚠️ Error cancelling upload:', error);
+            // Non-fatal - don't throw
+        }
+    }, []);
+
+    /**
+     * WRAPPER: Complete file removal for FileListItem
+     * Combines local cleanup + Firebase deletion + upload cancellation
+     */
+    const removeFileComplete = useCallback(async (fileId: string): Promise<void> => {
+        console.log(`🗑️ Starting complete file removal: ${fileId}`);
+        
+        const fileToRemove = files.find(f => f.id === fileId);
+        
+        if (!fileToRemove) {
+            console.warn(`⚠️ File not found in local state: ${fileId}`);
+            return;
+        }
+        
+        console.log(`📁 File info:`, {
+            name: fileToRemove.name,
+            status: fileToRemove.status,
+            hasDocumentId: !!fileToRemove.documentId,
+            documentId: fileToRemove.documentId,
+            isVirtual: fileToRemove.isVirtual
+        });
+        
+        // Step 1: Cancel any active uploads first
+        cancelFileUpload(fileId);
+        
+        // Step 2: Delete from Firebase if it was uploaded
+        if (fileToRemove.documentId) {
+            try {
+                await deleteFileFromFirebase(fileToRemove.documentId);
+                toast.success(`Deleted "${fileToRemove.name}" from cloud storage`);
+            } catch (error: any) {
+                console.error('❌ Firebase deletion failed, but continuing with local cleanup:', error);
+                toast.error(`Could not delete "${fileToRemove.name}" from cloud storage: ${error.message}`);
+                // Continue with local cleanup even if Firebase deletion fails
+            }
+        }
+        
+        // Step 3: Always clean up local state
+        removeFileFromLocal(fileId);
+        
+        console.log('✅ Complete file removal finished:', fileId);
+    }, [files, removeFileFromLocal, deleteFileFromFirebase, cancelFileUpload]);
+
+    // Also enhance your existing clearAll function
+    const enhancedClearAll = useCallback(async () => {
+        console.log('🧹 Starting enhanced clearAll - will clean up Firebase files too');
+        
+        // Get all uploaded files that need Firebase cleanup
+        const uploadedFiles = files
+            .filter(f => f.documentId)
+            .map(f => ({ id: f.documentId!, name: f.name }));
+        
+        if (uploadedFiles.length > 0) {
+            console.log(`🔥 Found ${uploadedFiles.length} uploaded files to delete from Firebase`);
+            
+            try {
+                // Delete files one by one with error handling
+                const deletePromises = uploadedFiles.map(async (file) => {
+                    try {
+                        await deleteFileFromFirebase(file.id);
+                        return { success: true, fileId: file.id, name: file.name };
+                    } catch (error: any) {
+                        console.error(`❌ Failed to delete ${file.name}:`, error);
+                        return { success: false, fileId: file.id, name: file.name, error: error.message };
+                    }
+                });
+                
+                const results = await Promise.all(deletePromises);
+                const successful = results.filter(r => r.success);
+                const failed = results.filter(r => !r.success);
+                
+                if (successful.length > 0) {
+                    console.log(`✅ Successfully deleted ${successful.length} files from Firebase`);
+                }
+                
+                if (failed.length > 0) {
+                    console.warn(`❌ Failed to delete ${failed.length} files from Firebase:`, failed);
+                    toast.warning(`Warning: Could not delete ${failed.length} files from cloud storage`);
+                } else {
+                    toast.success(`Cleared all files including ${successful.length} from cloud storage`);
+                }
+                
+            } catch (error: any) {
+                console.error('❌ Bulk deletion error:', error);
+                toast.error('Failed to clear some files from cloud storage');
+            }
+        } else {
+            console.log('📱 No uploaded files found - just clearing local state');
+        }
+        
+        // Clear local state (same as original clearAll)
+        console.log('🧹 Clearing local state');
+        setFiles([]);
+        setFirestoreData(new Map());
+        setSavingToFirestore(new Set());
+        
+        // Call reset callback if provided
+        if (resetProcessCallback.current) {
+            resetProcessCallback.current();
+        }
+        
+        console.log('✅ Enhanced clearAll completed');
+    }, [files, deleteFileFromFirebase]);
+
 
     // ==================== STATUS UPDATES ====================
     
@@ -471,8 +637,13 @@ export function useFileUpload(): UseFileUploadReturn {
         // File management actions
         addFiles,
         removeFile,
+        removeFileFromLocal,
+        deleteFileFromFirebase,
+        cancelFileUpload,
+        removeFileComplete,
         retryFile,
         clearAll,
+        enhancedClearAll,
         processFile,
         
         // FHIR integration

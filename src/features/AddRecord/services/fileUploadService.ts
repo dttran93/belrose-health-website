@@ -1,4 +1,4 @@
-import { saveFileMetadataToFirestore, uploadUserFile } from '@/firebase/uploadUtils';
+import { saveFileMetadataToFirestore, uploadUserFile, deleteFileComplete } from '@/firebase/uploadUtils';
 import { FileObject } from '@/types/core';
 import { 
   UploadResult, 
@@ -188,7 +188,6 @@ export class FileUploadService implements IFileUploadService {
 
   /**
    * Main upload method - this is what useFileUpload calls
-   * (This is the missing method that was causing the error!)
    */
   async uploadFile(fileObj: FileObject, options: UploadOptions = {}): Promise<UploadResult> {
     return await this.uploadWithRetry(fileObj, 3, (status, data) => {
@@ -253,35 +252,27 @@ export class FileUploadService implements IFileUploadService {
   /**
    * Delete a file from storage and Firestore
    */
-  async deleteFile(fileId: string): Promise<void> {
+  async deleteFile(documentId: string): Promise<void> {
     try {
-      // Cancel any active upload
-      const activeUpload = this.activeUploads.get(fileId);
-      if (activeUpload) {
-        activeUpload.abort();
-        this.activeUploads.delete(fileId);
-      }
-
-      // TODO: Implement actual file deletion
-      // await deleteFromStorage(filePath);
-      // await deleteFromFirestore(documentId);
+      console.log('🗑️ FileUploadService deleting from Firebase:', documentId);
       
-      console.log('🗑️ File deleted:', fileId);
+      const { deleteFileComplete } = await import('@/firebase/uploadUtils');
+      const result = await deleteFileComplete(documentId);
+      
+      console.log('✅ Firebase deletion completed:', {
+        documentId,
+        deletedFromStorage: result.deletedFromStorage,
+        deletedFromFirestore: result.deletedFromFirestore
+      });
       
     } catch (error: any) {
+      console.error('❌ Firebase deletion failed:', error);
       throw new FileUploadError(
-        `Failed to delete file: ${error.message}`,
+        `Failed to delete file from Firebase: ${error.message}`,
         'DELETE_FAILED',
-        fileId
+        documentId
       );
     }
-  }
-
-  /**
-   * Get upload progress for a specific file
-   */
-  getUploadProgress(fileId: string): UploadProgress | null {
-    return this.uploadProgressMap.get(fileId) || null;
   }
 
   /**
@@ -290,18 +281,12 @@ export class FileUploadService implements IFileUploadService {
   cancelUpload(fileId: string): void {
     const activeUpload = this.activeUploads.get(fileId);
     if (activeUpload) {
+      console.log('🛑 Cancelling upload for:', fileId);
       activeUpload.abort();
       this.activeUploads.delete(fileId);
       this.uploadProgressMap.delete(fileId);
-      console.log('🛑 Upload cancelled for:', fileId);
+      console.log('✅ Upload cancelled for:', fileId);
     }
-  }
-
-  /**
-   * Get all currently active uploads
-   */
-  getActiveUploads(): string[] {
-    return Array.from(this.activeUploads.keys());
   }
 
   // ==================== PRIVATE HELPER METHODS ====================

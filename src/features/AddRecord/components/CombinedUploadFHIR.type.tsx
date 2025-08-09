@@ -60,7 +60,7 @@ export interface CombinedUploadFHIRProps {
   // File management props - UPDATED to match hook exactly
   files: FileObject[];
   addFiles: (fileList: FileList, options?: AddFilesOptions) => void;
-  removeFile: (fileId: string) => void;
+  removeFile: (fileId: string) => Promise<void>;
   
   // Updated: Hook provides Promise<void>, takes fileId: string
   retryFile: (fileId: string) => Promise<void>;
@@ -79,6 +79,11 @@ export interface CombinedUploadFHIRProps {
   // Updated: Hook takes fileIds array, returns Promise<void>
   // Component should extract IDs from files and rely on state updates
   uploadFiles: (fileIds?: string[]) => Promise<UploadResult[]>;
+
+  
+  // 🔥 ADD FHIR PROPS
+  fhirData?: Map<string, FHIRWithValidation>
+  onFHIRConverted?: (fileId: string, uploadResult: any, fileObj?: FileObject) => Promise<void>;
   
   // Configuration props
   acceptedTypes?: string[];
