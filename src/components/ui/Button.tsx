@@ -1,10 +1,9 @@
-// FIXED VERSION: Your existing Button.jsx with loading prop support
-
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
-import { cva } from "class-variance-authority";
+import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
+// Define the button variants with cva
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
@@ -32,10 +31,14 @@ const buttonVariants = cva(
       size: "default",
     },
   }
-)
+);
 
 // Loading spinner component
-const LoadingSpinner = ({ className = "h-4 w-4" }) => (
+interface LoadingSpinnerProps {
+  className?: string;
+}
+
+const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ className = "h-4 w-4" }) => (
   <svg 
     className={cn("animate-spin", className)} 
     xmlns="http://www.w3.org/2000/svg" 
@@ -58,36 +61,45 @@ const LoadingSpinner = ({ className = "h-4 w-4" }) => (
   </svg>
 );
 
-const Button = React.forwardRef(({ 
-  className, 
-  variant, 
-  size, 
-  asChild = false, 
-  loading = false,
-  disabled = false,
-  children,
-  onClick,
-  ...props 
-}, ref) => {
-  const Comp = asChild ? Slot : "button";
-  
-  // CRITICAL FIX: Don't pass loading as a DOM attribute
-  const { loading: _, ...domProps } = props; // Remove loading from props spread
-  
-  return (
-    <Comp
-      className={cn(buttonVariants({ variant, size, className }))}
-      ref={ref}
-      disabled={loading || disabled}
-      onClick={loading ? undefined : onClick}
-      aria-busy={loading ? true : undefined}
-      {...domProps}
-    >
-      {loading && <LoadingSpinner />}
-      {children}
-    </Comp>
-  );
-});
+// Button component props interface
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
+  loading?: boolean;
+  children: React.ReactNode;
+}
+
+// Button component
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ 
+    className, 
+    variant, 
+    size, 
+    asChild = false, 
+    loading = false,
+    disabled = false,
+    children,
+    onClick,
+    ...props 
+  }, ref) => {
+    const Comp = asChild ? Slot : "button";
+    
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        disabled={loading || disabled}
+        onClick={loading ? undefined : onClick}
+        aria-busy={loading ? true : undefined}
+        {...props}
+      >
+        {loading && <LoadingSpinner />}
+        {children}
+      </Comp>
+    );
+  }
+);
 
 Button.displayName = "Button";
 

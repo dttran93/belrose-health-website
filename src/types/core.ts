@@ -24,21 +24,10 @@ export interface FileObject {
 }
 
 export type FileStatus = 
-  | 'ready'              // File uploaded, ready for processing
-  | 'extracting'         // Extracting text from file  
-  | 'analyzing_image'    // AI analyzing image content
-  | 'processing'         // General processing state
-  | 'detecting_medical'  // Checking if content is medical
-  | 'medical_detected'   // Confirmed as medical content
-  | 'non_medical_detected' // Confirmed as non-medical
-  | 'converting'         // Converting to FHIR format
-  | 'uploading'          // Uploading to Firestore
-  | 'completed'          // Fully processed and uploaded
-  | 'extraction_error'   // Failed during text extraction
-  | 'detection_error'    // Failed during medical detection  
-  | 'fhir_error'         // Failed during FHIR conversion
-  | 'processing_error'   // General processing failure
-  | 'error';             // Generic error state
+  | 'pending'      // File uploaded, waiting to process
+  | 'processing'   // Currently being processed  
+  | 'completed'    // Successfully processed
+  | 'error';       // Failed with error
 
 export interface ProcessingResult {
   fileName: string;
@@ -47,22 +36,10 @@ export interface ProcessingResult {
   processingSteps: string[];
   extractedText: string | null;
   wordCount: number;
-  medicalDetection: MedicalDetectionResult | null;
   processingMethod: string | null;
   success: boolean;
   error: string | null;
   processingTime: number;
-}
-
-export interface MedicalDetectionResult {
-  isMedical: boolean;
-  confidence: number;
-  detectedTerms: string[];
-  reasoning?: string;
-  documentType?: string;
-  suggestion?: string;
-  source?: 'ai_vision' | 'text_analysis' | 'hybrid';
-  medicalSpecialty?: string;
 }
 
 export interface DuplicateInfo {
@@ -71,4 +48,23 @@ export interface DuplicateInfo {
   matchedOn: ('name' | 'size' | 'lastModified' | 'hash')[];
   canRetry: boolean;
   userMessage?: string;
+}
+
+export interface UploadResult {
+  // Component needs (success/error tracking)
+  success: boolean;
+  error?: string;
+  fileId?: string;
+  
+  // Firebase service provides (upload details)
+  documentId?: string;
+  firestoreId?: string;        // Legacy compatibility
+  downloadURL?: string | null;
+  filePath?: string | null;
+  uploadedAt?: Date;
+  fileSize?: number;
+  
+  // Legacy fields for backward compatibility
+  savedAt?: string;
+  fileHash?: string;
 }

@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, Upload, Code, MessageSquare, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
+import React, { useState } from 'react';
+import { FileText, Upload, Code, MessageSquare, AlertCircle, CheckCircle, ExternalLink, RefreshCw } from 'lucide-react';
 import FileUploadZone from './ui/FileUploadZone';
-import { FileListItem } from './ui/FileListItem';
-
+import { FileListItem } from './FileListItem';
+import { TabNavigation } from './ui/TabNavigation';
 
 // Import the fixed types
 import type {
@@ -13,6 +13,24 @@ import type {
 
 import type { FHIRWithValidation } from '../services/fhirConversionService.type';
 import { FileObject, UploadResult } from '@/types/core';
+
+const TABS = [
+  { 
+    id: 'upload', 
+    label: 'File Upload',
+    icon: Upload 
+  },
+  { 
+    id: 'text', 
+    label: 'Text Input',
+    icon: MessageSquare 
+  },
+  { 
+    id: 'fhir', 
+    label: 'FHIR Data',
+    icon: Code 
+  }
+];
 
 const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   // File management props
@@ -45,6 +63,9 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
 
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('upload');
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId as TabType);
+  }
   
   // FHIR input state
   const [fhirText, setFhirText] = useState<string>('');
@@ -56,6 +77,12 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   const [patientName, setPatientName] = useState<string>('');
   const [submittingText, setSubmittingText] = useState<boolean>(false);
 
+  // Determine which section to show. Input section if no files. FileList if yes files
+  const stats = getStats();
+  const hasFiles = files.length > 0;
+  const allFilesCompleted = hasFiles && stats.completed === stats.total && stats.errors === 0;
+  const hasErrors = stats.errors > 0;
+
   // Handle file selection
   const handleFilesSelected = (fileList: FileList): void => {
     try {
@@ -64,6 +91,23 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       alert(errorMessage);
     }
+  };
+
+  // Clear all files and start over
+  const handleStartOver = () => {
+    // Remove all files
+    files.forEach(file => removeFile(file.id));
+    
+    // Reset form states
+    setFhirText('');
+    setFhirValidation(null);
+    setPlainText('');
+    setPatientName('');
+    setSubmitting(false);
+    setSubmittingText(false);
+    
+    // Reset to upload tab
+    setActiveTab('upload');
   };
 
   // Validate FHIR JSON
@@ -132,29 +176,30 @@ const handleFileComplete = async (fileItem: FileObject): Promise<void> => {
     return;
   }
   
+  // Only upload if file is completed and has extracted text
+  // FHIR data is now already attached to the file during processing! 🎉
   if (fileItem.status === 'completed' && fileItem.extractedText) {
     try {
       // Mark as upload in progress to prevent duplicate calls
       updateFileStatus(fileItem.id, 'uploading', { uploadInProgress: true });
       
-      console.log('🚀 Auto-uploading completed file:', fileItem.name);      
+      console.log('🚀 Auto-uploading completed file with FHIR data:', fileItem.name);      
+      console.log('🏥 File has FHIR data:', !!fileItem.fhirData);
+      
+      // Upload the file - it now includes both text AND FHIR data! 🎯
       const uploadResults: UploadResult[] = await uploadFiles([fileItem.id]);
 
       if (uploadResults && uploadResults[0]?.success) {
-        console.log('✅ File auto-uploaded successfully:', fileItem.name);
+        console.log('✅ File and FHIR data uploaded together successfully!', fileItem.name);
+        
         updateFileStatus(fileItem.id, 'completed', {
           documentId: uploadResults[0].documentId,
           uploadedAt: new Date().toISOString(),
           uploadInProgress: false // Clear the flag
         });
 
-        // 🔥 TRIGGER FHIR CONVERSION AFTER SUCCESSFUL UPLOAD
-        if (onFHIRConverted) {
-          console.log('🎯 Triggering FHIR conversion callback...');
-          await onFHIRConverted(fileItem.id, uploadResults[0], fileItem);
-        } else {
-          console.warn('⚠️ onFHIRConverted callback not available');
-        }
+        // 🎉 SUCCESS - Both file content and FHIR data are now in Firestore!
+        console.log('🎯 Complete pipeline successful: File → Text → FHIR → Firestore');
 
       } else {
         throw new Error('Upload failed - no success result')
@@ -276,21 +321,49 @@ const handleRetryFile = (fileItem: FileObject): void => {
   retryFile(fileItem.id);
 };
 
-// 4. Fix stats display to use the correct property names
-const stats = getStats();
-const hasFiles = files.length > 0;
-const canAddMore = files.length < maxFiles;
+return (
+  <div className={`space-y-6 ${className}`}>
+    {/* Main Container */}
+    <div className="bg-white rounded-lg shadow-sm border">
+      <div className="p-4 border-b">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
+              <FileText className="w-5 h-5 text-blue-600" />
+              <span>Add Health Records</span>
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              {hasFiles 
+                ? 'Processing your files...' 
+                : 'Upload documents, type medical notes, or input FHIR data - everything gets saved automatically'
+              }
+            </p>
+          </div>
+          
+          {/* Start Over Button - only show when files are present */}
+          {hasFiles && (
+            <button
+              onClick={handleStartOver}
+              className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Start Over</span>
+            </button>
+          )}
+        </div>
+      </div>
 
- return (
-    <div className={`space-y-6 ${className}`}>
-      {/* File Processing Overlay - Always visible when there are files */}
-      {hasFiles && (
-        <div className="bg-white rounded-lg shadow-sm border">
+      {/* 🔥 CONDITIONAL CONTENT: Files OR Input Interface */}
+      {hasFiles ? (
+        /* FILE PROCESSING VIEW */
+        <>
           <div className="p-4 border-b bg-blue-50">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                <h3 className="text-lg font-semibold text-gray-900">Processing Files</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {allFilesCompleted ? 'All Files Processed!' : 'Processing Files'}
+                </h3>
               </div>
               <div className="text-sm text-gray-600">
                 {stats.completed} of {stats.total} completed
@@ -299,19 +372,21 @@ const canAddMore = files.length < maxFiles;
                     ({stats.processing} processing)
                   </span>
                 )}
+                {hasErrors && (
+                  <span className="ml-2 text-red-600 font-medium">
+                    ({stats.errors} errors)
+                  </span>
+                )}
               </div>
             </div>
           </div>
 
           <div className="p-4 space-y-4 max-h-96 overflow-y-auto">
-            {/* File List - Always visible when files exist */}
+            {/* File List */}
             {files.map((fileItem: FileObject) => {
-              const fileFhirData = fhirData?.get(fileItem.id);
-              console.log(`🔍 File ${fileItem.name} (${fileItem.id}) FHIR data:`, !!fileFhirData);
-
-              const fhirResult = fileFhirData ? {
+              const fhirResult = fileItem.fhirData ? {
                 success: true,
-                fhirData: fileFhirData,
+                fhirData: fileItem.fhirData,
                 error: undefined
               } : undefined;
 
@@ -319,7 +394,7 @@ const canAddMore = files.length < maxFiles;
                 <FileListItem
                   key={fileItem.id}
                   fileItem={fileItem}
-                  fhirResult={fhirResult} // 🔥 PASS FHIR RESULT
+                  fhirResult={fhirResult}
                   onRemove={removeFile}
                   onRetry={handleRetryFile}
                   onComplete={handleFileComplete}
@@ -329,259 +404,208 @@ const canAddMore = files.length < maxFiles;
             })}
           </div>
 
-          {/* Quick Actions Footer */}
-          <div className="bg-gray-50 px-4 py-3 border-t">
-            <div className="flex items-center justify-between">
-              <a 
-                href="/edit-fhir" 
-                className="flex items-center text-sm text-blue-600 hover:text-blue-800"
-              >
-                <ExternalLink className="w-4 h-4 mr-1" />
-                Edit Records
-              </a>
-              
-              {canAddMore && (
-                <span className="text-sm text-gray-500">
-                  {maxFiles - files.length} more files allowed
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Main Input Interface */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="p-4 border-b">
-          <h2 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
-            <FileText className="w-5 h-5 text-blue-600" />
-            <span>Add Health Records</span>
-          </h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Upload documents, type medical notes, or input FHIR data - everything gets saved automatically
-          </p>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-4">
-            {/* File Upload Tab */}
-            <button
-              onClick={() => setActiveTab('upload')}
-              className={`py-3 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'upload'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <Upload className="w-4 h-4" />
-                <span>File Upload</span>
+          {/* Success/Actions Footer */}
+          {allFilesCompleted && (
+            <div className="bg-green-50 px-4 py-3 border-t border-green-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2 text-green-800">
+                  <CheckCircle className="w-5 h-5" />
+                  <span className="font-medium">All files processed successfully!</span>
+                </div>
+                <a 
+                  href="/edit-fhir" 
+                  className="flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  <span>View Records</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
               </div>
-            </button>
-
-            {/* Plain Text Tab */}
-            <button
-              onClick={() => setActiveTab('text')}
-              className={`py-3 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'text'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <MessageSquare className="w-4 h-4" />
-                <span>Text Input</span>
-              </div>
-            </button>
-
-            {/* FHIR Input Tab */}
-            <button
-              onClick={() => setActiveTab('fhir')}
-              className={`py-3 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'fhir'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <Code className="w-4 h-4" />
-                <span>FHIR Data</span>
-              </div>
-            </button>
-          </nav>
-        </div>
-        
-        <div className="p-6">
-          {/* File Upload Tab */}
-          {activeTab === 'upload' && (
-            <div>
-              <FileUploadZone
-                onFilesSelected={handleFilesSelected}
-                acceptedTypes={acceptedTypes}
-                maxFiles={maxFiles}
-                maxSizeBytes={maxSizeBytes}
-                title="Drop medical documents here or click to upload"
-                subtitle="Files will be processed and automatically saved to your cloud storage"
-              />
             </div>
           )}
-
-          {/* Plain Text Input Tab */}
-          {activeTab === 'text' && (
-            <div className="space-y-4">
+        </>
+      ) : (
+        /* INPUT INTERFACE */
+        <>
+          <div className="p-4 pb-0">
+            <TabNavigation 
+              tabs={TABS}
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+            />
+          </div>
+          
+          <div className="p-6">
+            {/* File Upload Tab */}
+            {activeTab === 'upload' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Patient Name (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={patientName}
-                  onChange={(e) => setPatientName(e.target.value)}
-                  placeholder="Enter patient name..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={submittingText}
+                <FileUploadZone
+                  onFilesSelected={handleFilesSelected}
+                  acceptedTypes={acceptedTypes}
+                  maxFiles={maxFiles}
+                  maxSizeBytes={maxSizeBytes}
+                  title="Drop medical documents here or click to upload"
+                  subtitle="Files will be processed and automatically saved to your cloud storage"
                 />
               </div>
+            )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Medical Note or Description
-                </label>
-                <textarea
-                  value={plainText}
-                  onChange={(e) => setPlainText(e.target.value)}
-                  placeholder={`Describe what happened during the medical visit...
+            {/* Plain Text Input Tab */}
+            {activeTab === 'text' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Patient Name (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={patientName}
+                    onChange={(e) => setPatientName(e.target.value)}
+                    placeholder="Enter patient name..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={submittingText}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Medical Note or Description
+                  </label>
+                  <textarea
+                    value={plainText}
+                    onChange={(e) => setPlainText(e.target.value)}
+                    placeholder={`Describe what happened during the medical visit...
 
 Examples:
 • "Had routine checkup with Dr. Smith. Blood pressure was 120/80. Everything looks normal."
 • "Visited urgent care for sore throat. Prescribed amoxicillin 500mg, take twice daily for 10 days."
 • "Follow-up appointment for diabetes. HbA1c improved to 7.2%. Continue current medication."
 • "Annual physical exam completed. All vitals within normal range. Recommended yearly mammogram."`}
-                  className="w-full h-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  disabled={submittingText}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-500">
-                  Your text will be automatically converted to medical FHIR format and saved.
+                    className="w-full h-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    disabled={submittingText}
+                  />
                 </div>
-                
-                <button
-                  onClick={handleTextSubmit}
-                  disabled={!plainText.trim() || submittingText}
-                  className={`px-6 py-2 rounded-lg font-medium ${
-                    plainText.trim() && !submittingText
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  }`}
-                >
-                  {submittingText ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Converting...</span>
-                    </div>
-                  ) : (
-                    'Save Medical Note'
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
 
-          {/* FHIR Input Tab */}
-          {activeTab === 'fhir' && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  FHIR JSON Data
-                </label>
-                <textarea
-                  value={fhirText}
-                  onChange={(e) => handleFhirTextChange(e.target.value)}
-                  placeholder={`Paste your FHIR JSON here...
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-500">
+                    Your text will be automatically converted to medical FHIR format and saved.
+                  </div>
+                  
+                  <button
+                    onClick={handleTextSubmit}
+                    disabled={!plainText.trim() || submittingText}
+                    className={`px-6 py-2 rounded-lg font-medium ${
+                      plainText.trim() && !submittingText
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    }`}
+                  >
+                    {submittingText ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Converting...</span>
+                      </div>
+                    ) : (
+                      'Save Medical Note'
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* FHIR Input Tab */}
+            {activeTab === 'fhir' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    FHIR JSON Data
+                  </label>
+                  <textarea
+                    value={fhirText}
+                    onChange={(e) => handleFhirTextChange(e.target.value)}
+                    placeholder={`Paste your FHIR JSON here...
 
 Example:
 {
-  "resourceType": "Bundle",
-  "type": "collection",
-  "entry": [
-    {
-      "resource": {
-        "resourceType": "Patient",
-        "name": [{"family": "Smith", "given": ["John"]}],
-        "birthDate": "1990-01-01"
-      }
+"resourceType": "Bundle",
+"type": "collection",
+"entry": [
+  {
+    "resource": {
+      "resourceType": "Patient",
+      "name": [{"family": "Smith", "given": ["John"]}],
+      "birthDate": "1990-01-01"
     }
-  ]
+  }
+]
 }`}
-                  className="w-full h-64 px-3 py-2 bg-background border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                  disabled={submitting}
-                />
-              </div>
-
-              {/* Validation Display */}
-              {fhirValidation && (
-                <div className={`p-3 rounded-lg border ${
-                  fhirValidation.valid 
-                    ? 'bg-green-50 border-green-200' 
-                    : 'bg-red-50 border-red-200'
-                }`}>
-                  <div className="flex items-center space-x-2">
-                    {fhirValidation.valid ? (
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                    ) : (
-                      <AlertCircle className="w-5 h-5 text-red-600" />
-                    )}
-                    <span className={`font-medium ${
-                      fhirValidation.valid ? 'text-green-800' : 'text-red-800'
-                    }`}>
-                      {fhirValidation.valid ? 'Valid FHIR Data' : 'Invalid FHIR Data'}
-                    </span>
-                  </div>
-                  
-                  {fhirValidation.error && (
-                    <p className="text-red-700 text-sm mt-1">{fhirValidation.error}</p>
-                  )}
-                  
-                  {fhirValidation.valid && (
-                    <div className="text-green-700 text-sm mt-1">
-                      Resource Type: {fhirValidation.resourceType}
-                      {fhirValidation.entryCount && (
-                        <span> • {fhirValidation.entryCount} entries</span>
-                      )}
-                    </div>
-                  )}
+                    className="w-full h-64 px-3 py-2 bg-background border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                    disabled={submitting}
+                  />
                 </div>
-              )}
 
-              <div className="flex justify-end">
-                <button
-                  onClick={handleFhirSubmit}
-                  disabled={!fhirValidation?.valid || submitting}
-                  className={`px-6 py-2 rounded-lg font-medium ${
-                    fhirValidation?.valid && !submitting
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  }`}
-                >
-                  {submitting ? (
+                {/* Validation Display */}
+                {fhirValidation && (
+                  <div className={`p-3 rounded-lg border ${
+                    fhirValidation.valid 
+                      ? 'bg-green-50 border-green-200' 
+                      : 'bg-red-50 border-red-200'
+                  }`}>
                     <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Uploading...</span>
+                      {fhirValidation.valid ? (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      ) : (
+                        <AlertCircle className="w-5 h-5 text-red-600" />
+                      )}
+                      <span className={`font-medium ${
+                        fhirValidation.valid ? 'text-green-800' : 'text-red-800'
+                      }`}>
+                        {fhirValidation.valid ? 'Valid FHIR Data' : 'Invalid FHIR Data'}
+                      </span>
                     </div>
-                  ) : (
-                    'Upload FHIR Data'
-                  )}
-                </button>
+                    
+                    {fhirValidation.error && (
+                      <p className="text-red-700 text-sm mt-1">{fhirValidation.error}</p>
+                    )}
+                    
+                    {fhirValidation.valid && (
+                      <div className="text-green-700 text-sm mt-1">
+                        Resource Type: {fhirValidation.resourceType}
+                        {fhirValidation.entryCount && (
+                          <span> • {fhirValidation.entryCount} entries</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleFhirSubmit}
+                    disabled={!fhirValidation?.valid || submitting}
+                    className={`px-6 py-2 rounded-lg font-medium ${
+                      fhirValidation?.valid && !submitting
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    }`}
+                  >
+                    {submitting ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Uploading...</span>
+                      </div>
+                    ) : (
+                      'Upload FHIR Data'
+                    )}
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
-  );
+  </div>
+);
 };
 
 export default CombinedUploadFHIR;

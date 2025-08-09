@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import DynamicFHIRField from './DynamicFHIRField';
 import { FIELD_CATEGORIES, FIELD_PRIORITY } from '@/lib/fhirConstants';
-import { useFHIRFormState } from '@/features/AddRecord/hooks/useFHIRFormState';
+import { useFHIRFormState } from '@/features/EditRecord/hooks/useFHIRFormState';
 import { generateFieldConfigurations } from '@/features/EditRecord/utils/fhirFieldExtraction';
 import {
   getFieldsByCategory,

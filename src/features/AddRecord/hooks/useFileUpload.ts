@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { FileUploadService } from '@/features/AddRecord/services/fileUploadService';
 import DocumentProcessorService from '@/features/AddRecord/services/documentProcessorService';
 import { FileObject, FileStatus, UploadResult } from '@/types/core';
+import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
 
 import {
   AddFilesOptions,
@@ -12,7 +13,6 @@ import {
   FHIRConversionCallback,
   ResetProcessCallback,
   UseFileUploadReturn,
-  ProcessingResult
 } from './useFileUpload.type';
 
 /**
@@ -183,6 +183,16 @@ export function useFileUpload(): UseFileUploadReturn {
 
     // ==================== FILE PROCESSING ====================
     
+    const convertTextToFHIR = async (extractedText: string, fileName: string) => {
+        try {
+            return await convertToFHIR(extractedText, 'medical_record');
+        } catch (error) {
+            console.error('FHIR conversion failed:', error);
+            throw error; // Re-throw so the caller can handle it
+        }
+    };
+
+
     const processFile = useCallback(async (fileObj: FileObject) => {
         if (!fileObj || !fileObj.file) {
             console.error(`❌ File not found or invalid: ${fileObj.id}`);
@@ -193,19 +203,68 @@ export function useFileUpload(): UseFileUploadReturn {
         updateFileStatus(fileObj.id, 'processing');
         
         try {          
-            // Process with document processor
+            // STEP 1: Process with document processor (extract text)
+            console.log(`📄 Starting text extraction for: ${fileObj.name}`);
             const result = await DocumentProcessorService.processDocument(fileObj.file);
-            console.log(`✅ Processing complete for: ${fileObj.name}`, result);
+            console.log(`✅ Text extraction complete for: ${fileObj.name}`, result);
             
-            const status: FileStatus = result.success ? 'completed' : 'error';
-            updateFileStatus(fileObj.id, status, {
+            if (!result.success) {
+                console.log(`❌ Text extraction failed for: ${fileObj.name}`, result.error);
+                updateFileStatus(fileObj.id, 'error', {
+                    error: result.error || 'Document processing failed'
+                });
+                return;
+            }
+
+            // STEP 2: Update with extraction results and start FHIR conversion
+            console.log(`📋 Updating file status with extracted text for: ${fileObj.name}`);
+            updateFileStatus(fileObj.id, 'processing', {
                 extractedText: result.extractedText,
                 wordCount: result.wordCount,
+                processingStage: 'converting_fhir' // Show FHIR conversion step
             });
             
+            // STEP 3: FHIR Conversion - DEBUG VERSION
+            console.log(`🔍 About to start FHIR conversion for: ${fileObj.name}`);
+            console.log(`🔍 Extracted text exists: ${!!result.extractedText}`);
+            console.log(`🔍 Extracted text length: ${result.extractedText?.length || 0}`);
+            
+            let fhirData = null;
+            if (result.extractedText) {
+                try {
+                    console.log(`🏥 Starting FHIR conversion for: ${fileObj.name}`);
+                    
+                    // Call the FHIR conversion service
+                    fhirData = await convertTextToFHIR(result.extractedText, fileObj.name);
+                    
+                    console.log(`✅ FHIR conversion complete for: ${fileObj.name}`, fhirData);
+                    
+                } catch (fhirError) {
+                    console.warn(`⚠️ FHIR conversion failed for ${fileObj.name}:`, fhirError);
+                    // Don't fail the whole process - FHIR conversion is optional
+                }
+            } else {
+                console.log(`⚠️ No extracted text available for FHIR conversion: ${fileObj.name}`);
+            }
+            
+            // STEP 4: Mark as completed with ALL data ready
+            console.log(`🎯 Marking file as completed. FHIR data exists: ${!!fhirData}`);
+            updateFileStatus(fileObj.id, 'completed', {
+                extractedText: result.extractedText,
+                wordCount: result.wordCount,
+                fhirData: fhirData, // Include FHIR data if available
+                processingStage: undefined, // Clear the processing stage
+                processedAt: new Date().toISOString()
+            });
+            
+            console.log(`🎉 Complete processing pipeline finished for: ${fileObj.name}. Final FHIR data: ${!!fhirData}`);
+                
         } catch (error: any) {
             console.error(`💥 Processing failed for ${fileObj.name}:`, error);
-            updateFileStatus(fileObj.id, 'error', { error: error.message });
+            updateFileStatus(fileObj.id, 'error', { 
+                error: error.message,
+                processingStage: undefined // Clear any processing stage on error
+            });
         }
     }, []);
 
@@ -257,15 +316,6 @@ export function useFileUpload(): UseFileUploadReturn {
                     description: 'Your file has been saved to cloud storage',
                     duration: 4000,
                 });
-                
-                // Trigger FHIR conversion if callback is set
-                if (fhirConversionCallback.current) {
-                    try {
-                        await fhirConversionCallback.current(fileObj.id, result);
-                    } catch (fhirError) {
-                        console.error(`❌ FHIR conversion failed for ${fileObj.name}:`, fhirError);
-                    }
-                }
                 
                 return {
                     success: true,

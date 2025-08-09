@@ -14,7 +14,7 @@ import type {
   FieldType
 } from './useFHIRFormState.type';
 
-import type { FHIRWithValidation } from '../services/fhirConversionService.type';
+import type { FHIRWithValidation } from '../../AddRecord/services/fhirConversionService.type';
 
 /**
  * Custom hook to manage FHIR form state
