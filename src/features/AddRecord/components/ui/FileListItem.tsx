@@ -15,7 +15,7 @@ import {
 import { EnhancedFHIRResults } from '@/features/AddRecord/components/FHIRValidation';
 
 // Import the unified types instead of defining your own
-import { FileObject, FileStatus, MedicalDetectionResult } from '@/types/core';
+import { FileObject, FileStatus, } from '@/types/core';
 import type { 
   FileListItemProps 
 } from '../CombinedUploadFHIR.type';
@@ -42,6 +42,7 @@ export const FileListItem: React.FC<FileListItemProps> = ({
   showFHIRResults = true
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const hasFHIRData = fhirResult?.success && fhirResult?.fhirData;
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
@@ -63,10 +64,6 @@ export const FileListItem: React.FC<FileListItemProps> = ({
     switch (status) {
       case 'processing':
         return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />;
-      case 'medical_detected':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'non_medical_detected':
-        return <AlertCircle className="w-4 h-4 text-yellow-500" />;
       case 'converting':
         return <Loader2 className="w-4 h-4 animate-spin text-purple-500" />;
       case 'completed':
@@ -148,7 +145,6 @@ export const FileListItem: React.FC<FileListItemProps> = ({
     }
   }, [fileItem.status, fileItem.extractedText, onComplete]);
 
-  const canForceConvert = fileItem.status === 'non_medical_detected' && fileItem.extractedText;
   const canRetry = fileItem.status.includes('error');
   const hasExpandableContent = fileItem.extractedText || fhirResult || fileItem.medicalDetection;
 
@@ -172,43 +168,33 @@ export const FileListItem: React.FC<FileListItemProps> = ({
                 {getStatusIcon(fileItem.status, fhirResult)}
                 <span>{getStatusText(fileItem.status, fhirResult)}</span>
               </span>
+
+              {fileItem.status === 'completed' && showFHIRResults && (
+                <span className="flex items-center space-x-1">
+                  {fhirResult?.success ? (
+                    <>
+                      <Zap className="w-3 h-3 text-green-600" />
+                      <span className="text-green-600 text-xs font-medium">FHIR ✓</span>
+                    </>
+                  ) : fhirResult?.error ? (
+                    <>
+                      <Zap className="w-3 h-3 text-red-600" />
+                      <span className="text-red-600 text-xs">FHIR Failed</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-3 h-3 text-blue-600 animate-spin" />
+                      <span className="text-blue-600 text-xs">Converting...</span>
+                    </>
+                  )}
+                </span>
+              )}
             </div>
-            
-            {/* Medical Detection Info */}
-            {fileItem.medicalDetection && (
-              <div className="flex items-center space-x-2 mt-1 text-xs">
-                <span className={`px-2 py-1 rounded-full ${
-                  fileItem.medicalDetection.isMedical 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-gray-100 text-gray-800'
-                }`}>
-                  {fileItem.medicalDetection.isMedical ? 'Medical' : 'Non-Medical'}
-                </span>
-                <span className="text-gray-500">
-                  {Math.round(fileItem.medicalDetection.confidence * 100)}% confidence
-                </span>
-                {fileItem.processingMethod && (
-                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
-                    {fileItem.processingMethod.replace(/_/g, ' ')}
-                  </span>
-                )}
-              </div>
-            )}
           </div>
         </div>
 
         <div className="flex items-center space-x-2">
           {/* Action Buttons */}
-          {canForceConvert && onForceConvert && (
-            <button
-              onClick={handleForceConvert}
-              className="bg-yellow-600 text-white px-3 py-1 rounded text-sm hover:bg-yellow-700"
-              title="Convert to FHIR anyway"
-            >
-              Convert Anyway
-            </button>
-          )}
-
           {canRetry && (
             <button
               onClick={handleRetry}
@@ -247,41 +233,9 @@ export const FileListItem: React.FC<FileListItemProps> = ({
         </div>
       )}
 
-      {/* Medical Detection Suggestion */}
-      {fileItem.medicalDetection && !fileItem.medicalDetection.isMedical && (
-        <div className="px-4 pb-2">
-          <div className="text-sm text-yellow-600 bg-yellow-50 p-2 rounded border border-yellow-200">
-            <strong>AI Analysis:</strong> {fileItem.medicalDetection.reasoning}
-          </div>
-        </div>
-      )}
-
       {/* Expanded Content */}
       {isExpanded && (
         <div className="border-t bg-gray-50">
-          {/* Medical Detection Details */}
-          {fileItem.medicalDetection && (
-            <div className="p-4 border-b">
-              <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
-                <AlertCircle className="w-4 h-4 mr-1" />
-                AI Medical Detection Results
-              </h4>
-              <div className="bg-white p-3 rounded text-sm border">
-                <div className="grid grid-cols-2 gap-4 mb-2">
-                  <div>
-                    <span className="font-medium">Classification:</span> {fileItem.medicalDetection.documentType || 'Unknown'}
-                  </div>
-                  <div>
-                    <span className="font-medium">Method:</span> {fileItem.processingMethod?.replace(/_/g, ' ') || 'Standard'}
-                  </div>
-                </div>
-                <div>
-                  <span className="font-medium">Reasoning:</span> {fileItem.medicalDetection.reasoning || 'No reasoning provided'}
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Extracted Text Preview */}
           {fileItem.extractedText && (
             <div className="p-4 border-b">

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { DeduplicationService } from '../services/deduplicationService';
 import { FileUploadService } from '@/features/AddRecord/services/fileUploadService';
@@ -27,9 +27,44 @@ import {
  * - Virtual file support
  */
 export function useFileUpload(): UseFileUploadReturn {
+    
+    //DEBUG LOGGING
+    console.log('🔄 useFileUpload hook executing/recreating');
+
+    
+
+
     // ==================== STATE MANAGEMENT ====================
     
-    const [files, setFiles] = useState<FileObject[]>([]);
+    const [files, setFiles] = useState<FileObject[]>(() => {
+        // Try to restore from sessionStorage on mount
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+            try {
+                const saved = sessionStorage.getItem('fileUpload_files');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    console.log('🔄 Restored files from sessionStorage:', parsed.length);
+                    return parsed;
+                }
+            } catch (error) {
+                console.warn('Failed to restore files from sessionStorage:', error);
+            }
+        }
+        return [];
+    });
+    
+    // Save to sessionStorage whenever files change
+    useEffect(() => {
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+            try {
+                sessionStorage.setItem('fileUpload_files', JSON.stringify(files));
+            } catch (error) {
+                console.warn('Failed to save files to sessionStorage:', error);
+            }
+        }
+    }, [files]);
+
+    console.log('📁 Current files in hook:', files.length, files.map(f => f.name));
     const [firestoreData, setFirestoreData] = useState<Map<string, any>>(new Map());
     const [savingToFirestore, setSavingToFirestore] = useState<Set<string>>(new Set());
 
@@ -64,6 +99,10 @@ export function useFileUpload(): UseFileUploadReturn {
     const addFiles = useCallback((fileList: FileList, options: AddFilesOptions = {}) => {
         const { maxFiles = 10, maxSizeBytes = 50 * 1024 * 1024, autoProcess = true } = options;
         
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+            sessionStorage.removeItem('fileUpload_files');
+        }
+    
         console.log(`📂 Adding ${fileList.length} files...`);
         
         const newFiles: FileObject[] = [];
@@ -113,6 +152,7 @@ export function useFileUpload(): UseFileUploadReturn {
 
     const removeFile = useCallback((fileId: string) => {
         console.log(`🗑️  Removing file: ${fileId}`);
+        console.trace('🔍 removeFile called from:'); // This will show you the call stack
         
         setFiles(prev => prev.filter(f => f.id !== fileId));
         setFirestoreData(prev => {
@@ -231,6 +271,12 @@ export function useFileUpload(): UseFileUploadReturn {
                 
                 setFirestoreData(prev => new Map([...prev, [fileObj.id, result]]));
                 updateFileStatus(fileObj.id, 'completed', { uploadResult: result });
+
+                // 🎉 SUCCESS TOAST HERE
+                toast.success(`📁 ${fileObj.name} uploaded successfully!`, {
+                    description: 'Your file has been saved to cloud storage',
+                    duration: 4000,
+                });
                 
                 // Trigger FHIR conversion if callback is set
                 if (fhirConversionCallback.current) {
@@ -251,7 +297,7 @@ export function useFileUpload(): UseFileUploadReturn {
             } catch (error: any) {
                 console.error(`💥 Upload failed for ${fileObj.name}:`, error);
                 updateFileStatus(fileObj.id, 'error', { error: error.message });
-                
+               
                 return {
                     success: false,
                     fileId: fileObj.id,

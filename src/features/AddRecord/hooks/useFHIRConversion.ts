@@ -2,9 +2,11 @@ import { useState, useCallback } from 'react';
 import { getFirestore, doc, setDoc } from 'firebase/firestore';
 import { useAuthContext } from '@/components/auth/AuthContext';
 import { toast } from 'sonner';
+import { FileObject } from '@/types/core';
+import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService'
+import { FileUploadService } from '../services/fileUploadService';
 
 import type {
-  ProcessedFile,
   ReviewedData,
   PatientResource,
   ObservationResource,
@@ -31,7 +33,7 @@ const db = getFirestore();
  * Custom hook for managing FHIR conversion state and data processing
  */
 export const useFHIRConversion = (
-  processedFiles: ProcessedFile[],
+  processedFiles: FileObject[],
   firestoreData?: Map<string, any>,
   updateFirestoreRecord?: (fileId: string, data: any) => void,
   uploadFiles?: () => Promise<any[]>, // Updated type signature
@@ -40,22 +42,90 @@ export const useFHIRConversion = (
     const [fhirData, setFhirData] = useState<Map<string, FHIRWithValidation>>(new Map());
     const [reviewedData, setReviewedData] = useState<Map<string, ReviewedData>>(new Map());
     const { user } = useAuthContext();
+    const uploadService = new FileUploadService();
 
     /**
      * Handle successful FHIR conversion
      */
-    const handleFHIRConverted = useCallback(async (fileId: string, fhirJsonData: FHIRWithValidation): Promise<void> => {
-        console.log('FHIR converted for file:', fileId, fhirJsonData);
+    const handleFHIRConverted = useCallback(async (fileId: string, uploadResult: any, fileObj?: FileObject): Promise<void> => {
+            console.log('🎯 Starting FHIR conversion for file:', fileId);
+            console.log('🎯 Upload result received:', uploadResult);
         
-        // Store raw FHIR data but don't save to Firestore yet
-        setFhirData(prev => {
-            const updated = new Map(prev);
-            updated.set(fileId, fhirJsonData);
-            return updated;
-        });
+        let targetFile = fileObj;
+        if(!targetFile) {
+            targetFile = processedFiles.find(f => f.id === fileId);
+        }
+
+        if (!targetFile || !targetFile.extractedText) {
+            console.error('❌ File not found or no extracted text:', fileId);
+            console.log('📋 Available processed files:', processedFiles.map(f => ({id: f.id, name: f.name})));
+            return;
+        } 
         
-        console.log('FHIR data stored for review, not yet saved to Firestore');
-    }, []);
+        try {
+            console.log('🔄 Converting extracted text to FHIR...');
+            console.log('📄 Extracted text preview:', targetFile.extractedText.substring(0, 100) + '...');
+            
+            const fhirResult = await convertToFHIR(
+                targetFile.extractedText,
+                targetFile.documentType || 'medical_record'
+            );        
+            
+            console.log('✅ FHIR conversion successful:', fhirResult);
+                      
+            // Store the converted FHIR data
+            setFhirData(prev => {
+                const updated = new Map(prev);
+                updated.set(fileId, fhirResult);
+                return updated;
+            });
+
+            if (user?.uid && uploadResult?.documentId) {
+                try {
+                    const fhirWithMetadata = {
+                        ...fhirResult,
+                        _metadata:{
+                            fileId: fileId,
+                            fileName: targetFile.name,
+                            uploadedAt: uploadResult.uploadedAt || new Date().toISOString(),
+                            fhirConvertedAt: new Date().toISOString(),
+                            userId: user.uid,
+                            autoSaved: true
+                        }
+                    };
+                    await uploadService.updateWithFHIR(uploadResult.documentId, fhirWithMetadata)
+                    console.log('✅ FHIR data saved via service!');
+
+                    toast.success(`💾 FHIR data saved for ${targetFile.name}`, {
+                    description: 'Medical data saved to cloud storage',
+                    duration: 4000,
+                });
+                } catch (error) {
+                    console.error('❌ Error saving FHIR via service:', error);
+                    toast.error(`💾 Failed to save FHIR data for ${targetFile.name}`, {
+                        description: 'Conversion succeeded but saving failed',
+                        duration: 6000,
+                });
+                }
+            }
+
+            console.log('🎉 FHIR data stored in state for fileId:', fileId);
+            console.log('🎯 About to show toast...');
+
+            toast.success(`⚡ FHIR conversion completed for ${targetFile.name}`, {
+                description: 'Medical data has been converted to FHIR format',
+                duration: 4000,
+            });
+            
+        } catch (error) {
+            console.error('❌ FHIR conversion failed:', error);
+            
+            toast.error(`⚡ FHIR conversion failed for ${targetFile.name}`, {
+                description: error instanceof Error ? error.message : 'Unknown error',
+                duration: 6000,
+            });
+        }
+    }, [processedFiles, user, uploadService]);
 
     /**
      * Handle data confirmation from review - Updated to match original functionality
@@ -398,7 +468,7 @@ const buildClinicalNotes = (
 const generateReviewDataFromFHIR = (
     fhirData: FHIRWithValidation, 
     fileId: string, 
-    processedFiles: ProcessedFile[]
+    processedFiles: FileObject[]
 ): ReviewedData | null => {
     try {
         if (fhirData.resourceType !== 'Bundle') {

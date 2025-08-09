@@ -1,5 +1,6 @@
 import React from 'react';
 import useFileUpload from '@/features/AddRecord/hooks/useFileUpload';
+import { useFHIRConversion } from '@/features/AddRecord/hooks/useFHIRConversion';
 import { ExportService } from '@/features/AddRecord/services/exportService';
 
 // Import components
@@ -47,6 +48,12 @@ interface ExportData {
  */
 const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
     // CONSOLIDATED FILE MANAGEMENT: Single source of truth for all file operations
+
+    //DEBUGGING
+    console.log('🔄 AddRecord component rendering');
+    const hookResult = useFileUpload();
+    console.log('📁 Files from hook:', hookResult.files.length);
+
     const {
         files,
         processedFiles,
@@ -55,6 +62,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
         addFiles,
         removeFile,
         retryFile,
+        updateFileStatus,
         clearAll,
         uploadFiles,
         updateFirestoreRecord,
@@ -62,9 +70,49 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
         savedToFirestoreCount,
         savingCount,
         deduplicationService,
-        addFhirAsVirtualFile, // NEW: For direct FHIR input
+        addFhirAsVirtualFile, 
+        setFHIRConversionCallback,
         reset: resetFileUpload
     } = useFileUpload();
+
+    const {
+        fhirData,
+        reviewedData,
+        handleFHIRConverted,
+        handleDataConfirmed,
+        handleDataRejected,
+        isAllFilesConverted,
+        isAllFilesReviewed,
+        getFHIRStats,
+        reset: resetFHIR
+    } = useFHIRConversion(
+        processedFiles,
+        firestoreData,
+        updateFirestoreRecord,
+        uploadFiles,
+        removeFile
+    );
+
+    // 🔥 SET UP FHIR CONVERSION CALLBACK WITH DEBUGGING
+    React.useEffect(() => {
+        console.log('🔍 Setting FHIR callback:', typeof handleFHIRConverted);
+        setFHIRConversionCallback((fileId: string, uploadResult: any) => {
+            console.log('🎯 FHIR CALLBACK TRIGGERED:', fileId, uploadResult);
+            
+            // 🔥 FIND THE FILE IN THE CURRENT FILES ARRAY
+            const currentFile = files.find(f => f.id === fileId);
+            if (!currentFile || !currentFile.extractedText) {
+                console.error('❌ File not found in current files:', fileId);
+                console.log('📋 Available files:', files.map(f => ({id: f.id, name: f.name})));
+                return Promise.resolve();
+            }
+            
+            console.log('✅ Found file for FHIR conversion:', currentFile.name);
+            return handleFHIRConverted(fileId, uploadResult, currentFile); // Pass the file object
+        });
+    }, [setFHIRConversionCallback, handleFHIRConverted, files]);
+
+    console.log('🔍 Destructured updateFileStatus:', updateFileStatus);
 
     console.log('📊 AddRecord state:', {
         filesCount: files.length,
@@ -153,32 +201,6 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
                     </div>
                 </div>
 
-                {/* Upload Status */}
-                {(savedToFirestoreCount > 0 || savingCount > 0) && (
-                    <div className="mb-6 bg-white border border-gray-200 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h3 className="font-medium text-gray-900">Cloud Storage Status</h3>
-                                <p className="text-sm text-gray-600 mt-1">
-                                    {savedToFirestoreCount} record{savedToFirestoreCount !== 1 ? 's' : ''} saved to cloud
-                                    {savingCount > 0 && (
-                                        <span className="text-blue-600 ml-2">
-                                            ({savingCount} uploading...)
-                                        </span>
-                                    )}
-                                </p>
-                            </div>
-                            
-                            {savedToFirestoreCount > 0 && (
-                                <div className="text-green-600 flex items-center">
-                                    <span className="w-2 h-2 bg-green-500 rounded-full mr-2" aria-hidden="true"></span>
-                                    <span className="text-sm font-medium">Synced</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
                 {/* Main Upload Interface */}
                 <CombinedUploadFHIR
                     files={files}
@@ -186,8 +208,11 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
                     removeFile={removeFile}
                     retryFile={retryFile}
                     getStats={getStats}
+                    updateFileStatus={updateFileStatus}
                     addFhirAsVirtualFile={addFhirAsVirtualFile} // NEW: Direct FHIR support
                     uploadFiles={uploadFiles} // NEW: Direct upload support
+                    fhirData={fhirData}
+                    onFHIRConverted={handleFHIRConverted}
                 />
 
                 {/* Stats Panel */}

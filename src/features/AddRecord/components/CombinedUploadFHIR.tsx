@@ -27,6 +27,10 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   addFhirAsVirtualFile,
   uploadFiles,
   convertTextToFHIR,
+
+  //FHIR props
+  fhirData,
+  onFHIRConverted,
   
   // Configuration props
   acceptedTypes = ['.pdf', '.docx', '.doc', '.txt', '.jpg', '.jpeg', '.png'],
@@ -34,6 +38,11 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   maxSizeBytes = 10 * 1024 * 1024, // 10MB
   className = ''
 }) => {
+
+  //DEBUG LOGGING
+  console.log('🔍 CombinedUploadFHIR props check:');
+  console.log('🔍 updateFileStatus:', typeof updateFileStatus, updateFileStatus);
+
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('upload');
   
@@ -106,26 +115,55 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   };
 
   // Submit FHIR data and immediately upload to Firestore
- const handleFileComplete = async (fileItem: FileObject): Promise<void> => {
+const handleFileComplete = async (fileItem: FileObject): Promise<void> => {
+  console.log('🚨 handleFileComplete called for:', fileItem.name, 'status:', fileItem.status);
+  
+  if (!updateFileStatus) {
+    console.error('❌ updateFileStatus is not available in handleFileComplete');
+    return;
+  }
+
+  // 🚨 PREVENT MULTIPLE UPLOADS - Check if already uploaded or uploading
+  if (fileItem.documentId || fileItem.uploadInProgress === true) {
+    console.log('⏭️ Skipping upload - already processed:', {
+      documentId: fileItem.documentId,
+      uploadInProgress: fileItem.uploadInProgress
+    });
+    return;
+  }
+  
   if (fileItem.status === 'completed' && fileItem.extractedText) {
     try {
-      updateFileStatus(fileItem.id, 'uploading');
+      // Mark as upload in progress to prevent duplicate calls
+      updateFileStatus(fileItem.id, 'uploading', { uploadInProgress: true });
+      
       console.log('🚀 Auto-uploading completed file:', fileItem.name);      
-      const uploadResults: UploadResult[] =  await uploadFiles([fileItem.id]);
+      const uploadResults: UploadResult[] = await uploadFiles([fileItem.id]);
 
       if (uploadResults && uploadResults[0]?.success) {
         console.log('✅ File auto-uploaded successfully:', fileItem.name);
-        // Set to uploaded status to show success state
         updateFileStatus(fileItem.id, 'completed', {
           documentId: uploadResults[0].documentId,
-          uploadedAt: new Date().toISOString()
+          uploadedAt: new Date().toISOString(),
+          uploadInProgress: false // Clear the flag
         });
+
+        // 🔥 TRIGGER FHIR CONVERSION AFTER SUCCESSFUL UPLOAD
+        if (onFHIRConverted) {
+          console.log('🎯 Triggering FHIR conversion callback...');
+          await onFHIRConverted(fileItem.id, uploadResults[0], fileItem);
+        } else {
+          console.warn('⚠️ onFHIRConverted callback not available');
+        }
+
       } else {
         throw new Error('Upload failed - no success result')
       }
     } catch (error) {
+      console.error('🔍 Error in handleFileComplete:', error);
       updateFileStatus(fileItem.id, 'completed', {
-        error: `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        error: `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        uploadInProgress: false // Clear the flag
       });
     }
   }
@@ -267,16 +305,28 @@ const canAddMore = files.length < maxFiles;
 
           <div className="p-4 space-y-4 max-h-96 overflow-y-auto">
             {/* File List - Always visible when files exist */}
-            {files.map((fileItem: FileObject) => (
-              <FileListItem
-                key={fileItem.id}
-                fileItem={fileItem}
-                onRemove={removeFile}
-                onRetry={handleRetryFile}
-                onComplete={handleFileComplete}
-                showFHIRResults={true}
-              />
-            ))}
+            {files.map((fileItem: FileObject) => {
+              const fileFhirData = fhirData?.get(fileItem.id);
+              console.log(`🔍 File ${fileItem.name} (${fileItem.id}) FHIR data:`, !!fileFhirData);
+
+              const fhirResult = fileFhirData ? {
+                success: true,
+                fhirData: fileFhirData,
+                error: undefined
+              } : undefined;
+
+              return (
+                <FileListItem
+                  key={fileItem.id}
+                  fileItem={fileItem}
+                  fhirResult={fhirResult} // 🔥 PASS FHIR RESULT
+                  onRemove={removeFile}
+                  onRetry={handleRetryFile}
+                  onComplete={handleFileComplete}
+                  showFHIRResults={true}
+                />
+              );
+            })}
           </div>
 
           {/* Quick Actions Footer */}

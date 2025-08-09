@@ -4,28 +4,7 @@ import type {
   FHIRBundle, 
   FHIRBundleEntry 
 } from '../services/fhirConversionService.type';
-
-export interface ProcessedFile {
-  id: string;
-  name: string;
-  status: FileStatus;
-  extractedText?: string;
-  wordCount?: number;
-  [key: string]: any;
-}
-
-export type FileStatus = 
-  | 'ready' 
-  | 'processing' 
-  | 'completed' 
-  | 'error'
-  | 'medical_detected'
-  | 'non_medical_detected'
-  | 'extraction_error'
-  | 'detection_error'
-  | 'converting'
-  | 'uploading'
-  | 'fhir_error';
+import type { FileObject, FileStatus } from '@/types/core';
 
 export interface ReviewedData {
   subject: string;
@@ -148,7 +127,7 @@ export interface FHIRConversionHookReturn {
 }
 
 export interface FHIRConversionHookParams {
-  processedFiles: ProcessedFile[];
+  processedFiles: FileObject[];
   firestoreData?: Map<string, any>;
   updateFirestoreRecord?: (fileId: string, data: any) => void;
   uploadFiles?: () => Promise<any[]>; // No parameters, returns upload results
