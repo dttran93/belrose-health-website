@@ -58,7 +58,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
         firestoreData,
         savingToFirestore,
         addFiles,
-        removeFile,
+        removeFileFromLocal,
         removeFileComplete,
         retryFile,
         updateFileStatus,
@@ -89,7 +89,6 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
         firestoreData,
         updateFirestoreRecord,
         uploadFiles,
-        removeFile
     );
 
     // 🔥 SET UP FHIR CONVERSION CALLBACK WITH DEBUGGING
@@ -170,6 +169,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
                     files={files}
                     addFiles={addFiles}
                     removeFile={removeFileComplete}
+                    removeFileFromLocal={removeFileFromLocal}
                     retryFile={retryFile}
                     getStats={getStats}
                     updateFileStatus={updateFileStatus}

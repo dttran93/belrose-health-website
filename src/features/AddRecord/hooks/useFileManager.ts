@@ -536,14 +536,6 @@ export function useFileUpload(): UseFileUploadReturn {
             uploadedAt: new Date().toISOString(),
             extractedText: virtualData.extractedText || '',
             wordCount: virtualData.wordCount || 0,
-            medicalDetection: virtualData.medicalDetection || { 
-                isMedical: false, 
-                confidence: 0, 
-                detectedTerms: [],
-                documentType: 'unknown', 
-                reasoning: '', 
-                suggestion: '' 
-            },
             documentType: virtualData.documentType || 'virtual',
             isVirtual: true,
             fhirData: virtualData.fhirData,
@@ -567,28 +559,32 @@ export function useFileUpload(): UseFileUploadReturn {
             type: 'application/fhir+json',
             extractedText: JSON.stringify(fhirData, null, 2),
             wordCount: JSON.stringify(fhirData).split(/\s+/).length,
-            medicalDetection: {
-                isMedical: true,
-                confidence: 1.0,
-                detectedTerms: [],
-                documentType: options.documentType || 'fhir',
-                reasoning: 'FHIR data is inherently medical',
-                suggestion: 'Process as medical document'
-            },
             documentType: options.documentType || 'fhir',
             fhirData,
             ...options
         };
         
         const generatedFileId = addVirtualFile(virtualFileData);
-        const virtualFile = files.find(f => f.id === generatedFileId);
         
-        if (!virtualFile) {
-            throw new Error('Failed to create virtual file');
-        }
+        // Instead of trying to find it in the files array (which might not be updated yet),
+        // construct the FileObject directly from the data we have
+        const virtualFile: FileObject = {
+            id: generatedFileId,
+            name: fileName,
+            size: JSON.stringify(fhirData).length,
+            type: 'application/fhir+json',
+            status: 'completed',
+            uploadedAt: new Date().toISOString(),
+            extractedText: JSON.stringify(fhirData, null, 2),
+            wordCount: JSON.stringify(fhirData).split(/\s+/).length,
+            documentType: options.documentType || 'fhir',
+            isVirtual: true,
+            fhirData,
+            file: undefined
+        };
         
         return { fileId: generatedFileId, virtualFile };
-    }, [addVirtualFile, files]);
+    }, [addVirtualFile]); // Remove 'files' from dependencies since we're not using it
 
     // ==================== FHIR INTEGRATION ====================
     

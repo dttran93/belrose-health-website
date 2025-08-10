@@ -1,7 +1,7 @@
 // Updated FileListItem.tsx
 
 import React, { useState } from 'react';
-import { FileText, X, Eye, EyeOff, File, Camera, FileType } from 'lucide-react';
+import { FileText, X, Eye, EyeOff, File, Camera, FileType, Check } from 'lucide-react';
 import { EnhancedFHIRResults } from '@/features/AddRecord/components/FHIRValidation';
 import { ProgressChips, createFileProcessingSteps } from './ui/ProgressChips';
 import * as Tooltip from '@radix-ui/react-tooltip';
@@ -12,6 +12,7 @@ export const FileListItem: React.FC<FileListItemProps> = ({
   fileItem,
   fhirResult,
   onRemove,
+  onConfirm,
   onRetry,
   onComplete,
   showFHIRResults = true
@@ -72,6 +73,7 @@ export const FileListItem: React.FC<FileListItemProps> = ({
 
   // Event handlers
   const handleRemove = () => onRemove(fileItem.id);
+  const handleConfirm = () => onConfirm(fileItem.id);
   const handleRetry = () => onRetry(fileItem);
   const handleToggleExpanded = () => setIsExpanded(!isExpanded);
 
@@ -126,6 +128,20 @@ export const FileListItem: React.FC<FileListItemProps> = ({
                       <Tooltip.Portal>
                         <Tooltip.Content className="bg-gray-900 text-white px-2 py-1 rounded text-xs max-w-xs" sideOffset={5}>
                           Cancel File Upload and Remove from List
+                          <Tooltip.Arrow className="fill-gray-900"/>
+                        </Tooltip.Content>
+                      </Tooltip.Portal>
+                    </Tooltip.Root>
+                    
+                    <Tooltip.Root>
+                      <Tooltip.Trigger asChild>
+                        <button onClick={handleConfirm} className="text-gray-400 hover:text-green-700 p-1 rounded-full hover:bg-green-300 transition-colors">
+                          <Check className="w-4 h-4" />
+                        </button>
+                      </Tooltip.Trigger>
+                      <Tooltip.Portal>
+                        <Tooltip.Content className="bg-gray-900 text-white px-2 py-1 rounded text-xs max-w-xs" sideOffset={5}>
+                          Confirm File Upload, Clear from List
                           <Tooltip.Arrow className="fill-gray-900"/>
                         </Tooltip.Content>
                       </Tooltip.Portal>

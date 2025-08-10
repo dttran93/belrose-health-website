@@ -61,6 +61,7 @@ export interface CombinedUploadFHIRProps {
   files: FileObject[];
   addFiles: (fileList: FileList, options?: AddFilesOptions) => void;
   removeFile: (fileId: string) => Promise<void>;
+  removeFileFromLocal: (fileId: string) => void;
   
   // Updated: Hook provides Promise<void>, takes fileId: string
   retryFile: (fileId: string) => Promise<void>;
@@ -106,6 +107,7 @@ export interface FileListItemProps {
     error?: string;
   };
   onRemove: (fileId: string) => void;
+  onConfirm: (fileId: string) => void;
   
   // Updated: FileListItem should pass FileItem, but retryFile expects fileId
   // We'll handle the conversion in the component

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { FileText, Upload, Code, MessageSquare, AlertCircle, CheckCircle, ExternalLink, RefreshCw } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { FileText, Upload, Code, MessageSquare, AlertCircle, CheckCircle, ExternalLink, RefreshCw, X } from 'lucide-react';
 import FileUploadZone from './ui/FileUploadZone';
 import { FileListItem } from './FileListItem';
 import { TabNavigation } from './ui/TabNavigation';
+import { toast } from 'sonner';
 
 // Import the fixed types
 import type {
@@ -13,6 +14,7 @@ import type {
 
 import type { FHIRWithValidation } from '../services/fhirConversionService.type';
 import { FileObject, UploadResult } from '@/types/core';
+import { Button } from '@/components/ui/Button';
 
 const TABS = [
   { 
@@ -36,7 +38,9 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   // File management props
   files,
   addFiles,
+  confirmFile,
   removeFile,
+  removeFileFromLocal,
   retryFile,
   getStats,
   updateFileStatus,
@@ -93,10 +97,10 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
     }
   };
 
-  // Clear all files and start over
+  // Keeps files, starts uploading things all over again
   const handleStartOver = () => {
     // Remove all files
-    files.forEach(file => removeFile(file.id));
+    files.forEach(file => removeFileFromLocal(file.id));
     
     // Reset form states
     setFhirText('');
@@ -109,6 +113,18 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
     // Reset to upload tab
     setActiveTab('upload');
   };
+
+  //Cancels uploads and deletes any files from session. 
+  const handleCancelandDelete = () => {
+    // Remove all files
+    files.forEach(file => removeFile(file.id));
+  };
+
+  const handleConfirm = useCallback((fileId: string) => {
+    //Confirm individual item and remove from processing list
+    console.log(`File Confirmed, Removing individual file from processing list: ${fileId}`);
+    removeFileFromLocal(fileId);
+  }, [removeFileFromLocal]);
 
   // Validate FHIR JSON
   const validateFhirJson = (jsonString: string): FHIRValidation => {
@@ -305,7 +321,9 @@ const handleFhirSubmit = async (): Promise<void> => {
     setFhirValidation(null);
     
     // Show success message
-    alert(`✅ FHIR data uploaded successfully!`);
+    toast.success('✅ FHIR data uploaded successfully!', {
+    description: 'Your FHIR Data is now in your Comprehensive Health Record',
+    duration: 4000,});
     
   } catch (error) {
     console.error('❌ Error submitting FHIR data:', error);
@@ -340,15 +358,24 @@ return (
             </p>
           </div>
           
-          {/* Start Over Button - only show when files are present */}
+          {/* Add More Files Button - only show when files are present - resets to the main page */}
           {hasFiles && (
-            <button
-              onClick={handleStartOver}
-              className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span>Start Over</span>
-            </button>
+            <div className="flex items-center space-x-2 px-4 py-2">
+              <Button
+                variant="outline"
+                onClick={() => {handleCancelandDelete(); handleStartOver();}}
+              >
+                <X className="w-4 h-4"/>
+                <span>Cancel Upload</span>
+              </Button>
+              <Button
+                variant="default"
+                onClick={handleStartOver}
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Add More Files</span>
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -395,6 +422,7 @@ return (
                   key={fileItem.id}
                   fileItem={fileItem}
                   fhirResult={fhirResult}
+                  onConfirm={handleConfirm}
                   onRemove={removeFile}
                   onRetry={handleRetryFile}
                   onComplete={handleFileComplete}
