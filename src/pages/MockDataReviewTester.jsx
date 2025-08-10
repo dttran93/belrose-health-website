@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FileText, Upload, TestTube, Eye, AlertCircle, Database } from 'lucide-react';
 import { TabNavigation } from '../features/AddRecord/components/ui/TabNavigation';
 import { Button } from '../components/ui/Button';
-import DataReviewSection from '../features/EditRecord/components/DataReviewSection';
+import DataReviewSection from '../features/ViewEditRecord/components/DataReviewSection';
 
 // Predefined FHIR test documents
 const SAMPLE_FHIR_DOCUMENTS = {

@@ -3,7 +3,7 @@ import { FileText, Check, X, AlertCircle, Save } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 // Custom hooks
-import { useDataReview } from '@/features/EditRecord/hooks/useDataReview';
+import { useDataReview } from '@/features/ViewEditRecord/hooks/useDataReview';
 
 // Import DynamicFHIRForm
 import DynamicFHIRForm from './DynamicFHIRForm';

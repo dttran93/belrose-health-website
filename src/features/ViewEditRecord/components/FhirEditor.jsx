@@ -1,6 +1,6 @@
 // components/FhirEditor.js - Pure editing component
 import React, { useState, useCallback } from 'react';
-import { useFhirEditor, useFhirEditSaver } from '@/features/EditRecord/hooks/useFHIREditor';
+import { useFhirEditor, useFhirEditSaver } from '@/features/ViewEditRecord/hooks/useFHIREditor';
 import { useAuthContext } from '@/components/auth/AuthContext';
 
 const FhirEditor = ({ fileId, onClose }) => {

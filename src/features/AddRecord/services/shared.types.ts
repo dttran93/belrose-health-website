@@ -2,12 +2,12 @@ import { ExtractionSource } from "./visionExtractService.types";
 
 export interface TextExtractionResult {
   text: string;
-  method?: string;
+  method: string;
   confidence?: number;
   wordCount?: number;
   processingTime?: 'fast' | 'medium' | 'slow' | 'failed';
   fallbackReason?: string;
-  source?: 'ai_vision' | 'ocr_fallback' | 'pdf_parser' | 'word_parser' | 'plain_text' | 'hybrid' | 'failed' | ExtractionSource | 'error' | string;
+  source?: 'ai_vision' | 'ocr_fallback' | 'pdf_parser' | 'word_parser' | 'plain_text' | 'hybrid' | 'failed' | 'error' | string;
   extractedText?: string;
 
   // For vision service compatibility

@@ -1,8 +1,8 @@
 // pages/EditFhir.jsx - Main page for FHIR editing
 import React, { useState } from 'react';
-import { useFhirRecordsList } from '@/features/EditRecord/hooks/useFHIREditor';
+import { useFhirRecordsList } from '@/features/ViewEditRecord/hooks/useFHIREditor';
 import { useAuthContext } from '../components/auth/AuthContext'; // Your existing auth
-import FhirEditor from '@/features/EditRecord/components/FhirEditor';
+import FhirEditor from '@/features/ViewEditRecord/components/FhirEditor';
 
 const EditFhir = () => {
   const { user } = useAuthContext();

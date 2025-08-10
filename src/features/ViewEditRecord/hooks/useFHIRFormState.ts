@@ -383,7 +383,7 @@ export const useFHIRFormState = ({
     
     try {
       // Use async/await for proper timing
-      const { convertFormDataToFHIR } = await import('@/features/EditRecord/utils/formtoFhirConverter');
+      const { convertFormDataToFHIR } = await import('@/features/ViewEditRecord/utils/formtoFhirConverter');
       
       // DEBUG: Log field configs to check for missing metadata
       console.log('🔍 Checking field configs for missing metadata...');
