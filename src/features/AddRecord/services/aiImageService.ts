@@ -1,15 +1,13 @@
 import type {
   AnalysisRequest,
   AnalysisType,
-  FullAnalysisResult,
-  MedicalDetectionResult,
+  TextExtractionResult,
   ApiErrorResponse,
   SupportedImageType
 } from './aiImageService.type';
 
 import {
-  SUPPORTED_IMAGE_TYPES,
-  MEDICAL_FILE_EXTENSIONS
+  SUPPORTED_IMAGE_TYPES
 } from './aiImageService.type';
 
 export class AiImageService {
@@ -61,9 +59,9 @@ export class AiImageService {
   }
 
   /**
-   * Analyze image with AI Vision for medical content detection and text extraction
+   * Extract text from image using AI Vision (simplified for MVP)
    */
-  async analyzeImage(file: File, analysisType: AnalysisType = 'full'): Promise<FullAnalysisResult> {
+  async extractTextFromImage(file: File): Promise<TextExtractionResult> {
     try {
       const base64Image = await this.fileToBase64(file);
       const mediaType = this.getMediaType(file.type);
@@ -75,7 +73,7 @@ export class AiImageService {
         },
         fileName: file.name,
         fileType: file.type,
-        analysisType: analysisType
+        analysisType: 'extraction' // Only text extraction for MVP
       };
 
       const response = await fetch(this.apiUrl, {
@@ -91,90 +89,60 @@ export class AiImageService {
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
-      const result: FullAnalysisResult = await response.json();
-      return result;
-
-    } catch (error) {
-      console.error('AI Vision analysis error:', error);
-      throw new Error(`Failed to analyze image: ${(error as Error).message}`);
-    }
-  }
-
-  /**
-   * Extract text from image using AI Vision
-   */
-  async extractTextFromImage(file: File): Promise<string> {
-    try {
-      const result = await this.analyzeImage(file, 'extraction');
-      return result.extractedText ?? ''; // Use nullish coalescing instead of ||
-    } catch (error) {
-      console.error('Error extracting text with AI Vision:', error);
-      // Fallback to Tesseract if AI fails
-      throw error;
-    }
-  }
-
-  /**
-   * Detect if image contains medical content
-   */
-  async detectMedicalContent(file: File): Promise<MedicalDetectionResult> {
-    try {
-      const result = await this.analyzeImage(file, 'detection');
+      const result = await response.json();
+      
       return {
-        isMedical: result.isMedical,
-        confidence: result.confidence,
-        documentType: result.documentType,
-        reasoning: result.reasoning,
-        suggestion: result.suggestion
+        extractedText: result.extractedText ?? '',
+        success: true,
+        wordCount: result.extractedText ? result.extractedText.split(/\s+/).length : 0
       };
-    } catch (error) {
-      console.error('Error detecting medical content:', error);
-      throw error;
-    }
-  }
 
-  /**
-   * Full analysis: detection + text extraction + classification
-   */
-  async analyzeImageFull(file: File): Promise<FullAnalysisResult> {
-    try {
-      const result = await this.analyzeImage(file, 'full');
+    } catch (error) {
+      console.error('AI Vision text extraction error:', error);
       return {
-        // Medical detection
-        isMedical: result.isMedical,
-        confidence: result.confidence,
-        documentType: result.documentType,
-        reasoning: result.reasoning,
-        suggestion: result.suggestion,
-        
-        // Text extraction
-        extractedText: result.extractedText,
-        
-        // Additional insights
-        medicalSpecialty: result.medicalSpecialty,
-        structuredData: result.structuredData, // Any structured medical data found
-        
-        // Quality assessment
-        imageQuality: result.imageQuality,
-        readabilityScore: result.readabilityScore
+        extractedText: '',
+        success: false,
+        error: `Failed to extract text: ${(error as Error).message}`,
+        wordCount: 0
       };
-    } catch (error) {
-      console.error('Error in full image analysis:', error);
-      throw error;
     }
   }
 
   /**
-   * Check if file is a medical imaging format
+   * Check if file type is supported for text extraction
    */
-  isMedicalImageFile(fileName: string, fileType: string): boolean {
-    const lowerFileName = fileName.toLowerCase();
-    const lowerFileType = fileType.toLowerCase();
-    
-    const hasMedialExtension = MEDICAL_FILE_EXTENSIONS.some((ext: string) => lowerFileName.endsWith(ext));
-    const isMedicalMimeType = lowerFileType.includes('dicom') || lowerFileType.includes('medical');
-    
-    return hasMedialExtension || isMedicalMimeType;
+  isImageFile(fileType: string): boolean {
+    return SUPPORTED_IMAGE_TYPES.includes(fileType as SupportedImageType);
+  }
+
+  /**
+   * Get file extension from filename
+   */
+  getFileExtension(fileName: string): string {
+    return fileName.toLowerCase().split('.').pop() || '';
+  }
+
+  /**
+   * Validate if file can be processed
+   */
+  canProcessFile(file: File): { canProcess: boolean; reason?: string } {
+    if (!this.isImageFile(file.type)) {
+      return {
+        canProcess: false,
+        reason: `Unsupported file type: ${file.type}. Supported types: ${SUPPORTED_IMAGE_TYPES.join(', ')}`
+      };
+    }
+
+    // Check file size (optional limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      return {
+        canProcess: false,
+        reason: `File too large: ${(file.size / 1024 / 1024).toFixed(1)}MB. Maximum size: 10MB`
+      };
+    }
+
+    return { canProcess: true };
   }
 }
 

@@ -3,7 +3,6 @@
 import { aiImageService } from '@/features/AddRecord/services/aiImageService';
 import { extractImageTextOCR } from './textExtractionService';
 import {
-  VisionAnalysisResult,
   TextExtractionResult,
   ProcessingRecommendation,
   CompressionResult,
@@ -14,7 +13,7 @@ import {
 
 /**
  * Service for vision-based text extraction and image analysis
- * Integrates AI Vision with OCR fallback for robust image processing
+ * Simplified for MVP - focuses on text extraction only
  */
 class VisionExtractionService implements IVisionExtractionService {
 
@@ -33,12 +32,15 @@ class VisionExtractionService implements IVisionExtractionService {
       // Try AI Vision first for better accuracy
       const visionResult = await aiImageService.extractTextFromImage(file);
       
+      // Handle the new TextExtractionResult format
       return {
-        text: visionResult,
+        text: visionResult.extractedText || '',
         method: 'ai_vision',
         confidence: 0.9, // AI Vision typically has high confidence
         processingTime: 'fast',
-        source: 'ai_vision'
+        source: 'ai_vision',
+        success: visionResult.success,
+        wordCount: visionResult.wordCount
       };
     } catch (visionError: any) {
       console.warn('AI Vision failed, falling back to Tesseract OCR:', visionError);
@@ -53,64 +55,13 @@ class VisionExtractionService implements IVisionExtractionService {
           confidence: 0.6, // OCR generally has lower confidence
           processingTime: 'slow',
           fallbackReason: visionError.message,
-          source: 'ocr_fallback'
+          source: 'ocr_fallback',
+          success: true,
+          wordCount: ocrText.split(/\s+/).length
         };
       } catch (ocrError: any) {
         console.error('Both AI Vision and OCR failed:', ocrError);
         throw new Error(`Image text extraction failed: ${ocrError.message}`);
-      }
-    }
-  }
-
-  /**
-   * Perform full AI analysis of an image (text + medical detection)
-   */
-  async analyzeImageFull(file: File, options: VisionAnalysisOptions = {}): Promise<VisionAnalysisResult> {
-    console.log('Starting full AI Vision analysis for:', file.name);
-    
-    // Validate input
-    if (!this.canProcess(file)) {
-      throw new Error(`File type ${file.type} is not supported for vision analysis`);
-    }
-
-    try {
-      // Use AI Vision for comprehensive analysis
-      const analysisResult = await aiImageService.analyzeImageFull(file);
-      
-      return {
-        extractedText: analysisResult.extractedText || '',
-        isMedical: analysisResult.isMedical || false,
-        confidence: analysisResult.confidence || 0.8,
-        documentType: analysisResult.documentType || 'unknown',
-        reasoning: analysisResult.reasoning || 'AI Vision analysis completed',
-        method: 'ai_vision_full',
-        processingTime: 'medium',
-        
-        // Additional AI Vision specific fields
-        medicalSpecialty: analysisResult.medicalSpecialty,
-        structuredData: analysisResult.structuredData,
-        imageQuality: analysisResult.imageQuality,
-        readabilityScore: analysisResult.readabilityScore
-      };
-    } catch (error: any) {
-      console.error('Full AI Vision analysis failed:', error);
-      
-      // Fallback to separate text extraction + basic analysis
-      try {
-        const textResult = await this.extractImageText(file, options);
-        
-        return {
-          extractedText: textResult.text,
-          isMedical: false, // Cannot determine without full AI analysis
-          confidence: 0.1, // Low confidence without proper analysis
-          documentType: 'unknown',
-          reasoning: 'AI Vision analysis failed, text extracted via fallback',
-          method: 'fallback_text_only',
-          processingTime: 'slow',
-          fallbackReason: error.message
-        };
-      } catch (fallbackError: any) {
-        throw new Error(`Complete image analysis failed: ${fallbackError.message}`);
       }
     }
   }
@@ -261,32 +212,33 @@ class VisionExtractionService implements IVisionExtractionService {
   }
 
   /**
-   * Batch process multiple images
+   * Batch process multiple images for text extraction
    */
   async processImageBatch(
     files: File[], 
     options: VisionAnalysisOptions = {}
-  ): Promise<VisionAnalysisResult[]> {
+  ): Promise<TextExtractionResult[]> {
     console.log(`Starting batch processing of ${files.length} images`);
     
-    const results: VisionAnalysisResult[] = [];
+    const results: TextExtractionResult[] = [];
     
     for (const file of files) {
       try {
-        const result = await this.analyzeImageFull(file, options);
+        const result = await this.extractImageText(file, options);
         results.push(result);
       } catch (error: any) {
         console.error(`Batch processing failed for ${file.name}:`, error);
         
         // Add failed result
         results.push({
-          extractedText: '',
-          isMedical: false,
-          confidence: 0,
-          documentType: 'error',
-          reasoning: `Processing failed: ${error.message}`,
+          text: '',
           method: 'failed',
-          processingTime: 'failed'
+          confidence: 0,
+          processingTime: 'failed',
+          source: 'error',
+          success: false,
+          error: error.message,
+          wordCount: 0
         });
       }
     }
@@ -405,7 +357,6 @@ export { VisionExtractionService };
 // Export individual methods for backward compatibility
 export const {
   extractImageText,
-  analyzeImageFull,
   canProcess,
   getProcessingRecommendation,
   compressImageIfNeeded

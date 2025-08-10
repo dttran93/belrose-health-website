@@ -11,7 +11,7 @@ import {
 } from './documentProcessorService.types';
 
 // Import service type definitions
-import type { VisionAnalysisResult, TextExtractionResult } from './visionExtractService.types';
+import type { TextExtractionResult } from './visionExtractService.types';
 
 /**
  * Simplified service for processing documents through text extraction only
@@ -239,9 +239,9 @@ class DocumentProcessorService implements IDocumentProcessorService {
 
         // Try AI Vision text extraction
         result.processingSteps.push('ai_vision_analysis');
-        const visionResult: VisionAnalysisResult = await VisionExtractionService.analyzeImageFull(file) as VisionAnalysisResult;
+        const visionResult: TextExtractionResult = await VisionExtractionService.extractImageText(file);
         
-        result.extractedText = visionResult.extractedText;
+        result.extractedText = visionResult.text;
         result.processingMethod = 'ai_vision_text_only';
         result.processingSteps.push('ai_vision_completed');
         
