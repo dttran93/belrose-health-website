@@ -84,6 +84,31 @@ export const FileListItem: React.FC<FileListItemProps> = ({
     }
   }, [fileItem.status, fileItem.extractedText, onComplete]);
 
+  //Function to show expanded text in originalText/extractedText preview
+  function ExpandableText({ text, maxLength = 500 }: {text: string; maxLength?: number}) {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const isLongText = text.length > maxLength;
+    const displayText = isExpanded ? text : text.slice(0, maxLength);
+  
+    return (
+      <div className="bg-white p-3 rounded text-sm text-gray-600 border">
+        <div className={`${isExpanded ? '' : 'max-h-32'} overflow-y-auto`}>
+          {displayText}
+          {!isExpanded && isLongText && '...'}
+        </div>
+        
+        {isLongText && (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="mt-2 text-foreground hover:text-destructive text-xs font-medium"
+          >
+            {isExpanded ? 'Show Less' : 'Show More'}
+          </button>
+        )}
+      </div>
+    );
+  }
+
   // Derived state
   const canRetry = fileItem.status.includes('error');
   const hasExpandableContent = fileItem.extractedText || fhirResult || fileItem.medicalDetection;
@@ -201,8 +226,18 @@ export const FileListItem: React.FC<FileListItemProps> = ({
                 Extracted Text Preview
               </h4>
               <div className="bg-white p-3 rounded text-sm text-gray-600 max-h-32 overflow-y-auto border">
-                {fileItem.extractedText.substring(0, 500)}
-                {fileItem.extractedText.length > 500 && '...'}
+                <ExpandableText text={fileItem.extractedText} maxLength={500}/>
+              </div>
+            </div>
+          )}
+          {fileItem.originalText && (
+            <div className="p-4 border-b">
+              <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                <FileText className="w-4 h-4 mr-1" />
+                Original Text Preview
+              </h4>
+              <div className="bg-white p-3 rounded text-sm text-gray-600 max-h-32 overflow-y-auto">
+                <ExpandableText text={fileItem.originalText} maxLength={500}/>
               </div>
             </div>
           )}

@@ -1,7 +1,6 @@
 import type {
   AnalysisRequest,
   AnalysisType,
-  TextExtractionResult,
   ApiErrorResponse,
   SupportedImageType
 } from './aiImageService.type';
@@ -9,6 +8,8 @@ import type {
 import {
   SUPPORTED_IMAGE_TYPES
 } from './aiImageService.type';
+
+import type { TextExtractionResult } from './shared.types';
 
 export class AiImageService {
   private readonly apiUrl: string;
@@ -92,7 +93,8 @@ export class AiImageService {
       const result = await response.json();
       
       return {
-        extractedText: result.extractedText ?? '',
+        text: result.extractedText ?? '',
+        method: 'ai_vision',
         success: true,
         wordCount: result.extractedText ? result.extractedText.split(/\s+/).length : 0
       };
@@ -100,7 +102,8 @@ export class AiImageService {
     } catch (error) {
       console.error('AI Vision text extraction error:', error);
       return {
-        extractedText: '',
+        text: '',
+        method: 'ai_vision',
         success: false,
         error: `Failed to extract text: ${(error as Error).message}`,
         wordCount: 0

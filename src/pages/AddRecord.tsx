@@ -107,7 +107,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
             }
             
             console.log('✅ Found file for FHIR conversion:', currentFile.name);
-            return handleFHIRConverted(fileId, uploadResult, currentFile); // Pass the file object
+            return handleFHIRConverted(fileId, uploadResult); // Pass the file object
         });
     }, [setFHIRConversionCallback, handleFHIRConverted, files]);
 

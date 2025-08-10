@@ -1,9 +1,7 @@
-// src/features/AddRecord/services/visionExtractionService.ts
-
 import { aiImageService } from '@/features/AddRecord/services/aiImageService';
 import { extractImageTextOCR } from './textExtractionService';
+import { TextExtractionResult } from './shared.types';
 import {
-  TextExtractionResult,
   ProcessingRecommendation,
   CompressionResult,
   IVisionExtractionService,

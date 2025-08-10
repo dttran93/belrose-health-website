@@ -1,13 +1,6 @@
-// src/features/AddRecord/services/textExtractionService.types.ts
+import { TextExtractionResult } from './shared.types'
 
 // ==================== TEXT EXTRACTION TYPES ====================
-
-export interface TextExtractionResult {
-  text: string;
-  method: string;
-  wordCount?: number;
-  confidence?: number;
-}
 
 export interface ExtractionOptions {
   preserveFormatting?: boolean;

@@ -1,14 +1,6 @@
-// src/features/AddRecord/hooks/useFileUpload.types.ts
-
-import { FileObject, FileStatus, UploadResult } from '@/types/core';
-
-// Import service types
-import { FileValidationResult, ProcessingOptions, DocumentProcessingResult } from '../services/documentProcessorService.types';
-
-// ==================== TYPE ALIASES ====================
-
-// Type alias to use DocumentProcessingResult as ProcessingResult
-export type ProcessingResult = DocumentProcessingResult;
+import { FileObject, FileStatus } from '@/types/core';
+import { UploadResult } from '../services/shared.types';
+import { VirtualFileResult } from '../components/CombinedUploadFHIR.type';
 
 // ==================== INTERFACE DEFINITIONS ====================
 
@@ -33,6 +25,7 @@ export interface VirtualFileData {
 export interface AddFhirAsVirtualFileOptions extends VirtualFileData {
   name?: string;
   documentType?: string;
+  autoUpload?: boolean;
 }
 
 export interface FileStats {
@@ -59,7 +52,6 @@ export interface UseFileUploadReturn {
   
   // File management actions
   addFiles: (fileList: FileList, options?: AddFilesOptions) => void;
-  removeFile: (fileId: string) => void;
   removeFileFromLocal: (fileId: string) => void;
   deleteFileFromFirebase: (documentId: string) => Promise<void>;
   cancelFileUpload: (fileId: string) => void;
@@ -87,7 +79,7 @@ export interface UseFileUploadReturn {
   
   // Virtual file support
   addVirtualFile: (virtualData: VirtualFileData) => string;
-  addFhirAsVirtualFile: (fhirData: any, options?: AddFhirAsVirtualFileOptions) => Promise<{ fileId: string; virtualFile: FileObject }>;
+  addFhirAsVirtualFile: (fhirData: any, options?: AddFhirAsVirtualFileOptions) => Promise<VirtualFileResult>;
   
   // Reset function
   reset: () => void;

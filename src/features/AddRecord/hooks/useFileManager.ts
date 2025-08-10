@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { FileUploadService } from '@/features/AddRecord/services/fileUploadService';
 import DocumentProcessorService from '@/features/AddRecord/services/documentProcessorService';
-import { FileObject, FileStatus, UploadResult } from '@/types/core';
+import { FileObject, FileStatus } from '@/types/core';
 import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
 
 import {
@@ -15,6 +15,7 @@ import {
   UseFileUploadReturn,
 } from './useFileManager.type';
 import { VirtualFileResult } from '../components/CombinedUploadFHIR.type';
+import { UploadResult } from '../services/shared.types';
 
 /**
  * A comprehensive file upload hook that handles:

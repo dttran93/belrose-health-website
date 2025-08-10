@@ -8,7 +8,6 @@ import type {
   ValidationCheck,
   ValidationStatusUI,
   FHIRWithValidation,
-  ExistingFHIRValidationResult,
   FHIRResource,
   FHIRBundle,
   FHIRBundleEntry,

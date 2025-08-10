@@ -4,7 +4,7 @@ import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion";
+} from "@/components/ui/Accordion";
 import { Badge } from "@/components/site/ui/Badge";
 import { Button } from "@/components/ui/Button";
 

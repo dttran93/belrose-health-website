@@ -1,94 +1,90 @@
-import { useRef, useCallback, useState } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { Upload } from 'lucide-react';
 
-/**
- * Reusable file upload zone with drag & drop functionality
- */
-function FileUploadZone({
-    onFilesSelected,
-    acceptedTypes = [],
-    maxFiles = 5,
-    maxSizeBytes = 10 * 1024 * 1024,
-    multiple = true,
-    title = "Drop files here or click to upload",
-    subtitle = "Supports various file formats",
-    className = ""
-}) {
-    const [dragActive, setDragActive] = useState(false);
-    const fileInputRef = useRef(null);
-
-    const formatFileSize = (bytes) => {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    };
-
-    const handleDrag = useCallback((e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.type === 'dragenter' || e.type === 'dragover') {
-            setDragActive(true);
-        } else if (e.type === 'dragleave') {
-            setDragActive(false);
-        }
-    }, []);
-
-    const handleDrop = useCallback((e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDragActive(false);
-        
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            onFilesSelected(e.dataTransfer.files);
-        }
-    }, [onFilesSelected]);
-
-    const handleFileInputChange = (e) => {
-        if (e.target.files) {
-            onFilesSelected(e.target.files);
-        }
-    };
-
-    return (
-        <div className={className}>
-            <div
-                className={`
-                    border-2 border-dashed rounded-lg p-8 text-center transition-all cursor-pointer
-                    ${dragActive 
-                        ? 'border-blue-500 bg-blue-50' 
-                        : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
-                    }
-                `}
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-            >
-                <Upload className={`w-12 h-12 mx-auto mb-4 ${dragActive ? 'text-blue-500' : 'text-gray-400'}`} />
-                <p className="text-lg font-medium text-gray-700 mb-2">
-                    {title}
-                </p>
-                <p className="text-sm text-gray-500 mb-2">
-                    {subtitle}
-                </p>
-                <p className="text-xs text-gray-400">
-                    Max {maxFiles} files, {formatFileSize(maxSizeBytes)} each
-                </p>
-            </div>
-
-            <input
-                ref={fileInputRef}
-                type="file"
-                multiple={multiple}
-                accept={acceptedTypes.join(',')}
-                onChange={handleFileInputChange}
-                className="hidden"
-            />
-        </div>
-    );
+interface FileUploadZoneProps {
+  onFilesSelected: (files: FileList) => void;
+  acceptedTypes: string[];
+  maxFiles: number;
+  maxSizeBytes: number;
+  title: string;
+  subtitle: string;
+  compact?: boolean;
 }
+
+const FileUploadZone: React.FC<FileUploadZoneProps> = ({
+  onFilesSelected,
+  acceptedTypes,
+  maxFiles,
+  maxSizeBytes,
+  title,
+  subtitle,
+  compact = false
+}) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const handleDrag = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      onFilesSelected(e.dataTransfer.files);
+    }
+  }, [onFilesSelected]);
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      onFilesSelected(e.target.files);
+    }
+  };
+
+  return (
+    <div
+      className={`border-2 border-dashed border-gray-300 rounded-lg text-center hover:border-gray-400 transition-colors cursor-pointer ${
+        compact ? 'p-4' : 'p-8'
+      }`}
+      onDragEnter={handleDrag}
+      onDragLeave={handleDrag}
+      onDragOver={handleDrag}
+      onDrop={handleDrop}
+      onClick={() => fileInputRef.current?.click()}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept={acceptedTypes.join(',')}
+        onChange={handleFileInputChange}
+        className="hidden"
+      />
+      
+      <Upload className={`mx-auto text-gray-400 mb-4 ${compact ? 'h-8 w-8' : 'h-12 w-12'}`} />
+      
+      <h3 className={`font-medium text-gray-900 mb-2 ${compact ? 'text-base' : 'text-lg'}`}>
+        {title}
+      </h3>
+      
+      <p className={`text-gray-600 mb-4 ${compact ? 'text-xs' : 'text-sm'}`}>
+        {subtitle}
+      </p>
+      
+      <p className="text-xs text-gray-500">
+        Accepted: {acceptedTypes.join(', ')} • Max {maxFiles} files • {formatFileSize(maxSizeBytes)} each
+      </p>
+    </div>
+  );
+};
 
 export default FileUploadZone;

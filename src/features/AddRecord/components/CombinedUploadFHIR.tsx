@@ -4,12 +4,13 @@ import FileUploadZone from './ui/FileUploadZone';
 import { FileListItem } from './FileListItem';
 import { TabNavigation } from './ui/TabNavigation';
 import { toast } from 'sonner';
-import { FileObject, UploadResult } from '@/types/core';
+import { FileObject, FileStatus } from '@/types/core';
 import { Button } from '@/components/ui/Button';
 
 // Import the fixed types
 import type { CombinedUploadFHIRProps, FHIRValidation, TabType } from './CombinedUploadFHIR.type';
 import type { FHIRWithValidation } from '../services/fhirConversionService.type';
+import { UploadResult } from '../services/shared.types';
 
 const TABS = [
   { 
@@ -49,7 +50,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   onFHIRConverted,
   
   // Configuration props
-  acceptedTypes = ['.pdf', '.docx', '.doc', '.txt', '.jpg', '.jpeg', '.png'],
+  acceptedTypes = ['.pdf', '.docx', '.doc', '.txt', '.jpg', '.jpeg', '.png'] as string[],
   maxFiles = 5,
   maxSizeBytes = 10 * 1024 * 1024, // 10MB
   className = ''
@@ -408,7 +409,7 @@ return (
             </div>
           </div>
 
-          <div className="p-4 space-y-4 max-h-96 overflow-y-auto">
+          <div className="p-4 space-y-4 max-h-[75vh] overflow-y-auto">
             {/* File List */}
             {files.map((fileItem: FileObject) => {
               const fhirResult = fileItem.fhirData ? {
@@ -495,7 +496,7 @@ return (
   • "Visited urgent care for sore throat. Prescribed amoxicillin 500mg, take twice daily for 10 days."
   • "Follow-up appointment for diabetes. HbA1c improved to 7.2%. Continue current medication."
   • "Annual physical exam completed. All vitals within normal range. Recommended yearly mammogram."`}
-                    className="w-full bg-background h-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    className="w-full bg-background min-h-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                     disabled={submittingText}
                   />
                 </div>

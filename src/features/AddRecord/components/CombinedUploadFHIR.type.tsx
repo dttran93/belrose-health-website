@@ -1,5 +1,6 @@
 import type { FHIRWithValidation } from '../services/fhirConversionService.type';
-import { FileObject, FileStatus, UploadResult } from '@/types/core';
+import { FileObject, FileStatus } from '@/types/core';
+import { UploadResult } from '../services/shared.types';
 
 // ============================================================================
 // FHIR VALIDATION TYPES

@@ -1,4 +1,4 @@
-import { MedicalDetectionResult } from '@/types/core';
+import { ProcessingResult } from './shared.types';
 
 // ==================== VALIDATION TYPES ====================
 
@@ -10,26 +10,9 @@ export interface FileValidationResult {
 // ==================== PROCESSING OPTIONS ====================
 
 export interface ProcessingOptions {
-  enableMedicalDetection?: boolean;
   enableVisionAI?: boolean;
   compressionThreshold?: number;
   signal?: AbortSignal; // For cancellation
-}
-
-// ==================== PROCESSING RESULT ====================
-
-export interface DocumentProcessingResult {
-  fileName: string;
-  fileType: string;
-  fileSize: number;
-  processingSteps: string[];
-  extractedText: string | null;
-  wordCount: number;
-  medicalDetection: MedicalDetectionResult | null;
-  processingMethod: string | null;
-  success: boolean;
-  error: string | null;
-  processingTime: number;
 }
 
 // ==================== SERVICE INTERFACE ====================
@@ -37,7 +20,7 @@ export interface DocumentProcessingResult {
 // This describes what the DocumentProcessorService should look like
 export interface IDocumentProcessorService {
   validateFile(file: File): FileValidationResult;
-  processDocument(file: File, options?: ProcessingOptions): Promise<DocumentProcessingResult>;
+  processDocument(file: File, options?: ProcessingOptions): Promise<ProcessingResult>;
 }
 
 // ==================== UTILITY TYPES ====================
@@ -54,8 +37,14 @@ export type SupportedFileType =
 export type ProcessingStep = 
   | 'text_extraction_started'
   | 'text_extraction_completed'
-  | 'medical_detection_started' 
-  | 'medical_detection_completed'
+  | 'ai_vision_analysis'
+  | 'ai_vision_completed'
+  | 'ai_vision_failed'
+  | 'image_text_extraction'
+  | 'image_compression'
+  | 'image_text_completed'
+  | 'document_text_extraction'
+  | 'document_text_completed'
   | 'processing_completed'
   | 'processing_failed';
 

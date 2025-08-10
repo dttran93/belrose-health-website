@@ -25,22 +25,10 @@ export interface FileObject {
 
 export type FileStatus = 
   | 'pending'      // File uploaded, waiting to process
-  | 'processing'   // Currently being processed  
+  | 'processing'   // Currently being processed
+  | 'uploading'    // Currently uploading, use for making sure there aren't multiple uploads  
   | 'completed'    // Successfully processed
   | 'error';       // Failed with error
-
-export interface ProcessingResult {
-  fileName: string;
-  fileType: string;
-  fileSize: number;
-  processingSteps: string[];
-  extractedText: string | null;
-  wordCount: number;
-  processingMethod: string | null;
-  success: boolean;
-  error: string | null;
-  processingTime: number;
-}
 
 export interface DuplicateInfo {
   existingFileId?: string;
@@ -48,23 +36,4 @@ export interface DuplicateInfo {
   matchedOn: ('name' | 'size' | 'lastModified' | 'hash')[];
   canRetry: boolean;
   userMessage?: string;
-}
-
-export interface UploadResult {
-  // Component needs (success/error tracking)
-  success: boolean;
-  error?: string;
-  fileId?: string;
-  
-  // Firebase service provides (upload details)
-  documentId?: string;
-  firestoreId?: string;        // Legacy compatibility
-  downloadURL?: string | null;
-  filePath?: string | null;
-  uploadedAt?: Date;
-  fileSize?: number;
-  
-  // Legacy fields for backward compatibility
-  savedAt?: string;
-  fileHash?: string;
 }

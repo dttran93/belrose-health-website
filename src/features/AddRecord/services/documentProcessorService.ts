@@ -3,7 +3,6 @@ import VisionExtractionService from './visionExtractionService';
 import { 
   FileValidationResult, 
   ProcessingOptions, 
-  DocumentProcessingResult,
   SupportedFileType,
   ProcessingStep,
   IDocumentProcessorService,
@@ -11,7 +10,7 @@ import {
 } from './documentProcessorService.types';
 
 // Import service type definitions
-import type { TextExtractionResult } from './visionExtractService.types';
+import { TextExtractionResult, ProcessingResult } from './shared.types';
 
 /**
  * Simplified service for processing documents through text extraction only
@@ -22,7 +21,7 @@ class DocumentProcessorService implements IDocumentProcessorService {
   /**
    * Process a document file through the simplified pipeline
    */
-  async processDocument(file: File, options: ProcessingOptions = {}): Promise<DocumentProcessingResult> {
+  async processDocument(file: File, options: ProcessingOptions = {}): Promise<ProcessingResult> {
     const {
       enableVisionAI = true,
       compressionThreshold = 2 * 1024 * 1024, // 2MB
@@ -32,7 +31,7 @@ class DocumentProcessorService implements IDocumentProcessorService {
     console.log(`Processing document: ${file.name} (${file.type})`);
 
     try {
-      let result: DocumentProcessingResult = {
+      let result: ProcessingResult = {
         fileName: file.name,
         fileType: file.type,
         fileSize: file.size,
@@ -166,12 +165,12 @@ class DocumentProcessorService implements IDocumentProcessorService {
   /**
    * Batch process multiple files
    */
-  async processMultipleDocuments(files: File[], options: BatchProcessingOptions = {}): Promise<DocumentProcessingResult[]> {
+  async processMultipleDocuments(files: File[], options: BatchProcessingOptions = {}): Promise<ProcessingResult[]> {
     const { maxConcurrent = 3, ...processingOptions } = options;
     
     console.log(`Processing ${files.length} files with max ${maxConcurrent} concurrent`);
 
-    const results: DocumentProcessingResult[] = [];
+    const results: ProcessingResult[] = [];
     
     // Process files in batches to avoid overwhelming the system
     for (let i = 0; i < files.length; i += maxConcurrent) {
@@ -224,11 +223,11 @@ class DocumentProcessorService implements IDocumentProcessorService {
    */
   private async processImageFile(
     file: File, 
-    result: DocumentProcessingResult, 
+    result: ProcessingResult, 
     enableVisionAI: boolean, 
     compressionThreshold: number,
     signal?: AbortSignal
-  ): Promise<DocumentProcessingResult> {
+  ): Promise<ProcessingResult> {
     
     if (enableVisionAI) {
       try {
@@ -275,9 +274,9 @@ class DocumentProcessorService implements IDocumentProcessorService {
    */
   private async processDocumentFile(
     file: File, 
-    result: DocumentProcessingResult,
+    result: ProcessingResult,
     signal?: AbortSignal
-  ): Promise<DocumentProcessingResult> {
+  ): Promise<ProcessingResult> {
     
     // Check for cancellation
     if (signal?.aborted) {

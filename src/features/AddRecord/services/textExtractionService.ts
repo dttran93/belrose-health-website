@@ -2,8 +2,8 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import Tesseract from 'tesseract.js';
 import mammoth from 'mammoth';
+import {TextExtractionResult} from './shared.types'
 import {
-  TextExtractionResult,
   ExtractionOptions,
   DocumentMetadata,
   PDFExtractionResult,

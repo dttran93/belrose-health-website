@@ -1,38 +1,12 @@
-// src/features/AddRecord/services/visionExtractionService.types.ts
+import { TextExtractionResult } from './shared.types';
 
 // ==================== VISION ANALYSIS TYPES ====================
-
-export interface VisionAnalysisResult {
-  extractedText: string;
-  isMedical: boolean;
-  confidence: number;
-  documentType?: string;
-  reasoning?: string;
-  method?: string;
-  processingTime?: ProcessingTime;  // ← More specific type
-  fallbackReason?: string;
-  
-  // Enhanced AI Vision fields
-  medicalSpecialty?: string;
-  structuredData?: any;
-  imageQuality?: string;
-  readabilityScore?: number;
-}
-
-export interface TextExtractionResult {
-  text: string;
-  method: string;
-  confidence?: number;
-  processingTime?: ProcessingTime;  // ← More specific type
-  fallbackReason?: string;
-  source?: ExtractionSource;        // ← More specific type
-}
 
 export interface ProcessingRecommendation {
   approach: string;
   recommendation: string;
   estimatedTime: string;
-  shouldCompress: boolean;  // ← This was missing!
+  shouldCompress: boolean;
   canProcess?: boolean;
   priority?: 'low' | 'medium' | 'high';
 }
@@ -52,7 +26,6 @@ export interface CompressionResult {
 export interface IVisionExtractionService {
   // Core extraction methods
   extractImageText(file: File, options?: VisionAnalysisOptions): Promise<TextExtractionResult>;
-  analyzeImageFull(file: File, options?: VisionAnalysisOptions): Promise<VisionAnalysisResult>;
   
   // Utility methods
   canProcess(file: File): boolean;
@@ -60,7 +33,6 @@ export interface IVisionExtractionService {
   compressImageIfNeeded(file: File, maxSize?: number, options?: CompressionOptions): Promise<File>;
   
   // Advanced methods
-  processImageBatch(files: File[], options?: VisionAnalysisOptions): Promise<VisionAnalysisResult[]>;
   validateImageFile(file: File): { valid: boolean; error?: string; warnings?: string[] };
   getCompressionPreview(file: File, targetSize: number): Promise<CompressionResult>;
   extractTextOptimized(file: File, options?: VisionAnalysisOptions): Promise<TextExtractionResult>;
