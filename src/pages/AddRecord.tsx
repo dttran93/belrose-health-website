@@ -1,6 +1,7 @@
 import React from 'react';
 import useFileUpload from '@/features/AddRecord/hooks/useFileManager';
 import { useFHIRConversion } from '@/features/AddRecord/hooks/useFHIRConversion';
+import {convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
 import { ExportService } from '@/features/AddRecord/services/exportService';
 
 // Import components
@@ -177,6 +178,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
                     uploadFiles={uploadFiles}
                     fhirData={fhirData}
                     onFHIRConverted={handleFHIRConverted}
+                    convertTextToFHIR={convertToFHIR}
                 />
 
             </div>

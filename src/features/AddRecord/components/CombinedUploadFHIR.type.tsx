@@ -44,6 +44,7 @@ export interface VirtualFileOptions {
 export interface VirtualFileResult {
   fileId: string;
   virtualFile: FileObject;
+  uploadResult?: any;
 }
 
 // ============================================================================

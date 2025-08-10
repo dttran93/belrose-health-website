@@ -14,6 +14,7 @@ import {
   ResetProcessCallback,
   UseFileUploadReturn,
 } from './useFileManager.type';
+import { VirtualFileResult } from '../components/CombinedUploadFHIR.type';
 
 /**
  * A comprehensive file upload hook that handles:
@@ -138,23 +139,6 @@ export function useFileUpload(): UseFileUploadReturn {
                 processFile(fileObj);
             });
         }
-    }, []);
-
-    const removeFile = useCallback((fileId: string) => {
-        console.log(`🗑️  Removing file: ${fileId}`);
-        console.trace('🔍 removeFile called from:'); // This will show you the call stack
-        
-        setFiles(prev => prev.filter(f => f.id !== fileId));
-        setFirestoreData(prev => {
-            const newMap = new Map(prev);
-            newMap.delete(fileId);
-            return newMap;
-        });
-        setSavingToFirestore(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(fileId);
-            return newSet;
-        });
     }, []);
 
     const retryFile = useCallback(async (fileId: string) => {
@@ -534,7 +518,8 @@ export function useFileUpload(): UseFileUploadReturn {
             type: virtualData.type || 'application/json',
             status: 'completed',
             uploadedAt: new Date().toISOString(),
-            extractedText: virtualData.extractedText || '',
+            fhirJson: virtualData.fhirJson,
+            originalText: virtualData.originalText,
             wordCount: virtualData.wordCount || 0,
             documentType: virtualData.documentType || 'virtual',
             isVirtual: true,
@@ -548,7 +533,7 @@ export function useFileUpload(): UseFileUploadReturn {
         return fileId;
     }, []);
 
-    const addFhirAsVirtualFile = useCallback(async (fhirData: any, options: AddFhirAsVirtualFileOptions = {}): Promise<{ fileId: string; virtualFile: FileObject }> => {
+    const addFhirAsVirtualFile = useCallback(async (fhirData: any | undefined, options: AddFhirAsVirtualFileOptions = {}): Promise<VirtualFileResult> => {
         const fileId = options.id || generateId();
         const fileName = options.name || `FHIR Document ${fileId}`;
         
@@ -557,7 +542,8 @@ export function useFileUpload(): UseFileUploadReturn {
             name: fileName,
             size: JSON.stringify(fhirData).length,
             type: 'application/fhir+json',
-            extractedText: JSON.stringify(fhirData, null, 2),
+            fhirJson: JSON.stringify(fhirData, null, 2),
+            originalText: options.originalText,
             wordCount: JSON.stringify(fhirData).split(/\s+/).length,
             documentType: options.documentType || 'fhir',
             fhirData,
@@ -575,7 +561,8 @@ export function useFileUpload(): UseFileUploadReturn {
             type: 'application/fhir+json',
             status: 'completed',
             uploadedAt: new Date().toISOString(),
-            extractedText: JSON.stringify(fhirData, null, 2),
+            fhirJson: JSON.stringify(fhirData, null, 2),
+            originalText: virtualFileData.originalText,
             wordCount: JSON.stringify(fhirData).split(/\s+/).length,
             documentType: options.documentType || 'fhir',
             isVirtual: true,
@@ -583,8 +570,67 @@ export function useFileUpload(): UseFileUploadReturn {
             file: undefined
         };
         
+        // 🔥 AUTO-UPLOAD if requested
+        if (options.autoUpload) {
+            console.log('🚀 Auto-uploading virtual file:', virtualFile.name);
+            
+            try {
+                // Prevent duplicate uploads
+                if (savingToFirestore.has(fileId)) {
+                    throw new Error('File already uploading');
+                }
+                
+                setSavingToFirestore(prev => new Set([...prev, fileId]));
+                
+                const uploadResult = await fileUploadService.current.uploadFile(virtualFile);
+                console.log(`✅ Auto-upload successful for ${virtualFile.name}:`, uploadResult);
+                
+                // Update state with upload result
+                setFirestoreData(prev => new Map([...prev, [fileId, uploadResult]]));
+                updateFileStatus(fileId, 'completed', { 
+                    uploadResult,
+                    documentId: uploadResult.documentId,
+                    uploadedAt: uploadResult.uploadedAt 
+                });
+
+                // Show success toast
+                toast.success(`📁 ${virtualFile.name} uploaded successfully!`, {
+                    description: 'Your file has been saved to cloud storage',
+                    duration: 4000,
+                });
+                
+                return { 
+                    fileId: generatedFileId, 
+                    virtualFile, 
+                    uploadResult: {
+                        success: true,
+                        documentId: uploadResult.documentId,
+                        fileId: fileId,
+                        uploadedAt: uploadResult.uploadedAt,
+                        filePath: uploadResult.filePath,
+                        downloadURL: uploadResult.downloadURL
+                    }
+                };
+                
+            } catch (error) {
+                console.error(`❌ Auto-upload failed for ${virtualFile.name}:`, error);
+                updateFileStatus(fileId, 'error', { 
+                    uploadError: error instanceof Error ? error.message : 'Upload failed' 
+                });
+                throw error; // Re-throw so caller can handle it
+                
+            } finally {
+                setSavingToFirestore(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(fileId);
+                    return newSet;
+                });
+            }
+        }
+        
+        // Return without upload result if not auto-uploading
         return { fileId: generatedFileId, virtualFile };
-    }, [addVirtualFile]); // Remove 'files' from dependencies since we're not using it
+    }, [addVirtualFile, fileUploadService, savingToFirestore, setFirestoreData, updateFileStatus]);
 
     // ==================== FHIR INTEGRATION ====================
     
@@ -632,7 +678,6 @@ export function useFileUpload(): UseFileUploadReturn {
         
         // File management actions
         addFiles,
-        removeFile,
         removeFileFromLocal,
         deleteFileFromFirebase,
         cancelFileUpload,

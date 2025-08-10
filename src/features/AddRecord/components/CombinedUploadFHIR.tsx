@@ -4,17 +4,12 @@ import FileUploadZone from './ui/FileUploadZone';
 import { FileListItem } from './FileListItem';
 import { TabNavigation } from './ui/TabNavigation';
 import { toast } from 'sonner';
-
-// Import the fixed types
-import type {
-  CombinedUploadFHIRProps,
-  FHIRValidation,
-  TabType,
-} from './CombinedUploadFHIR.type';
-
-import type { FHIRWithValidation } from '../services/fhirConversionService.type';
 import { FileObject, UploadResult } from '@/types/core';
 import { Button } from '@/components/ui/Button';
+
+// Import the fixed types
+import type { CombinedUploadFHIRProps, FHIRValidation, TabType } from './CombinedUploadFHIR.type';
+import type { FHIRWithValidation } from '../services/fhirConversionService.type';
 
 const TABS = [
   { 
@@ -38,7 +33,6 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   // File management props
   files,
   addFiles,
-  confirmFile,
   removeFile,
   removeFileFromLocal,
   retryFile,
@@ -277,11 +271,17 @@ const handleTextSubmit = async (): Promise<void> => {
       // Create virtual file with FHIR data
       const { fileId, virtualFile } = await addFhirAsVirtualFile(fhirData, {
         name: `Medical Note${patientName ? ` - ${patientName}` : ''} - ${new Date().toLocaleDateString()}`,
-        documentType: 'medical_note_from_text'
+        documentType: 'medical_note_from_text',
+        originalText: plainText.trim(),
+        autoUpload: true
       });
 
       console.log('✅ Plain text converted to FHIR successfully');
-      
+      toast.success('✅ Medical note saved successfully!', {
+        description: 'Your note has been converted to FHIR and saved to your health record',
+        duration: 4000,
+      });
+
       // Clear the form
       setPlainText('');
       setPatientName('');
@@ -289,7 +289,7 @@ const handleTextSubmit = async (): Promise<void> => {
     } catch (error) {
       console.error('❌ Error converting text to FHIR:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to convert text to FHIR: ${errorMessage}`);
+      toast.error(`Failed to convert text to FHIR: ${errorMessage}`,{duration: 6000,});
     } finally {
       setSubmittingText(false);
     }
@@ -304,15 +304,13 @@ const handleFhirSubmit = async (): Promise<void> => {
     
     console.log('🎯 Submitting FHIR data directly to Firestore');
     
-    // Step 1: Create virtual file with FHIR data
-    const { fileId, virtualFile } = await addFhirAsVirtualFile(fhirData, {
+    // Step 1: Create virtual file with FHIR data and AUTO-UPLOAD
+    const { fileId, virtualFile, uploadResult } = await addFhirAsVirtualFile(fhirData, {
       name: `Manual FHIR Input - ${fhirData.resourceType}`,
-      documentType: 'fhir_manual_input'
+      documentType: 'fhir_manual_input',
+      originalText: fhirText.trim(),
+      autoUpload: true  // 🔥 Add this to use the working auto-upload feature
     });
-    
-    console.log('📤 Uploading FHIR data to Firestore...');
-    
-    await uploadFiles([fileId]);
     
     console.log('✅ FHIR data uploaded successfully');
     
@@ -322,18 +320,20 @@ const handleFhirSubmit = async (): Promise<void> => {
     
     // Show success message
     toast.success('✅ FHIR data uploaded successfully!', {
-    description: 'Your FHIR Data is now in your Comprehensive Health Record',
-    duration: 4000,});
+      description: 'Your FHIR Data is now in your Comprehensive Health Record',
+      duration: 4000,
+    });
     
   } catch (error) {
     console.error('❌ Error submitting FHIR data:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    alert(`Failed to upload FHIR data: ${errorMessage}`);
+    toast.error(`Failed to upload FHIR data: ${errorMessage}`, {
+      duration: 6000,
+    });
   } finally {
     setSubmitting(false);
   }
 };
-
 
 const handleRetryFile = (fileItem: FileObject): void => {
   retryFile(fileItem.id);

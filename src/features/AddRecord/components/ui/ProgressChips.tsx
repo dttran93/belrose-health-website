@@ -65,6 +65,13 @@ const ProcessingChip: React.FC<{ step: ProcessingStep }> = ({ step }) => {
   );
 };
 
+// Function to determine upload type
+const getUploadType = (fileObj: FileObject): 'file' | 'text' | 'json' => {
+  if (fileObj.documentType === 'medical_note_from_text') return 'text';
+  if (fileObj.documentType === 'fhir_manual_input') return 'json';
+  return 'file'; // default for regular file uploads
+};
+
 // Main Component
 export const ProgressChips: React.FC<ProgressChipsProps> = ({ 
   steps, 
@@ -80,74 +87,100 @@ export const ProgressChips: React.FC<ProgressChipsProps> = ({
 };
 
 // Utility function to create common step patterns
-export const createFileProcessingSteps = (
-  fileObj: FileObject // Pass the whole file object instead of individual flags
-): ProcessingStep[] => {
-  const baseSteps = [
-    { id: 'received', label: 'File Received' },
-    { id: 'extract', label: 'Extract Text' },
-    { id: 'fhir', label: 'Convert to FHIR' },
-    { id: 'save', label: 'Save to Cloud' }
-  ];
+export const createFileProcessingSteps = (fileObj: FileObject): ProcessingStep[] => {
+    const uploadType = getUploadType(fileObj);
+    const steps = [];
 
-  // Determine progress based on file object state
-  const hasExtractedText = !!fileObj.extractedText;
-  const hasFhirData = !!fileObj.fhirData;
-  const hasDocumentId = !!fileObj.documentId;
-  const hasError = fileObj.status === 'error';
-  const isProcessing = fileObj.status === 'processing';
-  const processingStage = fileObj.processingStage;
-
-  return baseSteps.map((step) => {
-    // Handle error states
-    if (hasError) {
-      if (step.id === 'received') return { ...step, status: 'completed' };
-      if (step.id === 'extract' && !hasExtractedText) return { ...step, status: 'error' };
-      if (step.id === 'fhir' && hasExtractedText && !hasFhirData) return { ...step, status: 'error' };
-      if (step.id === 'save' && hasFhirData && !hasDocumentId) return { ...step, status: 'error' };
-      return { ...step, status: 'pending' };
+    if (uploadType === 'json') {
+    // JSON/FHIR input flow: receive → validate → save
+    steps.push(
+        { id: 'received', label: 'FHIR Received' },
+        { id: 'validate', label: 'Validate FHIR' },
+        { id: 'save', label: 'Save to Cloud' }
+    );
+    } else {
+    // File and text input flow: receive → extract/process → convert → save
+    steps.push(
+        { id: 'received', label: uploadType === 'text' ? 'Text Received' : 'File Received' },
+        { id: 'extract', label: uploadType === 'text' ? 'Process Text' : 'Extract Text' },
+        { id: 'fhir', label: 'Convert to FHIR' },
+        { id: 'save', label: 'Save to Cloud' }
+    );
     }
+    
+    // Determine progress based on file object state
+    const hasTextContent = !!fileObj.extractedText || !!fileObj.originalText;
+    const hasFhirData = !!fileObj.fhirData;
+    const hasDocumentId = !!fileObj.documentId;
+    const hasError = fileObj.status === 'error';
+    const isProcessing = fileObj.status === 'processing';
+    const processingStage = fileObj.processingStage;
 
-    // Normal progression logic
-    switch (step.id) {
-      case 'received':
-        return { ...step, status: 'completed' }; // Always completed once file is added
+    return steps.map((step) => {
+        // Handle error states
+        if (hasError) {
+            if (step.id === 'received') return {...step, status: 'completed'};
 
-      case 'extract':
-        if (hasExtractedText) {
-          return { ...step, status: 'completed' }; // ✅ Extraction done
-        } else if (isProcessing && !processingStage) {
-          return { ...step, status: 'active' }; // 🔄 Currently extracting
-        } else {
-          return { ...step, status: 'pending' }; // ⏳ Not started yet
+            //Type-specific errors
+            if(uploadType === 'json'){
+                if (step.id === 'validate' && !hasFhirData) return { ...step, status: 'error' };
+                if (step.id === 'save' && hasFhirData && !hasDocumentId) return { ...step, status: 'error' };
+            } else {
+                if (step.id === 'extract' && !hasTextContent) return { ...step, status: 'error' };
+                if (step.id === 'fhir' && hasTextContent && !hasFhirData) return { ...step, status: 'error' };
+                if (step.id === 'save' && hasFhirData && !hasDocumentId) return { ...step, status: 'error' };
+            }
+            return {...step, status: 'pending'};
         }
 
-      case 'fhir':
-        if (hasFhirData) {
-          return { ...step, status: 'completed' }; // ✅ FHIR conversion done
-        } else if (hasExtractedText && (processingStage === 'converting_fhir' || (isProcessing && processingStage))) {
-          return { ...step, status: 'active' }; // 🔄 Currently converting FHIR
-        } else if (hasExtractedText) {
-          return { ...step, status: 'pending' }; // ⏳ Ready for FHIR conversion
-        } else {
-          return { ...step, status: 'pending' }; // ⏳ Waiting for text extraction
-        }
+        switch (step.id) {
+            case 'received':
+                return { ...step, status: 'completed' }; // Always completed once file is added
 
-      case 'save':
-        if (hasDocumentId) {
-          return { ...step, status: 'completed' }; // ✅ Saved to cloud
-        } else if (hasFhirData && fileObj.uploadInProgress) {
-          return { ...step, status: 'active' }; // 🔄 Currently uploading
-        } else if (hasFhirData) {
-          return { ...step, status: 'pending' }; // ⏳ Ready to upload
-        } else {
-          return { ...step, status: 'pending' }; // ⏳ Waiting for FHIR data
-        }
+            case 'extract': // For file and text uploads
+                if (hasTextContent) {
+                return { ...step, status: 'completed' }; // ✅ Text available
+                } else if (isProcessing && !processingStage) {
+                return { ...step, status: 'active' }; // 🔄 Currently extracting/processing
+                } else {
+                return { ...step, status: 'pending' }; // ⏳ Not started yet
+                }
 
-      default:
-        return { ...step, status: 'pending' };
-    }
-  });
+            case 'validate': // For JSON uploads
+                if (hasFhirData) {
+                return { ...step, status: 'completed' }; // ✅ FHIR validation passed
+                } else if (isProcessing) {
+                return { ...step, status: 'active' }; // 🔄 Currently validating
+                } else {
+                return { ...step, status: 'pending' }; // ⏳ Not started yet
+                }
+
+            case 'fhir': // For file and text uploads (JSON skips this)
+                if (hasFhirData) {
+                return { ...step, status: 'completed' }; // ✅ FHIR conversion done
+                } else if (hasTextContent && (processingStage === 'converting_fhir' || (isProcessing && processingStage))) {
+                return { ...step, status: 'active' }; // 🔄 Currently converting FHIR
+                } else if (hasTextContent) {
+                return { ...step, status: 'pending' }; // ⏳ Ready for FHIR conversion
+                } else {
+                return { ...step, status: 'pending' }; // ⏳ Waiting for text
+                }
+
+            case 'save': // For all upload types
+                if (hasDocumentId) {
+                return { ...step, status: 'completed' }; // ✅ Saved to cloud
+                } else if (hasFhirData && fileObj.uploadInProgress) {
+                return { ...step, status: 'active' }; // 🔄 Currently uploading
+                } else if (hasFhirData) {
+                return { ...step, status: 'pending' }; // ⏳ Ready to upload
+                } else {
+                return { ...step, status: 'pending' }; // ⏳ Waiting for data
+                }
+
+            default:
+                return { ...step, status: 'pending' };
+            }
+    });
 };
 
 export default ProgressChips;

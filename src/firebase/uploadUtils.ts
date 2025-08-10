@@ -50,6 +50,7 @@ export interface FileMetadata {
   isVirtual?: boolean;
   virtualFileType?: string;
   fhirData?: any;
+  originalText?: string;
 }
 
 export interface UploadFileCompleteResult {
@@ -178,6 +179,9 @@ export async function saveFileMetadataToFirestore({ downloadURL, filePath, fileO
     }
     if (fileObj.fhirData) {
       documentData.fhirData = fileObj.fhirData;
+    }
+    if (fileObj.originalText) {
+      documentData.originalText = fileObj.originalText;
     }
 
     const docRef: DocumentReference = await addDoc(collection(db, "users", user.uid, "files"), documentData);
