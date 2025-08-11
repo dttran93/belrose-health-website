@@ -6,19 +6,19 @@ export interface User {
 }
 
 export interface FileObject {
-  id: string;
-  file?: File;
-  name: string;
-  size: number;
-  type: string;
-  status: FileStatus;
-  error?: string;
-  extractedText?: string | null;
-  wordCount?: number;
-  fileHash?: string;
-  documentType?: string;
-  lastModified?: number;
-  isVirtual?: boolean;
+  id: string; //fileId. Generated in useFileManager via createFileObject() or addVirtualFile(). file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}
+  file?: File; //actual file object from file input. Real life upload not virtual. Generated in createFileObject in useFileManager.ts
+  name: string; //file name or custom name for virtual files. set by createFileObject() in useFileManager.ts
+  size: number; //file size. Set in createFileObject in useFileManager.ts. file.size for real files
+  type: string; //file type. Set in createFileObject in useFileManager.ts. file.type for real files or applicaion/fhir+json for virtual
+  status: FileStatus; //Processing property. Initially set as pending. Then pending/processing... see below
+  error?: string; //Failed processing
+  extractedText?: string | null; //text extracted from image/pdf
+  wordCount?: number; //calculated during text extraction
+  fileHash?: string; 
+  documentType?: string; //can be deleted probably
+  lastModified?: number; //Filetracking for UI state management. Can probably be deleted
+  isVirtual?: boolean; //for virtual files
   fhirData?: any;
   [key: string]: any;
 }

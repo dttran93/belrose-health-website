@@ -9,16 +9,17 @@ import {
   Loader2,
   AlertCircle
 } from 'lucide-react';
-import { HealthRecordCard, HealthRecord } from '@/features/ViewEditRecord/components/ui/HealthRecordCard';
+import { HealthRecordCard } from '@/features/ViewEditRecord/components/ui/HealthRecordCard';
 import { useFhirRecordsList } from '@/features/ViewEditRecord/hooks/useFHIREditor';
 import { useAuthContext } from '@/components/auth/AuthContext';
+import { FileObject } from '@/types/core';
 
 interface PatientRecordsListProps {
-  onViewRecord?: (record: HealthRecord) => void;
-  onEditRecord?: (record: HealthRecord) => void;
-  onDownloadRecord?: (record: HealthRecord) => void;
-  onShareRecord?: (record: HealthRecord) => void;
-  onDeleteRecord?: (record: HealthRecord) => void;
+  onViewRecord?: (record: FileObject) => void;
+  onEditRecord?: (record: FileObject) => void;
+  onDownloadRecord?: (record: FileObject) => void;
+  onShareRecord?: (record: FileObject) => void;
+  onDeleteRecord?: (record: FileObject) => void;
   onAddNewRecord?: () => void;
 }
 
@@ -39,44 +40,31 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
 
   // Filter and search records
   const filteredRecords = records.filter(record => {
-    const fileName = record.fileName || '';
+    const fileName = record.name || '';
     const matchesSearch = fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (record.documentType || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (record.resourceType || '').toLowerCase().includes(searchTerm.toLowerCase());
+                         (record.documentType || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesFilter = filterType === 'all' || 
-                         record.documentType === filterType || 
-                         record.resourceType === filterType;
+                         record.documentType === filterType;
     
     return matchesSearch && matchesFilter;
   });
 
   // Sort records by date (newest first)
   const sortedRecords = filteredRecords.sort((a, b) => {
-    const dateA = a.createdAt;
-    const dateB = b.createdAt;
+    const dateA = a.lastModified;
+    const dateB = b.lastModified;
     
     if (!dateA && !dateB) return 0;
     if (!dateA) return 1;
     if (!dateB) return -1;
     
-    // Handle Firestore timestamps
-    const getTime = (timestamp: any) => {
-      if (timestamp.toDate && typeof timestamp.toDate === 'function') {
-        return timestamp.toDate().getTime();
-      }
-      return new Date(timestamp).getTime();
-    };
-    
-    return getTime(dateB) - getTime(dateA);
+    return dateB - dateA;
   });
 
   // Get unique document types for filter dropdown
   const documentTypes = Array.from(
-    new Set([
-      ...records.map(record => record.documentType).filter(Boolean),
-      ...records.map(record => record.resourceType).filter(Boolean)
-    ])
+    new Set(records.map(record => record.documentType).filter(Boolean))
   );
 
   // Loading state
@@ -172,7 +160,7 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
                 <option value="all">All Types</option>
                 {documentTypes.map(type => (
                   <option key={type} value={type}>
-                    {type?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    {type?.replace(/_/g, ' ').replace(/\b\w/g, (letter: string) => letter.toUpperCase())}
                   </option>
                 ))}
               </select>
