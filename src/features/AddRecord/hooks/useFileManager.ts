@@ -2,8 +2,9 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { FileUploadService } from '@/features/AddRecord/services/fileUploadService';
 import DocumentProcessorService from '@/features/AddRecord/services/documentProcessorService';
-import { FileObject, FileStatus } from '@/types/core';
+import { FileObject, FileStatus, AIProcessingStatus } from '@/types/core';
 import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
+import { processRecordWithAI } from '@/features/AddRecord/services/aiRecordProcessingService';
 
 import {
   AddFilesOptions,
@@ -81,9 +82,10 @@ export function useFileUpload(): UseFileUploadReturn {
         uploadedAt: new Date().toISOString(),
         extractedText: '',
         wordCount: 0,
-        medicalDetection: { isMedical: false, confidence: 0, documentType: 'unknown', reasoning: '', suggestion: '' },
         documentType: 'unknown',
-        isVirtual: false
+        isVirtual: false,
+        aiProcessingStatus: 'not_needed' as AIProcessingStatus,
+        belroseAI: undefined,
     });
 
     // ==================== CORE FILE MANAGEMENT ====================
@@ -166,6 +168,16 @@ export function useFileUpload(): UseFileUploadReturn {
         }
     }, []);
 
+    // ==================== STATUS UPDATES ====================
+    
+    const updateFileStatus = useCallback((fileId: string, status: FileStatus, additionalData: Partial<FileObject> = {}) => {
+        setFiles(prev => prev.map(f => 
+            f.id === fileId 
+                ? { ...f, status, ...additionalData }
+                : f
+        ));
+    }, []);
+
     // ==================== FILE PROCESSING ====================
     
     const convertTextToFHIR = async (extractedText: string, fileName: string) => {
@@ -177,80 +189,125 @@ export function useFileUpload(): UseFileUploadReturn {
         }
     };
 
-    const processFile = useCallback(async (fileObj: FileObject) => {
-        if (!fileObj || !fileObj.file) {
-            console.error(`❌ File not found or invalid: ${fileObj.id}`);
-            return;
-        }
+    const processWithAI = useCallback(async (fileObj: FileObject) => {
+        console.log(`🤖 Starting AI processing for: ${fileObj.name}`);
         
-        console.log(`🔄 Processing file: ${fileObj.name}`);
-        updateFileStatus(fileObj.id, 'processing');
+        // Update status to processing
+        updateFileStatus(fileObj.id, fileObj.status, {
+            aiProcessingStatus: 'processing'
+        });
         
-        try {          
-            // STEP 1: Process with document processor (extract text)
-            console.log(`📄 Starting text extraction for: ${fileObj.name}`);
-            const result = await DocumentProcessorService.processDocument(fileObj.file);
-            console.log(`✅ Text extraction complete for: ${fileObj.name}`, result);
+        try {
+            // TODO: Implement your AI service call here
+            // For now, this is a placeholder that you'll replace with your actual AI service
+            const aiResult = await processRecordWithAI(fileObj.fhirData);
             
-            if (!result.success) {
-                console.log(`❌ Text extraction failed for: ${fileObj.name}`, result.error);
-                updateFileStatus(fileObj.id, 'error', {
-                    error: result.error || 'Document processing failed'
-                });
-                return;
-            }
-
-            // STEP 2: Update with extraction results and start FHIR conversion
-            console.log(`📋 Updating file status with extracted text for: ${fileObj.name}`);
-            updateFileStatus(fileObj.id, 'processing', {
-                extractedText: result.extractedText,
-                wordCount: result.wordCount,
-                processingStage: 'converting_fhir' // Show FHIR conversion step
+            // Update with AI results
+            updateFileStatus(fileObj.id, fileObj.status, {
+                aiProcessingStatus: 'completed',
+                belroseAI: {
+                    visitType: aiResult.visitType,
+                    title: aiResult.title,
+                    summary: aiResult.summary,
+                    completedDate: aiResult.completedDate,
+                    provider: aiResult.provider,
+                    institution: aiResult.institution,
+                    aiProcessedAt: new Date().toISOString()
+                }
             });
             
-            // STEP 3: FHIR Conversion - DEBUG VERSION
-            console.log(`🔍 About to start FHIR conversion for: ${fileObj.name}`);
-            console.log(`🔍 Extracted text exists: ${!!result.extractedText}`);
-            console.log(`🔍 Extracted text length: ${result.extractedText?.length || 0}`);
+            console.log(`✅ AI processing completed for: ${fileObj.name}`);
             
+        } catch (error: any) {
+            console.error(`❌ AI processing failed for ${fileObj.name}:`, error);
+            
+            updateFileStatus(fileObj.id, fileObj.status, {
+                aiProcessingStatus: 'failed',
+                belroseAI: {
+                    aiFailureReason: error.message,
+                    aiProcessedAt: new Date().toISOString()
+                }
+            });
+        }
+    }, [updateFileStatus]);
+
+    const processFile = useCallback(async (fileObj: FileObject): Promise<void> => {
+        console.log(`📋 Starting complete processing pipeline for: ${fileObj.name}`);
+        
+        updateFileStatus(fileObj.id, 'processing', {
+            processingStage: 'Starting processing...'
+        });
+
+        try {
+            // Step 1: Extract text and process document (existing logic)
+            console.log(`📝 Step 1: Extracting text from: ${fileObj.name}`);
+            updateFileStatus(fileObj.id, 'processing', {
+                processingStage: 'Extracting text...'
+            });
+            
+            const result = await DocumentProcessorService.processDocument(fileObj.file!);
+            console.log(`📄 Text extraction complete. Word count: ${result.wordCount}`);
+            
+            // Step 2: Try FHIR conversion (existing logic)
             let fhirData = null;
-            if (result.extractedText) {
+            if (result.extractedText && result.extractedText.trim().length > 0) {
+                console.log(`🩺 Step 2: Attempting FHIR conversion for: ${fileObj.name}`);
+                updateFileStatus(fileObj.id, 'processing', {
+                    processingStage: 'Converting to FHIR...'
+                });
+                
                 try {
-                    console.log(`🏥 Starting FHIR conversion for: ${fileObj.name}`);
-                    
-                    // Call the FHIR conversion service
-                    fhirData = await convertTextToFHIR(result.extractedText, fileObj.name);
-                    
-                    console.log(`✅ FHIR conversion complete for: ${fileObj.name}`, fhirData);
-                    
-                } catch (fhirError) {
-                    console.warn(`⚠️ FHIR conversion failed for ${fileObj.name}:`, fhirError);
-                    // Don't fail the whole process - FHIR conversion is optional
+                    const fhirResult = await convertToFHIR(result.extractedText);
+                    if (fhirResult?.success && fhirResult?.data) {
+                        fhirData = fhirResult.data;
+                        console.log(`✅ FHIR conversion successful for: ${fileObj.name}`);
+                        
+                        // NEW: Step 3: AI Processing if FHIR data exists
+                        console.log(`🤖 Step 3: Starting AI processing for: ${fileObj.name}`);
+                        updateFileStatus(fileObj.id, 'processing', {
+                            processingStage: 'AI processing...',
+                            fhirData: fhirData,
+                            aiProcessingStatus: 'pending'
+                        });
+                        
+                        // Trigger AI processing in the background
+                        const updatedFileObj = { ...fileObj, fhirData };
+                        processWithAI(updatedFileObj).catch(error => {
+                            console.error('AI processing failed:', error);
+                        });
+                    } else {
+                        console.log(`ℹ️ FHIR conversion failed for: ${fileObj.name}, continuing without FHIR data`);
+                    }
+                } catch (fhirError: any) {
+                    console.warn(`⚠️ FHIR conversion failed for ${fileObj.name}:`, fhirError.message);
                 }
             } else {
-                console.log(`⚠️ No extracted text available for FHIR conversion: ${fileObj.name}`);
+                console.log(`ℹ️ No text extracted from: ${fileObj.name}, skipping FHIR conversion`);
             }
-            
-            // STEP 4: Mark as completed with ALL data ready
-            console.log(`🎯 Marking file as completed. FHIR data exists: ${!!fhirData}`);
+
+            // Step 4: Complete processing
+            console.log(`✅ Marking file as completed: ${fileObj.name}. FHIR data exists: ${!!fhirData}`);
             updateFileStatus(fileObj.id, 'completed', {
                 extractedText: result.extractedText,
                 wordCount: result.wordCount,
-                fhirData: fhirData, // Include FHIR data if available
-                processingStage: undefined, // Clear the processing stage
-                processedAt: new Date().toISOString()
+                fhirData: fhirData,
+                processingStage: undefined,
+                processedAt: new Date().toISOString(),
+                // Keep existing AI status if already set
+                aiProcessingStatus: fhirData ? 'pending' : 'not_needed'
             });
             
-            console.log(`🎉 Complete processing pipeline finished for: ${fileObj.name}. Final FHIR data: ${!!fhirData}`);
+            console.log(`🎉 Complete processing pipeline finished for: ${fileObj.name}`);
                 
         } catch (error: any) {
             console.error(`💥 Processing failed for ${fileObj.name}:`, error);
             updateFileStatus(fileObj.id, 'error', { 
                 error: error.message,
-                processingStage: undefined // Clear any processing stage on error
+                processingStage: undefined,
+                aiProcessingStatus: 'not_needed'
             });
         }
-    }, []);
+    }, [updateFileStatus, processWithAI]);
 
     // ================ FILE DELETION =========================
 
@@ -417,17 +474,6 @@ export function useFileUpload(): UseFileUploadReturn {
         
         console.log('✅ Enhanced clearAll completed');
     }, [files, deleteFileFromFirebase]);
-
-
-    // ==================== STATUS UPDATES ====================
-    
-    const updateFileStatus = useCallback((fileId: string, status: FileStatus, additionalData: Partial<FileObject> = {}) => {
-        setFiles(prev => prev.map(f => 
-            f.id === fileId 
-                ? { ...f, status, ...additionalData }
-                : f
-        ));
-    }, []);
 
     // ==================== FIRESTORE OPERATIONS ====================
     

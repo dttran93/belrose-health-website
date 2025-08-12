@@ -5,6 +5,30 @@ export interface User {
   photoURL: string | null;
 }
 
+export interface BelroseFields {
+  // Core display fields - these are what users see in list views
+  visitType?: string;           // e.g., "Follow-up Appointment", "Lab Results", "Imaging Study"
+  title?: string;               // Short descriptive title (e.g., "Cardiology Follow-up")
+  summary?: string;             // Slightly longer summary, main information a future reader would need to know
+  
+  // Key dates and people
+  completedDate?: string;       // ISO date string - the main date for this record
+  provider?: string;            // Primary provider name
+  institution?: string;         // Healthcare institution/facility
+  
+  // Simple processing metadata
+  aiProcessedAt?: string;       // ISO timestamp when AI processing completed
+  aiFailureReason?: string;     // If AI processing failed, why?
+}
+
+
+export type AIProcessingStatus =
+  | 'pending'        // AI processing not yet started
+  | 'processing'     // AI is currently processing
+  | 'completed'      // AI processing finished successfully
+  | 'failed'         // AI processing failed
+  | 'not_needed';    // This record type doesn't need AI processing
+
 export interface FileObject {
   id: string; //fileId. Generated in useFileManager via createFileObject() or addVirtualFile(). file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}
   file?: File; //actual file object from file input. Real life upload not virtual. Generated in createFileObject in useFileManager.ts
@@ -21,6 +45,11 @@ export interface FileObject {
   isVirtual?: boolean; //for virtual files
   fhirData?: any;
   [key: string]: any;
+
+  //For AI enrichedFields
+  belroseFields: BelroseFields;
+  aiProcessingStatus?: AIProcessingStatus;
+
 }
 
 export type FileStatus = 
