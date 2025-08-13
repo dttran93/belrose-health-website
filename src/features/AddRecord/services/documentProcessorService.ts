@@ -262,6 +262,14 @@ class DocumentProcessorService implements IDocumentProcessorService {
     }
 
     const textResult: TextExtractionResult = await VisionExtractionService.extractImageText(fileToProcess) as TextExtractionResult;
+    
+    console.log('🔍 DocProcessor: Text result received:', {
+    text: textResult.text?.substring(0, 50) + '...',
+    wordCount: textResult.text?.split(/\s+/).length || 0,
+    success: textResult.success
+    });
+
+    
     result.extractedText = textResult.text;
     result.processingMethod = textResult.method;
     result.processingSteps.push('image_text_completed');

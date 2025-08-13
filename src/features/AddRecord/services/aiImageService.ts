@@ -63,54 +63,58 @@ export class AiImageService {
    * Extract text from image using AI Vision (simplified for MVP)
    */
   async extractTextFromImage(file: File): Promise<TextExtractionResult> {
-    try {
-      const base64Image = await this.fileToBase64(file);
-      const mediaType = this.getMediaType(file.type);
+  console.log('🎯 AI Service: Starting extraction for:', file.name);
+  
+  try {
+    const base64Image = await this.fileToBase64(file);
+    console.log('📸 Base64 length:', base64Image.length);
+    
+    const mediaType = this.getMediaType(file.type);
+    console.log('🔧 Media type:', mediaType);
 
-      const requestBody: AnalysisRequest = {
-        image: {
-          base64: base64Image,
-          mediaType: mediaType
-        },
-        fileName: file.name,
-        fileType: file.type,
-        analysisType: 'extraction' // Only text extraction for MVP
-      };
+    const requestBody: AnalysisRequest = {
+      image: { base64: base64Image, mediaType: mediaType },
+      fileName: file.name,
+      fileType: file.type,
+      analysisType: 'extraction'
+    };
 
-      const response = await fetch(this.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      });
+    console.log('📤 Sending request to:', this.apiUrl);
+    const response = await fetch(this.apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    });
 
-      if (!response.ok) {
-        const errorData: ApiErrorResponse = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
+    console.log('📥 Response status:', response.status, 'OK:', response.ok);
 
-      const result = await response.json();
-      
-      return {
-        text: result.extractedText ?? '',
-        method: 'ai_vision',
-        success: true,
-        wordCount: result.extractedText ? result.extractedText.split(/\s+/).length : 0
-      };
-
-    } catch (error) {
-      console.error('AI Vision text extraction error:', error);
-      return {
-        text: '',
-        method: 'ai_vision',
-        success: false,
-        error: `Failed to extract text: ${(error as Error).message}`,
-        wordCount: 0
-      };
+    if (!response.ok) {
+      const errorData: ApiErrorResponse = await response.json();
+      console.error('❌ Error response:', errorData);
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
     }
-  }
 
+    const result = await response.json();
+    console.log('✅ Success response:', result);
+    
+    return {
+      text: result.extractedText ?? '',
+      method: 'ai_vision',
+      success: true,
+      wordCount: result.extractedText ? result.extractedText.split(/\s+/).length : 0
+    };
+
+  } catch (error) {
+    console.error('💥 AI Vision complete failure:', error);
+    return {
+      text: '',
+      method: 'ai_vision',
+      success: false,
+      error: `Failed to extract text: ${(error as Error).message}`,
+      wordCount: 0
+    };
+  }
+}
   /**
    * Check if file type is supported for text extraction
    */

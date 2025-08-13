@@ -138,13 +138,18 @@ export const createFileProcessingSteps = (fileObj: FileObject): ProcessingStep[]
                 return { ...step, status: 'completed' }; // Always completed once file is added
 
             case 'extract': // For file and text uploads
-                if (hasTextContent) {
+              if (hasTextContent) {
                 return { ...step, status: 'completed' }; // ✅ Text available
-                } else if (isProcessing && !processingStage) {
-                return { ...step, status: 'active' }; // 🔄 Currently extracting/processing
-                } else {
+              } else if (isProcessing && (
+                !processingStage || 
+                processingStage.includes('text') || 
+                processingStage.includes('Extracting') ||
+                processingStage === 'Starting processing...'
+              )) {
+                return { ...step, status: 'active' }; // 🔄 Currently extracting
+              } else {
                 return { ...step, status: 'pending' }; // ⏳ Not started yet
-                }
+              }
 
             case 'validate': // For JSON uploads
                 if (hasFhirData) {
@@ -155,16 +160,16 @@ export const createFileProcessingSteps = (fileObj: FileObject): ProcessingStep[]
                 return { ...step, status: 'pending' }; // ⏳ Not started yet
                 }
 
-            case 'fhir': // For file and text uploads (JSON skips this)
-                if (hasFhirData) {
+            case 'fhir': // For file and text uploads
+              if (hasFhirData) {
                 return { ...step, status: 'completed' }; // ✅ FHIR conversion done
-                } else if (hasTextContent && (processingStage === 'converting_fhir' || (isProcessing && processingStage))) {
+              } else if (hasTextContent && isProcessing && (processingStage?.includes('FHIR') || processingStage?.includes('Converting') || processingStage === 'AI processing...')) {
                 return { ...step, status: 'active' }; // 🔄 Currently converting FHIR
-                } else if (hasTextContent) {
+              } else if (hasTextContent) {
                 return { ...step, status: 'pending' }; // ⏳ Ready for FHIR conversion
-                } else {
+              } else {
                 return { ...step, status: 'pending' }; // ⏳ Waiting for text
-                }
+              }
 
             case 'save': // For all upload types
                 if (hasDocumentId) {

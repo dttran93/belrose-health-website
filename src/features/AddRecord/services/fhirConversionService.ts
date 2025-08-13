@@ -68,30 +68,42 @@ export const convertToFHIR = async (
       // For now, let's warn but continue (since AI-generated FHIR might have minor issues)
     }
 
-    if (validationResult.hasWarnings) {
-      console.warn('⚠️ FHIR Validation Warnings:', validationResult.warnings);
-    }
+if (validationResult.hasWarnings) {
+  console.warn('⚠️ FHIR Validation Warnings:', validationResult.warnings);
+}
 
-    // Step 3: Add validation metadata to the response
-    const result: FHIRWithValidation = {
-      ...fhirData,
-      _validation: {
-        isValid: validationResult.isValid,
-        hasErrors: validationResult.hasErrors,
-        hasWarnings: validationResult.hasWarnings,
-        errors: validationResult.errors,
-        warnings: validationResult.warnings,
-        info: validationResult.info,
-        validatedAt: new Date().toISOString(),
-        validatorVersion: 'fhirpath.js'
-      }
-    };
+// ADD DEBUG LOGS HERE:
+console.log('🔍 Full FHIR validation result:', validationResult);
+console.log('🔍 FHIR data keys:', Object.keys(fhirData));
+console.log('🔍 About to return success...');
 
-    return result;
+// Step 3: Add validation metadata to the response
+const result: FHIRWithValidation = {
+  ...fhirData,
+  _validation: {
+    isValid: validationResult.isValid,
+    hasErrors: validationResult.hasErrors,
+    hasWarnings: validationResult.hasWarnings,
+    errors: validationResult.errors,
+    warnings: validationResult.warnings,
+    info: validationResult.info,
+    validatedAt: new Date().toISOString(),
+    validatorVersion: 'fhirpath.js'
+  }
+};
+
+console.log('✅ Returning FHIR result with validation metadata');
+return result;
 
   } catch (error) {
-    console.error('❌ FHIR conversion/validation error:', error);
-    throw new Error(`Failed to convert to FHIR: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error('💥 FHIR conversion error details:', error);
+    if (error instanceof Error) {
+      console.error('💥 Error stack:', error.stack);
+      throw new Error(`Failed to convert to FHIR: ${error.message}`);
+    } else {
+      console.error('💥 Non-Error thrown:', error);
+      throw new Error(`Failed to convert to FHIR: ${String(error)}`);
+    }
   }
 };
 

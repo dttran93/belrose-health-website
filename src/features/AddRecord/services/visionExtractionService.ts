@@ -29,10 +29,15 @@ class VisionExtractionService implements IVisionExtractionService {
     try {
       // Try AI Vision first for better accuracy
       const visionResult = await aiImageService.extractTextFromImage(file);
+
+console.log('🔍 VisionService: Full AI result object:', visionResult);
+console.log('🔍 VisionService: Object keys:', Object.keys(visionResult));
+console.log('🔍 VisionService: extractedText value:', visionResult.extractedText);
+console.log('🔍 VisionService: text value:', visionResult.text);
       
       // Handle the new TextExtractionResult format
       return {
-        text: visionResult.extractedText || '',
+        text: visionResult.text || '',
         method: 'ai_vision',
         confidence: 0.9, // AI Vision typically has high confidence
         processingTime: 'fast',
@@ -40,6 +45,7 @@ class VisionExtractionService implements IVisionExtractionService {
         success: visionResult.success,
         wordCount: visionResult.wordCount
       };
+      
     } catch (visionError: any) {
       console.warn('AI Vision failed, falling back to Tesseract OCR:', visionError);
       

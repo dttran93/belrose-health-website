@@ -258,8 +258,11 @@ export function useFileUpload(): UseFileUploadReturn {
                 
                 try {
                     const fhirResult = await convertToFHIR(result.extractedText);
-                    if (fhirResult?.success && fhirResult?.data) {
-                        fhirData = fhirResult.data;
+                        console.log('🔍 FHIR result received in useFileManager:', fhirResult);
+                        console.log('🔍 FHIR result type:', typeof fhirResult);
+                        console.log('🔍 FHIR result keys:', Object.keys(fhirResult || {}));
+                    if (fhirResult && fhirResult.resourceType ==='Bundle') {
+                        fhirData = fhirResult;
                         console.log(`✅ FHIR conversion successful for: ${fileObj.name}`);
                         
                         // NEW: Step 3: AI Processing if FHIR data exists
@@ -279,6 +282,7 @@ export function useFileUpload(): UseFileUploadReturn {
                         console.log(`ℹ️ FHIR conversion failed for: ${fileObj.name}, continuing without FHIR data`);
                     }
                 } catch (fhirError: any) {
+                     console.error(`💥 FHIR conversion error in useFileManager:`, fhirError);
                     console.warn(`⚠️ FHIR conversion failed for ${fileObj.name}:`, fhirError.message);
                 }
             } else {
