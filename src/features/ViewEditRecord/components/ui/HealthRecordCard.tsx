@@ -54,11 +54,6 @@ const getDocumentTypeColor = (type?: string): string => {
   return colors[type || 'medical_record'] || 'bg-gray-100 text-gray-800 border-gray-200';
 };
 
-const formatDocumentType = (type?: string): string => {
-  if (!type) return 'Medical Record';
-  return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-};
-
 const getFileExtension = (fileName?: string): string => {
   if (!fileName) return 'Unknown';
   const extension = fileName.split('.').pop()?.toUpperCase();
@@ -73,17 +68,9 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
   className = '',
 }) => {
 
-  // 🔍 DEBUGGING - Add this temporarily to see what's in your record
-  console.log('🔍 Record object:', record);
-  console.log('🔍 BelroseFields:', record.belroseFields);
-  console.log('🔍 Institution specifically:', record.belroseFields?.institution);
-
   // Get the display name - your hook provides fileName
   const displayName = record.name || 'Unknown Document';
   
-  // Get the creation date - your hook provides createdAt
-  const createdAt = record.lastModified;
-
   return (
     <div className={`bg-background rounded-lg shadow-sm border border-border/20 hover:shadow-md transition-shadow ${className}`}>
       <div className="p-6">

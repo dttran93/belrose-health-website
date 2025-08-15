@@ -2,14 +2,16 @@ import React, { useState } from 'react';
 import { 
   Search, 
   Filter, 
-  Grid, 
-  List, 
   Upload, 
   FileText,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  List,
+  Eye,
+  ArrowLeft
 } from 'lucide-react';
 import { HealthRecordCard } from '@/features/ViewEditRecord/components/ui/HealthRecordCard';
+import HealthRecordFull from '@/features/ViewEditRecord/components/ui/HealthRecordFull';
 import { useCompleteRecords } from '@/features/ViewEditRecord/hooks/useCompleteRecords';
 import { useAuthContext } from '@/components/auth/AuthContext';
 import { FileObject } from '@/types/core';
@@ -38,7 +40,8 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'summary' | 'detailed'>('summary');
+  const [selectedRecord, setSelectedRecord] = useState<FileObject | null>(null);
 
   // 🔍 Add debugging to see what records we're getting
   console.log('📊 Complete records received:', records.length);
@@ -51,6 +54,23 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
       provider: record.belroseFields?.provider
     });
   });
+
+  // Handle view record - switch to detailed view
+  const handleViewRecord = (record: FileObject) => {
+    setSelectedRecord(record);
+    setViewMode('detailed');
+    
+    // Call the original onViewRecord if provided (for any external logic)
+    if (onViewRecord) {
+      onViewRecord(record);
+    }
+  };
+
+  // Handle back to summary
+  const handleBackToSummary = () => {
+    setViewMode('summary');
+    setSelectedRecord(null);
+  };
 
   // Filter and search records
   const filteredRecords = records.filter(record => {
@@ -134,6 +154,21 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
     );
   }
 
+  // If we're in detailed view, show the full record component
+  if (viewMode === 'detailed' && selectedRecord) {
+    return (
+      <HealthRecordFull 
+        record={selectedRecord}
+        onBack={handleBackToSummary}
+        onEdit={onEditRecord}
+        onDownload={onDownloadRecord}
+        onShare={onShareRecord}
+        onDelete={onDeleteRecord}
+      />
+    );
+  }
+
+  // Summary view (list of cards)
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -184,24 +219,23 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
             ))}
           </select>
 
-          <div className="flex border border-gray-300 rounded-lg">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 ${viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-600'}`}
-            >
-              <Grid className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 ${viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-600'}`}
-            >
-              <List className="w-4 h-4" />
-            </button>
+          {/* View Mode Toggle */}
+          <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <List className="w-4 h-4" />
+            <span>List View</span>
           </div>
+        </div>
+
+        {/* Results Summary */}
+        <div className="mt-4">
+          <p className="text-gray-600">
+            Showing {filteredRecords.length} of {records.length} records
+            {searchTerm && ` matching "${searchTerm}"`}
+          </p>
         </div>
       </div>
 
-      {/* Records Grid/List */}
+      {/* Records List */}
       <div className="max-w-7xl mx-auto px-4 pb-8">
         {sortedRecords.length === 0 ? (
           <div className="text-center py-12">
@@ -209,18 +243,14 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
             <p className="text-gray-600">No records match your search criteria.</p>
           </div>
         ) : (
-          <div className={
-            viewMode === 'grid' 
-              ? "grid gap-6 md:grid-cols-2 lg:grid-cols-3" 
-              : "space-y-4"
-          }>
+          <div className="space-y-4">
             {sortedRecords.map((record) => (
               <HealthRecordCard
                 key={record.id}
                 record={record}
-                onView={onViewRecord}
+                onView={handleViewRecord} // Use our new handler
                 onEdit={onEditRecord}
-                className={viewMode === 'list' ? 'max-w-none' : ''}
+                className="max-w-none" // Full width for list view
               />
             ))}
           </div>
