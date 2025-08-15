@@ -6,6 +6,7 @@ import { TabNavigation } from './ui/TabNavigation';
 import { toast } from 'sonner';
 import { FileObject, FileStatus } from '@/types/core';
 import { Button } from '@/components/ui/Button';
+import { processRecordWithAI } from '../services/aiRecordProcessingService';
 
 // Import the fixed types
 import type { CombinedUploadFHIRProps, FHIRValidation, TabType } from './CombinedUploadFHIR.type';
@@ -327,12 +328,38 @@ const handleTextSubmit = async (): Promise<void> => {
       };
     }
 
+    let belroseFields;
+    try {
+      console.log('🤖 Processing text submission with AI...');
+      const aiResult = await processRecordWithAI(fhirData, {
+        fileName: `Medical Note${patientName ? ` - ${patientName}` : ''}`,
+        extractedText: plainText.trim(),
+      });
+      
+      belroseFields = {
+        visitType: aiResult.visitType,
+        title: aiResult.title,
+        summary: aiResult.summary,
+        completedDate: aiResult.completedDate,
+        provider: aiResult.provider,
+        institution: aiResult.institution,
+        aiProcessedAt: new Date().toISOString()
+      };
+      
+      console.log('✅ AI processing completed for text submission:', belroseFields);
+    } catch (aiError) {
+      console.warn('⚠️ AI processing failed for text submission:', aiError);
+      // Continue without AI data
+    }
+
       // Create virtual file with FHIR data
       const { fileId, virtualFile } = await addFhirAsVirtualFile(fhirData, {
         name: `Medical Note${patientName ? ` - ${patientName}` : ''} - ${new Date().toLocaleDateString()}`,
         documentType: 'medical_note_from_text',
         originalText: plainText.trim(),
-        autoUpload: true
+        autoUpload: true,
+        belroseFields,
+        aiProcessingStatus: belroseFields? 'complete' : 'failed'
       });
 
       console.log('✅ Plain text converted to FHIR successfully');
@@ -361,15 +388,40 @@ const handleFhirSubmit = async (): Promise<void> => {
   try {
     const fhirData: FHIRWithValidation = JSON.parse(fhirText);
     
-    console.log('🎯 Submitting FHIR data directly to Firestore');
-    
-    // Step 1: Create virtual file with FHIR data and AUTO-UPLOAD
-    const { fileId, virtualFile, uploadResult } = await addFhirAsVirtualFile(fhirData, {
-      name: `Manual FHIR Input - ${fhirData.resourceType}`,
-      documentType: 'fhir_manual_input',
-      originalText: fhirText.trim(),
-      autoUpload: true  // 🔥 Add this to use the working auto-upload feature
+    let belroseFields;
+    try {
+      console.log('🤖 Processing FHIR submission with AI...');
+      const aiResult = await processRecordWithAI(fhirData, {
+        fileName: `Manual FHIR Input - ${fhirData.resourceType}`,
+        extractedText: fhirText.trim(), // Use the raw FHIR JSON as extracted text
     });
+
+    belroseFields = {
+      visitType: aiResult.visitType,
+      title: aiResult.title,
+      summary: aiResult.summary,
+      completedDate: aiResult.completedDate,
+      provider: aiResult.provider,
+      institution: aiResult.institution,
+      aiProcessedAt: new Date().toISOString()
+    };
+
+      console.log('✅ AI processing completed for FHIR submission:', belroseFields);
+  } catch (aiError) {
+    console.warn('⚠️ AI processing failed for FHIR submission:', aiError);
+  }  
+
+  console.log('🎯 Submitting FHIR data directly to Firestore');
+  
+  // Step 1: Create virtual file with FHIR data and AUTO-UPLOAD
+  const { fileId, virtualFile, uploadResult } = await addFhirAsVirtualFile(fhirData, {
+    name: `Manual FHIR Input - ${fhirData.resourceType}`,
+    documentType: 'fhir_manual_input',
+    originalText: fhirText.trim(),
+    autoUpload: true,  // 🔥 Add this to use the working auto-upload feature
+    belroseFields,
+    aiProcessingStatus: belroseFields? 'completed' : 'failed'
+  });
     
     console.log('✅ FHIR data uploaded successfully');
     

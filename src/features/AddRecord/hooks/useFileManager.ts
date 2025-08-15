@@ -649,7 +649,9 @@ export function useFileUpload(): UseFileUploadReturn {
             documentType: virtualData.documentType || 'virtual',
             isVirtual: true,
             fhirData: virtualData.fhirData,
-            file: undefined
+            file: undefined,
+            belroseFields: virtualData.belroseFields,
+            aiProcessingStatus: virtualData.aiProcessingStatus
         };
         
         setFiles(prev => [...prev, virtualFile]);
@@ -692,7 +694,9 @@ export function useFileUpload(): UseFileUploadReturn {
             documentType: options.documentType || 'fhir',
             isVirtual: true,
             fhirData,
-            file: undefined
+            file: undefined,
+            belroseFields: options.belroseFields,
+            aiProcessingStatus: options.aiProcessingStatus || 'not_needed'
         };
         
         // 🔥 AUTO-UPLOAD if requested
