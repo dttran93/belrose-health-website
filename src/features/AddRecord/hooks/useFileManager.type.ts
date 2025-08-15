@@ -72,6 +72,8 @@ export interface UseFileUploadReturn {
   uploadFiles: (fileIds?: string[]) => Promise<UploadResult[]>;
   updateFirestoreRecord: (fileId: string, data: any) => Promise<void>;
   
+  shouldAutoUpload: (file: FileObject) => boolean;
+
   // Computed values
   getStats: () => FileStats;
   savedToFirestoreCount: number;

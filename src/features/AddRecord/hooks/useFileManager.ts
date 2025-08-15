@@ -85,7 +85,6 @@ export function useFileUpload(): UseFileUploadReturn {
         documentType: 'unknown',
         isVirtual: false,
         aiProcessingStatus: 'not_needed' as AIProcessingStatus,
-        belroseFields: undefined,
     });
 
     // ==================== CORE FILE MANAGEMENT ====================

@@ -564,8 +564,8 @@ function buildFHIRPrompt(fhirData: any, fileName?: string, analysis?: FHIRAnalys
 Required JSON response:
 {
   "visitType": "Visit type (e.g., 'Lab Results', 'Follow-up Appointment')",
-  "title": "Short title under 100 chars (e.g., 'Cardiology Follow-up - Dr. Smith')",
-  "summary": "Brief summary under 250 chars",
+  "title": "Short title under 100-150 characters succinctly describing the record",
+  "summary": "Summary of record in approximately 250-500 characters, include as much information as possible that a future reader of the record would find useful",
   "completedDate": "Date in YYYY-MM-DD format",
   "provider": "Doctor/provider name",
   "institution": "Hospital/clinic name"
@@ -573,8 +573,8 @@ Required JSON response:
 
 Rules:
 - Use today's date if no date found: ${today}
-- Use "Healthcare Provider" if no provider found
-- Use "Medical Center" if no institution found
+- Use "Unknown Healthcare Provider" if no provider found
+- Use "Unknown Medical Center" if no institution found
 - Respond with ONLY the JSON object
 
 Context:

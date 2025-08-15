@@ -73,6 +73,11 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
   className = '',
 }) => {
 
+  // 🔍 DEBUGGING - Add this temporarily to see what's in your record
+  console.log('🔍 Record object:', record);
+  console.log('🔍 BelroseFields:', record.belroseFields);
+  console.log('🔍 Institution specifically:', record.belroseFields?.institution);
+
   // Get the display name - your hook provides fileName
   const displayName = record.name || 'Unknown Document';
   
@@ -86,7 +91,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-2">
             <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getDocumentTypeColor(record.documentType)}`}>
-              {formatDocumentType(record.documentType)}
+              {record.belroseFields?.visitType}
             </span>
             <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded border">
               {getFileExtension(displayName)}
@@ -99,30 +104,30 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
 
         {/* Document Name */}
         <h3 className="text-lg flex justify-start font-semibold text-gray-900 mb-2 line-clamp-2" title={displayName}>
-          {displayName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ')}
+          {record.belroseFields?.title}
         </h3>
         
         {/* Date Information */}
         <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
           <Calendar className="w-4 h-4" />
-          <span>Uploaded: {formatDate(createdAt)}</span>
+          <span>{record.belroseFields?.completedDate}</span>
         </div>
 
         {/* Provider/Institution Information */}
         <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
           <User className="w-4 h-4" />
-          <span>Provider Name</span>
+          <span>{record.belroseFields?.provider}</span>
         </div>       
         <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
           <Hospital className="w-4 h-4" />
-          <span>Institution Name</span>
+          <span>{record.belroseFields?.institution || 'Institution not available'}</span>
         </div>       
 
         {/* Summary */}
           <div className="mb-4">
             <p className="flex justify-start text-xs text-gray-500 uppercase tracking-wider mt-3 mb-2">Summary</p>
             <p className="flex justify-start text-left text-sm text-gray-700 line-clamp-2">
-              {record.extractedText}
+              {record.belroseFields?.summary}
             </p>
           </div>
 

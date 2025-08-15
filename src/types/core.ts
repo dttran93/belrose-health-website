@@ -21,7 +21,6 @@ export interface BelroseFields {
   aiFailureReason?: string;     // If AI processing failed, why?
 }
 
-
 export type AIProcessingStatus =
   | 'pending'        // AI processing not yet started
   | 'processing'     // AI is currently processing
@@ -34,7 +33,7 @@ export interface FileObject {
   file?: File; //actual file object from file input. Real life upload not virtual. Generated in createFileObject in useFileManager.ts
   name: string; //file name or custom name for virtual files. set by createFileObject() in useFileManager.ts
   size: number; //file size. Set in createFileObject in useFileManager.ts. file.size for real files
-  type: string; //file type. Set in createFileObject in useFileManager.ts. file.type for real files or applicaion/fhir+json for virtual
+  type: string; //file type. Set in createFileObject in useFileManager.ts. file.type for real files or application/fhir+json for virtual - NEVER undefined
   status: FileStatus; //Processing property. Initially set as pending. Then pending/processing... see below
   error?: string; //Failed processing
   extractedText?: string | null; //text extracted from image/pdf
@@ -47,9 +46,8 @@ export interface FileObject {
   [key: string]: any;
 
   //For AI enrichedFields
-  belroseFields: BelroseFields;
+  belroseFields?: BelroseFields; // Make this optional since not all records may have it yet
   aiProcessingStatus?: AIProcessingStatus;
-
 }
 
 export type FileStatus = 

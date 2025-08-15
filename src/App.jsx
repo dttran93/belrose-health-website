@@ -8,7 +8,7 @@ import NotFound from "./pages/NotFound";
 import AuthPage from "./pages/AuthPage.jsx";
 import Layout from "./components/app/Layout.jsx";
 import Dashboard from "./pages/Dashboard";
-import Activity from "./pages/Activity";
+import PatientRecordsList from "./pages/Activity";
 import ProtectedRoute from "./components/auth/ProtectedRoute.jsx";
 import AddRecord from "./pages/AddRecord.jsx";
 import './App.css'
@@ -38,7 +38,7 @@ const App = () => {
               <Layout>
                 <Routes>
                   <Route index element= {<Dashboard />}/>
-                    <Route path="activity" element={<Activity />}/>
+                    <Route path="activity" element={<PatientRecordsList />}/>
                     <Route path="addrecord" element={<AddRecord />}/>
                     <Route path="fhirtesting" element={<MockFHIRFormTester />} />
                     <Route path="datareviewtesting" element={<MockDataReviewTester />} />
