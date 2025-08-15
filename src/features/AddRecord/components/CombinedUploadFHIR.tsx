@@ -44,6 +44,9 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   addFhirAsVirtualFile,
   uploadFiles,
   convertTextToFHIR,
+  shouldAutoUpload,
+  savingToFirestore,
+  firestoreData,
 
   //FHIR props
   fhirData,
@@ -170,60 +173,115 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   };
 
   // Submit FHIR data and immediately upload to Firestore
-const handleFileComplete = async (fileItem: FileObject): Promise<void> => {
-  console.log('🚨 handleFileComplete called for:', fileItem.name, 'status:', fileItem.status);
-  
-  if (!updateFileStatus) {
-    console.error('❌ updateFileStatus is not available in handleFileComplete');
-    return;
-  }
-
-  // 🚨 PREVENT MULTIPLE UPLOADS - Check if already uploaded or uploading
-  if (fileItem.documentId || fileItem.uploadInProgress === true) {
-    console.log('⏭️ Skipping upload - already processed:', {
-      documentId: fileItem.documentId,
-      uploadInProgress: fileItem.uploadInProgress
-    });
-    return;
-  }
-  
-  // Only upload if file is completed and has extracted text
-  // FHIR data is now already attached to the file during processing! 🎉
-  if (fileItem.status === 'completed' && fileItem.extractedText) {
-    try {
-      // Mark as upload in progress to prevent duplicate calls
-      updateFileStatus(fileItem.id, 'uploading', { uploadInProgress: true });
+  const handleFileComplete = async (fileItem: FileObject): Promise<void> => {
+      console.log('🚨 handleFileComplete called for:', fileItem.name, 'status:', fileItem.status);
       
-      console.log('🚀 Auto-uploading completed file with FHIR data:', fileItem.name);      
-      console.log('🏥 File has FHIR data:', !!fileItem.fhirData);
-      
-      // Upload the file - it now includes both text AND FHIR data! 🎯
-      const uploadResults: UploadResult[] = await uploadFiles([fileItem.id]);
-
-      if (uploadResults && uploadResults[0]?.success) {
-        console.log('✅ File and FHIR data uploaded together successfully!', fileItem.name);
-        
-        updateFileStatus(fileItem.id, 'completed', {
-          documentId: uploadResults[0].documentId,
-          uploadedAt: new Date().toISOString(),
-          uploadInProgress: false // Clear the flag
-        });
-
-        // 🎉 SUCCESS - Both file content and FHIR data are now in Firestore!
-        console.log('🎯 Complete pipeline successful: File → Text → FHIR → Firestore');
-
-      } else {
-        throw new Error('Upload failed - no success result')
+      if (!updateFileStatus) {
+          console.error('❌ updateFileStatus is not available in handleFileComplete');
+          return;
       }
-    } catch (error) {
-      console.error('🔍 Error in handleFileComplete:', error);
-      updateFileStatus(fileItem.id, 'completed', {
-        error: `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        uploadInProgress: false // Clear the flag
+      
+      // 🔧 GET LATEST FILE STATE - The fileItem parameter might be stale!
+      const latestFile = files.find(f => f.id === fileItem.id);
+      if (!latestFile) {
+          console.error('❌ Could not find latest file state for:', fileItem.id);
+          return;
+      }
+      
+      console.log('🔍 Latest file state:', {
+          name: latestFile.name,
+          status: latestFile.status,
+          aiStatus: latestFile.aiProcessingStatus,
+          hasBelroseFields: !!latestFile.belroseFields,
+          belroseFields: latestFile.belroseFields
       });
-    }
-  }
-};
+      
+      // Use shouldAutoUpload with latest file state
+      if (!shouldAutoUpload(latestFile)) {
+          console.log(`⏭️ File not ready for upload: ${latestFile.name}`);
+          console.log(`   Status: ${latestFile.status}, AI Status: ${latestFile.aiProcessingStatus}`);
+          return;
+      }
+      
+      // 🚨 PREVENT MULTIPLE UPLOADS - Enhanced checks
+      if (latestFile.documentId || latestFile.uploadInProgress === true) {
+          console.log('⏭️ Skipping upload - already processed (local check):', {
+              documentId: latestFile.documentId,
+              uploadInProgress: latestFile.uploadInProgress
+          });
+          return;
+      }
+      
+      // Check global state
+      if (savingToFirestore.has(latestFile.id)) {
+          console.log('⏳ Upload already in progress (global check):', latestFile.name);
+          return;
+      }
+      
+      // Check Firestore data
+      const existingData = firestoreData.get(latestFile.id);
+      if (existingData?.documentId) {
+          console.log('⏭️ Skipping upload - already in Firestore:', {
+              documentId: existingData.documentId
+          });
+          return;
+      }
+      
+      // Only upload if file has extracted text
+      if (latestFile.extractedText) {
+          try {
+              // Mark as upload in progress
+              updateFileStatus(latestFile.id, 'uploading', { uploadInProgress: true });
+              
+              console.log('🚀 Auto-uploading completed file with ALL data:', latestFile.name);
+              console.log('🏥 File has FHIR data:', !!latestFile.fhirData);
+              console.log('🤖 AI Status:', latestFile.aiProcessingStatus);
+              console.log('📊 Has BelroseFields:', !!latestFile.belroseFields);
+              console.log('📋 BelroseFields content:', latestFile.belroseFields);
+              
+              // Upload with LATEST file state (including belroseFields!)
+              const uploadResults: UploadResult[] = await uploadFiles([latestFile.id]);
+              
+              if (uploadResults && uploadResults[0]?.success) {
+                  console.log('✅ File with ALL data uploaded successfully!', latestFile.name);
+                  
+                  updateFileStatus(latestFile.id, 'completed', {
+                      documentId: uploadResults[0].documentId,
+                      uploadedAt: new Date().toISOString(),
+                      uploadInProgress: false
+                  });
+                  
+                  // Enhanced success message with AI info
+                  const aiInfo = latestFile.belroseFields?.visitType 
+                      ? `Classified as: ${latestFile.belroseFields.visitType}`
+                      : 'Processing completed';
+                      
+                  toast.success(`🎯 ${latestFile.name} uploaded successfully!`, {
+                      description: aiInfo,
+                      duration: 4000
+                  });
+                  
+                  console.log('🎯 Complete pipeline: File → Text → FHIR → AI → Firebase ✅');
+                  
+              } else {
+                  throw new Error('Upload failed - no success result');
+              }
+          } catch (error) {
+              console.error('🔍 Error in handleFileComplete:', error);
+              updateFileStatus(latestFile.id, 'completed', {
+                  error: `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                  uploadInProgress: false
+              });
+              
+              toast.error(`Failed to upload ${latestFile.name}`, {
+                  description: error instanceof Error ? error.message : 'Upload failed',
+                  duration: 5000
+              });
+          }
+      } else {
+          console.log('ℹ️ File completed without extracted text, skipping upload:', latestFile.name);
+      }
+  };
 
 const handleTextSubmit = async (): Promise<void> => {
   if (!plainText.trim()) return;

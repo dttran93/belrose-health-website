@@ -85,7 +85,7 @@ export function useFileUpload(): UseFileUploadReturn {
         documentType: 'unknown',
         isVirtual: false,
         aiProcessingStatus: 'not_needed' as AIProcessingStatus,
-        belroseAI: undefined,
+        belroseFields: undefined,
     });
 
     // ==================== CORE FILE MANAGEMENT ====================
@@ -168,6 +168,16 @@ export function useFileUpload(): UseFileUploadReturn {
         }
     }, []);
 
+    const updateFirestoreRecord = useCallback(async (fileId: string, data: any) => {
+        try {
+            await fileUploadService.current.updateRecord(fileId, data);
+            setFirestoreData(prev => new Map([...prev, [fileId, { ...prev.get(fileId), ...data }]]));
+        } catch (error: any) {
+            console.error(`❌ Failed to update Firestore record for ${fileId}:`, error);
+            throw error;
+        }
+    }, []);
+
     // ==================== STATUS UPDATES ====================
     
     const updateFileStatus = useCallback((fileId: string, status: FileStatus, additionalData: Partial<FileObject> = {}) => {
@@ -192,44 +202,31 @@ export function useFileUpload(): UseFileUploadReturn {
     const processWithAI = useCallback(async (fileObj: FileObject) => {
         console.log(`🤖 Starting AI processing for: ${fileObj.name}`);
         
-        // Update status to processing
-        updateFileStatus(fileObj.id, fileObj.status, {
-            aiProcessingStatus: 'processing'
-        });
-        
         try {
-            // TODO: Implement your AI service call here
-            // For now, this is a placeholder that you'll replace with your actual AI service
-            const aiResult = await processRecordWithAI(fileObj.fhirData);
-            
-            // Update with AI results
-            updateFileStatus(fileObj.id, fileObj.status, {
-                aiProcessingStatus: 'completed',
-                belroseAI: {
-                    visitType: aiResult.visitType,
-                    title: aiResult.title,
-                    summary: aiResult.summary,
-                    completedDate: aiResult.completedDate,
-                    provider: aiResult.provider,
-                    institution: aiResult.institution,
-                    aiProcessedAt: new Date().toISOString()
-                }
+            // Call AI service
+            const aiResult = await processRecordWithAI(fileObj.fhirData, {
+                fileName: fileObj.name,
+                extractedText: fileObj.extractedText || undefined,
             });
             
-            console.log(`✅ AI processing completed for: ${fileObj.name}`);
+            console.log(`✅ AI processing completed for: ${fileObj.name}`, aiResult);
+            
+            // 🔥 RETURN the result instead of updating status
+            return {
+                success: true,
+                result: aiResult
+            };
             
         } catch (error: any) {
             console.error(`❌ AI processing failed for ${fileObj.name}:`, error);
             
-            updateFileStatus(fileObj.id, fileObj.status, {
-                aiProcessingStatus: 'failed',
-                belroseAI: {
-                    aiFailureReason: error.message,
-                    aiProcessedAt: new Date().toISOString()
-                }
-            });
+            // 🔥 RETURN the error instead of updating status
+            return {
+                success: false,
+                error: error.message
+            };
         }
-    }, [updateFileStatus]);
+    }, []);
 
     const processFile = useCallback(async (fileObj: FileObject): Promise<void> => {
         console.log(`📋 Starting complete processing pipeline for: ${fileObj.name}`);
@@ -239,7 +236,7 @@ export function useFileUpload(): UseFileUploadReturn {
         });
 
         try {
-            // Step 1: Extract text and process document (existing logic)
+            // Step 1: Extract text and process document
             console.log(`📝 Step 1: Extracting text from: ${fileObj.name}`);
             updateFileStatus(fileObj.id, 'processing', {
                 processingStage: 'Extracting text...'
@@ -247,8 +244,14 @@ export function useFileUpload(): UseFileUploadReturn {
             
             const result = await DocumentProcessorService.processDocument(fileObj.file!);
             console.log(`📄 Text extraction complete. Word count: ${result.wordCount}`);
+
+            updateFileStatus(fileObj.id, 'processing', {
+                extractedText: result.extractedText,
+                wordCount: result.wordCount,
+                processingStage: 'Text extraction completed'
+            })
             
-            // Step 2: Try FHIR conversion (existing logic)
+            // Step 2: Try FHIR conversion
             let fhirData = null;
             if (result.extractedText && result.extractedText.trim().length > 0) {
                 console.log(`🩺 Step 2: Attempting FHIR conversion for: ${fileObj.name}`);
@@ -258,47 +261,111 @@ export function useFileUpload(): UseFileUploadReturn {
                 
                 try {
                     const fhirResult = await convertToFHIR(result.extractedText);
-                        console.log('🔍 FHIR result received in useFileManager:', fhirResult);
-                        console.log('🔍 FHIR result type:', typeof fhirResult);
-                        console.log('🔍 FHIR result keys:', Object.keys(fhirResult || {}));
-                    if (fhirResult && fhirResult.resourceType ==='Bundle') {
+                    console.log('🔍 FHIR result received:', fhirResult);
+                    
+                    if (fhirResult && fhirResult.resourceType === 'Bundle') {
                         fhirData = fhirResult;
                         console.log(`✅ FHIR conversion successful for: ${fileObj.name}`);
-                        
-                        // NEW: Step 3: AI Processing if FHIR data exists
-                        console.log(`🤖 Step 3: Starting AI processing for: ${fileObj.name}`);
-                        updateFileStatus(fileObj.id, 'processing', {
-                            processingStage: 'AI processing...',
+                    
+                        updateFileStatus(fileObj.id, 'processing',{
                             fhirData: fhirData,
+                            processingStage: 'FHIR conversion complete',
                             aiProcessingStatus: 'pending'
-                        });
-                        
-                        // Trigger AI processing in the background
-                        const updatedFileObj = { ...fileObj, fhirData };
-                        processWithAI(updatedFileObj).catch(error => {
-                            console.error('AI processing failed:', error);
-                        });
+                        })
+                    
                     } else {
                         console.log(`ℹ️ FHIR conversion failed for: ${fileObj.name}, continuing without FHIR data`);
                     }
                 } catch (fhirError: any) {
-                     console.error(`💥 FHIR conversion error in useFileManager:`, fhirError);
+                    console.error(`💥 FHIR conversion error:`, fhirError);
                     console.warn(`⚠️ FHIR conversion failed for ${fileObj.name}:`, fhirError.message);
                 }
             } else {
                 console.log(`ℹ️ No text extracted from: ${fileObj.name}, skipping FHIR conversion`);
             }
 
-            // Step 4: Complete processing
-            console.log(`✅ Marking file as completed: ${fileObj.name}. FHIR data exists: ${!!fhirData}`);
+            // Step 3: Update file with basic processing results (but don't set AI stage yet)
+            if (!fhirData){
+                updateFileStatus(fileObj.id, 'processing', {
+                processingStage: 'Completing...',
+                aiProcessingStatus: 'not_needed'
+            });
+            } 
+
+            // Step 4: AI Processing (if FHIR data exists)
+            let belroseFields = undefined;
+            if (fhirData) {
+                console.log(`🤖 Step 4: Starting AI processing for: ${fileObj.name}`);
+                
+                // Update to AI processing stage
+                updateFileStatus(fileObj.id, 'processing', {
+                    aiProcessingStatus: 'processing',
+                    processingStage: 'AI analyzing content...'
+                });
+                
+                try {
+                    // Create updated file object with all the processed data
+                    const updatedFileObj: FileObject = {
+                        ...fileObj,
+                        extractedText: result.extractedText,
+                        wordCount: result.wordCount,
+                        fhirData: fhirData,
+                        status: 'processing',
+                        aiProcessingStatus: 'processing'
+                    };
+                    
+                    // 🔥 Call AI processing and wait for the result
+                    const aiResult = await processRecordWithAI(updatedFileObj.fhirData, {
+                        fileName: updatedFileObj.name,
+                        extractedText: updatedFileObj.extractedText || undefined,
+                    });
+                    
+                    belroseFields = {
+                        visitType: aiResult.visitType,
+                        title: aiResult.title,
+                        summary: aiResult.summary,
+                        completedDate: aiResult.completedDate,
+                        provider: aiResult.provider,
+                        institution: aiResult.institution,
+                        aiProcessedAt: new Date().toISOString()
+                    };
+                    
+                    console.log(`✅ AI processing completed for: ${fileObj.name}`, aiResult);
+                    
+                    // Show success toast
+                    toast.success(`🤖 AI analysis completed for ${fileObj.name}`, {
+                        description: `Classified as: ${aiResult.visitType}`,
+                        duration: 3000
+                    });
+                    
+                } catch (error: any) {
+                    console.error(`❌ AI processing failed for ${fileObj.name}:`, error);
+                    
+                    belroseFields = {
+                        aiFailureReason: error.message,
+                        aiProcessedAt: new Date().toISOString()
+                    };
+                    
+                    // Show error toast
+                    toast.error(`AI analysis failed for ${fileObj.name}`, {
+                        description: error.message,
+                        duration: 5000
+                    });
+                }
+            } else {
+                // No AI processing needed - update the processing stage to indicate completion
+                updateFileStatus(fileObj.id, 'processing', {
+                    processingStage: 'Completing...'
+                });
+            }
+            
+            // 🎉 FINAL STEP: Mark as completed with ALL data including AI results
+            console.log(`🎉 Marking file as completed: ${fileObj.name}`);
             updateFileStatus(fileObj.id, 'completed', {
-                extractedText: result.extractedText,
-                wordCount: result.wordCount,
-                fhirData: fhirData,
                 processingStage: undefined,
                 processedAt: new Date().toISOString(),
-                // Keep existing AI status if already set
-                aiProcessingStatus: fhirData ? 'pending' : 'not_needed'
+                aiProcessingStatus: fhirData ? (belroseFields?.aiFailureReason ? 'failed' : 'completed') : 'not_needed',
+                belroseFields: belroseFields
             });
             
             console.log(`🎉 Complete processing pipeline finished for: ${fileObj.name}`);
@@ -311,7 +378,24 @@ export function useFileUpload(): UseFileUploadReturn {
                 aiProcessingStatus: 'not_needed'
             });
         }
-    }, [updateFileStatus, processWithAI]);
+    }, [updateFileStatus]);
+
+    // Also add this helper function to prevent auto-upload during processing
+    const shouldAutoUpload = useCallback((file: FileObject): boolean => {
+        const fileCompleted = file.status === 'completed';
+        const aiStatus = file.aiProcessingStatus || 'not_needed';
+        const needsAI = !!file.fhirData;
+        
+        if (!needsAI) {
+            return fileCompleted && aiStatus === 'not_needed';
+        }
+        
+        // 🔥 KEY: If FHIR data exists, require belroseFields
+        const hasBelroseFields = !!file.belroseFields && Object.keys(file.belroseFields).length > 0;
+        const aiCompleted = aiStatus === 'completed';
+        
+        return fileCompleted && aiCompleted && hasBelroseFields;
+    }, []);
 
     // ================ FILE DELETION =========================
 
@@ -547,16 +631,6 @@ export function useFileUpload(): UseFileUploadReturn {
         return results;
     }, [files, savingToFirestore, updateFileStatus]);
 
-    const updateFirestoreRecord = useCallback(async (fileId: string, data: any) => {
-        try {
-            await fileUploadService.current.updateRecord(fileId, data);
-            setFirestoreData(prev => new Map([...prev, [fileId, { ...prev.get(fileId), ...data }]]));
-        } catch (error: any) {
-            console.error(`❌ Failed to update Firestore record for ${fileId}:`, error);
-            throw error;
-        }
-    }, []);
-
     // ==================== VIRTUAL FILE SUPPORT ====================
     
     const addVirtualFile = useCallback((virtualData: VirtualFileData): string => {
@@ -748,7 +822,10 @@ export function useFileUpload(): UseFileUploadReturn {
         // Firestore operations
         uploadFiles,
         updateFirestoreRecord,
-        
+
+        //Helper function
+        shouldAutoUpload,
+
         // Computed values
         getStats,
         savedToFirestoreCount: firestoreData.size,

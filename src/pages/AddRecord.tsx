@@ -72,6 +72,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
         savingCount,
         addFhirAsVirtualFile, 
         setFHIRConversionCallback,
+        shouldAutoUpload,
         reset: resetFileUpload
     } = useFileUpload();
 
@@ -179,6 +180,9 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
                     fhirData={fhirData}
                     onFHIRConverted={handleFHIRConverted}
                     convertTextToFHIR={convertToFHIR}
+                    shouldAutoUpload={shouldAutoUpload}
+                    savingToFirestore={savingToFirestore}
+                    firestoreData={firestoreData}
                 />
 
             </div>

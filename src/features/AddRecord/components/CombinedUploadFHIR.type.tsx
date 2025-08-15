@@ -82,7 +82,9 @@ export interface CombinedUploadFHIRProps {
   // Updated: Hook takes fileIds array, returns Promise<void>
   // Component should extract IDs from files and rely on state updates
   uploadFiles: (fileIds?: string[]) => Promise<UploadResult[]>;
-
+  shouldAutoUpload: (file:FileObject) => boolean;
+  savingToFirestore: Set<string>;
+  firestoreData: Map<string, any>;
   
   // 🔥 ADD FHIR PROPS
   fhirData?: Map<string, FHIRWithValidation>

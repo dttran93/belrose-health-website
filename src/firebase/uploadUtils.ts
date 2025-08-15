@@ -51,6 +51,17 @@ export interface FileMetadata {
   virtualFileType?: string;
   fhirData?: any;
   originalText?: string;
+  belroseFields?: {
+    visitType?: string;
+    title?: string;
+    summary?: string;
+    completedDate?: string;
+    provider?: string;
+    institution?: string;
+    aiProcessedAt?: string;
+    aiFailureReason?: string;
+  };
+  aiProcessingStatus?: 'pending' | 'processing' | 'completed' | 'failed' | 'not_needed';
 }
 
 export interface UploadFileCompleteResult {
@@ -183,10 +194,19 @@ export async function saveFileMetadataToFirestore({ downloadURL, filePath, fileO
     if (fileObj.originalText) {
       documentData.originalText = fileObj.originalText;
     }
+    if (fileObj.belroseFields) {
+      documentData.belroseFields = fileObj.belroseFields;
+      console.log('✅ Adding belroseFields to Firestore:', fileObj.belroseFields);
+    }
+    if (fileObj.aiProcessingStatus) {
+      documentData.aiProcessingStatus = fileObj.aiProcessingStatus;
+      console.log('✅ Adding aiProcessingStatus to Firestore:', fileObj.aiProcessingStatus);
+    }
 
     const docRef: DocumentReference = await addDoc(collection(db, "users", user.uid, "files"), documentData);
 
     return docRef.id; // Return the document ID for reference
+
   } catch (error: any) {
     console.error("Error saving file metadata:", error);
     throw new Error(`Failed to save file metadata: ${error.message}`);
