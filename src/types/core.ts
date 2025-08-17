@@ -43,6 +43,10 @@ export interface FileObject {
   lastModified?: number; //Filetracking for UI state management. Can probably be deleted
   isVirtual?: boolean; //for virtual files
   fhirData?: any;
+  downloadURL?: string;
+  fileName?: string;
+  fileType?: string;
+  fileSize?: number;
   [key: string]: any;
 
   //For AI enrichedFields

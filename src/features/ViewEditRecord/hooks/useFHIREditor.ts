@@ -1,4 +1,3 @@
-// src/features/EditRecord/hooks/useFHIREditor.ts
 import { useState, useEffect } from 'react';
 import { 
   doc, 
@@ -17,34 +16,7 @@ import { db } from '@/firebase/config';
 import { FHIRBundle } from '@/types/fhir';
 import { FileObject } from '@/types/core';
 import { UseFhirEditorReturn, UseFhirEditSaverReturn, UseFhirRecordsListReturn, UserId, FileId } from './useFHIREditor.types'
-
-/**
- * Utility function to map Firestore data to FileObject
- * This is where we handle the data boundary conversion
- */
-const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject => {
-  return {
-    id: docId,
-    name: data.fileName || data.name || 'Unknown File',
-    size: data.fileSize || 0,
-    type: data.fileType || 'unknown',
-    status: 'completed', // Files with FHIR data are completed
-    lastModified: data.createdAt?.toMillis() || data.uploadedAt?.toMillis() || Date.now(),
-    
-    // Copy over all the app-specific fields
-    fhirData: data.fhirData,
-    documentType: data.documentType,
-    extractedText: data.extractedText,
-    wordCount: data.wordCount,
-    fileHash: data.fileHash,
-    isVirtual: data.isVirtual,
-    
-    // Edit tracking (extend FileObject as needed)
-    editedByUser: data.editedByUser || false,
-    lastEditedAt: data.lastEditedAt,
-    lastEditDescription: data.lastEditDescription
-  } as FileObject;
-};
+import mapFirestoreToFileObject from '@/features/ViewEditRecord/utils/firestoreMapping';
 
 /**
  * Hook to read and edit existing FHIR data from Firestore
@@ -82,7 +54,7 @@ export const useFhirEditor = (userId: UserId, fileId: FileId): UseFhirEditorRetu
         setLoading(false);
       },
       (err: Error) => {
-        console.error('❌ Error listening to FHIR document:', err);
+        console.error('Error listening to FHIR document:', err);
         setError(err);
         setLoading(false);
       }
@@ -129,9 +101,9 @@ export const useFhirEditSaver = (): UseFhirEditSaverReturn => {
         editedByUser: true
       });
 
-      console.log('✅ FHIR edits saved successfully');
+      console.log('FHIR edits saved successfully');
     } catch (err) {
-      console.error('❌ Error saving FHIR edits:', err);
+      console.error('Error saving FHIR edits:', err);
       const error = err instanceof Error ? err : new Error('Unknown error saving FHIR edits');
       setError(error);
       throw error;
@@ -165,7 +137,7 @@ export const useFhirRecordsList = (userId: UserId): UseFhirRecordsListReturn => 
         
         const snapshot: QuerySnapshot<DocumentData> = await getDocs(q);
         
-        // Map each Firestore document to FileObject format
+        // Map each Firestore document to FileObject format using shared function
         const recordsList: FileObject[] = snapshot.docs.map(doc => 
           mapFirestoreToFileObject(doc.id, doc.data())
         );
@@ -173,7 +145,7 @@ export const useFhirRecordsList = (userId: UserId): UseFhirRecordsListReturn => 
         setRecords(recordsList);
         setError(null);
       } catch (err) {
-        console.error('❌ Error fetching FHIR records:', err);
+        console.error('Error fetching FHIR records:', err);
         const error = err instanceof Error ? err : new Error('Unknown error fetching records');
         setError(error);
       } finally {

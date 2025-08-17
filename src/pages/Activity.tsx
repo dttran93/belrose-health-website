@@ -11,8 +11,8 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { HealthRecordCard } from '@/features/ViewEditRecord/components/ui/HealthRecordCard';
-import HealthRecordFull from '@/features/ViewEditRecord/components/ui/HealthRecordFull';
-import { useCompleteRecords } from '@/features/ViewEditRecord/hooks/useCompleteRecords';
+import HealthRecordFull from '@/features/ViewEditRecord/components/HealthRecordFull';
+import { useCompleteRecords } from '@/features/ViewEditRecord/hooks/useAllUserRecords';
 import { useAuthContext } from '@/components/auth/AuthContext';
 import { FileObject } from '@/types/core';
 
