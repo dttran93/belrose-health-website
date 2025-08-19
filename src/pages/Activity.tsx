@@ -218,12 +218,6 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
               </option>
             ))}
           </select>
-
-          {/* View Mode Toggle */}
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
-            <List className="w-4 h-4" />
-            <span>List View</span>
-          </div>
         </div>
 
         {/* Results Summary */}

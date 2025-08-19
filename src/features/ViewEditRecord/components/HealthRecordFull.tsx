@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { X, Share2, ClipboardPlus, Code, FileInput, } from 'lucide-react';
+import { X, Share2, ClipboardPlus, Code, FileInput, Ellipsis, } from 'lucide-react';
 import { FileObject } from '@/types/core';
 import { TabNavigation } from "@/features/AddRecord/components/ui/TabNavigation";
 import HealthRecord from "@/features/ViewEditRecord/components/ui/HealthRecord";
+import HealthRecordMenu from "./ui/HealthRecordMenu";
 
 type TabType = 'record' | 'data' | 'original';
 
@@ -36,7 +37,14 @@ const tabs = [
   }
 ];
 
-export const HealthRecordFull: React.FC<HealthRecordFullProps> = ({record}) => {
+export const HealthRecordFull: React.FC<HealthRecordFullProps> = ({
+  record,
+  onEdit,
+  onDownload,
+  onShare,
+  onDelete,
+  onBack,
+}) => {
 
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('record');
@@ -44,7 +52,13 @@ export const HealthRecordFull: React.FC<HealthRecordFullProps> = ({record}) => {
     setActiveTab(tabId as TabType);
   }
 
-    // Debug information
+  const handleExit = () => {
+    if (onBack) {
+      onBack(record);
+    }
+  };
+
+  // Debug information
   console.log('🔍 Debug Record Data:', {
     hasDownloadURL: !!record.downloadURL,
     downloadURL: record.downloadURL,
@@ -62,17 +76,20 @@ export const HealthRecordFull: React.FC<HealthRecordFullProps> = ({record}) => {
             <h1 className="text-2xl font-bold">{record.belroseFields?.title}</h1>
             <p className="mt-1 text-sm">{record.belroseFields?.completedDate} • {record.belroseFields?.provider} • {record.belroseFields?.institution}</p>
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-1">
             <span className="px-3 py-1 bg-red-500/20 text-red-100 rounded-full text-sm font-medium">
               Self Reported
             </span>
-            <Button variant="default">
-              <Share2 className="w-5 h-5" />
-            </Button>
-            <Button variant="outline" className="px-4 py-2 rounded-lg font-medium hover:bg-gray-50">
-              Edit Record
-            </Button>
-            <Button variant="outline" className="px-4 py-2 bg-white rounded-lg font-medium hover:bg-gray-50">
+            <HealthRecordMenu 
+              record={record}
+              triggerIcon={Ellipsis}
+              showView={false}         // No view option (already viewing)
+              triggerClassName="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
+            />
+            <Button 
+              variant="default" 
+              className="w-6 h-6 hover:bg-white/10"
+              onClick={handleExit}>
               <X className="w-5 h-5"/>
             </Button>
           </div>
