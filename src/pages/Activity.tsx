@@ -10,8 +10,8 @@ import {
   Eye,
   ArrowLeft
 } from 'lucide-react';
-import { HealthRecordCard } from '@/features/ViewEditRecord/components/ui/HealthRecordCard';
-import HealthRecordFull from '@/features/ViewEditRecord/components/HealthRecordFull';
+import { HealthRecordCard } from '@/features/ViewEditRecord/components/ui/RecordCard';
+import HealthRecordFull from '@/features/ViewEditRecord/components/RecordFull';
 import { useCompleteRecords } from '@/features/ViewEditRecord/hooks/useAllUserRecords';
 import { useAuthContext } from '@/components/auth/AuthContext';
 import { FileObject } from '@/types/core';

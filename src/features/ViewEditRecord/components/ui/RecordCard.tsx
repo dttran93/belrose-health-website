@@ -4,10 +4,12 @@ import {
   Edit, 
   Eye,
   User,
-  Hospital, 
+  Hospital,
+  Ellipsis 
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { FileObject } from '@/types/core';
+import HealthRecordMenu from '@/features/ViewEditRecord/components/ui/RecordMenu'
 
 interface HealthRecordCardProps {
   record: FileObject;
@@ -84,9 +86,17 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
               {getFileExtension(displayName)}
             </span>
           </div>
+          <div className='flex'>
           <div className="bg-red-100 text-red-800 border-red-200 rounded-full text-xs px-2 py-1">
             Self-Reported
           </div>
+          <HealthRecordMenu 
+              record={record}
+              triggerIcon={Ellipsis}
+              showView={true}
+              triggerClassName="mx-1 p-2 rounded-3xl hover:bg-gray-100"
+           />
+           </div>
         </div>
 
         {/* Document Name */}

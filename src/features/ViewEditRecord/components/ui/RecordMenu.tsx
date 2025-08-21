@@ -64,7 +64,6 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
   onEdit,
   onShare,
   onDelete,
-  onArchive,
   onView,
   triggerIcon: TriggerIcon = MoreHorizontal,
   triggerClassName = "p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors",
@@ -74,7 +73,6 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
   showDownload = true,
   showCopy = true,
   showView = false, // Usually false for full view, true for cards
-  showArchive = true,
   showDelete = true,
   additionalItems = []
 }) => {
@@ -195,18 +193,8 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
     }
 
     // Add divider before destructive actions if we have any non-destructive items
-    if (items.length > 0 && (showArchive || showDelete)) {
+    if (items.length > 0 && ( showDelete)) {
       items.push({ type: 'divider', key: 'divider-1' });
-    }
-
-    // Archive action
-    if (showArchive && onArchive) {
-      items.push({
-        key: 'archive',
-        label: 'Archive Record',
-        icon: Archive,
-        onClick: createHandler(onArchive)
-      });
     }
 
     // Delete action
