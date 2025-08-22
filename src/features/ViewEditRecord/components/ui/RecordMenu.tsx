@@ -61,10 +61,10 @@ interface HealthRecordMenuProps {
 
 const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
   record,
+  onView,
   onEdit,
   onShare,
   onDelete,
-  onView,
   triggerIcon: TriggerIcon = MoreHorizontal,
   triggerClassName = "p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors",
   menuClassName = "absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[160px]",

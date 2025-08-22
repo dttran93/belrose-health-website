@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { X, Share2, ClipboardPlus, Code, FileInput, Ellipsis, Edit3, Save } from 'lucide-react';
+import { X, Share2, ClipboardPlus, Code, FileInput, Ellipsis } from 'lucide-react';
 import { FileObject } from '@/types/core';
 import { TabNavigation } from "@/features/AddRecord/components/ui/TabNavigation";
 import HealthRecord from "@/features/ViewEditRecord/components/ui/Record";
 import HealthRecordMenu from "./ui/RecordMenu";
-import EditRecord from "@/features/ViewEditRecord/components/ui/EditRecord";
 
 type TabType = 'record' | 'data' | 'original';
 
@@ -51,11 +50,12 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
 
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('record');
-
-  //Edit mode state
-  const [isEditMode, setIsEditMode ] = useState(false);
-  const [editedRecord, setEditedRecord] = useState(record);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  
+  const handleEnterEditMode = () => {
+    setIsEditMode(true);
+  }
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId as TabType);
@@ -72,43 +72,25 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
     }
   };
 
-   const handleEnterEditMode = () => {
-    setIsEditMode(true);
-    setEditedRecord(record); // Reset to original data
-    setHasUnsavedChanges(false);
-  };
-
-  const handleExitEditMode = () => {
-    if (hasUnsavedChanges) {
-      const confirmExit = window.confirm("You have unsaved changes. Are you sure you want to cancel editing?");
-      if (!confirmExit) return;
-    }
-    
-    setIsEditMode(false);
-    setEditedRecord(record);
-    setHasUnsavedChanges(false);
-  };
-
-  const handleSaveEdits = () => {
-    // Call the parent save handler if provided
-    if (onSave) {
-      onSave(editedRecord);
-    }
-    
-    // Exit edit mode
-    setIsEditMode(false);
-    setHasUnsavedChanges(false);
-    
-    console.log('✅ Record saved:', editedRecord);
-  };
-
-  const handleRecordChange = (updatedFhirData: any) => {
+  const handleSaveRecord = (updatedFhirData: any) => {
     const updatedRecord = {
-      ...editedRecord,
+      ...record,
       fhirData: updatedFhirData
     };
-    setEditedRecord(updatedRecord);
-    setHasUnsavedChanges(true);
+    
+    // Call the parent save handler if provided
+    if (onSave) {
+      onSave(updatedRecord);
+    }
+    
+    setIsEditMode(false);
+    setHasUnsavedChanges(false);
+    console.log('✅ Record saved:', updatedRecord);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setHasUnsavedChanges(false);
   };
 
   // Debug information
@@ -128,12 +110,6 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
           <div className="flex items-center space-x-4 text-white">
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold">{record.belroseFields?.title}</h1>
-              {/* NEW: Edit mode indicator */}
-              {isEditMode && (
-                <span className="px-2 py-1 bg-amber-500/20 text-amber-100 rounded-full text-xs font-medium">
-                  Editing
-                </span>
-              )}
               {hasUnsavedChanges && (
                 <span className="px-2 py-1 bg-red-500/20 text-red-100 rounded-full text-xs font-medium">
                   Unsaved Changes
@@ -147,13 +123,13 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
             <span className="px-3 py-1 bg-red-500/20 text-red-100 rounded-full text-sm font-medium">
               Self Reported
             </span>
-                <HealthRecordMenu 
-                  record={record}
-                  triggerIcon={Ellipsis}
-                  showView={false}         // No view option (already viewing)
-                  triggerClassName="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
-                  onEdit={handleEnterEditMode}
-                />
+            <HealthRecordMenu 
+              record={record}
+              triggerIcon={Ellipsis}
+              showView={false}         // No view option (already viewing)
+              triggerClassName="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
+              onEdit={handleEnterEditMode}
+            />
             <Button 
               variant="default" 
               className="w-6 h-6 hover:bg-white/10"
@@ -178,16 +154,13 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
         {/* Tab Content */}
         {activeTab === "record" && (
           <div className="space-y-6">
-            {/* NEW: Conditional rendering based on edit mode */}
-            {isEditMode ? (
-              <EditRecord 
-                fhirData={editedRecord.fhirData}
-                onSave={handleRecordChange}
-                onCancel={handleExitEditMode}
-              />
-            ) : (
-              <HealthRecord fhirData={record.fhirData}/>
-            )}
+            {/* Simplified: Single HealthRecord component with edit capabilities */}
+            <HealthRecord 
+              fhirData={record.fhirData}
+              onSave={handleSaveRecord}
+              onCancel={handleCancelEdit}
+              editable={isEditMode}
+            />
           </div>
         )}
 
@@ -196,31 +169,24 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-900">FHIR Data</h2>
-              {/* NEW: Edit mode note */}
-              {isEditMode && (
-                <span className="text-sm text-amber-600 font-medium">
-                  ⚡ Viewing edited data (unsaved)
-                </span>
-              )}
             </div>
             <div className="bg-gray-50 rounded-lg p-4 border">
-              {/* NEW: Show edited data in edit mode */}
-              {(isEditMode ? editedRecord.fhirData : record.fhirData) ? (
+              {record.fhirData ? (
                 <div>
                   <div className="flex justify-between items-center mb-4 pb-2 border-b">
                     <span className="text-sm font-medium text-gray-600">
-                      {(isEditMode ? editedRecord.fhirData : record.fhirData).type} Bundle • {(isEditMode ? editedRecord.fhirData : record.fhirData).entry?.length || 0} entries
+                      {record.fhirData.type} Bundle • {record.fhirData.entry?.length || 0} entries
                     </span>
                     <Button
                       variant="outline"
-                      onClick={() => navigator.clipboard.writeText(JSON.stringify((isEditMode ? editedRecord.fhirData : record.fhirData), null, 2))}
+                      onClick={() => navigator.clipboard.writeText(JSON.stringify(record.fhirData, null, 2))}
                       className="text-xs px-2 py-1 rounded"
                     >
                       Copy JSON
                     </Button>
                   </div>
                   <pre className="text-sm text-gray-800 overflow-x-auto whitespace-pre-wrap max-h-96 overflow-y-auto">
-                    {JSON.stringify((isEditMode ? editedRecord.fhirData : record.fhirData), null, 2)}
+                    {JSON.stringify(record.fhirData, null, 2)}
                   </pre>
                 </div>
               ) : (<p className="text-gray-600">No FHIR data available</p>)}

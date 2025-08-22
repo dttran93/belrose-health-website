@@ -1,31 +1,193 @@
-import React from 'react';
-import { FHIRResourceCardProps, HealthRecordProps } from '@/features/ViewEditRecord/components/ui/HealthRecord.types'
+import React, { useState } from 'react';
+import { Save, X, Edit2, Plus, Minus } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { FHIRResourceCardProps, HealthRecordProps, EditFHIRFieldProps } from '@/features/ViewEditRecord/components/ui/Record.types'
+
+// Smart input type detection utility
+const getInputType = (value: any, label: string): string => {
+  if (typeof value === 'boolean') return 'checkbox';
+  if (typeof value === 'number') return 'number';
+  
+  const stringValue = String(value || '');
+  
+  // Large text detection
+  if (stringValue.includes('\n') || stringValue.length > 100) return 'textarea';
+  
+  // Date detection
+  if (stringValue.match(/^\d{4}-\d{2}-\d{2}$/)) return 'date';
+  if (stringValue.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) return 'datetime-local';
+  
+  // Field name hints for dates
+  const fieldNameLower = label.toLowerCase();
+  if (fieldNameLower.includes('date') || 
+      fieldNameLower.includes('birth') || 
+      fieldNameLower.includes('time') ||
+      fieldNameLower.includes('effective')) {
+    const parsedDate = new Date(stringValue);
+    if (!isNaN(parsedDate.getTime()) && stringValue.length > 8) {
+      return stringValue.includes('T') ? 'datetime-local' : 'date';
+    }
+  }
+  
+  // Other type detection
+  if (stringValue.includes('@') && stringValue.includes('.')) return 'email';
+  if (stringValue.startsWith('http://') || stringValue.startsWith('https://')) return 'url';
+  if (stringValue.match(/^\+?[\d\s\-\(\)]{10,}$/)) return 'tel';
+  
+  return 'text';
+};
 
 // Recursive field renderer that handles nested objects and arrays
-const FHIRField = ({ label, value, depth = 0 }: { label: string; value: any; depth?: number }) => {
-  if (value === null || value === undefined) return null;
+const FHIRField: React.FC<EditFHIRFieldProps> = ({ 
+  label, 
+  value, 
+  depth = 0, 
+  editable = false,
+  onChange,
+  onDelete,
+  canDelete = false,
+  path = ''
+}) => {
+    
+  // Helper to update nested values
+  const updateNestedValue = (key: string, newValue: any) => {
+    if (!onChange) return;
+    
+    if (Array.isArray(value)) {
+      const newArray = [...value];
+      newArray[parseInt(key)] = newValue;
+      onChange(newArray);
+    } else if (typeof value === 'object' && value !== null) {
+      onChange({ ...value, [key]: newValue });
+    }
+  };
+
+  // Helper to delete nested values
+  const deleteNestedValue = (key: string) => {
+    if (!onChange) return;
+    
+    if (Array.isArray(value)) {
+      const newArray = value.filter((_, index) => index !== parseInt(key));
+      onChange(newArray);
+    } else if (typeof value === 'object' && value !== null) {
+      const newObj = { ...value };
+      delete newObj[key];
+      onChange(newObj);
+    }
+  };
+
+  // Helper to add new items
+  const addNewItem = () => {
+    if (!onChange) return;
+    
+    if (Array.isArray(value)) {
+      onChange([...value, '']);
+    } else if (typeof value === 'object' && value !== null) {
+      const newKey = `newField${Object.keys(value).length + 1}`;
+      onChange({ ...value, [newKey]: '' });
+    }
+  };
 
   const renderNestedContent = (content: any, currentDepth: number) => {
     if (content === null || content === undefined) {
+      if (editable) {
+        return (
+          <input
+            type="text"
+            value=""
+            onChange={(e) => onChange?.(e.target.value || null)}
+            placeholder="Enter value..."
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        );
+      }
       return <span className="text-sm text-gray-500 italic">N/A</span>;
     }
     
     if (Array.isArray(content)) {
       if (content.length === 0) {
+        if (editable) {
+          return (
+            <div className="bg-gray-50 border border-gray-200 rounded p-3 mt-2 w-full">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500 italic">Empty array</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addNewItem}
+                  className="px-2 py-1 text-xs"
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add Item
+                </Button>
+              </div>
+            </div>
+          );
+        }
         return <span className="text-sm text-gray-500 italic">Empty array</span>;
       }
       
       // FLATTEN: If array has only 1 item and it's an object, render the object directly
       if (content.length === 1 && typeof content[0] === 'object' && content[0] !== null) {
-        return renderNestedContent(content[0], currentDepth);
+        return (
+          <div className="bg-gray-50 border border-gray-200 rounded p-3 mt-2 w-full">
+            {editable && (
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-600 font-medium">Single Item Array</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addNewItem}
+                  className="px-2 py-1 text-xs"
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add Item
+                </Button>
+              </div>
+            )}
+            <FHIRField
+              label="item"
+              value={content[0]}
+              depth={currentDepth + 1}
+              editable={editable}
+              onChange={editable ? (newValue) => updateNestedValue('0', newValue) : undefined}
+              onDelete={editable ? () => deleteNestedValue('0') : undefined}
+              canDelete={editable}
+              path={`${path}[0]`}
+            />
+          </div>
+        );
       }
       
       return (
         <div className="bg-gray-50 border border-gray-200 rounded p-3 mt-2 w-full">
-          <div>
+          {editable && (
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-600 font-medium">Array ({content.length} items)</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addNewItem}
+                className="px-2 py-1 text-xs"
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Add Item
+              </Button>
+            </div>
+          )}
+          <div className="space-y-2">
             {content.map((item, index) => (
-              <div key={index} className="text-right">
-                {renderNestedContent(item, currentDepth + 1)}
+              <div key={index} className={editable ? "border-l-2 border-blue-200 pl-3" : ""}>
+                <FHIRField
+                  label={`[${index}]`}
+                  value={item}
+                  depth={currentDepth + 1}
+                  editable={editable}
+                  onChange={editable ? (newValue) => updateNestedValue(index.toString(), newValue) : undefined}
+                  onDelete={editable ? () => deleteNestedValue(index.toString()) : undefined}
+                  canDelete={editable}
+                  path={`${path}[${index}]`}
+                />
               </div>
             ))}
           </div>
@@ -36,11 +198,43 @@ const FHIRField = ({ label, value, depth = 0 }: { label: string; value: any; dep
     if (typeof content === 'object') {
       const entries = Object.entries(content);
       if (entries.length === 0) {
+        if (editable) {
+          return (
+            <div className="bg-gray-50 border border-gray-200 rounded p-3 mt-2 w-full">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500 italic">Empty object</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addNewItem}
+                  className="px-2 py-1 text-xs"
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add Field
+                </Button>
+              </div>
+            </div>
+          );
+        }
         return <span className="text-sm text-gray-500 italic">Empty object</span>;
       }
       
       return (
         <div className="bg-gray-50 border border-gray-200 rounded p-3 mt-2 w-full">
+          {editable && (
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-600 font-medium">Object ({entries.length} fields)</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addNewItem}
+                className="px-2 py-1 text-xs"
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Add Field
+              </Button>
+            </div>
+          )}
           <div className="">
             {entries.map(([key, val]) => (
               <FHIRField 
@@ -48,6 +242,11 @@ const FHIRField = ({ label, value, depth = 0 }: { label: string; value: any; dep
                 label={key} 
                 value={val} 
                 depth={currentDepth + 1}
+                editable={editable}
+                onChange={editable ? (newValue) => updateNestedValue(key, newValue) : undefined}
+                onDelete={editable ? () => deleteNestedValue(key) : undefined}
+                canDelete={editable && key !== 'resourceType'} // Protect resourceType
+                path={path ? `${path}.${key}` : key}
               />
             ))}
           </div>
@@ -56,11 +255,95 @@ const FHIRField = ({ label, value, depth = 0 }: { label: string; value: any; dep
     }
     
     // Primitive values (string, number, boolean)
-    return (
-      <span className="text-sm text-gray-900">
-        {String(content)}
-      </span>
-    );
+    if (editable) {
+      const inputType = getInputType(content, label);
+      const primitiveValue = content != null ? String(content) : '';
+
+      if (inputType === 'checkbox') {
+        return (
+          <input
+            type="checkbox"
+            checked={Boolean(content)}
+            onChange={(e) => onChange?.(e.target.checked)}
+            className="rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+          />
+        );
+      }
+
+      if (inputType === 'textarea') {
+        return (
+          <textarea
+            value={primitiveValue}
+            onChange={(e) => onChange?.(e.target.value)}
+            rows={3}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          />
+        );
+      }
+
+      if (inputType === 'date' || inputType === 'datetime-local') {
+        let dateValue = '';
+        if (primitiveValue && primitiveValue !== 'undefined') {
+          try {
+            const date = new Date(primitiveValue);
+            if (!isNaN(date.getTime())) {
+              if (inputType === 'date') {
+                dateValue = date.toISOString().split('T')[0] ?? '';
+              } else {
+                const isoString = date.toISOString();
+                dateValue = isoString.slice(0, 16) ?? '';
+              }
+            }
+          } catch (e) {
+            console.warn('Could not parse date:', primitiveValue);
+          }
+        }
+        
+        return (
+          <input
+            type={inputType}
+            value={dateValue}
+            onChange={(e) => {
+              const newValue = e.target.value;
+              if (newValue) {
+                const date = new Date(newValue);
+                if (!isNaN(date.getTime())) {
+                  if (primitiveValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                    onChange?.(date.toISOString().split('T')[0]);
+                  } else if (primitiveValue.includes('T')) {
+                    onChange?.(date.toISOString());
+                  } else {
+                    onChange?.(date.toLocaleDateString('en-CA'));
+                  }
+                } else {
+                  onChange?.(newValue);
+                }
+              } else {
+                onChange?.('');
+              }
+            }}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        );
+      }
+
+      // Default text input
+      return (
+        <input
+          type={inputType}
+          value={primitiveValue}
+          onChange={(e) => onChange?.(e.target.value)}
+          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      );
+    } else {
+      // View mode - original display logic
+      return (
+        <span className="text-sm text-gray-900">
+          {String(content)}
+        </span>
+      );
+    }
   };
 
   // Check if content will render as a nested box (array or object)
@@ -68,32 +351,43 @@ const FHIRField = ({ label, value, depth = 0 }: { label: string; value: any; dep
     if (content === null || content === undefined) return false;
     
     if (Array.isArray(content)) {
-      if (content.length === 0) return false;
-      // Check if it will flatten to an object
+      if (content.length === 0) return editable; // Show box in edit mode for adding items
       if (content.length === 1 && typeof content[0] === 'object' && content[0] !== null) {
-        return willRenderAsBox(content[0]);
+        return true;
       }
-      return true; // Multi-item arrays render as boxes
+      return true;
     }
     
     if (typeof content === 'object') {
       const entries = Object.entries(content);
-      return entries.length > 0; // Non-empty objects render as boxes
+      return entries.length > 0 || editable; // Show box in edit mode for adding fields
     }
     
-    return false; // Primitive values don't render as boxes
+    return false;
   };
 
   const shouldStackVertically = willRenderAsBox(value);
 
   return (
-    <div className="py-1">
+    <div className={`py-1 ${editable ? 'hover:bg-gray-50 rounded transition-colors duration-150' : ''}`}>
       {shouldStackVertically ? (
         // Vertical layout for nested content
         <div>
-          <span className="text-sm text-left font-medium text-gray-600 capitalize block mb-2">
-            {label.replace(/([A-Z])/g, ' $1').trim()}:
-          </span>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-left font-medium text-gray-600 capitalize">
+              {label.replace(/([A-Z])/g, ' $1').trim()}:
+            </span>
+            {canDelete && onDelete && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onDelete}
+                className="px-2 py-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <Minus className="w-3 h-3" />
+              </Button>
+            )}
+          </div>
           <div className="w-full">
             {renderNestedContent(value, depth)}
           </div>
@@ -104,8 +398,22 @@ const FHIRField = ({ label, value, depth = 0 }: { label: string; value: any; dep
           <span className="text-sm font-medium text-gray-600 capitalize flex-shrink-0">
             {label.replace(/([A-Z])/g, ' $1').trim()}:
           </span>
-          <div className="ml-4 flex-1 min-w-0 text-right">
-            {renderNestedContent(value, depth)}
+          <div className="ml-4 flex-1 min-w-0">
+            <div className={editable ? "flex items-center gap-2" : "text-right"}>
+              <div className="flex-1">
+                {renderNestedContent(value, depth)}
+              </div>
+              {canDelete && onDelete && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onDelete}
+                  className="px-2 py-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  <Minus className="w-3 h-3" />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -114,7 +422,12 @@ const FHIRField = ({ label, value, depth = 0 }: { label: string; value: any; dep
 };
 
 // FHIR Resource Card Component
-const FHIRResourceCard: React.FC<FHIRResourceCardProps> = ({ resource, index }) => {
+const FHIRResourceCard: React.FC<FHIRResourceCardProps> = ({ 
+  resource, 
+  index, 
+  editable = false, 
+  onChange 
+}) => {
   // Extract all fields except common metadata fields for cleaner display
   const getDisplayFields = (resource: any) => {
     const fields: { [key: string]: any } = {};
@@ -129,6 +442,29 @@ const FHIRResourceCard: React.FC<FHIRResourceCardProps> = ({ resource, index }) 
 
   const displayFields = getDisplayFields(resource);
 
+  // Update a specific field in the resource
+  const updateField = (fieldKey: string, newValue: any) => {
+    if (!onChange) return;
+    const updatedResource = { ...resource, [fieldKey]: newValue };
+    onChange(updatedResource);
+  };
+
+  // Delete a field from the resource
+  const deleteField = (fieldKey: string) => {
+    if (!onChange) return;
+    const updatedResource = { ...resource };
+    delete updatedResource[fieldKey];
+    onChange(updatedResource);
+  };
+
+  // Add a new field to the resource
+  const addNewField = () => {
+    if (!onChange) return;
+    const newFieldKey = `newField${Object.keys(resource).length + 1}`;
+    const updatedResource = { ...resource, [newFieldKey]: '' };
+    onChange(updatedResource);
+  };
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
       <div className="flex items-start justify-between mb-4">
@@ -137,31 +473,108 @@ const FHIRResourceCard: React.FC<FHIRResourceCardProps> = ({ resource, index }) 
             {resource.resourceType}
           </h4>
         </div>
-        <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-sm">
-          Resource {index + 1}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-sm">
+            Resource {index + 1}
+          </span>
+          {editable && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addNewField}
+              className="px-2 py-1 text-xs"
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              Add Field
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Render fields with nested support */}
       <div className="border-t pt-4">
         {Object.entries(displayFields).map(([key, value]) => (
-          <FHIRField key={key} label={key} value={value} />
+          <FHIRField 
+            key={key} 
+            label={key} 
+            value={value} 
+            editable={editable}
+            onChange={editable ? (newValue) => updateField(key, newValue) : undefined}
+            onDelete={editable ? () => deleteField(key) : undefined}
+            canDelete={editable && key !== 'resourceType'}
+            path={key}
+          />
         ))}
       </div>
 
       {/* Show if no displayable fields */}
       {Object.keys(displayFields).length === 0 && (
-        <p className="text-sm text-gray-500 italic border-t pt-4">
-          No displayable fields found
-        </p>
+        <div className="border-t pt-4">
+          <p className="text-sm text-gray-500 italic">
+            No displayable fields found
+          </p>
+          {editable && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addNewField}
+              className="mt-2 px-2 py-1 text-xs"
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              Add First Field
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );
 };
 
 // Main Health Record Component
-const HealthRecord: React.FC<HealthRecordProps> = ({ fhirData, className }) => {
-  if (!fhirData || !fhirData.entry) {
+const HealthRecord: React.FC<HealthRecordProps> = ({ 
+  fhirData, 
+  className,
+  editable = false,
+  onSave,
+  onCancel 
+}) => {
+  const [editedData, setEditedData] = useState(fhirData);
+  const [hasChanges, setHasChanges] = useState(false);
+
+    // ADD THESE DEBUG LOGS
+  console.log('🔍 HealthRecord render:', { 
+    editable, 
+    hasOnSave: !!onSave,
+    hasOnCancel: !!onCancel 
+  });
+
+
+  // Update a specific resource
+  const updateResource = (index: number, updatedResource: any) => {
+    const newData = { ...editedData };
+    if (newData.entry && newData.entry[index]) {
+      newData.entry[index].resource = updatedResource;
+      setEditedData(newData);
+      setHasChanges(true);
+    }
+  };
+
+  // Handle save
+  const handleSave = () => {
+    if (onSave) {
+      onSave(editedData);
+    }
+    setHasChanges(false);
+  };
+
+  // Handle cancel
+  const handleCancel = () => {
+    setEditedData(fhirData);
+    setHasChanges(false);
+    if (onCancel) onCancel();
+  };
+
+  if (!editedData || !editedData.entry) {
     return (
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
         <p className="text-yellow-800">No FHIR data available for this record.</p>
@@ -170,14 +583,16 @@ const HealthRecord: React.FC<HealthRecordProps> = ({ fhirData, className }) => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${className}`}>
       {/* Individual resource cards */}
       <div className="space-y-4">
-        {fhirData.entry.map((entry, index) => (
+        {editedData.entry.map((entry, index) => (
           <FHIRResourceCard 
             key={index}
             resource={entry.resource}
             index={index}
+            editable={editable}
+            onChange={editable ? (updatedResource) => updateResource(index, updatedResource) : undefined}
           />
         ))}
       </div>
@@ -185,14 +600,48 @@ const HealthRecord: React.FC<HealthRecordProps> = ({ fhirData, className }) => {
       {/* Complete bundle JSON for testing */}
       <details className="bg-gray-100 rounded-lg">
         <summary className="p-4 cursor-pointer font-medium text-gray-700 hover:text-gray-900">
-          View Complete Bundle JSON
+          {editable ? 'View Current JSON (Live Preview)' : 'View Complete Bundle JSON'}
         </summary>
         <div className="px-4 pb-4">
           <pre className="text-sm text-gray-800 overflow-x-auto whitespace-pre-wrap bg-white p-4 rounded border max-h-96 overflow-y-auto">
-            {JSON.stringify(fhirData, null, 2)}
+            {JSON.stringify(editable ? editedData : fhirData, null, 2)}
           </pre>
         </div>
       </details>
+
+  {/* Edit Mode Controls */}
+  {editable && (
+    <div className="fixed bottom-0 left-[55%] transform -translate-x-1/2 w-full max-w-5xl bg-white border-t border-gray-200 shadow-lg z-50 rounded-t-lg animate-in slide-in-from-bottom duration-300">
+      <div className="flex justify-between items-center p-2 px-8">
+        <div className="flex items-center gap-2">
+          {hasChanges && (
+            <span className="px-2 py-1 text-xs bg-amber-100 text-amber-800 rounded-full">
+              Unsaved changes
+            </span>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleCancel}
+            className="px-4 py-2 flex items-center gap-2"
+          >
+            <X className="w-4 h-4" />
+            Cancel
+          </Button>
+          <Button
+            variant="default"
+            onClick={handleSave}
+            disabled={!hasChanges}
+            className="px-4 py-2 flex items-center gap-2"
+          >
+            <Save className="w-4 h-4" />
+            Save Changes
+          </Button>
+        </div>
+      </div>
+    </div>
+  )}
     </div>
   );
 };
