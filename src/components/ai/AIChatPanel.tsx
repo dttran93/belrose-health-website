@@ -1,17 +1,31 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { X, Bot, Send, Maximize2, Minimize2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 
-function AIChatPanel({ isOpen, onToggle, width, onWidthChange, isFullscreen, onFullscreenToggle }) {
-  const [prompt, setPrompt] = useState('')
-  const [messages, setMessages] = useState([
+interface Message {
+  role: 'user' | 'assistant'
+  content: String;
+}
+
+interface AIChatPanelProps {
+  isOpen: Boolean;
+  onToggle: () => void;
+  width: Number;
+  onWidthChange: (width: number) => void;
+  isFullscreen: boolean;
+  onFullscreenToggle: () => void;
+}
+
+function AIChatPanel({ isOpen, onToggle, width, onWidthChange, isFullscreen, onFullscreenToggle }: AIChatPanelProps) {
+  const [prompt, setPrompt] = useState<string>('')
+  const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
       content: 'Hello! I\'m your AI assistant. How can I help you with your medical records today?'
     }
   ])
-  const [isLoading, setIsLoading] = useState(false)
-  const messagesEndRef = useRef(null)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -19,18 +33,18 @@ function AIChatPanel({ isOpen, onToggle, width, onWidthChange, isFullscreen, onF
 
   useEffect(scrollToBottom, [messages])
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!prompt.trim() || isLoading) return
 
-    const userMessage = { role: 'user', content: prompt }
+    const userMessage: Message = { role: 'user', content: prompt }
     setMessages(prev => [...prev, userMessage])
     setPrompt('')
     setIsLoading(true)
 
     // Simulate AI response (replace with actual AI integration)
     setTimeout(() => {
-      const aiResponse = {
+      const aiResponse: Message = {
         role: 'assistant',
         content: `I understand you're asking about: "${prompt}". This is a simulated response. In a real implementation, this would connect to your AI service to analyze medical data and provide insights.`
       }

@@ -1,8 +1,23 @@
-import { X, Bot, User } from "lucide-react";
-import NavItem from "../site/ui/NavItem";
+import { X, Bot } from "lucide-react";
+import NavItem from "../ui/NavItem";
 import UserMenuButton from "../ui/UserMenuButton";
+import {NavigationItem } from "./navigation";
+import { User } from "./DesktopSidebar";
 
-function MobileSidebar({ isOpen, onClose, user, onToggleAI, isAIOpen, healthRecords, healthCategories, onLogout, onSettings, onHelp, }) {
+interface MobileSidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+  user: User;
+  onToggleAI: () => void;
+  isAIOpen: boolean;
+  healthRecords: NavigationItem[];
+  healthCategories: NavigationItem[];
+  onLogout?: () => void;
+  onSettings?: () => void;
+  onHelp?: () => void;
+}
+
+function MobileSidebar({ isOpen, onClose, user, onToggleAI, isAIOpen, healthRecords, healthCategories, onLogout, onSettings, onHelp, }: MobileSidebarProps) {
   return (
     <div>
       {/* Backdrop */}

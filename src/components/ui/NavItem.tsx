@@ -1,8 +1,15 @@
 import { NavLink, useLocation } from "react-router-dom";
+import { NavigationItem } from "@/components/app/navigation";
 
-function NavItem({ item, isCollapsed, onClick }) {
-  const location = useLocation()
-  const isActive = location.pathname === item.url
+interface NavItemProps {
+  item: NavigationItem;
+  isCollapsed?: boolean;
+  onClick?: () => void;
+}
+
+function NavItem({ item, isCollapsed = false, onClick }: NavItemProps) {
+  const location = useLocation();
+  const isActive = location.pathname === item.url;
   
   return (
     <NavLink
@@ -20,7 +27,7 @@ function NavItem({ item, isCollapsed, onClick }) {
       <item.icon className="w-5 h-5 flex-shrink-0" />
       {!isCollapsed && <span className="text-sm">{item.title}</span>}
     </NavLink>
-  )
+  );
 }
 
 export default NavItem;

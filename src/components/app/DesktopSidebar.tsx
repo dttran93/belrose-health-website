@@ -1,8 +1,30 @@
-import { PanelLeft, ArrowLeftToLine, ArrowRightToLine } from "lucide-react";
+import { PanelLeft, ArrowLeftToLine, ArrowRightToLine, Bot } from "lucide-react";
 import UserMenuButton from "@/components/ui/UserMenuButton";
-import NavItem from "../site/ui/NavItem";
+import NavItem from "@/components/ui/NavItem";
+import { NavigationItem } from './navigation';
 
-function DesktopSidebar({ isCollapsed, onToggle, user, onLogout, healthRecords, healthCategories, onSettings, onHelp }) {
+export interface User {
+  uid: String;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+}
+
+interface DesktopSidebarProps {
+  isCollapsed: boolean;
+  onToggle: () => void;
+  user: User;
+  onLogout: () => void;
+  healthRecords: NavigationItem[];
+  healthCategories: NavigationItem[];
+  onSettings: () => void;
+  onHelp: () => void;
+  onToggleAI: () => void;
+  onCloseAI: () => void;
+  isAIOpen: boolean;
+}
+
+function DesktopSidebar({ isCollapsed, onToggle, user, onLogout, healthRecords, healthCategories, onSettings, onHelp, onToggleAI, onCloseAI, isAIOpen }: DesktopSidebarProps) {
   return (
     <div className={`
       bg-primary text-white flex flex-col 
@@ -42,6 +64,26 @@ function DesktopSidebar({ isCollapsed, onToggle, user, onLogout, healthRecords, 
 
       {/* Navigation */}
       <div className="flex-1 p-4 space-y-6 overflow-y-auto">
+        {/* AI Assistant Button */}
+          <div className="mb-4">
+            <button
+              onClick={() => {
+                onToggleAI()
+                onCloseAI()
+              }}
+              className={`
+                w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
+                ${isAIOpen 
+                  ? 'bg-secondary text-primary font-medium' 
+                  : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                }
+              `}
+            >
+              <Bot className="w-5 h-5 flex-shrink-0" />
+              <span className="text-sm">AI Assistant</span>
+            </button>
+          </div>
+
         {/* Health Records Section */}
         <div>
           {!isCollapsed && (

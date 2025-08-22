@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Save, X, Edit2, Plus, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { FHIRResourceCardProps, HealthRecordProps, EditFHIRFieldProps } from '@/features/ViewEditRecord/components/ui/Record.types'
+import { FHIRResourceCardProps, HealthRecordProps, EditFHIRFieldProps } from '@/features/ViewEditRecord/components/ui/Record.types';
+import { LayoutSlot } from '@/components/app/LayoutProvider';
 
 // Smart input type detection utility
 const getInputType = (value: any, label: string): string => {
@@ -609,39 +610,33 @@ const HealthRecord: React.FC<HealthRecordProps> = ({
         </div>
       </details>
 
-  {/* Edit Mode Controls */}
-  {editable && (
-    <div className="fixed bottom-0 left-[55%] transform -translate-x-1/2 w-full max-w-5xl bg-white border-t border-gray-200 shadow-lg z-50 rounded-t-lg animate-in slide-in-from-bottom duration-300">
-      <div className="flex justify-between items-center p-2 px-8">
-        <div className="flex items-center gap-2">
-          {hasChanges && (
-            <span className="px-2 py-1 text-xs bg-amber-100 text-amber-800 rounded-full">
-              Unsaved changes
-            </span>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={handleCancel}
-            className="px-4 py-2 flex items-center gap-2"
-          >
-            <X className="w-4 h-4" />
-            Cancel
-          </Button>
-          <Button
-            variant="default"
-            onClick={handleSave}
-            disabled={!hasChanges}
-            className="px-4 py-2 flex items-center gap-2"
-          >
-            <Save className="w-4 h-4" />
-            Save Changes
-          </Button>
-        </div>
-      </div>
-    </div>
-  )}
+      {editable && (
+        <LayoutSlot slot="footer">
+          <div className="flex justify-between items-center p-4 bg-white border-t border-gray-200">
+            <div className="flex items-center gap-2">
+              {hasChanges && (
+                <span className="px-3 py-1 text-sm bg-amber-100 text-amber-800 rounded-full font-medium">
+                  Unsaved changes
+                </span>
+              )}
+              <span className="text-sm text-gray-500">
+                Editing health record data
+              </span>
+            </div>
+            
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={handleCancel}>
+                <X className="w-4 h-4" />
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={!hasChanges}>
+                <Save className="w-4 h-4" />
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </LayoutSlot>
+      )}
     </div>
   );
 };

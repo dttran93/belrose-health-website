@@ -13,6 +13,7 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 import AddRecord from "./pages/AddRecord";
 import './App.css';
 import { AuthProvider } from "./components/auth/AuthContext";
+import { LayoutProvider } from "./components/app/LayoutProvider";
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
@@ -38,13 +39,15 @@ const App: React.FC = (): React.JSX.Element => {
                 path="/dashboard/*" 
                 element={
                   <ProtectedRoute>
-                    <Layout>
-                      <Routes>
-                        <Route index element={<Dashboard />} />
-                        <Route path="activity" element={<PatientRecordsList />} />
-                        <Route path="addrecord" element={<AddRecord />} />
-                      </Routes>
-                    </Layout>
+                    <LayoutProvider>
+                      <Layout>
+                        <Routes>
+                          <Route index element={<Dashboard />} />
+                          <Route path="activity" element={<PatientRecordsList />} />
+                          <Route path="addrecord" element={<AddRecord />} />
+                        </Routes>
+                      </Layout>
+                    </LayoutProvider>
                   </ProtectedRoute>
                 }
               />

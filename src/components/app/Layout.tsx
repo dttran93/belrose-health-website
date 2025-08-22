@@ -1,27 +1,33 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import DesktopSidebar from '@/components/app/DesktopSidebar';
 import MobileSidebar from '@/components/app/MobileSidebar';
-import DesktopHeader from '@/components/app/DesktopHeader';
 import MobileHeader from '@/components/app/MobileHeader';
 import ResizeHandle from '@/components/ui/ResizeHandle';
 import AIChatPanel from '@/components/ai/AIChatPanel';
 import useMediaQuery from "@/hooks/useMediaQuery";
 import { healthRecords, healthCategories } from "@/components/app/navigation";
 import { useAuthContext } from '@/components/auth/AuthContext';
+import { authService } from '@/services/authServices'
+import { useLayout } from '@/components/app/LayoutProvider';
+
+interface AppLayoutProps {
+  children: ReactNode;
+}
 
 // Main Layout Component
-function AppLayout({ children }) {
+function AppLayout({ children }: AppLayoutProps) {
 
   const { user } = useAuthContext();
-  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false)
-  const [isMobileOpen, setIsMobileOpen] = useState(false)
-  const [isAIOpen, setIsAIOpen] = useState(false)
-  const [aiPanelWidth, setAIPanelWidth] = useState(400)
-  const [isAIFullscreen, setIsAIFullscreen] = useState(false)
-  const isDesktop = useMediaQuery('(min-width: 1024px)')
-  const navigate = useNavigate()
+  const { header, footer } = useLayout();
+  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isAIOpen, setIsAIOpen] = useState(false);
+  const [aiPanelWidth, setAIPanelWidth] = useState(400);
+  const [isAIFullscreen, setIsAIFullscreen] = useState(false);
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
@@ -40,7 +46,7 @@ function AppLayout({ children }) {
     window.open('https://help.example.com', '_blank')
   }
 
-  const handleAIPanelResize = (deltaX) => {
+  const handleAIPanelResize = (deltaX: number) => {
     setAIPanelWidth(prev => {
       const newWidth = prev + deltaX
       return Math.min(Math.max(newWidth, 300), 800) // Min 300px, Max 800px
@@ -69,29 +75,32 @@ function AppLayout({ children }) {
             healthCategories={healthCategories}
             onSettings={handleSettings}
             onHelp={handleHelp}
+            onCloseAI={() => setIsMobileOpen(false)}
+            onToggleAI={() => setIsAIOpen(!isAIOpen)}
+            isAIOpen={isAIOpen}
           />
         </div>
         
         {/* Main Content Area */}
         <div className="flex flex-col flex-1 overflow-hidden">
-          {/* Header */}
-          <DesktopHeader 
-            user={user} 
-            onLogout={handleLogout}
-            onToggleAI={() => setIsAIOpen(!isAIOpen)}
-            isAIOpen={isAIOpen}
-          />
+
+        {/* Conditional Header */}
+        {header && (
+          <div className="border-b border-gray-200 bg-white shadow-sm">
+            {header}
+          </div>
+        )}
           
-          {/* Content and AI Panel */}
-          <div className="flex flex-1 overflow-hidden">
-            <main className="flex-1 p-6 overflow-auto bg-gray-50">
-              {children}
-            </main>
+        {/* Content and AI Panel */}
+        <div className="flex flex-1 overflow-hidden">
+          <main className="flex-1 p-6 overflow-auto bg-gray-50">
+            {children}
+          </main>
             
-            {/* Resize Handle */}
-            {isAIOpen && !isAIFullscreen && (
-              <ResizeHandle onResize={handleAIPanelResize} />
-            )}
+          {/* Resize Handle */}
+          {isAIOpen && !isAIFullscreen && (
+            <ResizeHandle onResize={handleAIPanelResize} />
+          )}
 
             {/* AI Panel */}
             <AIChatPanel 
@@ -103,6 +112,13 @@ function AppLayout({ children }) {
               onFullscreenToggle={() => setIsAIFullscreen(!isAIFullscreen)}
             />
           </div>
+          
+          {/* Conditional Footer */}
+          {footer && (
+            <div className="border-t border-gray-200 bg-white shadow-sm">
+              {footer}
+            </div>
+          )}
         </div>
       </div>
     )
@@ -119,6 +135,7 @@ function AppLayout({ children }) {
         onLogout={handleLogout}
         onToggleAI={() => setIsAIOpen(!isAIOpen)}
         isAIOpen={isAIOpen}
+        additionalContent={header}
       />
 
       {/* Mobile Sidebar */}
@@ -130,6 +147,9 @@ function AppLayout({ children }) {
         isAIOpen={isAIOpen}
         healthRecords={healthRecords}
         healthCategories={healthCategories}
+        onLogout={handleLogout}
+        onSettings={handleSettings}
+        onHelp={handleHelp}
       />
 
       {/* Main Content */}
@@ -154,6 +174,13 @@ function AppLayout({ children }) {
           </>
         )}
       </div>
+
+      {/* Conditional Footer */}
+        {footer && (
+          <div className="border-t border-gray-200 bg-white shadow-sm">
+            {footer}
+          </div>
+        )}
     </div>
   )
 }
