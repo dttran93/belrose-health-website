@@ -57,6 +57,7 @@ export interface FileMetadata {
     summary?: string;
     completedDate?: string;
     provider?: string;
+    patient?: string;
     institution?: string;
     aiProcessedAt?: string;
     aiFailureReason?: string;

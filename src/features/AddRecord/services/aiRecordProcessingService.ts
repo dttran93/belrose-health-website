@@ -89,7 +89,8 @@ export class AIRecordProcessingService {
       typeof result.summary === 'string' &&
       typeof result.completedDate === 'string' &&
       typeof result.provider === 'string' &&
-      typeof result.institution === 'string'
+      typeof result.institution === 'string' &&
+      typeof result.patient === 'string'
     );
   }
 

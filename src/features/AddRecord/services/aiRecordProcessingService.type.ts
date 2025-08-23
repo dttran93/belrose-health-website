@@ -19,6 +19,7 @@ export interface AIProcessingResult {
   completedDate: string;
   provider: string;
   institution: string;
+  patient: string;
 }
 
 // ==================== CONFIGURATION ====================

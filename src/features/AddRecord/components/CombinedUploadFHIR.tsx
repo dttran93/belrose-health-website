@@ -342,6 +342,7 @@ const handleTextSubmit = async (): Promise<void> => {
         summary: aiResult.summary,
         completedDate: aiResult.completedDate,
         provider: aiResult.provider,
+        patient: aiResult.patient,
         institution: aiResult.institution,
         aiProcessedAt: new Date().toISOString()
       };
@@ -402,6 +403,7 @@ const handleFhirSubmit = async (): Promise<void> => {
       summary: aiResult.summary,
       completedDate: aiResult.completedDate,
       provider: aiResult.provider,
+      patient: aiResult.patient,
       institution: aiResult.institution,
       aiProcessedAt: new Date().toISOString()
     };

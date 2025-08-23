@@ -15,6 +15,7 @@ export interface BelroseFields {
   completedDate?: string;       // ISO date string - the main date for this record
   provider?: string;            // Primary provider name
   institution?: string;         // Healthcare institution/facility
+  patient?: string;             // Patient Name
   
   // Simple processing metadata
   aiProcessedAt?: string;       // ISO timestamp when AI processing completed

@@ -569,12 +569,14 @@ Required JSON response:
   "completedDate": "Date in YYYY-MM-DD format",
   "provider": "Doctor/provider name",
   "institution": "Hospital/clinic name"
+  "patient" : "Patient name"
 }
 
 Rules:
 - Use today's date if no date found: ${today}
 - Use "Unknown Healthcare Provider" if no provider found
 - Use "Unknown Medical Center" if no institution found
+- Use "Unknown Patient" if no patient found
 - Respond with ONLY the JSON object
 
 Context:
@@ -598,7 +600,8 @@ function validateAndCleanFHIRResult(
     summary: truncateString(result.summary || 'Medical record processed.', 250),
     completedDate: validateDate(result.completedDate) || today,
     provider: truncateString(result.provider || 'Healthcare Provider', 100),
-    institution: truncateString(result.institution || 'Medical Center', 100)
+    institution: truncateString(result.institution || 'Medical Center', 100),
+    patient: truncateString(result.patient || 'Patient', 100),
   };
 }
 
@@ -625,7 +628,8 @@ function createFallbackFHIRResponse(
     summary: 'Medical record processed successfully.',
     completedDate: new Date().toISOString().split('T')[0],
     provider: 'Healthcare Provider',
-    institution: 'Medical Center'
+    institution: 'Medical Center',
+    patient: 'Patient'
   };
 }
 

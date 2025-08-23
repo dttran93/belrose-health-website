@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Save, X, Edit2, Plus, Minus } from 'lucide-react';
+import { Plus, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { FHIRResourceCardProps, HealthRecordProps, EditFHIRFieldProps } from '@/features/ViewEditRecord/components/ui/Record.types';
-import { LayoutSlot } from '@/components/app/LayoutProvider';
 
 // Smart input type detection utility
 const getInputType = (value: any, label: string): string => {
@@ -178,7 +177,7 @@ const FHIRField: React.FC<EditFHIRFieldProps> = ({
           )}
           <div className="space-y-2">
             {content.map((item, index) => (
-              <div key={index} className={editable ? "border-l-2 border-blue-200 pl-3" : ""}>
+              <div key={index}>
                 <FHIRField
                   label={`[${index}]`}
                   value={item}
@@ -266,7 +265,7 @@ const FHIRField: React.FC<EditFHIRFieldProps> = ({
             type="checkbox"
             checked={Boolean(content)}
             onChange={(e) => onChange?.(e.target.checked)}
-            className="rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+            className="bg-background rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
           />
         );
       }
@@ -277,7 +276,7 @@ const FHIRField: React.FC<EditFHIRFieldProps> = ({
             value={primitiveValue}
             onChange={(e) => onChange?.(e.target.value)}
             rows={3}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            className="bg-background w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
         );
       }
@@ -323,7 +322,7 @@ const FHIRField: React.FC<EditFHIRFieldProps> = ({
                 onChange?.('');
               }
             }}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="bg-background w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         );
       }
@@ -334,7 +333,7 @@ const FHIRField: React.FC<EditFHIRFieldProps> = ({
           type={inputType}
           value={primitiveValue}
           onChange={(e) => onChange?.(e.target.value)}
-          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="bg-background w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       );
     } else {
@@ -383,9 +382,9 @@ const FHIRField: React.FC<EditFHIRFieldProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={onDelete}
-                className="px-2 py-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-none bg-transparent rounded-full"
               >
-                <Minus className="w-3 h-3" />
+                <Minus className="w-2 h-2" />
               </Button>
             )}
           </div>
@@ -409,9 +408,9 @@ const FHIRField: React.FC<EditFHIRFieldProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={onDelete}
-                  className="px-2 py-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                  className="px-2 py-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-none bg-transparent rounded-full"
                 >
-                  <Minus className="w-3 h-3" />
+                  <Minus className="w-2 h-2" />
                 </Button>
               )}
             </div>
@@ -537,7 +536,8 @@ const HealthRecord: React.FC<HealthRecordProps> = ({
   className,
   editable = false,
   onSave,
-  onCancel 
+  onCancel,
+  onFhirChange,
 }) => {
   const [editedData, setEditedData] = useState(fhirData);
   const [hasChanges, setHasChanges] = useState(false);
@@ -609,34 +609,6 @@ const HealthRecord: React.FC<HealthRecordProps> = ({
           </pre>
         </div>
       </details>
-
-      {editable && (
-        <LayoutSlot slot="footer">
-          <div className="flex justify-between items-center p-4 bg-white border-t border-gray-200">
-            <div className="flex items-center gap-2">
-              {hasChanges && (
-                <span className="px-3 py-1 text-sm bg-amber-100 text-amber-800 rounded-full font-medium">
-                  Unsaved changes
-                </span>
-              )}
-              <span className="text-sm text-gray-500">
-                Editing health record data
-              </span>
-            </div>
-            
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={handleCancel}>
-                <X className="w-4 h-4" />
-                Cancel
-              </Button>
-              <Button onClick={handleSave} disabled={!hasChanges}>
-                <Save className="w-4 h-4" />
-                Save Changes
-              </Button>
-            </div>
-          </div>
-        </LayoutSlot>
-      )}
     </div>
   );
 };

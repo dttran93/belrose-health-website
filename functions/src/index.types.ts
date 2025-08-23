@@ -125,6 +125,7 @@ export interface FHIRProcessingResponse {
   completedDate: string;
   provider: string;
   institution: string;
+  patient: string;
 }
 
 // ==================== CLAUDE API TYPES ====================

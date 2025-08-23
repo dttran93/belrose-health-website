@@ -498,17 +498,19 @@ function buildFHIRPrompt(fhirData, fileName, analysis) {
 Required JSON response:
 {
   "visitType": "Visit type (e.g., 'Lab Results', 'Follow-up Appointment')",
-  "title": "Short title under 100 chars (e.g., 'Cardiology Follow-up - Dr. Smith')",
-  "summary": "Brief summary under 250 chars",
+  "title": "Short title under 100-150 characters succinctly describing the record",
+  "summary": "Summary of record in approximately 250-500 characters, include as much information as possible that a future reader of the record would find useful",
   "completedDate": "Date in YYYY-MM-DD format",
   "provider": "Doctor/provider name",
   "institution": "Hospital/clinic name"
+  "patient" : "Patient name"
 }
 
 Rules:
 - Use today's date if no date found: ${today}
-- Use "Healthcare Provider" if no provider found
-- Use "Medical Center" if no institution found
+- Use "Unknown Healthcare Provider" if no provider found
+- Use "Unknown Medical Center" if no institution found
+- Use "Unknown Patient" if no patient found
 - Respond with ONLY the JSON object
 
 Context:
@@ -527,7 +529,8 @@ function validateAndCleanFHIRResult(result, fileName) {
         summary: truncateString(result.summary || 'Medical record processed.', 250),
         completedDate: validateDate(result.completedDate) || today,
         provider: truncateString(result.provider || 'Healthcare Provider', 100),
-        institution: truncateString(result.institution || 'Medical Center', 100)
+        institution: truncateString(result.institution || 'Medical Center', 100),
+        patient: truncateString(result.patient || 'Patient', 100),
     };
 }
 function createFallbackFHIRResponse(fileName, analysis) {
@@ -549,7 +552,8 @@ function createFallbackFHIRResponse(fileName, analysis) {
         summary: 'Medical record processed successfully.',
         completedDate: new Date().toISOString().split('T')[0],
         provider: 'Healthcare Provider',
-        institution: 'Medical Center'
+        institution: 'Medical Center',
+        patient: 'Patient'
     };
 }
 function validateDate(dateStr) {

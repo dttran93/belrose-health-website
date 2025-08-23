@@ -325,6 +325,7 @@ export function useFileUpload(): UseFileUploadReturn {
                         summary: aiResult.summary,
                         completedDate: aiResult.completedDate,
                         provider: aiResult.provider,
+                        patient: aiResult.patient,
                         institution: aiResult.institution,
                         aiProcessedAt: new Date().toISOString()
                     };

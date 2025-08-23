@@ -80,9 +80,9 @@ function DesktopSidebar({ isCollapsed, onToggle, user, onLogout, healthRecords, 
               `}
             >
               <Bot className="w-5 h-5 flex-shrink-0" />
-              <span className="text-sm">AI Assistant</span>
+              {!isCollapsed && (<span className="text-sm">AI Assistant</span>)}
             </button>
-          </div>
+        </div>
 
         {/* Health Records Section */}
         <div>

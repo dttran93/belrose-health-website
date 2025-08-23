@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { X, Share2, ClipboardPlus, Code, FileInput, Ellipsis } from 'lucide-react';
-import { FileObject } from '@/types/core';
+import { X, Share2, ClipboardPlus, Code, FileInput, Ellipsis, Save } from 'lucide-react';
+import { FileObject, BelroseFields } from '@/types/core';
 import { TabNavigation } from "@/features/AddRecord/components/ui/TabNavigation";
 import HealthRecord from "@/features/ViewEditRecord/components/ui/Record";
 import HealthRecordMenu from "./ui/RecordMenu";
+import { LayoutSlot } from "@/components/app/LayoutProvider";
 
 type TabType = 'record' | 'data' | 'original';
 
@@ -38,6 +39,80 @@ const tabs = [
   }
 ];
 
+// Component for editable belrose fields
+const EditableBelroseFields = ({editedBelroseFields, updateBelroseField}: {
+  editedBelroseFields: BelroseFields;
+  updateBelroseField: (field: keyof BelroseFields, value: string) => void;
+}) => (
+  <div className="space-y-4">
+    <div className="grid grid-cols-12 gap-4">
+      <div className="col-span-4">
+        <label className="block text-sm font-medium text-white/90 mb-1">Title</label>
+        <input
+          type="text"
+          value={editedBelroseFields.title || ''}
+          onChange={(e) => updateBelroseField('title', e.target.value)}
+          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
+          placeholder="Enter record title..."
+        />
+      </div>
+      
+      <div className="col-span-2">
+        <label className="block text-sm font-medium text-white/90 mb-1">Provider</label>
+        <input
+          type="text"
+          value={editedBelroseFields.provider || ''}
+          onChange={(e) => updateBelroseField('provider', e.target.value)}
+          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
+          placeholder="Provider name..."
+        />
+      </div>
+      
+      <div className="col-span-2">
+        <label className="block text-sm font-medium text-white/90 mb-1">Institution</label>
+        <input
+          type="text"
+          value={editedBelroseFields.institution || ''}
+          onChange={(e) => updateBelroseField('institution', e.target.value)}
+          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
+          placeholder="Healthcare institution..."
+        />
+      </div>
+      
+      <div className="col-span-2">
+        <label className="block text-sm font-medium text-white/90 mb-1">Completed Date</label>
+        <input
+          type="date"
+          value={editedBelroseFields.completedDate ? editedBelroseFields.completedDate.split('T')[0] : ''}
+          onChange={(e) => updateBelroseField('completedDate', e.target.value)}
+          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
+        />
+      </div>
+              
+      <div className="col-span-2">
+        <label className="block text-sm font-medium text-white/90 mb-1">Visit Type</label>
+        <input
+          type="text"
+          value={editedBelroseFields.visitType || ''}
+          onChange={(e) => updateBelroseField('visitType', e.target.value)}
+          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
+          placeholder="e.g., Follow-up Appointment, Lab Results..."
+        />
+      </div>
+    </div>
+    <div>
+      <label className="block text-sm font-medium text-white/90 mb-1">Summary</label>
+      <textarea
+        value={editedBelroseFields.summary || ''}
+        onChange={(e) => updateBelroseField('summary', e.target.value)}
+        rows={2}
+        className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
+        placeholder="Brief summary of the record..."
+      />
+    </div>
+  </div>
+);
+
 export const RecordFull: React.FC<HealthRecordFullProps> = ({
   record,
   onEdit,
@@ -51,10 +126,21 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('record');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [hasFhirChanges, setHasFhirChanges] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  
+  const [editedBelroseFields, setEditedBelroseFields] = useState<BelroseFields>(
+    record.belroseFields || {}
+  );
+
+  const hasAnyChanges = hasUnsavedChanges || hasFhirChanges;
+
+  const handleFhirChanges = (hasChanges:boolean) => {
+    setHasFhirChanges(hasChanges);
+  };
+
   const handleEnterEditMode = () => {
     setIsEditMode(true);
+    setEditedBelroseFields(record.belroseFields || {});
   }
 
   const handleTabChange = (tabId: string) => {
@@ -75,7 +161,8 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
   const handleSaveRecord = (updatedFhirData: any) => {
     const updatedRecord = {
       ...record,
-      fhirData: updatedFhirData
+      fhirData: updatedFhirData,
+      belroseFields: editedBelroseFields,
     };
     
     // Call the parent save handler if provided
@@ -91,6 +178,14 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
   const handleCancelEdit = () => {
     setIsEditMode(false);
     setHasUnsavedChanges(false);
+    setEditedBelroseFields(record.belroseFields || {});
+  };
+
+  // Handlers for belroseFields editing
+  const updateBelroseField = (field: keyof BelroseFields, value: string) => {
+    setEditedBelroseFields(prev => ({...prev, [field]: value
+    }));
+    setHasUnsavedChanges(true);
   };
 
   // Debug information
@@ -106,19 +201,42 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
     <div className="max-w-7xl mx-auto bg-background rounded-2xl shadow-xl overflow-hidden">
       {/* Header */}
       <div className="bg-primary px-8 py-6">
+        {isEditMode ? (
+          <>
+            <div className="flex items-center justify-end space-x-1">
+              <span className="px-3 py-1 bg-red-500/20 text-red-100 rounded-full text-sm font-medium">
+                Self Reported
+              </span>
+              <HealthRecordMenu 
+                record={record}
+                triggerIcon={Ellipsis}
+                showView={false}         // No view option (already viewing)
+                triggerClassName="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
+                onEdit={handleEnterEditMode}
+              />
+              <Button 
+                variant="default" 
+                className="w-6 h-6 hover:bg-white/10"
+                onClick={handleExit}
+              >
+                <X className="w-5 h-5"/>
+              </Button>
+            </div>
+            <div className="mt-4">
+              <EditableBelroseFields
+                editedBelroseFields={editedBelroseFields}
+                updateBelroseField={updateBelroseField}
+              />
+            </div>
+          </>
+        ) : (
+        <>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4 text-white">
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold">{record.belroseFields?.title}</h1>
-              {hasUnsavedChanges && (
-                <span className="px-2 py-1 bg-red-500/20 text-red-100 rounded-full text-xs font-medium">
-                  Unsaved Changes
-                </span>
-              )}
             </div>
-            <p className="mt-1 text-sm">{record.belroseFields?.completedDate} • {record.belroseFields?.provider} • {record.belroseFields?.institution}</p>
           </div>
-          
           <div className="flex items-center space-x-1">
             <span className="px-3 py-1 bg-red-500/20 text-red-100 rounded-full text-sm font-medium">
               Self Reported
@@ -139,9 +257,14 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
             </Button>
           </div>
         </div>
-        <div className="flex justify-left text-white/50">
-          <p>{record.belroseFields?.summary}</p>
-        </div>
+            <div className="flex text-sm text-white items-start gap-4 my-2">
+              <div>{record.belroseFields?.completedDate} • {record.belroseFields?.patient} • {record.belroseFields?.provider} • {record.belroseFields?.institution}</div>
+            </div>
+            <div className="flex justify-left text-white/50 text-left">
+              <p>{record.belroseFields?.summary}</p>
+            </div>
+        </>
+        )}
       </div>
       
       <TabNavigation 
@@ -160,6 +283,7 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
               onSave={handleSaveRecord}
               onCancel={handleCancelEdit}
               editable={isEditMode}
+              onFhirChange={handleFhirChanges}
             />
           </div>
         )}
@@ -288,6 +412,35 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
           </div>
         )}
       </div>
+
+      {isEditMode && (
+        <LayoutSlot slot="footer">
+          <div className="flex justify-between items-center p-4 bg-white border-t border-gray-200">
+            <div className="flex items-center gap-2">
+              {hasAnyChanges && (
+                <span className="px-3 py-1 text-sm bg-amber-100 text-amber-800 rounded-full font-medium">
+                  Unsaved changes
+                </span>
+              )}
+              <span className="text-sm text-gray-500">
+                Editing health record data
+              </span>
+            </div>
+            
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={handleCancelEdit}>
+                <X className="w-4 h-4" />
+                Cancel
+              </Button>
+              <Button onClick={handleSaveRecord} disabled={!hasAnyChanges}>
+                <Save className="w-4 h-4" />
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </LayoutSlot>
+      )}
+
     </div>
   );
 };

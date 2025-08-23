@@ -5,7 +5,8 @@ import {
   Eye,
   User,
   Hospital,
-  Ellipsis 
+  Ellipsis, 
+  BriefcaseMedical
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { FileObject } from '@/types/core';
@@ -111,14 +112,22 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
         </div>
 
         {/* Provider/Institution Information */}
+        <div className="flex gap-2">
+          <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+            <BriefcaseMedical className="w-4 h-4" />
+            <span>{record.belroseFields?.provider}</span>
+          </div>       
+          <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+            <Hospital className="w-4 h-4" />
+            <span>{record.belroseFields?.institution || 'Institution not available'}</span>
+          </div>
+        </div>    
+
+        {/* Patient Information */}
         <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
-          <User className="w-4 h-4" />
-          <span>{record.belroseFields?.provider}</span>
-        </div>       
-        <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
-          <Hospital className="w-4 h-4" />
-          <span>{record.belroseFields?.institution || 'Institution not available'}</span>
-        </div>       
+            <User className="w-4 h-4" />
+            <span>{record.belroseFields?.patient}</span>
+        </div>     
 
         {/* Summary */}
           <div className="mb-4">
