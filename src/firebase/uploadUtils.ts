@@ -18,6 +18,7 @@ import {
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import type { FileObject } from '@/types/core';
+import { setDoc } from 'firebase/firestore';
 
 // ==================== TYPE DEFINITIONS ====================
 
@@ -240,7 +241,7 @@ export const updateFirestoreRecord = async (documentId: string, updateData: any)
   
   try {
     const docRef = doc(db, "users", user.uid, "files", documentId);
-    await updateDoc(docRef, filteredData); 
+    await setDoc(docRef, filteredData, { merge: true}); 
     console.log('Updated fields:', Object.keys(filteredData));
   } catch (error: any) {
     console.error("Error updating document:", error);

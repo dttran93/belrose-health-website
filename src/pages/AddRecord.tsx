@@ -124,25 +124,45 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
     });
 
     const handleReviewFile = (fileRecord: FileObject) => {
+        const latestFile = files.find (f => f.id === fileRecord.id);
+
+        if (!latestFile?.documentId) {
+            console.error('File not found:', fileRecord.id);
+            return;
+        }
+
         setReviewMode({ active: true, record: fileRecord });
     };
 
     const handleSaveFromReview = async (updatedRecord: FileObject) => {
         try {
-            if(!updatedRecord.id){
+            const documentId = updatedRecord.documentId;
+
+            if (!documentId) {
                 throw new Error('Cannot save record - no document ID found');
             }
-
-            await updateFirestoreRecord(updatedRecord.id, {
+            
+            await updateFirestoreRecord(documentId, {
                 fhirData: updatedRecord.fhirData,
                 belroseFields: updatedRecord.belroseFields,
+                lastUpdated: new Date().toISOString()
             });
 
-            toast.success(`Record "${updatedRecord.belroseFields?.title}" saved successfully`, {duration: 4000});
+            //To update local files array with fresh data
+            updateFileStatus(updatedRecord.id, 'completed', {
+                fhirData: updatedRecord.fhirData,
+                belroseFields: updatedRecord.belroseFields,
+                lastUpdated: new Date().toISOString()
+            });
+
+            toast.success(`Record "${updatedRecord.belroseFields?.title}" saved successfully`, {
+                duration: 4000
+            });
             setReviewMode({ active: false, record: null });
+
         } catch (error) {
             console.error('Failed to save record:', error);
-            toast.error('Failed to save record', {duration: 4000});
+            toast.error('Failed to save record', { duration: 4000 });
         }
     };
 
