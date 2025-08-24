@@ -13,7 +13,7 @@ import {
   FileStats,
   FHIRConversionCallback,
   ResetProcessCallback,
-  UseFileUploadReturn,
+  UseFileManagerTypes,
 } from './useFileManager.type';
 import { VirtualFileResult } from '../components/CombinedUploadFHIR.type';
 import { UploadResult } from '../services/shared.types';
@@ -27,7 +27,7 @@ import { UploadResult } from '../services/shared.types';
  * - FHIR data integration
  * - Virtual file support
  */
-export function useFileUpload(): UseFileUploadReturn {
+export function useFileManager(): UseFileManagerTypes {
     
     // ==================== STATE MANAGEMENT ====================    
     const [files, setFiles] = useState<FileObject[]>(() => {
@@ -844,4 +844,4 @@ export function useFileUpload(): UseFileUploadReturn {
     };
 }
 
-export default useFileUpload;
+export default useFileManager;

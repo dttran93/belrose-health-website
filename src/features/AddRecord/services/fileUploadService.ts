@@ -201,33 +201,14 @@ export class FileUploadService implements IFileUploadService {
   async updateRecord(fileId: string, data: Partial<FirestoreFileMetadata>): Promise<void> {
   try {
     console.log('📝 Updating Firestore record:', fileId, data);
-    console.log('📋 data.fhirData exists:', !!data.fhirData);
-    console.log('📋 data.fhirData type:', typeof data.fhirData);
     
-    // 🔥 ADD MORE DETAILED LOGGING
-    const { updateFirestoreWithFHIR } = await import('@/firebase/uploadUtils');
-    console.log('✅ Successfully imported updateFirestoreWithFHIR');
-    
-    if (data.fhirData) {
-      console.log('🎯 About to call updateFirestoreWithFHIR with:');
-      console.log('  - documentId:', fileId);
-      console.log('  - fhirData preview:', JSON.stringify(data.fhirData).substring(0, 200) + '...');
-      
-      await updateFirestoreWithFHIR(fileId, data.fhirData);
-      
-      console.log('✅ updateFirestoreWithFHIR completed successfully!');
-    } else {
-      console.log('📝 Non-FHIR update - implement if needed');
-    }
-    
+    const { updateFirestoreRecord } = await import('@/firebase/uploadUtils');
+    await updateFirestoreRecord(fileId, data);
+
+    console.log('✅ updateFirestoreRecord completed successfully!');   
+
   } catch (error: any) {
-    console.error('❌ DETAILED ERROR in updateRecord:', {
-      message: error.message,
-      code: error.code,
-      stack: error.stack,
-      fileId: fileId
-    });
-    
+    console.error('❌ DETAILED ERROR in updateRecord:', error);
     throw new FileUploadError(
       `Failed to update record: ${error.message}`,
       'UPDATE_FAILED',

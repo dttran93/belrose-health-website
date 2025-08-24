@@ -214,29 +214,36 @@ export async function saveFileMetadataToFirestore({ downloadURL, filePath, fileO
   }
 }
 
-export const updateFirestoreWithFHIR = async (documentId: string, fhirData: any): Promise<void> => {
-  console.log("documentID received:", documentId, "type:", typeof documentId);
-
+export const updateFirestoreRecord = async (documentId: string, updateData: any): Promise<void> => {
   const db = getFirestore();
   const auth = getAuth();
   const user = auth.currentUser;
 
   if (!user) throw new Error("User not authenticated");
 
-  if (!documentId) {
-    console.error("Document ID is undefined, null, or empty");
+  if(!documentId) {
     throw new Error("Document ID is required");
+  }
+
+  const allowedFields = ['fhirData', 'belroseFields'];
+
+  const filteredData = Object.keys(updateData)
+    .filter(key => allowedFields.includes(key))
+    .reduce((obj, key) => {
+      obj[key] = updateData[key];
+      return obj;
+    }, {} as any)
+
+  if (Object.keys(filteredData).length === 0) {
+    throw new Error("No valid fields to update");
   }
   
   try {
     const docRef = doc(db, "users", user.uid, "files", documentId);
-    await updateDoc(docRef, {
-      fhirData: fhirData,
-      fhirConvertedAt: new Date().toISOString(),
-      processingStatus: 'fhir_converted'
-    });
+    await updateDoc(docRef, filteredData); 
+    console.log('Updated fields:', Object.keys(filteredData));
   } catch (error: any) {
-    console.error("Error updating document with FHIR data:", error);
+    console.error("Error updating document:", error);
     throw new Error(`Failed to update document: ${error.message}`);
   }
 };

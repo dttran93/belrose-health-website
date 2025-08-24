@@ -1,11 +1,15 @@
-import React from 'react';
-import useFileUpload from '@/features/AddRecord/hooks/useFileManager';
+import React, { useState } from 'react';
+import useFileManager from '@/features/AddRecord/hooks/useFileManager';
 import { useFHIRConversion } from '@/features/AddRecord/hooks/useFHIRConversion';
-import {convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
+import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
 import { ExportService } from '@/features/AddRecord/services/exportService';
+import { FileObject } from '@/types/core';
+import { toast } from 'sonner';
+import HealthRecordFull from "@/features/ViewEditRecord/components/RecordFull";
 
 // Import components
 import CombinedUploadFHIR from '@/features/AddRecord/components/CombinedUploadFHIR';
+import { useSonner } from 'sonner';
 
 // ==================== TYPE DEFINITIONS ====================
 
@@ -50,7 +54,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
 
     //DEBUGGING
     console.log('🔄 AddRecord component rendering');
-    const hookResult = useFileUpload();
+    const hookResult = useFileManager();
     console.log('📁 Files from hook:', hookResult.files.length);
 
     const {
@@ -74,21 +78,14 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
         setFHIRConversionCallback,
         shouldAutoUpload,
         reset: resetFileUpload
-    } = useFileUpload();
+    } = useFileManager();
 
     const {
         fhirData,
-        reviewedData,
         handleFHIRConverted,
-        handleDataConfirmed,
-        handleDataRejected,
-        isAllFilesConverted,
-        isAllFilesReviewed,
-        getFHIRStats,
         reset: resetFHIR
     } = useFHIRConversion(
         processedFiles,
-        firestoreData,
         updateFirestoreRecord,
         uploadFiles,
     );
@@ -120,6 +117,34 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
         savedToFirestoreCount,
         savingCount
     });
+
+    const [reviewMode, setReviewMode] = useState<{active: Boolean; record: FileObject | null}>({
+        active: false,
+        record: null
+    });
+
+    const handleReviewFile = (fileRecord: FileObject) => {
+        setReviewMode({ active: true, record: fileRecord });
+    };
+
+    const handleSaveFromReview = async (updatedRecord: FileObject) => {
+        try {
+            if(!updatedRecord.id){
+                throw new Error('Cannot save record - no document ID found');
+            }
+
+            await updateFirestoreRecord(updatedRecord.id, {
+                fhirData: updatedRecord.fhirData,
+                belroseFields: updatedRecord.belroseFields,
+            });
+
+            toast.success(`Record "${updatedRecord.belroseFields?.title}" saved successfully`, {duration: 4000});
+            setReviewMode({ active: false, record: null });
+        } catch (error) {
+            console.error('Failed to save record:', error);
+            toast.error('Failed to save record', {duration: 4000});
+        }
+    };
 
     // Export service instance
     const exportService = new ExportService();
@@ -162,6 +187,17 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
 
     // ==================== RENDER JSX ====================
 
+    if (reviewMode.active && reviewMode.record) {
+        return (
+            <HealthRecordFull
+            record={reviewMode.record}
+            initialEditMode={true}
+            onBack={() => setReviewMode({ active: false, record: null })}
+            onSave={handleSaveFromReview}
+            />
+        );
+    }
+
     return (
         <div className={`min-h-screen bg-gray-50 ${className || ''}`}>
             <div className="max-w-7xl mx-auto px-4 py-8">
@@ -183,6 +219,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
                     shouldAutoUpload={shouldAutoUpload}
                     savingToFirestore={savingToFirestore}
                     firestoreData={firestoreData}
+                    onReview={handleReviewFile}
                 />
 
             </div>

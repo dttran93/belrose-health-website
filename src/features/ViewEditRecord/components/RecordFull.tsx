@@ -6,6 +6,7 @@ import { TabNavigation } from "@/features/AddRecord/components/ui/TabNavigation"
 import HealthRecord from "@/features/ViewEditRecord/components/ui/Record";
 import HealthRecordMenu from "./ui/RecordMenu";
 import { LayoutSlot } from "@/components/app/LayoutProvider";
+import { getDocumentTypeColor, getFileExtension } from "@/features/ViewEditRecord/components/ui/RecordCard";
 
 type TabType = 'record' | 'data' | 'original';
 
@@ -19,6 +20,7 @@ interface HealthRecordFullProps {
   showMenu?: boolean;
   onBack?: (record: FileObject) => void;
   onSave?: (updatedRecord: FileObject) => void;
+  initialEditMode?: boolean;
 }
 
 const tabs = [
@@ -46,7 +48,7 @@ const EditableBelroseFields = ({editedBelroseFields, updateBelroseField}: {
 }) => (
   <div className="space-y-4">
     <div className="grid grid-cols-12 gap-4">
-      <div className="col-span-4">
+      <div className="col-span-10">
         <label className="block text-sm font-medium text-white/90 mb-1">Title</label>
         <input
           type="text"
@@ -56,39 +58,6 @@ const EditableBelroseFields = ({editedBelroseFields, updateBelroseField}: {
           placeholder="Enter record title..."
         />
       </div>
-      
-      <div className="col-span-2">
-        <label className="block text-sm font-medium text-white/90 mb-1">Provider</label>
-        <input
-          type="text"
-          value={editedBelroseFields.provider || ''}
-          onChange={(e) => updateBelroseField('provider', e.target.value)}
-          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
-          placeholder="Provider name..."
-        />
-      </div>
-      
-      <div className="col-span-2">
-        <label className="block text-sm font-medium text-white/90 mb-1">Institution</label>
-        <input
-          type="text"
-          value={editedBelroseFields.institution || ''}
-          onChange={(e) => updateBelroseField('institution', e.target.value)}
-          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
-          placeholder="Healthcare institution..."
-        />
-      </div>
-      
-      <div className="col-span-2">
-        <label className="block text-sm font-medium text-white/90 mb-1">Completed Date</label>
-        <input
-          type="date"
-          value={editedBelroseFields.completedDate ? editedBelroseFields.completedDate.split('T')[0] : ''}
-          onChange={(e) => updateBelroseField('completedDate', e.target.value)}
-          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
-        />
-      </div>
-              
       <div className="col-span-2">
         <label className="block text-sm font-medium text-white/90 mb-1">Visit Type</label>
         <input
@@ -99,6 +68,50 @@ const EditableBelroseFields = ({editedBelroseFields, updateBelroseField}: {
           placeholder="e.g., Follow-up Appointment, Lab Results..."
         />
       </div>
+      
+      <div className="col-span-3">
+        <label className="block text-sm font-medium text-white/90 mb-1">Completed Date</label>
+        <input
+          type="date"
+          value={editedBelroseFields.completedDate ? editedBelroseFields.completedDate.split('T')[0] : ''}
+          onChange={(e) => updateBelroseField('completedDate', e.target.value)}
+          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
+        />
+      </div>
+      
+      <div className="col-span-3">
+        <label className="block text-sm font-medium text-white/90 mb-1">Patient</label>
+        <input
+          type="text"
+          value={editedBelroseFields.patient || ''}
+          onChange={(e) => updateBelroseField('patient', e.target.value)}
+          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
+          placeholder="Patient Name..."
+        />
+      </div>
+
+      <div className="col-span-3">
+        <label className="block text-sm font-medium text-white/90 mb-1">Provider</label>
+        <input
+          type="text"
+          value={editedBelroseFields.provider || ''}
+          onChange={(e) => updateBelroseField('provider', e.target.value)}
+          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
+          placeholder="Provider name..."
+        />
+      </div>
+      
+      <div className="col-span-3">
+        <label className="block text-sm font-medium text-white/90 mb-1">Institution</label>
+        <input
+          type="text"
+          value={editedBelroseFields.institution || ''}
+          onChange={(e) => updateBelroseField('institution', e.target.value)}
+          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
+          placeholder="Healthcare institution..."
+        />
+      </div>
+
     </div>
     <div>
       <label className="block text-sm font-medium text-white/90 mb-1">Summary</label>
@@ -121,25 +134,32 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
   onDelete,
   onBack,
   onSave,
+  initialEditMode
 }) => {
 
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('record');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [hasFhirChanges, setHasFhirChanges] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [currentFhirData, setCurrentFhirData] = useState(record.fhirData);
+  const [isEditMode, setIsEditMode] = useState(initialEditMode || false);
   const [editedBelroseFields, setEditedBelroseFields] = useState<BelroseFields>(
     record.belroseFields || {}
   );
 
   const hasAnyChanges = hasUnsavedChanges || hasFhirChanges;
 
-  const handleFhirChanges = (hasChanges:boolean) => {
+  const handleFhirDataChange = (updatedData: any) => {
+    setCurrentFhirData(updatedData);
+  };
+
+  const handleFhirChanged = (hasChanges:boolean) => {
     setHasFhirChanges(hasChanges);
   };
 
   const handleEnterEditMode = () => {
     setIsEditMode(true);
+    setActiveTab('record'); //only record tab has stuff to edit
     setEditedBelroseFields(record.belroseFields || {});
   }
 
@@ -148,7 +168,7 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
   }
 
   const handleExit = () => {
-    if (hasUnsavedChanges) {
+    if (hasAnyChanges) {
       const confirmExit = window.confirm("You have unsaved changes. Are you sure you want to exit?");
       if (!confirmExit) return;
     }
@@ -158,10 +178,10 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
     }
   };
 
-  const handleSaveRecord = (updatedFhirData: any) => {
+  const handleSaveRecord = () => {
     const updatedRecord = {
       ...record,
-      fhirData: updatedFhirData,
+      fhirData: currentFhirData,
       belroseFields: editedBelroseFields,
     };
     
@@ -172,12 +192,15 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
     
     setIsEditMode(false);
     setHasUnsavedChanges(false);
+    setHasFhirChanges(false);
     console.log('✅ Record saved:', updatedRecord);
   };
 
   const handleCancelEdit = () => {
     setIsEditMode(false);
     setHasUnsavedChanges(false);
+    setHasFhirChanges(false);
+    setCurrentFhirData(record.fhirData);
     setEditedBelroseFields(record.belroseFields || {});
   };
 
@@ -201,27 +224,40 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
     <div className="max-w-7xl mx-auto bg-background rounded-2xl shadow-xl overflow-hidden">
       {/* Header */}
       <div className="bg-primary px-8 py-6">
+        <div className="flex items-center justify-between space-x-1 mb-3">
+          <div className="flex items-center gap-2">
+            {!isEditMode && <>
+              <span className="px-2 py-1 text-xs font-medium rounded-full border bg-background text-primary">
+                {record.belroseFields?.visitType}
+              </span>
+              <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded border">
+                {record.documentType}
+              </span>
+            </>}
+          </div>
+          <div className="flex items-center">
+            <span className="px-3 py-1 mx-1 bg-red-500/20 text-red-100 rounded-full text-sm font-medium">
+              Self Reported
+            </span>
+            <HealthRecordMenu 
+              record={record}
+              triggerIcon={Ellipsis}
+              showView={false}         // No view option (already viewing)
+              triggerClassName="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
+              onEdit={handleEnterEditMode}
+            />
+            <Button 
+              variant="default" 
+              className="p-2 w-8 h-8 hover:bg-white/20 transition-colors"
+              onClick={handleExit}
+            >
+              <X className="w-5 h-5"/>
+            </Button>
+          </div>
+        </div>
+
         {isEditMode ? (
           <>
-            <div className="flex items-center justify-end space-x-1">
-              <span className="px-3 py-1 bg-red-500/20 text-red-100 rounded-full text-sm font-medium">
-                Self Reported
-              </span>
-              <HealthRecordMenu 
-                record={record}
-                triggerIcon={Ellipsis}
-                showView={false}         // No view option (already viewing)
-                triggerClassName="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
-                onEdit={handleEnterEditMode}
-              />
-              <Button 
-                variant="default" 
-                className="w-6 h-6 hover:bg-white/10"
-                onClick={handleExit}
-              >
-                <X className="w-5 h-5"/>
-              </Button>
-            </div>
             <div className="mt-4">
               <EditableBelroseFields
                 editedBelroseFields={editedBelroseFields}
@@ -236,25 +272,6 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold">{record.belroseFields?.title}</h1>
             </div>
-          </div>
-          <div className="flex items-center space-x-1">
-            <span className="px-3 py-1 bg-red-500/20 text-red-100 rounded-full text-sm font-medium">
-              Self Reported
-            </span>
-            <HealthRecordMenu 
-              record={record}
-              triggerIcon={Ellipsis}
-              showView={false}         // No view option (already viewing)
-              triggerClassName="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
-              onEdit={handleEnterEditMode}
-            />
-            <Button 
-              variant="default" 
-              className="w-6 h-6 hover:bg-white/10"
-              onClick={handleExit}
-            >
-              <X className="w-5 h-5"/>
-            </Button>
           </div>
         </div>
             <div className="flex text-sm text-white items-start gap-4 my-2">
@@ -280,10 +297,9 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
             {/* Simplified: Single HealthRecord component with edit capabilities */}
             <HealthRecord 
               fhirData={record.fhirData}
-              onSave={handleSaveRecord}
-              onCancel={handleCancelEdit}
               editable={isEditMode}
-              onFhirChange={handleFhirChanges}
+              onFhirChanged={handleFhirChanged}
+              onDataChange={handleFhirDataChange}
             />
           </div>
         )}

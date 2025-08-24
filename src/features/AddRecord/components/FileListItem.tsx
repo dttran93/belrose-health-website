@@ -15,7 +15,8 @@ export const FileListItem: React.FC<FileListItemProps> = ({
   onConfirm,
   onRetry,
   onComplete,
-  showFHIRResults = true
+  showFHIRResults = true,
+  onReview,
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
@@ -188,7 +189,7 @@ export const FileListItem: React.FC<FileListItemProps> = ({
                     Retry
                   </button>
                 )}
-                <Button variant="default">Review</Button>
+                <Button variant="default" onClick={() => onReview?.(fileItem)}>Review</Button>
               </div>
             </div>
 

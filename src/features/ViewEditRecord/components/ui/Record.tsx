@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { FHIRResourceCardProps, HealthRecordProps, EditFHIRFieldProps } from '@/features/ViewEditRecord/components/ui/Record.types';
@@ -535,20 +535,35 @@ const HealthRecord: React.FC<HealthRecordProps> = ({
   fhirData, 
   className,
   editable = false,
-  onSave,
-  onCancel,
-  onFhirChange,
+  onFhirChanged,
+  onDataChange
 }) => {
   const [editedData, setEditedData] = useState(fhirData);
   const [hasChanges, setHasChanges] = useState(false);
 
-    // ADD THESE DEBUG LOGS
-  console.log('🔍 HealthRecord render:', { 
-    editable, 
-    hasOnSave: !!onSave,
-    hasOnCancel: !!onCancel 
-  });
+  // Reset editedData and hasChanges when fhirData prop changes
+  useEffect(() => {
+    setEditedData(fhirData);
+    setHasChanges(false);
+  }, [fhirData]);
 
+ /* Notify parent if there are updates. Second useEffect below notifies what the updates are
+ Kept separate to be more performative. parent could derive boolean state but would require
+ more computation, comparing potentially large JSONs everytime. More efficient to just pass boolean?
+ Maybe stupid? but whatever */
+  useEffect(() => {
+    console.log('🔔 HealthRecord hasChanges changed:', hasChanges);
+    if (onFhirChanged) {
+      onFhirChanged(hasChanges);
+    }
+  }, [hasChanges, onFhirChanged]);
+
+   //Notify parent of what changed
+  useEffect(() => {
+    if (onDataChange) {
+      onDataChange(editedData);
+    }
+  }, [editedData, onDataChange]);
 
   // Update a specific resource
   const updateResource = (index: number, updatedResource: any) => {
@@ -558,21 +573,6 @@ const HealthRecord: React.FC<HealthRecordProps> = ({
       setEditedData(newData);
       setHasChanges(true);
     }
-  };
-
-  // Handle save
-  const handleSave = () => {
-    if (onSave) {
-      onSave(editedData);
-    }
-    setHasChanges(false);
-  };
-
-  // Handle cancel
-  const handleCancel = () => {
-    setEditedData(fhirData);
-    setHasChanges(false);
-    if (onCancel) onCancel();
   };
 
   if (!editedData || !editedData.entry) {

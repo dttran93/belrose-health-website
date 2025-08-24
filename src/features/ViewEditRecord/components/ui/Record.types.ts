@@ -44,8 +44,8 @@ export interface HealthRecordProps {
   className?: string;
   //Edit mode props
   editable?: boolean;
-  onSave?: (updatedData: any) => void;
-  onCancel?: () => void;
+  onFhirChanged?: (hasChanges: boolean) => void;
+  onDataChange?: (updatedFhirData: any) => void;
 }
 
 // Props for FHIR field component

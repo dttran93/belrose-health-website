@@ -40,6 +40,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   retryFile,
   getStats,
   updateFileStatus,
+  onReview,
   
   // Direct upload functions
   addFhirAsVirtualFile,
@@ -52,6 +53,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   //FHIR props
   fhirData,
   onFHIRConverted,
+
   
   // Configuration props
   acceptedTypes = ['.pdf', '.docx', '.doc', '.txt', '.jpg', '.jpeg', '.png'] as string[],
@@ -540,6 +542,7 @@ return (
                   onRetry={handleRetryFile}
                   onComplete={handleFileComplete}
                   showFHIRResults={true}
+                  onReview={onReview}
                 />
               );
             })}

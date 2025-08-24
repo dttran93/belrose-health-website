@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { toast } from 'sonner';
+import useFileManager from '@/features/AddRecord/hooks/useFileManager';
 import { 
   Search, 
   Filter, 
@@ -34,26 +36,62 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
   onAddNewRecord
 }) => {
   const { user } = useAuthContext();
-  
-  // 🔥 USE THE NEW HOOK THAT FETCHES COMPLETE DATA
   const { records, loading, error } = useCompleteRecords(user?.uid);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [viewMode, setViewMode] = useState<'summary' | 'detailed'>('summary');
   const [selectedRecord, setSelectedRecord] = useState<FileObject | null>(null);
+  const [editMode, setEditMode] = useState(false);
 
-  // 🔍 Add debugging to see what records we're getting
-  console.log('📊 Complete records received:', records.length);
-  records.forEach((record, index) => {
-    console.log(`Record ${index}:`, {
-      id: record.id,
-      name: record.name,
-      hasBelroseFields: !!record.belroseFields,
-      institution: record.belroseFields?.institution,
-      provider: record.belroseFields?.provider
-    });
-  });
+  const { updateFirestoreRecord } = useFileManager();
+
+  const handleEditRecord = (record: FileObject) => {
+    setSelectedRecord(record);
+    setViewMode('detailed');
+    setEditMode(true);
+
+    if(onEditRecord) {
+      onEditRecord(record);
+    }
+  }
+
+  useEffect(() => {
+    if (selectedRecord && selectedRecord.id) {
+      const updatedRecord = records.find(r => r.id === selectedRecord.id);
+      if(updatedRecord) {
+        setSelectedRecord(updatedRecord);
+      }
+    }
+  }, [records, selectedRecord]);
+
+  const handleSaveRecord = async (updatedRecord: FileObject) => {
+    try {
+      if(!updatedRecord.id) {
+        throw new Error('Cannot save record - no document ID found')
+      }
+
+      //Update the record in Firestore with both FHIR data and belroseFields
+      await updateFirestoreRecord(updatedRecord.id, {
+        fhirData: updatedRecord.fhirData,
+        belroseFields: updatedRecord.belroseFields,
+        lastModified: new Date().toISOString()
+      });
+
+      console.log('Record saved successfully');
+      toast.success(`💾 Record saved for ${updatedRecord.belroseFields?.title}`, {
+        description: 'Record updates saved to cloud storage',
+        duration: 4000,
+      }) 
+
+      } catch (error) {
+        console.error('Failed to save record: ', error);
+        toast.error(`Failed to save ${updatedRecord.belroseFields?.title}`, {
+          description: error instanceof Error ? error.message : 'Unknown error occurred',
+          duration: 4000,
+        })
+      }
+    }
 
   // Handle view record - switch to detailed view
   const handleViewRecord = (record: FileObject) => {
@@ -159,11 +197,13 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
     return (
       <HealthRecordFull 
         record={selectedRecord}
-        onBack={handleBackToSummary}
+        onBack={() => {handleBackToSummary(); setEditMode(false);}}
         onEdit={onEditRecord}
         onDownload={onDownloadRecord}
         onShare={onShareRecord}
         onDelete={onDeleteRecord}
+        onSave={handleSaveRecord}
+        initialEditMode={editMode}
       />
     );
   }
@@ -243,7 +283,7 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
                 key={record.id}
                 record={record}
                 onView={handleViewRecord} // Use our new handler
-                onEdit={onEditRecord}
+                onEdit={handleEditRecord}
                 className="max-w-none" // Full width for list view
               />
             ))}
