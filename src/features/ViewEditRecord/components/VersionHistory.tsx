@@ -269,7 +269,7 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 ml-4">
-                    {!compact && (
+                    {(versions.length > 1 || !isCurrent) && (
                       <>
                         <Button
                           variant={isSelected ? "default" : "outline"}
@@ -281,7 +281,9 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                           {isSelected ? `Selected #${selectionInfo?.order}` : 'Select'}
                         </Button>
 
-                        <Button
+                        {!isCurrent && (
+                          <>
+                          <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleViewVersion(version)}
@@ -290,8 +292,7 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                           <Eye className="w-3 h-3 mr-1" />
                           View
                         </Button>
-                        
-                        {!isCurrent && (
+
                           <Button
                             variant="outline"
                             size="sm"
@@ -306,6 +307,7 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                             )}
                             Rollback
                           </Button>
+                        </>
                         )}
                       </>
                     )}
