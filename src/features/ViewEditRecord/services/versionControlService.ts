@@ -21,7 +21,9 @@ import {
   RecordVersion,
   ChangeSet,
   VersionDiff,
-  RollbackResult
+  RollbackResult,
+  JsonDiffEntry,
+  Change,
 } from './versionControlService.types';
 
 // ==================== MAIN VERSION CONTROL SERVICE ====================
@@ -59,9 +61,10 @@ export class VersionControlService {
       commitMessage: 'Initial version',
       changes: [], // No changes for initial version
       fileObjectSnapshot: {
-        fhirData: fileObject.fhirData,
-        belroseFields: fileObject.belroseFields,
-        extractedText: fileObject.extractedText,
+        fhirData: fileObject.fhirData || null,
+        belroseFields: fileObject.belroseFields || null,
+        extractedText: fileObject.extractedText || null,
+        originalText: fileObject.originalText || null,
       },
       checksum: this.calculateChecksum(fileObject),
       isInitialVersion: true
@@ -94,94 +97,176 @@ export class VersionControlService {
   /**
    * Create a new version when the record is updated
    */
-  async createVersion(
-    documentId: string, 
-    updatedFileObject: FileObject, 
-    commitMessage?: string
-  ): Promise<string> {
-    if (!this.currentUser) throw new Error("User not authenticated");
+async createVersion(
+  documentId: string, 
+  updatedFileObject: FileObject, 
+  commitMessage?: string
+): Promise<string> {
+  if (!this.currentUser) throw new Error("User not authenticated");
 
-    // Get current version control record
-    const versionControlRef = doc(this.db, `users/${this.userId}/recordVersions`, documentId);
-    const versionControlDoc = await getDoc(versionControlRef);
+  console.log(`🔍 Creating version for document: ${documentId}`);
 
-    if (!versionControlDoc.exists()) {
-      // If no version control exists yet, initialize it
-      return this.initializeVersioning(documentId, updatedFileObject);
-    }
+  // Get current version control record
+  const versionControlRef = doc(this.db, `users/${this.userId}/recordVersions`, documentId);
+  const versionControlDoc = await getDoc(versionControlRef);
 
-    const versionControlData = versionControlDoc.data() as VersionControlRecord;
-    
-    // Get the current version to compare against
-    const currentVersionRef = doc(
-      this.db, 
-      `users/${this.userId}/recordVersions/${documentId}/versions`, 
-      versionControlData.currentVersion
-    );
-    const currentVersionDoc = await getDoc(currentVersionRef);
+  if (!versionControlDoc.exists()) {
+    console.log(`📝 No version control exists for ${documentId}, initializing...`);
+    // If no version control exists yet, initialize it
+    return this.initializeVersioning(documentId, updatedFileObject);
+  }
 
-    if (!currentVersionDoc.exists()) {
-      throw new Error("Current version not found");
-    }
+  const versionControlData = versionControlDoc.data() as VersionControlRecord;
+  console.log(`📊 Found version control record:`, versionControlData);
+  
+  // Get the current version to compare against
+  const currentVersionRef = doc(
+    this.db, 
+    `users/${this.userId}/recordVersions/${documentId}/versions`, 
+    versionControlData.currentVersion
+  );
+  const currentVersionDoc = await getDoc(currentVersionRef);
 
-    const currentVersion = currentVersionDoc.data() as RecordVersion;
-    
-    // Calculate differences
-    const changes = this.calculateDifferences(
-      currentVersion.fileObjectSnapshot,
-      {
-        fhirData: updatedFileObject.fhirData,
-        belroseFields: updatedFileObject.belroseFields,
-        extractedText: updatedFileObject.extractedText,
-      }
-    );
+  if (!currentVersionDoc.exists()) {
+    console.error(`❌ Current version ${versionControlData.currentVersion} not found for document ${documentId}`);
+    console.log(`🔍 Attempting to reinitialize version control...`);
+    // Current version is missing, reinitialize
+    return this.initializeVersioning(documentId, updatedFileObject);
+  }
 
-    // Only create a new version if there are actual changes
-    if (changes.length === 0) {
-      console.log("No changes detected, skipping version creation");
-      return versionControlData.currentVersion;
-    }
-
-    const newVersionId = this.generateVersionId();
-    const timestamp = new Date().toISOString();
-
-    // Create new version
-    const newVersion: RecordVersion = {
-      versionId: newVersionId,
-      parentVersion: versionControlData.currentVersion,
-      timestamp,
-      author: this.userId,
-      authorName: this.currentUser.displayName || this.currentUser.email || 'Unknown',
-      commitMessage: commitMessage || this.generateAutoCommitMessage(changes),
-      changes,
-      fileObjectSnapshot: {
-        fhirData: updatedFileObject.fhirData,
-        belroseFields: updatedFileObject.belroseFields,
-        extractedText: updatedFileObject.extractedText,
-      },
-      checksum: this.calculateChecksum(updatedFileObject),
-      isInitialVersion: false
+  const currentVersion = currentVersionDoc.data() as RecordVersion;
+  //DEBUGGING
+  const newSnapshot = {
+  fhirData: updatedFileObject.fhirData ?? null,
+  belroseFields: updatedFileObject.belroseFields ?? null,
+  extractedText: updatedFileObject.extractedText ?? null,
+  originalText: updatedFileObject.originalText ?? null,
     };
 
-    // Save new version
-    const newVersionRef = doc(
-      this.db, 
-      `users/${this.userId}/recordVersions/${documentId}/versions`, 
-      newVersionId
-    );
-    await setDoc(newVersionRef, newVersion);
+  console.log(`✅ Found current version: ${currentVersion.versionId}`);
+  console.log("Current version fileObjectSnapshot:", JSON.stringify(currentVersion.fileObjectSnapshot, null, 2));
+  console.log("Updated version:", JSON.stringify(currentVersion.fileObjectSnapshot, null, 2));
+  console.log("New updated file object snapshot for comparison:", JSON.stringify(newSnapshot, null, 2));
 
-    // Update version control record
-    await updateDoc(versionControlRef, {
-      currentVersion: newVersionId,
-      'metadata.lastModified': timestamp,
-      'metadata.lastModifiedBy': this.userId,
-      'metadata.totalVersions': versionControlData.metadata.totalVersions + 1,
-      'metadata.recordTitle': updatedFileObject.belroseFields?.title
-    });
+  // Calculate differences
+  const changes = this.deepDiff(
+    currentVersion.fileObjectSnapshot,
+    {
+      fhirData: updatedFileObject.fhirData ?? null,
+      belroseFields: updatedFileObject.belroseFields ?? null,
+      extractedText: updatedFileObject.extractedText ?? null,
+      originalText: updatedFileObject.originalText ?? null,
+    }
+  );
 
-    return newVersionId;
+    console.log('Changes Array Content:', changes )
+
+  // Only create a new version if there are actual changes
+  if (changes.length === 0) {
+    console.log("🔄 No changes detected, skipping version creation");
+    return versionControlData.currentVersion;
   }
+
+  console.log(`📝 Creating new version with ${changes.length} changes`);
+
+  const newVersionId = this.generateVersionId();
+  const timestamp = new Date().toISOString();
+
+  // Create new version
+  const newVersion: RecordVersion = {
+    versionId: newVersionId,
+    parentVersion: versionControlData.currentVersion,
+    timestamp,
+    author: this.userId,
+    authorName: this.currentUser.displayName || this.currentUser.email || 'Unknown',
+    commitMessage: commitMessage || this.generateAutoCommitMessage(changes),
+    changes,
+    fileObjectSnapshot: {
+      fhirData: updatedFileObject.fhirData ?? null,
+      belroseFields: updatedFileObject.belroseFields ?? null,
+      extractedText: updatedFileObject.extractedText ?? null,
+      originalText: updatedFileObject.originalText ?? null,
+    },
+    checksum: this.calculateChecksum(updatedFileObject),
+    isInitialVersion: false
+  };
+
+  // Save new version
+  const newVersionRef = doc(
+    this.db, 
+    `users/${this.userId}/recordVersions/${documentId}/versions`, 
+    newVersionId
+  );
+
+console.log('🔍 About to save version with data:', {
+  versionId: newVersion.versionId,
+  timestamp: newVersion.timestamp,
+  author: newVersion.author,
+  authorName: newVersion.authorName,
+  commitMessage: newVersion.commitMessage,
+  changes: newVersion.changes,
+  fileObjectSnapshot: newVersion.fileObjectSnapshot,
+  checksum: newVersion.checksum,
+  isInitialVersion: newVersion.isInitialVersion
+});
+
+// Check for undefined values in the changes array
+newVersion.changes.forEach((change, index) => {
+  // Type-safe way to check each property
+  if (change.operation === undefined) console.error(`🚨 Found undefined operation in change[${index}]`);
+  if (change.path === undefined) console.error(`🚨 Found undefined path in change[${index}]`);
+  if (change.fieldType === undefined) console.error(`🚨 Found undefined fieldType in change[${index}]`);
+  if (change.timestamp === undefined) console.error(`🚨 Found undefined timestamp in change[${index}]`);
+  if (change.description === undefined) console.error(`🚨 Found undefined description in change[${index}]`);
+  // oldValue and newValue can be undefined/null legitimately, but let's check anyway
+  if (change.operation === 'update' && change.oldValue === undefined) {
+    console.error(`🚨 Found undefined oldValue in UPDATE change[${index}]:`, change);
+  }
+  if ((change.operation === 'update' || change.operation === 'create') && change.newValue === undefined) {
+    console.error(`🚨 Found undefined newValue in ${change.operation} change[${index}]:`, change);
+  }
+});
+
+// Check fileObjectSnapshot
+const snapshot = newVersion.fileObjectSnapshot;
+if (snapshot.fhirData === undefined) console.error(`🚨 Found undefined fhirData in snapshot`);
+if (snapshot.belroseFields === undefined) console.error(`🚨 Found undefined belroseFields in snapshot`);
+if (snapshot.extractedText === undefined) console.error(`🚨 Found undefined extractedText in snapshot`);
+if (snapshot.originalText === undefined) console.error(`🚨 Found undefined originalText in snapshot`);
+
+// Also check top-level properties
+const topLevelChecks = {
+  versionId: newVersion.versionId,
+  timestamp: newVersion.timestamp,
+  author: newVersion.author,
+  authorName: newVersion.authorName,
+  commitMessage: newVersion.commitMessage,
+  checksum: newVersion.checksum,
+  isInitialVersion: newVersion.isInitialVersion,
+  parentVersion: newVersion.parentVersion
+};
+
+Object.entries(topLevelChecks).forEach(([key, value]) => {
+  if (value === undefined) {
+    console.error(`🚨 Found undefined ${key} in newVersion`);
+  }
+});
+
+  await setDoc(newVersionRef, newVersion);
+  console.log(`✅ Created new version: ${newVersionId}`);
+
+  // Update version control record
+  await updateDoc(versionControlRef, {
+    currentVersion: newVersionId,
+    'metadata.lastModified': timestamp,
+    'metadata.lastModifiedBy': this.userId,
+    'metadata.totalVersions': versionControlData.metadata.totalVersions + 1,
+    'metadata.recordTitle': updatedFileObject.belroseFields?.title
+  });
+  console.log(`✅ Updated version control record`);
+
+  return newVersionId;
+}
 
   // ==================== RETRIEVAL METHODS ====================
 
@@ -271,62 +356,72 @@ export class VersionControlService {
   // ==================== UTILITY METHODS ====================
 
   private calculateDifferences(oldData: any, newData: any): ChangeSet[] {
-    const changes: ChangeSet[] = [];
+  try {
+    const diffResult = jsonDiff(oldData, newData);
     
-    try {
-      const diffResult = jsonDiff(oldData, newData);
-      
-      if (!diffResult || !Array.isArray(diffResult)) return changes;
-      
-      this.convertJsonDiffToChangeSets(diffResult, changes);
-      return changes;
-    } catch (error) {
-      console.error('Error calculating differences:', error);
-      return changes;
+    console.log('🔍 Raw diff result:', diffResult);
+    console.log('🔍 Diff result type:', typeof diffResult);
+    console.log('🔍 Is array:', Array.isArray(diffResult));
+    
+    if (!diffResult || !Array.isArray(diffResult)) {
+      console.log('No changes detected');
+      return [];
     }
+    
+    const timestamp = new Date().toISOString();
+    const changes = this.convertJsonDiffToChangeSets(diffResult, timestamp);
+    console.log('🔍 Final changes:', changes);
+    return changes;
+  } catch (error) {
+    console.error('Error calculating differences:', error);
+    return [];
   }
+}
 
-  private convertJsonDiffToChangeSets(diffResult: any[], changes: ChangeSet[]): void {
-    diffResult.forEach((change: any) => {
-      const timestamp = new Date().toISOString();
-      
-      // json-diff-ts returns objects with type, key, value, oldValue, etc.
-      if (change.type === 'UPDATE') {
-        changes.push({
-          operation: 'update',
-          path: change.path || change.key,
-          oldValue: change.oldValue,
-          newValue: change.value,
-          fieldType: typeof change.value,
-          timestamp,
-          description: `Updated ${this.pathToHumanReadable(change.path || change.key)}`
-        });
-      } else if (change.type === 'ADD') {
-        changes.push({
-          operation: 'create',
-          path: change.path || change.key,
-          newValue: change.value,
-          fieldType: typeof change.value,
-          timestamp,
-          description: `Added ${this.pathToHumanReadable(change.path || change.key)}`
-        });
-      } else if (change.type === 'REMOVE') {
-        changes.push({
-          operation: 'delete',
-          path: change.path || change.key,
-          oldValue: change.oldValue || change.value,
-          fieldType: typeof (change.oldValue || change.value),
-          timestamp,
-          description: `Deleted ${this.pathToHumanReadable(change.path || change.key)}`
-        });
-      }
-      
-      // Handle nested changes
-      if (change.changes && Array.isArray(change.changes)) {
-        this.convertJsonDiffToChangeSets(change.changes, changes);
-      }
-    });
-  }
+private convertJsonDiffToChangeSets(differences: any[], timestamp: string): ChangeSet[] {
+  const changes: ChangeSet[] = [];
+  
+  differences.forEach((change, index) => {
+    console.log(`🔍 Processing change ${index}:`, change);
+    
+    // Handle based on json-diff-ts actual format
+    if (change.type === 'UPDATE') {
+      changes.push({
+        operation: 'update',
+        path: change.key || change.path || `change_${index}`,
+        oldValue: change.oldValue ?? null,
+        newValue: change.value ?? null,
+        fieldType: typeof (change.value ?? 'unknown'),
+        timestamp,
+        description: `Updated ${this.pathToHumanReadable(change.key || change.path || `change_${index}`)}`
+      });
+    } else if (change.type === 'ADD') {
+      changes.push({
+        operation: 'create',
+        path: change.key || change.path || `change_${index}`,
+        oldValue: null,
+        newValue: change.value ?? null,
+        fieldType: typeof (change.value ?? 'unknown'),
+        timestamp,
+        description: `Added ${this.pathToHumanReadable(change.key || change.path || `change_${index}`)}`
+      });
+    } else if (change.type === 'REMOVE') {
+      changes.push({
+        operation: 'delete',
+        path: change.key || change.path || `change_${index}`,
+        oldValue: change.oldValue ?? change.value ?? null,
+        newValue: null,
+        fieldType: typeof (change.oldValue ?? change.value ?? 'unknown'),
+        timestamp,
+        description: `Deleted ${this.pathToHumanReadable(change.key || change.path || `change_${index}`)}`
+      });
+    }
+    
+    console.log(`🔍 Changes array now has ${changes.length} items`);
+  });
+  
+  return changes;
+}
 
   private pathToHumanReadable(path: string): string {
     // Convert JSON paths to human-readable descriptions
@@ -357,59 +452,206 @@ export class VersionControlService {
     return `v_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  private calculateChecksum(fileObject: FileObject | Partial<FileObject>): string {
-    // Create a deterministic string representation for checksumming
-    const data = {
-      fhirData: fileObject.fhirData,
-      belroseFields: fileObject.belroseFields,
-      extractedText: fileObject.extractedText
-    };
-    
-    const dataString = JSON.stringify(data, Object.keys(data).sort());
-    
-    // Simple hash function (you could use crypto for better hashing)
-    let hash = 0;
-    for (let i = 0; i < dataString.length; i++) {
-      const char = dataString.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
+    private calculateChecksum(fileObject: FileObject | Partial<FileObject>): string {
+        // Create a deterministic string representation for checksumming
+        const data = {
+            fhirData: fileObject.fhirData ?? null,
+            belroseFields: fileObject.belroseFields ?? null,
+            extractedText: fileObject.extractedText ?? null,
+            originalText: fileObject.originalText ?? null
+        };
+        
+        const dataString = JSON.stringify(data, Object.keys(data).sort());
+        
+        // Simple hash function (you could use crypto for better hashing)
+        let hash = 0;
+        for (let i = 0; i < dataString.length; i++) {
+            const char = dataString.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        
+        return Math.abs(hash).toString(16);
     }
-    
-    return Math.abs(hash).toString(16);
-  }
 
   // ==================== COMPARISON UTILITIES ====================
 
+private deepDiff(oldObj: any, newObj: any, path: string = ''): Change[] {
+  const changes: Change[] = [];
+
+  // Handle null/undefined cases
+  if (oldObj === null || oldObj === undefined) {
+    if (newObj !== null && newObj !== undefined) {
+      changes.push({
+        operation: 'create',
+        path: path || 'root',
+        oldValue: oldObj,
+        newValue: newObj,
+        description: `Added new value at ${path || 'root'}`
+      });
+    }
+    return changes;
+  }
+
+  if (newObj === null || newObj === undefined) {
+    changes.push({
+      operation: 'delete',
+      path: path || 'root',
+      oldValue: oldObj,
+      newValue: newObj,
+      description: `Removed value from ${path || 'root'}`
+    });
+    return changes;
+  }
+
+  // Handle primitive types
+  if (typeof oldObj !== 'object' || typeof newObj !== 'object') {
+    if (oldObj !== newObj) {
+      changes.push({
+        operation: 'update',
+        path: path || 'root',
+        oldValue: oldObj,
+        newValue: newObj,
+        description: `Updated ${path || 'root'} from "${oldObj}" to "${newObj}"`
+      });
+    }
+    return changes;
+  }
+
+  // Handle arrays
+  if (Array.isArray(oldObj) || Array.isArray(newObj)) {
+    const oldArray = Array.isArray(oldObj) ? oldObj : [];
+    const newArray = Array.isArray(newObj) ? newObj : [];
+    
+    const maxLength = Math.max(oldArray.length, newArray.length);
+    
+    for (let i = 0; i < maxLength; i++) {
+      const arrayPath = path ? `${path}[${i}]` : `[${i}]`;
+      
+      if (i >= oldArray.length) {
+        // New item added
+        changes.push({
+          operation: 'create',
+          path: arrayPath,
+          oldValue: undefined,
+          newValue: newArray[i],
+          description: `Added new array item at index ${i}`
+        });
+      } else if (i >= newArray.length) {
+        // Item removed
+        changes.push({
+          operation: 'delete',
+          path: arrayPath,
+          oldValue: oldArray[i],
+          newValue: undefined,
+          description: `Removed array item at index ${i}`
+        });
+      } else {
+        // Recursively compare array items
+        changes.push(...this.deepDiff(oldArray[i], newArray[i], arrayPath));
+      }
+    }
+    
+    return changes;
+  }
+
+  // Handle objects
+  const allKeys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
+  
+  for (const key of allKeys) {
+    const newPath = path ? `${path}.${key}` : key;
+    
+    if (!(key in oldObj)) {
+      // New property added
+      changes.push({
+        operation: 'create',
+        path: newPath,
+        oldValue: undefined,
+        newValue: newObj[key],
+        description: `Added new property "${key}"`
+      });
+    } else if (!(key in newObj)) {
+      // Property removed
+      changes.push({
+        operation: 'delete',
+        path: newPath,
+        oldValue: oldObj[key],
+        newValue: undefined,
+        description: `Removed property "${key}"`
+      });
+    } else {
+      // Property exists in both - recursively compare
+      changes.push(...this.deepDiff(oldObj[key], newObj[key], newPath));
+    }
+  }
+
+  return changes;
+}
+
+private generateDiffSummary(changes: Change[], olderVersion: any, newerVersion: any): string {
+  if (changes.length === 0) {
+    return 'No changes between versions';
+  }
+
+  const operations = {
+    create: changes.filter(c => c.operation === 'create').length,
+    update: changes.filter(c => c.operation === 'update').length,
+    delete: changes.filter(c => c.operation === 'delete').length
+  };
+
+  const parts: string[] = [];
+  if (operations.update > 0) parts.push(`${operations.update} updated`);
+  if (operations.create > 0) parts.push(`${operations.create} added`);
+  if (operations.delete > 0) parts.push(`${operations.delete} removed`);
+
+  const olderDate = new Date(olderVersion.timestamp).toLocaleDateString();
+  const newerDate = new Date(newerVersion.timestamp).toLocaleDateString();
+  
+  return `${parts.join(', ')} between ${olderDate} and ${newerDate}`;
+}
+
+private async getVersionData(documentId: string, versionId: string): Promise<{data: any, timestamp: string} | null> {
+  const version = await this.getVersion(documentId, versionId);
+  if (!version) return null;
+  
+  return {
+    data: version.fileObjectSnapshot,
+    timestamp: version.timestamp
+  };
+}
   /**
    * Compare two versions and return a detailed diff
    */
-  async compareVersions(
-    documentId: string, 
-    versionId1: string, 
-    versionId2: string
-  ): Promise<VersionDiff> {
-    const [version1, version2] = await Promise.all([
-      this.getVersion(documentId, versionId1),
-      this.getVersion(documentId, versionId2)
+async compareVersions(documentId: string, olderVersionId: string, newerVersionId: string): Promise<VersionDiff> {
+  try {
+    // Fetch both versions
+    const [olderVersion, newerVersion] = await Promise.all([
+      this.getVersionData(documentId, olderVersionId),
+      this.getVersionData(documentId, newerVersionId)
     ]);
 
-    if (!version1 || !version2) {
-      throw new Error("One or both versions not found");
+    if (!olderVersion || !newerVersion) {
+      throw new Error('One or both versions not found');
     }
 
-    const changes = this.calculateDifferences(
-      version1.fileObjectSnapshot,
-      version2.fileObjectSnapshot
-    );
+    // Perform deep diff
+    const changes = this.deepDiff(olderVersion.data, newerVersion.data);
+
+    // Create summary
+    const summary = this.generateDiffSummary(changes, olderVersion, newerVersion);
 
     return {
-      versionId: versionId2,
-      parentVersionId: versionId1,
-      timestamp: version2.timestamp,
+      olderVersionId,
+      newerVersionId,
       changes,
-      summary: this.generateAutoCommitMessage(changes)
+      summary,
+      timestamp: new Date().toISOString()
     };
+  } catch (error) {
+    console.error('Error comparing versions:', error);
+    throw new Error(`Failed to compare versions: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+}
 
   /**
    * Get recent versions (for quick access)

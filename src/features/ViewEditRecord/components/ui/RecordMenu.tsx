@@ -8,7 +8,8 @@ import {
   Eye,
   Archive, 
   Trash2,
-  LucideIcon 
+  LucideIcon, 
+  GitBranch
 } from 'lucide-react';
 
 // Types for the menu system
@@ -40,6 +41,7 @@ interface HealthRecordMenuProps {
   onDelete?: (record: any) => void;
   onArchive?: (record: any) => void;
   onView?: (record: any) => void;
+  onVersion?: (record: any) => void;
   
   // Customization props
   triggerIcon?: LucideIcon;
@@ -54,6 +56,7 @@ interface HealthRecordMenuProps {
   showView?: boolean;
   showArchive?: boolean;
   showDelete?: boolean;
+  showVersions?: boolean;
   
   // Additional menu items from parent
   additionalItems?: MenuItem[];
@@ -65,6 +68,7 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
   onEdit,
   onShare,
   onDelete,
+  onVersion,
   triggerIcon: TriggerIcon = MoreHorizontal,
   triggerClassName = "p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors",
   menuClassName = "absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[160px]",
@@ -74,6 +78,7 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
   showCopy = true,
   showView = false, // Usually false for full view, true for cards
   showDelete = true,
+  showVersions = true,
   additionalItems = []
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -154,6 +159,16 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
         label: 'Edit Record',
         icon: Edit3,
         onClick: createHandler(onEdit)
+      });
+    }
+
+    // Edit action
+    if (showVersions && onVersion) {
+      items.push({
+        key: 'versions',
+        label: 'View Versions',
+        icon: GitBranch,
+        onClick: createHandler(onVersion)
       });
     }
 

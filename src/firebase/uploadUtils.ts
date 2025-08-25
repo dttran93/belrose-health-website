@@ -19,6 +19,7 @@ import {
 import { getAuth } from "firebase/auth";
 import type { FileObject } from '@/types/core';
 import { setDoc } from 'firebase/firestore';
+import { VersionControlService } from '@/features/ViewEditRecord/services/versionControlService'
 
 // ==================== TYPE DEFINITIONS ====================
 
@@ -215,39 +216,72 @@ export async function saveFileMetadataToFirestore({ downloadURL, filePath, fileO
   }
 }
 
-export const updateFirestoreRecord = async (documentId: string, updateData: any): Promise<void> => {
+export const updateFirestoreRecord = async (
+  documentId: string, 
+  updateData: any,
+  commitMessage?: string
+): Promise<void> => {
   const db = getFirestore();
   const auth = getAuth();
   const user = auth.currentUser;
 
   if (!user) throw new Error("User not authenticated");
+  if (!documentId) throw new Error("Document ID is required");
 
-  if(!documentId) {
-    throw new Error("Document ID is required");
-  }
-
-  const allowedFields = ['fhirData', 'belroseFields'];
-
+  // Filter allowed fields
+  const allowedFields = ['fhirData', 'belroseFields', 'extractedText', 'originalText', 'lastModified'];
   const filteredData = Object.keys(updateData)
     .filter(key => allowedFields.includes(key))
     .reduce((obj, key) => {
       obj[key] = updateData[key];
       return obj;
-    }, {} as any)
+    }, {} as any);
 
   if (Object.keys(filteredData).length === 0) {
     throw new Error("No valid fields to update");
   }
-  
+
+  // Add timestamp
+  filteredData.lastModified = new Date().toISOString();
+
   try {
+    // Step 1: Get current document state for version control
     const docRef = doc(db, "users", user.uid, "files", documentId);
-    await setDoc(docRef, filteredData, { merge: true}); 
-    console.log('Updated fields:', Object.keys(filteredData));
+    const currentDoc = await getDoc(docRef);
+    const currentFileObject = currentDoc.exists() ? currentDoc.data() as FileObject : null;
+
+    // Step 2: Update the main document
+    await setDoc(docRef, filteredData, { merge: true });
+    console.log('✅ Updated fields:', Object.keys(filteredData));
+
+    // Step 3: Create version (always enabled)
+    if (currentFileObject) {
+      const versionControl = new VersionControlService();
+      
+      const updatedFileObject: FileObject = {
+        ...currentFileObject,
+        ...filteredData,
+        id: documentId
+      };
+
+      try {
+        const versionId = await versionControl.createVersion(
+          documentId,
+          updatedFileObject,
+          commitMessage
+        );
+        console.log(`✅ Version ${versionId} created for document ${documentId}`);
+      } catch (versionError) {
+        console.error('⚠️ Error creating version (continuing with main update):', versionError);
+      }
+    }
+
   } catch (error: any) {
-    console.error("Error updating document:", error);
+    console.error("❌ Error updating document:", error);
     throw new Error(`Failed to update document: ${error.message}`);
   }
 };
+
 
 // ==================== DELETE FUNCTIONS ====================
 

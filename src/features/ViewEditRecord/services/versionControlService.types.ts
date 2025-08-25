@@ -5,16 +5,15 @@ import { FileObject } from '@/types/core';
 // ==================== MAIN VERSION CONTROL TYPES ====================
 
 export interface VersionControlRecord {
-  // Keep your existing FileObject structure
   currentVersion: string;
-  documentId: string; // This is the main document ID in your files collection
+  documentId: string;
   metadata: {
     createdAt: string;
     createdBy: string;
     lastModified: string;
     lastModifiedBy: string;
     totalVersions: number;
-    recordTitle?: string; // From belroseFields.title
+    recordTitle?: string;
   };
 }
 
@@ -25,36 +24,39 @@ export interface RecordVersion {
   author: string;
   authorName?: string;
   commitMessage?: string;
-  changes: ChangeSet[];
+  changes: Change[]; // Updated to use Change instead of ChangeSet
   
-  // Store the complete FileObject state at this version
   fileObjectSnapshot: {
     fhirData?: any;
     belroseFields?: any;
     extractedText?: string | null;
-    // Other relevant fields from FileObject that can change
+    originalText?: string;
   };
   
   checksum: string;
   isInitialVersion: boolean;
 }
 
-export interface ChangeSet {
-  operation: 'create' | 'update' | 'delete' | 'add_array_item' | 'remove_array_item';
-  path: string; // JSON path like "fhirData.entry[0].resource.name"
+// Consolidated Change interface with all needed properties
+export interface Change {
+  operation: 'create' | 'update' | 'delete';
+  path: string;
   oldValue?: any;
   newValue?: any;
-  fieldType: string;
-  timestamp: string;
-  description?: string; // Human-readable description
+  description?: string;
+  fieldType?: string; // Optional for backward compatibility
+  timestamp?: string; // Optional for backward compatibility
 }
 
+// Type alias for backward compatibility
+export type ChangeSet = Change;
+
 export interface VersionDiff {
-  versionId: string;
-  parentVersionId?: string;
+  olderVersionId: string;
+  newerVersionId: string;
+  changes: Change[]; // Updated to use Change
+  summary: string;
   timestamp: string;
-  changes: ChangeSet[];
-  summary: string; // e.g., "3 fields updated, 1 field added"
 }
 
 // ==================== HOOK RETURN TYPES ====================
@@ -76,7 +78,18 @@ export interface VersionHistoryProps {
   documentId: string;
   onVersionSelect?: (version: RecordVersion) => void;
   onRollback?: (versionId: string) => void;
+  onViewVersion?: (version: RecordVersion) => void;
   compact?: boolean;
+  selectedVersions?: string[];
+  onVersionsLoaded?: (loadedVersions: RecordVersion[]) => void;
+  onBack?: () => void;
+  getSelectionInfo?: (versionId: string) => {
+    order: number;
+    colorClass: string;
+    bgClass: string;
+    textClass: string;
+    badgeClass: string;
+  } | null;
 }
 
 export interface VersionDiffViewerProps {
@@ -87,6 +100,9 @@ export interface VersionDiffViewerProps {
 export interface VersionControlPanelProps {
   documentId: string;
   className?: string;
+  onRollback?: () => void;
+  onBack?: () => void;
+  onViewVersion?: (version: RecordVersion) => void;
 }
 
 // ==================== SERVICE CONFIGURATION TYPES ====================
@@ -107,4 +123,15 @@ export interface MigrationResult {
   migratedCount: number;
   skippedCount: number;
   errors: string[];
+}
+
+// ==================== INTERNAL HELPER TYPES ====================
+
+export interface JsonDiffEntry {
+  type: 'INSERT' | 'UPDATE' | 'DELETE';
+  key?: string;
+  path?: string[];
+  value?: any;
+  oldValue?: any;
+  changes?: JsonDiffEntry[];
 }

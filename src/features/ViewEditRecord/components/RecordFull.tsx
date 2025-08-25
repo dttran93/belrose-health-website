@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { X, Share2, ClipboardPlus, Code, FileInput, Ellipsis, Save } from 'lucide-react';
+import { X, Share2, ClipboardPlus, Code, FileInput, Ellipsis, Save, Eye } from 'lucide-react';
 import { FileObject, BelroseFields } from '@/types/core';
 import { TabNavigation } from "@/features/AddRecord/components/ui/TabNavigation";
 import HealthRecord from "@/features/ViewEditRecord/components/ui/Record";
 import HealthRecordMenu from "./ui/RecordMenu";
 import { LayoutSlot } from "@/components/app/LayoutProvider";
-import { getDocumentTypeColor, getFileExtension } from "@/features/ViewEditRecord/components/ui/RecordCard";
+import VersionControlPanel from "./VersionControlPanel";
+import { RecordVersion } from "../services/versionControlService.types"
 
 type TabType = 'record' | 'data' | 'original';
 
@@ -146,6 +147,49 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
   const [editedBelroseFields, setEditedBelroseFields] = useState<BelroseFields>(
     record.belroseFields || {}
   );
+  const [showVersions, setShowVersions] = useState(false);
+  const [viewingVersion, setViewingVersion] = useState<RecordVersion | null>(null);
+  const [isVersionView, setIsVersionView] = useState(false);
+
+  const reconstructFileObjectFromVersion = (version: RecordVersion, originalRecord: FileObject): FileObject => {
+    return{
+      ...originalRecord,
+      fhirData: version.fileObjectSnapshot.fhirData,
+      belroseFields: version.fileObjectSnapshot.belroseFields,
+      extractedText: version.fileObjectSnapshot.extractedText,
+      originalText: version.fileObjectSnapshot.originalText,
+
+      _versionInfo: {
+      versionId: version.versionId,
+      timestamp: version.timestamp,
+      isHistoricalView: true
+      }
+    }
+  }
+
+  const displayRecord = isVersionView && viewingVersion
+    ? reconstructFileObjectFromVersion(viewingVersion, record)
+    : record;
+
+  const handleViewVersion = (version: RecordVersion) => {
+    setViewingVersion(version);
+    setIsVersionView(true);
+    setShowVersions(false);
+    setIsEditMode(false);
+  }
+
+  const handleReturnToCurrent = () => {
+    setIsVersionView(false);
+    setViewingVersion(null)
+  };
+
+  const handleVersionHistoryBack = () => {
+    if (isVersionView) {
+      setIsVersionView(false);
+      setViewingVersion(null);
+      setShowVersions(true);
+    } 
+  }
 
   const hasAnyChanges = hasUnsavedChanges || hasFhirChanges;
 
@@ -153,12 +197,18 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
     setCurrentFhirData(updatedData);
   };
 
+  const handleVersionMode = (record: string) => {
+    setIsEditMode(false);
+    setShowVersions(true);
+  }
+
   const handleFhirChanged = (hasChanges:boolean) => {
     setHasFhirChanges(hasChanges);
   };
 
   const handleEnterEditMode = () => {
     setIsEditMode(true);
+    setShowVersions(false);
     setActiveTab('record'); //only record tab has stuff to edit
     setEditedBelroseFields(record.belroseFields || {});
   }
@@ -211,6 +261,16 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
     setHasUnsavedChanges(true);
   };
 
+  // Handle version control panel callbacks
+  const handleVersionControlRollback = () => {
+    // Clear any unsaved changes
+    setHasUnsavedChanges(false);
+    setHasFhirChanges(false);
+    // Exit version mode and refresh the page to show the rolled-back version
+    setShowVersions(false);
+    window.location.reload();
+  };
+
   // Debug information
   console.log('🔍 Debug Record Data:', {
     hasDownloadURL: !!record.downloadURL,
@@ -220,18 +280,48 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
     allKeys: Object.keys(record)
   });
 
+  const canEdit = !isVersionView;
+
  return (
     <div className="max-w-7xl mx-auto bg-background rounded-2xl shadow-xl overflow-hidden">
       {/* Header */}
       <div className="bg-primary px-8 py-6">
+
+         {isVersionView && viewingVersion && (
+          <LayoutSlot slot="header">
+          <div className="p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="ml-3 flex items-center gap-2 text-yellow-100">
+                <span className="text-sm font-medium text-primary">
+                  Viewing historical version from {new Date(viewingVersion.timestamp).toLocaleString()}
+                </span>
+                {viewingVersion.commitMessage && (
+                  <span className="text-xs opacity-75">
+                    • {viewingVersion.commitMessage}
+                  </span>
+                )}
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleReturnToCurrent}
+                className="text-primary border-yellow-500/30 hover:bg-yellow-500/20"
+              >
+                Return to Current
+              </Button>
+            </div>
+          </div>
+          </LayoutSlot>
+        )}
+
         <div className="flex items-center justify-between space-x-1 mb-3">
           <div className="flex items-center gap-2">
             {!isEditMode && <>
               <span className="px-2 py-1 text-xs font-medium rounded-full border bg-background text-primary">
-                {record.belroseFields?.visitType}
+                {displayRecord.belroseFields?.visitType}
               </span>
               <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded border">
-                {record.documentType}
+                {displayRecord.documentType}
               </span>
             </>}
           </div>
@@ -244,7 +334,8 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
               triggerIcon={Ellipsis}
               showView={false}         // No view option (already viewing)
               triggerClassName="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
-              onEdit={handleEnterEditMode}
+              onEdit={canEdit? handleEnterEditMode : undefined}
+              onVersion={!isVersionView ? handleVersionMode : undefined}
             />
             <Button 
               variant="default" 
@@ -270,20 +361,31 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4 text-white">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">{record.belroseFields?.title}</h1>
+              <h1 className="text-2xl font-bold">{displayRecord.belroseFields?.title}</h1>
             </div>
           </div>
         </div>
             <div className="flex text-sm text-white items-start gap-4 my-2">
-              <div>{record.belroseFields?.completedDate} • {record.belroseFields?.patient} • {record.belroseFields?.provider} • {record.belroseFields?.institution}</div>
+              <div>{displayRecord.belroseFields?.completedDate} • {displayRecord.belroseFields?.patient} • {displayRecord.belroseFields?.provider} • {displayRecord.belroseFields?.institution}</div>
             </div>
             <div className="flex justify-left text-white/50 text-left">
-              <p>{record.belroseFields?.summary}</p>
+              <p>{displayRecord.belroseFields?.summary}</p>
             </div>
         </>
         )}
       </div>
       
+      {showVersions ? (
+        <div className="p-8">
+          <VersionControlPanel 
+            documentId={record.id}
+            onBack={() => setShowVersions(!showVersions)} 
+            onRollback={handleVersionControlRollback}
+            onViewVersion={handleViewVersion}
+          />
+        </div>
+       ) :(
+      <>
       <TabNavigation 
         tabs={tabs}
         activeTab={activeTab}
@@ -294,10 +396,9 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
         {/* Tab Content */}
         {activeTab === "record" && (
           <div className="space-y-6">
-            {/* Simplified: Single HealthRecord component with edit capabilities */}
             <HealthRecord 
-              fhirData={record.fhirData}
-              editable={isEditMode}
+              fhirData={displayRecord.fhirData}
+              editable={isEditMode && canEdit}
               onFhirChanged={handleFhirChanged}
               onDataChange={handleFhirDataChange}
             />
@@ -311,22 +412,22 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
               <h2 className="text-xl font-semibold text-gray-900">FHIR Data</h2>
             </div>
             <div className="bg-gray-50 rounded-lg p-4 border">
-              {record.fhirData ? (
+              {displayRecord.fhirData ? (
                 <div>
                   <div className="flex justify-between items-center mb-4 pb-2 border-b">
                     <span className="text-sm font-medium text-gray-600">
-                      {record.fhirData.type} Bundle • {record.fhirData.entry?.length || 0} entries
+                      {displayRecord.fhirData.type} Bundle • {displayRecord.fhirData.entry?.length || 0} entries
                     </span>
                     <Button
                       variant="outline"
-                      onClick={() => navigator.clipboard.writeText(JSON.stringify(record.fhirData, null, 2))}
+                      onClick={() => navigator.clipboard.writeText(JSON.stringify(displayRecord.fhirData, null, 2))}
                       className="text-xs px-2 py-1 rounded"
                     >
                       Copy JSON
                     </Button>
                   </div>
                   <pre className="text-sm text-gray-800 overflow-x-auto whitespace-pre-wrap max-h-96 overflow-y-auto">
-                    {JSON.stringify(record.fhirData, null, 2)}
+                    {JSON.stringify(displayRecord.fhirData, null, 2)}
                   </pre>
                 </div>
               ) : (<p className="text-gray-600">No FHIR data available</p>)}
@@ -341,7 +442,7 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
               <div className="flex flex-col">
                 <h2 className="text-xl font-semibold text-gray-900">Original Text Submission</h2>
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-gray-600">{record.originalText}</p>
+                  <p className="text-gray-600">{displayRecord.originalText}</p>
                 </div>
               </div>
             )}
@@ -351,7 +452,7 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
               <div className="flex flex-col">
                 <h2 className="text-xl font-semibold text-gray-900">Extracted Text from File</h2>
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-gray-600">{record.extractedText}</p>
+                  <p className="text-gray-600">{displayRecord.extractedText}</p>
                 </div>
               </div>
             )}
@@ -427,9 +528,9 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
             )}
           </div>
         )}
-      </div>
+      </div> 
 
-      {isEditMode && (
+      {isEditMode && !isVersionView && (
         <LayoutSlot slot="footer">
           <div className="flex justify-between items-center p-4 bg-white border-t border-gray-200">
             <div className="flex items-center gap-2">
@@ -456,7 +557,23 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
           </div>
         </LayoutSlot>
       )}
-
+      {!isEditMode && isVersionView && (
+        <LayoutSlot slot="footer">
+          <div className="flex justify-end items-center p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg">
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={handleVersionHistoryBack}>
+                <X className="w-4 h-4" />
+                Return to Version History
+              </Button>
+              <Button onClick={handleVersionControlRollback}>
+                <Save className="w-4 h-4" />
+                Rollback
+              </Button>
+            </div>
+          </div>
+        </LayoutSlot>
+      )}
+    </>)}
     </div>
   );
 };
