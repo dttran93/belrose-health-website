@@ -241,40 +241,43 @@ export const updateFirestoreRecord = async (
     throw new Error("No valid fields to update");
   }
 
-  // Add timestamp
-  filteredData.lastModified = new Date().toISOString();
+  // Add timestamp if not already present
+  if (!filteredData.lastModified) {
+    filteredData.lastModified = new Date().toISOString();
+  }
+
+  console.log('🔄 Updating Firestore with filtered data:', filteredData);
 
   try {
     // Step 1: Get current document state for version control
     const docRef = doc(db, "users", user.uid, "files", documentId);
     const currentDoc = await getDoc(docRef);
-    const currentFileObject = currentDoc.exists() ? currentDoc.data() as FileObject : null;
+    const currentFileObject = currentDoc.exists() ? currentDoc.data() : null;
+
+    if (!currentFileObject) {
+      throw new Error("Document not found");
+    }
 
     // Step 2: Update the main document
-    await setDoc(docRef, filteredData, { merge: true });
+    await updateDoc(docRef, filteredData);
     console.log('✅ Updated fields:', Object.keys(filteredData));
 
     // Step 3: Create version (always enabled)
-    if (currentFileObject) {
+      const {VersionControlService } = await import('@/features/ViewEditRecord/services/versionControlService');
       const versionControl = new VersionControlService();
-      
-      const updatedFileObject: FileObject = {
+
+      const updatedFileObject = {
         ...currentFileObject,
         ...filteredData,
         id: documentId
       };
 
-      try {
-        const versionId = await versionControl.createVersion(
-          documentId,
-          updatedFileObject,
-          commitMessage
-        );
-        console.log(`✅ Version ${versionId} created for document ${documentId}`);
-      } catch (versionError) {
-        console.error('⚠️ Error creating version (continuing with main update):', versionError);
-      }
-    }
+      await versionControl.createVersion(
+        documentId,
+        updatedFileObject,
+        commitMessage || `Record updated`
+      );
+        console.log(`✅ Version created for update`)
 
   } catch (error: any) {
     console.error("❌ Error updating document:", error);

@@ -22,6 +22,17 @@ export interface BelroseFields {
   aiFailureReason?: string;     // If AI processing failed, why?
 }
 
+export interface BlockchainVerification {
+  recordHash: string; //has of the record content
+  blockchainTxId: string; //Transaction ID on the blockchain
+  providerSignature?: string; //Digital signature (for provider records)
+  signerId?: string; //ID of who signed it
+  blockchainNetwork: string; //blockchain network, e.g. ethereum, solana
+  timestamp: number; //when it was recorded
+  isVerified: boolean; //whether blockchain verification passed. May change this to a credit system of sorts in the future
+  previousRecordHash?: string;
+}
+
 export type AIProcessingStatus =
   | 'pending'        // AI processing not yet started
   | 'processing'     // AI is currently processing
@@ -38,6 +49,7 @@ export interface FileObject {
   status: FileStatus; //Processing property. Initially set as pending. Then pending/processing... see below
   error?: string; //Failed processing
   extractedText?: string | null; //text extracted from image/pdf
+  originalText?: string | null;
   wordCount?: number; //calculated during text extraction
   fileHash?: string; 
   documentType?: string; //can be deleted probably
@@ -53,6 +65,10 @@ export interface FileObject {
   //For AI enrichedFields
   belroseFields?: BelroseFields; // Make this optional since not all records may have it yet
   aiProcessingStatus?: AIProcessingStatus;
+
+  //Blockchain Verification
+  blockchainVerification?: BlockchainVerification;
+  isProviderRecord?: boolean;
 }
 
 export type FileStatus = 

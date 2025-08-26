@@ -329,6 +329,7 @@ Object.entries(topLevelChecks).forEach(([key, value]) => {
       fhirData: targetVersion.fileObjectSnapshot.fhirData,
       belroseFields: targetVersion.fileObjectSnapshot.belroseFields,
       extractedText: targetVersion.fileObjectSnapshot.extractedText,
+      originalText: targetVersion.fileObjectSnapshot.originalText,
     };
 
     const newVersionId = await this.createVersion(
@@ -343,6 +344,8 @@ Object.entries(topLevelChecks).forEach(([key, value]) => {
       await updateFirestoreRecord(documentId, {
         fhirData: targetVersion.fileObjectSnapshot.fhirData,
         belroseFields: targetVersion.fileObjectSnapshot.belroseFields,
+        extractedText: targetVersion.fileObjectSnapshot.extractedText,
+        originalText: targetVersion.fileObjectSnapshot.originalText,
         lastModified: new Date().toISOString()
       });
     }
