@@ -45,19 +45,7 @@ const formatDate = (timestamp: any): string => {
   });
 };
 
-const getDocumentTypeColor = (type?: string): string => {
-  const colors: Record<string, string> = {
-    emergency_visit: 'bg-red-100 text-red-800 border-red-200',
-    routine_checkup: 'bg-green-100 text-green-800 border-green-200',
-    lab_results: 'bg-blue-100 text-blue-800 border-blue-200',
-    specialist_consult: 'bg-purple-100 text-purple-800 border-purple-200',
-    medical_record: 'bg-blue-100 text-blue-800 border-blue-200',
-    vision_prescription: 'bg-orange-100 text-orange-800 border-orange-200'
-  };
-  return colors[type || 'medical_record'] || 'bg-gray-100 text-gray-800 border-gray-200';
-};
-
-const getFileExtension = (fileName?: string): string => {
+export const getFileExtension = (fileName?: string): string => {
   if (!fileName) return 'Unknown';
   const extension = fileName.split('.').pop()?.toUpperCase();
   return extension || 'Unknown';
@@ -72,7 +60,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
 }) => {
 
   // Get the display name - your hook provides fileName
-  const displayName = record.name || 'Unknown Document';
+  const displayName = record.fileName || 'Unknown Document';
   
   return (
     <div className={`bg-background rounded-lg shadow-sm border border-border/20 hover:shadow-md transition-shadow ${className}`}>
@@ -80,11 +68,11 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
         {/* Header with document type badge and menu and verification status */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-2">
-            <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getDocumentTypeColor(record.documentType)}`}>
+            <span className='px-2 py-1 text-xs font-medium rounded-full border'>
               {record.belroseFields?.visitType}
             </span>
             <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded border">
-              {getFileExtension(displayName)}
+              {record.documentType}
             </span>
           </div>
           <div className='flex'>

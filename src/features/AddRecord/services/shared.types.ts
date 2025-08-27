@@ -27,7 +27,6 @@ export interface ProcessingResult {
   error: string | null;
   processingTime: number;
   // Optional field from DocumentProcessingResult
-  medicalDetection?: any; // You can make this more specific later
 }
 
 export interface FileValidationResult {
@@ -36,7 +35,6 @@ export interface FileValidationResult {
 }
 
 export interface ProcessingOptions {
-  enableMedicalDetection?: boolean;
   enableVisionAI?: boolean;
   compressionThreshold?: number;
   signal?: AbortSignal;

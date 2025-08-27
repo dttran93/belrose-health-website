@@ -7,9 +7,9 @@ import { FileObject } from '@/types/core';
 const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject => {
   return {
     id: docId,
-    name: data.fileName || data.name || 'Unknown File',
-    size: data.fileSize || 0,
-    type: data.fileType || data.type || 'application/octet-stream',
+    fileName: data.fileName || 'Unknown File',
+    fileSize: data.fileSize || 0,
+    fileType: data.fileType || 'application/octet-stream',
     status: 'completed', // Files in Firestore are assumed completed
     lastModified: data.createdAt?.toMillis?.() || data.uploadedAt?.toMillis?.() || Date.now(),
     

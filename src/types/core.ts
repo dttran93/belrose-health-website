@@ -43,23 +43,20 @@ export type AIProcessingStatus =
 export interface FileObject {
   id: string; //fileId. Generated in useFileManager via createFileObject() or addVirtualFile(). file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}
   file?: File; //actual file object from file input. Real life upload not virtual. Generated in createFileObject in useFileManager.ts
-  name: string; //file name or custom name for virtual files. set by createFileObject() in useFileManager.ts
-  size: number; //file size. Set in createFileObject in useFileManager.ts. file.size for real files
-  type: string; //file type. Set in createFileObject in useFileManager.ts. file.type for real files or application/fhir+json for virtual - NEVER undefined
+  fileName: string; //file name or custom name for virtual files. set by createFileObject() in useFileManager.ts
+  fileSize: number; //file size. Set in createFileObject in useFileManager.ts. file.size for real files
+  fileType: string; //file type. Set in createFileObject in useFileManager.ts. file.type for real files or application/fhir+json for virtual - NEVER undefined
   status: FileStatus; //Processing property. Initially set as pending. Then pending/processing... see below
   error?: string; //Failed processing
   extractedText?: string | null; //text extracted from image/pdf
   originalText?: string | null;
   wordCount?: number; //calculated during text extraction
   fileHash?: string; 
-  documentType?: string; //can be deleted probably
-  lastModified?: number; //Filetracking for UI state management. Can probably be deleted
+  documentType?: string; 
+  lastModified?: number; //Filetracking for UI state management.
   isVirtual?: boolean; //for virtual files
   fhirData?: any;
   downloadURL?: string;
-  fileName?: string;
-  fileType?: string;
-  fileSize?: number;
   [key: string]: any;
 
   //For AI enrichedFields

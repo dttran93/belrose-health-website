@@ -75,9 +75,9 @@ export function useFileManager(): UseFileManagerTypes {
     const createFileObject = (file: File, id?: string): FileObject => ({
         id: id || generateId(),
         file,
-        name: file.name,
-        size: file.size,
-        type: file.type,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
         status: 'pending' as FileStatus,
         uploadedAt: new Date().toISOString(),
         extractedText: '',
@@ -638,9 +638,9 @@ export function useFileManager(): UseFileManagerTypes {
         
         const virtualFile: FileObject = {
             id: fileId,
-            name: virtualData.name || `Virtual File ${fileId}`,
-            size: virtualData.size || 0,
-            type: virtualData.type || 'application/json',
+            fileName: virtualData.name || `Virtual File ${fileId}`,
+            fileSize: virtualData.size || 0,
+            fileType: virtualData.type || 'application/json',
             status: 'completed',
             uploadedAt: new Date().toISOString(),
             fhirJson: virtualData.fhirJson,
@@ -683,9 +683,9 @@ export function useFileManager(): UseFileManagerTypes {
         // construct the FileObject directly from the data we have
         const virtualFile: FileObject = {
             id: generatedFileId,
-            name: fileName,
-            size: JSON.stringify(fhirData).length,
-            type: 'application/fhir+json',
+            fileName: fileName,
+            fileSize: JSON.stringify(fhirData).length,
+            fileType: 'application/fhir+json',
             status: 'completed',
             uploadedAt: new Date().toISOString(),
             fhirJson: JSON.stringify(fhirData, null, 2),
