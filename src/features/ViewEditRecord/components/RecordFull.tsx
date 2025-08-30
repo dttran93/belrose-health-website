@@ -336,6 +336,7 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
               triggerClassName="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
               onEdit={canEdit? handleEnterEditMode : undefined}
               onVersion={!isVersionView ? handleVersionMode : undefined}
+              onDelete={onDelete}
             />
             <Button 
               variant="default" 

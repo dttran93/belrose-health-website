@@ -243,7 +243,8 @@ export class FileUploadService implements IFileUploadService {
       console.log('✅ Firebase deletion completed:', {
         documentId,
         deletedFromStorage: result.deletedFromStorage,
-        deletedFromFirestore: result.deletedFromFirestore
+        deletedFromFirestore: result.deletedFromFirestore,
+        deletedVersions: result.deletedVersions,
       });
       
     } catch (error: any) {
@@ -255,7 +256,7 @@ export class FileUploadService implements IFileUploadService {
       );
     }
   }
-
+  
   /**
    * Cancel an active upload
    */

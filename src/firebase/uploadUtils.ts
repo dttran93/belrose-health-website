@@ -13,6 +13,7 @@ import {
   updateDoc,
   deleteDoc,
   getDoc,
+  getDocs,
   DocumentReference,
   DocumentSnapshot
 } from "firebase/firestore";
@@ -77,6 +78,7 @@ export interface DeleteResult {
   success: boolean;
   deletedFromStorage: boolean;
   deletedFromFirestore: boolean;
+  deletedVersions: true;
 }
 
 // ==================== UPLOAD FUNCTIONS ====================
@@ -366,6 +368,44 @@ export async function getFileMetadata(documentId: string): Promise<FileMetadata>
 }
 
 /**
+ * Delete all version history for record
+ * */
+
+export async function deleteRecordVersions(documentId: string): Promise<void>{
+  const auth=getAuth();
+  const user = auth.currentUser;
+ if (!user) throw new Error("User not authenticated");
+  if (!documentId) throw new Error("Document ID is required");
+
+  const db = getFirestore();
+  
+  try {
+    console.log('🗑️ Deleting all versions for document:', documentId);
+    
+    // Delete the main version control document
+    const versionControlRef = doc(db, `users/${user.uid}/recordVersions`, documentId);
+    await deleteDoc(versionControlRef);
+    console.log('✅ Deleted version control document');
+    
+    // Delete all individual versions
+    const versionsCollectionRef = collection(db, `users/${user.uid}/recordVersions/${documentId}/versions`);
+    const versionsSnapshot = await getDocs(versionsCollectionRef);
+    
+    const deletePromises = versionsSnapshot.docs.map(versionDoc => 
+      deleteDoc(versionDoc.ref)
+    );
+    
+    await Promise.all(deletePromises);
+    console.log(`✅ Deleted ${versionsSnapshot.docs.length} version documents`);
+    
+  } catch (error: any) {
+    console.error('❌ Error deleting versions:', error);
+    throw new Error(`Failed to delete version history: ${error.message}`);
+  }
+}
+
+
+/**
  * Complete file deletion - removes both storage file and Firestore document
  */
 export async function deleteFileComplete(documentId: string): Promise<DeleteResult> {
@@ -393,13 +433,15 @@ export async function deleteFileComplete(documentId: string): Promise<DeleteResu
     
     // Delete from Firestore
     await deleteFromFirestore(documentId);
+    await deleteRecordVersions(documentId);
     
     console.log('✅ Complete file deletion successful:', documentId);
     
     return {
       success: true,
       deletedFromStorage,
-      deletedFromFirestore: true
+      deletedFromFirestore: true,
+      deletedVersions: true
     };
     
   } catch (error: any) {

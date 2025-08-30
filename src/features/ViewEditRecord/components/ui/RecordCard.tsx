@@ -56,6 +56,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
   record,
   onView,
   onEdit,
+  onDelete,
   className = '',
 }) => {
 
@@ -84,6 +85,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
               triggerIcon={Ellipsis}
               showView={true}
               triggerClassName="mx-1 p-2 rounded-3xl hover:bg-gray-100"
+              onDelete={onDelete}
            />
            </div>
         </div>

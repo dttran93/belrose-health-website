@@ -44,7 +44,7 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
   const [selectedRecord, setSelectedRecord] = useState<FileObject | null>(null);
   const [editMode, setEditMode] = useState(false);
 
-  const { updateFirestoreRecord } = useFileManager();
+  const { updateFirestoreRecord, deleteFileFromFirebase } = useFileManager();
 
   const handleEditRecord = (record: FileObject) => {
     setSelectedRecord(record);
@@ -55,7 +55,6 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
       onEditRecord(record);
     }
   }
-
   useEffect(() => {
     if (selectedRecord && selectedRecord.id) {
       const updatedRecord = records.find(r => r.id === selectedRecord.id);
@@ -92,6 +91,33 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
         })
       }
     }
+
+  //Handle Delete record
+  const handleDeleteRecord = async (record: FileObject) => {
+    if (!confirm(`Are you sure you want to delete "${record.belroseFields?.title}"? This cannot be undone.`)) {
+      return;
+    }  
+    
+    try {
+        if(!record.id) {
+          throw new Error('Cannot save record - no document ID found')
+        }
+
+        await deleteFileFromFirebase(record.id);
+        console.log('Record deleted successfully');
+        toast.success(`💾 Deleted for ${record.belroseFields?.title}`, {
+          description: 'Entry deleted from record',
+          duration: 4000,
+        })
+        setViewMode('summary');
+        setEditMode(false); 
+      } catch (error) {
+        console.error('Failed to delete record: ', error);
+        toast.error(`Failed to delete ${record.belroseFields?.title}`, {
+          description: error instanceof Error ? error.message : 'Unknown error occurred',
+          duration: 4000,
+      })}
+    };
 
   // Handle view record - switch to detailed view
   const handleViewRecord = (record: FileObject) => {
@@ -201,7 +227,7 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
         onEdit={onEditRecord}
         onDownload={onDownloadRecord}
         onShare={onShareRecord}
-        onDelete={onDeleteRecord}
+        onDelete={handleDeleteRecord}
         onSave={handleSaveRecord}
         initialEditMode={editMode}
       />
@@ -282,8 +308,9 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
               <HealthRecordCard
                 key={record.id}
                 record={record}
-                onView={handleViewRecord} // Use our new handler
+                onView={handleViewRecord}
                 onEdit={handleEditRecord}
+                onDelete={handleDeleteRecord}
                 className="max-w-none" // Full width for list view
               />
             ))}
