@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { FileObject } from '@/types/core';
 import HealthRecordMenu from '@/features/ViewEditRecord/components/ui/RecordMenu'
+import { VerificationBadge } from '@/features/BlockchainVerification/component/VerificationBadge';
 
 interface HealthRecordCardProps {
   record: FileObject;
@@ -77,8 +78,9 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
             </span>
           </div>
           <div className='flex'>
-          <div className="bg-red-100 text-red-800 border-red-200 rounded-full text-xs px-2 py-1">
-            Self-Reported
+          <div className="flex items-center bg-red-100 text-red-800 border-red-200 rounded-full text-xs px-2 py-1">
+            <VerificationBadge
+            fileObject={record}/>
           </div>
           <HealthRecordMenu 
               record={record}

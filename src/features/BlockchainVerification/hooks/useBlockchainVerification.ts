@@ -26,7 +26,7 @@ interface UseBlockchainVerificationReturn {
   };
   
   // Utility
-  shouldShowVerificationBadge: (fileObject: FileObject) => boolean;
+  isSelfReported: (fileObject: FileObject) => boolean;
 }
 
 export const useBlockchainVerification = (): UseBlockchainVerificationReturn => {
@@ -89,7 +89,7 @@ export const useBlockchainVerification = (): UseBlockchainVerificationReturn => 
     return BlockchainService.getVerificationStatus(fileObject);
   }, []);
 
-  const shouldShowVerificationBadge = useCallback((fileObject: FileObject): boolean => {
+  const isSelfReported = useCallback((fileObject: FileObject): boolean => {
     // Show badge for provider records or any record with blockchain verification
     return fileObject.isProviderRecord || !!fileObject.blockchainVerification;
   }, []);
@@ -106,6 +106,6 @@ export const useBlockchainVerification = (): UseBlockchainVerificationReturn => 
     getVerificationStatus,
     
     // Utility
-    shouldShowVerificationBadge
+    isSelfReported
   };
 };

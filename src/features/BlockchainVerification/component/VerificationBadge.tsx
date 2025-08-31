@@ -1,5 +1,3 @@
-// src/components/VerificationBadge.tsx
-
 import React from 'react';
 import { FileObject } from '@/types/core';
 import { useBlockchainVerification } from '../hooks/useBlockchainVerification';
@@ -17,10 +15,10 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
   showDetails = false,
   onClick
 }) => {
-  const { getVerificationStatus, shouldShowVerificationBadge } = useBlockchainVerification();
+  const { getVerificationStatus, isSelfReported } = useBlockchainVerification();
   
-  if (!shouldShowVerificationBadge(fileObject)) {
-    return null;
+  if (!isSelfReported(fileObject)) {
+    return "Self-Reported";
   }
 
   const { status, message, icon } = getVerificationStatus(fileObject);
