@@ -15,10 +15,11 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
   showDetails = false,
   onClick
 }) => {
-  const { getVerificationStatus, isSelfReported } = useBlockchainVerification();
+  const { getVerificationStatus, canUseBlockchainVerification } = useBlockchainVerification();
   
-  if (!isSelfReported(fileObject)) {
-    return "Self-Reported";
+  //if can't use blockchain verification, it's self-reported
+  if (!canUseBlockchainVerification(fileObject)) {
+    return <div className="bg-red-100 text-red-800 border-red-200 rounded-full text-xs px-2 py-1">Self-Reported</div>;
   }
 
   const { status, message, icon } = getVerificationStatus(fileObject);
@@ -40,9 +41,9 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
       case 'pending':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'unverified':
-        return 'bg-gray-100 text-gray-600 border-gray-200';
+        return 'bg-red-100 text-red-800 border-red-200 rounded-full text-xs px-2 py-1';
       default:
-        return 'bg-gray-100 text-gray-600 border-gray-200';
+        return 'bg-red-100 text-red-800 border-red-200 rounded-full text-xs px-2 py-1';
     }
   };
 

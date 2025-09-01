@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import PatientRecordsList from "./pages/Activity";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import AddRecord from "./pages/AddRecord";
+import Verification from "./pages/Verification";
 import './App.css';
 import { AuthProvider } from "./components/auth/AuthContext";
 import { LayoutProvider } from "./components/app/LayoutProvider";
@@ -45,6 +46,7 @@ const App: React.FC = (): React.JSX.Element => {
                           <Route index element={<Dashboard />} />
                           <Route path="activity" element={<PatientRecordsList />} />
                           <Route path="addrecord" element={<AddRecord />} />
+                          <Route path="verification" element={<Verification />} />
                         </Routes>
                       </Layout>
                     </LayoutProvider>

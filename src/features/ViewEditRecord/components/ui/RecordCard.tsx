@@ -78,7 +78,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
             </span>
           </div>
           <div className='flex'>
-          <div className="flex items-center bg-red-100 text-red-800 border-red-200 rounded-full text-xs px-2 py-1">
+          <div className="flex items-center">
             <VerificationBadge
             fileObject={record}/>
           </div>

@@ -8,6 +8,7 @@ import HealthRecordMenu from "./ui/RecordMenu";
 import { LayoutSlot } from "@/components/app/LayoutProvider";
 import VersionControlPanel from "./VersionControlPanel";
 import { RecordVersion } from "../services/versionControlService.types"
+import { VerificationBadge } from "@/features/BlockchainVerification/component/VerificationBadge";
 
 type TabType = 'record' | 'data' | 'original';
 
@@ -326,9 +327,8 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
             </>}
           </div>
           <div className="flex items-center">
-            <span className="px-3 py-1 mx-1 bg-red-500/20 text-red-100 rounded-full text-sm font-medium">
-              Self Reported
-            </span>
+            <VerificationBadge
+            fileObject={record}/>
             <HealthRecordMenu 
               record={record}
               triggerIcon={Ellipsis}

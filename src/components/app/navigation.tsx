@@ -7,7 +7,8 @@ import {
   PersonStanding, 
   Smile, 
   CircleEllipsisIcon,
-  LucideIcon
+  LucideIcon,
+  ShieldCheck
 } from "lucide-react";
 
 export interface NavigationItem {
@@ -20,6 +21,7 @@ export const healthRecords: NavigationItem[] = [
   { title: "Overview", url: "/dashboard", icon: Activity },
   { title: "Activity", url: "/dashboard/activity", icon: Clipboard },
   { title: "Add Record", url: "/dashboard/addrecord", icon: FilePlus2 },
+  { title: "Verification", url: "/dashboard/verification", icon: ShieldCheck },
 ];
 
 export const healthCategories: NavigationItem[] = [
