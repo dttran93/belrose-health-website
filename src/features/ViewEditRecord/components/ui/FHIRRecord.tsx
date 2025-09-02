@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { FHIRResourceCardProps, HealthRecordProps, EditFHIRFieldProps } from '@/features/ViewEditRecord/components/ui/Record.types';
+import { FHIRResourceCardProps, FHIRRecordProps, EditFHIRFieldProps } from '@/features/ViewEditRecord/components/ui/Record.types';
 
 // Smart input type detection utility
 const getInputType = (value: any, label: string): string => {
@@ -531,7 +531,7 @@ const FHIRResourceCard: React.FC<FHIRResourceCardProps> = ({
 };
 
 // Main Health Record Component
-const HealthRecord: React.FC<HealthRecordProps> = ({ 
+const FHIRRecord: React.FC<FHIRRecordProps> = ({ 
   fhirData, 
   className,
   editable = false,
@@ -613,4 +613,4 @@ const HealthRecord: React.FC<HealthRecordProps> = ({
   );
 };
 
-export default HealthRecord;
+export default FHIRRecord;

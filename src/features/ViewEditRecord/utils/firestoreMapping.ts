@@ -39,6 +39,7 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
     editedByUser: data.editedByUser || false,
     lastEditedAt: data.lastEditedAt,
     lastEditDescription: data.lastEditDescription,
+    blockchainVerification: data.blockchainVerification || undefined,
   } as FileObject;
 };
 

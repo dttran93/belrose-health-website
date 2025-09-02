@@ -9,7 +9,8 @@ import {
   Archive, 
   Trash2,
   LucideIcon, 
-  GitBranch
+  GitBranch,
+  Shield,
 } from 'lucide-react';
 
 // Types for the menu system
@@ -42,6 +43,7 @@ interface HealthRecordMenuProps {
   onArchive?: (record: any) => void;
   onView?: (record: any) => void;
   onVersion?: (record: any) => void;
+  onViewVerification?: (record: any) => void;
   
   // Customization props
   triggerIcon?: LucideIcon;
@@ -57,6 +59,7 @@ interface HealthRecordMenuProps {
   showArchive?: boolean;
   showDelete?: boolean;
   showVersions?: boolean;
+  showVerification?: boolean;
   
   // Additional menu items from parent
   additionalItems?: MenuItem[];
@@ -69,6 +72,7 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
   onShare,
   onDelete,
   onVersion,
+  onViewVerification,
   triggerIcon: TriggerIcon = MoreHorizontal,
   triggerClassName = "p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors",
   menuClassName = "absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[160px]",
@@ -79,6 +83,7 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
   showView = false, // Usually false for full view, true for cards
   showDelete = true,
   showVersions = true,
+  showVerification = true,
   additionalItems = []
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -128,6 +133,13 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
     setIsOpen(false);
   };
 
+  const handleViewVerification = () => {
+    setIsOpen(false);
+    if (onViewVerification) {
+      onViewVerification(record);
+    }
+  }
+
   // Wrapper for parent handlers
   const createHandler = (handler?: (record: any) => void) => {
     return () => {
@@ -162,8 +174,8 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
       });
     }
 
-    // Edit action
-    if (showVersions && onVersion) {
+    // Versions action
+    if (showVersions) {
       items.push({
         key: 'versions',
         label: 'View Versions',
@@ -200,6 +212,15 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
         icon: Copy,
         onClick: handleCopyData
       });
+    }
+
+    if (showVerification) {
+      items.push({
+        key: 'verification',
+        label: 'View Verification',
+        icon: Shield,
+        onClick:handleViewVerification
+      })
     }
 
     // Add any additional items from parent

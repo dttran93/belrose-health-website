@@ -19,7 +19,7 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
   
   //if can't use blockchain verification, it's self-reported
   if (!canUseBlockchainVerification(fileObject)) {
-    return <div className="bg-red-100 text-red-800 border-red-200 rounded-full text-xs px-2 py-1">Self-Reported</div>;
+    return <div className="bg-red-100 text-red-800 border-red-200 rounded-full text-xs px-2 py-1 m-1">Self-Reported</div>;
   }
 
   const { status, message, icon } = getVerificationStatus(fileObject);

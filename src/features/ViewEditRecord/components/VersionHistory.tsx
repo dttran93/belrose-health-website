@@ -11,8 +11,8 @@ import {
   FileText,
   AlertTriangle,
   CheckCircle,
-  X,
-  SquareDashedMousePointer
+  SquareDashedMousePointer,
+  ArrowLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
@@ -187,7 +187,7 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
             </div>
           )}
           <Button onClick={onBack} className="w-8 h-8 border-none bg-transparent hover:bg-gray-200">
-            <X className="text-primary" />
+            <ArrowLeft className="text-primary" />
           </Button>
         </div>
       </div>
