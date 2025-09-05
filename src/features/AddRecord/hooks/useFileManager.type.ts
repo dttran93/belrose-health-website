@@ -1,6 +1,7 @@
-import { FileObject, FileStatus } from '@/types/core';
+import { AIProcessingStatus, FileObject, FileStatus } from '@/types/core';
 import { UploadResult } from '../services/shared.types';
 import { VirtualFileResult } from '../components/CombinedUploadFHIR.type';
+import { BlockchainVerification } from '@/types/core';
 
 // ==================== INTERFACE DEFINITIONS ====================
 
@@ -17,15 +18,16 @@ export interface VirtualFileData {
   type?: string;
   extractedText?: string;
   wordCount?: number;
-  documentType?: string;
+  documentType?: "Plain Text Submission" | "Manual FHIR JSON Submission" | "File Upload";
   fhirData?: any;
+  belroseFields?: any;
+  aiProcessingStatus?: AIProcessingStatus;
+  signerId?: string;
+  providerSignature?: string;
+  blockchainNetwork?: string;
+  blockchainVerification?: BlockchainVerification;
+  autoUpload?: boolean; 
   [key: string]: any; // Allow additional properties
-}
-
-export interface AddFhirAsVirtualFileOptions extends VirtualFileData {
-  name?: string;
-  documentType?: string;
-  autoUpload?: boolean;
 }
 
 export interface FileStats {
@@ -43,7 +45,7 @@ export type ResetProcessCallback = () => void;
 
 // ==================== HOOK RETURN TYPE ====================
 
-export interface UseFileUploadReturn {
+export interface UseFileManagerTypes {
   // Core state
   files: FileObject[];
   processedFiles: FileObject[];
@@ -80,8 +82,8 @@ export interface UseFileUploadReturn {
   savingCount: number;
   
   // Virtual file support
-  addVirtualFile: (virtualData: VirtualFileData) => string;
-  addFhirAsVirtualFile: (fhirData: any, options?: AddFhirAsVirtualFileOptions) => Promise<VirtualFileResult>;
+  addVirtualFile: (virtualData: VirtualFileData) => Promise<string>;
+  addFhirAsVirtualFile: (fhirData: any, options?: VirtualFileData) => Promise<VirtualFileResult>;
   
   // Reset function
   reset: () => void;

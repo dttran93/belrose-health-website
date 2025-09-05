@@ -5,11 +5,11 @@ import DocumentProcessorService from '@/features/AddRecord/services/documentProc
 import { FileObject, FileStatus, AIProcessingStatus } from '@/types/core';
 import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
 import { processRecordWithAI } from '@/features/AddRecord/services/aiRecordProcessingService';
+import { BlockchainService } from '@/features/BlockchainVerification/service/blockchainService'
 
 import {
   AddFilesOptions,
   VirtualFileData,
-  AddFhirAsVirtualFileOptions,
   FileStats,
   FHIRConversionCallback,
   ResetProcessCallback,
@@ -82,7 +82,7 @@ export function useFileManager(): UseFileManagerTypes {
         uploadedAt: new Date().toISOString(),
         extractedText: '',
         wordCount: 0,
-        documentType: 'unknown',
+        documentType: 'File Upload',
         isVirtual: false,
         aiProcessingStatus: 'not_needed' as AIProcessingStatus,
     });
@@ -358,6 +358,65 @@ export function useFileManager(): UseFileManagerTypes {
                     processingStage: 'Completing...'
                 });
             }
+
+        // STEP 5: Blockchain Verification
+        let blockchainVerification = undefined;
+        
+        // Create the complete record object with all processed data
+        const completeRecord: FileObject = {
+            ...fileObj,
+            extractedText: result.extractedText,
+            wordCount: result.wordCount,
+            fhirData: fhirData,
+            belroseFields: belroseFields,
+            status: 'processing' // Still processing until verification is done
+        };
+        
+        // Check if blockchain verification is needed
+        if (BlockchainService.needsBlockchainVerification(completeRecord)) {
+            console.log(`🔗 Step 5: Generating blockchain verification for: ${fileObj.name}`);
+            
+            updateFileStatus(fileObj.id, 'processing', {
+                processingStage: 'Generating blockchain verification...'
+            });
+            
+            try {
+                blockchainVerification = await BlockchainService.createBlockchainVerification(
+                    completeRecord,
+                    { 
+                        // You might want to pass provider info here based on your app's auth
+                        signerId: 'current-provider-id', // Replace with actual provider ID
+                        network: 'ethereum-testnet',
+                        providerSignature: 'provider-signature-if-available'
+                    }
+                );
+                
+                console.log(`✅ Blockchain verification generated for: ${fileObj.name}`, {
+                    hash: blockchainVerification.recordHash,
+                    txId: blockchainVerification.blockchainTxId
+                });
+                
+                // Show success toast for blockchain verification
+                toast.success(`🔗 Blockchain verification completed for ${fileObj.name}`, {
+                    description: `Record hash: ${blockchainVerification.recordHash.substring(0, 12)}...`,
+                    duration: 3000
+                });
+                
+            } catch (error: any) {
+                console.error(`❌ Blockchain verification failed for ${fileObj.name}:`, error);
+                
+                // Show warning toast but don't fail the entire process
+                toast.warning(`Blockchain verification failed for ${fileObj.name}`, {
+                    description: 'Record will be saved without blockchain verification',
+                    duration: 4000
+                });
+                
+                // Log the error but continue processing
+                console.warn(`⚠️ Continuing without blockchain verification for ${fileObj.name}`);
+            }
+        } else {
+            console.log(`ℹ️ Blockchain verification not required for: ${fileObj.name}`);
+        }
             
             // 🎉 FINAL STEP: Mark as completed with ALL data including AI results
             console.log(`🎉 Marking file as completed: ${fileObj.name}`);
@@ -365,7 +424,8 @@ export function useFileManager(): UseFileManagerTypes {
                 processingStage: undefined,
                 processedAt: new Date().toISOString(),
                 aiProcessingStatus: fhirData ? (belroseFields?.aiFailureReason ? 'failed' : 'completed') : 'not_needed',
-                belroseFields: belroseFields
+                belroseFields: belroseFields,
+                blockchainVerification: blockchainVerification
             });
             
             console.log(`🎉 Complete processing pipeline finished for: ${fileObj.name}`);
@@ -633,7 +693,7 @@ export function useFileManager(): UseFileManagerTypes {
 
     // ==================== VIRTUAL FILE SUPPORT ====================
     
-    const addVirtualFile = useCallback((virtualData: VirtualFileData): string => {
+    const addVirtualFile = useCallback(async (virtualData: VirtualFileData): Promise<string> => {
         const fileId = virtualData.id || generateId();
         
         const virtualFile: FileObject = {
@@ -646,7 +706,6 @@ export function useFileManager(): UseFileManagerTypes {
             fhirJson: virtualData.fhirJson,
             originalText: virtualData.originalText,
             wordCount: virtualData.wordCount || 0,
-            documentType: virtualData.documentType || 'virtual',
             isVirtual: true,
             fhirData: virtualData.fhirData,
             file: undefined,
@@ -654,13 +713,55 @@ export function useFileManager(): UseFileManagerTypes {
             aiProcessingStatus: virtualData.aiProcessingStatus
         };
         
-        setFiles(prev => [...prev, virtualFile]);
-        console.log(`✅ Added virtual file: ${virtualFile.name}`);
-        
-        return fileId;
-    }, []);
+       // 🔗 ADD BLOCKCHAIN VERIFICATION for virtual files
+    let blockchainVerification = undefined;
+    if (BlockchainService.needsBlockchainVerification(virtualFile)) {
+        try {
+            console.log('🔗 Generating blockchain verification for virtual file:', virtualFile.fileName);
+            
+            blockchainVerification = await BlockchainService.createBlockchainVerification(
+                virtualFile,
+                { 
+                    signerId: virtualData.signerId || 'virtual-file-creator',
+                    network: virtualData.blockchainNetwork || 'ethereum-testnet',
+                    providerSignature: virtualData.providerSignature
+                }
+            );
+            
+            // Add verification to the virtual file
+            virtualFile.blockchainVerification = blockchainVerification;
+            
+            console.log(`✅ Blockchain verification generated for virtual file: ${virtualFile.fileName}`, {
+                hash: blockchainVerification.recordHash.substring(0, 12) + '...'
+            });
+            
+            // Optional: Show success toast for blockchain verification
+            toast.success(`🔗 Virtual file verified: ${virtualFile.fileName}`, {
+                description: `Hash: ${blockchainVerification.recordHash.substring(0, 12)}...`,
+                duration: 3000
+            });
+            
+        } catch (error: any) {
+            console.error(`❌ Blockchain verification failed for virtual file ${virtualFile.fileName}:`, error);
+            
+            // Show warning but continue
+            toast.warning(`Blockchain verification failed for ${virtualFile.fileName}`, {
+                description: 'File will be saved without verification',
+                duration: 3000
+            });
+        }
+    } else {
+        console.log(`ℹ️ Blockchain verification not required for virtual file: ${virtualFile.fileName}`);
+    }
+    
+    // Add to state with blockchain verification included
+    setFiles(prev => [...prev, virtualFile]);
+    console.log(`✅ Added virtual file with blockchain verification: ${virtualFile.fileName}`);
+    
+    return fileId;
+}, [setFiles]);
 
-    const addFhirAsVirtualFile = useCallback(async (fhirData: any | undefined, options: AddFhirAsVirtualFileOptions = {}): Promise<VirtualFileResult> => {
+    const addFhirAsVirtualFile = useCallback(async (fhirData: any | undefined, options: VirtualFileData = {}): Promise<VirtualFileResult> => {
         const fileId = options.id || generateId();
         const fileName = options.name || `FHIR Document ${fileId}`;
         
@@ -672,12 +773,15 @@ export function useFileManager(): UseFileManagerTypes {
             fhirJson: JSON.stringify(fhirData, null, 2),
             originalText: options.originalText,
             wordCount: JSON.stringify(fhirData).split(/\s+/).length,
-            documentType: options.documentType || 'fhir',
+            documentType: options.documentType,
             fhirData,
+            signerId: options.signerId,
+            providerSignature: options.providerSignature,
+            blockchainNetwork: options.blockchainNetwork,
             ...options
         };
-        
-        const generatedFileId = addVirtualFile(virtualFileData);
+
+        const generatedFileId = await addVirtualFile(virtualFileData);
         
         // Instead of trying to find it in the files array (which might not be updated yet),
         // construct the FileObject directly from the data we have
@@ -691,7 +795,7 @@ export function useFileManager(): UseFileManagerTypes {
             fhirJson: JSON.stringify(fhirData, null, 2),
             originalText: virtualFileData.originalText,
             wordCount: JSON.stringify(fhirData).split(/\s+/).length,
-            documentType: options.documentType || 'fhir',
+            documentType: virtualFileData.documentType,
             isVirtual: true,
             fhirData,
             file: undefined,

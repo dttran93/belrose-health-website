@@ -52,7 +52,7 @@ export interface FileObject {
   originalText?: string | null;
   wordCount?: number; //calculated during text extraction
   fileHash?: string; 
-  documentType?: string; 
+  documentType?: 'Plain Text' | 'Manual FHIR JSON' | 'File Upload'
   lastModified?: number; //Filetracking for UI state management.
   isVirtual?: boolean; //for virtual files
   fhirData?: any;

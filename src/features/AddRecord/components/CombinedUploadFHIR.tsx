@@ -358,7 +358,7 @@ const handleTextSubmit = async (): Promise<void> => {
       // Create virtual file with FHIR data
       const { fileId, virtualFile } = await addFhirAsVirtualFile(fhirData, {
         name: `Medical Note${patientName ? ` - ${patientName}` : ''} - ${new Date().toLocaleDateString()}`,
-        documentType: 'medical_note_from_text',
+        documentType: 'Plain Text Submission',
         originalText: plainText.trim(),
         autoUpload: true,
         belroseFields,
@@ -420,7 +420,7 @@ const handleFhirSubmit = async (): Promise<void> => {
   // Step 1: Create virtual file with FHIR data and AUTO-UPLOAD
   const { fileId, virtualFile, uploadResult } = await addFhirAsVirtualFile(fhirData, {
     name: `Manual FHIR Input - ${fhirData.resourceType}`,
-    documentType: 'fhir_manual_input',
+    documentType: 'Manual FHIR JSON Submission',
     originalText: fhirText.trim(),
     autoUpload: true,  // 🔥 Add this to use the working auto-upload feature
     belroseFields,

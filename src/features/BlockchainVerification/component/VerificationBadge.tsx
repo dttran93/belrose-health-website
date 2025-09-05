@@ -35,7 +35,7 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
   const getStatusStyles = (status: string) => {
     switch (status) {
       case 'verified':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-green-100 text-green-800 border-green-200 text-xs';
       case 'failed':
         return 'bg-red-100 text-red-800 border-red-200';
       case 'pending':

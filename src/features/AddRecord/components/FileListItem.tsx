@@ -1,7 +1,7 @@
 // Updated FileListItem.tsx
 
 import React, { useState } from 'react';
-import { FileText, X, Eye, EyeOff, File, Camera, FileType, Check } from 'lucide-react';
+import { FileText, X, Eye, EyeOff, File, Camera, FileType, Check, HardDriveUpload } from 'lucide-react';
 import { EnhancedFHIRResults } from '@/features/AddRecord/components/FHIRValidation';
 import { ProgressChips, createFileProcessingSteps } from './ui/ProgressChips';
 import * as Tooltip from '@radix-ui/react-tooltip';
@@ -27,24 +27,6 @@ export const FileListItem: React.FC<FileListItemProps> = ({
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const getEnhancedFileIcon = (type: string): React.ReactElement => {
-    let icon = <File/>;
-    
-    if (type.startsWith('image/')) {
-      icon = <Camera/>;
-    } else if (type === 'application/pdf') {
-      icon = <FileText/>;
-    } else if (type.includes('word')) {
-      icon = <FileType/>;
-    }
-
-    return (
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center`}>
-        <span className="text-lg">{icon}</span>
-      </div>
-    );
   };
 
   const getContainerStyles = () => {
@@ -112,7 +94,7 @@ export const FileListItem: React.FC<FileListItemProps> = ({
 
   // Derived state
   const canRetry = fileItem.status.includes('error');
-  const hasExpandableContent = fileItem.extractedText || fhirResult || fileItem.medicalDetection;
+  const hasExpandableContent = fileItem.extractedText || fhirResult ;
   const statusMessage = getStatusMessage();
 
   return (
@@ -121,7 +103,7 @@ export const FileListItem: React.FC<FileListItemProps> = ({
       {/* File Header */}
       <div className="p-5 flex items-center justify-between">
         <div className="flex items-center space-x-3 flex-1 min-w-0">
-          {getEnhancedFileIcon(fileItem.type)}
+          <HardDriveUpload/>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
               <p className="font-semibold text-gray-900 truncate">{fileItem.name}</p>
