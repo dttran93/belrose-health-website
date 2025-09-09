@@ -19,8 +19,7 @@ import {
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import type { FileObject } from '@/types/core';
-import { setDoc } from 'firebase/firestore';
-import { VersionControlService } from '@/features/ViewEditRecord/services/versionControlService'
+
 
 // ==================== TYPE DEFINITIONS ====================
 
@@ -34,38 +33,6 @@ export interface SaveMetadataParams {
   downloadURL: string | null;
   filePath: string | null;
   fileObj: FileObject;
-}
-
-export interface FileMetadata {
-  fileName: string;
-  fileType: string;
-  fileSize: number;
-  downloadURL: string | null;
-  storagePath: string | null;
-  uploadedBy: string;
-  uploadedAt: Date;
-  extractedText?: string;
-  wordCount?: number;
-  documentType?: string;
-  extractedAt?: string;
-  processingStatus?: string;
-  fileHash?: string;
-  isVirtual?: boolean;
-  virtualFileType?: string;
-  fhirData?: any;
-  originalText?: string;
-  belroseFields?: {
-    visitType?: string;
-    title?: string;
-    summary?: string;
-    completedDate?: string;
-    provider?: string;
-    patient?: string;
-    institution?: string;
-    aiProcessedAt?: string;
-    aiFailureReason?: string;
-  };
-  aiProcessingStatus?: 'pending' | 'processing' | 'completed' | 'failed' | 'not_needed';
 }
 
 export interface UploadFileCompleteResult {
@@ -154,63 +121,47 @@ export async function saveFileMetadataToFirestore({ downloadURL, filePath, fileO
   if (!user) throw new Error("User not authenticated");
 
   try {
-    // Handle both regular files and file wrapper objects
-    const file = fileObj.file || fileObj; // Support both formats
-    const fileName = fileObj.name || (file as File)?.name;
-    const fileSize = fileObj.size || (file as File)?.size;
-    const fileType = fileObj.type || (file as File)?.type;
 
-    const documentData: Partial<FileMetadata> = {
-      fileName: fileName,
+    // DEBUG
+    console.log('🔍 FileObj being spread:', {
+      hasBlockchainVerification: !!fileObj.blockchainVerification,
+      blockchainData: fileObj.blockchainVerification,
+      allFileObjKeys: Object.keys(fileObj)
+    });
+
+    const documentData = {
+      ...fileObj,
+      file: undefined,
       downloadURL,
       storagePath: filePath,
       uploadedBy: user.uid,
       uploadedAt: new Date(),
-      fileType: fileType,
-      fileSize: fileSize,
     };
 
-    // Add additional metadata for processed files
-    if (fileObj.extractedText) {
-      documentData.extractedText = fileObj.extractedText;
-    }
-    if (fileObj.wordCount) {
-      documentData.wordCount = fileObj.wordCount;
-    }
-    if (fileObj.documentType) {
-      documentData.documentType = fileObj.documentType;
-    }
-    if (fileObj.extractedAt) {
-      documentData.extractedAt = fileObj.extractedAt;
-    }
-    if (fileObj.processingStatus) {
-      documentData.processingStatus = fileObj.processingStatus;
-    }
-    if (fileObj.fileHash) {
-      documentData.fileHash = fileObj.fileHash;
-    }
-    if (fileObj.isVirtual) {
-      documentData.isVirtual = fileObj.isVirtual;
-      documentData.virtualFileType = 'fhir_input';
-    }
-    if (fileObj.fhirData) {
-      documentData.fhirData = fileObj.fhirData;
-    }
-    if (fileObj.originalText) {
-      documentData.originalText = fileObj.originalText;
-    }
-    if (fileObj.belroseFields) {
-      documentData.belroseFields = fileObj.belroseFields;
-      console.log('✅ Adding belroseFields to Firestore:', fileObj.belroseFields);
-    }
-    if (fileObj.aiProcessingStatus) {
-      documentData.aiProcessingStatus = fileObj.aiProcessingStatus;
-      console.log('✅ Adding aiProcessingStatus to Firestore:', fileObj.aiProcessingStatus);
-    }
+    //DEBUG
+    console.log('🔍 DocumentData before cleanup:', {
+      hasBlockchainVerification: !!documentData.blockchainVerification,
+      blockchainData: documentData.blockchainVerification,
+      allKeysBeforeCleanup: Object.keys(documentData)
+    });
+
+        Object.keys(documentData).forEach(key => {
+      if (documentData[key as keyof typeof documentData] === undefined) {
+        delete documentData[key as keyof typeof documentData];
+      }
+    });
+
+    console.log('📄 Saving to Firestore:', {
+      fileName: documentData.fileName,
+      hasBlockchainVerification: !!documentData.blockchainVerification,
+      blockchainVerificationData: documentData.blockchainVerification,
+      hasBelroseFields: !!documentData.belroseFields,
+      hasFhirData: !!documentData.fhirData,
+      allFields: Object.keys(documentData)
+    });
 
     const docRef: DocumentReference = await addDoc(collection(db, "users", user.uid, "files"), documentData);
-
-    return docRef.id; // Return the document ID for reference
+    return docRef.id;
 
   } catch (error: any) {
     console.error("Error saving file metadata:", error);
@@ -231,7 +182,7 @@ export const updateFirestoreRecord = async (
   if (!documentId) throw new Error("Document ID is required");
 
   // Filter allowed fields
-  const allowedFields = ['fhirData', 'belroseFields', 'extractedText', 'originalText', 'lastModified'];
+  const allowedFields = ['fhirData', 'belroseFields', 'extractedText', 'originalText', 'lastModified', 'blockchainVerification'];
   const filteredData = Object.keys(updateData)
     .filter(key => allowedFields.includes(key))
     .reduce((obj, key) => {
@@ -344,7 +295,7 @@ export async function deleteFromFirestore(documentId: string): Promise<void> {
 /**
  * Get file metadata to determine what needs to be deleted
  */
-export async function getFileMetadata(documentId: string): Promise<FileMetadata> {
+export async function getFileMetadata(documentId: string): Promise<FileObject> {
   const db = getFirestore();
   const auth = getAuth();
   const user = auth.currentUser;
@@ -357,7 +308,7 @@ export async function getFileMetadata(documentId: string): Promise<FileMetadata>
     const docSnap: DocumentSnapshot = await getDoc(docRef);
     
     if (docSnap.exists()) {
-      return docSnap.data() as FileMetadata;
+      return docSnap.data() as FileObject;
     } else {
       throw new Error("Document not found");
     }

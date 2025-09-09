@@ -52,6 +52,13 @@ export class FileUploadService implements IFileUploadService {
   private async handleVirtualFileUpload(fileObj: FileObject, options: UploadOptions): Promise<UploadResult> {
     console.log('🎯 Processing virtual file upload:', fileObj.name);
     
+    //DEBUG
+    console.log('🔍 FileUploadService received virtual file:', {
+      hasBlockchainVerification: !!fileObj.blockchainVerification,
+      blockchainData: fileObj.blockchainVerification,
+      allKeys: Object.keys(fileObj)
+    });
+
     // For virtual files, we only save metadata to Firestore
     const firestoreDoc = await saveFileMetadataToFirestore({
       downloadURL: null, // No file in storage

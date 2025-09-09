@@ -82,7 +82,7 @@ export interface UseFileManagerTypes {
   savingCount: number;
   
   // Virtual file support
-  addVirtualFile: (virtualData: VirtualFileData) => Promise<string>;
+  addVirtualFile: (virtualData: VirtualFileData) => Promise<{ fileId: string; blockchainVerification?: BlockchainVerification }>;
   addFhirAsVirtualFile: (fhirData: any, options?: VirtualFileData) => Promise<VirtualFileResult>;
   
   // Reset function

@@ -7,8 +7,6 @@ import { Request, Response } from 'express';
 import {
   FHIRConversionRequest,
   FHIRConversionResponse,
-  MedicalDetectionRequest,
-  MedicalDetectionResponse,
   ImageAnalysisRequest,
   ImageAnalysisResponse,
   FHIRProcessingRequest,
@@ -120,124 +118,6 @@ export const convertToFHIR = functions.https.onRequest(
       } catch (error) {
         console.error('FHIR conversion error:', error);
         handleError(res, error, 'FHIR conversion');
-      }
-    });
-  }
-);
-
-// ==================== MEDICAL DETECTION FUNCTION ====================
-
-export const detectMedicalRecord = functions.https.onRequest(
-  { secrets: [anthropicKey] },
-  (req: Request, res: Response): void => {
-    corsHandler(req, res, async (): Promise<void> => {
-      if (req.method !== 'POST') {
-        res.status(405).json({ error: 'Method Not Allowed' });
-        return;
-      }
-
-      try {
-        const { documentText, fileName = '', fileType = '' }: MedicalDetectionRequest = req.body;
-
-        // Validate input
-        if (!documentText || typeof documentText !== 'string') {
-          res.status(400).json({ error: 'documentText is required and must be a string' });
-          return;
-        }
-
-        const ANTHROPIC_API_KEY = anthropicKey.value();
-        
-        if (!ANTHROPIC_API_KEY) {
-          console.error('Anthropic API key not configured');
-          res.status(500).json({ error: 'API key not configured' });
-          return;
-        }
-
-        const prompt = `
-          You are a medical document classification expert. Analyze the following document text and determine if it is a medical record or medical-related document.
-
-          Document Text:
-          ${documentText}
-
-          Additional Context:
-          - File Name: ${fileName}
-          - File Type: ${fileType}
-
-          Please analyze this document and provide your assessment in JSON format with the following structure:
-          {
-            "isMedical": boolean,
-            "confidence": number between 0 and 1,
-            "documentType": string (options: "medical_record", "lab_results", "radiology_report", "prescription", "discharge_summary", "consultation_notes", "medical_imaging", "insurance_document", "business_document", "invoice", "receipt", "personal_document", "unknown"),
-            "reasoning": string explaining your decision,
-            "medicalSpecialty": string or null (if medical, what specialty: "cardiology", "neurology", "general", etc.),
-            "suggestion": string with recommendation
-          }
-
-          Classification Guidelines:
-          1. Medical records contain patient information, diagnoses, treatments, medications, or clinical observations
-          2. Business documents like invoices, receipts, hotel bills are NOT medical even if from medical facilities
-          3. Look for medical terminology, patient identifiers, clinical measurements, diagnostic codes
-          4. Consider document structure typical of medical records
-          5. Be conservative - if unsure, lean towards non-medical to avoid false positives
-
-          Return ONLY the JSON response, no additional text.
-        `;
-
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': ANTHROPIC_API_KEY,
-            'anthropic-version': '2023-06-01'
-          },
-          body: JSON.stringify({
-            model: 'claude-3-5-sonnet-20241022',
-            max_tokens: 1000,
-            temperature: 0.1,
-            messages: [
-              {
-                role: 'user',
-                content: prompt
-              }
-            ]
-          })
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('Anthropic API error:', errorData);
-          throw new Error(`AI API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
-        }
-
-        const data: ClaudeResponse = await response.json();
-        
-        // Extract and clean JSON
-        let detectionContent = data.content[0].text;
-        detectionContent = cleanMarkdownJson(detectionContent);
-        
-        // Parse and validate the JSON
-        const detectionResult: MedicalDetectionResponse = JSON.parse(detectionContent);
-        
-        // Validate the response structure
-        if (typeof detectionResult.isMedical !== 'boolean' ||
-            typeof detectionResult.confidence !== 'number' ||
-            !detectionResult.documentType ||
-            !detectionResult.reasoning) {
-          throw new Error('Invalid response structure from AI');
-        }
-
-        // Ensure confidence is between 0 and 1
-        detectionResult.confidence = Math.max(0, Math.min(1, detectionResult.confidence));
-        
-        // Add timestamp
-        detectionResult.detectedAt = new Date().toISOString();
-        
-        // Return the detection result
-        res.json(detectionResult);
-
-      } catch (error) {
-        console.error('Medical detection error:', error);
-        handleMedicalDetectionError(res, error);
       }
     });
   }
@@ -653,37 +533,6 @@ function handleError(res: Response, error: any, context: string): void {
     res.status(502).json({ error: 'External API error' });
   } else {
     res.status(500).json({ error: 'Internal server error' });
-  }
-}
-
-function handleMedicalDetectionError(res: Response, error: any): void {
-  if (error.message.includes('JSON')) {
-    res.status(500).json({ 
-      error: 'Failed to parse AI response',
-      isMedical: false,
-      confidence: 0,
-      documentType: 'unknown',
-      reasoning: 'AI service error - unable to analyze document',
-      suggestion: 'Please try again or contact support'
-    });
-  } else if (error.message.includes('Claude API')) {
-    res.status(502).json({ 
-      error: 'External AI service error',
-      isMedical: false,
-      confidence: 0,
-      documentType: 'unknown',
-      reasoning: 'AI service temporarily unavailable',
-      suggestion: 'Please try again later'
-    });
-  } else {
-    res.status(500).json({ 
-      error: 'Internal server error',
-      isMedical: false,
-      confidence: 0,
-      documentType: 'unknown',
-      reasoning: 'Server error during analysis',
-      suggestion: 'Please try again or contact support'
-    });
   }
 }
 

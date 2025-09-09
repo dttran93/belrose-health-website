@@ -1,4 +1,5 @@
 import { FileObject, BlockchainVerification } from '@/types/core';
+import { removeUndefinedValues } from '@/lib/utils';
 
 export class BlockchainService {
   
@@ -33,29 +34,32 @@ export class BlockchainService {
   /**
    * Create blockchain verification object for a new record
    */
-  static async createBlockchainVerification(
-    fileObject: FileObject,
-    options: {
-      providerSignature?: string;
-      signerId?: string;
-      network?: string;
-    } = {}
-  ): Promise<BlockchainVerification> {
-    const recordHash = await this.generateRecordHash(fileObject);
-    
-    // For Phase 1, we'll simulate blockchain transaction
-    const simulatedTxId = this.generateSimulatedTransactionId();
-    
-    return {
-      recordHash,
-      blockchainTxId: simulatedTxId,
-      providerSignature: options.providerSignature,
-      signerId: options.signerId,
-      blockchainNetwork: options.network || 'ethereum-testnet', // Default for simulation
-      timestamp: Date.now(),
-      isVerified: true // In Phase 1, we assume verification succeeds
-    };
-  }
+static async createBlockchainVerification(
+  fileObject: FileObject,
+  options: {
+    providerSignature?: string;
+    signerId?: string;
+    network?: string;
+  } = {}
+): Promise<BlockchainVerification> {
+  const recordHash = await this.generateRecordHash(fileObject);
+  
+  // For Phase 1, we'll simulate blockchain transaction
+  const simulatedTxId = this.generateSimulatedTransactionId();
+  
+  const baseVerification = {
+    recordHash,
+    blockchainTxId: simulatedTxId,
+    providerSignature: options.providerSignature,
+    signerId: options.signerId,
+    blockchainNetwork: options.network || 'ethereum-testnet',
+    timestamp: Date.now(),
+    isVerified: true
+  };
+  
+  // Use the utility function instead of duplicating logic
+  return removeUndefinedValues(baseVerification) as BlockchainVerification;
+}
 
   /**
    * Verify a record against its blockchain verification
@@ -78,14 +82,8 @@ export class BlockchainService {
    * Provider records always need it, patient records are optional
    */
   static needsBlockchainVerification(fileObject: FileObject): boolean {
-    // Provider records always need blockchain verification
-    if (fileObject.isProviderRecord) {
-      return true;
-    }
-    
-    // Self-reported records don't necessarily need blockchain verification
-    // but user could opt-in later
-    return false;
+    // For the timebeing just set all as needs BlockchianVerification, but probably need to adjust this eventually
+    return true;
   }
 
   /**
