@@ -10,12 +10,12 @@ import { removeUndefinedValues } from '@/lib/utils';
 
 import {
   AddFilesOptions,
-  VirtualFileData,
   FileStats,
   FHIRConversionCallback,
   ResetProcessCallback,
   UseFileManagerTypes,
 } from './useFileManager.type';
+import { VirtualFileInput } from '@/types/core';
 import { VirtualFileResult } from '../components/CombinedUploadFHIR.type';
 import { UploadResult } from '../services/shared.types';
 
@@ -59,7 +59,7 @@ export function useFileManager(): UseFileManagerTypes {
         }
     }, [files]);
 
-    console.log('📁 Current files in hook:', files.length, files.map(f => f.name));
+    console.log('📁 Current files in hook:', files.length, files.map(f => f.fileName));
     const [firestoreData, setFirestoreData] = useState<Map<string, any>>(new Map());
     const [savingToFirestore, setSavingToFirestore] = useState<Set<string>>(new Set());
 
@@ -151,7 +151,7 @@ export function useFileManager(): UseFileManagerTypes {
             return;
         }
         
-        console.log(`🔄 Retrying file: ${file.name}`);
+        console.log(`🔄 Retrying file: ${file.fileName}`);
         updateFileStatus(fileId, 'processing');
         await processFile(file);
     }, [files]);
@@ -200,16 +200,16 @@ export function useFileManager(): UseFileManagerTypes {
     };
 
     const processWithAI = useCallback(async (fileObj: FileObject) => {
-        console.log(`🤖 Starting AI processing for: ${fileObj.name}`);
+        console.log(`🤖 Starting AI processing for: ${fileObj.fileName}`);
         
         try {
             // Call AI service
             const aiResult = await processRecordWithAI(fileObj.fhirData, {
-                fileName: fileObj.name,
+                fileName: fileObj.fileName,
                 extractedText: fileObj.extractedText || undefined,
             });
             
-            console.log(`✅ AI processing completed for: ${fileObj.name}`, aiResult);
+            console.log(`✅ AI processing completed for: ${fileObj.fileName}`, aiResult);
             
             // 🔥 RETURN the result instead of updating status
             return {
@@ -218,7 +218,7 @@ export function useFileManager(): UseFileManagerTypes {
             };
             
         } catch (error: any) {
-            console.error(`❌ AI processing failed for ${fileObj.name}:`, error);
+            console.error(`❌ AI processing failed for ${fileObj.fileName}:`, error);
             
             // 🔥 RETURN the error instead of updating status
             return {
@@ -229,7 +229,7 @@ export function useFileManager(): UseFileManagerTypes {
     }, []);
 
     const processFile = useCallback(async (fileObj: FileObject): Promise<void> => {
-        console.log(`📋 Starting complete processing pipeline for: ${fileObj.name}`);
+        console.log(`📋 Starting complete processing pipeline for: ${fileObj.fileName}`);
         
         updateFileStatus(fileObj.id, 'processing', {
             processingStage: 'Starting processing...'
@@ -237,7 +237,7 @@ export function useFileManager(): UseFileManagerTypes {
 
         try {
             // Step 1: Extract text and process document
-            console.log(`📝 Step 1: Extracting text from: ${fileObj.name}`);
+            console.log(`📝 Step 1: Extracting text from: ${fileObj.fileName}`);
             updateFileStatus(fileObj.id, 'processing', {
                 processingStage: 'Extracting text...'
             });
@@ -254,7 +254,7 @@ export function useFileManager(): UseFileManagerTypes {
             // Step 2: Try FHIR conversion
             let fhirData = null;
             if (result.extractedText && result.extractedText.trim().length > 0) {
-                console.log(`🩺 Step 2: Attempting FHIR conversion for: ${fileObj.name}`);
+                console.log(`🩺 Step 2: Attempting FHIR conversion for: ${fileObj.fileName}`);
                 updateFileStatus(fileObj.id, 'processing', {
                     processingStage: 'Converting to FHIR...'
                 });
@@ -265,7 +265,7 @@ export function useFileManager(): UseFileManagerTypes {
                     
                     if (fhirResult && fhirResult.resourceType === 'Bundle') {
                         fhirData = fhirResult;
-                        console.log(`✅ FHIR conversion successful for: ${fileObj.name}`);
+                        console.log(`✅ FHIR conversion successful for: ${fileObj.fileName}`);
                     
                         updateFileStatus(fileObj.id, 'processing',{
                             fhirData: fhirData,
@@ -274,14 +274,14 @@ export function useFileManager(): UseFileManagerTypes {
                         })
                     
                     } else {
-                        console.log(`ℹ️ FHIR conversion failed for: ${fileObj.name}, continuing without FHIR data`);
+                        console.log(`ℹ️ FHIR conversion failed for: ${fileObj.fileName}, continuing without FHIR data`);
                     }
                 } catch (fhirError: any) {
                     console.error(`💥 FHIR conversion error:`, fhirError);
-                    console.warn(`⚠️ FHIR conversion failed for ${fileObj.name}:`, fhirError.message);
+                    console.warn(`⚠️ FHIR conversion failed for ${fileObj.fileName}:`, fhirError.message);
                 }
             } else {
-                console.log(`ℹ️ No text extracted from: ${fileObj.name}, skipping FHIR conversion`);
+                console.log(`ℹ️ No text extracted from: ${fileObj.fileName}, skipping FHIR conversion`);
             }
 
             // Step 3: Update file with basic processing results (but don't set AI stage yet)
@@ -295,7 +295,7 @@ export function useFileManager(): UseFileManagerTypes {
             // Step 4: AI Processing (if FHIR data exists)
             let belroseFields = undefined;
             if (fhirData) {
-                console.log(`🤖 Step 4: Starting AI processing for: ${fileObj.name}`);
+                console.log(`🤖 Step 4: Starting AI processing for: ${fileObj.fileName}`);
                 
                 // Update to AI processing stage
                 updateFileStatus(fileObj.id, 'processing', {
@@ -316,7 +316,7 @@ export function useFileManager(): UseFileManagerTypes {
                     
                     // 🔥 Call AI processing and wait for the result
                     const aiResult = await processRecordWithAI(updatedFileObj.fhirData, {
-                        fileName: updatedFileObj.name,
+                        fileName: updatedFileObj.fileName,
                         extractedText: updatedFileObj.extractedText || undefined,
                     });
                     
@@ -331,16 +331,16 @@ export function useFileManager(): UseFileManagerTypes {
                         aiProcessedAt: new Date().toISOString()
                     };
                     
-                    console.log(`✅ AI processing completed for: ${fileObj.name}`, aiResult);
+                    console.log(`✅ AI processing completed for: ${fileObj.fileName}`, aiResult);
                     
                     // Show success toast
-                    toast.success(`🤖 AI analysis completed for ${fileObj.name}`, {
+                    toast.success(`🤖 AI analysis completed for ${fileObj.fileName}`, {
                         description: `Classified as: ${aiResult.visitType}`,
                         duration: 3000
                     });
                     
                 } catch (error: any) {
-                    console.error(`❌ AI processing failed for ${fileObj.name}:`, error);
+                    console.error(`❌ AI processing failed for ${fileObj.fileName}:`, error);
                     
                     belroseFields = {
                         aiFailureReason: error.message,
@@ -348,7 +348,7 @@ export function useFileManager(): UseFileManagerTypes {
                     };
                     
                     // Show error toast
-                    toast.error(`AI analysis failed for ${fileObj.name}`, {
+                    toast.error(`AI analysis failed for ${fileObj.fileName}`, {
                         description: error.message,
                         duration: 5000
                     });
@@ -375,7 +375,7 @@ export function useFileManager(): UseFileManagerTypes {
         
         // Check if blockchain verification is needed
         if (BlockchainService.needsBlockchainVerification(completeRecord)) {
-            console.log(`🔗 Step 5: Generating blockchain verification for: ${fileObj.name}`);
+            console.log(`🔗 Step 5: Generating blockchain verification for: ${fileObj.fileName}`);
             
             updateFileStatus(fileObj.id, 'processing', {
                 processingStage: 'Generating blockchain verification...'
@@ -392,35 +392,35 @@ export function useFileManager(): UseFileManagerTypes {
                     }
                 );
                 
-                console.log(`✅ Blockchain verification generated for: ${fileObj.name}`, {
+                console.log(`✅ Blockchain verification generated for: ${fileObj.fileName}`, {
                     hash: blockchainVerification.recordHash,
                     txId: blockchainVerification.blockchainTxId
                 });
                 
                 // Show success toast for blockchain verification
-                toast.success(`🔗 Blockchain verification completed for ${fileObj.name}`, {
+                toast.success(`🔗 Blockchain verification completed for ${fileObj.fileName}`, {
                     description: `Record hash: ${blockchainVerification.recordHash.substring(0, 12)}...`,
                     duration: 3000
                 });
                 
             } catch (error: any) {
-                console.error(`❌ Blockchain verification failed for ${fileObj.name}:`, error);
+                console.error(`❌ Blockchain verification failed for ${fileObj.fileName}:`, error);
                 
                 // Show warning toast but don't fail the entire process
-                toast.warning(`Blockchain verification failed for ${fileObj.name}`, {
+                toast.warning(`Blockchain verification failed for ${fileObj.fileName}`, {
                     description: 'Record will be saved without blockchain verification',
                     duration: 4000
                 });
                 
                 // Log the error but continue processing
-                console.warn(`⚠️ Continuing without blockchain verification for ${fileObj.name}`);
+                console.warn(`⚠️ Continuing without blockchain verification for ${fileObj.fileName}`);
             }
         } else {
-            console.log(`ℹ️ Blockchain verification not required for: ${fileObj.name}`);
+            console.log(`ℹ️ Blockchain verification not required for: ${fileObj.fileName}`);
         }
             
             // 🎉 FINAL STEP: Mark as completed with ALL data including AI results
-            console.log(`🎉 Marking file as completed: ${fileObj.name}`);
+            console.log(`🎉 Marking file as completed: ${fileObj.fileName}`);
             updateFileStatus(fileObj.id, 'completed', {
                 processingStage: undefined,
                 processedAt: new Date().toISOString(),
@@ -429,10 +429,10 @@ export function useFileManager(): UseFileManagerTypes {
                 blockchainVerification: blockchainVerification
             });
             
-            console.log(`🎉 Complete processing pipeline finished for: ${fileObj.name}`);
+            console.log(`🎉 Complete processing pipeline finished for: ${fileObj.fileName}`);
                 
         } catch (error: any) {
-            console.error(`💥 Processing failed for ${fileObj.name}:`, error);
+            console.error(`💥 Processing failed for ${fileObj.fileName}:`, error);
             updateFileStatus(fileObj.id, 'error', { 
                 error: error.message,
                 processingStage: undefined,
@@ -535,7 +535,7 @@ export function useFileManager(): UseFileManagerTypes {
         }
         
         console.log(`📁 File info:`, {
-            name: fileToRemove.name,
+            name: fileToRemove.fileName,
             status: fileToRemove.status,
             hasDocumentId: !!fileToRemove.documentId,
             documentId: fileToRemove.documentId,
@@ -549,10 +549,10 @@ export function useFileManager(): UseFileManagerTypes {
         if (fileToRemove.documentId) {
             try {
                 await deleteFileFromFirebase(fileToRemove.documentId);
-                toast.success(`Deleted "${fileToRemove.name}" from cloud storage`);
+                toast.success(`Deleted "${fileToRemove.fileName}" from cloud storage`);
             } catch (error: any) {
                 console.error('❌ Firebase deletion failed, but continuing with local cleanup:', error);
-                toast.error(`Could not delete "${fileToRemove.name}" from cloud storage: ${error.message}`);
+                toast.error(`Could not delete "${fileToRemove.fileName}" from cloud storage: ${error.message}`);
                 // Continue with local cleanup even if Firebase deletion fails
             }
         }
@@ -570,7 +570,7 @@ export function useFileManager(): UseFileManagerTypes {
         // Get all uploaded files that need Firebase cleanup
         const uploadedFiles = files
             .filter(f => f.documentId)
-            .map(f => ({ id: f.documentId!, name: f.name }));
+            .map(f => ({ id: f.documentId!, fileName: f.fileName }));
         
         if (uploadedFiles.length > 0) {
             console.log(`🔥 Found ${uploadedFiles.length} uploaded files to delete from Firebase`);
@@ -580,10 +580,10 @@ export function useFileManager(): UseFileManagerTypes {
                 const deletePromises = uploadedFiles.map(async (file) => {
                     try {
                         await deleteFileFromFirebase(file.id);
-                        return { success: true, fileId: file.id, name: file.name };
+                        return { success: true, fileId: file.id, name: file.fileName };
                     } catch (error: any) {
-                        console.error(`❌ Failed to delete ${file.name}:`, error);
-                        return { success: false, fileId: file.id, name: file.name, error: error.message };
+                        console.error(`❌ Failed to delete ${file.fileName}:`, error);
+                        return { success: false, fileId: file.id, name: file.fileName, error: error.message };
                     }
                 });
                 
@@ -652,13 +652,13 @@ export function useFileManager(): UseFileManagerTypes {
             
             try {
                 const result = await fileUploadService.current.uploadFile(fileObj);
-                console.log(`✅ Upload successful for ${fileObj.name}:`, result);
+                console.log(`✅ Upload successful for ${fileObj.fileName}:`, result);
                 
                 setFirestoreData(prev => new Map([...prev, [fileObj.id, result]]));
                 updateFileStatus(fileObj.id, 'completed', { uploadResult: result });
 
                 // 🎉 SUCCESS TOAST HERE
-                toast.success(`📁 ${fileObj.name} uploaded successfully!`, {
+                toast.success(`📁 ${fileObj.fileName} uploaded successfully!`, {
                     description: 'Your file has been saved to cloud storage',
                     duration: 4000,
                 });
@@ -671,7 +671,7 @@ export function useFileManager(): UseFileManagerTypes {
                 };
                 
             } catch (error: any) {
-                console.error(`💥 Upload failed for ${fileObj.name}:`, error);
+                console.error(`💥 Upload failed for ${fileObj.fileName}:`, error);
                 updateFileStatus(fileObj.id, 'error', { error: error.message });
                
                 return {
@@ -694,14 +694,14 @@ export function useFileManager(): UseFileManagerTypes {
 
     // ==================== VIRTUAL FILE SUPPORT ====================
     
-const addVirtualFile = useCallback(async (virtualData: VirtualFileData): Promise<{ fileId: string; blockchainVerification?: BlockchainVerification }> => {
+const addVirtualFile = useCallback(async (virtualData: VirtualFileInput): Promise<{ fileId: string; blockchainVerification?: BlockchainVerification }> => {
     const fileId = virtualData.id || generateId();
     
     const virtualFile: FileObject = {
         id: fileId,
-        fileName: virtualData.name || `Virtual File ${fileId}`,
-        fileSize: virtualData.size || 0,
-        fileType: virtualData.type || 'application/json',
+        fileName: virtualData.fileName || `Virtual File ${fileId}`,
+        fileSize: virtualData.fileSize || 0,
+        fileType: virtualData.fileType || 'application/json',
         status: 'completed',
         uploadedAt: new Date().toISOString(),
         fhirJson: virtualData.fhirJson,
@@ -767,15 +767,15 @@ const addVirtualFile = useCallback(async (virtualData: VirtualFileData): Promise
 }, [setFiles]);
 
 
-    const addFhirAsVirtualFile = useCallback(async (fhirData: any | undefined, options: VirtualFileData = {}): Promise<VirtualFileResult> => {
+    const addFhirAsVirtualFile = useCallback(async (fhirData: any | undefined, options: VirtualFileInput & {autoUpload?: boolean } = {}): Promise<VirtualFileResult> => {
         const fileId = options.id || generateId();
-        const fileName = options.name || `FHIR Document ${fileId}`;
+        const fileName = options.fileName || `FHIR Document ${fileId}`;
         
-        const virtualFileData: VirtualFileData = {
+        const virtualFileInput: VirtualFileInput = {
             id: fileId,
-            name: fileName,
-            size: JSON.stringify(fhirData).length,
-            type: 'application/fhir+json',
+            fileName: fileName,
+            fileSize: JSON.stringify(fhirData).length,
+            fileType: 'application/fhir+json',
             fhirJson: JSON.stringify(fhirData, null, 2),
             originalText: options.originalText,
             wordCount: JSON.stringify(fhirData).split(/\s+/).length,
@@ -787,7 +787,7 @@ const addVirtualFile = useCallback(async (virtualData: VirtualFileData): Promise
             ...options
         };
 
-        const { fileId: generatedFileId, blockchainVerification} = await addVirtualFile(virtualFileData);
+        const { fileId: generatedFileId, blockchainVerification} = await addVirtualFile(virtualFileInput);
         
         // Instead of trying to find it in the files array (which might not be updated yet),
         // construct the FileObject directly from the data we have
@@ -799,9 +799,9 @@ const addVirtualFile = useCallback(async (virtualData: VirtualFileData): Promise
             status: 'completed',
             uploadedAt: new Date().toISOString(),
             fhirJson: JSON.stringify(fhirData, null, 2),
-            originalText: virtualFileData.originalText,
+            originalText: virtualFileInput.originalText,
             wordCount: JSON.stringify(fhirData).split(/\s+/).length,
-            documentType: virtualFileData.documentType,
+            documentType: virtualFileInput.documentType,
             isVirtual: true,
             fhirData,
             file: undefined,
@@ -812,7 +812,7 @@ const addVirtualFile = useCallback(async (virtualData: VirtualFileData): Promise
         
         // 🔥 AUTO-UPLOAD if requested
         if (options.autoUpload) {
-            console.log('🚀 Auto-uploading virtual file:', virtualFile.name);
+            console.log('🚀 Auto-uploading virtual file:', virtualFile.fileName);
             
             try {
                 // Prevent duplicate uploads
@@ -823,7 +823,7 @@ const addVirtualFile = useCallback(async (virtualData: VirtualFileData): Promise
                 setSavingToFirestore(prev => new Set([...prev, fileId]));
                 
                 const uploadResult = await fileUploadService.current.uploadFile(virtualFile);
-                console.log(`✅ Auto-upload successful for ${virtualFile.name}:`, uploadResult);
+                console.log(`✅ Auto-upload successful for ${virtualFile.fileName}:`, uploadResult);
                 
                 // Update state with upload result
                 setFirestoreData(prev => new Map([...prev, [fileId, uploadResult]]));
@@ -834,7 +834,7 @@ const addVirtualFile = useCallback(async (virtualData: VirtualFileData): Promise
                 });
 
                 // Show success toast
-                toast.success(`📁 ${virtualFile.name} uploaded successfully!`, {
+                toast.success(`📁 ${virtualFile.fileName} uploaded successfully!`, {
                     description: 'Your file has been saved to cloud storage',
                     duration: 4000,
                 });
@@ -853,7 +853,7 @@ const addVirtualFile = useCallback(async (virtualData: VirtualFileData): Promise
                 };
                 
             } catch (error) {
-                console.error(`❌ Auto-upload failed for ${virtualFile.name}:`, error);
+                console.error(`❌ Auto-upload failed for ${virtualFile.fileName}:`, error);
                 updateFileStatus(fileId, 'error', { 
                     uploadError: error instanceof Error ? error.message : 'Upload failed' 
                 });

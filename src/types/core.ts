@@ -40,6 +40,33 @@ export type AIProcessingStatus =
   | 'failed'         // AI processing failed
   | 'not_needed';    // This record type doesn't need AI processing
 
+export type FileStatus = 
+  | 'pending'      // File uploaded, waiting to process
+  | 'processing'   // Currently being processed
+  | 'uploading'    // Currently uploading, use for making sure there aren't multiple uploads  
+  | 'completed'    // Successfully processed
+  | 'error';       // Failed with error
+
+export type DocumentType = 'Plain Text Submission' | 'Manual FHIR JSON Submission' | 'File Upload';
+
+export interface DuplicateInfo {
+  existingFileId?: string;
+  confidence: number;
+  matchedOn: ('name' | 'size' | 'lastModified' | 'hash')[];
+  canRetry: boolean;
+  userMessage?: string;
+}
+
+export interface VirtualFileInput {
+  fileName?: string;
+  documentType?: DocumentType;
+  extractedText?: string;
+  fhirData?: any;
+  wordCount?: number;
+
+  [key: string]: any;
+}
+
 export interface FileObject {
   id: string; //fileId. Generated in useFileManager via createFileObject() or addVirtualFile(). file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}
   file?: File; //actual file object from file input. Real life upload not virtual. Generated in createFileObject in useFileManager.ts
@@ -52,7 +79,7 @@ export interface FileObject {
   originalText?: string | null;
   wordCount?: number; //calculated during text extraction
   fileHash?: string; 
-  documentType?: 'Plain Text' | 'Manual FHIR JSON' | 'File Upload'
+  documentType?: 'Plain Text Submission' | 'Manual FHIR JSON Submission' | 'File Upload'
   lastModified?: number; //Filetracking for UI state management.
   isVirtual?: boolean; //for virtual files
   fhirData?: any;
@@ -68,17 +95,3 @@ export interface FileObject {
   isProviderRecord?: boolean;
 }
 
-export type FileStatus = 
-  | 'pending'      // File uploaded, waiting to process
-  | 'processing'   // Currently being processed
-  | 'uploading'    // Currently uploading, use for making sure there aren't multiple uploads  
-  | 'completed'    // Successfully processed
-  | 'error';       // Failed with error
-
-export interface DuplicateInfo {
-  existingFileId?: string;
-  confidence: number;
-  matchedOn: ('name' | 'size' | 'lastModified' | 'hash')[];
-  canRetry: boolean;
-  userMessage?: string;
-}

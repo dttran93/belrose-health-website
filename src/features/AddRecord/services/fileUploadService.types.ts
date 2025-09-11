@@ -1,6 +1,6 @@
 // src/features/AddRecord/services/fileUploadService.types.ts
 
-import { FileObject } from '@/types/core';
+import { FileObject, FileMetadata } from '@/types/core';
 
 // ==================== UPLOAD TYPES ====================
 
@@ -35,29 +35,6 @@ export interface UploadOptions {
 
 // ==================== FIRESTORE TYPES ====================
 
-export interface FirestoreFileMetadata {
-  fileName: string;
-  fileType: string;
-  fileSize: number;
-  downloadURL: string;
-  storagePath: string;
-  uploadedBy: string;
-  uploadedAt: Date;
-  
-  // Optional processed data
-  extractedText?: string;
-  wordCount?: number;
-  documentType?: string;
-  extractedAt?: string;
-  processingStatus?: string;
-  fileHash?: string;
-  
-  // Virtual file support
-  isVirtual?: boolean;
-  virtualFileType?: string;
-  fhirData?: any;
-}
-
 export interface FHIRUpdateData {
   fhirData: any;
   fhirConvertedAt: string;
@@ -68,7 +45,7 @@ export interface FHIRUpdateData {
 
 export interface IFileUploadService {
   uploadFile(fileObj: FileObject, options?: UploadOptions): Promise<UploadResult>;
-  updateRecord(fileId: string, data: Partial<FirestoreFileMetadata>): Promise<void>;
+  updateRecord(fileId: string, data: Partial<FileMetadata>): Promise<void>;
   deleteFile(fileId: string): Promise<void>;
   
   // FHIR specific methods
