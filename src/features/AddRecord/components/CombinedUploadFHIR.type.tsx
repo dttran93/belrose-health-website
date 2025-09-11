@@ -1,5 +1,5 @@
 import type { FHIRWithValidation } from '../services/fhirConversionService.type';
-import { FileObject, FileStatus } from '@/types/core';
+import { FileObject, FileStatus, VirtualFileInput } from '@/types/core';
 import { UploadResult } from '../services/shared.types';
 
 // ============================================================================
@@ -35,13 +35,6 @@ export interface AddFilesOptions {
   maxSizeBytes?: number;
 }
 
-export interface VirtualFileOptions {
-  id?: string;
-  name?: string;
-  documentType?: string;
-  [key: string]: any;
-}
-
 export interface VirtualFileResult {
   fileId: string;
   virtualFile: FileObject;
@@ -72,11 +65,12 @@ export interface CombinedUploadFHIRProps {
   getStats: () => FileStats;
 
   updateFileStatus: (fileId: string, status: FileStatus, additionalData?: Partial<FileObject>) => void;
+  onReview: (fileItem: FileObject) => void;
   
   // Direct upload functions - UPDATED to match hook
   addFhirAsVirtualFile: (
     fhirData: FHIRWithValidation, 
-    options?: VirtualFileOptions
+    options?: VirtualFileInput & { autoUpload?: boolean}
   ) => Promise<VirtualFileResult>;
   
   // Updated: Hook takes fileIds array, returns Promise<void>
@@ -119,6 +113,7 @@ export interface FileListItemProps {
   onForceConvert?: (fileItem: FileObject) => void;
   onComplete?: (fileItem: FileObject) => void;
   showFHIRResults?: boolean;
+  onReview?: (fileItem: FileObject) => void;
 }
 
 // ============================================================================

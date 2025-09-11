@@ -15,7 +15,7 @@ const tabs = [
   },
   { 
     id: 'data', 
-    label: 'FHIR Data',
+    label: 'JSON Data',
     icon: Code
   },
   { 
@@ -75,29 +75,29 @@ export const RecordView: React.FC<RecordViewProps> = ({
           </div>
         )}
 
-        {/* FHIR Data JSON Tab */}
+        {/* JSON Tab */}
         {activeTab === 'data' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">FHIR Data</h2>
+              <h2 className="text-xl font-semibold text-gray-900">JSON Data</h2>
             </div>
             <div className="bg-gray-50 rounded-lg p-4 border">
-              {record.fhirData ? (
+              {record ? (
                 <div>
                   <div className="flex justify-between items-center mb-4 pb-2 border-b">
                     <span className="text-sm font-medium text-gray-600">
-                      {record.fhirData.type} Bundle • {record.fhirData.entry?.length || 0} entries
+                      Full Record Data
                     </span>
                     <Button
                       variant="outline"
-                      onClick={() => navigator.clipboard.writeText(JSON.stringify(record.fhirData, null, 2))}
+                      onClick={() => navigator.clipboard.writeText(JSON.stringify(record, null, 2))}
                       className="text-xs px-2 py-1 rounded"
                     >
                       Copy JSON
                     </Button>
                   </div>
                   <pre className="text-sm text-gray-800 overflow-x-auto whitespace-pre-wrap max-h-96 overflow-y-auto">
-                    {JSON.stringify(record.fhirData, null, 2)}
+                    {JSON.stringify(record, null, 2)}
                   </pre>
                 </div>
               ) : (
@@ -144,13 +144,28 @@ export const RecordView: React.FC<RecordViewProps> = ({
                       <Share2 className="w-4 h-4" />
                       <span>Open</span>
                     </Button>
-                    <Button 
+                    <Button
                       variant="default"
-                      onClick={() => {
-                        const link = document.createElement('a');
-                        link.href = record.downloadURL || '#';
-                        link.download = record.fileName || 'document';
-                        link.click();
+                      onClick={async () => {
+                        if (!record.downloadURL) {
+                          console.error('No download URL available');
+                          return;
+                        }
+
+                        try {
+                          const response = await fetch(record.downloadURL);
+                          const blob = await response.blob();
+                          
+                          const link = document.createElement('a');
+                          link.href = URL.createObjectURL(blob);
+                          link.download = record.fileName || 'document';
+                          link.click();
+                          
+                          URL.revokeObjectURL(link.href);
+                        } catch (error) {
+                          console.error('Download failed:', error);
+                          window.open(record.downloadURL, '_blank');
+                        }
                       }}
                       className="flex items-center space-x-2"
                     >

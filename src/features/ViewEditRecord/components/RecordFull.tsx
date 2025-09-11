@@ -24,6 +24,7 @@ interface HealthRecordFullProps {
   onSave?: (updatedRecord: FileObject) => void;
   initialEditMode?: boolean;
   onViewVerification?: (record: FileObject) => void;
+  comingFromAddRecord?: boolean;
 }
 
 export const RecordFull: React.FC<HealthRecordFullProps> = ({
@@ -35,7 +36,8 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
   onBack,
   onSave,
   onViewVerification,
-  initialEditMode
+  initialEditMode,
+  comingFromAddRecord = false,
 }) => {
 
   const [viewMode, setViewMode] = useState<ViewMode>(initialEditMode ? 'edit' : 'record');
@@ -111,6 +113,7 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
 
   // SAVE AND CANCEL HANDLERS
   const hasAnyChanges = hasUnsavedChanges || hasFhirChanges;
+  const shouldDisableSave = comingFromAddRecord ? false : !hasAnyChanges;
 
   const handleSaveRecord = () => {
     const updatedRecord = {
@@ -262,7 +265,7 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
                 <X className="w-4 h-4" />
                 Cancel
               </Button>
-              <Button onClick={handleSaveRecord} disabled={!hasAnyChanges}>
+              <Button onClick={handleSaveRecord} disabled={shouldDisableSave}>
                 <Save className="w-4 h-4" />
                 Save Changes
               </Button>

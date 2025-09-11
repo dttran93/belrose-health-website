@@ -212,6 +212,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
             <HealthRecordFull
             record={reviewMode.record}
             initialEditMode={true}
+            comingFromAddRecord={true}
             onBack={() => setReviewMode({ active: false, record: null })}
             onSave={handleSaveFromReview}
             />
