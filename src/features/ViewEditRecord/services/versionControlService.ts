@@ -65,6 +65,7 @@ export class VersionControlService {
         belroseFields: fileObject.belroseFields || null,
         extractedText: fileObject.extractedText || null,
         originalText: fileObject.originalText || null,
+        blockchainVerification: fileObject.blockchainVerification || null,
       },
       checksum: this.calculateChecksum(fileObject),
       isInitialVersion: true
@@ -156,6 +157,7 @@ async createVersion(
       belroseFields: updatedFileObject.belroseFields ?? null,
       extractedText: updatedFileObject.extractedText ?? null,
       originalText: updatedFileObject.originalText ?? null,
+      blockchainVerification: updatedFileObject.blockchainVerification ?? null,
     }
   );
 
@@ -186,6 +188,7 @@ async createVersion(
       belroseFields: updatedFileObject.belroseFields ?? null,
       extractedText: updatedFileObject.extractedText ?? null,
       originalText: updatedFileObject.originalText ?? null,
+      blockchainVerification: updatedFileObject.blockchainVerification ?? null,
     },
     checksum: this.calculateChecksum(updatedFileObject),
     isInitialVersion: false
@@ -481,6 +484,7 @@ private convertJsonDiffToChangeSets(differences: any[], timestamp: string): Chan
 
 private deepDiff(oldObj: any, newObj: any, path: string = ''): Change[] {
   const changes: Change[] = [];
+  const timestamp = new Date().toISOString();
 
   // Handle null/undefined cases
   if (oldObj === null || oldObj === undefined) {
@@ -488,9 +492,11 @@ private deepDiff(oldObj: any, newObj: any, path: string = ''): Change[] {
       changes.push({
         operation: 'create',
         path: path || 'root',
-        oldValue: oldObj,
+        oldValue: null,
         newValue: newObj,
-        description: `Added new value at ${path || 'root'}`
+        description: `Added new value at ${path || 'root'}`,
+        fieldType: typeof newObj,
+        timestamp
       });
     }
     return changes;
@@ -501,8 +507,10 @@ private deepDiff(oldObj: any, newObj: any, path: string = ''): Change[] {
       operation: 'delete',
       path: path || 'root',
       oldValue: oldObj,
-      newValue: newObj,
-      description: `Removed value from ${path || 'root'}`
+      newValue: null,
+      description: `Removed value from ${path || 'root'}`,
+      fieldType: typeof oldObj,
+      timestamp
     });
     return changes;
   }
@@ -515,7 +523,9 @@ private deepDiff(oldObj: any, newObj: any, path: string = ''): Change[] {
         path: path || 'root',
         oldValue: oldObj,
         newValue: newObj,
-        description: `Updated ${path || 'root'} from "${oldObj}" to "${newObj}"`
+        description: `Updated ${path || 'root'} from "${oldObj}" to "${newObj}"`,
+        fieldType: typeof newObj,
+        timestamp
       });
     }
     return changes;
@@ -536,9 +546,11 @@ private deepDiff(oldObj: any, newObj: any, path: string = ''): Change[] {
         changes.push({
           operation: 'create',
           path: arrayPath,
-          oldValue: undefined,
+          oldValue: null,
           newValue: newArray[i],
-          description: `Added new array item at index ${i}`
+          description: `Added new array item at index ${i}`,
+          fieldType: typeof newArray[i],
+          timestamp
         });
       } else if (i >= newArray.length) {
         // Item removed
@@ -546,8 +558,10 @@ private deepDiff(oldObj: any, newObj: any, path: string = ''): Change[] {
           operation: 'delete',
           path: arrayPath,
           oldValue: oldArray[i],
-          newValue: undefined,
-          description: `Removed array item at index ${i}`
+          newValue: null,
+          description: `Removed array item at index ${i}`,
+          fieldType: typeof oldArray[i],
+          timestamp
         });
       } else {
         // Recursively compare array items
@@ -569,9 +583,11 @@ private deepDiff(oldObj: any, newObj: any, path: string = ''): Change[] {
       changes.push({
         operation: 'create',
         path: newPath,
-        oldValue: undefined,
+        oldValue: null,
         newValue: newObj[key],
-        description: `Added new property "${key}"`
+        description: `Added new property "${key}"`,
+        fieldType: typeof newObj[key],
+        timestamp
       });
     } else if (!(key in newObj)) {
       // Property removed
@@ -579,8 +595,10 @@ private deepDiff(oldObj: any, newObj: any, path: string = ''): Change[] {
         operation: 'delete',
         path: newPath,
         oldValue: oldObj[key],
-        newValue: undefined,
-        description: `Removed property "${key}"`
+        newValue: null,
+        description: `Removed property "${key}"`,
+        fieldType: typeof oldObj[key],
+        timestamp
       });
     } else {
       // Property exists in both - recursively compare

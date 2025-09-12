@@ -19,6 +19,7 @@ import {
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import type { FileObject } from '@/types/core';
+import { BlockchainService } from "@/features/BlockchainVerification/service/blockchainService";
 
 
 // ==================== TYPE DEFINITIONS ====================
@@ -54,7 +55,7 @@ export async function uploadUserFile(fileObj: FileObject): Promise<UploadUserFil
   console.log('📄 uploadUserFile received:', {
     hasFile: !!fileObj.file,
     hasFileProperty: 'file' in fileObj,
-    fileName: fileObj.name,
+    fileName: fileObj.fileName,
     isVirtual: fileObj.isVirtual,
     extractedText: !!fileObj.extractedText,
     allKeys: Object.keys(fileObj)
@@ -85,7 +86,7 @@ export async function uploadUserFile(fileObj: FileObject): Promise<UploadUserFil
   }
 
   // Organize files by user ID
-  const fileName = fileObj.name || file.name;
+  const fileName = fileObj.fileName || file.name;
   const filePath = `users/${user.uid}/uploads/${Date.now()}_${fileName}`;
   const fileRef = ref(storage, filePath);
 
@@ -211,33 +212,80 @@ export const updateFirestoreRecord = async (
       throw new Error("Document not found");
     }
 
-    // Step 2: Update the main document
+    const originalFileObjectForVersioning = JSON.parse(JSON.stringify({
+      ...currentFileObject,
+      id: documentId
+    }));
+
+    // Step 2: Check updatedFileObject for hash generation
+    const updatedFileObject = {
+      ...currentFileObject,
+      ...filteredData,
+      id: documentId
+    };
+
+    const hashRelevantFields = ['fhirData','belroseFields','extractedText','originalText'];
+    const needsHashUpdate = hashRelevantFields.some(field => 
+      filteredData.hasOwnProperty(field) &&
+      JSON.stringify(filteredData[field]) !== JSON.stringify(currentFileObject[field])
+    );
+
+    if (needsHashUpdate) {
+      console.log('🔐 Content changed, regenerating recordHash...');
+      
+      try{
+        const newRecordHash = await BlockchainService.generateRecordHash(updatedFileObject);
+
+        const newBlockchainVerification = {
+          ...currentFileObject.blockchainVerification,
+          recordHash: newRecordHash,
+          timestamp: Date.now(),
+          previousRecordHash: currentFileObject.blockchainVerification?.recordHash
+        };
+
+        filteredData.blockchainVerification = newBlockchainVerification;
+        updatedFileObject.blockchainVerification = newBlockchainVerification;
+
+        console.log('✅ New recordHash generated:', newRecordHash.substring(0, 12) + '...');
+      } catch (hashError) {
+        console.error('⚠️ Failed to generate recordHash:', hashError);
+        console.warn('⚠️ Proceeding with update without hash regeneration');
+      }
+    } else {
+      console.log('ℹ️ No hash-relevant fields changed, keeping existing hash');
+    }
+
+    // Step 3: Update the main document
     await updateDoc(docRef, filteredData);
     console.log('✅ Updated fields:', Object.keys(filteredData));
 
-    // Step 3: Create version (always enabled)
-      const {VersionControlService } = await import('@/features/ViewEditRecord/services/versionControlService');
-      const versionControl = new VersionControlService();
+    // Step 4: Create version. Initialize if needed or just add new version
+    const {VersionControlService } = await import('@/features/ViewEditRecord/services/versionControlService');
+    const versionControl = new VersionControlService();
+    const versionControlRecord = await versionControl.getVersionControlRecord(documentId);
 
-      const updatedFileObject = {
-        ...currentFileObject,
-        ...filteredData,
-        id: documentId
-      };
-
+    if (!versionControlRecord) {
+      console.log('🔧 No version control exists, initializing with original data...');
+      await versionControl.initializeVersioning(documentId, originalFileObjectForVersioning);
       await versionControl.createVersion(
         documentId,
         updatedFileObject,
         commitMessage || `Record updated`
       );
-        console.log(`✅ Version created for update`)
-
+    } else {
+      await versionControl.createVersion(
+        documentId,
+        updatedFileObject,
+        commitMessage || `Record updated`
+      );
+    
+      console.log(`✅ Version created for update`)
+    }
   } catch (error: any) {
     console.error("❌ Error updating document:", error);
     throw new Error(`Failed to update document: ${error.message}`);
   }
 };
-
 
 // ==================== DELETE FUNCTIONS ====================
 

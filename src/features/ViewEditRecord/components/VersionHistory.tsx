@@ -159,7 +159,12 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
 
   if (versions.length === 0) {
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className="flex flex-col">
+        <div className="flex justify-end">
+            <Button onClick={onBack} className="w-8 h-8 border-none bg-transparent hover:bg-gray-200">
+            <ArrowLeft className="text-primary" />
+          </Button>
+        </div>
         <div className="text-center text-gray-500">
           <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
           <p>No version history available</p>

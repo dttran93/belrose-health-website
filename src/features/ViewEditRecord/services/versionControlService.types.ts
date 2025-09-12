@@ -30,7 +30,8 @@ export interface RecordVersion {
     fhirData?: any;
     belroseFields?: any;
     extractedText?: string | null;
-    originalText?: string;
+    originalText?: string | null;
+    blockchainVerification?: any;
   };
   
   checksum: string;
