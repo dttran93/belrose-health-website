@@ -19,7 +19,7 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
     // Processing properties
     extractedText: data.extractedText,
     wordCount: data.wordCount,
-    documentType: data.documentType,
+    sourceType: data.sourceType,
     isVirtual: data.isVirtual,
     fileHash: data.fileHash,
     originalText: data.originalText,

@@ -144,7 +144,7 @@ export const RecordHeader: React.FC<RecordHeaderProps> = ({
                   {displayRecord.belroseFields?.visitType}
                 </span>
                 <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded border">
-                  {displayRecord.documentType}
+                  {displayRecord.sourceType}
                 </span>
               </>
             )}
@@ -157,7 +157,7 @@ export const RecordHeader: React.FC<RecordHeaderProps> = ({
               triggerIcon={Ellipsis}
               showView={false}
               triggerClassName="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
-              onEdit={onEnterEditMode}
+              onEdit={isEditMode ? onEnterEditMode : undefined}
               onVersion={!isVersionView ? onVersionMode : undefined}
               onDelete={onDelete}
               onViewVerification={handleViewVerification}

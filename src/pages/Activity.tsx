@@ -140,10 +140,10 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
   const filteredRecords = records.filter(record => {
     const fileName = record.name || '';
     const matchesSearch = fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (record.documentType || '').toLowerCase().includes(searchTerm.toLowerCase());
+                         (record.sourceType || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesFilter = filterType === 'all' || 
-                         record.documentType === filterType;
+                         record.sourceType === filterType;
     
     return matchesSearch && matchesFilter;
   });
@@ -161,8 +161,8 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
   });
 
   // Get unique document types for filter dropdown
-  const documentTypes = Array.from(
-    new Set(records.map(record => record.documentType).filter(Boolean))
+  const sourceTypes = Array.from(
+    new Set(records.map(record => record.sourceType).filter(Boolean))
   );
 
   // Loading state
@@ -278,7 +278,7 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
             className="px-3 py-2 bg-background border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Types</option>
-            {documentTypes.map(type => (
+            {sourceTypes.map(type => (
               <option key={type} value={type}>
                 {(type || '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
               </option>

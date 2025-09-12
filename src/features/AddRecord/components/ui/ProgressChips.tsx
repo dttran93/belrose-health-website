@@ -67,8 +67,8 @@ const ProcessingChip: React.FC<{ step: ProcessingStep }> = ({ step }) => {
 
 // Function to determine upload type
 const getUploadType = (fileObj: FileObject): 'file' | 'text' | 'json' => {
-  if (fileObj.documentType === 'medical_note_from_text') return 'text';
-  if (fileObj.documentType === 'fhir_manual_input') return 'json';
+  if (fileObj.sourceType === 'Plain Text Submission') return 'text';
+  if (fileObj.sourceType === 'Manual FHIR JSON Submission') return 'json';
   return 'file'; // default for regular file uploads
 };
 

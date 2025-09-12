@@ -12,7 +12,7 @@ export interface ReviewedData {
   institution?: string | null;
   address?: string | null;
   notes: string;
-  documentType: string;
+  sourceType: string;
   confirmedAt: string;
 }
 
@@ -117,7 +117,7 @@ export interface HealthRecordData {
 export interface FHIRConversionHookReturn {
   fhirData: Map<string, FHIRWithValidation>;
   reviewedData: Map<string, ReviewedData>;
-  handleFHIRConverted: (fileId: string, fhirData: FHIRWithValidation) => Promise<void>;
+  handleFHIRConverted: (fileId: string, fhirData: FHIRWithValidation, fileObj?: FileObject) => Promise<void>;
   handleDataConfirmed: (fileId: string, editedData: any) => Promise<void>;
   handleDataRejected: (fileId: string) => void;
   isAllFilesConverted: () => boolean;
@@ -135,12 +135,6 @@ export interface FHIRConversionHookParams {
 }
 
 export interface ExtractedDataHelpers {
-  mapFHIRToHealthRecord: (fhirData: FHIRWithValidation, fileName: string, fileId: string) => HealthRecordData | null;
-  buildClinicalNotes: (observations: FHIRBundleEntry[], patientResource: PatientResource | null) => string;
-  extractPatientName: (patientResource: PatientResource | null) => string;
-  extractProvider: (observations: FHIRBundleEntry[]) => string | null;
-  extractInstitution: (observations: FHIRBundleEntry[]) => string | null;
-  extractAddress: (patientResource: PatientResource | null) => string | null;
   generateNotes: (observations: FHIRBundleEntry[], patientResource: PatientResource | null) => string;
   determineSubject: (observations: FHIRBundleEntry[], fileName: string) => string;
 }
@@ -162,5 +156,3 @@ export const DEFAULT_DOCUMENT_TYPES = {
   MEDICAL_REPORT: 'Medical Report',
   MEDICAL_RECORD: 'Medical Record'
 } as const;
-
-export type DocumentType = typeof DEFAULT_DOCUMENT_TYPES[keyof typeof DEFAULT_DOCUMENT_TYPES];

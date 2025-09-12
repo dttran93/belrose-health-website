@@ -35,7 +35,7 @@ export const convertToFHIR = functions.https.onRequest(
       }
 
       try {
-        const { documentText, documentType = 'medical_record' }: FHIRConversionRequest = req.body;
+        const { documentText }: FHIRConversionRequest = req.body;
 
         // Validate input
         if (!documentText || typeof documentText !== 'string') {
@@ -55,7 +55,6 @@ export const convertToFHIR = functions.https.onRequest(
         const prompt = `
           You are a medical data specialist. Convert the following medical document into a valid FHIR (Fast Healthcare Interoperability Resources) R4 format JSON.
 
-          Document Type: ${documentType}
           Document Content:
           ${documentText}
 
@@ -63,7 +62,7 @@ export const convertToFHIR = functions.https.onRequest(
           1. Create appropriate FHIR resources (Patient, Observation, Condition, MedicationStatement, etc.)
           2. Use proper FHIR resource structure and data types
           3. Include all relevant medical information from the document
-          4. Generate realistic but anonymous identifiers
+          4. Preserve any patient identifiers, dates, and provider information found in the original document
           5. Follow FHIR R4 specification
           6. Return only valid JSON, no additional text
 
@@ -316,7 +315,6 @@ function getImageAnalysisPrompt(analysisType: string): string {
         {
           "isMedical": boolean,
           "confidence": number (0-1),
-          "documentType": string,
           "reasoning": string,
           "suggestion": string
         }
@@ -355,7 +353,6 @@ function getImageAnalysisPrompt(analysisType: string): string {
         {
           "isMedical": boolean,
           "confidence": number (0-1),
-          "documentType": string ("lab_results", "prescription", "medical_record", "radiology_report", "discharge_summary", "medical_imaging", "non_medical", etc.),
           "reasoning": string,
           "suggestion": string,
           "extractedText": string,
@@ -439,17 +436,27 @@ function buildFHIRPrompt(fhirData: any, fileName?: string, analysis?: FHIRAnalys
   const resourceTypes = analysis?.resourceTypes || [];
   const extractedDates = analysis?.extractedDates || [];
   
-  return `Analyze this FHIR healthcare data and extract 6 key fields in JSON format.
+  return `Analyze this FHIR healthcare data and extract 7 key fields in JSON format.
 
 Required JSON response:
 {
   "visitType": "Visit type (e.g., 'Lab Results', 'Follow-up Appointment')",
   "title": "Short title under 100-150 characters succinctly describing the record",
-  "summary": "Summary of record in approximately 250-500 characters, include as much information as possible that a future reader of the record would find useful",
-  "completedDate": "Date in YYYY-MM-DD format",
-  "provider": "Doctor/provider name",
-  "institution": "Hospital/clinic name"
-  "patient" : "Patient name"
+  "summary": "Create a clinical summary for a healthcare provider handoff. Present the key medical information as you would when briefing a colleague taking over patient care.
+    Patient presents with [condition/chief complaint]. [Key clinical findings, timeline, and relevant history]. [Current status, treatments, and any urgent considerations].
+
+      Guidelines:
+        - Be concise, but comprehensive. Use up to 500-750 words. This is not a hard cutoff, go slightly over if necessary. Do not end mid-way through a sentence or thought.
+        - Use present tense for current conditions ("Patient has..." not "This record shows...")
+        - Focus on clinically relevant information
+        - Maintain professional medical terminology
+        - End with current status or next steps if applicable
+
+    Format as a brief clinical note, not a document description.",
+  "completedDate": "Date in YYYY-MM-DD format when this healthcare event occured",
+  "provider": "Doctor/provider name who performed or ordered this service",
+  "institution": "Hospital/clinic name where this occured",
+  "patient" : "Patient name (first and last name if available)"
 }
 
 Rules:
@@ -457,7 +464,7 @@ Rules:
 - Use "Unknown Healthcare Provider" if no provider found
 - Use "Unknown Medical Center" if no institution found
 - Use "Unknown Patient" if no patient found
-- Respond with ONLY the JSON object
+- Respond with ONLY the JSON object, no additional text
 
 Context:
 File: ${fileName || 'Unknown'}
@@ -476,12 +483,12 @@ function validateAndCleanFHIRResult(
   
   return {
     visitType: result.visitType || 'Medical Record',
-    title: truncateString(result.title || fileName || 'Health Record', 100),
-    summary: truncateString(result.summary || 'Medical record processed.', 250),
+    title: result.title || fileName || 'Health Record',
+    summary: result.summary || 'Medical record processed.',
     completedDate: validateDate(result.completedDate) || today,
-    provider: truncateString(result.provider || 'Healthcare Provider', 100),
-    institution: truncateString(result.institution || 'Medical Center', 100),
-    patient: truncateString(result.patient || 'Patient', 100),
+    provider: result.provider || 'Healthcare Provider',
+    institution: result.institution || 'Medical Center',
+    patient: result.patient || 'Patient',
   };
 }
 

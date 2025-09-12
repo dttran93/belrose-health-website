@@ -47,7 +47,7 @@ export type FileStatus =
   | 'completed'    // Successfully processed
   | 'error';       // Failed with error
 
-export type DocumentType = 'Plain Text Submission' | 'Manual FHIR JSON Submission' | 'File Upload';
+export type SourceType = 'Plain Text Submission' | 'Manual FHIR JSON Submission' | 'File Upload';
 
 export interface DuplicateInfo {
   existingFileId?: string;
@@ -59,7 +59,7 @@ export interface DuplicateInfo {
 
 export interface VirtualFileInput {
   fileName?: string;
-  documentType?: DocumentType;
+  sourceType?: SourceType;
   extractedText?: string;
   fhirData?: any;
   wordCount?: number;
@@ -79,7 +79,7 @@ export interface FileObject {
   originalText?: string | null;
   wordCount?: number; //calculated during text extraction
   fileHash?: string; 
-  documentType?: 'Plain Text Submission' | 'Manual FHIR JSON Submission' | 'File Upload'
+  sourceType?: SourceType;
   lastModified?: number; //Filetracking for UI state management.
   isVirtual?: boolean; //for virtual files
   fhirData?: any;

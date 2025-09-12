@@ -83,7 +83,7 @@ export function useFileManager(): UseFileManagerTypes {
         uploadedAt: new Date().toISOString(),
         extractedText: '',
         wordCount: 0,
-        documentType: 'File Upload',
+        sourceType: 'File Upload',
         isVirtual: false,
         aiProcessingStatus: 'not_needed' as AIProcessingStatus,
     });
@@ -192,7 +192,7 @@ export function useFileManager(): UseFileManagerTypes {
     
     const convertTextToFHIR = async (extractedText: string, fileName: string) => {
         try {
-            return await convertToFHIR(extractedText, 'medical_record');
+            return await convertToFHIR(extractedText);
         } catch (error) {
             console.error('FHIR conversion failed:', error);
             throw error; // Re-throw so the caller can handle it
@@ -779,7 +779,7 @@ const addVirtualFile = useCallback(async (virtualData: VirtualFileInput): Promis
             fhirJson: JSON.stringify(fhirData, null, 2),
             originalText: options.originalText,
             wordCount: JSON.stringify(fhirData).split(/\s+/).length,
-            documentType: options.documentType,
+            sourceType: options.sourceType,
             fhirData,
             signerId: options.signerId,
             providerSignature: options.providerSignature,
@@ -801,7 +801,7 @@ const addVirtualFile = useCallback(async (virtualData: VirtualFileInput): Promis
             fhirJson: JSON.stringify(fhirData, null, 2),
             originalText: virtualFileInput.originalText,
             wordCount: JSON.stringify(fhirData).split(/\s+/).length,
-            documentType: virtualFileInput.documentType,
+            sourceType: virtualFileInput.sourceType,
             isVirtual: true,
             fhirData,
             file: undefined,

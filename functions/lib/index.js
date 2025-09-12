@@ -37,7 +37,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.health = exports.processFHIRWithAI = exports.analyzeImageWithAI = exports.detectMedicalRecord = exports.convertToFHIR = void 0;
+exports.health = exports.processFHIRWithAI = exports.analyzeImageWithAI = exports.convertToFHIR = void 0;
 const functions = __importStar(require("firebase-functions"));
 const params_1 = require("firebase-functions/params");
 const cors_1 = __importDefault(require("cors"));
@@ -54,7 +54,7 @@ exports.convertToFHIR = functions.https.onRequest({ secrets: [anthropicKey] }, (
             return;
         }
         try {
-            const { documentText, documentType = 'medical_record' } = req.body;
+            const { documentText } = req.body;
             // Validate input
             if (!documentText || typeof documentText !== 'string') {
                 res.status(400).json({ error: 'documentText is required and must be a string' });
@@ -70,7 +70,6 @@ exports.convertToFHIR = functions.https.onRequest({ secrets: [anthropicKey] }, (
             const prompt = `
           You are a medical data specialist. Convert the following medical document into a valid FHIR (Fast Healthcare Interoperability Resources) R4 format JSON.
 
-          Document Type: ${documentType}
           Document Content:
           ${documentText}
 
@@ -78,7 +77,7 @@ exports.convertToFHIR = functions.https.onRequest({ secrets: [anthropicKey] }, (
           1. Create appropriate FHIR resources (Patient, Observation, Condition, MedicationStatement, etc.)
           2. Use proper FHIR resource structure and data types
           3. Include all relevant medical information from the document
-          4. Generate realistic but anonymous identifiers
+          4. Preserve any patient identifiers, dates, and provider information found in the original document
           5. Follow FHIR R4 specification
           6. Return only valid JSON, no additional text
 
@@ -128,7 +127,6 @@ exports.convertToFHIR = functions.https.onRequest({ secrets: [anthropicKey] }, (
         }
     });
 });
-
 // ==================== IMAGE ANALYSIS FUNCTION ====================
 exports.analyzeImageWithAI = functions.https.onRequest({ secrets: [anthropicKey] }, (req, res) => {
     corsHandler(req, res, async () => {
@@ -287,7 +285,6 @@ function getImageAnalysisPrompt(analysisType) {
         {
           "isMedical": boolean,
           "confidence": number (0-1),
-          "documentType": string,
           "reasoning": string,
           "suggestion": string
         }
@@ -324,7 +321,6 @@ function getImageAnalysisPrompt(analysisType) {
         {
           "isMedical": boolean,
           "confidence": number (0-1),
-          "documentType": string ("lab_results", "prescription", "medical_record", "radiology_report", "discharge_summary", "medical_imaging", "non_medical", etc.),
           "reasoning": string,
           "suggestion": string,
           "extractedText": string,
@@ -394,17 +390,27 @@ function buildFHIRPrompt(fhirData, fileName, analysis) {
     const today = new Date().toISOString().split('T')[0];
     const resourceTypes = (analysis === null || analysis === void 0 ? void 0 : analysis.resourceTypes) || [];
     const extractedDates = (analysis === null || analysis === void 0 ? void 0 : analysis.extractedDates) || [];
-    return `Analyze this FHIR healthcare data and extract 6 key fields in JSON format.
+    return `Analyze this FHIR healthcare data and extract 7 key fields in JSON format.
 
 Required JSON response:
 {
   "visitType": "Visit type (e.g., 'Lab Results', 'Follow-up Appointment')",
   "title": "Short title under 100-150 characters succinctly describing the record",
-  "summary": "Summary of record in approximately 250-500 characters, include as much information as possible that a future reader of the record would find useful",
-  "completedDate": "Date in YYYY-MM-DD format",
-  "provider": "Doctor/provider name",
-  "institution": "Hospital/clinic name"
-  "patient" : "Patient name"
+  "summary": "Create a clinical summary for a healthcare provider handoff. Present the key medical information as you would when briefing a colleague taking over patient care.
+    Patient presents with [condition/chief complaint]. [Key clinical findings, timeline, and relevant history]. [Current status, treatments, and any urgent considerations].
+
+      Guidelines:
+        - Be concise, but comprehensive. Use up to 500-750 words. This is not a hard cutoff, go slightly over if necessary. Do not end mid-way through a sentence or thought.
+        - Use present tense for current conditions ("Patient has..." not "This record shows...")
+        - Focus on clinically relevant information
+        - Maintain professional medical terminology
+        - End with current status or next steps if applicable
+
+    Format as a brief clinical note, not a document description.",
+  "completedDate": "Date in YYYY-MM-DD format when this healthcare event occured",
+  "provider": "Doctor/provider name who performed or ordered this service",
+  "institution": "Hospital/clinic name where this occured",
+  "patient" : "Patient name (first and last name if available)"
 }
 
 Rules:
@@ -412,7 +418,7 @@ Rules:
 - Use "Unknown Healthcare Provider" if no provider found
 - Use "Unknown Medical Center" if no institution found
 - Use "Unknown Patient" if no patient found
-- Respond with ONLY the JSON object
+- Respond with ONLY the JSON object, no additional text
 
 Context:
 File: ${fileName || 'Unknown'}
@@ -426,12 +432,12 @@ function validateAndCleanFHIRResult(result, fileName) {
     const today = new Date().toISOString().split('T')[0];
     return {
         visitType: result.visitType || 'Medical Record',
-        title: truncateString(result.title || fileName || 'Health Record', 100),
-        summary: truncateString(result.summary || 'Medical record processed.', 250),
+        title: result.title || fileName || 'Health Record',
+        summary: result.summary || 'Medical record processed.',
         completedDate: validateDate(result.completedDate) || today,
-        provider: truncateString(result.provider || 'Healthcare Provider', 100),
-        institution: truncateString(result.institution || 'Medical Center', 100),
-        patient: truncateString(result.patient || 'Patient', 100),
+        provider: result.provider || 'Healthcare Provider',
+        institution: result.institution || 'Medical Center',
+        patient: result.patient || 'Patient',
     };
 }
 function createFallbackFHIRResponse(fileName, analysis) {
@@ -480,7 +486,6 @@ function handleError(res, error, context) {
         res.status(500).json({ error: 'Internal server error' });
     }
 }
-
 function handleImageAnalysisError(res, error) {
     if (error.message.includes('JSON')) {
         res.status(500).json({

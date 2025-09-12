@@ -20,6 +20,7 @@ interface HealthRecordCardProps {
   onDownload?: (record: FileObject) => void;
   onShare?: (record: FileObject) => void;
   onDelete?: (record: FileObject) => void;
+  onVersions?: (record: FileObject) => void;
   className?: string;
   showActions?: boolean;
   showMenu?: boolean;
@@ -58,6 +59,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
   onView,
   onEdit,
   onDelete,
+  onVersions,
   className = '',
 }) => {
 
@@ -74,7 +76,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
               {record.belroseFields?.visitType}
             </span>
             <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded border">
-              {record.documentType}
+              {record.sourceType}
             </span>
           </div>
           <div className='flex'>
@@ -88,6 +90,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
               showView={true}
               triggerClassName="mx-1 p-2 rounded-3xl hover:bg-gray-100"
               onDelete={onDelete}
+              onVersion={onVersions}
            />
            </div>
         </div>
