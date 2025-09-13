@@ -1,6 +1,6 @@
 // src/features/AddRecord/services/fileUploadService.types.ts
 
-import { FileObject, FileMetadata } from '@/types/core';
+import { FileObject } from '@/types/core';
 
 // ==================== UPLOAD TYPES ====================
 
@@ -12,7 +12,7 @@ export interface UploadResult {
   uploadedAt?: Date;
   fileSize?: number;
   savedAt?: string;       // Legacy field for compatibility
-  fileHash?: string;      // Legacy field for compatibility
+  originalFileHash?: string | null;      // Legacy field for compatibility
   success: boolean;
   fileId?: string;
   error?: string;
@@ -45,7 +45,7 @@ export interface FHIRUpdateData {
 
 export interface IFileUploadService {
   uploadFile(fileObj: FileObject, options?: UploadOptions): Promise<UploadResult>;
-  updateRecord(fileId: string, data: Partial<FileMetadata>): Promise<void>;
+  updateRecord(fileId: string, data: Record<string, any>): Promise<void>;
   deleteFile(fileId: string): Promise<void>;
   
   // FHIR specific methods

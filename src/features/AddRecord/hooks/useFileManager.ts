@@ -73,77 +73,56 @@ export function useFileManager(): UseFileManagerTypes {
     
     const generateId = () => `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    const createFileObject = (file: File, id?: string): FileObject => ({
-        id: id || generateId(),
-        file,
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type,
-        status: 'pending' as FileStatus,
-        uploadedAt: new Date().toISOString(),
-        extractedText: '',
-        wordCount: 0,
-        sourceType: 'File Upload',
-        isVirtual: false,
-        aiProcessingStatus: 'not_needed' as AIProcessingStatus,
-    });
+    const createFileObject = useCallback(async (file: File, id?: string): Promise<FileObject> => {
+        console.log(`📁 Creating file object for: ${file.name}`);
+        
+        // Hash the original file immediately
+        let originalFileHash: string | null = null;
+        try {
+            originalFileHash = await hashOriginalFile(file);
+        } catch (error) {
+            console.warn(`⚠️ Could not hash file ${file.name}:`, error);
+            // Continue without hash rather than failing entirely
+            originalFileHash = null;
+        }
+        
+        return {
+            id: id || generateId(),
+            file,
+            fileName: file.name,
+            fileSize: file.size,
+            fileType: file.type,
+            status: 'pending' as FileStatus,
+            uploadedAt: new Date().toISOString(),
+            extractedText: '',
+            wordCount: 0,
+            sourceType: 'File Upload',
+            isVirtual: false,
+            aiProcessingStatus: 'not_needed' as AIProcessingStatus,
+            originalFileHash,
+        };
+    }, []);
+
+    const hashOriginalFile = async (file: File): Promise<string> => {
+        try{
+            console.log(`🔍 Hashing original file: ${file.name} (${file.size} bytes)`);
+            const arrayBuffer = await file.arrayBuffer();
+
+            const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+            
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+            
+            console.log(`✅ Original hash generated: ${hashHex.substring(0, 12)}...`);
+            return hashHex;
+        } catch (error) {
+            console.error('❌ Failed to hash original file:', error);
+            throw new Error('File hashing failed');
+        }
+    };
 
     // ==================== CORE FILE MANAGEMENT ====================
     
-    const addFiles = useCallback((fileList: FileList, options: AddFilesOptions = {}) => {
-        const { maxFiles = 10, maxSizeBytes = 50 * 1024 * 1024, autoProcess = true } = options;
-        
-        if (typeof window !== 'undefined' && window.sessionStorage) {
-            sessionStorage.removeItem('fileUpload_files');
-        }
-    
-        console.log(`📂 Adding ${fileList.length} files...`);
-        
-        const newFiles: FileObject[] = [];
-        const errors: string[] = [];
-        
-        // Convert FileList to array and validate
-        Array.from(fileList).forEach((file) => {
-            // Check file count limit
-            if (newFiles.length >= maxFiles) {
-                errors.push(`Maximum ${maxFiles} files allowed`);
-                return;
-            }
-            
-            // Check file size
-            if (file.size > maxSizeBytes) {
-                errors.push(`${file.name} is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB)`);
-                return;
-            }
-            
-            const fileObj = createFileObject(file);
-            newFiles.push(fileObj);
-        });
-        
-        // Show errors if any
-        if (errors.length > 0) {
-            toast.error(errors.join(', '));
-        }
-        
-        if (newFiles.length === 0) {
-            console.log('❌ No valid files to add');
-            return;
-        }
-        
-        setFiles(prev => {
-            const combined = [...prev, ...newFiles];
-            console.log(`✅ Added ${newFiles.length} files. Total: ${combined.length}`);
-            return combined;
-        });
-        
-        // Auto-process if enabled
-        if (autoProcess) {
-            newFiles.forEach(fileObj => {
-                processFile(fileObj);
-            });
-        }
-    }, []);
-
     const retryFile = useCallback(async (fileId: string) => {
         const file = files.find(f => f.id === fileId);
         if (!file) {
@@ -458,6 +437,78 @@ export function useFileManager(): UseFileManagerTypes {
         return fileCompleted && aiCompleted && hasBelroseFields;
     }, []);
 
+    // ==================== ADD FILES ====================
+
+    const addFiles = useCallback(async (fileList: FileList, options: AddFilesOptions = {}) => {
+        const { maxFiles = 10, maxSizeBytes = 50 * 1024 * 1024, autoProcess = true } = options;
+        
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+            sessionStorage.removeItem('fileUpload_files');
+        }
+    
+        console.log(`📂 Adding ${fileList.length} files...`);
+        
+        const newFiles: FileObject[] = [];
+        const errors: string[] = [];
+        
+        // Convert FileList to array and validate
+        for (const file of Array.from(fileList)) {
+            // Check file count limit
+            if (newFiles.length >= maxFiles) {
+                errors.push(`Maximum ${maxFiles} files allowed`);
+                continue;
+            }
+            
+            // Check file size
+            if (file.size > maxSizeBytes) {
+                errors.push(`${file.name} is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB)`);
+                continue;
+            }
+            
+            try {
+                const fileObj = await createFileObject(file);
+                newFiles.push(fileObj);
+
+                console.log(`✅ File processed: ${file.name}`, {
+                    id: fileObj.id,
+                    hasHash: !!fileObj.originalFileHash,
+                    hashPreview: fileObj.originalFileHash?.substring(0, 12) + '...' 
+                });
+            } catch (error) {
+                console.error(`❌ Failed to process file ${file.name}:`, error);
+                errors.push(`Failed to process ${file.name}`);
+            }
+        }
+        
+        // Show errors if any
+        if (errors.length > 0) {
+            toast.error(errors.join(', '));
+        }
+        
+        if (newFiles.length === 0) {
+            console.log('❌ No valid files to add');
+            return;
+        }
+        
+        setFiles(prev => {
+            const combined = [...prev, ...newFiles];
+            console.log(`✅ Added ${newFiles.length} files. Total: ${combined.length}`);
+            return combined;
+        });
+        
+        // Auto-process if enabled
+        if (autoProcess) {
+            console.log('🔄 Auto-processing enabled, starting file processing...');
+            for (const fileObj of newFiles) {
+                try {
+                    await processFile(fileObj);
+                } catch (error) {
+                    console.error(`❌ Auto-processing failed for ${fileObj.fileName}:`, error);
+                }
+            }
+        }
+    }, [setFiles, processFile]);
+
     // ================ FILE DELETION =========================
 
       /**
@@ -704,7 +755,7 @@ const addVirtualFile = useCallback(async (virtualData: VirtualFileInput): Promis
         fileType: virtualData.fileType || 'application/json',
         status: 'completed',
         uploadedAt: new Date().toISOString(),
-        fhirJson: virtualData.fhirJson,
+
         originalText: virtualData.originalText,
         wordCount: virtualData.wordCount || 0,
         isVirtual: true,
@@ -776,7 +827,6 @@ const addVirtualFile = useCallback(async (virtualData: VirtualFileInput): Promis
             fileName: fileName,
             fileSize: JSON.stringify(fhirData).length,
             fileType: 'application/fhir+json',
-            fhirJson: JSON.stringify(fhirData, null, 2),
             originalText: options.originalText,
             wordCount: JSON.stringify(fhirData).split(/\s+/).length,
             sourceType: options.sourceType,
@@ -798,7 +848,6 @@ const addVirtualFile = useCallback(async (virtualData: VirtualFileInput): Promis
             fileType: 'application/fhir+json',
             status: 'completed',
             uploadedAt: new Date().toISOString(),
-            fhirJson: JSON.stringify(fhirData, null, 2),
             originalText: virtualFileInput.originalText,
             wordCount: JSON.stringify(fhirData).split(/\s+/).length,
             sourceType: virtualFileInput.sourceType,
@@ -830,7 +879,7 @@ const addVirtualFile = useCallback(async (virtualData: VirtualFileInput): Promis
                 updateFileStatus(fileId, 'completed', { 
                     uploadResult,
                     documentId: uploadResult.documentId,
-                    uploadedAt: uploadResult.uploadedAt 
+                    uploadedAt: uploadResult.uploadedAt?.toISOString() || new Date().toISOString()
                 });
 
                 // Show success toast

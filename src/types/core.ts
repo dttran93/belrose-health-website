@@ -77,8 +77,9 @@ export interface FileObject {
   error?: string; //Failed processing
   extractedText?: string | null; //text extracted from image/pdf
   originalText?: string | null;
+  originalFileHash?: string | null; //hash of the original file that was uploaded
+  uploadedAt?: string;
   wordCount?: number; //calculated during text extraction
-  fileHash?: string; 
   sourceType?: SourceType;
   lastModified?: number; //Filetracking for UI state management.
   isVirtual?: boolean; //for virtual files

@@ -29,7 +29,7 @@ export class ExportService {
       files: processedFiles.map((file): FileExportData => ({
         fileName: file.name,
         fileId: file.id,
-        fileHash: file.fileHash,
+        originalFileHash: file.originalFileHash,
         extractedText: file.extractedText,
         wordCount: file.wordCount,
         fhirData: fhirData.get(file.id),
@@ -84,7 +84,7 @@ export class ExportService {
         return [
           `"${file.fileName}"`,
           `"${file.fileId}"`,
-          `"${file.fileHash || ''}"`,
+          `"${file.originalFileHash || ''}"`,
           file.wordCount?.toString() || '0',
           file.fhirData ? 'Yes' : 'No',
           file.firestoreInfo ? 'Yes' : 'No'

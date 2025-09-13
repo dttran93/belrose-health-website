@@ -21,7 +21,7 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
     wordCount: data.wordCount,
     sourceType: data.sourceType,
     isVirtual: data.isVirtual,
-    fileHash: data.fileHash,
+    originalFileHash: data.originalFileHash,
     originalText: data.originalText,
     
     // FHIR properties
