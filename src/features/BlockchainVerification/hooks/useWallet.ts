@@ -1,110 +1,98 @@
 // src/hooks/useWallet.ts
 import { useState, useEffect, useCallback } from 'react';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/firebase/config';
 import { WalletService, WalletConnection, AuthMethod } from '@/features/BlockchainVerification/service/walletService';
+import { UserWalletService } from '@/features/BlockchainVerification/service/userWalletService';
 
 export interface WalletState {
   isConnected: boolean;
   isConnecting: boolean;
   address: string;
-  chainId: number;
-  networkName: string;
   balance: string;
   error: string | null;
-  isSupportedNetwork: boolean;
-  authMethod: 'web3auth' | 'metamask' | null;
-  userInfo: {
-    displayName: string;
-    identifier: string;
-    avatar?: string;
-    method: string;
-  } | null;
+  authMethod: 'metamask' | null;
+  isLinkedToAccount: boolean;
+  isLinking: boolean;
+  canLinkWallet: boolean;
 }
 
 export const useWallet = () => {
+  const [user] = useAuthState(auth); // Get current Firebase user
+  
   const [walletState, setWalletState] = useState<WalletState>({
     isConnected: false,
     isConnecting: false,
     address: '',
-    chainId: 0,
-    networkName: '',
     balance: '0',
     error: null,
-    isSupportedNetwork: false,
     authMethod: null,
-    userInfo: null
+    isLinkedToAccount: false,
+    isLinking: false,
+    canLinkWallet: false
   });
 
-  // Update wallet state from connection
-  const updateWalletState = useCallback(async (connection: WalletConnection | null) => {
-    if (!connection) {
+  // Update wallet state from current wallet info
+  const updateWalletState = useCallback(async () => {
+    const isConnected = WalletService.isConnected();
+    
+    if (!isConnected) {
       setWalletState(prev => ({
         ...prev,
         isConnected: false,
         address: '',
-        chainId: 0,
-        networkName: '',
         balance: '0',
-        isSupportedNetwork: false,
         authMethod: null,
-        userInfo: null,
+        isLinkedToAccount: false,
+        canLinkWallet: false,
         error: null
       }));
       return;
     }
 
     try {
-      const balance = await WalletService.getBalance();
-      const isSupportedNetwork = WalletService.isSupportedNetwork();
-      const userInfo = WalletService.getUserDisplayInfo();
+      const walletInfo = await WalletService.getWalletInfo();
+      if (!walletInfo) {
+        throw new Error('Unable to get wallet information');
+      }
+
+      // Check if wallet is linked to current user account
+      let isLinkedToAccount = false;
+      if (user) {
+        const linkedWallet = await UserWalletService.getUserWallet(user.uid);
+        isLinkedToAccount = linkedWallet?.address?.toLowerCase() === walletInfo.address.toLowerCase();
+      }
 
       setWalletState(prev => ({
         ...prev,
         isConnected: true,
         isConnecting: false,
-        address: connection.address,
-        chainId: connection.chainId,
-        networkName: connection.networkName,
-        balance,
-        isSupportedNetwork,
-        authMethod: connection.authMethod,
-        userInfo,
+        address: walletInfo.address,
+        balance: walletInfo.balance || '0',
+        authMethod: 'metamask', // We're only using MetaMask now
+        isLinkedToAccount,
+        canLinkWallet: !!user && !isLinkedToAccount,
         error: null
       }));
     } catch (error: any) {
       console.error('Failed to update wallet state:', error);
       setWalletState(prev => ({
         ...prev,
-        error: error.message
+        error: error.message,
+        isConnecting: false
       }));
     }
-  }, []);
+  }, [user]);
 
-  // Connect wallet with preferred method
+  // Connect wallet with MetaMask
   const connectWallet = useCallback(async (preferredMethod?: AuthMethod) => {
     setWalletState(prev => ({ ...prev, isConnecting: true, error: null }));
 
     try {
-      const connection = await WalletService.connectWallet(preferredMethod);
-      await updateWalletState(connection);
+      await WalletService.connectWallet(preferredMethod);
+      await updateWalletState();
     } catch (error: any) {
       console.error('Wallet connection failed:', error);
-      setWalletState(prev => ({
-        ...prev,
-        isConnecting: false,
-        error: error.message
-      }));
-    }
-  }, [updateWalletState]);
-
-  // Connect specifically with Web3Auth
-  const connectWithWeb3Auth = useCallback(async (method?: AuthMethod) => {
-    setWalletState(prev => ({ ...prev, isConnecting: true, error: null }));
-
-    try {
-      const connection = await WalletService.connectWithWeb3Auth(method);
-      await updateWalletState(connection);
-    } catch (error: any) {
-      console.error('Web3Auth connection failed:', error);
       setWalletState(prev => ({
         ...prev,
         isConnecting: false,
@@ -118,8 +106,8 @@ export const useWallet = () => {
     setWalletState(prev => ({ ...prev, isConnecting: true, error: null }));
 
     try {
-      const connection = await WalletService.connectWithMetaMask();
-      await updateWalletState(connection);
+      await WalletService.connectWithMetaMask();
+      await updateWalletState();
     } catch (error: any) {
       console.error('MetaMask connection failed:', error);
       setWalletState(prev => ({
@@ -130,11 +118,76 @@ export const useWallet = () => {
     }
   }, [updateWalletState]);
 
+  // Link wallet to current user account
+  const linkWalletToAccount = useCallback(async () => {
+    if (!user || !walletState.isConnected) {
+      throw new Error('User must be logged in and wallet connected');
+    }
+
+    setWalletState(prev => ({ ...prev, isLinking: true, error: null }));
+
+    try {
+      await UserWalletService.linkWalletToAccount(user.uid);
+      
+      // Update state to reflect linking
+      setWalletState(prev => ({ 
+        ...prev, 
+        isLinkedToAccount: true, 
+        canLinkWallet: false,
+        isLinking: false 
+      }));
+      
+      console.log('Wallet successfully linked to account');
+    } catch (error: any) {
+      console.error('Failed to link wallet:', error);
+      setWalletState(prev => ({ 
+        ...prev, 
+        error: error.message,
+        isLinking: false 
+      }));
+      throw error;
+    }
+  }, [user, walletState.isConnected]);
+
+  // Unlink wallet from account
+  const unlinkWalletFromAccount = useCallback(async () => {
+    if (!user) {
+      throw new Error('User must be logged in');
+    }
+
+    try {
+      await UserWalletService.unlinkWalletFromAccount(user.uid);
+      
+      // Update state to reflect unlinking
+      setWalletState(prev => ({ 
+        ...prev, 
+        isLinkedToAccount: false,
+        canLinkWallet: prev.isConnected 
+      }));
+      
+      console.log('Wallet successfully unlinked from account');
+    } catch (error: any) {
+      console.error('Failed to unlink wallet:', error);
+      setWalletState(prev => ({ ...prev, error: error.message }));
+      throw error;
+    }
+  }, [user]);
+
+  // Connect and link wallet in one step
+  const connectAndLinkWallet = useCallback(async (preferredMethod?: AuthMethod) => {
+    await connectWallet(preferredMethod);
+    
+    // Link after successful connection if user is logged in
+    if (user) {
+      await linkWalletToAccount();
+    }
+  }, [connectWallet, linkWalletToAccount, user]);
+
   // Disconnect wallet
   const disconnectWallet = useCallback(async () => {
     try {
       await WalletService.disconnect();
-      await updateWalletState(null);
+      await updateWalletState();
     } catch (error: any) {
       console.error('Disconnect failed:', error);
       setWalletState(prev => ({ ...prev, error: error.message }));
@@ -142,75 +195,96 @@ export const useWallet = () => {
   }, [updateWalletState]);
 
   // Switch network
-  const switchNetwork = useCallback(async (chainId: number) => {
+  const switchNetwork = useCallback(async (chainId: string) => {
     try {
       setWalletState(prev => ({ ...prev, error: null }));
       await WalletService.switchNetwork(chainId);
       
       // Update state after network switch
-      const connection = WalletService.getCurrentConnection();
-      await updateWalletState(connection);
+      await updateWalletState();
     } catch (error: any) {
       setWalletState(prev => ({ ...prev, error: error.message }));
     }
   }, [updateWalletState]);
 
-  // Switch to recommended network (Mumbai)
+  // Switch to Polygon Mumbai (recommended for testing)
   const switchToRecommendedNetwork = useCallback(async () => {
-    const recommended = WalletService.getRecommendedNetwork();
-    await switchNetwork(recommended.chainId);
+    await switchNetwork('0x13881'); // Polygon Mumbai testnet
   }, [switchNetwork]);
 
-  // Sign message
+  // Sign message and update last used timestamp
   const signMessage = useCallback(async (message: string): Promise<string> => {
     try {
       setWalletState(prev => ({ ...prev, error: null }));
-      return await WalletService.signMessage(message);
+      const signature = await WalletService.signMessage(message);
+      
+      // Update last used timestamp if wallet is linked
+      if (user && walletState.isLinkedToAccount) {
+        await UserWalletService.updateWalletLastUsed(user.uid);
+      }
+      
+      return signature;
     } catch (error: any) {
       setWalletState(prev => ({ ...prev, error: error.message }));
       throw error;
     }
-  }, []);
+  }, [user, walletState.isLinkedToAccount]);
+
+  // Refresh wallet balance
+  const refreshBalance = useCallback(async () => {
+    if (WalletService.isConnected()) {
+      await updateWalletState();
+    }
+  }, [updateWalletState]);
 
   // Check for existing connection on mount
   useEffect(() => {
-    const checkExistingConnection = async () => {
-      try {
-        const existingConnection = WalletService.getCurrentConnection();
-        if (existingConnection) {
-          await updateWalletState(existingConnection);
-        }
-      } catch (error) {
-        console.log('No existing wallet connection found');
+    const checkExistingConnection = () => {
+      if (WalletService.isConnected()) {
+        updateWalletState();
       }
     };
 
     checkExistingConnection();
   }, [updateWalletState]);
 
-  // Set up event listeners
+  // Update linking state when user changes
   useEffect(() => {
-    const handleAccountChanged = async (address: string) => {
-      if (address) {
-        const connection = WalletService.getCurrentConnection();
-        await updateWalletState(connection);
+    if (walletState.isConnected) {
+      updateWalletState();
+    }
+  }, [user, updateWalletState]);
+
+  // Set up MetaMask event listeners
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.ethereum) {
+      return;
+    }
+
+    const handleAccountsChanged = async (accounts: string[]) => {
+      if (accounts.length === 0) {
+        // User disconnected
+        await updateWalletState();
       } else {
-        await updateWalletState(null);
+        // Account changed
+        await updateWalletState();
       }
     };
 
-    const handleNetworkChanged = async (chainId: number, networkName: string) => {
-      const connection = WalletService.getCurrentConnection();
-      await updateWalletState(connection);
+    const handleChainChanged = async (chainId: string) => {
+      // Network changed
+      await updateWalletState();
     };
 
-    WalletService.setupEventListeners(handleAccountChanged, handleNetworkChanged);
+    // Add event listeners
+    window.ethereum.on('accountsChanged', handleAccountsChanged);
+    window.ethereum.on('chainChanged', handleChainChanged);
 
     // Cleanup listeners on unmount
     return () => {
-      if (WalletService.isMetaMaskAvailable()) {
-        window.ethereum?.removeAllListeners?.('accountsChanged');
-        window.ethereum?.removeAllListeners?.('chainChanged');
+      if (window.ethereum?.removeListener) {
+        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        window.ethereum.removeListener('chainChanged', handleChainChanged);
       }
     };
   }, [updateWalletState]);
@@ -221,17 +295,19 @@ export const useWallet = () => {
     
     // Actions
     connectWallet,
-    connectWithWeb3Auth,
     connectWithMetaMask,
+    connectAndLinkWallet,
     disconnectWallet,
+    linkWalletToAccount,
+    unlinkWalletFromAccount,
     switchNetwork,
     switchToRecommendedNetwork,
     signMessage,
+    refreshBalance,
     
     // Utilities
-    isWalletAvailable: WalletService.isWalletAvailable(),
-    isMetaMaskAvailable: WalletService.isMetaMaskAvailable(),
-    recommendedNetwork: WalletService.getRecommendedNetwork(),
-    availableAuthMethods: WalletService.getAvailableAuthMethods()
+    isMetaMaskAvailable: typeof window !== 'undefined' && !!window.ethereum,
+    isUserLoggedIn: !!user,
+    currentUserId: user?.uid || null
   };
 };

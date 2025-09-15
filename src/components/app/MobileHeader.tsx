@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Menu, Bot } from "lucide-react";
-import { User } from "./DesktopSidebar";
+import { User } from "@/types/core";
 
 interface MobileHeaderProps {
   user: User;

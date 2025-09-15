@@ -2,7 +2,28 @@ export interface User {
   uid: string;
   email: string | null;
   displayName: string | null;
-  photoURL: string | null;
+  photoURL?: string | null;
+}
+
+export interface UserProfile extends User {
+  createdAt: any;
+  updatedAt: any;
+  connectedWallet?: {
+    address: string;
+    authMethod: 'web3auth' | 'metamask';
+    connectedAt: string;
+    lastUsed: string;
+    userInfo?: {
+      email?: string;
+      name?: string;
+      profileImage?: string;
+      typeOfLogin?: string;
+    };
+  };
+  preferences?: {
+    blockchainVerificationEnabled: boolean;
+    autoConnectWallet: boolean;
+  };
 }
 
 export interface BelroseFields {

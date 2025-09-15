@@ -20,6 +20,10 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.jsx">  
+      if (typeof global === 'undefined') {
+        var global = globalThis;
+      }
+    </script>
   </body>
 </html>

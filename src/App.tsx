@@ -15,6 +15,7 @@ import Verification from "./pages/Verification";
 import './App.css';
 import { AuthProvider } from "./components/auth/AuthContext";
 import { LayoutProvider } from "./components/app/LayoutProvider";
+import SettingsPage from "./pages/Settings";
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
@@ -47,6 +48,7 @@ const App: React.FC = (): React.JSX.Element => {
                           <Route path="activity" element={<PatientRecordsList />} />
                           <Route path="addrecord" element={<AddRecord />} />
                           <Route path="verification" element={<Verification />} />
+                          <Route path="settings" element={<SettingsPage/>} />
                         </Routes>
                       </Layout>
                     </LayoutProvider>

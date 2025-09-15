@@ -39,7 +39,7 @@ function AppLayout({ children }: AppLayoutProps) {
   }
 
   const handleSettings = () => {
-    navigate('/settings')
+    navigate('/dashboard/settings')
   }
 
   const handleHelp = () => {

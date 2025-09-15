@@ -2,7 +2,7 @@ import { X, Bot } from "lucide-react";
 import NavItem from "../ui/NavItem";
 import UserMenuButton from "../ui/UserMenuButton";
 import {NavigationItem } from "./navigation";
-import { User } from "./DesktopSidebar";
+import { User } from "@/types/core";
 
 interface MobileSidebarProps {
   isOpen: boolean;

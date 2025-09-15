@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { FileUploadService } from '@/features/AddRecord/services/fileUploadService';
 import DocumentProcessorService from '@/features/AddRecord/services/documentProcessorService';
-import { FileObject, FileStatus, AIProcessingStatus, BlockchainVerification } from '@/types/core';
+import { FileObject, FileStatus, AIProcessingStatus, BlockchainVerification, VirtualFileInput } from '@/types/core';
 import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
 import { processRecordWithAI } from '@/features/AddRecord/services/aiRecordProcessingService';
 import { BlockchainService } from '@/features/BlockchainVerification/service/blockchainService';
@@ -15,7 +15,6 @@ import {
   ResetProcessCallback,
   UseFileManagerTypes,
 } from './useFileManager.type';
-import { VirtualFileInput } from '@/types/core';
 import { VirtualFileResult } from '../components/CombinedUploadFHIR.type';
 import { UploadResult } from '../services/shared.types';
 
