@@ -12,7 +12,8 @@
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "types" : ["node"]
   },
   "compileOnSave": true,
   "include": [

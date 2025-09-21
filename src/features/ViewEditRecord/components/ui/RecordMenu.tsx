@@ -175,7 +175,7 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
     }
 
     // Versions action
-    if (showVersions) {
+    if (showVersions && onVersion) {
       items.push({
         key: 'versions',
         label: 'View Versions',

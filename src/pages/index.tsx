@@ -1,4 +1,4 @@
-// src/pages/Index.jsx
+// src/pages/Index.tsx
 import React, { useEffect } from 'react';
 import Navbar from '../components/site/Navbar';
 import HeroSection from '../components/site/HeroSection';
