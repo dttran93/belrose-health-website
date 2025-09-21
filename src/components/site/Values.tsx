@@ -2,18 +2,25 @@ import React from 'react';
 import ValuesCard from './ui/ValuesCard.jsx';
 import { Shield, Users, Handshake } from 'lucide-react';
 
-const Values = () => {
-  const values = [
+interface ValueItem {
+  icon: React.ReactElement;
+  title: string;
+  description: string;
+  link: string;
+}
+
+const Values: React.FC = () => {
+  const values: ValueItem[] = [
     {
       icon: <Shield size={32} />,
       title: "We Don't Want Your Data",
-      description: "With our data storage protocol, even Belrose employees and people with physical access to our servers cannot see your records. We are the only health tech company that literally does not want your data.",
+      description: "With our data storage protocol, even Belrose employees cannot see your records. And you can store your records literally anywhere you want. We are the only health tech company that does not want your data.",
       link: "#"
     },
     {
       icon: <Users size={32} />,
       title: "Power to the Patients",
-      description: "The average person lacks vital information about themselves. Data on blood type, vaccinations, medications and more is scattered and inaccessible. We believe patients should have this information on demand.",
+      description: "The average person lacks vital information about themselves. Data on blood type, vaccinations, medications and more is scattered or inaccessible. We believe patients should have sovereignty over this information.",
       link: "#"
     },
     {
@@ -35,7 +42,7 @@ const Values = () => {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
-          {values.map((value, index) => (
+          {values.map((value: ValueItem, index: number) => (
               <ValuesCard 
                 key={index}
                 icon={value.icon} 

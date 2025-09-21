@@ -1,7 +1,26 @@
 import React from 'react';
 import NavCard from "@/components/site/ui/NavCard";
+import { DropdownName } from '@/components/site/Navbar';
 
-const DropdownMenu = ({ 
+export interface DropdownItem {
+  icon: React.ReactElement;
+  title: string;
+  description: string;
+  link: string;
+  color: string;
+}
+
+interface DropdownMenuProps {
+  name: DropdownName;
+  label: string;
+  href: string;
+  items: DropdownItem[]
+  isOpen: boolean;
+  onMouseEnter: (name: DropdownName) => void;
+  onMouseLeave: () => void;
+}
+
+const DropdownMenu: React.FC<DropdownMenuProps> = ({ 
   name, 
   label, 
   href = "#", 
@@ -35,7 +54,7 @@ const DropdownMenu = ({
       >
         <div className="flex items-center justify-center p-6">
           <div className="container mx-auto grid grid-cols-1 md:grid-cols-3 gap-1">
-            {items.map((item, index) => (
+            {items.map((item: DropdownItem, index: number) => (
               <div 
                 key={index} 
                 className={`transition-all duration-300 ease-in-out ${

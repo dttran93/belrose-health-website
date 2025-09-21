@@ -8,7 +8,7 @@ import FAQ from '../components/site/FAQ';
 import CTASection from '../components/site/CTASection';
 import Footer from '../components/site/Footer';
 
-const Index = () => {
+const Index: React.FC = () => {
   useEffect(() => {
     const handleScroll = () => {
       const elements = document.querySelectorAll('.animate-fade-in');

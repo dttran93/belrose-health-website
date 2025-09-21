@@ -1,10 +1,56 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
-// Accordion Context
-const AccordionContext = createContext();
+// Type definitions
+type AccordionType = "single" | "multiple";
+type AccordionValue = string;
+
+// Context type definitions
+interface AccordionContextType {
+  toggleItem: (value: AccordionValue) => void;
+  isOpen: (value: AccordionValue) => boolean;
+  type: AccordionType;
+  collapsible: boolean;
+}
+
+interface AccordionItemContextType {
+  value: AccordionValue;
+}
+
+// Props interfaces
+interface AccordionProps {
+  type?: AccordionType;
+  collapsible?: boolean;
+  children: React.ReactNode;
+  className?: string;
+  defaultValue?: AccordionValue | AccordionValue[] | null;
+  [key: string]: any; // For spread props
+}
+
+interface AccordionItemProps {
+  value: AccordionValue;
+  children: React.ReactNode;
+  className?: string;
+  [key: string]: any; // For spread props
+}
+
+interface AccordionTriggerProps {
+  children: React.ReactNode;
+  className?: string;
+  [key: string]: any; // For spread props
+}
+
+interface AccordionContentProps {
+  children: React.ReactNode;
+  className?: string;
+  [key: string]: any; // For spread props
+}
+
+// Create contexts with proper typing
+const AccordionContext = createContext<AccordionContextType | null>(null);
+const AccordionItemContext = createContext<AccordionItemContextType | null>(null);
 
 // Main Accordion Component
-const Accordion = ({ 
+const Accordion: React.FC<AccordionProps> = ({ 
   type = "single", 
   collapsible = false, 
   children, 
@@ -12,11 +58,14 @@ const Accordion = ({
   defaultValue = null,
   ...props 
 }) => {
-  const [openItems, setOpenItems] = useState(
-    defaultValue ? (Array.isArray(defaultValue) ? defaultValue : [defaultValue]) : []
-  );
+  const [openItems, setOpenItems] = useState<AccordionValue[]>(() => {
+    if (defaultValue) {
+      return Array.isArray(defaultValue) ? defaultValue : [defaultValue];
+    }
+    return [];
+  });
 
-  const toggleItem = (value) => {
+  const toggleItem = (value: AccordionValue): void => {
     if (type === "single") {
       // Single accordion - only one item can be open
       if (openItems.includes(value)) {
@@ -34,10 +83,17 @@ const Accordion = ({
     }
   };
 
-  const isOpen = (value) => openItems.includes(value);
+  const isOpen = (value: AccordionValue): boolean => openItems.includes(value);
+
+  const contextValue: AccordionContextType = {
+    toggleItem,
+    isOpen,
+    type,
+    collapsible
+  };
 
   return (
-    <AccordionContext.Provider value={{ toggleItem, isOpen, type, collapsible }}>
+    <AccordionContext.Provider value={contextValue}>
       <div className={`accordion ${className}`} {...props}>
         {children}
       </div>
@@ -45,8 +101,8 @@ const Accordion = ({
   );
 };
 
-// Accordion Item Component
-const AccordionItem = ({ 
+// Accordion Item Component (basic version)
+const AccordionItem: React.FC<AccordionItemProps> = ({ 
   value, 
   children, 
   className = "",
@@ -72,7 +128,7 @@ const AccordionItem = ({
 };
 
 // Accordion Trigger Component
-const AccordionTrigger = ({ 
+const AccordionTrigger: React.FC<AccordionTriggerProps> = ({ 
   children, 
   className = "",
   ...props 
@@ -84,15 +140,8 @@ const AccordionTrigger = ({
     throw new Error('AccordionTrigger must be used within an Accordion');
   }
 
-  // Get the value from the parent AccordionItem
-  const getItemValue = () => {
-    const itemElement = document.activeElement?.closest('[data-state]');
-    return itemElement?.previousElementSibling?.getAttribute('data-value') || 
-           itemElement?.getAttribute('data-value');
-  };
-
-  const handleClick = (e) => {
-    const itemElement = e.target.closest('.accordion-item');
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>): void => {
+    const itemElement = (e.target as HTMLElement).closest('.accordion-item') as HTMLElement;
     const value = itemElement?.getAttribute('data-value') || 
                   itemElement?.querySelector('[data-value]')?.getAttribute('data-value');
     
@@ -100,12 +149,6 @@ const AccordionTrigger = ({
       context.toggleItem(value);
     }
   };
-
-  // Find the parent AccordionItem to get its value
-  const parentItem = React.useRef();
-  React.useEffect(() => {
-    parentItem.current = document.querySelector(`[data-value]`);
-  });
 
   return (
     <button
@@ -131,20 +174,20 @@ const AccordionTrigger = ({
 };
 
 // Accordion Content Component
-const AccordionContent = ({ 
+const AccordionContent: React.FC<AccordionContentProps> = ({ 
   children, 
   className = "",
   ...props 
 }) => {
   const context = useContext(AccordionContext);
   const item = useContext(AccordionItemContext);
-  const isOpen = context?.isOpen(item?.value);
+  const isOpen = context?.isOpen(item?.value || '');
   
   return (
     <div
       className={`accordion-content overflow-hidden transition-all duration-300 ease-in-out ${className}`}
       style={{
-        maxHeight: isOpen ? '500px' : '0px', // Set a reasonable max height when open
+        maxHeight: isOpen ? '500px' : '0px',
         opacity: isOpen ? 1 : 0,
         paddingTop: isOpen ? '16px' : '0px',
         paddingBottom: isOpen ? '16px' : '0px'
@@ -159,16 +202,19 @@ const AccordionContent = ({
 };
 
 // Enhanced AccordionItem with proper value handling
-const EnhancedAccordionItem = ({ value, children, className = "", ...props }) => {
+const EnhancedAccordionItem: React.FC<AccordionItemProps> = ({ 
+  value, 
+  children, 
+  className = "", 
+  ...props 
+}) => {
   const context = useContext(AccordionContext);
   const isOpen = context?.isOpen(value);
   
-  React.useEffect(() => {
-    const item = document.querySelector(`[data-value="${value}"]`);
+  useEffect(() => {
+    const item = document.querySelector(`[data-value="${value}"]`) as HTMLElement;
     if (item) {
-      const trigger = item.querySelector('.accordion-trigger');
-      const content = item.querySelector('.accordion-content');
-      const chevron = item.querySelector('.accordion-chevron');
+      const content = item.querySelector('.accordion-content') as HTMLElement;
       
       if (isOpen) {
         item.style.setProperty('--accordion-content-height', `${content?.scrollHeight || 0}px`);
@@ -194,13 +240,17 @@ const EnhancedAccordionItem = ({ value, children, className = "", ...props }) =>
   );
 };
 
-// Create context for AccordionItem
-const AccordionItemContext = createContext();
-
 // Final AccordionItem that provides context
-const FinalAccordionItem = ({ value, children, className = "", ...props }) => {
+const FinalAccordionItem: React.FC<AccordionItemProps> = ({ 
+  value, 
+  children, 
+  className = "", 
+  ...props 
+}) => {
+  const contextValue: AccordionItemContextType = { value };
+
   return (
-    <AccordionItemContext.Provider value={{ value }}>
+    <AccordionItemContext.Provider value={contextValue}>
       <EnhancedAccordionItem value={value} className={className} {...props}>
         {children}
       </EnhancedAccordionItem>

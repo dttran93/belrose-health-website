@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/Button";
 
-const CTASection = () => {
+const CTASection: React.FC = () => {
   return (
     <section className="py-20 bg-background text-black relative overflow-hidden">
   

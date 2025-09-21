@@ -1,9 +1,9 @@
 import React from 'react';
 import { Button } from "@/components/ui/Button";
 
-const HeroSection = () => {
+const HeroSection: React.FC = () => {
   return (
-    <section className="relative bg-gradient-to-b from-gray-50 to-white py-20 md:py-32">
+    <section className="relative bg-gradient-to-b from-gray-50 to-white py-10 md:py-20">
       <div className="container mx-auto px-4 md:px-6">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="flex flex-col space-y-8 max-w-xl">
@@ -12,7 +12,7 @@ const HeroSection = () => {
               <span className="text-destructive"> Until Now</span>
             </h1>
             <p className="text-xl text-gray-600">
-              The NHS wastes billions trying to centralize your health data. We incentivize patients to be at the center their health records, not the government, not hospitals, not big tech, you.
+              No centralization, government, or doomed IT implementations. Belrose's tamper-proof records can be stored anywhere, integrate with any system, and are 100% owned by the patient.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button className="px-8 py-6 text-lg">
@@ -30,11 +30,9 @@ const HeroSection = () => {
             </div>
           </div>
           <div className="relative">
-            <div className="absolute -top-10 -left-10 w-40 h-40 bg-blue-100 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
-            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-green-100 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
             <div className="relative rounded-3xl overflow-hidden shadow-2xl">
               <img 
-                src="https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80" 
+                src="/pexels-tima-miroshnichenko-5452232.jpg" 
                 alt="Person using health records app" 
                 className="w-full h-auto object-cover"
               />

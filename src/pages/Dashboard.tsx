@@ -1,25 +1,67 @@
 import React from 'react';
+import { User } from '@/types/core';
 
-const Dashboard = ({ user = null }) => {
+// Interface for component props
+interface DashboardProps {
+  user?: User | null;
+}
+
+// Interface for health statistics
+interface HealthStats {
+  lastCheckup: string;
+  upcomingAppointments: number;
+  activeMedications: number;
+  pendingLabResults: number;
+}
+
+// Interface for activity items
+interface ActivityItem {
+  type: 'appointment' | 'lab' | 'medication';
+  description: string;
+  date: string;
+}
+
+// Interface for vital signs
+interface Vitals {
+  bloodPressure: string;
+  heartRate: string;
+  weight: string;
+  temperature: string;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ user = null }) => {
   // Sample data - in real app, this would come from your API
-  const healthStats = {
+  const healthStats: HealthStats = {
     lastCheckup: '2024-05-15',
     upcomingAppointments: 2,
     activeMedications: 3,
     pendingLabResults: 1,
   };
 
-  const recentActivity = [
+  const recentActivity: ActivityItem[] = [
     { type: 'appointment', description: 'Annual Physical Exam', date: '2024-05-15' },
     { type: 'lab', description: 'Blood work completed', date: '2024-05-10' },
     { type: 'medication', description: 'Prescription refilled', date: '2024-05-08' },
   ];
 
-  const vitals = {
+  const vitals: Vitals = {
     bloodPressure: '120/80',
     heartRate: '72 bpm',
     weight: '165 lbs',
     temperature: '98.6°F',
+  };
+
+  const getActivityIcon = (type: ActivityItem['type']): string => {
+    switch (type) {
+      case 'appointment':
+        return '👨‍⚕️';
+      case 'lab':
+        return '🧪';
+      case 'medication':
+        return '💊';
+      default:
+        return '📋';
+    }
   };
 
   return (
@@ -27,7 +69,7 @@ const Dashboard = ({ user = null }) => {
       {/* Welcome Section */}
       <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white">
         <h2 className="text-2xl font-bold mb-2">
-          Welcome back, {user?.name || 'User'}!
+          Welcome back, {user?.displayName || 'User'}!
         </h2>
         <p className="text-blue-100">
           Here's your health overview for today
@@ -94,12 +136,11 @@ const Dashboard = ({ user = null }) => {
           </div>
           <div className="p-6">
             <div className="space-y-4">
-              {recentActivity.map((activity, index) => (
+              {recentActivity.map((activity: ActivityItem, index: number) => (
                 <div key={index} className="flex items-start space-x-3">
                   <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
                     <span className="text-sm">
-                      {activity.type === 'appointment' ? '👨‍⚕️' : 
-                       activity.type === 'lab' ? '🧪' : '💊'}
+                      {getActivityIcon(activity.type)}
                     </span>
                   </div>
                   <div className="flex-1">

@@ -1,8 +1,36 @@
+import { ReactNode } from 'react';
+
+// ==================== USER & AUTHENTICATION ====================
+
 export interface User {
   uid: string;
   email: string | null;
   displayName: string | null;
   photoURL?: string | null;
+}
+
+// Authentication context data structure
+export interface AuthContextData {
+  user: User | null;
+  loading: boolean;
+  signOut: () => Promise<void>;
+  isAuthenticated: boolean;
+}
+
+// Props for components that need auth context
+export interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export interface ProtectedRouteProps {
+  children: ReactNode;
+}
+
+// Location state for navigation
+export interface LocationState {
+  from: {
+    pathname: string;
+  };
 }
 
 export interface UserProfile extends User {
@@ -25,6 +53,8 @@ export interface UserProfile extends User {
     autoConnectWallet: boolean;
   };
 }
+
+// ==================== HEALTH RECORDS FILE ====================
 
 export interface BelroseFields {
   // Core display fields - these are what users see in list views
@@ -70,14 +100,6 @@ export type FileStatus =
 
 export type SourceType = 'Plain Text Submission' | 'Manual FHIR JSON Submission' | 'File Upload';
 
-export interface DuplicateInfo {
-  existingFileId?: string;
-  confidence: number;
-  matchedOn: ('name' | 'size' | 'lastModified' | 'hash')[];
-  canRetry: boolean;
-  userMessage?: string;
-}
-
 export interface VirtualFileInput {
   fileName?: string;
   sourceType?: SourceType;
@@ -116,4 +138,5 @@ export interface FileObject {
   blockchainVerification?: BlockchainVerification;
   isProviderRecord?: boolean;
 }
+
 

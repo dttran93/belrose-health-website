@@ -1,8 +1,20 @@
 import React from 'react';
 import { HeartPulse } from "lucide-react";
 
-const Footer = () => {
-  const currentYear = new Date().getFullYear();
+interface LinkItem {
+  name: string;
+  href: string;
+}
+
+interface LinkCategory {
+  product: LinkItem[];
+  company: LinkItem[];
+  legal: LinkItem[];
+  support: LinkItem[];
+}
+
+const Footer: React.FC = () => {
+  const currentYear: number = new Date().getFullYear();
 
   const links = {
     product: [
@@ -72,7 +84,7 @@ const Footer = () => {
           <div>
             <h3 className="font-semibold text-white mb-4">Product</h3>
             <ul className="space-y-2">
-              {links.product.map((link, index) => (
+              {links.product.map((link: LinkItem, index: number) => (
                 <li key={index}>
                   <a href={link.href} className="text-gray-400 hover:text-white transition-colors">
                     {link.name}
@@ -85,7 +97,7 @@ const Footer = () => {
           <div>
             <h3 className="font-semibold text-white mb-4">Company</h3>
             <ul className="space-y-2">
-              {links.company.map((link, index) => (
+              {links.company.map((link: LinkItem, index: number) => (
                 <li key={index}>
                   <a href={link.href} className="text-gray-400 hover:text-white transition-colors">
                     {link.name}
@@ -98,7 +110,7 @@ const Footer = () => {
           <div>
             <h3 className="font-semibold text-white mb-4">Legal</h3>
             <ul className="space-y-2">
-              {links.legal.map((link, index) => (
+              {links.legal.map((link: LinkItem, index: number) => (
                 <li key={index}>
                   <a href={link.href} className="text-gray-400 hover:text-white transition-colors">
                     {link.name}

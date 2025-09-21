@@ -5,11 +5,6 @@ import { WalletConnection } from '@/features/BlockchainVerification/component/Wa
 const SettingsPage = () => {
   const [activeSection, setActiveSection] = useState('profile');
 
-    console.log('Environment check:', {
-        clientId: import.meta.env.VITE_WEB3AUTH_CLIENT_ID,
-        allEnvVars: Object.keys(process.env).filter(key => key.startsWith('REACT_APP_'))
-    });
-
   const settingsSections = [
     { id: 'profile', name: 'Profile', icon: CircleUserRound },
     { id: 'wallet', name: 'Blockchain Wallet', icon: Link },

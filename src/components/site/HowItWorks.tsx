@@ -1,11 +1,20 @@
 import React from 'react';
 import { Badge } from './ui/Badge';
 import HowItWorksCard from './ui/HowItWorksCard';
-import {ClipboardPenLine, Combine, Server, CheckCircle } from 'lucide-react';
+import {ClipboardPenLine, Combine, Server, CheckCircle, LucideIcon } from 'lucide-react';
 
-const HowItWorks = () => {
+interface StepItem {
+  id: number;
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  gradient: string; 
+  delay: string;
+}
 
-    const steps = [
+const HowItWorks: React.FC = () => {
+
+    const steps: StepItem[] = [
     {
       id: 1,
       title: "Sign Up",
@@ -53,7 +62,7 @@ const HowItWorks = () => {
       </div> 
     
     <div className="flex flex-col gap-4 max-w-4xl mx-auto">
-      {steps.map((step, index) => (
+      {steps.map((step: StepItem, index: number) => (
         <div key={index}>
           <HowItWorksCard 
             id={step.id} 
@@ -71,7 +80,7 @@ const HowItWorks = () => {
     </div>
   
 
-     <style jsx>{`
+     <style>{`
         @keyframes fadeInUp {
           from {
             opacity: 0;

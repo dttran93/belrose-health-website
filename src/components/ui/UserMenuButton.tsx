@@ -1,17 +1,37 @@
+import React, { useState, useRef, useEffect } from 'react';
 import { User, Settings, LogOut, HelpCircle, ChevronUp } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
+import { User as UserType } from '@/types/core'
 
-const UserMenuButton = ({ user, isCollapsed, onLogout, onSettings, onHelp }) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const menuRef = useRef(null);
-  const buttonRef = useRef(null);
+// Menu action types
+type MenuAction = 'logout' | 'settings' | 'help';
+
+// Props interface
+interface UserMenuButtonProps {
+  user?: UserType | null;
+  isCollapsed: boolean;
+  onLogout?: () => void;
+  onSettings?: () => void;
+  onHelp?: () => void;
+}
+
+const UserMenuButton: React.FC<UserMenuButtonProps> = ({ 
+  user, 
+  isCollapsed, 
+  onLogout, 
+  onSettings, 
+  onHelp 
+}) => {
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Close menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target) && 
-          buttonRef.current && !buttonRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent): void => {
+      const target = event.target as Node;
+      if (menuRef.current && !menuRef.current.contains(target) && 
+          buttonRef.current && !buttonRef.current.contains(target)) {
         setIsMenuOpen(false);
       }
     };
@@ -20,15 +40,18 @@ const UserMenuButton = ({ user, isCollapsed, onLogout, onSettings, onHelp }) => 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleMenuItemClick = (action) => {
+  const handleMenuItemClick = (action: MenuAction): void => {
     setIsMenuOpen(false);
     // Handle the action (logout, settings, etc.)
     switch (action) {
-      case 'logout': onLogout?.();
+      case 'logout':
+        onLogout?.();
         break;
-      case 'settings': onSettings?.();
+      case 'settings':
+        onSettings?.();
         break;
-      case 'help' : onHelp?.();
+      case 'help':
+        onHelp?.();
         break;
       default:
         console.log(`${action} clicked`);
@@ -36,7 +59,7 @@ const UserMenuButton = ({ user, isCollapsed, onLogout, onSettings, onHelp }) => 
   };
 
   // Determine dropdown positioning based on collapsed state
-  const getDropdownClasses = () => {
+  const getDropdownClasses = (): string => {
     if (isCollapsed) {
       // Collapsed: position dropdown to the right to avoid cutoff
       return 'absolute bottom-full mb-2 left-0 w-48';

@@ -1,26 +1,70 @@
-import React, {useState} from 'react';
-import {Mail, Lock, User, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { Mail, Lock, User, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { Button } from "@/components/ui/Button";
 import { toast } from "sonner";
 import { authService } from '@/services/authServices';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { LocationState } from '@/types/core'; // Import from core types
 
-const getPasswordRequirements = (password) => {
-    return {
-        length: password.length >= 8,
-        uppercase: /[A-Z]/.test(password),
-        lowercase: /[a-z]/.test(password),
-        number: /[0-9]/.test(password),
-        symbol: /[!@#$%^&*(),.?":{}|<>]/.test(password)
-    };
+// Type definitions
+interface PasswordRequirements {
+  length: boolean;
+  uppercase: boolean;
+  lowercase: boolean;
+  number: boolean;
+  symbol: boolean;
+}
+
+interface FormData {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  firstName: string;
+  lastName: string;
+}
+
+interface FormErrors {
+  email?: string;
+  password?: string;
+  confirmPassword?: string;
+  firstName?: string;
+  lastName?: string;
+  submit?: string;
+}
+
+interface PasswordRequirementsProps {
+  password: string;
+  show: boolean;
+}
+
+interface RequirementItem {
+  key: keyof PasswordRequirements;
+  text: string;
+  met: boolean;
+}
+
+// Firebase Auth Error interface (extend as needed)
+interface FirebaseError extends Error {
+  code?: string;
+}
+
+// Helper function with proper typing
+const getPasswordRequirements = (password: string): PasswordRequirements => {
+  return {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+    symbol: /[!@#$%^&*(),.?":{}|<>]/.test(password)
+  };
 };
 
-const PasswordRequirements = ({ password, show }) => {
+const PasswordRequirementsComponent: React.FC<PasswordRequirementsProps> = ({ password, show }) => {
   if (!show) return null;
 
   const requirements = getPasswordRequirements(password);
 
-  const requirementItems = [
+  const requirementItems: RequirementItem[] = [
     { key: 'length', text: 'At least 8 characters', met: requirements.length },
     { key: 'uppercase', text: 'One uppercase letter (A-Z)', met: requirements.uppercase },
     { key: 'lowercase', text: 'One lowercase letter (a-z)', met: requirements.lowercase },
@@ -45,252 +89,254 @@ const PasswordRequirements = ({ password, show }) => {
   );
 };
 
-const Auth = () => {
-    const navigate = useNavigate();
-    const location = useLocation();
-    const [isLogin, setIsLogin] = useState(true);
-    const [showPassword, setShowPassword] = useState(false);
-    const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
-    const [formData,setFormData] = useState({
-        email: '',
-        password: '',
-        confirmPassword: '',
-        firstName: '',
-        lastName: '',
-    });
+const Auth: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [isLogin, setIsLogin] = useState<boolean>(true);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [showPasswordRequirements, setShowPasswordRequirements] = useState<boolean>(false);
+  const [formData, setFormData] = useState<FormData>({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    firstName: '',
+    lastName: '',
+  });
 
-    const [errors, setErrors] = useState({});
-    const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-    const handleInputChange = (e) => {
-        const {name, value} = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
 
-        //Clear error when user starts typing
-        if(errors[name]) {
-            setErrors(prev => ({
-                ...prev,
-                [name]: ''
-            }));
-        }   
-    };
+    // Clear error when user starts typing
+    if (errors[name as keyof FormErrors]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
 
-    const validateForm = () => {
-        const newErrors = {};
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {};
 
-        //Email validation
-        if(!formData.email.trim()){
-            newErrors.email = 'Email is required';
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-            newErrors.email = 'Please enter a valid email';
-        }
+    // Email validation
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      newErrors.email = 'Please enter a valid email';
+    }
 
-        //Password validation                                                                
-         if (!formData.password) {
-            newErrors.password = 'Password is required';
-            } else {
-                // Check if password meets all requirements
-                const requirements = getPasswordRequirements(formData.password);
-                const allMet = Object.values(requirements).every(Boolean);
-                if (!allMet) {
-                newErrors.password = 'Password does not meet all requirements';
-                }
-        }
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else {
+      // Check if password meets all requirements
+      const requirements = getPasswordRequirements(formData.password);
+      const allMet = Object.values(requirements).every(Boolean);
+      if (!allMet) {
+        newErrors.password = 'Password does not meet all requirements';
+      }
+    }
 
-        //Sign up specific validation
-        if (!isLogin) {
-            if (!formData.firstName.trim()) {
-            newErrors.firstName = 'First name is required';
-            }
-            if (!formData.lastName.trim()) {
-            newErrors.lastName = 'Last name is required';
-            }
-            if (formData.password !== formData.confirmPassword) {
-            newErrors.confirmPassword = 'Passwords do not match';
-            }
-        }
+    // Sign up specific validation
+    if (!isLogin) {
+      if (!formData.firstName.trim()) {
+        newErrors.firstName = 'First name is required';
+      }
+      if (!formData.lastName.trim()) {
+        newErrors.lastName = 'Last name is required';
+      }
+      if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match';
+      }
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-};
+  };
 
-const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
 
-    if(!validateForm()) return;
+    if (!validateForm()) return;
 
     setIsLoading(true);
 
-    //Trim email before sending to Firebase
+    // Trim email before sending to Firebase
     const trimmedEmail = formData.email.trim();
 
     try {
-        //Login with Firebase
-        if(isLogin) {
-            const user = await authService.signIn(trimmedEmail, formData.password);
-            console.log("User logged in:", user);
+      // Login with Firebase
+      if (isLogin) {
+        const user = await authService.signIn(trimmedEmail, formData.password);
+        console.log("User logged in:", user);
 
-            toast.success ('Login successful!', {
-                description: 'Welcome back! You have logged in.',
-                duration: 3000,
-            });
-
-            //Redirect to dashboard or protected route
-            const from = location.state?.from?.pathname || "/dashboard";
-            navigate(from, { replace: true });
-        } else {
-
-            // Sign up with Firebase
-            const user = await authService.signUp(
-                trimmedEmail, 
-                formData.password, 
-                `${formData.firstName.trim()} ${formData.lastName.trim()}`
-            );
-            console.log('User created:', user);
-
-            toast.success('Sign up successful!',{
-                description: 'Your account has been created.',
-                duration: 3000,
-            });
-            
-            //Redirect to dashboard or protected route
-            const from = location.state?.from?.pathname || '/dashboard';
-            navigate(from, { replace: true });
-        } 
-    } catch (error) {
-        console.error('Auth error:', error);
-
-        //Handle specific Firebase auth errors
-        let errorMessage = 'An error occurred. Please try again.';
-
-        switch (error.code) {
-            case 'auth/user-not-found':
-                errorMessage = 'No account found with this email address.';
-                break;
-            case 'auth/wrong-password':
-                errorMessage = 'Incorrect password. Please try again.';
-                break;
-            case 'auth/email-already-in-use':
-                errorMessage = 'An account with this email already exists.';
-                break;
-            case 'auth/weak-password':
-                errorMessage = 'Password is too weak. Please choose a stronger password.';
-                break;
-            case 'auth/invalid-email':
-                errorMessage = 'Invalid email address format.';
-                break;
-            case 'auth/too-many-requests':
-                errorMessage = 'Too many failed attempts. Please try again later.';
-                break;
-            default:
-                errorMessage = error.message || errorMessage;
-        }
-
-        setErrors({submit: error.message});
-
-        toast.error('Authentication failed', {
-            description: error.message, 
-            duration: 4000,
+        toast.success('Login successful!', {
+          description: 'Welcome back! You have logged in.',
+          duration: 3000,
         });
-    } finally {
-        setIsLoading(false);
-    }
-};
 
-// Handle Google Sign In
-const handleGoogleSignIn = async () => {
-    setIsLoading(true);
-    try {
-        const user = await authService.signInWithGoogle();
-        console.log('Google sign in successful:', user);
-        
-        toast.success('Google sign in successful!', {
-            description: 'Welcome! You have been signed in with Google.',
-            duration: 3000,
+        // Redirect to dashboard or protected route
+        const from = location.state?.from?.pathname || "/dashboard";
+        navigate(from, { replace: true });
+      } else {
+        // Sign up with Firebase
+        const user = await authService.signUp(
+          trimmedEmail,
+          formData.password,
+          `${formData.firstName.trim()} ${formData.lastName.trim()}`
+        );
+        console.log('User created:', user);
+
+        toast.success('Sign up successful!', {
+          description: 'Your account has been created.',
+          duration: 3000,
         });
-        
+
+        // Redirect to dashboard or protected route
         const from = location.state?.from?.pathname || '/dashboard';
         navigate(from, { replace: true });
-
+      }
     } catch (error) {
-        console.error('Google sign in error:', error);
-        toast.error('Google sign in failed', {
-            description: error.message || 'Failed to sign in with Google',
-            duration: 4000,
-        });
-    } finally {
-        setIsLoading(false);
-    }
-};
+      console.error('Auth error:', error);
+      const firebaseError = error as FirebaseError;
 
-// Handle Facebook Sign In
-const handleFacebookSignIn = async () => {
+      // Handle specific Firebase auth errors
+      let errorMessage = 'An error occurred. Please try again.';
+
+      switch (firebaseError.code) {
+        case 'auth/user-not-found':
+          errorMessage = 'No account found with this email address.';
+          break;
+        case 'auth/wrong-password':
+          errorMessage = 'Incorrect password. Please try again.';
+          break;
+        case 'auth/email-already-in-use':
+          errorMessage = 'An account with this email already exists.';
+          break;
+        case 'auth/weak-password':
+          errorMessage = 'Password is too weak. Please choose a stronger password.';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Invalid email address format.';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = 'Too many failed attempts. Please try again later.';
+          break;
+        default:
+          errorMessage = firebaseError.message || errorMessage;
+      }
+
+      setErrors({ submit: firebaseError.message });
+
+      toast.error('Authentication failed', {
+        description: firebaseError.message,
+        duration: 4000,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle Google Sign In
+  const handleGoogleSignIn = async (): Promise<void> => {
     setIsLoading(true);
     try {
-        const user = await authService.signInWithFacebook();
-        console.log('Facebook sign in successful:', user);
-        
-        toast.success('Facebook sign in successful!', {
-            description: 'Welcome! You have been signed in with Facebook.',
-            duration: 3000,
-        });
-        
-        const from = location.state?.from?.pathname || '/dashboard';
-        navigate(from, { replace: true });
+      const user = await authService.signInWithGoogle();
+      console.log('Google sign in successful:', user);
+
+      toast.success('Google sign in successful!', {
+        description: 'Welcome! You have been signed in with Google.',
+        duration: 3000,
+      });
+
+      const from = location.state?.from?.pathname || '/dashboard';
+      navigate(from, { replace: true });
+
     } catch (error) {
-        console.error('Facebook sign in error:', error);
-        toast.error('Facebook sign in failed', {
-            description: error.message || 'Failed to sign in with Facebook',
-            duration: 4000,
-        });
+      console.error('Google sign in error:', error);
+      const firebaseError = error as FirebaseError;
+      toast.error('Google sign in failed', {
+        description: firebaseError.message || 'Failed to sign in with Google',
+        duration: 4000,
+      });
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
-};
+  };
 
-
-// Handle GitHub Sign In
-const handleGitHubSignIn = async () => {
+  // Handle Facebook Sign In
+  const handleFacebookSignIn = async (): Promise<void> => {
     setIsLoading(true);
     try {
-        const user = await authService.signInWithGitHub();
-        console.log('GitHub sign in successful:', user);
-        
-        toast.success('GitHub sign in successful!', {
-            description: 'Welcome! You have been signed in with GitHub.',
-            duration: 3000,
-        });
-        
-        const from = location.state?.from?.pathname || '/dashboard';
-        navigate(from, { replace: true });
-    } catch (error) {
-        console.error('GitHub sign in error:', error);
-        toast.error('GitHub sign in failed', {
-            description: error.message || 'Failed to sign in with GitHub',
-            duration: 4000,
-        });
-    } finally {
-        setIsLoading(false);
-    }
-};
+      const user = await authService.signInWithFacebook();
+      console.log('Facebook sign in successful:', user);
 
-const toggleMode = () => {
+      toast.success('Facebook sign in successful!', {
+        description: 'Welcome! You have been signed in with Facebook.',
+        duration: 3000,
+      });
+
+      const from = location.state?.from?.pathname || '/dashboard';
+      navigate(from, { replace: true });
+    } catch (error) {
+      console.error('Facebook sign in error:', error);
+      const firebaseError = error as FirebaseError;
+      toast.error('Facebook sign in failed', {
+        description: firebaseError.message || 'Failed to sign in with Facebook',
+        duration: 4000,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle GitHub Sign In
+  const handleGitHubSignIn = async (): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const user = await authService.signInWithGitHub();
+      console.log('GitHub sign in successful:', user);
+
+      toast.success('GitHub sign in successful!', {
+        description: 'Welcome! You have been signed in with GitHub.',
+        duration: 3000,
+      });
+
+      const from = location.state?.from?.pathname || '/dashboard';
+      navigate(from, { replace: true });
+    } catch (error) {
+      console.error('GitHub sign in error:', error);
+      const firebaseError = error as FirebaseError;
+      toast.error('GitHub sign in failed', {
+        description: firebaseError.message || 'Failed to sign in with GitHub',
+        duration: 4000,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleMode = (): void => {
     setIsLogin(!isLogin);
     setFormData({
-        email:'',
-        password:'',
-        confirmPassword:'',
-        firstName:'',
-        lastName:'',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      firstName: '',
+      lastName: '',
     });
     setErrors({});
     setShowPasswordRequirements(false);
-};
+  };
 
-return (
+  return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-card">
       <div className="w-full max-w-md">
         {/* Header */}
@@ -390,48 +436,48 @@ return (
 
             {/* Password field */}
             <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Password
-            </label>
-            <div className="relative">
+              </label>
+              <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-5 w-5 text-gray-400" />
+                  <Lock className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                type={showPassword ? 'text' : 'password'}
-                name="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                onFocus={() => !isLogin && setShowPasswordRequirements(true)}
-                onBlur={() => setShowPasswordRequirements(false)}
-                className={`w-full pl-10 pr-12 py-3 bg-background border focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent rounded-xl ${
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  onFocus={() => !isLogin && setShowPasswordRequirements(true)}
+                  onBlur={() => setShowPasswordRequirements(false)}
+                  className={`w-full pl-10 pr-12 py-3 bg-background border focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent rounded-xl ${
                     errors.password ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="Enter your password"
+                  }`}
+                  placeholder="Enter your password"
                 />
                 <button
-                type="button"
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                onClick={() => setShowPassword(!showPassword)}
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  onClick={() => setShowPassword(!showPassword)}
                 >
-                {showPassword ? (
+                  {showPassword ? (
                     <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-                ) : (
+                  ) : (
                     <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-                )}
+                  )}
                 </button>
-            </div>
-            
-            {/* Show requirements when password field has focus or has content, but only during signup */}
-            <PasswordRequirements 
-                password={formData.password} 
-                show={!isLogin && (showPasswordRequirements || formData.password.length > 0)} 
-            />
-            
-            {/* Show simple error message for empty password */}
-            {errors.password && formData.password.length === 0 && (
+              </div>
+
+              {/* Show requirements when password field has focus or has content, but only during signup */}
+              <PasswordRequirementsComponent
+                password={formData.password}
+                show={!isLogin && (showPasswordRequirements || formData.password.length > 0)}
+              />
+
+              {/* Show simple error message for empty password */}
+              {errors.password && formData.password.length === 0 && (
                 <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-            )}
+              )}
             </div>
 
             {/* Confirm Password field (only for signup) */}
@@ -510,7 +556,7 @@ return (
                 <span className="px-2 bg-background text-gray-500">Or continue with</span>
               </div>
             </div>
-            
+
             <div className="mt-4 space-y-3">
               {/* Google Sign In */}
               <Button
@@ -564,4 +610,4 @@ return (
   );
 };
 
-export default Auth; 
+export default Auth;

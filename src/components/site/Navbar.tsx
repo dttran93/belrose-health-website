@@ -2,17 +2,30 @@ import React, { useState } from 'react';
 import {useNavigate} from 'react-router-dom';
 import { Button } from "@/components/ui/Button";
 import {Users, Hospital, Microscope, CircleCheckBig, BriefcaseBusiness, Mailbox, ChevronDown} from "lucide-react";
-import DropdownMenu from '@/components/ui/DropdownMenu';
+import DropdownMenu, {DropdownItem} from '@/components/ui/DropdownMenu';
 import NavCard from "@/components/site/ui/NavCard";
 
-const Navbar = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeDropdown, setActiveDropdown] = useState(null);
-  const [dropdownTimeout, setDropdownTimeout] = useState(null);
-  const [mobileAccordionOpen, setMobileAccordionOpen] = useState(null);
+interface DropdownCategory {
+  items: DropdownItem[];
+}
+
+interface DropdownConfig {
+  'who-we-serve': DropdownCategory;
+  'company': DropdownCategory;
+}
+
+export type DropdownName = 'who-we-serve' | 'company';
+
+type MobileAccordionName = DropdownName | null;
+
+const Navbar: React.FC = () => {
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+  const [activeDropdown, setActiveDropdown] = useState<DropdownName | null>(null);
+  const [dropdownTimeout, setDropdownTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [mobileAccordionOpen, setMobileAccordionOpen] = useState<MobileAccordionName>(null);
   const navigate = useNavigate();
 
-  const handleMouseEnter = (dropdownName) => {
+  const handleMouseEnter = (dropdownName: DropdownName) => {
   if (dropdownTimeout) {
     clearTimeout(dropdownTimeout);
     setDropdownTimeout(null);
@@ -27,11 +40,11 @@ const handleMouseLeave = () => {
   setDropdownTimeout(timeout);
 };
 
-const toggleMobileAccordion = (accordionName) => {
+const toggleMobileAccordion = (accordionName: DropdownName) => {
   setMobileAccordionOpen(mobileAccordionOpen === accordionName ? null: accordionName);
 }
 
-const dropdownConfig = {
+const dropdownConfig: DropdownConfig = {
     'who-we-serve': {
     items: [
       {

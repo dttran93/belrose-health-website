@@ -1,7 +1,7 @@
 import React from 'react';
 import Auth from '../components/auth/Auth';
 
-const AuthPage = () => {
+const AuthPage: React.FC = () => {
     return <Auth/>;
 };
 

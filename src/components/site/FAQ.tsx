@@ -8,8 +8,13 @@ import {
 import { Badge } from "@/components/site/ui/Badge";
 import { Button } from "@/components/ui/Button";
 
-const FAQ = () => {
-  const faqs = [
+interface FAQItem {
+  question: string;
+  answer: string;
+}
+
+const FAQ: React.FC = () => {
+  const faqs: FAQItem[] = [
     {
       question: "Is Belrose HIPAA/GDPR compliant?",
       answer: "Yes, Belrose is fully HIPAA/GDPR compliant. We implement all the necessary security measures and protocols to ensure your health information is protected according to HIPAA/GDPR standards. Our platform undergoes regular security audits to maintain compliance."
@@ -51,7 +56,7 @@ const FAQ = () => {
         
         <div className="max-w-3xl mx-auto">
           <Accordion type="single" collapsible className="w-full">
-            {faqs.map((faq, index) => (
+            {faqs.map((faq: FAQItem, index: number) => (
               <AccordionItem key={index} value={`item-${index}`} className="bg-white border border-gray-200 rounded-lg mb-4 overflow-hidden">
                 <AccordionTrigger className="px-6 py-4">
                   <span className="font-semibold text-left">{faq.question}</span>
