@@ -2,7 +2,13 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { FileUploadService } from '@/features/AddRecord/services/fileUploadService';
 import DocumentProcessorService from '@/features/AddRecord/services/documentProcessorService';
-import { FileObject, FileStatus, AIProcessingStatus, BlockchainVerification, VirtualFileInput } from '@/types/core';
+import {
+  FileObject,
+  FileStatus,
+  AIProcessingStatus,
+  BlockchainVerification,
+  VirtualFileInput,
+} from '@/types/core';
 import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
 import { processRecordWithAI } from '@/features/AddRecord/services/aiRecordProcessingService';
 import { BlockchainService } from '@/features/BlockchainVerification/service/blockchainService';
@@ -28,979 +34,966 @@ import { UploadResult } from '../services/shared.types';
  * - Virtual file support
  */
 export function useFileManager(): UseFileManagerTypes {
-    
-    // ==================== STATE MANAGEMENT ====================    
-    const [files, setFiles] = useState<FileObject[]>(() => {
-        // Try to restore from sessionStorage on mount
-        if (typeof window !== 'undefined' && window.sessionStorage) {
-            try {
-                const saved = sessionStorage.getItem('fileUpload_files');
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    console.log('🔄 Restored files from sessionStorage:', parsed.length);
-                    return parsed;
-                }
-            } catch (error) {
-                console.warn('Failed to restore files from sessionStorage:', error);
-            }
+  // ==================== STATE MANAGEMENT ====================
+  const [files, setFiles] = useState<FileObject[]>(() => {
+    // Try to restore from sessionStorage on mount
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        const saved = sessionStorage.getItem('fileUpload_files');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          console.log('🔄 Restored files from sessionStorage:', parsed.length);
+          return parsed;
         }
-        return [];
-    });
-    
-    // Save to sessionStorage whenever files change
-    useEffect(() => {
-        if (typeof window !== 'undefined' && window.sessionStorage) {
-            try {
-                sessionStorage.setItem('fileUpload_files', JSON.stringify(files));
-            } catch (error) {
-                console.warn('Failed to save files to sessionStorage:', error);
-            }
-        }
-    }, [files]);
+      } catch (error) {
+        console.warn('Failed to restore files from sessionStorage:', error);
+      }
+    }
+    return [];
+  });
 
-    console.log('📁 Current files in hook:', files.length, files.map(f => f.fileName));
-    const [firestoreData, setFirestoreData] = useState<Map<string, any>>(new Map());
-    const [savingToFirestore, setSavingToFirestore] = useState<Set<string>>(new Set());
+  // Save to sessionStorage whenever files change
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        sessionStorage.setItem('fileUpload_files', JSON.stringify(files));
+      } catch (error) {
+        console.warn('Failed to save files to sessionStorage:', error);
+      }
+    }
+  }, [files]);
 
-    // ==================== REFS & SERVICES ====================
-    
-    const fileUploadService = useRef(new FileUploadService());
-    const fhirConversionCallback = useRef<FHIRConversionCallback | null>(null);
-    const resetProcessCallback = useRef<ResetProcessCallback | null>(null);
+  console.log(
+    '📁 Current files in hook:',
+    files.length,
+    files.map(f => f.fileName)
+  );
+  const [firestoreData, setFirestoreData] = useState<Map<string, any>>(new Map());
+  const [savingToFirestore, setSavingToFirestore] = useState<Set<string>>(new Set());
 
-    // ==================== UTILITY/FACTORY FUNCTIONS ====================
-    
-    const generateId = () => `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    const createFileObject = useCallback(async (file: File, id?: string): Promise<FileObject> => {
-        console.log(`📁 Creating file object for: ${file.name}`);
-        
-        // Hash the original file immediately
-        let originalFileHash: string | null = null;
-        try {
-            originalFileHash = await hashOriginalFile(file);
-        } catch (error) {
-            console.warn(`⚠️ Could not hash file ${file.name}:`, error);
-            // Continue without hash rather than failing entirely
-            originalFileHash = null;
-        }
-        
-        return {
-            id: id || generateId(),
-            file,
-            fileName: file.name,
-            fileSize: file.size,
-            fileType: file.type,
-            status: 'pending' as FileStatus,
-            uploadedAt: new Date().toISOString(),
-            extractedText: '',
-            wordCount: 0,
-            sourceType: 'File Upload',
-            isVirtual: false,
-            aiProcessingStatus: 'not_needed' as AIProcessingStatus,
-            originalFileHash,
-        };
-    }, []);
+  // ==================== REFS & SERVICES ====================
 
-    const hashOriginalFile = async (file: File): Promise<string> => {
-        try{
-            console.log(`🔍 Hashing original file: ${file.name} (${file.size} bytes)`);
-            const arrayBuffer = await file.arrayBuffer();
+  const fileUploadService = useRef(new FileUploadService());
+  const fhirConversionCallback = useRef<FHIRConversionCallback | null>(null);
+  const resetProcessCallback = useRef<ResetProcessCallback | null>(null);
 
-            const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-            
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
-            
-            console.log(`✅ Original hash generated: ${hashHex.substring(0, 12)}...`);
-            return hashHex;
-        } catch (error) {
-            console.error('❌ Failed to hash original file:', error);
-            throw new Error('File hashing failed');
-        }
+  // ==================== UTILITY/FACTORY FUNCTIONS ====================
+
+  const generateId = () => `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  const createFileObject = useCallback(async (file: File, id?: string): Promise<FileObject> => {
+    console.log(`📁 Creating file object for: ${file.name}`);
+
+    // Hash the original file immediately
+    let originalFileHash: string | null = null;
+    try {
+      originalFileHash = await hashOriginalFile(file);
+    } catch (error) {
+      console.warn(`⚠️ Could not hash file ${file.name}:`, error);
+      // Continue without hash rather than failing entirely
+      originalFileHash = null;
+    }
+
+    return {
+      id: id || generateId(),
+      file,
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      status: 'pending' as FileStatus,
+      uploadedAt: new Date().toISOString(),
+      extractedText: '',
+      wordCount: 0,
+      sourceType: 'File Upload',
+      isVirtual: false,
+      aiProcessingStatus: 'not_needed' as AIProcessingStatus,
+      originalFileHash,
     };
+  }, []);
 
-    // ==================== CORE FILE MANAGEMENT ====================
-    
-    const retryFile = useCallback(async (fileId: string) => {
-        const file = files.find(f => f.id === fileId);
-        if (!file) {
-            console.error(`❌ File not found for retry: ${fileId}`);
-            return;
-        }
-        
-        console.log(`🔄 Retrying file: ${file.fileName}`);
-        updateFileStatus(fileId, 'processing');
-        await processFile(file);
-    }, [files]);
+  const hashOriginalFile = async (file: File): Promise<string> => {
+    try {
+      console.log(`🔍 Hashing original file: ${file.name} (${file.size} bytes)`);
+      const arrayBuffer = await file.arrayBuffer();
 
-    const clearAll = useCallback(() => {
-        console.log('🧹 Clearing all files and data');
-        setFiles([]);
-        setFirestoreData(new Map());
-        setSavingToFirestore(new Set());
-        
-        // Call reset callback if provided
-        if (resetProcessCallback.current) {
-            resetProcessCallback.current();
-        }
-    }, []);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
 
-    const updateFirestoreRecord = useCallback(async (fileId: string, data: any) => {
-        try {
-            await fileUploadService.current.updateRecord(fileId, data);
-            setFirestoreData(prev => new Map([...prev, [fileId, { ...prev.get(fileId), ...data }]]));
-        } catch (error: any) {
-            console.error(`❌ Failed to update Firestore record for ${fileId}:`, error);
-            throw error;
-        }
-    }, []);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
 
-    // ==================== STATUS UPDATES ====================
-    
-    const updateFileStatus = useCallback((fileId: string, status: FileStatus, additionalData: Partial<FileObject> = {}) => {
-        setFiles(prev => prev.map(f => 
-            f.id === fileId 
-                ? { ...f, status, ...additionalData }
-                : f
-        ));
-    }, []);
+      console.log(`✅ Original hash generated: ${hashHex.substring(0, 12)}...`);
+      return hashHex;
+    } catch (error) {
+      console.error('❌ Failed to hash original file:', error);
+      throw new Error('File hashing failed');
+    }
+  };
 
-    // ==================== FILE PROCESSING ====================
-    
-    const convertTextToFHIR = async (extractedText: string, fileName: string) => {
-        try {
-            return await convertToFHIR(extractedText);
-        } catch (error) {
-            console.error('FHIR conversion failed:', error);
-            throw error; // Re-throw so the caller can handle it
-        }
-    };
+  // ==================== CORE FILE MANAGEMENT ====================
 
-    const processWithAI = useCallback(async (fileObj: FileObject) => {
-        console.log(`🤖 Starting AI processing for: ${fileObj.fileName}`);
-        
-        try {
-            // Call AI service
-            const aiResult = await processRecordWithAI(fileObj.fhirData, {
-                fileName: fileObj.fileName,
-                extractedText: fileObj.extractedText || undefined,
-            });
-            
-            console.log(`✅ AI processing completed for: ${fileObj.fileName}`, aiResult);
-            
-            // 🔥 RETURN the result instead of updating status
-            return {
-                success: true,
-                result: aiResult
-            };
-            
-        } catch (error: any) {
-            console.error(`❌ AI processing failed for ${fileObj.fileName}:`, error);
-            
-            // 🔥 RETURN the error instead of updating status
-            return {
-                success: false,
-                error: error.message
-            };
-        }
-    }, []);
+  const retryFile = useCallback(
+    async (fileId: string) => {
+      const file = files.find(f => f.id === fileId);
+      if (!file) {
+        console.error(`❌ File not found for retry: ${fileId}`);
+        return;
+      }
 
-    const processFile = useCallback(async (fileObj: FileObject): Promise<void> => {
-        console.log(`📋 Starting complete processing pipeline for: ${fileObj.fileName}`);
-        
+      console.log(`🔄 Retrying file: ${file.fileName}`);
+      updateFileStatus(fileId, 'processing');
+      await processFile(file);
+    },
+    [files]
+  );
+
+  const clearAll = useCallback(() => {
+    console.log('🧹 Clearing all files and data');
+    setFiles([]);
+    setFirestoreData(new Map());
+    setSavingToFirestore(new Set());
+
+    // Call reset callback if provided
+    if (resetProcessCallback.current) {
+      resetProcessCallback.current();
+    }
+  }, []);
+
+  const updateFirestoreRecord = useCallback(async (fileId: string, data: any) => {
+    try {
+      await fileUploadService.current.updateRecord(fileId, data);
+      setFirestoreData(prev => new Map([...prev, [fileId, { ...prev.get(fileId), ...data }]]));
+    } catch (error: any) {
+      console.error(`❌ Failed to update Firestore record for ${fileId}:`, error);
+      throw error;
+    }
+  }, []);
+
+  // ==================== STATUS UPDATES ====================
+
+  const updateFileStatus = useCallback(
+    (fileId: string, status: FileStatus, additionalData: Partial<FileObject> = {}) => {
+      setFiles(prev => prev.map(f => (f.id === fileId ? { ...f, status, ...additionalData } : f)));
+    },
+    []
+  );
+
+  // ==================== FILE PROCESSING ====================
+
+  const convertTextToFHIR = async (extractedText: string, fileName: string) => {
+    try {
+      return await convertToFHIR(extractedText);
+    } catch (error) {
+      console.error('FHIR conversion failed:', error);
+      throw error; // Re-throw so the caller can handle it
+    }
+  };
+
+  const processWithAI = useCallback(async (fileObj: FileObject) => {
+    console.log(`🤖 Starting AI processing for: ${fileObj.fileName}`);
+
+    try {
+      // Call AI service
+      const aiResult = await processRecordWithAI(fileObj.fhirData, {
+        fileName: fileObj.fileName,
+        extractedText: fileObj.extractedText || undefined,
+      });
+
+      console.log(`✅ AI processing completed for: ${fileObj.fileName}`, aiResult);
+
+      // 🔥 RETURN the result instead of updating status
+      return {
+        success: true,
+        result: aiResult,
+      };
+    } catch (error: any) {
+      console.error(`❌ AI processing failed for ${fileObj.fileName}:`, error);
+
+      // 🔥 RETURN the error instead of updating status
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }, []);
+
+  const processFile = useCallback(
+    async (fileObj: FileObject): Promise<void> => {
+      console.log(`📋 Starting complete processing pipeline for: ${fileObj.fileName}`);
+
+      updateFileStatus(fileObj.id, 'processing', {
+        processingStage: 'Starting processing...',
+      });
+
+      try {
+        // Step 1: Extract text and process document
+        console.log(`📝 Step 1: Extracting text from: ${fileObj.fileName}`);
         updateFileStatus(fileObj.id, 'processing', {
-            processingStage: 'Starting processing...'
+          processingStage: 'Extracting text...',
         });
 
-        try {
-            // Step 1: Extract text and process document
-            console.log(`📝 Step 1: Extracting text from: ${fileObj.fileName}`);
-            updateFileStatus(fileObj.id, 'processing', {
-                processingStage: 'Extracting text...'
-            });
-            
-            const result = await DocumentProcessorService.processDocument(fileObj.file!);
-            console.log(`📄 Text extraction complete. Word count: ${result.wordCount}`);
+        const result = await DocumentProcessorService.processDocument(fileObj.file!);
+        console.log(`📄 Text extraction complete. Word count: ${result.wordCount}`);
 
-            updateFileStatus(fileObj.id, 'processing', {
-                extractedText: result.extractedText,
-                wordCount: result.wordCount,
-                processingStage: 'Text extraction completed'
-            })
-            
-            // Step 2: Try FHIR conversion
-            let fhirData = null;
-            if (result.extractedText && result.extractedText.trim().length > 0) {
-                console.log(`🩺 Step 2: Attempting FHIR conversion for: ${fileObj.fileName}`);
-                updateFileStatus(fileObj.id, 'processing', {
-                    processingStage: 'Converting to FHIR...'
-                });
-                
-                try {
-                    const fhirResult = await convertToFHIR(result.extractedText);
-                    console.log('🔍 FHIR result received:', fhirResult);
-                    
-                    if (fhirResult && fhirResult.resourceType === 'Bundle') {
-                        fhirData = fhirResult;
-                        console.log(`✅ FHIR conversion successful for: ${fileObj.fileName}`);
-                    
-                        updateFileStatus(fileObj.id, 'processing',{
-                            fhirData: fhirData,
-                            processingStage: 'FHIR conversion complete',
-                            aiProcessingStatus: 'pending'
-                        })
-                    
-                    } else {
-                        console.log(`ℹ️ FHIR conversion failed for: ${fileObj.fileName}, continuing without FHIR data`);
-                    }
-                } catch (fhirError: any) {
-                    console.error(`💥 FHIR conversion error:`, fhirError);
-                    console.warn(`⚠️ FHIR conversion failed for ${fileObj.fileName}:`, fhirError.message);
-                }
+        updateFileStatus(fileObj.id, 'processing', {
+          extractedText: result.extractedText,
+          wordCount: result.wordCount,
+          processingStage: 'Text extraction completed',
+        });
+
+        // Step 2: Try FHIR conversion
+        let fhirData = null;
+        if (result.extractedText && result.extractedText.trim().length > 0) {
+          console.log(`🩺 Step 2: Attempting FHIR conversion for: ${fileObj.fileName}`);
+          updateFileStatus(fileObj.id, 'processing', {
+            processingStage: 'Converting to FHIR...',
+          });
+
+          try {
+            const fhirResult = await convertToFHIR(result.extractedText);
+            console.log('🔍 FHIR result received:', fhirResult);
+
+            if (fhirResult && fhirResult.resourceType === 'Bundle') {
+              fhirData = fhirResult;
+              console.log(`✅ FHIR conversion successful for: ${fileObj.fileName}`);
+
+              updateFileStatus(fileObj.id, 'processing', {
+                fhirData: fhirData,
+                processingStage: 'FHIR conversion complete',
+                aiProcessingStatus: 'pending',
+              });
             } else {
-                console.log(`ℹ️ No text extracted from: ${fileObj.fileName}, skipping FHIR conversion`);
+              console.log(
+                `ℹ️ FHIR conversion failed for: ${fileObj.fileName}, continuing without FHIR data`
+              );
             }
+          } catch (fhirError: any) {
+            console.error(`💥 FHIR conversion error:`, fhirError);
+            console.warn(`⚠️ FHIR conversion failed for ${fileObj.fileName}:`, fhirError.message);
+          }
+        } else {
+          console.log(`ℹ️ No text extracted from: ${fileObj.fileName}, skipping FHIR conversion`);
+        }
 
-            // Step 3: Update file with basic processing results (but don't set AI stage yet)
-            if (!fhirData){
-                updateFileStatus(fileObj.id, 'processing', {
-                processingStage: 'Completing...',
-                aiProcessingStatus: 'not_needed'
+        // Step 3: Update file with basic processing results (but don't set AI stage yet)
+        if (!fhirData) {
+          updateFileStatus(fileObj.id, 'processing', {
+            processingStage: 'Completing...',
+            aiProcessingStatus: 'not_needed',
+          });
+        }
+
+        // Step 4: AI Processing (if FHIR data exists)
+        let belroseFields = undefined;
+        if (fhirData) {
+          console.log(`🤖 Step 4: Starting AI processing for: ${fileObj.fileName}`);
+
+          // Update to AI processing stage
+          updateFileStatus(fileObj.id, 'processing', {
+            aiProcessingStatus: 'processing',
+            processingStage: 'AI analyzing content...',
+          });
+
+          try {
+            // Create updated file object with all the processed data
+            const updatedFileObj: FileObject = {
+              ...fileObj,
+              extractedText: result.extractedText,
+              wordCount: result.wordCount,
+              fhirData: fhirData,
+              status: 'processing',
+              aiProcessingStatus: 'processing',
+            };
+
+            // 🔥 Call AI processing and wait for the result
+            const aiResult = await processRecordWithAI(updatedFileObj.fhirData, {
+              fileName: updatedFileObj.fileName,
+              extractedText: updatedFileObj.extractedText || undefined,
             });
-            } 
 
-            // Step 4: AI Processing (if FHIR data exists)
-            let belroseFields = undefined;
-            if (fhirData) {
-                console.log(`🤖 Step 4: Starting AI processing for: ${fileObj.fileName}`);
-                
-                // Update to AI processing stage
-                updateFileStatus(fileObj.id, 'processing', {
-                    aiProcessingStatus: 'processing',
-                    processingStage: 'AI analyzing content...'
-                });
-                
-                try {
-                    // Create updated file object with all the processed data
-                    const updatedFileObj: FileObject = {
-                        ...fileObj,
-                        extractedText: result.extractedText,
-                        wordCount: result.wordCount,
-                        fhirData: fhirData,
-                        status: 'processing',
-                        aiProcessingStatus: 'processing'
-                    };
-                    
-                    // 🔥 Call AI processing and wait for the result
-                    const aiResult = await processRecordWithAI(updatedFileObj.fhirData, {
-                        fileName: updatedFileObj.fileName,
-                        extractedText: updatedFileObj.extractedText || undefined,
-                    });
-                    
-                    belroseFields = {
-                        visitType: aiResult.visitType,
-                        title: aiResult.title,
-                        summary: aiResult.summary,
-                        completedDate: aiResult.completedDate,
-                        provider: aiResult.provider,
-                        patient: aiResult.patient,
-                        institution: aiResult.institution,
-                        aiProcessedAt: new Date().toISOString()
-                    };
-                    
-                    console.log(`✅ AI processing completed for: ${fileObj.fileName}`, aiResult);
-                    
-                    // Show success toast
-                    toast.success(`🤖 AI analysis completed for ${fileObj.fileName}`, {
-                        description: `Classified as: ${aiResult.visitType}`,
-                        duration: 3000
-                    });
-                    
-                } catch (error: any) {
-                    console.error(`❌ AI processing failed for ${fileObj.fileName}:`, error);
-                    
-                    belroseFields = {
-                        aiFailureReason: error.message,
-                        aiProcessedAt: new Date().toISOString()
-                    };
-                    
-                    // Show error toast
-                    toast.error(`AI analysis failed for ${fileObj.fileName}`, {
-                        description: error.message,
-                        duration: 5000
-                    });
-                }
-            } else {
-                // No AI processing needed - update the processing stage to indicate completion
-                updateFileStatus(fileObj.id, 'processing', {
-                    processingStage: 'Completing...'
-                });
-            }
+            belroseFields = {
+              visitType: aiResult.visitType,
+              title: aiResult.title,
+              summary: aiResult.summary,
+              completedDate: aiResult.completedDate,
+              provider: aiResult.provider,
+              patient: aiResult.patient,
+              institution: aiResult.institution,
+              aiProcessedAt: new Date().toISOString(),
+            };
 
-        // STEP 5: Blockchain Verification
-        let blockchainVerification = undefined;
-        
+            console.log(`✅ AI processing completed for: ${fileObj.fileName}`, aiResult);
+
+            // Show success toast
+            toast.success(`🤖 AI analysis completed for ${fileObj.fileName}`, {
+              description: `Classified as: ${aiResult.visitType}`,
+              duration: 3000,
+            });
+          } catch (error: any) {
+            console.error(`❌ AI processing failed for ${fileObj.fileName}:`, error);
+
+            belroseFields = {
+              aiFailureReason: error.message,
+              aiProcessedAt: new Date().toISOString(),
+            };
+
+            // Show error toast
+            toast.error(`AI analysis failed for ${fileObj.fileName}`, {
+              description: error.message,
+              duration: 5000,
+            });
+          }
+        } else {
+          // No AI processing needed - update the processing stage to indicate completion
+          updateFileStatus(fileObj.id, 'processing', {
+            processingStage: 'Completing...',
+          });
+        }
+
+        // STEP 5: Record Hash Generation
+        let recordHash = undefined;
+
         // Create the complete record object with all processed data
         const completeRecord: FileObject = {
-            ...fileObj,
-            extractedText: result.extractedText,
-            wordCount: result.wordCount,
-            fhirData: fhirData,
-            belroseFields: belroseFields,
-            status: 'processing' // Still processing until verification is done
+          ...fileObj,
+          extractedText: result.extractedText,
+          wordCount: result.wordCount,
+          fhirData: fhirData,
+          belroseFields: belroseFields,
+          status: 'processing', // Still processing until hash is generated
         };
-        
-        // Check if blockchain verification is needed
-        if (BlockchainService.needsBlockchainVerification(completeRecord)) {
-            console.log(`🔗 Step 5: Generating blockchain verification for: ${fileObj.fileName}`);
-            
-            updateFileStatus(fileObj.id, 'processing', {
-                processingStage: 'Generating blockchain verification...'
-            });
-            
-            try {
-                blockchainVerification = await BlockchainService.createBlockchainVerification(
-                    completeRecord,
-                    { 
-                        // You might want to pass provider info here based on your app's auth
-                        signerId: 'current-provider-id', // Replace with actual provider ID
-                        network: 'ethereum-testnet',
-                        providerSignature: 'provider-signature-if-available'
-                    }
-                );
-                
-                console.log(`✅ Blockchain verification generated for: ${fileObj.fileName}`, {
-                    hash: blockchainVerification.recordHash,
-                    txId: blockchainVerification.blockchainTxId
-                });
-                
-                // Show success toast for blockchain verification
-                toast.success(`🔗 Blockchain verification completed for ${fileObj.fileName}`, {
-                    description: `Record hash: ${blockchainVerification.recordHash.substring(0, 12)}...`,
-                    duration: 3000
-                });
-                
-            } catch (error: any) {
-                console.error(`❌ Blockchain verification failed for ${fileObj.fileName}:`, error);
-                
-                // Show warning toast but don't fail the entire process
-                toast.warning(`Blockchain verification failed for ${fileObj.fileName}`, {
-                    description: 'Record will be saved without blockchain verification',
-                    duration: 4000
-                });
-                
-                // Log the error but continue processing
-                console.warn(`⚠️ Continuing without blockchain verification for ${fileObj.fileName}`);
-            }
-        } else {
-            console.log(`ℹ️ Blockchain verification not required for: ${fileObj.fileName}`);
-        }
-            
-            // 🎉 FINAL STEP: Mark as completed with ALL data including AI results
-            console.log(`🎉 Marking file as completed: ${fileObj.fileName}`);
-            updateFileStatus(fileObj.id, 'completed', {
-                processingStage: undefined,
-                processedAt: new Date().toISOString(),
-                aiProcessingStatus: fhirData ? (belroseFields?.aiFailureReason ? 'failed' : 'completed') : 'not_needed',
-                belroseFields: belroseFields,
-                blockchainVerification: blockchainVerification
-            });
-            
-            console.log(`🎉 Complete processing pipeline finished for: ${fileObj.fileName}`);
-                
+
+        console.log(`🔗 Step 5: Generating record hash for: ${fileObj.fileName}`);
+
+        updateFileStatus(fileObj.id, 'processing', {
+          processingStage: 'Generating record hash...',
+        });
+
+        try {
+          recordHash = await BlockchainService.generateRecordHash(completeRecord);
+
+          console.log(`✅ Record hash generated for: ${fileObj.fileName}`, {
+            hash: recordHash.substring(0, 12) + '...',
+          });
+
+          // Show success toast for hash generation
+          toast.success(`🔗 Record hash generated for ${fileObj.fileName}`, {
+            description: `Hash: ${recordHash.substring(0, 12)}...`,
+            duration: 3000,
+          });
         } catch (error: any) {
-            console.error(`💥 Processing failed for ${fileObj.fileName}:`, error);
-            updateFileStatus(fileObj.id, 'error', { 
-                error: error.message,
-                processingStage: undefined,
-                aiProcessingStatus: 'not_needed'
-            });
-        }
-    }, [updateFileStatus]);
+          console.error(`❌ Record hash generation failed for ${fileObj.fileName}:`, error);
 
-    // Also add this helper function to prevent auto-upload during processing
-    const shouldAutoUpload = useCallback((file: FileObject): boolean => {
-        const fileCompleted = file.status === 'completed';
-        const aiStatus = file.aiProcessingStatus || 'not_needed';
-        const needsAI = !!file.fhirData;
-        
-        if (!needsAI) {
-            return fileCompleted && aiStatus === 'not_needed';
-        }
-        
-        // 🔥 KEY: If FHIR data exists, require belroseFields
-        const hasBelroseFields = !!file.belroseFields && Object.keys(file.belroseFields).length > 0;
-        const aiCompleted = aiStatus === 'completed';
-        
-        return fileCompleted && aiCompleted && hasBelroseFields;
-    }, []);
+          // Show warning toast but don't fail the entire process
+          toast.warning(`Record hash generation failed for ${fileObj.fileName}`, {
+            description: 'Record will be saved without hash verification',
+            duration: 4000,
+          });
 
-    // ==================== ADD FILES ====================
+          // Log the error but continue processing
+          console.warn(`⚠️ Continuing without record hash for ${fileObj.fileName}`);
+        }
 
-    const addFiles = useCallback(async (fileList: FileList, options: AddFilesOptions = {}) => {
-        const { maxFiles = 10, maxSizeBytes = 50 * 1024 * 1024, autoProcess = true } = options;
-        
-        if (typeof window !== 'undefined' && window.sessionStorage) {
-            sessionStorage.removeItem('fileUpload_files');
-        }
-    
-        console.log(`📂 Adding ${fileList.length} files...`);
-        
-        const newFiles: FileObject[] = [];
-        const errors: string[] = [];
-        
-        // Convert FileList to array and validate
-        for (const file of Array.from(fileList)) {
-            // Check file count limit
-            if (newFiles.length >= maxFiles) {
-                errors.push(`Maximum ${maxFiles} files allowed`);
-                continue;
-            }
-            
-            // Check file size
-            if (file.size > maxSizeBytes) {
-                errors.push(`${file.name} is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB)`);
-                continue;
-            }
-            
-            try {
-                const fileObj = await createFileObject(file);
-                newFiles.push(fileObj);
-
-                console.log(`✅ File processed: ${file.name}`, {
-                    id: fileObj.id,
-                    hasHash: !!fileObj.originalFileHash,
-                    hashPreview: fileObj.originalFileHash?.substring(0, 12) + '...' 
-                });
-            } catch (error) {
-                console.error(`❌ Failed to process file ${file.name}:`, error);
-                errors.push(`Failed to process ${file.name}`);
-            }
-        }
-        
-        // Show errors if any
-        if (errors.length > 0) {
-            toast.error(errors.join(', '));
-        }
-        
-        if (newFiles.length === 0) {
-            console.log('❌ No valid files to add');
-            return;
-        }
-        
-        setFiles(prev => {
-            const combined = [...prev, ...newFiles];
-            console.log(`✅ Added ${newFiles.length} files. Total: ${combined.length}`);
-            return combined;
+        // 🎉 FINAL STEP: Mark as completed with ALL data including record hash
+        console.log(`🎉 Marking file as completed: ${fileObj.fileName}`);
+        updateFileStatus(fileObj.id, 'completed', {
+          processingStage: undefined,
+          processedAt: new Date().toISOString(),
+          aiProcessingStatus: fhirData
+            ? belroseFields?.aiFailureReason
+              ? 'failed'
+              : 'completed'
+            : 'not_needed',
+          belroseFields: belroseFields,
+          recordHash: recordHash,
         });
-        
-        // Auto-process if enabled
-        if (autoProcess) {
-            console.log('🔄 Auto-processing enabled, starting file processing...');
-            for (const fileObj of newFiles) {
-                try {
-                    await processFile(fileObj);
-                } catch (error) {
-                    console.error(`❌ Auto-processing failed for ${fileObj.fileName}:`, error);
-                }
-            }
+
+        console.log(`🎉 Complete processing pipeline finished for: ${fileObj.fileName}`);
+      } catch (error: any) {
+        console.error(`💥 Processing failed for ${fileObj.fileName}:`, error);
+        updateFileStatus(fileObj.id, 'error', {
+          error: error.message,
+          processingStage: undefined,
+          aiProcessingStatus: 'not_needed',
+        });
+      }
+    },
+    [updateFileStatus]
+  );
+
+  // Also add this helper function to prevent auto-upload during processing
+  const shouldAutoUpload = useCallback((file: FileObject): boolean => {
+    const fileCompleted = file.status === 'completed';
+    const aiStatus = file.aiProcessingStatus || 'not_needed';
+    const needsAI = !!file.fhirData;
+
+    if (!needsAI) {
+      return fileCompleted && aiStatus === 'not_needed';
+    }
+
+    // 🔥 KEY: If FHIR data exists, require belroseFields
+    const hasBelroseFields = !!file.belroseFields && Object.keys(file.belroseFields).length > 0;
+    const aiCompleted = aiStatus === 'completed';
+
+    return fileCompleted && aiCompleted && hasBelroseFields;
+  }, []);
+
+  // ==================== ADD FILES ====================
+
+  const addFiles = useCallback(
+    async (fileList: FileList, options: AddFilesOptions = {}) => {
+      const { maxFiles = 10, maxSizeBytes = 50 * 1024 * 1024, autoProcess = true } = options;
+
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        sessionStorage.removeItem('fileUpload_files');
+      }
+
+      console.log(`📂 Adding ${fileList.length} files...`);
+
+      const newFiles: FileObject[] = [];
+      const errors: string[] = [];
+
+      // Convert FileList to array and validate
+      for (const file of Array.from(fileList)) {
+        // Check file count limit
+        if (newFiles.length >= maxFiles) {
+          errors.push(`Maximum ${maxFiles} files allowed`);
+          continue;
         }
-    }, [setFiles, processFile]);
 
-    // ================ FILE DELETION =========================
+        // Check file size
+        if (file.size > maxSizeBytes) {
+          errors.push(`${file.name} is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB)`);
+          continue;
+        }
 
-      /**
-     * Remove file from local state only
-     * Pure local state cleanup - no Firebase operations
-     */
-    const removeFileFromLocal = useCallback((fileId: string) => {
-        console.log(`🧹 Removing file from local state: ${fileId}`);
-        
-        setFiles(prev => {
-            const filtered = prev.filter(f => f.id !== fileId);
-            console.log(`📊 Files before removal: ${prev.length}, after: ${filtered.length}`);
-            return filtered;
+        try {
+          const fileObj = await createFileObject(file);
+          newFiles.push(fileObj);
+
+          console.log(`✅ File processed: ${file.name}`, {
+            id: fileObj.id,
+            hasHash: !!fileObj.originalFileHash,
+            hashPreview: fileObj.originalFileHash?.substring(0, 12) + '...',
+          });
+        } catch (error) {
+          console.error(`❌ Failed to process file ${file.name}:`, error);
+          errors.push(`Failed to process ${file.name}`);
+        }
+      }
+
+      // Show errors if any
+      if (errors.length > 0) {
+        toast.error(errors.join(', '));
+      }
+
+      if (newFiles.length === 0) {
+        console.log('❌ No valid files to add');
+        return;
+      }
+
+      setFiles(prev => {
+        const combined = [...prev, ...newFiles];
+        console.log(`✅ Added ${newFiles.length} files. Total: ${combined.length}`);
+        return combined;
+      });
+
+      // Auto-process if enabled
+      if (autoProcess) {
+        console.log('🔄 Auto-processing enabled, starting file processing...');
+        for (const fileObj of newFiles) {
+          try {
+            await processFile(fileObj);
+          } catch (error) {
+            console.error(`❌ Auto-processing failed for ${fileObj.fileName}:`, error);
+          }
+        }
+      }
+    },
+    [setFiles, processFile]
+  );
+
+  // ================ FILE DELETION =========================
+
+  /**
+   * Remove file from local state only
+   * Pure local state cleanup - no Firebase operations
+   */
+  const removeFileFromLocal = useCallback((fileId: string) => {
+    console.log(`🧹 Removing file from local state: ${fileId}`);
+
+    setFiles(prev => {
+      const filtered = prev.filter(f => f.id !== fileId);
+      console.log(`📊 Files before removal: ${prev.length}, after: ${filtered.length}`);
+      return filtered;
+    });
+
+    setFirestoreData(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(fileId);
+      return newMap;
+    });
+
+    setSavingToFirestore(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(fileId);
+      return newSet;
+    });
+
+    console.log('✅ File removed from local state:', fileId);
+  }, []);
+
+  /**
+   * Delete file from Firebase
+   * Pure Firebase operation wrapper - delegates to service
+   */
+  const deleteFileFromFirebase = useCallback(async (documentId: string): Promise<void> => {
+    console.log(`🔥 Deleting file from Firebase: ${documentId}`);
+
+    try {
+      await fileUploadService.current.deleteFile(documentId);
+      console.log('✅ File deleted from Firebase:', documentId);
+    } catch (error: any) {
+      console.error('❌ Firebase deletion failed:', error);
+      throw error; // Let caller handle the error
+    }
+  }, []);
+
+  /**
+   * Cancel upload operations for a file
+   * Service operation wrapper
+   */
+  const cancelFileUpload = useCallback((fileId: string) => {
+    console.log(`🛑 Cancelling upload operations for: ${fileId}`);
+
+    try {
+      fileUploadService.current.cancelUpload(fileId);
+      console.log('✅ Upload operations cancelled for:', fileId);
+    } catch (error: any) {
+      console.warn('⚠️ Error cancelling upload:', error);
+      // Non-fatal - don't throw
+    }
+  }, []);
+
+  /**
+   * WRAPPER: Complete file removal for FileListItem
+   * Combines local cleanup + Firebase deletion + upload cancellation
+   */
+  const removeFileComplete = useCallback(
+    async (fileId: string): Promise<void> => {
+      console.log(`🗑️ Starting complete file removal: ${fileId}`);
+
+      const fileToRemove = files.find(f => f.id === fileId);
+
+      if (!fileToRemove) {
+        console.warn(`⚠️ File not found in local state: ${fileId}`);
+        return;
+      }
+
+      console.log(`📁 File info:`, {
+        name: fileToRemove.fileName,
+        status: fileToRemove.status,
+        hasDocumentId: !!fileToRemove.documentId,
+        documentId: fileToRemove.documentId,
+        isVirtual: fileToRemove.isVirtual,
+      });
+
+      // Step 1: Cancel any active uploads first
+      cancelFileUpload(fileId);
+
+      // Step 2: Delete from Firebase if it was uploaded
+      if (fileToRemove.documentId) {
+        try {
+          await deleteFileFromFirebase(fileToRemove.documentId);
+          toast.success(`Deleted "${fileToRemove.fileName}" from cloud storage`);
+        } catch (error: any) {
+          console.error('❌ Firebase deletion failed, but continuing with local cleanup:', error);
+          toast.error(
+            `Could not delete "${fileToRemove.fileName}" from cloud storage: ${error.message}`
+          );
+          // Continue with local cleanup even if Firebase deletion fails
+        }
+      }
+
+      // Step 3: Always clean up local state
+      removeFileFromLocal(fileId);
+
+      console.log('✅ Complete file removal finished:', fileId);
+    },
+    [files, removeFileFromLocal, deleteFileFromFirebase, cancelFileUpload]
+  );
+
+  // Also enhance your existing clearAll function
+  const enhancedClearAll = useCallback(async () => {
+    console.log('🧹 Starting enhanced clearAll - will clean up Firebase files too');
+
+    // Get all uploaded files that need Firebase cleanup
+    const uploadedFiles = files
+      .filter(f => f.documentId)
+      .map(f => ({ id: f.documentId!, fileName: f.fileName }));
+
+    if (uploadedFiles.length > 0) {
+      console.log(`🔥 Found ${uploadedFiles.length} uploaded files to delete from Firebase`);
+
+      try {
+        // Delete files one by one with error handling
+        const deletePromises = uploadedFiles.map(async file => {
+          try {
+            await deleteFileFromFirebase(file.id);
+            return { success: true, fileId: file.id, name: file.fileName };
+          } catch (error: any) {
+            console.error(`❌ Failed to delete ${file.fileName}:`, error);
+            return { success: false, fileId: file.id, name: file.fileName, error: error.message };
+          }
         });
-        
-        setFirestoreData(prev => {
-            const newMap = new Map(prev);
-            newMap.delete(fileId);
-            return newMap;
-        });
-        
-        setSavingToFirestore(prev => {
+
+        const results = await Promise.all(deletePromises);
+        const successful = results.filter(r => r.success);
+        const failed = results.filter(r => !r.success);
+
+        if (successful.length > 0) {
+          console.log(`✅ Successfully deleted ${successful.length} files from Firebase`);
+        }
+
+        if (failed.length > 0) {
+          console.warn(`❌ Failed to delete ${failed.length} files from Firebase:`, failed);
+          toast.warning(`Warning: Could not delete ${failed.length} files from cloud storage`);
+        } else {
+          toast.success(`Cleared all files including ${successful.length} from cloud storage`);
+        }
+      } catch (error: any) {
+        console.error('❌ Bulk deletion error:', error);
+        toast.error('Failed to clear some files from cloud storage');
+      }
+    } else {
+      console.log('📱 No uploaded files found - just clearing local state');
+    }
+
+    // Clear local state (same as original clearAll)
+    console.log('🧹 Clearing local state');
+    setFiles([]);
+    setFirestoreData(new Map());
+    setSavingToFirestore(new Set());
+
+    // Call reset callback if provided
+    if (resetProcessCallback.current) {
+      resetProcessCallback.current();
+    }
+
+    console.log('✅ Enhanced clearAll completed');
+  }, [files, deleteFileFromFirebase]);
+
+  // ==================== FIRESTORE OPERATIONS ====================
+
+  const uploadFiles = useCallback(
+    async (fileIds?: string[]): Promise<UploadResult[]> => {
+      const filesToUpload = fileIds
+        ? files.filter(f => fileIds.includes(f.id))
+        : files.filter(f => f.status === 'completed');
+
+      if (filesToUpload.length === 0) {
+        console.log('📤 No files ready for upload');
+        return [];
+      }
+
+      console.log(`📤 Uploading ${filesToUpload.length} files to Firestore...`);
+
+      const uploadPromises = filesToUpload.map(async (fileObj): Promise<UploadResult> => {
+        if (savingToFirestore.has(fileObj.id)) {
+          console.log(`⏳ File ${fileObj.id} already uploading, skipping...`);
+          return {
+            success: false,
+            fileId: fileObj.id,
+            error: 'File already uploading',
+          };
+        }
+
+        setSavingToFirestore(prev => new Set([...prev, fileObj.id]));
+
+        try {
+          const result = await fileUploadService.current.uploadFile(fileObj);
+          console.log(`✅ Upload successful for ${fileObj.fileName}:`, result);
+
+          setFirestoreData(prev => new Map([...prev, [fileObj.id, result]]));
+          updateFileStatus(fileObj.id, 'completed', { uploadResult: result });
+
+          // 🎉 SUCCESS TOAST HERE
+          toast.success(`📁 ${fileObj.fileName} uploaded successfully!`, {
+            description: 'Your file has been saved to cloud storage',
+            duration: 4000,
+          });
+
+          return {
+            success: true,
+            documentId: result.documentId,
+            downloadURL: result.downloadURL,
+            fileId: fileObj.id,
+          };
+        } catch (error: any) {
+          console.error(`💥 Upload failed for ${fileObj.fileName}:`, error);
+          updateFileStatus(fileObj.id, 'error', { error: error.message });
+
+          return {
+            success: false,
+            fileId: fileObj.id,
+            error: error.message,
+          };
+        } finally {
+          setSavingToFirestore(prev => {
             const newSet = new Set(prev);
-            newSet.delete(fileId);
+            newSet.delete(fileObj.id);
             return newSet;
-        });
-        
-        console.log('✅ File removed from local state:', fileId);
-    }, []);
-
-    /**
-     * Delete file from Firebase
-     * Pure Firebase operation wrapper - delegates to service
-     */
-    const deleteFileFromFirebase = useCallback(async (documentId: string): Promise<void> => {
-        console.log(`🔥 Deleting file from Firebase: ${documentId}`);
-        
-        try {
-            await fileUploadService.current.deleteFile(documentId);
-            console.log('✅ File deleted from Firebase:', documentId);
-        } catch (error: any) {
-            console.error('❌ Firebase deletion failed:', error);
-            throw error; // Let caller handle the error
+          });
         }
-    }, []);
+      });
 
-    /**
-     * Cancel upload operations for a file
-     * Service operation wrapper
-     */
-    const cancelFileUpload = useCallback((fileId: string) => {
-        console.log(`🛑 Cancelling upload operations for: ${fileId}`);
-        
-        try {
-            fileUploadService.current.cancelUpload(fileId);
-            console.log('✅ Upload operations cancelled for:', fileId);
-        } catch (error: any) {
-            console.warn('⚠️ Error cancelling upload:', error);
-            // Non-fatal - don't throw
-        }
-    }, []);
+      const results = await Promise.all(uploadPromises);
+      return results;
+    },
+    [files, savingToFirestore, updateFileStatus]
+  );
 
-    /**
-     * WRAPPER: Complete file removal for FileListItem
-     * Combines local cleanup + Firebase deletion + upload cancellation
-     */
-    const removeFileComplete = useCallback(async (fileId: string): Promise<void> => {
-        console.log(`🗑️ Starting complete file removal: ${fileId}`);
-        
-        const fileToRemove = files.find(f => f.id === fileId);
-        
-        if (!fileToRemove) {
-            console.warn(`⚠️ File not found in local state: ${fileId}`);
-            return;
-        }
-        
-        console.log(`📁 File info:`, {
-            name: fileToRemove.fileName,
-            status: fileToRemove.status,
-            hasDocumentId: !!fileToRemove.documentId,
-            documentId: fileToRemove.documentId,
-            isVirtual: fileToRemove.isVirtual
-        });
-        
-        // Step 1: Cancel any active uploads first
-        cancelFileUpload(fileId);
-        
-        // Step 2: Delete from Firebase if it was uploaded
-        if (fileToRemove.documentId) {
-            try {
-                await deleteFileFromFirebase(fileToRemove.documentId);
-                toast.success(`Deleted "${fileToRemove.fileName}" from cloud storage`);
-            } catch (error: any) {
-                console.error('❌ Firebase deletion failed, but continuing with local cleanup:', error);
-                toast.error(`Could not delete "${fileToRemove.fileName}" from cloud storage: ${error.message}`);
-                // Continue with local cleanup even if Firebase deletion fails
-            }
-        }
-        
-        // Step 3: Always clean up local state
-        removeFileFromLocal(fileId);
-        
-        console.log('✅ Complete file removal finished:', fileId);
-    }, [files, removeFileFromLocal, deleteFileFromFirebase, cancelFileUpload]);
+  // ==================== VIRTUAL FILE SUPPORT ====================
 
-    // Also enhance your existing clearAll function
-    const enhancedClearAll = useCallback(async () => {
-        console.log('🧹 Starting enhanced clearAll - will clean up Firebase files too');
-        
-        // Get all uploaded files that need Firebase cleanup
-        const uploadedFiles = files
-            .filter(f => f.documentId)
-            .map(f => ({ id: f.documentId!, fileName: f.fileName }));
-        
-        if (uploadedFiles.length > 0) {
-            console.log(`🔥 Found ${uploadedFiles.length} uploaded files to delete from Firebase`);
-            
-            try {
-                // Delete files one by one with error handling
-                const deletePromises = uploadedFiles.map(async (file) => {
-                    try {
-                        await deleteFileFromFirebase(file.id);
-                        return { success: true, fileId: file.id, name: file.fileName };
-                    } catch (error: any) {
-                        console.error(`❌ Failed to delete ${file.fileName}:`, error);
-                        return { success: false, fileId: file.id, name: file.fileName, error: error.message };
-                    }
-                });
-                
-                const results = await Promise.all(deletePromises);
-                const successful = results.filter(r => r.success);
-                const failed = results.filter(r => !r.success);
-                
-                if (successful.length > 0) {
-                    console.log(`✅ Successfully deleted ${successful.length} files from Firebase`);
-                }
-                
-                if (failed.length > 0) {
-                    console.warn(`❌ Failed to delete ${failed.length} files from Firebase:`, failed);
-                    toast.warning(`Warning: Could not delete ${failed.length} files from cloud storage`);
-                } else {
-                    toast.success(`Cleared all files including ${successful.length} from cloud storage`);
-                }
-                
-            } catch (error: any) {
-                console.error('❌ Bulk deletion error:', error);
-                toast.error('Failed to clear some files from cloud storage');
-            }
-        } else {
-            console.log('📱 No uploaded files found - just clearing local state');
-        }
-        
-        // Clear local state (same as original clearAll)
-        console.log('🧹 Clearing local state');
-        setFiles([]);
-        setFirestoreData(new Map());
-        setSavingToFirestore(new Set());
-        
-        // Call reset callback if provided
-        if (resetProcessCallback.current) {
-            resetProcessCallback.current();
-        }
-        
-        console.log('✅ Enhanced clearAll completed');
-    }, [files, deleteFileFromFirebase]);
+  const addVirtualFile = useCallback(
+    async (virtualData: VirtualFileInput): Promise<{ fileId: string; recordHash?: string }> => {
+      const fileId = virtualData.id || generateId();
 
-    // ==================== FIRESTORE OPERATIONS ====================
-    
-    const uploadFiles = useCallback(async (fileIds?: string[]): Promise<UploadResult[]> => {
-        const filesToUpload = fileIds 
-            ? files.filter(f => fileIds.includes(f.id))
-            : files.filter(f => f.status === 'completed');
-        
-        if (filesToUpload.length === 0) {
-            console.log('📤 No files ready for upload');
-            return [];
-        }
-        
-        console.log(`📤 Uploading ${filesToUpload.length} files to Firestore...`);
-        
-        const uploadPromises = filesToUpload.map(async (fileObj): Promise<UploadResult> => {
-            if (savingToFirestore.has(fileObj.id)) {
-                console.log(`⏳ File ${fileObj.id} already uploading, skipping...`);
-                return {
-                    success: false,
-                    fileId: fileObj.id,
-                    error: 'File already uploading'
-                };
-            }
-            
-            setSavingToFirestore(prev => new Set([...prev, fileObj.id]));
-            
-            try {
-                const result = await fileUploadService.current.uploadFile(fileObj);
-                console.log(`✅ Upload successful for ${fileObj.fileName}:`, result);
-                
-                setFirestoreData(prev => new Map([...prev, [fileObj.id, result]]));
-                updateFileStatus(fileObj.id, 'completed', { uploadResult: result });
-
-                // 🎉 SUCCESS TOAST HERE
-                toast.success(`📁 ${fileObj.fileName} uploaded successfully!`, {
-                    description: 'Your file has been saved to cloud storage',
-                    duration: 4000,
-                });
-                
-                return {
-                    success: true,
-                    documentId: result.documentId,
-                    downloadURL: result.downloadURL,
-                    fileId: fileObj.id
-                };
-                
-            } catch (error: any) {
-                console.error(`💥 Upload failed for ${fileObj.fileName}:`, error);
-                updateFileStatus(fileObj.id, 'error', { error: error.message });
-               
-                return {
-                    success: false,
-                    fileId: fileObj.id,
-                    error: error.message
-                };
-            } finally {
-                setSavingToFirestore(prev => {
-                    const newSet = new Set(prev);
-                    newSet.delete(fileObj.id);
-                    return newSet;
-                });
-            }
-        });
-        
-        const results = await Promise.all(uploadPromises);
-        return results;
-    }, [files, savingToFirestore, updateFileStatus]);
-
-    // ==================== VIRTUAL FILE SUPPORT ====================
-    
-const addVirtualFile = useCallback(async (virtualData: VirtualFileInput): Promise<{ fileId: string; blockchainVerification?: BlockchainVerification }> => {
-    const fileId = virtualData.id || generateId();
-    
-    const virtualFile: FileObject = {
+      const virtualFile: FileObject = {
         id: fileId,
         fileName: virtualData.fileName || `Virtual File ${fileId}`,
         fileSize: virtualData.fileSize || 0,
         fileType: virtualData.fileType || 'application/json',
         status: 'completed',
         uploadedAt: new Date().toISOString(),
-
         originalText: virtualData.originalText,
         wordCount: virtualData.wordCount || 0,
         isVirtual: true,
         fhirData: virtualData.fhirData,
         file: undefined,
         belroseFields: virtualData.belroseFields,
-        aiProcessingStatus: virtualData.aiProcessingStatus
-    };
+        aiProcessingStatus: virtualData.aiProcessingStatus,
+      };
 
-    // 🔗 ADD BLOCKCHAIN VERIFICATION for virtual files
-    let blockchainVerification = undefined;
-    
-    if (BlockchainService.needsBlockchainVerification(virtualFile)) {
+      // Always generate record hash for virtual files
+      let recordHash = undefined;
+
+      console.log('🔗 Generating record hash for virtual file:', virtualFile.fileName);
+
+      try {
+        recordHash = await BlockchainService.generateRecordHash(virtualFile);
+
+        // Add hash to the virtual file
+        virtualFile.recordHash = recordHash;
+
+        console.log(`✅ Record hash generated for virtual file: ${virtualFile.fileName}`, {
+          hash: recordHash.substring(0, 12) + '...',
+        });
+
+        toast.success(`🔗 Virtual file hash generated: ${virtualFile.fileName}`, {
+          description: `Hash: ${recordHash.substring(0, 12)}...`,
+          duration: 3000,
+        });
+      } catch (error: any) {
+        console.error(`❌ Hash generation failed for virtual file ${virtualFile.fileName}:`, error);
+
+        toast.warning(`Hash generation failed for ${virtualFile.fileName}`, {
+          description: 'File will be saved without hash verification',
+          duration: 3000,
+        });
+      }
+
+      // Add to state
+      setFiles(prev => [...prev, virtualFile]);
+      console.log(`✅ Added virtual file: ${virtualFile.fileName}`);
+
+      return { fileId, recordHash };
+    },
+    [setFiles]
+  );
+
+  const addFhirAsVirtualFile = useCallback(
+    async (
+      fhirData: any | undefined,
+      options: VirtualFileInput & { autoUpload?: boolean } = {}
+    ): Promise<VirtualFileResult> => {
+      const fileId = options.id || generateId();
+      const fileName = options.fileName || `FHIR Document ${fileId}`;
+
+      const virtualFileInput: VirtualFileInput = {
+        id: fileId,
+        fileName: fileName,
+        fileSize: JSON.stringify(fhirData).length,
+        fileType: 'application/fhir+json',
+        originalText: options.originalText,
+        wordCount: JSON.stringify(fhirData).split(/\s+/).length,
+        sourceType: options.sourceType,
+        fhirData,
+        ...options,
+      };
+
+      const { fileId: generatedFileId, recordHash } = await addVirtualFile(virtualFileInput);
+
+      // Instead of trying to find it in the files array (which might not be updated yet),
+      // construct the FileObject directly from the data we have
+      const virtualFile: FileObject = {
+        id: generatedFileId,
+        fileName: fileName,
+        fileSize: JSON.stringify(fhirData).length,
+        fileType: 'application/fhir+json',
+        status: 'completed',
+        uploadedAt: new Date().toISOString(),
+        originalText: virtualFileInput.originalText,
+        wordCount: JSON.stringify(fhirData).split(/\s+/).length,
+        sourceType: virtualFileInput.sourceType,
+        isVirtual: true,
+        fhirData,
+        file: undefined,
+        belroseFields: options.belroseFields,
+        aiProcessingStatus: options.aiProcessingStatus || 'not_needed',
+        recordHash: recordHash,
+      };
+
+      // 🔥 AUTO-UPLOAD if requested
+      if (options.autoUpload) {
+        console.log('🚀 Auto-uploading virtual file:', virtualFile.fileName);
+
         try {
-            console.log('🔗 Generating blockchain verification for virtual file:', virtualFile.fileName);
-            
-            // Simple approach with defaults
-            const blockchainOptions = removeUndefinedValues({
-                signerId: virtualData.signerId || 'virtual-file-creator',
-                network: virtualData.blockchainNetwork || 'ethereum-testnet',
-                providerSignature: virtualData.providerSignature // Default to null instead of undefined
-            });
-            
-            console.log('🔍 Blockchain options:', blockchainOptions);
-            
-            blockchainVerification = await BlockchainService.createBlockchainVerification(
-                virtualFile,
-                blockchainOptions
-            );
-            
-            // Add verification to the virtual file
-            virtualFile.blockchainVerification = blockchainVerification;
-            
-            console.log(`✅ Blockchain verification generated for virtual file: ${virtualFile.fileName}`, {
-                hash: blockchainVerification.recordHash.substring(0, 12) + '...'
-            });
-            
-            toast.success(`🔗 Virtual file verified: ${virtualFile.fileName}`, {
-                description: `Hash: ${blockchainVerification.recordHash.substring(0, 12)}...`,
-                duration: 3000
-            });
-            
-        } catch (error: any) {
-            console.error(`❌ Blockchain verification failed for virtual file ${virtualFile.fileName}:`, error);
-            
-            toast.warning(`Blockchain verification failed for ${virtualFile.fileName}`, {
-                description: 'File will be saved without verification',
-                duration: 3000
-            });
+          // Prevent duplicate uploads
+          if (savingToFirestore.has(fileId)) {
+            throw new Error('File already uploading');
+          }
+
+          setSavingToFirestore(prev => new Set([...prev, fileId]));
+
+          const uploadResult = await fileUploadService.current.uploadFile(virtualFile);
+          console.log(`✅ Auto-upload successful for ${virtualFile.fileName}:`, uploadResult);
+
+          // Update state with upload result
+          setFirestoreData(prev => new Map([...prev, [fileId, uploadResult]]));
+          updateFileStatus(fileId, 'completed', {
+            uploadResult,
+            documentId: uploadResult.documentId,
+            uploadedAt: uploadResult.uploadedAt?.toISOString() || new Date().toISOString(),
+          });
+
+          // Show success toast
+          toast.success(`📁 ${virtualFile.fileName} uploaded successfully!`, {
+            description: 'Your file has been saved to cloud storage',
+            duration: 4000,
+          });
+
+          return {
+            fileId: generatedFileId,
+            virtualFile,
+            uploadResult: {
+              success: true,
+              documentId: uploadResult.documentId,
+              fileId: fileId,
+              uploadedAt: uploadResult.uploadedAt,
+              filePath: uploadResult.filePath,
+              downloadURL: uploadResult.downloadURL,
+            },
+          };
+        } catch (error) {
+          console.error(`❌ Auto-upload failed for ${virtualFile.fileName}:`, error);
+          updateFileStatus(fileId, 'error', {
+            uploadError: error instanceof Error ? error.message : 'Upload failed',
+          });
+          throw error; // Re-throw so caller can handle it
+        } finally {
+          setSavingToFirestore(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(fileId);
+            return newSet;
+          });
         }
-    } else {
-        console.log(`ℹ️ Blockchain verification not required for virtual file: ${virtualFile.fileName}`);
-    }
+      }
 
-    // Add to state
-    setFiles(prev => [...prev, virtualFile]);
-    console.log(`✅ Added virtual file: ${virtualFile.fileName}`);
+      // Return without upload result if not auto-uploading
+      return { fileId: generatedFileId, virtualFile };
+    },
+    [addVirtualFile, fileUploadService, savingToFirestore, setFirestoreData, updateFileStatus]
+  );
 
-    return { fileId, blockchainVerification };
-}, [setFiles]);
+  // ==================== FHIR INTEGRATION ====================
 
+  const setFHIRConversionCallback = useCallback((callback: FHIRConversionCallback) => {
+    fhirConversionCallback.current = callback;
+  }, []);
 
-    const addFhirAsVirtualFile = useCallback(async (fhirData: any | undefined, options: VirtualFileInput & {autoUpload?: boolean } = {}): Promise<VirtualFileResult> => {
-        const fileId = options.id || generateId();
-        const fileName = options.fileName || `FHIR Document ${fileId}`;
-        
-        const virtualFileInput: VirtualFileInput = {
-            id: fileId,
-            fileName: fileName,
-            fileSize: JSON.stringify(fhirData).length,
-            fileType: 'application/fhir+json',
-            originalText: options.originalText,
-            wordCount: JSON.stringify(fhirData).split(/\s+/).length,
-            sourceType: options.sourceType,
-            fhirData,
-            signerId: options.signerId,
-            providerSignature: options.providerSignature,
-            blockchainNetwork: options.blockchainNetwork,
-            ...options
-        };
+  const setResetProcessCallback = useCallback((callback: ResetProcessCallback) => {
+    resetProcessCallback.current = callback;
+  }, []);
 
-        const { fileId: generatedFileId, blockchainVerification} = await addVirtualFile(virtualFileInput);
-        
-        // Instead of trying to find it in the files array (which might not be updated yet),
-        // construct the FileObject directly from the data we have
-        const virtualFile: FileObject = {
-            id: generatedFileId,
-            fileName: fileName,
-            fileSize: JSON.stringify(fhirData).length,
-            fileType: 'application/fhir+json',
-            status: 'completed',
-            uploadedAt: new Date().toISOString(),
-            originalText: virtualFileInput.originalText,
-            wordCount: JSON.stringify(fhirData).split(/\s+/).length,
-            sourceType: virtualFileInput.sourceType,
-            isVirtual: true,
-            fhirData,
-            file: undefined,
-            belroseFields: options.belroseFields,
-            aiProcessingStatus: options.aiProcessingStatus || 'not_needed',
-            blockchainVerification: blockchainVerification
-        };
-        
-        // 🔥 AUTO-UPLOAD if requested
-        if (options.autoUpload) {
-            console.log('🚀 Auto-uploading virtual file:', virtualFile.fileName);
-            
-            try {
-                // Prevent duplicate uploads
-                if (savingToFirestore.has(fileId)) {
-                    throw new Error('File already uploading');
-                }
-                
-                setSavingToFirestore(prev => new Set([...prev, fileId]));
-                
-                const uploadResult = await fileUploadService.current.uploadFile(virtualFile);
-                console.log(`✅ Auto-upload successful for ${virtualFile.fileName}:`, uploadResult);
-                
-                // Update state with upload result
-                setFirestoreData(prev => new Map([...prev, [fileId, uploadResult]]));
-                updateFileStatus(fileId, 'completed', { 
-                    uploadResult,
-                    documentId: uploadResult.documentId,
-                    uploadedAt: uploadResult.uploadedAt?.toISOString() || new Date().toISOString()
-                });
+  // ==================== COMPUTED VALUES ====================
 
-                // Show success toast
-                toast.success(`📁 ${virtualFile.fileName} uploaded successfully!`, {
-                    description: 'Your file has been saved to cloud storage',
-                    duration: 4000,
-                });
-                
-                return { 
-                    fileId: generatedFileId, 
-                    virtualFile, 
-                    uploadResult: {
-                        success: true,
-                        documentId: uploadResult.documentId,
-                        fileId: fileId,
-                        uploadedAt: uploadResult.uploadedAt,
-                        filePath: uploadResult.filePath,
-                        downloadURL: uploadResult.downloadURL
-                    }
-                };
-                
-            } catch (error) {
-                console.error(`❌ Auto-upload failed for ${virtualFile.fileName}:`, error);
-                updateFileStatus(fileId, 'error', { 
-                    uploadError: error instanceof Error ? error.message : 'Upload failed' 
-                });
-                throw error; // Re-throw so caller can handle it
-                
-            } finally {
-                setSavingToFirestore(prev => {
-                    const newSet = new Set(prev);
-                    newSet.delete(fileId);
-                    return newSet;
-                });
-            }
-        }
-        
-        // Return without upload result if not auto-uploading
-        return { fileId: generatedFileId, virtualFile };
-    }, [addVirtualFile, fileUploadService, savingToFirestore, setFirestoreData, updateFileStatus]);
-
-    // ==================== FHIR INTEGRATION ====================
-    
-    const setFHIRConversionCallback = useCallback((callback: FHIRConversionCallback) => {
-        fhirConversionCallback.current = callback;
-    }, []);
-
-    const setResetProcessCallback = useCallback((callback: ResetProcessCallback) => {
-        resetProcessCallback.current = callback;
-    }, []);
-
-    // ==================== COMPUTED VALUES ====================
-    
-    const getStats = useCallback((): FileStats => {
-        const total = files.length;
-        const processing = files.filter(f => f.status === 'processing').length;
-        const completed = files.filter(f => f.status === 'completed').length;
-        const errors = files.filter(f => f.status === 'error').length;
-        const percentComplete = total > 0 ? Math.round((completed / total) * 100) : 0;
-        
-        return {
-            total,
-            processing,
-            completed,
-            errors,
-            percentComplete
-        };
-    }, [files]);
-
-    /**
-     * Get files in the format expected by other parts of the app
-     */
-    const processedFiles = files.filter(f => 
-        f.status === 'completed'
-    );
-
-    // ==================== RETURN INTERFACE ====================
+  const getStats = useCallback((): FileStats => {
+    const total = files.length;
+    const processing = files.filter(f => f.status === 'processing').length;
+    const completed = files.filter(f => f.status === 'completed').length;
+    const errors = files.filter(f => f.status === 'error').length;
+    const percentComplete = total > 0 ? Math.round((completed / total) * 100) : 0;
 
     return {
-        // Core state (for compatibility)
-        files,
-        processedFiles,
-        firestoreData,
-        savingToFirestore,
-        
-        // File management actions
-        addFiles,
-        removeFileFromLocal,
-        deleteFileFromFirebase,
-        cancelFileUpload,
-        removeFileComplete,
-        retryFile,
-        clearAll,
-        enhancedClearAll,
-        processFile,
-        
-        // FHIR integration
-        setFHIRConversionCallback,
-        setResetProcessCallback,
-        
-        // Status updates
-        updateFileStatus,
-        
-        // Firestore operations
-        uploadFiles,
-        updateFirestoreRecord,
-
-        //Helper function
-        shouldAutoUpload,
-
-        // Computed values
-        getStats,
-        savedToFirestoreCount: firestoreData.size,
-        savingCount: savingToFirestore.size,
-
-        // VirtualFile Support
-        addVirtualFile,
-        addFhirAsVirtualFile,
-        
-        // Reset function
-        reset: clearAll
+      total,
+      processing,
+      completed,
+      errors,
+      percentComplete,
     };
+  }, [files]);
+
+  /**
+   * Get files in the format expected by other parts of the app
+   */
+  const processedFiles = files.filter(f => f.status === 'completed');
+
+  // ==================== RETURN INTERFACE ====================
+
+  return {
+    // Core state (for compatibility)
+    files,
+    processedFiles,
+    firestoreData,
+    savingToFirestore,
+
+    // File management actions
+    addFiles,
+    removeFileFromLocal,
+    deleteFileFromFirebase,
+    cancelFileUpload,
+    removeFileComplete,
+    retryFile,
+    clearAll,
+    enhancedClearAll,
+    processFile,
+
+    // FHIR integration
+    setFHIRConversionCallback,
+    setResetProcessCallback,
+
+    // Status updates
+    updateFileStatus,
+
+    // Firestore operations
+    uploadFiles,
+    updateFirestoreRecord,
+
+    //Helper function
+    shouldAutoUpload,
+
+    // Computed values
+    getStats,
+    savedToFirestoreCount: firestoreData.size,
+    savingCount: savingToFirestore.size,
+
+    // VirtualFile Support
+    addVirtualFile,
+    addFhirAsVirtualFile,
+
+    // Reset function
+    reset: clearAll,
+  };
 }
 
 export default useFileManager;

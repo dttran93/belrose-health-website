@@ -37,9 +37,10 @@ export const VerificationView: React.FC<VerificationViewProps> = ({
   const verification = record.blockchainVerification;
   const status = getVerificationStatus(record);
 
-  const recordHash = record.blockchainVerification?.recordHash
+  const recordHash = record.recordHash
 
-  console.log("active record", {record});
+  console.log("active record", {record},
+  "record hash", {recordHash});
 
   // Generate a new hash for comparison
   const generateNewHash = async () => {
@@ -232,31 +233,33 @@ export const VerificationView: React.FC<VerificationViewProps> = ({
 
                   <div className="space-y-6">
                     {/* Original Hash */}
+                    {recordHash && ( 
                     <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                       <div className="flex items-center justify-between mb-3">
                         <span className="font-medium text-green-800">Original Hash (Blockchain)</span>
                         <button
-                          onClick={() => copyToClipboard(verification.recordHash, 'originalHash')}
+                          onClick={() => copyToClipboard(recordHash, 'originalHash')}
                           className="p-2 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors"
                         >
                           {copySuccess === 'originalHash' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                         </button>
                       </div>
                       <p className="font-mono text-sm break-all text-green-900 bg-white p-3 rounded border">
-                        {verification.recordHash}
+                        {recordHash}
                       </p>
                     </div>
+                    )}
 
                     {/* Current Hash (if generated) */}
                     {newlyGeneratedHash && (
                       <div className={`p-4 border rounded-lg ${
-                        newlyGeneratedHash === verification.recordHash 
+                        newlyGeneratedHash === recordHash 
                           ? 'bg-green-50 border-green-200' 
                           : 'bg-red-50 border-red-200'
                       }`}>
                         <div className="flex items-center justify-between mb-3">
                           <span className={`font-medium ${
-                            newlyGeneratedHash === verification.recordHash 
+                            newlyGeneratedHash === recordHash 
                               ? 'text-green-800' 
                               : 'text-red-800'
                           }`}>
@@ -265,7 +268,7 @@ export const VerificationView: React.FC<VerificationViewProps> = ({
                           <button
                             onClick={() => copyToClipboard(newlyGeneratedHash, 'currentHash')}
                             className={`p-2 rounded transition-colors ${
-                              newlyGeneratedHash === verification.recordHash 
+                              newlyGeneratedHash === recordHash 
                                 ? 'text-green-600 hover:text-green-700 hover:bg-green-100' 
                                 : 'text-red-600 hover:text-red-700 hover:bg-red-100'
                             }`}
@@ -274,7 +277,7 @@ export const VerificationView: React.FC<VerificationViewProps> = ({
                           </button>
                         </div>
                         <p className={`font-mono text-sm break-all bg-white p-3 rounded border ${
-                          newlyGeneratedHash === verification.recordHash 
+                          newlyGeneratedHash === recordHash 
                             ? 'text-green-900' 
                             : 'text-red-900'
                         }`}>
@@ -283,11 +286,11 @@ export const VerificationView: React.FC<VerificationViewProps> = ({
                         
                         {/* Hash Comparison Result */}
                         <div className={`mt-4 p-3 rounded-lg flex items-center gap-3 ${
-                          newlyGeneratedHash === verification.recordHash 
+                          newlyGeneratedHash === recordHash 
                             ? 'bg-green-100 text-green-800' 
                             : 'bg-red-100 text-red-800'
                         }`}>
-                          {newlyGeneratedHash === verification.recordHash ? (
+                          {newlyGeneratedHash === recordHash ? (
                             <>
                               <Check className="w-5 h-5 flex-shrink-0" />
                               <div>

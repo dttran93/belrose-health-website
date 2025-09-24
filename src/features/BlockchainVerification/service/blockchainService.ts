@@ -3,43 +3,42 @@ import { FileObject, BlockchainVerification } from '@/types/core';
 import { removeUndefinedValues } from '@/lib/utils';
 
 // Your deployed contract address
-const CONTRACT_ADDRESS = "0x586B5cE24aF93842AB54fd5573B03c740f39387A";
+const CONTRACT_ADDRESS = '0x586B5cE24aF93842AB54fd5573B03c740f39387A';
 
 // Contract ABI (simplified - just the functions we need)
 const CONTRACT_ABI = [
   {
-    "inputs": [
-      {"internalType": "string", "name": "recordHash", "type": "string"},
-      {"internalType": "string", "name": "recordId", "type": "string"}
+    inputs: [
+      { internalType: 'string', name: 'recordHash', type: 'string' },
+      { internalType: 'string', name: 'recordId', type: 'string' },
     ],
-    "name": "storeRecordHash",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
+    name: 'storeRecordHash',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
   },
   {
-    "inputs": [{"internalType": "string", "name": "recordHash", "type": "string"}],
-    "name": "verifyRecordExists",
-    "outputs": [
-      {"internalType": "bool", "name": "exists", "type": "bool"},
-      {"internalType": "address", "name": "submitter", "type": "address"},
-      {"internalType": "uint256", "name": "timestamp", "type": "uint256"},
-      {"internalType": "string", "name": "recordId", "type": "string"}
+    inputs: [{ internalType: 'string', name: 'recordHash', type: 'string' }],
+    name: 'verifyRecordExists',
+    outputs: [
+      { internalType: 'bool', name: 'exists', type: 'bool' },
+      { internalType: 'address', name: 'submitter', type: 'address' },
+      { internalType: 'uint256', name: 'timestamp', type: 'uint256' },
+      { internalType: 'string', name: 'recordId', type: 'string' },
     ],
-    "stateMutability": "view",
-    "type": "function"
+    stateMutability: 'view',
+    type: 'function',
   },
   {
-    "inputs": [],
-    "name": "getTotalRecords",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  }
+    inputs: [],
+    name: 'getTotalRecords',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
 ];
 
 export class BlockchainService {
-  
   /**
    * Generate a hash of the medical record content
    */
@@ -58,26 +57,23 @@ export class BlockchainService {
     // Sort keys to ensure consistent hashing
     const sortedContent = this.sortObjectKeys(hashableContent);
     const contentString = JSON.stringify(sortedContent);
-    
+
     // Use Web Crypto API for proper cryptographic hashing
     const encoder = new TextEncoder();
     const data = encoder.encode(contentString);
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    
+
     // Convert to hex string
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
-    
+
     return hashHex;
   }
 
   /**
    * Actually write to the blockchain!
    */
-  static async writeToBlockchain(
-    recordHash: string, 
-    recordId: string
-  ): Promise<string> {
+  static async writeToBlockchain(recordHash: string, recordId: string): Promise<string> {
     try {
       // Check if MetaMask is available
       if (!window.ethereum) {
@@ -85,43 +81,47 @@ export class BlockchainService {
       }
 
       console.log('🔗 Connecting to wallet...');
-      
+
       // Create provider and signer
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
-      
+
       console.log('📝 Connected wallet:', await signer.getAddress());
 
       // Create contract instance
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer) as any;
 
-      console.log('⛓️ Writing to blockchain...', { recordHash: recordHash.substring(0, 12) + '...', recordId });
+      console.log('⛓️ Writing to blockchain...', {
+        recordHash: recordHash.substring(0, 12) + '...',
+        recordId,
+      });
 
       // Call the smart contract function
       const transaction = await contract.storeRecordHash(recordHash, recordId);
-      
+
       console.log('⏳ Transaction sent! Hash:', transaction.hash);
       console.log('⏳ Waiting for confirmation...');
 
       // Wait for the transaction to be mined (confirmed)
       const receipt = await transaction.wait();
-      
+
       console.log('✅ Transaction confirmed!', {
         txHash: receipt.hash,
         blockNumber: receipt.blockNumber,
-        gasUsed: receipt.gasUsed?.toString()
+        gasUsed: receipt.gasUsed?.toString(),
       });
 
       return receipt.hash; // Return the real transaction hash
-
     } catch (error: any) {
       console.error('❌ Blockchain write failed:', error);
-      
+
       // Handle specific error types
       if (error.code === 'ACTION_REJECTED') {
         throw new Error('Transaction was rejected by user');
       } else if (error.code === 'INSUFFICIENT_FUNDS') {
-        throw new Error('Insufficient funds for transaction. Get testnet ETH from https://sepoliafaucet.com/');
+        throw new Error(
+          'Insufficient funds for transaction. Get testnet ETH from https://sepoliafaucet.com/'
+        );
       } else if (error.message?.includes('user rejected')) {
         throw new Error('Transaction was rejected by user');
       } else if (error.message?.includes('MetaMask')) {
@@ -144,7 +144,7 @@ export class BlockchainService {
     try {
       // Create read-only provider (no wallet needed for reading)
       const provider = new ethers.JsonRpcProvider('https://1rpc.io/sepolia');
-      
+
       // Create contract instance for reading
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider) as any;
 
@@ -152,20 +152,19 @@ export class BlockchainService {
 
       // Call the verification function
       const result = await contract.verifyRecordExists(recordHash);
-      
+
       console.log('📋 Blockchain result:', {
         exists: result[0],
         submitter: result[1],
-        timestamp: Number(result[2])
+        timestamp: Number(result[2]),
       });
 
       return {
         exists: result[0],
         submitter: result[1],
         timestamp: Number(result[2]),
-        recordId: result[3]
+        recordId: result[3],
       };
-
     } catch (error: any) {
       console.error('❌ Blockchain verification failed:', error);
       return { exists: false };
@@ -184,36 +183,35 @@ export class BlockchainService {
     } = {}
   ): Promise<BlockchainVerification> {
     const recordHash = await this.generateRecordHash(fileObject);
-    
+
     try {
       console.log('🚀 Attempting real blockchain write...');
-      
+
       // 🔥 ACTUALLY WRITE TO BLOCKCHAIN!
       const realTxId = await this.writeToBlockchain(recordHash, fileObject.id);
-      
+
       const verification = {
         recordHash,
-        blockchainTxId: realTxId, // Real transaction hash!
+        blockchainTxId: realTxId,
         providerSignature: options.providerSignature,
         signerId: options.signerId,
         blockchainNetwork: options.network || 'sepolia',
         timestamp: Date.now(),
-        isVerified: true // Real verification!
+        isVerified: true,
       };
-      
+
       console.log('✅ Real blockchain verification created!', {
         hash: recordHash.substring(0, 12) + '...',
-        txId: realTxId
+        txId: realTxId,
       });
-      
+
       return removeUndefinedValues(verification) as BlockchainVerification;
-      
     } catch (error: any) {
       console.error('❌ Real blockchain write failed, falling back to simulation:', error);
-      
+
       // Fall back to simulation if blockchain write fails
       const simulatedTxId = this.generateSimulatedTransactionId();
-      
+
       const verification = {
         recordHash,
         blockchainTxId: simulatedTxId,
@@ -221,11 +219,11 @@ export class BlockchainService {
         signerId: options.signerId,
         blockchainNetwork: 'simulated-' + (options.network || 'sepolia'),
         timestamp: Date.now(),
-        isVerified: false // Mark as unverified since it's simulated
+        isVerified: false, // Mark as unverified since it's simulated
       };
-      
+
       console.log('⚠️ Using simulated verification due to error:', error.message);
-      
+
       return removeUndefinedValues(verification) as BlockchainVerification;
     }
   }
@@ -241,8 +239,8 @@ export class BlockchainService {
     }
 
     const currentHash = await this.generateRecordHash(fileObject);
-    const storedHash = fileObject.blockchainVerification.recordHash;
-    
+    const storedHash = fileObject.recordHash;
+
     // First check if hashes match
     if (currentHash !== storedHash) {
       console.warn('❌ Record hash mismatch:', { currentHash, storedHash });
@@ -250,12 +248,14 @@ export class BlockchainService {
     }
 
     // If we have a real blockchain transaction, verify it exists on chain
-    if (fileObject.blockchainVerification.isVerified && 
-        !fileObject.blockchainVerification.blockchainNetwork?.includes('simulated')) {
+    if (
+      fileObject.blockchainVerification.isVerified &&
+      !fileObject.blockchainVerification.blockchainNetwork?.includes('simulated')
+    ) {
       try {
         console.log('🔍 Verifying record on blockchain...');
         const chainResult = await this.verifyRecordOnBlockchain(storedHash);
-        
+
         if (chainResult.exists) {
           console.log('✅ Record verified on blockchain!');
           return true;
@@ -268,7 +268,7 @@ export class BlockchainService {
         return false;
       }
     }
-    
+
     // For simulated transactions, just check hash match
     console.log('✅ Hash match confirmed (simulated verification)');
     return true;
@@ -301,18 +301,18 @@ export class BlockchainService {
     if (obj === null || typeof obj !== 'object') {
       return obj;
     }
-    
+
     if (Array.isArray(obj)) {
       return obj.map(item => this.sortObjectKeys(item));
     }
-    
+
     const sortedObj: any = {};
     const sortedKeys = Object.keys(obj).sort();
-    
+
     for (const key of sortedKeys) {
       sortedObj[key] = this.sortObjectKeys(obj[key]);
     }
-    
+
     return sortedObj;
   }
 
@@ -322,21 +322,24 @@ export class BlockchainService {
    */
   static createVersionChain(
     currentVerification: BlockchainVerification,
-    previousVerification?: BlockchainVerification
+    previousVerification?: FileObject
   ): BlockchainVerification {
     return {
       ...currentVerification,
       // Add reference to previous version for audit trail
-      previousRecordHash: previousVerification?.recordHash
+      previousRecordHash: previousVerification?.recordHash,
     };
   }
 
   /**
    * Validate blockchain verification format
    */
-  static isValidBlockchainVerification(verification: BlockchainVerification): boolean {
+  static isValidBlockchainVerification(
+    record: FileObject,
+    verification: BlockchainVerification
+  ): boolean {
     return !!(
-      verification.recordHash &&
+      record.recordHash &&
       verification.blockchainTxId &&
       verification.blockchainNetwork &&
       verification.timestamp &&
@@ -357,13 +360,13 @@ export class BlockchainService {
         return {
           status: 'pending',
           message: 'Blockchain verification pending',
-          icon: '⏳'
+          icon: '⏳',
         };
       } else {
         return {
           status: 'unverified',
           message: 'Self-reported (no verification required)',
-          icon: '📝'
+          icon: '📝',
         };
       }
     }
@@ -372,13 +375,13 @@ export class BlockchainService {
       return {
         status: 'verified',
         message: 'Blockchain verified',
-        icon: '✅'
+        icon: '✅',
       };
     } else {
       return {
         status: 'failed',
         message: 'Verification failed',
-        icon: '❌'
+        icon: '❌',
       };
     }
   }

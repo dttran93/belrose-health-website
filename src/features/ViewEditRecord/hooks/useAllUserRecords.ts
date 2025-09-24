@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { 
-  getFirestore, 
-  collection, 
-  query, 
-  orderBy, 
+import {
+  getFirestore,
+  collection,
+  query,
+  orderBy,
   onSnapshot,
   QuerySnapshot,
-  DocumentData 
+  DocumentData,
 } from 'firebase/firestore';
 import { FileObject } from '@/types/core';
 import mapFirestoreToFileObject from '@/features/ViewEditRecord/utils/firestoreMapping';
@@ -34,29 +34,18 @@ export const useCompleteRecords = (userId?: string): UseCompleteRecordsReturn =>
     setError(null);
 
     const db = getFirestore();
-    
+
     // Query the complete documents from Firestore
-    const q = query(
-      collection(db, 'users', userId, 'files'),
-      orderBy('uploadedAt', 'desc')
-    );
+    const q = query(collection(db, 'users', userId, 'files'), orderBy('uploadedAt', 'desc'));
 
     // Set up real-time listener
     const unsubscribe = onSnapshot(
       q,
       (snapshot: QuerySnapshot<DocumentData>) => {
         console.log('Received', snapshot.docs.length, 'complete records from Firestore');
-        
+
         const completeRecords: FileObject[] = snapshot.docs.map(doc => {
           const data = doc.data();
-          
-          // Log each record to debug
-          console.log('Record:', doc.id, {
-            name: data.fileName || data.name,
-            hasBelroseFields: !!data.belroseFields,
-            belroseFields: data.belroseFields,
-            aiProcessingStatus: data.aiProcessingStatus
-          });
 
           // Use shared mapping function
           return mapFirestoreToFileObject(doc.id, data);
@@ -65,7 +54,7 @@ export const useCompleteRecords = (userId?: string): UseCompleteRecordsReturn =>
         setRecords(completeRecords);
         setLoading(false);
       },
-      (err) => {
+      err => {
         console.error('Error fetching complete records:', err);
         setError(err as Error);
         setLoading(false);

@@ -58,23 +58,22 @@ export interface UserProfile extends User {
 
 export interface BelroseFields {
   // Core display fields - these are what users see in list views
-  visitType?: string;           // e.g., "Follow-up Appointment", "Lab Results", "Imaging Study"
-  title?: string;               // Short descriptive title (e.g., "Cardiology Follow-up")
-  summary?: string;             // Slightly longer summary, main information a future reader would need to know
-  
+  visitType?: string; // e.g., "Follow-up Appointment", "Lab Results", "Imaging Study"
+  title?: string; // Short descriptive title (e.g., "Cardiology Follow-up")
+  summary?: string; // Slightly longer summary, main information a future reader would need to know
+
   // Key dates and people
-  completedDate?: string;       // ISO date string - the main date for this record
-  provider?: string;            // Primary provider name
-  institution?: string;         // Healthcare institution/facility
-  patient?: string;             // Patient Name
-  
+  completedDate?: string; // ISO date string - the main date for this record
+  provider?: string; // Primary provider name
+  institution?: string; // Healthcare institution/facility
+  patient?: string; // Patient Name
+
   // Simple processing metadata
-  aiProcessedAt?: string;       // ISO timestamp when AI processing completed
-  aiFailureReason?: string;     // If AI processing failed, why?
+  aiProcessedAt?: string; // ISO timestamp when AI processing completed
+  aiFailureReason?: string; // If AI processing failed, why?
 }
 
 export interface BlockchainVerification {
-  recordHash: string; //has of the record content
   blockchainTxId: string; //Transaction ID on the blockchain
   providerSignature?: string; //Digital signature (for provider records)
   signerId?: string; //ID of who signed it
@@ -85,18 +84,18 @@ export interface BlockchainVerification {
 }
 
 export type AIProcessingStatus =
-  | 'pending'        // AI processing not yet started
-  | 'processing'     // AI is currently processing
-  | 'completed'      // AI processing finished successfully
-  | 'failed'         // AI processing failed
-  | 'not_needed';    // This record type doesn't need AI processing
+  | 'pending' // AI processing not yet started
+  | 'processing' // AI is currently processing
+  | 'completed' // AI processing finished successfully
+  | 'failed' // AI processing failed
+  | 'not_needed'; // This record type doesn't need AI processing
 
-export type FileStatus = 
-  | 'pending'      // File uploaded, waiting to process
-  | 'processing'   // Currently being processed
-  | 'uploading'    // Currently uploading, use for making sure there aren't multiple uploads  
-  | 'completed'    // Successfully processed
-  | 'error';       // Failed with error
+export type FileStatus =
+  | 'pending' // File uploaded, waiting to process
+  | 'processing' // Currently being processed
+  | 'uploading' // Currently uploading, use for making sure there aren't multiple uploads
+  | 'completed' // Successfully processed
+  | 'error'; // Failed with error
 
 export type SourceType = 'Plain Text Submission' | 'Manual FHIR JSON Submission' | 'File Upload';
 
@@ -106,7 +105,6 @@ export interface VirtualFileInput {
   extractedText?: string;
   fhirData?: any;
   wordCount?: number;
-
   [key: string]: any;
 }
 
@@ -128,6 +126,7 @@ export interface FileObject {
   isVirtual?: boolean; //for virtual files
   fhirData?: any;
   downloadURL?: string;
+  recordHash: string; //has of the record content
   [key: string]: any;
 
   //For AI enrichedFields
@@ -138,5 +137,3 @@ export interface FileObject {
   blockchainVerification?: BlockchainVerification;
   isProviderRecord?: boolean;
 }
-
-

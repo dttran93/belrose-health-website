@@ -12,29 +12,33 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
     fileType: data.fileType || 'application/octet-stream',
     status: 'completed', // Files in Firestore are assumed completed
     lastModified: data.createdAt?.toMillis?.() || data.uploadedAt?.toMillis?.() || Date.now(),
-    
+
     // File storage properties
     downloadURL: data.downloadURL,
-    
+
     // Processing properties
     extractedText: data.extractedText,
     wordCount: data.wordCount,
     sourceType: data.sourceType,
     isVirtual: data.isVirtual,
-    originalFileHash: data.originalFileHash,
+
     originalText: data.originalText,
-    
+
+    // Verification properties
+    originalFileHash: data.originalFileHash,
+    recordHash: data.recordHash,
+
     // FHIR properties
     fhirData: data.fhirData,
-    
+
     // AI enrichment properties
     belroseFields: data.belroseFields || undefined,
     aiProcessingStatus: data.aiProcessingStatus || undefined,
-    
+
     // Timestamp properties
     createdAt: data.createdAt,
     uploadedAt: data.uploadedAt,
-    
+
     // Edit tracking properties
     editedByUser: data.editedByUser || false,
     lastEditedAt: data.lastEditedAt,
