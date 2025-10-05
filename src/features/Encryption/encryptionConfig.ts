@@ -26,11 +26,13 @@ export const ENCRYPTION_CONFIG = {
 
   // ==================== WHAT TO ENCRYPT ====================
   encryptComponents: {
+    fileName: true, //Encrypt file name
     file: true, // Encrypt original uploaded file
     extractedText: true, // Encrypt extracted text
     originalText: true, // Encrypt original text
     fhirData: true, // Encrypt FHIR data
     belroseFields: true, // Encrypt Belrose fields
+    customData: true, //encrypt custom data
   },
 };
 

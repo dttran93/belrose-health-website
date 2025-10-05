@@ -1,5 +1,6 @@
 // src/services/encryptionService.ts
 import { ENCRYPTION_CONFIG } from '../encryptionConfig';
+import * as bip39 from 'bip39';
 
 export class EncryptionService {
   /**
@@ -150,11 +151,12 @@ export class EncryptionService {
   static async encryptCompleteRecord(
     fileName: string,
     file: File | undefined,
-    extractedText: string | undefined,
-    originalText: string | undefined,
+    extractedText: string | undefined | null,
+    originalText: string | undefined | null,
     fhirData: any | null,
     belroseFields: any | null,
-    customData: any | null
+    customData: any | null,
+    userKey: CryptoKey
   ): Promise<{
     fileName: {
       encrypted: ArrayBuffer;
@@ -197,7 +199,6 @@ export class EncryptionService {
 
     //Generate key for all data in this record
     const fileKey = await this.generateFileKey();
-    const userKey = await this.getUserMasterKey();
 
     const result: any = {};
 
@@ -281,7 +282,7 @@ export class EncryptionService {
 
     // Encrypt the file key with user's master key
     console.log('  🔒 Encrypting file key with user master key...');
-    const encryptedKeyData = await this.encryptKeyForUser(fileKey, userKey);
+    const encryptedKeyData = await this.encryptKeyWithMasterKey(fileKey, userKey);
     result.encryptedKey = this.arrayBufferToBase64(encryptedKeyData);
     console.log('    ✓ File key encrypted');
 
@@ -302,7 +303,8 @@ export class EncryptionService {
       fhirData?: { encrypted: ArrayBuffer; iv: string };
       belroseFields?: { encrypted: ArrayBuffer; iv: string };
       customData?: { encrypted: ArrayBuffer; iv: string };
-    }
+    },
+    userKey: CryptoKey
   ): Promise<{
     fileName: string;
     file?: ArrayBuffer;
@@ -315,9 +317,8 @@ export class EncryptionService {
     console.log('🔓 Starting complete record decryption...');
 
     // Decrypt the file key
-    const userKey = await this.getUserMasterKey();
     const keyData = this.base64ToArrayBuffer(encryptedKey);
-    const fileKeyData = await this.decryptKeyForUser(keyData, userKey);
+    const fileKeyData = await this.decryptKeyWithMasterKey(keyData, userKey);
     const fileKey = await this.importKey(fileKeyData);
     console.log('  ✓ File key decrypted');
 
@@ -415,46 +416,38 @@ export class EncryptionService {
     return bytes.buffer;
   }
 
-  // ================== USER KEY MANAGEMENT ======================
-
-  // Placeholder methods - you'll implement these based on your auth system
-  private static async getUserMasterKey(): Promise<CryptoKey> {
-    // This should derive a key from the user's password/PIN
-    // For now, using a hardcoded key for testing
-    const password = 'user-password-123'; // Replace with actual user auth
-    const encoder = new TextEncoder();
-    const keyMaterial = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(password),
-      { name: 'PBKDF2' },
-      false,
-      ['deriveBits', 'deriveKey']
-    );
-
-    return crypto.subtle.deriveKey(
-      {
-        name: 'PBKDF2',
-        salt: encoder.encode('salt-should-be-random-per-user'),
-        iterations: ENCRYPTION_CONFIG.pbkdf2.iterations,
-        hash: ENCRYPTION_CONFIG.pbkdf2.hash,
-      },
-      keyMaterial,
-      { name: ENCRYPTION_CONFIG.algorithm, length: ENCRYPTION_CONFIG.keyLength },
-      false,
-      ['encrypt', 'decrypt']
-    );
+  /**
+   * Generate a random salt for password-based key derivation
+   */
+  static generateSalt(): Uint8Array {
+    return crypto.getRandomValues(new Uint8Array(16));
   }
 
-  private static async encryptKeyForUser(
+  /**
+   * Convert Uint8Array to base64 for storage
+   */
+  static saltToString(salt: Uint8Array): string {
+    return btoa(String.fromCharCode(...salt));
+  }
+
+  /**
+   * Convert base64 string back to Uint8Array
+   */
+  static stringToSalt(saltString: string): Uint8Array {
+    const binaryString = atob(saltString);
+    return new Uint8Array([...binaryString].map(char => char.charCodeAt(0)));
+  }
+
+  private static async encryptKeyWithMasterKey(
     fileKey: CryptoKey,
-    userKey: CryptoKey
+    masterKey: CryptoKey
   ): Promise<ArrayBuffer> {
     const keyData = await this.exportKey(fileKey);
     const iv = crypto.getRandomValues(new Uint8Array(ENCRYPTION_CONFIG.ivLength));
 
     const encrypted = await crypto.subtle.encrypt(
       { name: ENCRYPTION_CONFIG.algorithm, iv },
-      userKey,
+      masterKey,
       keyData
     );
 
@@ -466,9 +459,9 @@ export class EncryptionService {
     return result.buffer;
   }
 
-  private static async decryptKeyForUser(
+  private static async decryptKeyWithMasterKey(
     encryptedKeyData: ArrayBuffer,
-    userKey: CryptoKey
+    masterKey: CryptoKey
   ): Promise<ArrayBuffer> {
     const data = new Uint8Array(encryptedKeyData);
     const iv = data.slice(0, ENCRYPTION_CONFIG.ivLength);
@@ -476,8 +469,80 @@ export class EncryptionService {
 
     return await crypto.subtle.decrypt(
       { name: ENCRYPTION_CONFIG.algorithm, iv },
-      userKey,
+      masterKey,
       encrypted
     );
+  }
+
+  // ========== ENCRYPTION KEY DERIVATION AND RECOVERY ============
+
+  /**
+   * Derive an encryption key from a password using PBKDF2
+   */
+  static async deriveKeyFromPassword(password: string, salt: Uint8Array): Promise<CryptoKey> {
+    const encoder = new TextEncoder();
+
+    // Import password as key material
+    const passwordKey = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(password),
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+
+    // Derive actual encryption key
+    return crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: salt as BufferSource,
+        iterations: 100000, // OWASP recommendation for 2024
+        hash: 'SHA-256',
+      },
+      passwordKey,
+      { name: 'AES-GCM', length: 256 },
+      false, // Not extractable
+      ['encrypt', 'decrypt']
+    );
+  }
+
+  /**
+   * Create a verification hash of the password (for checking without exposing key)
+   */
+  static async hashPassword(password: string, salt: Uint8Array): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = new Uint8Array([...encoder.encode(password), ...salt]);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  /**
+   * Generate a 24-word recovery mnemonic
+   */
+  static generateRecoveryKey(): string {
+    return bip39.generateMnemonic(256);
+  }
+
+  /**
+   * Validate a recovery mnemonic
+   */
+  static validateRecoveryKey(mnemonic: string): boolean {
+    return bip39.validateMnemonic(mnemonic);
+  }
+
+  /**
+   * Derive encryption key from recovery mnemonic
+   */
+  static async deriveKeyFromRecoveryKey(mnemonic: string, salt: Uint8Array): Promise<CryptoKey> {
+    if (!bip39.validateMnemonic(mnemonic)) {
+      throw new Error('Invalid recovery key');
+    }
+
+    const seed = bip39.mnemonicToSeedSync(mnemonic);
+    // Use first 32 bytes as password material
+    const keyMaterial = Buffer.from(seed.slice(0, 32)).toString('hex');
+
+    return this.deriveKeyFromPassword(keyMaterial, salt);
   }
 }

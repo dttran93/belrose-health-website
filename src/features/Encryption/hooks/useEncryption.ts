@@ -1,6 +1,7 @@
 // src/features/Encryption/hooks/useEncryption.ts
 import { useState, useCallback } from 'react';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
+import { EncryptionKeyManager } from '../services/encryptionKeyManager';
 import { isEncryptionEnabled, measurePerformance } from '@/features/Encryption/encryptionConfig';
 
 interface CompleteRecordEncryption {
@@ -39,7 +40,7 @@ interface UseEncryptionReturn {
   encryptCompleteRecord: (
     fileName: string,
     file: File | undefined,
-    extractedText: string,
+    extractedText: string | undefined,
     originalText: string | undefined,
     fhirData: any | null,
     belroseFields: any | null,
@@ -50,11 +51,13 @@ interface UseEncryptionReturn {
     encryptedKey: string,
     encryptedData: any
   ) => Promise<{
+    fileName: string;
     file?: ArrayBuffer;
-    extractedText: string;
+    extractedText?: string;
     originalText?: string;
     fhirData?: any;
     belroseFields?: any;
+    customData?: any;
   } | null>;
 
   isEncrypting: boolean;
@@ -72,7 +75,7 @@ export function useEncryption(): UseEncryptionReturn {
     async (
       fileName: string,
       file: File | undefined,
-      extractedText: string,
+      extractedText: string | undefined,
       originalText: string | undefined,
       fhirData: any | null,
       belroseFields: any | null,
@@ -82,6 +85,12 @@ export function useEncryption(): UseEncryptionReturn {
       if (!isEncryptionEnabled()) {
         console.log('ℹ️ Encryption is disabled - skipping encryption');
         return null;
+      }
+
+      // Get session key
+      const userKey = EncryptionKeyManager.getSessionKey();
+      if (!userKey) {
+        throw new Error('No active encryption session. Please unlock encryption first.');
       }
 
       setIsEncrypting(true);
@@ -96,7 +105,8 @@ export function useEncryption(): UseEncryptionReturn {
             originalText,
             fhirData,
             belroseFields,
-            customData
+            customData,
+            userKey
           );
         });
 
@@ -122,12 +132,22 @@ export function useEncryption(): UseEncryptionReturn {
         return encryptedData;
       }
 
+      // Get session key
+      const userKey = EncryptionKeyManager.getSessionKey();
+      if (!userKey) {
+        throw new Error('No active encryption session. Please unlock encryption first.');
+      }
+
       setIsDecrypting(true);
       setError(null);
 
       try {
         const result = await measurePerformance('Complete Record Decryption', async () => {
-          return await EncryptionService.decryptCompleteRecord(encryptedKey, encryptedData);
+          return await EncryptionService.decryptCompleteRecord(
+            encryptedKey,
+            encryptedData,
+            userKey
+          );
         });
 
         console.log('✅ Complete record decryption successful');

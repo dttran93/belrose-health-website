@@ -7,6 +7,15 @@ export interface User {
   email: string | null;
   displayName: string | null;
   photoURL?: string | null;
+
+  encryption?: {
+    enabled: boolean;
+    salt: string; // base64 encoded
+    passwordHash: string; // for verification only
+    recoveryKeyHash: string; // for recovery key verification
+    setupAt: string;
+    lastUnlockedAt?: string; // track usage
+  };
 }
 
 // Authentication context data structure
@@ -125,6 +134,7 @@ export interface VirtualFileInput {
 
 export interface FileObject {
   id: string; //fileId. Generated in useFileManager via createFileObject() or addVirtualFile(). file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}
+  firestoreId?: string; //Id for firestore set after upload
   fileSize: number; //file size. Set in createFileObject in useFileManager.ts. file.size for real files
   fileType: string; //file type. Set in createFileObject in useFileManager.ts. file.type for real files or application/fhir+json for virtual - NEVER undefined
   status: FileStatus; //Processing property. Initially set as pending. Then pending/processing... see below
@@ -135,6 +145,7 @@ export interface FileObject {
   sourceType?: SourceType;
   lastModified?: string; //Filetracking for UI state management.
   isVirtual?: boolean; //for virtual files
+  storagePath?: string;
   downloadURL?: string;
   recordHash?: string; //has of the record content
   processingStage?: ProcessingStages;

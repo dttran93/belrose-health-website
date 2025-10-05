@@ -10,6 +10,7 @@ import {
   measurePerformance,
   logEncryption,
 } from '@/features/Encryption/encryptionConfig';
+import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { FileObject, VirtualFileInput, BelroseFields, ProcessingStages } from '@/types/core';
 
 export interface ProcessedRecord {
@@ -170,6 +171,11 @@ export class CombinedRecordProcessingService {
         console.log(`🔒 Step 5: Encrypting file: ${fileObj.fileName}`);
         onStageUpdate?.('Encrypting record data...');
 
+        const userKey = EncryptionKeyManager.getSessionKey();
+        if (!userKey) {
+          throw new Error('No encryption session active');
+        }
+
         try {
           result.encryptedData = await measurePerformance(
             `Complete Record Encryption: ${fileObj.fileName}`,
@@ -181,7 +187,8 @@ export class CombinedRecordProcessingService {
                 fileObj.originalText,
                 result.fhirData,
                 result.belroseFields,
-                null
+                null,
+                userKey
               );
             }
           );
@@ -331,6 +338,11 @@ export class CombinedRecordProcessingService {
       logEncryption('Encrypting virtual file', { fileName });
       onStageUpdate?.('Encrypting record data...');
 
+      const userKey = EncryptionKeyManager.getSessionKey();
+      if (!userKey) {
+        throw new Error('No encryption session active');
+      }
+
       try {
         result.encryptedData = await EncryptionService.encryptCompleteRecord(
           fileName,
@@ -339,7 +351,8 @@ export class CombinedRecordProcessingService {
           virtualData.originalText,
           virtualData.fhirData,
           result.belroseFields,
-          null
+          null,
+          userKey
         );
 
         toast.success(`🔒 Virtual file encrypted: ${fileName}`);
