@@ -25,7 +25,6 @@ interface AddRecordProps {
  */
 interface ExportData {
   files: any[]; // Using any[] since processedFiles type varies
-  firestoreData: Record<string, any>;
   stats: {
     files: any; // Return type from getStats()
   };
@@ -60,7 +59,6 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
     const {
         files,
         processedFiles,
-        firestoreData,
         savingToFirestore,
         addFiles,
         removeFileFromLocal,
@@ -100,11 +98,11 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
             const currentFile = files.find(f => f.id === fileId);
             if (!currentFile || !currentFile.extractedText) {
                 console.error('❌ File not found in current files:', fileId);
-                console.log('📋 Available files:', files.map(f => ({id: f.id, name: f.name})));
+                console.log('📋 Available files:', files.map(f => ({id: f.id, name: f.fileName})));
                 return Promise.resolve();
             }
             
-            console.log('✅ Found file for FHIR conversion:', currentFile.name);
+            console.log('✅ Found file for FHIR conversion:', currentFile.fileName);
             return handleFHIRConverted(fileId, uploadResult); // Pass the file object
         });
     }, [setFHIRConversionCallback, handleFHIRConverted, files]);
@@ -126,7 +124,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
     const handleReviewFile = (fileRecord: FileObject) => {
         const latestFile = files.find (f => f.id === fileRecord.id);
 
-        if (!latestFile?.documentId) {
+        if (!latestFile?.id) {
             console.error('File not found:', fileRecord.id);
             return;
         }
@@ -136,7 +134,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
 
     const handleSaveFromReview = async (updatedRecord: FileObject) => {
         try {
-            const documentId = updatedRecord.documentId;
+            const documentId = updatedRecord.id;
 
             if (!documentId) {
                 throw new Error('Cannot save record - no document ID found');
@@ -145,14 +143,14 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
             await updateFirestoreRecord(documentId, {
                 fhirData: updatedRecord.fhirData,
                 belroseFields: updatedRecord.belroseFields,
-                lastUpdated: new Date().toISOString()
+                lastModified: new Date().toISOString()
             });
 
             //To update local files array with fresh data
             updateFileStatus(updatedRecord.id, 'completed', {
                 fhirData: updatedRecord.fhirData,
                 belroseFields: updatedRecord.belroseFields,
-                lastUpdated: new Date().toISOString()
+                lastModified: new Date().toISOString()
             });
 
             toast.success(`Record "${updatedRecord.belroseFields?.title}" saved successfully`, {
@@ -173,19 +171,18 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
 
     /**
      * Download all processed data as JSON
-     * Includes files, firestore data, and statistics
+     * Includes files and statistics
      */
     const downloadAllData = (): void => {        
-        const exportData: ExportData = {
-            files: processedFiles,
-            firestoreData: Object.fromEntries(firestoreData),
-            stats: {
-                files: getStats(),
-            },
-            exportedAt: new Date().toISOString()
-        };
+    const exportData: ExportData = {
+        files: processedFiles,
+        stats: {
+        files: getStats(),
+        },
+        exportedAt: new Date().toISOString()
+    };
 
-        exportService.downloadData(exportData, 'belrose-health-records');
+    exportService.downloadData(exportData, 'belrose-health-records');
     };
 
     /**
@@ -239,7 +236,6 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
                     convertTextToFHIR={convertToFHIR}
                     shouldAutoUpload={shouldAutoUpload}
                     savingToFirestore={savingToFirestore}
-                    firestoreData={firestoreData}
                     onReview={handleReviewFile}
                 />
 

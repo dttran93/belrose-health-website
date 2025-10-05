@@ -138,7 +138,7 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
 
   // Filter and search records
   const filteredRecords = records.filter(record => {
-    const fileName = record.name || '';
+    const fileName = record.fileName || '';
     const matchesSearch = fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (record.sourceType || '').toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -150,14 +150,14 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
 
   // Sort records by date (newest first)
   const sortedRecords = filteredRecords.sort((a, b) => {
-    const dateA = a.lastModified;
-    const dateB = b.lastModified;
+    const dateA = a.lastModified ? new Date(a.lastModified) : null;
+    const dateB = b.lastModified ? new Date(b.lastModified) : null;
     
     if (!dateA && !dateB) return 0;
     if (!dateA) return 1;
     if (!dateB) return -1;
     
-    return dateB - dateA;
+    return dateB.getTime() - dateA.getTime();
   });
 
   // Get unique document types for filter dropdown

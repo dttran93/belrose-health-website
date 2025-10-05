@@ -130,14 +130,15 @@ export interface FileObject {
   status: FileStatus; //Processing property. Initially set as pending. Then pending/processing... see below
   error?: string; //Failed processing
   originalFileHash?: string | null; //hash of the original file that was uploaded
-  uploadedAt?: string;
+  uploadedAt?: string | number;
   wordCount?: number; //calculated during text extraction
   sourceType?: SourceType;
-  lastModified?: number; //Filetracking for UI state management.
+  lastModified?: string; //Filetracking for UI state management.
   isVirtual?: boolean; //for virtual files
   downloadURL?: string;
   recordHash?: string; //has of the record content
   processingStage?: ProcessingStages;
+  uploadInProgress?: boolean; // for managing upload process
 
   // PLAIN TEXT PERSONAL HEALTH DATA, MUST BE ENCRYPTED
   fileName: string; //file name or custom name for virtual files. set by createFileObject() in useFileManager.ts
@@ -151,17 +152,16 @@ export interface FileObject {
   //For processing Belrose, AI enriched Fields
   aiProcessingStatus?: AIProcessingStatus;
 
+  //For versioning purposes
+  versionInfo?: {
+    versionId?: string;
+    timestamp?: string;
+    isHistoricalView?: true;
+  };
+
   //Blockchain Verification
   blockchainVerification?: BlockchainVerification;
   isProviderRecord?: boolean;
-
-  //For Client-Side Encryption. One key encrypts all the personal data fields
-  encryption?: {
-    isEncrypted: boolean;
-    algorithm: 'AES-GCM';
-    keyLength: 256;
-    encryptedAt: string;
-  };
 
   encryptedData?: {
     encryptedKey: string; // Single key for all encrypted data (Base64)

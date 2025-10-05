@@ -58,7 +58,7 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
       originalText: version.fileObjectSnapshot.originalText,
       blockchainVerification: version.fileObjectSnapshot.blockchainVerification ?? null,
 
-      _versionInfo: {
+      versionInfo: {
       versionId: version.versionId,
       timestamp: version.timestamp,
       isHistoricalView: true

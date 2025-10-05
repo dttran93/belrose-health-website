@@ -6,7 +6,6 @@ import { TabNavigation } from './ui/TabNavigation';
 import { toast } from 'sonner';
 import { FileObject, FileStatus } from '@/types/core';
 import { Button } from '@/components/ui/Button';
-import { processRecordWithAI } from '../services/aiRecordProcessingService';
 
 // Import the fixed types
 import type { CombinedUploadFHIRProps, FHIRValidation, TabType } from './CombinedUploadFHIR.type';
@@ -48,7 +47,6 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   convertTextToFHIR,
   shouldAutoUpload,
   savingToFirestore,
-  firestoreData,
 
   //FHIR props
   fhirData,
@@ -177,7 +175,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
 
   // Submit FHIR data and immediately upload to Firestore
   const handleFileComplete = async (fileItem: FileObject): Promise<void> => {
-      console.log('🚨 handleFileComplete called for:', fileItem.name, 'status:', fileItem.status);
+      console.log('🚨 handleFileComplete called for:', fileItem.fileName, 'status:', fileItem.status);
       
       if (!updateFileStatus) {
           console.error('❌ updateFileStatus is not available in handleFileComplete');
@@ -192,7 +190,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
       }
       
       console.log('🔍 Latest file state:', {
-          name: latestFile.name,
+          name: latestFile.fileName,
           status: latestFile.status,
           aiStatus: latestFile.aiProcessingStatus,
           hasBelroseFields: !!latestFile.belroseFields,
@@ -201,15 +199,15 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
       
       // Use shouldAutoUpload with latest file state
       if (!shouldAutoUpload(latestFile)) {
-          console.log(`⏭️ File not ready for upload: ${latestFile.name}`);
+          console.log(`⏭️ File not ready for upload: ${latestFile.fileName}`);
           console.log(`   Status: ${latestFile.status}, AI Status: ${latestFile.aiProcessingStatus}`);
           return;
       }
       
       // 🚨 PREVENT MULTIPLE UPLOADS - Enhanced checks
-      if (latestFile.documentId || latestFile.uploadInProgress === true) {
+        if (latestFile.firestoreId || latestFile.uploadInProgress === true) {
           console.log('⏭️ Skipping upload - already processed (local check):', {
-              documentId: latestFile.documentId,
+              documentId: latestFile.id,
               uploadInProgress: latestFile.uploadInProgress
           });
           return;
@@ -217,26 +215,17 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
       
       // Check global state
       if (savingToFirestore.has(latestFile.id)) {
-          console.log('⏳ Upload already in progress (global check):', latestFile.name);
+          console.log('⏳ Upload already in progress (global check):', latestFile.fileName);
           return;
       }
-      
-      // Check Firestore data
-      const existingData = firestoreData.get(latestFile.id);
-      if (existingData?.documentId) {
-          console.log('⏭️ Skipping upload - already in Firestore:', {
-              documentId: existingData.documentId
-          });
-          return;
-      }
-      
+            
       // Only upload if file has extracted text
       if (latestFile.extractedText) {
           try {
               // Mark as upload in progress
               updateFileStatus(latestFile.id, 'uploading', { uploadInProgress: true });
               
-              console.log('🚀 Auto-uploading completed file with ALL data:', latestFile.name);
+              console.log('🚀 Auto-uploading completed file with ALL data:', latestFile.fileName);
               console.log('🏥 File has FHIR data:', !!latestFile.fhirData);
               console.log('🤖 AI Status:', latestFile.aiProcessingStatus);
               console.log('📊 Has BelroseFields:', !!latestFile.belroseFields);
@@ -246,10 +235,10 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
               const uploadResults: UploadResult[] = await uploadFiles([latestFile.id]);
               
               if (uploadResults && uploadResults[0]?.success) {
-                  console.log('✅ File with ALL data uploaded successfully!', latestFile.name);
+                  console.log('✅ File with ALL data uploaded successfully!', latestFile.fileName);
                   
                   updateFileStatus(latestFile.id, 'completed', {
-                      documentId: uploadResults[0].documentId,
+                      firestoreId: uploadResults[0].documentId,
                       uploadedAt: new Date().toISOString(),
                       uploadInProgress: false
                   });
@@ -259,7 +248,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
                       ? `Classified as: ${latestFile.belroseFields.visitType}`
                       : 'Processing completed';
                       
-                  toast.success(`🎯 ${latestFile.name} uploaded successfully!`, {
+                  toast.success(`🎯 ${latestFile.fileName} uploaded successfully!`, {
                       description: aiInfo,
                       duration: 4000
                   });
@@ -276,13 +265,13 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
                   uploadInProgress: false
               });
               
-              toast.error(`Failed to upload ${latestFile.name}`, {
+              toast.error(`Failed to upload ${latestFile.fileName}`, {
                   description: error instanceof Error ? error.message : 'Upload failed',
                   duration: 5000
               });
           }
       } else {
-          console.log('ℹ️ File completed without extracted text, skipping upload:', latestFile.name);
+          console.log('ℹ️ File completed without extracted text, skipping upload:', latestFile.fileName);
       }
   };
 
@@ -297,8 +286,8 @@ const handleTextSubmit = async (): Promise<void> => {
     if (convertTextToFHIR) {
       fhirData = await convertTextToFHIR(plainText, patientName || undefined);
     } else {
-       // Fallback: Create a simple FHIR Bundle with the text as a note
-        fhirData = {
+      // Fallback: Create a simple FHIR Bundle with the text as a note
+      fhirData = {
         resourceType: 'Bundle',
         type: 'collection',
         entry: [
@@ -309,7 +298,7 @@ const handleTextSubmit = async (): Promise<void> => {
               content: [{
                 attachment: {
                   contentType: 'text/plain',
-                  data: btoa(plainText) // base64 encode
+                  data: btoa(plainText)
                 }
               }],
               description: `Medical note${patientName ? ` for ${patientName}` : ''}`,
@@ -330,59 +319,32 @@ const handleTextSubmit = async (): Promise<void> => {
       };
     }
 
-    let belroseFields;
-    try {
-      console.log('🤖 Processing text submission with AI...');
-      const aiResult = await processRecordWithAI(fhirData, {
-        fileName: `Medical Note${patientName ? ` - ${patientName}` : ''}`,
-        extractedText: plainText.trim(),
-      });
-      
-      belroseFields = {
-        visitType: aiResult.visitType,
-        title: aiResult.title,
-        summary: aiResult.summary,
-        completedDate: aiResult.completedDate,
-        provider: aiResult.provider,
-        patient: aiResult.patient,
-        institution: aiResult.institution,
-        aiProcessedAt: new Date().toISOString()
-      };
-      
-      console.log('✅ AI processing completed for text submission:', belroseFields);
-    } catch (aiError) {
-      console.warn('⚠️ AI processing failed for text submission:', aiError);
-      // Continue without AI data
-    }
+    // Create virtual file - hook will handle AI processing, hashing, encryption
+    await addFhirAsVirtualFile(fhirData, {
+      fileName: `Medical Note${patientName ? ` - ${patientName}` : ''} - ${new Date().toLocaleDateString()}`,
+      sourceType: 'Plain Text Submission',
+      originalText: plainText.trim(),
+      autoUpload: true,
+    });
 
-      // Create virtual file with FHIR data
-      const { fileId, virtualFile } = await addFhirAsVirtualFile(fhirData, {
-        name: `Medical Note${patientName ? ` - ${patientName}` : ''} - ${new Date().toLocaleDateString()}`,
-        sourceType: 'Plain Text Submission',
-        originalText: plainText.trim(),
-        autoUpload: true,
-        belroseFields,
-        aiProcessingStatus: belroseFields? 'complete' : 'failed'
-      });
+    console.log('✅ Plain text converted to FHIR successfully');
+    toast.success('✅ Medical note saved successfully!', {
+      description: 'Your note has been converted to FHIR and saved to your health record',
+      duration: 4000,
+    });
 
-      console.log('✅ Plain text converted to FHIR successfully');
-      toast.success('✅ Medical note saved successfully!', {
-        description: 'Your note has been converted to FHIR and saved to your health record',
-        duration: 4000,
-      });
-
-      // Clear the form
-      setPlainText('');
-      setPatientName('');
+    // Clear the form
+    setPlainText('');
+    setPatientName('');
     
-    } catch (error) {
-      console.error('❌ Error converting text to FHIR:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`Failed to convert text to FHIR: ${errorMessage}`,{duration: 6000,});
-    } finally {
-      setSubmittingText(false);
-    }
-  };
+  } catch (error) {
+    console.error('❌ Error converting text to FHIR:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    toast.error(`Failed to convert text to FHIR: ${errorMessage}`, {duration: 6000});
+  } finally {
+    setSubmittingText(false);
+  }
+};
 
 const handleFhirSubmit = async (): Promise<void> => {
   if (!fhirText.trim() || !fhirValidation?.valid) return;
@@ -391,41 +353,15 @@ const handleFhirSubmit = async (): Promise<void> => {
   try {
     const fhirData: FHIRWithValidation = JSON.parse(fhirText);
     
-    let belroseFields;
-    try {
-      console.log('🤖 Processing FHIR submission with AI...');
-      const aiResult = await processRecordWithAI(fhirData, {
-        fileName: `Manual FHIR Input - ${fhirData.resourceType}`,
-        extractedText: fhirText.trim(), // Use the raw FHIR JSON as extracted text
+    console.log('🎯 Submitting FHIR data directly to Firestore');
+    
+    // Create virtual file - hook will handle AI processing, hashing, encryption
+    await addFhirAsVirtualFile(fhirData, {
+      fileName: `Manual FHIR Input - ${fhirData.resourceType}`,
+      sourceType: 'Manual FHIR JSON Submission',
+      originalText: fhirText.trim(),
+      autoUpload: true,
     });
-
-    belroseFields = {
-      visitType: aiResult.visitType,
-      title: aiResult.title,
-      summary: aiResult.summary,
-      completedDate: aiResult.completedDate,
-      provider: aiResult.provider,
-      patient: aiResult.patient,
-      institution: aiResult.institution,
-      aiProcessedAt: new Date().toISOString()
-    };
-
-      console.log('✅ AI processing completed for FHIR submission:', belroseFields);
-  } catch (aiError) {
-    console.warn('⚠️ AI processing failed for FHIR submission:', aiError);
-  }  
-
-  console.log('🎯 Submitting FHIR data directly to Firestore');
-  
-  // Step 1: Create virtual file with FHIR data and AUTO-UPLOAD
-  const { fileId, virtualFile, uploadResult } = await addFhirAsVirtualFile(fhirData, {
-    name: `Manual FHIR Input - ${fhirData.resourceType}`,
-    sourceType: 'Manual FHIR JSON Submission',
-    originalText: fhirText.trim(),
-    autoUpload: true,  // 🔥 Add this to use the working auto-upload feature
-    belroseFields,
-    aiProcessingStatus: belroseFields? 'completed' : 'failed'
-  });
     
     console.log('✅ FHIR data uploaded successfully');
     

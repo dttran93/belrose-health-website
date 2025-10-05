@@ -1,17 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { FileUploadService } from '@/features/AddRecord/services/fileUploadService';
-import DocumentProcessorService from '@/features/AddRecord/services/documentProcessorService';
 import { FileObject, FileStatus, AIProcessingStatus, VirtualFileInput } from '@/types/core';
 import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
 import { processRecordWithAI } from '@/features/AddRecord/services/aiRecordProcessingService';
-import { BlockchainService } from '@/features/BlockchainVerification/service/blockchainService';
-import { EncryptionService } from '@/features/Encryption/services/encryptionService';
-import {
-  isEncryptionEnabled,
-  measurePerformance,
-  logEncryption,
-} from '@/features/Encryption/encryptionConfig';
 
 import {
   AddFilesOptions,
@@ -22,6 +14,7 @@ import {
 } from './useFileManager.type';
 import { VirtualFileResult } from '../components/CombinedUploadFHIR.type';
 import { UploadResult } from '../services/shared.types';
+import { CombinedRecordProcessingService } from '../services/combinedRecordProcessingService';
 
 /**
  * A comprehensive file upload hook that handles:
@@ -68,7 +61,6 @@ export function useFileManager(): UseFileManagerTypes {
     files.length,
     files.map(f => f.fileName)
   );
-  const [firestoreData, setFirestoreData] = useState<Map<string, any>>(new Map());
   const [savingToFirestore, setSavingToFirestore] = useState<Set<string>>(new Set());
 
   // ==================== REFS & SERVICES ====================
@@ -149,7 +141,6 @@ export function useFileManager(): UseFileManagerTypes {
   const clearAll = useCallback(() => {
     console.log('🧹 Clearing all files and data');
     setFiles([]);
-    setFirestoreData(new Map());
     setSavingToFirestore(new Set());
 
     // Call reset callback if provided
@@ -161,7 +152,6 @@ export function useFileManager(): UseFileManagerTypes {
   const updateFirestoreRecord = useCallback(async (fileId: string, data: any) => {
     try {
       await fileUploadService.current.updateRecord(fileId, data);
-      setFirestoreData(prev => new Map([...prev, [fileId, { ...prev.get(fileId), ...data }]]));
     } catch (error: any) {
       console.error(`❌ Failed to update Firestore record for ${fileId}:`, error);
       throw error;
@@ -218,8 +208,6 @@ export function useFileManager(): UseFileManagerTypes {
 
   const processFile = useCallback(
     async (fileObj: FileObject) => {
-      const fileId = fileObj.id;
-
       console.log(`📋 Starting complete processing pipeline for: ${fileObj.fileName}`);
 
       updateFileStatus(fileObj.id, 'processing', {
@@ -227,241 +215,30 @@ export function useFileManager(): UseFileManagerTypes {
       });
 
       try {
-        // Step 1: Extract text and process document
-        console.log(`📝 Step 1: Extracting text from: ${fileObj.fileName}`);
-        updateFileStatus(fileObj.id, 'processing', {
-          processingStage: 'Extracting text...',
-        });
-
-        const result = await DocumentProcessorService.processDocument(fileObj.file!);
-        console.log(`📄 Text extraction complete. Word count: ${result.wordCount}`);
-
-        updateFileStatus(fileObj.id, 'processing', {
-          extractedText: result.extractedText,
-          wordCount: result.wordCount,
-          processingStage: 'Text extraction completed',
-        });
-
-        // Step 2: Try FHIR conversion
-        let fhirData = null;
-        if (result.extractedText && result.extractedText.trim().length > 0) {
-          console.log(`🩺 Step 2: Attempting FHIR conversion for: ${fileObj.fileName}`);
-          updateFileStatus(fileObj.id, 'processing', {
-            processingStage: 'Converting to FHIR...',
-          });
-
-          try {
-            const fhirResult = await convertToFHIR(result.extractedText);
-            console.log('🔍 FHIR result received:', fhirResult);
-
-            if (fhirResult && fhirResult.resourceType === 'Bundle') {
-              fhirData = fhirResult;
-              console.log(`✅ FHIR conversion successful for: ${fileObj.fileName}`);
-
-              updateFileStatus(fileObj.id, 'processing', {
-                fhirData: fhirData,
-                processingStage: 'FHIR conversion completed',
-                aiProcessingStatus: 'pending',
-              });
-            } else {
-              console.log(
-                `ℹ️ FHIR conversion failed for: ${fileObj.fileName}, continuing without FHIR data`
-              );
-            }
-          } catch (fhirError: any) {
-            console.error(`💥 FHIR conversion error:`, fhirError);
-            console.warn(`⚠️ FHIR conversion failed for ${fileObj.fileName}:`, fhirError.message);
-          }
-        } else {
-          console.log(`ℹ️ No text extracted from: ${fileObj.fileName}, skipping FHIR conversion`);
-        }
-
-        // Step 3: Update file with basic processing results
-        if (!fhirData) {
-          updateFileStatus(fileObj.id, 'processing', {
-            processingStage: 'Completing...',
-            aiProcessingStatus: 'not_needed',
-          });
-        }
-
-        // Step 4: AI Processing (if FHIR data exists)
-        let belroseFields = undefined;
-        if (fhirData) {
-          console.log(`🤖 Step 4: Starting AI processing for: ${fileObj.fileName}`);
-
-          // Update to AI processing stage
-          updateFileStatus(fileObj.id, 'processing', {
-            aiProcessingStatus: 'processing',
-            processingStage: 'AI analyzing content...',
-          });
-
-          try {
-            // Create updated file object with all the processed data
-            const updatedFileObj: FileObject = {
-              ...fileObj,
-              extractedText: result.extractedText,
-              wordCount: result.wordCount,
-              fhirData: fhirData,
-              status: 'processing',
-              aiProcessingStatus: 'processing',
-            };
-
-            // 🔥 Call AI processing and wait for the result
-            const aiResult = await processRecordWithAI(updatedFileObj.fhirData, {
-              fileName: updatedFileObj.fileName,
-              extractedText: updatedFileObj.extractedText || undefined,
-            });
-
-            belroseFields = {
-              visitType: aiResult.visitType,
-              title: aiResult.title,
-              summary: aiResult.summary,
-              completedDate: aiResult.completedDate,
-              provider: aiResult.provider,
-              patient: aiResult.patient,
-              institution: aiResult.institution,
-              aiProcessedAt: new Date().toISOString(),
-            };
-
-            console.log(`✅ AI processing completed for: ${fileObj.fileName}`, aiResult);
-
-            // Show success toast
-            toast.success(`🤖 AI analysis completed for ${fileObj.fileName}`, {
-              description: `Classified as: ${aiResult.visitType}`,
-              duration: 3000,
-            });
-          } catch (error: any) {
-            console.error(`❌ AI processing failed for ${fileObj.fileName}:`, error);
-
-            belroseFields = {
-              aiFailureReason: error.message,
-              aiProcessedAt: new Date().toISOString(),
-            };
-
-            // Show error toast
-            toast.error(`AI analysis failed for ${fileObj.fileName}`, {
-              description: error.message,
-              duration: 5000,
-            });
-          }
-        } else {
-          // No AI processing needed - update the processing stage to indicate completion
-          updateFileStatus(fileObj.id, 'processing', {
-            processingStage: 'Completing...',
-          });
-        }
-
-        // STEP 5: Record Hash Generation
-        let recordHash = undefined;
-
-        // Create the complete record object with all processed data
-        const completeRecord: FileObject = {
-          ...fileObj,
-          extractedText: result.extractedText,
-          wordCount: result.wordCount,
-          fhirData: fhirData,
-          belroseFields: belroseFields,
-          status: 'processing', // Still processing until hash is generated
-        };
-
-        console.log(`🔗 Step 5: Generating record hash for: ${fileObj.fileName}`);
-
-        updateFileStatus(fileObj.id, 'processing', {
-          processingStage: 'Generating record hash...',
-        });
-
-        try {
-          recordHash = await BlockchainService.generateRecordHash(completeRecord);
-
-          console.log(`✅ Record hash generated for: ${fileObj.fileName}`, {
-            hash: recordHash.substring(0, 12) + '...',
-          });
-
-          // Show success toast for hash generation
-          toast.success(`🔗 Record hash generated for ${fileObj.fileName}`, {
-            description: `Hash: ${recordHash.substring(0, 12)}...`,
-            duration: 3000,
-          });
-        } catch (error: any) {
-          console.error(`❌ Record hash generation failed for ${fileObj.fileName}:`, error);
-
-          // Show warning toast but don't fail the entire process
-          toast.warning(`Record hash generation failed for ${fileObj.fileName}`, {
-            description: 'Record will be saved without hash verification',
-            duration: 4000,
-          });
-
-          // Log the error but continue processing
-          console.warn(`⚠️ Continuing without record hash for ${fileObj.fileName}`);
-        }
-
-        // STEP 6: Encryption
-        if (isEncryptionEnabled()) {
-          logEncryption('Starting complete record encryption', {
-            fileName: fileObj.fileName,
-          });
-          console.log(`🔒 Step 6: Encrypting file: ${fileObj.fileName}`);
-          updateFileStatus(fileObj.id, 'processing', {
-            processingStage: 'Encrypting record data...',
-          });
-
-          try {
-            const encryptedResult = await measurePerformance(
-              `Complete Record Encryption: ${fileObj.fileName}`,
-              async () => {
-                return await EncryptionService.encryptCompleteRecord(
-                  fileObj.fileName, // File name (PII!)
-                  fileObj.file, // Original file
-                  result.extractedText, // Extracted text
-                  fileObj.originalText, // Original text (if exists)
-                  fhirData, // FHIR data (if exists)
-                  belroseFields, // Belrose fields (if exists)
-                  null // Custom data (you can add this later)
-                );
-              }
-            );
-
-            logEncryption('Encryption complete', {
-              fileName: fileObj.fileName,
-              components: Object.keys(encryptedResult).filter(k => k !== 'encryptedKey'),
-            });
-
+        // Use the service to process the file
+        const result = await CombinedRecordProcessingService.processUploadedFile(fileObj, {
+          onStageUpdate: (stage, data) => {
             updateFileStatus(fileObj.id, 'processing', {
-              encryptedData: encryptedResult, // Store ALL encrypted components
-              processingStage: 'Record encrypted',
+              processingStage: stage,
+              ...data,
             });
+          },
+          onError: error => {
+            console.error(`Processing error for ${fileObj.fileName}:`, error);
+          },
+        });
 
-            toast.success(`🔒 Record encrypted for ${fileObj.fileName}`, {
-              description: 'All sensitive data is now encrypted',
-              duration: 3000,
-            });
-          } catch (error: any) {
-            console.error(`❌ Encryption failed for ${fileObj.fileName}:`, error);
-
-            toast.error(`Encryption failed for ${fileObj.fileName}`, {
-              description: error.message,
-              duration: 5000,
-            });
-
-            throw new Error(`Encryption failed: ${error.message}`);
-          }
-        } else {
-          logEncryption('Encryption disabled - storing plaintext', {
-            fileName: fileObj.fileName,
-          });
-        }
-
-        // 🎉 FINAL STEP: Mark as completed with ALL data including record hash
+        // Mark as completed with all processed data
         console.log(`🎉 Marking file as completed: ${fileObj.fileName}`);
         updateFileStatus(fileObj.id, 'completed', {
           processingStage: undefined,
-          aiProcessingStatus: fhirData
-            ? belroseFields?.aiFailureReason
-              ? 'failed'
-              : 'completed'
-            : 'not_needed',
-          belroseFields: belroseFields,
-          recordHash: recordHash,
+          extractedText: result.extractedText,
+          wordCount: result.wordCount,
+          fhirData: result.fhirData,
+          belroseFields: result.belroseFields,
+          recordHash: result.recordHash,
+          encryptedData: result.encryptedData,
+          aiProcessingStatus: result.aiProcessingStatus,
         });
 
         console.log(`🎉 Complete processing pipeline finished for: ${fileObj.fileName}`);
@@ -584,12 +361,6 @@ export function useFileManager(): UseFileManagerTypes {
       return filtered;
     });
 
-    setFirestoreData(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(fileId);
-      return newMap;
-    });
-
     setSavingToFirestore(prev => {
       const newSet = new Set(prev);
       newSet.delete(fileId);
@@ -658,9 +429,9 @@ export function useFileManager(): UseFileManagerTypes {
       cancelFileUpload(fileId);
 
       // Step 2: Delete from Firebase if it was uploaded
-      if (fileToRemove.id) {
+      if (fileToRemove.firestoreId) {
         try {
-          await deleteFileFromFirebase(fileToRemove.id);
+          await deleteFileFromFirebase(fileToRemove.firestoreId);
           toast.success(`Deleted "${fileToRemove.fileName}" from cloud storage`);
         } catch (error: any) {
           console.error('❌ Firebase deletion failed, but continuing with local cleanup:', error);
@@ -684,7 +455,9 @@ export function useFileManager(): UseFileManagerTypes {
     console.log('🧹 Starting enhanced clearAll - will clean up Firebase files too');
 
     // Get all uploaded files that need Firebase cleanup
-    const uploadedFiles = files.filter(f => f.id).map(f => ({ id: f.id!, fileName: f.fileName }));
+    const uploadedFiles = files
+      .filter(f => f.firestoreId)
+      .map(f => ({ id: f.firestoreId!, fileName: f.fileName }));
 
     if (uploadedFiles.length > 0) {
       console.log(`🔥 Found ${uploadedFiles.length} uploaded files to delete from Firebase`);
@@ -726,7 +499,6 @@ export function useFileManager(): UseFileManagerTypes {
     // Clear local state (same as original clearAll)
     console.log('🧹 Clearing local state');
     setFiles([]);
-    setFirestoreData(new Map());
     setSavingToFirestore(new Set());
 
     // Call reset callback if provided
@@ -768,8 +540,9 @@ export function useFileManager(): UseFileManagerTypes {
           const result = await fileUploadService.current.uploadFile(fileObj);
           console.log(`✅ Upload successful for ${fileObj.fileName}:`, result);
 
-          setFirestoreData(prev => new Map([...prev, [fileObj.id, result]]));
-          updateFileStatus(fileObj.id, 'completed');
+          updateFileStatus(fileObj.id, 'completed', {
+            firestoreId: result.documentId,
+          });
 
           // 🎉 SUCCESS TOAST HERE
           toast.success(`📁 ${fileObj.fileName} uploaded successfully!`, {
@@ -810,83 +583,47 @@ export function useFileManager(): UseFileManagerTypes {
   // ==================== VIRTUAL FILE SUPPORT ====================
 
   const addVirtualFile = useCallback(
-    async (virtualData: VirtualFileInput): Promise<{ fileId: string; recordHash?: string }> => {
+    async (
+      virtualData: VirtualFileInput
+    ): Promise<{
+      fileId: string;
+      recordHash?: string;
+      virtualFile: FileObject; // ← Add this
+    }> => {
       const fileId = virtualData.id || generateId();
+      const fileName = virtualData.fileName || `Virtual File ${fileId}`;
 
+      // Process the virtual file through the pipeline
+      const result = await CombinedRecordProcessingService.processVirtualFile(
+        virtualData,
+        fileName
+      );
+
+      // Create virtual file with processed data
       const virtualFile: FileObject = {
         id: fileId,
-        fileName: virtualData.fileName || `Virtual File ${fileId}`,
+        fileName: fileName,
         fileSize: virtualData.fileSize || 0,
         fileType: virtualData.fileType || 'application/json',
         status: 'completed',
         uploadedAt: new Date().toISOString(),
         originalText: virtualData.originalText,
         wordCount: virtualData.wordCount || 0,
+        sourceType: virtualData.sourceType,
         isVirtual: true,
         fhirData: virtualData.fhirData,
         file: undefined,
-        belroseFields: virtualData.belroseFields,
-        aiProcessingStatus: virtualData.aiProcessingStatus,
+        belroseFields: result.belroseFields, // ← Has the processed data
+        aiProcessingStatus: result.aiProcessingStatus,
+        recordHash: result.recordHash,
+        encryptedData: result.encryptedData,
       };
-
-      // Always generate record hash for virtual files
-      let recordHash = undefined;
-
-      console.log('🔗 Generating record hash for virtual file:', virtualFile.fileName);
-
-      try {
-        recordHash = await BlockchainService.generateRecordHash(virtualFile);
-
-        // Add hash to the virtual file
-        virtualFile.recordHash = recordHash;
-
-        console.log(`✅ Record hash generated for virtual file: ${virtualFile.fileName}`, {
-          hash: recordHash.substring(0, 12) + '...',
-        });
-
-        toast.success(`🔗 Virtual file hash generated: ${virtualFile.fileName}`, {
-          description: `Hash: ${recordHash.substring(0, 12)}...`,
-          duration: 3000,
-        });
-      } catch (error: any) {
-        console.error(`❌ Hash generation failed for virtual file ${virtualFile.fileName}:`, error);
-
-        toast.warning(`Hash generation failed for ${virtualFile.fileName}`, {
-          description: 'File will be saved without hash verification',
-          duration: 3000,
-        });
-      }
-
-      //Encrypt virtual file data if encryption is enabled
-      if (isEncryptionEnabled() && (virtualData.fhirData || virtualData.originalText)) {
-        logEncryption('Encrypting virtual file', { fileName: virtualFile.fileName });
-
-        try {
-          const encryptedResult = await EncryptionService.encryptCompleteRecord(
-            virtualFile.fileName,
-            undefined,
-            null,
-            virtualData.originalText,
-            virtualData.fhirData,
-            virtualData.belroseFields,
-            null //for custom data, add in the future
-          );
-
-          virtualFile.encryptedData = encryptedResult;
-
-          toast.success(`🔒 Virtual file encrypted: ${virtualFile.fileName}`);
-        } catch (error: any) {
-          console.error('Encryption failed for virtual file:', error);
-          toast.error(`Encryption failed: ${error.message}`);
-          throw error;
-        }
-      }
 
       // Add to state
       setFiles(prev => [...prev, virtualFile]);
       console.log(`✅ Added virtual file: ${virtualFile.fileName}`);
 
-      return { fileId, recordHash };
+      return { fileId, recordHash: result.recordHash, virtualFile }; // ← Return it
     },
     [setFiles]
   );
@@ -911,51 +648,32 @@ export function useFileManager(): UseFileManagerTypes {
         ...options,
       };
 
-      const { fileId: generatedFileId, recordHash } = await addVirtualFile(virtualFileInput);
-
-      // Instead of trying to find it in the files array (which might not be updated yet),
-      // construct the FileObject directly from the data we have
-      const virtualFile: FileObject = {
-        id: generatedFileId,
-        fileName: fileName,
-        fileSize: JSON.stringify(fhirData).length,
-        fileType: 'application/fhir+json',
-        status: 'completed',
-        uploadedAt: new Date().toISOString(),
-        originalText: virtualFileInput.originalText,
-        wordCount: JSON.stringify(fhirData).split(/\s+/).length,
-        sourceType: virtualFileInput.sourceType,
-        isVirtual: true,
-        fhirData,
-        file: undefined,
-        belroseFields: options.belroseFields,
-        aiProcessingStatus: options.aiProcessingStatus || 'not_needed',
-        recordHash: recordHash,
-      };
+      // Get the processed virtual file directly from the return value
+      const {
+        fileId: generatedFileId,
+        recordHash,
+        virtualFile,
+      } = await addVirtualFile(virtualFileInput);
 
       // 🔥 AUTO-UPLOAD if requested
       if (options.autoUpload) {
         console.log('🚀 Auto-uploading virtual file:', virtualFile.fileName);
 
         try {
-          // Prevent duplicate uploads
-          if (savingToFirestore.has(fileId)) {
+          if (savingToFirestore.has(generatedFileId)) {
             throw new Error('File already uploading');
           }
 
-          setSavingToFirestore(prev => new Set([...prev, fileId]));
+          setSavingToFirestore(prev => new Set([...prev, generatedFileId]));
 
           const uploadResult = await fileUploadService.current.uploadFile(virtualFile);
           console.log(`✅ Auto-upload successful for ${virtualFile.fileName}:`, uploadResult);
 
-          // Update state with upload result
-          setFirestoreData(prev => new Map([...prev, [fileId, uploadResult]]));
-          updateFileStatus(fileId, 'completed', {
-            id: uploadResult.documentId,
+          updateFileStatus(generatedFileId, 'completed', {
+            firestoreId: uploadResult.documentId,
             uploadedAt: uploadResult.uploadedAt?.toISOString() || new Date().toISOString(),
           });
 
-          // Show success toast
           toast.success(`📁 ${virtualFile.fileName} uploaded successfully!`, {
             description: 'Your file has been saved to cloud storage',
             duration: 4000,
@@ -967,7 +685,7 @@ export function useFileManager(): UseFileManagerTypes {
             uploadResult: {
               success: true,
               documentId: uploadResult.documentId,
-              fileId: fileId,
+              fileId: generatedFileId,
               uploadedAt: uploadResult.uploadedAt,
               filePath: uploadResult.filePath,
               downloadURL: uploadResult.downloadURL,
@@ -975,23 +693,22 @@ export function useFileManager(): UseFileManagerTypes {
           };
         } catch (error) {
           console.error(`❌ Auto-upload failed for ${virtualFile.fileName}:`, error);
-          updateFileStatus(fileId, 'error', {
+          updateFileStatus(generatedFileId, 'error', {
             error: error instanceof Error ? error.message : 'Upload failed',
           });
-          throw error; // Re-throw so caller can handle it
+          throw error;
         } finally {
           setSavingToFirestore(prev => {
             const newSet = new Set(prev);
-            newSet.delete(fileId);
+            newSet.delete(generatedFileId);
             return newSet;
           });
         }
       }
 
-      // Return without upload result if not auto-uploading
       return { fileId: generatedFileId, virtualFile };
     },
-    [addVirtualFile, fileUploadService, savingToFirestore, setFirestoreData, updateFileStatus]
+    [addVirtualFile, fileUploadService, savingToFirestore, updateFileStatus]
   );
 
   // ==================== FHIR INTEGRATION ====================
@@ -1033,7 +750,6 @@ export function useFileManager(): UseFileManagerTypes {
     // Core state (for compatibility)
     files,
     processedFiles,
-    firestoreData,
     savingToFirestore,
 
     // File management actions
@@ -1063,7 +779,7 @@ export function useFileManager(): UseFileManagerTypes {
 
     // Computed values
     getStats,
-    savedToFirestoreCount: firestoreData.size,
+    savedToFirestoreCount: files.filter(f => f.firestoreId).length,
     savingCount: savingToFirestore.size,
 
     // VirtualFile Support

@@ -78,7 +78,6 @@ export interface CombinedUploadFHIRProps {
   uploadFiles: (fileIds?: string[]) => Promise<UploadResult[]>;
   shouldAutoUpload: (file:FileObject) => boolean;
   savingToFirestore: Set<string>;
-  firestoreData: Map<string, any>;
   
   // 🔥 ADD FHIR PROPS
   fhirData?: Map<string, FHIRWithValidation>
