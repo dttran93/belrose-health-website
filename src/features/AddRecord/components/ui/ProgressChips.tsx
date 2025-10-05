@@ -110,7 +110,7 @@ export const createFileProcessingSteps = (fileObj: FileObject): ProcessingStep[]
   // Get current state
   const hasTextContent = !!fileObj.extractedText || !!fileObj.originalText;
   const hasFhirData = !!fileObj.fhirData;
-  const hasDocumentId = !!fileObj.documentId;
+  const hasDocumentId = !!fileObj.id;
   const hasError = fileObj.status === 'error';
   const isProcessing = fileObj.status === 'processing';
   const isCompleted = fileObj.status === 'completed';
@@ -119,7 +119,7 @@ export const createFileProcessingSteps = (fileObj: FileObject): ProcessingStep[]
   const hasBelroseFields = !!fileObj.belroseFields && Object.keys(fileObj.belroseFields).length > 0;
 
   console.log('🔍 ProgressChips Debug:', {
-      fileName: fileObj.name,
+      fileName: fileObj.fileName,
       status: `"${fileObj.status}"`,
       processingStage: `"${processingStage}"`,
       aiStatus: aiStatus,
@@ -218,7 +218,7 @@ case 'fhir': // For file and text uploads
           if (hasDocumentId) {
               console.log(`🔍 Save step: COMPLETED`);
               return { ...step, status: 'completed' }; // ✅ Saved
-          } else if (fileObj.status === 'uploading' || fileObj.uploadInProgress) {
+          } else if (fileObj.status === 'uploading') {
               console.log(`🔍 Save step: ACTIVE`);
               return { ...step, status: 'active' }; // 🔄 Uploading
           } else {

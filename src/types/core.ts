@@ -99,6 +99,21 @@ export type FileStatus =
 
 export type SourceType = 'Plain Text Submission' | 'Manual FHIR JSON Submission' | 'File Upload';
 
+//Processing Stages good for the progress chips in the Add Record process
+export type ProcessingStages =
+  | 'Starting processing...'
+  | 'Extracting text...'
+  | 'Text extraction completed'
+  | 'Converting to FHIR...'
+  | 'FHIR conversion completed'
+  | 'Completing...'
+  | 'AI processing...'
+  | 'AI analyzing content...'
+  | 'Encrypting record data...'
+  | 'Record encrypted'
+  | 'Generating record hash...'
+  | undefined;
+
 export interface VirtualFileInput {
   fileName?: string;
   sourceType?: SourceType;
@@ -110,30 +125,87 @@ export interface VirtualFileInput {
 
 export interface FileObject {
   id: string; //fileId. Generated in useFileManager via createFileObject() or addVirtualFile(). file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}
-  file?: File; //actual file object from file input. Real life upload not virtual. Generated in createFileObject in useFileManager.ts
-  fileName: string; //file name or custom name for virtual files. set by createFileObject() in useFileManager.ts
   fileSize: number; //file size. Set in createFileObject in useFileManager.ts. file.size for real files
   fileType: string; //file type. Set in createFileObject in useFileManager.ts. file.type for real files or application/fhir+json for virtual - NEVER undefined
   status: FileStatus; //Processing property. Initially set as pending. Then pending/processing... see below
   error?: string; //Failed processing
-  extractedText?: string | null; //text extracted from image/pdf
-  originalText?: string | null;
   originalFileHash?: string | null; //hash of the original file that was uploaded
   uploadedAt?: string;
   wordCount?: number; //calculated during text extraction
   sourceType?: SourceType;
   lastModified?: number; //Filetracking for UI state management.
   isVirtual?: boolean; //for virtual files
-  fhirData?: any;
   downloadURL?: string;
-  recordHash: string; //has of the record content
-  [key: string]: any;
+  recordHash?: string; //has of the record content
+  processingStage?: ProcessingStages;
 
-  //For AI enrichedFields
-  belroseFields?: BelroseFields; // Make this optional since not all records may have it yet
+  // PLAIN TEXT PERSONAL HEALTH DATA, MUST BE ENCRYPTED
+  fileName: string; //file name or custom name for virtual files. set by createFileObject() in useFileManager.ts
+  file?: File; //actual file object from file input. Real life upload not virtual. Generated in createFileObject in useFileManager.ts
+  extractedText?: string | null; //text extracted from image/pdf
+  originalText?: string | null; //text typed into app by user
+  fhirData?: any;
+  belroseFields?: BelroseFields; //AI enriched fields for easy labeling within the Belrose App
+  customData?: any; //for non-medical data that may come in different formats, but not be particularly suited to FHIR format
+
+  //For processing Belrose, AI enriched Fields
   aiProcessingStatus?: AIProcessingStatus;
 
   //Blockchain Verification
   blockchainVerification?: BlockchainVerification;
   isProviderRecord?: boolean;
+
+  //For Client-Side Encryption. One key encrypts all the personal data fields
+  encryption?: {
+    isEncrypted: boolean;
+    algorithm: 'AES-GCM';
+    keyLength: 256;
+    encryptedAt: string;
+  };
+
+  encryptedData?: {
+    encryptedKey: string; // Single key for all encrypted data (Base64)
+
+    // Encrypted fileName (always exists - contains PII!)
+    fileName: {
+      encrypted: ArrayBuffer; // Only exists during upload process
+      iv: string; // Base64
+    };
+
+    // Encrypted file (original upload) - stored in memory during processing
+    file?: {
+      encrypted: ArrayBuffer; // Only exists during upload process
+      iv: string; // Base64
+    };
+
+    // Encrypted extracted text
+    extractedText?: {
+      encrypted: ArrayBuffer; // Only exists during upload process
+      iv: string; // Base64
+    };
+
+    // Encrypted original text (if exists)
+    originalText?: {
+      encrypted: ArrayBuffer; // Only exists during upload process
+      iv: string; // Base64
+    };
+
+    // Encrypted FHIR data (if exists)
+    fhirData?: {
+      encrypted: ArrayBuffer; // Only exists during upload process
+      iv: string; // Base64
+    };
+
+    // Encrypted belrose fields (if exists)
+    belroseFields?: {
+      encrypted: ArrayBuffer; // Only exists during upload process
+      iv: string; // Base64
+    };
+
+    // Encrypted custom data (if exists)
+    customData?: {
+      encrypted: ArrayBuffer; // Only exists during upload process
+      iv: string; // Base64
+    };
+  };
 }
