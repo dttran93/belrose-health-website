@@ -364,20 +364,6 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({ onSwitchToLogin
         </Button>
       </form>
 
-      {/* Toggle between login/signup */}
-      <div className="mt-6 text-center">
-        <p className="text-foreground">
-          Already have an account?
-          <button
-            type="button"
-            onClick={onSwitchToLogin}
-            className="ml-2 text-destructive font-medium hover:underline transition-colors"
-          >
-            Sign in
-          </button>
-        </p>
-      </div>
-
       {/* Social login*/}
       <SocialAuthButtons disabled={isLoading} />
 

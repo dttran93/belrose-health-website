@@ -45,6 +45,21 @@ export interface LocationState {
 export interface UserProfile extends User {
   createdAt: any;
   updatedAt: any;
+
+  generatedWallet?: {
+    address: string;
+    encryptedPrivateKey: string;
+    keyIv: string;
+    keyAuthTag: string;
+    keySalt: string;
+    encryptedMnemonic: string; // Backup recovery phrase
+    mnemonicIv: string;
+    mnemonicAuthTag: string;
+    mnemonicSalt: string;
+    walletType: 'generated';
+    createdAt: string;
+  };
+
   connectedWallet?: {
     address: string;
     authMethod: 'web3auth' | 'metamask';
