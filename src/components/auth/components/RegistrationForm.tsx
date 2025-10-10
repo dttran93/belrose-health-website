@@ -1,21 +1,29 @@
 // /features/Auth/components/RegistrationForm.tsx
 
 import React, { useState } from 'react';
-import { Check, Lock, Wallet, ShieldCheck, ArrowRight, ArrowLeft } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  Check,
+  Lock,
+  Wallet,
+  ShieldCheck,
+  ArrowRight,
+  ArrowLeft,
+  RotateCcwKey,
+  IdCard,
+} from 'lucide-react';
+import { useNavigate, useLocation, data } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
-
-// Import your existing components
-import { useAuthForm } from '../hooks/useAuthForm';
 import BelroseAccountForm from './BelroseAccountForm';
-import { EncryptionPasswordSetup } from '@/features/Encryption/components/EncryptionPasswordSetup';
+import EncryptionPasswordSetup from './EncryptionPasswordSetup';
+import { RecoveryKeyDisplay } from './RecoveryKeyDisplay';
+import WalletSetup from './WalletSetup';
+import { getFirestore, doc, setDoc } from 'firebase/firestore';
 
 interface StepConfig {
   number: number;
   title: string;
   subtitle: string;
-  description: string;
   icon: typeof ShieldCheck;
 }
 
@@ -30,10 +38,15 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
 
   // Store data from all steps
   const [registrationData, setRegistrationData] = useState({
-    basicInfo: {},
+    userId: '',
+    email: '',
+    firstName: '',
+    lastName: '',
     encryptionPassword: '',
     walletAddress: '',
-    verificationStatus: '',
+    walletType: '' as 'generated' | 'metamask' | '',
+    recoveryKey: '',
+    acknowledgedRecoveryKey: false,
   });
 
   const steps: StepConfig[] = [
@@ -41,49 +54,67 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
       number: 1,
       title: 'Account Creation',
       subtitle: 'Create your secure Belrose account',
-      description:
-        'Your Belrose account is the central hub for the encryption and blockchain transactions that will allow you to own your health data',
       icon: ShieldCheck,
     },
     {
       number: 2,
       title: 'Encryption Setup',
       subtitle: 'Protect your health records',
-      description: 'Only you can access your medical data with encryption',
       icon: Lock,
     },
     {
       number: 3,
       title: 'Blockchain Connection',
-      subtitle: 'Connect your blockchain wallet (optional)',
-      description:
-        'You control your records, but doctors may need to verify their accuracy, that is where blockchain comes in.',
+      subtitle: 'Connect your blockchain wallet',
       icon: Wallet,
     },
     {
       number: 4,
+      title: 'Recovery Key',
+      subtitle: 'Save your recovery key for your encryption and blockchain wallet',
+      icon: RotateCcwKey,
+    },
+    {
+      number: 5,
       title: 'Identity Verification',
       subtitle: "Verify you're a real person (optional)",
-      description:
-        'If you choose to verify your identity, we can go out and get your records on your behalf.',
-      icon: Check,
+      icon: IdCard,
     },
   ];
 
+  const isStepCompleted = (stepNumber: number): boolean => {
+    switch (stepNumber) {
+      case 1:
+        //Step 1 is done if we have a userId and email
+        return !!(registrationData.userId && registrationData.email);
+      case 2:
+        //Step 2 is complete if encryption password is set
+        return !!registrationData.encryptionPassword;
+      case 3:
+        // Step 3 is complete if wallet address and type are set
+        return !!(registrationData.walletAddress && registrationData.walletType);
+      case 4:
+        // Step 4 is completed if a recovery Key has been created/saved. Maybe change to if they've acknowledged? But I guess there's technically not a lot for them to do here...
+        return !!registrationData.acknowledgedRecoveryKey;
+      case 5:
+        //TO BE UPDATED WITH ID VERIFICATION THING
+        return true;
+      default:
+        return false;
+    }
+  };
+
+  const canProceed = (): Boolean => {
+    return isStepCompleted(1) && isStepCompleted(2) && isStepCompleted(3) && isStepCompleted(4);
+  };
+
   const handleStepComplete = (stepNumber: number, data: any) => {
-    // Save step data
-    const dataKey =
-      stepNumber === 1
-        ? 'basicInfo'
-        : stepNumber === 2
-        ? 'encryptionPassword'
-        : stepNumber === 3
-        ? 'walletAddress'
-        : 'verificationStatus';
+    //DEBUG
+    console.log('📥 handleStepComplete received:', { stepNumber, data });
 
     setRegistrationData(prev => ({
       ...prev,
-      [dataKey]: data,
+      ...data,
     }));
 
     // Move to next step or complete registration
@@ -94,26 +125,34 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     }
   };
 
-  const handleCompleteRegistration = () => {
-    toast.success('Registration complete!', {
-      description: 'Welcome to Belrose!',
-      duration: 3000,
-    });
+  const handleCompleteRegistration = async () => {
+    try {
+      //Save user profile data to Firestore
+      const db = getFirestore();
+      const userDocRef = doc(db, 'users', registrationData.userId);
 
-    const from = location.state?.from?.pathname || '/dashboard';
-    navigate(from, { replace: true });
-  };
+      await setDoc(userDocRef, {
+        email: registrationData.email,
+        firstName: registrationData.firstName,
+        lastName: registrationData.lastName,
+        walletAddress: registrationData.walletAddress,
+        walletType: registrationData.walletType,
+        createdAt: new Date(),
+      });
 
-  const handleBack = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
+      toast.success('Registration complete!', {
+        description: 'Welcome to Belrose!',
+        duration: 3000,
+      });
 
-  const handleSkipStep = () => {
-    if (currentStep === 3) {
-      // Wallet connection is optional
-      setCurrentStep(currentStep + 1);
+      const from = location.state?.from?.pathname || '/dashboard';
+      navigate(from, { replace: true });
+    } catch (error) {
+      console.error('Error completing registration:', error);
+      toast.error('Failed to complete registration', {
+        description: 'Please try again or contact support',
+        duration: 5000,
+      });
     }
   };
 
@@ -129,7 +168,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
           <div className="space-y-8">
             {steps.map(step => {
               const Icon = step.icon;
-              const isCompleted = step.number < currentStep;
+              const isCompleted = isStepCompleted(step.number);
               const isCurrent = step.number === currentStep;
 
               return (
@@ -172,19 +211,34 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
             {/* Render current step */}
             {currentStep === 1 && (
               <BelroseAccountForm
-                onSwitchToLogin={onSwitchToLogin}
                 onComplete={data => handleStepComplete(1, data)}
-                initialData={registrationData.basicInfo}
+                initialData={registrationData}
+                isCompleted={isStepCompleted(1)}
               />
             )}
             {currentStep === 2 && (
               <EncryptionPasswordSetup
-                onComplete={() => handleStepComplete}
-                onCancel={handleBack}
+                onComplete={data => handleStepComplete(2, data)}
+                isCompleted={isStepCompleted(2)}
               />
             )}
-            {currentStep === 3 && <div>Placeholder for Step 3: Wallet Connection</div>}
-            {currentStep === 4 && <div>Placeholder for Step 4: Identity Verification</div>}
+            {currentStep === 3 && (
+              <WalletSetup
+                userId={registrationData.userId}
+                encryptionPassword={registrationData.encryptionPassword}
+                onComplete={data => handleStepComplete(3, data)}
+                isCompleted={isStepCompleted(3)}
+              />
+            )}
+
+            {currentStep === 4 && (
+              <RecoveryKeyDisplay
+                recoveryKey={registrationData.recoveryKey}
+                onComplete={data => handleStepComplete(4, data)}
+                isCompleted={isStepCompleted(4)}
+              />
+            )}
+            {currentStep === 5 && <div>Placeholder for Step 5: Identity Verification</div>}
           </div>
         </div>
       </div>
@@ -209,19 +263,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
             </div>
           </div>
 
-          {/* Center Footer - Description */}
-          <div className="flex">
-            {steps.map(step => {
-              const isCurrent = step.number === currentStep;
-
-              return (
-                <div className="flex items-start space-x-4">
-                  {isCurrent && <p className="text-chart-4 text-sm mt-1">{step.description}</p>}
-                </div>
-              );
-            })}
-          </div>
-
           {/* Right side - Navigation buttons */}
           <div className="flex items-center space-x-4">
             <div className="flex text-white mx-3 items-center">
@@ -242,8 +283,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <Button
-              onClick={() => setCurrentStep(Math.min(currentStep + 1, 4))}
-              disabled={currentStep === 4}
+              onClick={() => setCurrentStep(Math.min(currentStep + 1, 5))}
+              disabled={currentStep === 5}
               className="px-4 py-2 rounded-lg hover:bg-secondary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <ArrowRight className="w-5 h-5" />
@@ -251,9 +292,10 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
             <Button
               variant="secondary"
               type="submit"
+              disabled={!canProceed()}
               className="rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
             >
-              <span>Create Account</span>
+              <span>Complete Registration</span>
             </Button>
           </div>
         </div>

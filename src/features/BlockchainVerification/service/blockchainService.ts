@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 import { FileObject, BlockchainVerification } from '@/types/core';
 import { removeUndefinedValues } from '@/lib/utils';
+import { RecordHashService } from '@/features/ViewEditRecord/services/generateRecordHash';
 
 // Your deployed contract address
 const CONTRACT_ADDRESS = '0x586B5cE24aF93842AB54fd5573B03c740f39387A';
@@ -39,40 +40,6 @@ const CONTRACT_ABI = [
 ];
 
 export class BlockchainService {
-  /**
-   * Generate a hash of the medical record content
-   */
-  static async generateRecordHash(fileObject: FileObject): Promise<string> {
-    const hashableContent = {
-      // Only Core content that affects record integrity
-      fhirData: fileObject.fhirData || null,
-      belroseFields: fileObject.belroseFields || null,
-      extractedText: fileObject.extractedText || null,
-      originalText: fileObject.originalText || null,
-      originalFileHash: fileObject.originalFileHash || null,
-      // Exclude UI state, timestamps, processing status, etc.
-      // as these don't affect the medical content integrity
-    };
-
-    // Sort keys to ensure consistent hashing
-    const sortedContent = this.sortObjectKeys(hashableContent);
-    const contentString = JSON.stringify(sortedContent);
-
-    // Use Web Crypto API for proper cryptographic hashing
-    const encoder = new TextEncoder();
-    const data = encoder.encode(contentString);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-
-    // Convert to hex string
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
-
-    return hashHex;
-  }
-
-  /**
-   * Actually write to the blockchain!
-   */
   static async writeToBlockchain(recordHash: string, recordId: string): Promise<string> {
     try {
       // Check if MetaMask is available
@@ -182,7 +149,7 @@ export class BlockchainService {
       network?: string;
     } = {}
   ): Promise<BlockchainVerification> {
-    const recordHash = await this.generateRecordHash(fileObject);
+    const recordHash = await RecordHashService.generateRecordHash(fileObject);
 
     try {
       console.log('🚀 Attempting real blockchain write...');
@@ -238,7 +205,7 @@ export class BlockchainService {
       return false;
     }
 
-    const currentHash = await this.generateRecordHash(fileObject);
+    const currentHash = await RecordHashService.generateRecordHash(fileObject);
     const storedHash = fileObject.recordHash;
 
     // First check if hashes match
@@ -314,21 +281,6 @@ export class BlockchainService {
     }
 
     return sortedObj;
-  }
-
-  /**
-   * Create a version chain reference
-   * Each version should reference the previous version's hash
-   */
-  static createVersionChain(
-    currentVerification: BlockchainVerification,
-    previousVerification?: FileObject
-  ): BlockchainVerification {
-    return {
-      ...currentVerification,
-      // Add reference to previous version for audit trail
-      previousRecordHash: previousVerification?.recordHash,
-    };
   }
 
   /**

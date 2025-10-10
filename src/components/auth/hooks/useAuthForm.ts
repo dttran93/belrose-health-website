@@ -36,6 +36,7 @@ export const useAuthForm = <T extends Record<string, any>>(initialValues: T) => 
 
   return {
     formData,
+    setFormData,
     errors,
     isLoading,
     setErrors,

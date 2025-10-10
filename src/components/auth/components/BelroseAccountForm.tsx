@@ -1,14 +1,18 @@
 // /features/Auth/components/BelroseAccountForm.tsx
 
-import React, { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, User, Edit2, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import { authService } from '@/services/authServices';
-import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthForm } from '../hooks/useAuthForm';
 import { SocialAuthButtons } from './ui/SocialAuthButtons';
-import { EncryptionPasswordSetup } from '@/features/Encryption/components/EncryptionPasswordSetup';
+import { PasswordStrengthIndicator } from '@/components/auth/components/ui/PasswordSTrengthIndicator';
+import {
+  validatePassword,
+  validatePasswordConfirmation,
+} from '@/components/auth/utils/PasswordStrength';
+import InputField from './ui/InputField';
 
 interface BelroseAccountFormData {
   email: string;
@@ -18,90 +22,124 @@ interface BelroseAccountFormData {
   lastName: string;
 }
 
-interface PasswordRequirements {
-  length: boolean;
-  uppercase: boolean;
-  lowercase: boolean;
-  number: boolean;
-  symbol: boolean;
-}
-
 interface FirebaseError extends Error {
   code?: string;
 }
 
 interface BelroseAccountFormProps {
-  onSwitchToLogin: () => void;
-  onComplete: (data: any) => void;
-  initialData?: any;
+  onComplete: (data: {
+    userId: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  }) => void;
+  initialData: any;
+  isCompleted?: boolean;
 }
 
-const getPasswordRequirements = (password: string): PasswordRequirements => {
-  return {
-    length: password.length >= 8,
-    uppercase: /[A-Z]/.test(password),
-    lowercase: /[a-z]/.test(password),
-    number: /[0-9]/.test(password),
-    symbol: /[!@#$%^&*(),.?":{}|<>]/.test(password),
-  };
-};
-
-const PasswordRequirementsComponent: React.FC<{ password: string; show: boolean }> = ({
-  password,
-  show,
+const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
+  onComplete,
+  initialData,
+  isCompleted = false,
 }) => {
-  if (!show) return null;
-
-  const requirements = getPasswordRequirements(password);
-
-  const requirementItems = [
-    { key: 'length', text: 'At least 8 characters', met: requirements.length },
-    { key: 'uppercase', text: 'One uppercase letter (A-Z)', met: requirements.uppercase },
-    { key: 'lowercase', text: 'One lowercase letter (a-z)', met: requirements.lowercase },
-    { key: 'number', text: 'One number (0-9)', met: requirements.number },
-    { key: 'symbol', text: 'One symbol (!@#$%^&*)', met: requirements.symbol },
-  ];
-
-  return (
-    <div className="mt-2 p-3 bg-gray-50 rounded-lg border">
-      <p className="text-xs font-medium text-foreground mb-2">Password requirements:</p>
-      <ul className="space-y-1">
-        {requirementItems.map(req => (
-          <li key={req.key} className="flex items-center text-xs">
-            <div
-              className={`w-2 h-2 rounded-full mr-2 ${req.met ? 'bg-green-500' : 'bg-red-400'}`}
-            />
-            <span
-              className={`${
-                req.met ? 'text-green-700 line-through' : 'text-red-600 font-semibold'
-              }`}
-            >
-              {req.text}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-};
-
-const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({ onSwitchToLogin }) => {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const { formData, errors, isLoading, setErrors, setIsLoading, handleInputChange } =
+  const { formData, errors, isLoading, setErrors, setIsLoading, handleInputChange, setFormData } =
     useAuthForm<BelroseAccountFormData>({
-      email: '',
+      email: initialData.email || '',
       password: '',
       confirmPassword: '',
-      firstName: '',
-      lastName: '',
+      firstName: initialData.firstName || '',
+      lastName: initialData.lastName || '',
     });
 
   const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [showPasswordRequirements, setShowPasswordRequirements] = useState<boolean>(false);
-  const [showEncryptionSetup, setShowEncryptionSetup] = useState<boolean>(false);
+  const [isEditing, setIsEditing] = useState(!isCompleted);
 
+  useEffect(() => {
+    if (initialData.email || initialData.firstName || initialData.lastName) {
+      // Check if setFormData exists in your useAuthForm hook
+      // If not, we'll need to update the hook
+      if (setFormData) {
+        setFormData({
+          email: initialData.email || '',
+          password: '',
+          confirmPassword: '',
+          firstName: initialData.firstName || '',
+          lastName: initialData.lastName || '',
+        });
+      }
+    }
+  }, [initialData.email, initialData.firstName, initialData.lastName]);
+
+  // ========== COMPLETED VIEW ========================
+  if (isCompleted && !isEditing) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-full mb-4">
+            <Lock className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900">Account Created</h2>
+          <p className="text-gray-600 mt-2">Your Belrose account has been successfully created.</p>
+        </div>
+
+        {/* Completed Banner */}
+        <div className="bg-green-50 border-l-4 border-green-500 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold text-green-900">Step Complete</p>
+              <p className="text-sm text-green-700 mt-1">
+                Your account information has been saved and verified.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Summary of entered data */}
+        <div className="space-y-4">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              First Name
+            </label>
+            <p className="text-gray-900 font-medium mt-1">{initialData.firstName}</p>
+          </div>
+
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              Last Name
+            </label>
+            <p className="text-gray-900 font-medium mt-1">{initialData.lastName}</p>
+          </div>
+
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              Email
+            </label>
+            <p className="text-gray-900 font-medium mt-1">{initialData.email}</p>
+          </div>
+
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              User ID
+            </label>
+            <p className="text-gray-900 font-mono text-sm mt-1">{initialData.userId}</p>
+          </div>
+        </div>
+
+        <Button
+          variant="outline"
+          onClick={() => setIsEditing(true)}
+          className="w-full flex items-center justify-center space-x-2"
+        >
+          <Edit2 className="w-4 h-4" />
+          <span>Edit Information</span>
+        </Button>
+      </div>
+    );
+  }
+
+  // =============== NORMAL FORM VIEW (EDITING OR NOT YET COMPLETED) =================
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
 
@@ -118,18 +156,19 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({ onSwitchToLogin
       newErrors.email = 'Please enter a valid email';
     }
 
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else {
-      const requirements = getPasswordRequirements(formData.password);
-      const allMet = Object.values(requirements).every(Boolean);
-      if (!allMet) {
-        newErrors.password = 'Password does not meet all requirements';
+    if (!isCompleted) {
+      if (!formData.password) {
+        newErrors.password = 'Password is required';
+      } else {
+        const passwordValidation = validatePassword(formData.password, 8, 3);
+        if (!passwordValidation.valid) {
+          newErrors.password = passwordValidation.error || 'Password does not meet requirements';
+        }
       }
-    }
 
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
+      if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match';
+      }
     }
 
     setErrors(newErrors);
@@ -141,6 +180,19 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({ onSwitchToLogin
 
     if (!validateForm()) return;
 
+    if (isCompleted && isEditing) {
+      onComplete({
+        userId: initialData.userId, // Keep the same userId
+        email: formData.email.trim(),
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+      });
+      setIsEditing(false);
+      toast.success('Information updated successfully');
+      return;
+    }
+
+    // Normal Sign-up Flow
     setIsLoading(true);
     const trimmedEmail = formData.email.trim();
 
@@ -152,12 +204,12 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({ onSwitchToLogin
       );
       console.log('User created:', user);
 
-      toast.success('Sign up successful!', {
-        description: 'Your account has been created.',
-        duration: 3000,
+      onComplete({
+        userId: user.uid, // ← This is the Firebase user ID
+        email: trimmedEmail,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
       });
-
-      setShowEncryptionSetup(true);
     } catch (error) {
       console.error('Auth error:', error);
       const firebaseError = error as FirebaseError;
@@ -189,28 +241,41 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({ onSwitchToLogin
     }
   };
 
-  const handleEncryptionSetupComplete = (): void => {
-    setShowEncryptionSetup(false);
-    toast.success('Encryption enabled! Your health records are now protected.', {
-      duration: 4000,
-    });
-    const from = location.state?.from?.pathname || '/dashboard';
-    navigate(from, { replace: true });
-  };
-
-  const handleSkipEncryption = (): void => {
-    setShowEncryptionSetup(false);
-    toast.info('You can enable encryption later in Settings', {
-      duration: 4000,
-    });
-    const from = location.state?.from?.pathname || '/dashboard';
-    navigate(from, { replace: true });
-  };
-
   return (
     <>
+      {/* Show editing banner if in edit mode */}
+      {isCompleted && isEditing && (
+        <div className="bg-blue-50 rounded-lg p-4 mb-6">
+          <div className="flex items-start space-x-3">
+            <Edit2 className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold text-blue-900">Editing Account Information</p>
+              <p className="text-sm text-blue-700 mt-1">
+                Make your changes and click "Save Changes" when done.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
+        {!isCompleted && (
+          <>
+            {/* Header */}
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-full mb-4">
+                <Lock className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900">Create Belrose Account</h2>
+              <p className="text-gray-600 mt-2">
+                This account coordinates all the tools necessary for you to own and manage your
+                health data.
+              </p>
+            </div>
+          </>
+        )}
+
         {/* First Name field */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">First Name</label>
@@ -218,12 +283,12 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({ onSwitchToLogin
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <User className="h-5 w-5 text-gray-400" />
             </div>
-            <input
+            <InputField
               type="text"
               name="firstName"
               value={formData.firstName}
               onChange={handleInputChange}
-              className={`w-full pl-10 pr-4 py-3 border bg-background rounded-xl focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all ${
+              className={`w-full rounded-xl transition-all ${
                 errors.firstName ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="Enter your first name"
@@ -239,12 +304,12 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({ onSwitchToLogin
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <User className="h-5 w-5 text-gray-400" />
             </div>
-            <input
+            <InputField
               type="text"
               name="lastName"
               value={formData.lastName}
               onChange={handleInputChange}
-              className={`w-full pl-10 pr-4 py-3 border bg-background rounded-xl focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all ${
+              className={`w-full rounded-xl transition-all ${
                 errors.lastName ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="Enter your last name"
@@ -260,12 +325,12 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({ onSwitchToLogin
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Mail className="h-5 w-5 text-gray-400" />
             </div>
-            <input
+            <InputField
               type="email"
               name="email"
               value={formData.email}
               onChange={handleInputChange}
-              className={`w-full pl-10 pr-12 py-3 bg-background border focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent rounded-xl ${
+              className={`w-full rounded-xl transition-all ${
                 errors.email ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="Enter your email"
@@ -274,70 +339,71 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({ onSwitchToLogin
           {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
         </div>
 
-        {/* Password field */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">Password</label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Lock className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              type={showPassword ? 'text' : 'password'}
-              name="password"
-              value={formData.password}
-              onChange={handleInputChange}
-              onFocus={() => setShowPasswordRequirements(true)}
-              onBlur={() => setShowPasswordRequirements(false)}
-              className={`w-full pl-10 pr-12 py-3 bg-background border focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent rounded-xl ${
-                errors.password ? 'border-red-500' : 'border-gray-300'
-              }`}
-              placeholder="Enter your password"
-            />
-            <button
-              type="button"
-              className="absolute inset-y-0 right-0 pr-3 flex items-center"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? (
-                <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-              ) : (
-                <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+        {!isCompleted && (
+          <>
+            {/* Password field */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Password</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-400" />
+                </div>
+                <InputField
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  className={`w-full rounded-xl transition-all ${
+                    errors.password ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="Enter your password"
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                  )}
+                </button>
+              </div>
+
+              <PasswordStrengthIndicator password={formData.password} showFeedback={true} />
+
+              {errors.password && formData.password.length === 0 && (
+                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
               )}
-            </button>
-          </div>
-
-          <PasswordRequirementsComponent
-            password={formData.password}
-            show={showPasswordRequirements || formData.password.length > 0}
-          />
-
-          {errors.password && formData.password.length === 0 && (
-            <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-          )}
-        </div>
-
-        {/* Confirm Password field */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">Confirm Password</label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Lock className="h-5 w-5 text-gray-400" />
             </div>
-            <input
-              type={showPassword ? 'text' : 'password'}
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleInputChange}
-              className={`w-full pl-10 pr-4 py-3 bg-background border rounded-xl focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all ${
-                errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
-              }`}
-              placeholder="Confirm your password"
-            />
-          </div>
-          {errors.confirmPassword && (
-            <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
-          )}
-        </div>
+
+            {/* Confirm Password field */}
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Confirm Password
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-400" />
+                </div>
+                <InputField
+                  type={showPassword ? 'text' : 'password'}
+                  name="confirmPassword"
+                  value={formData.confirmPassword}
+                  onChange={handleInputChange}
+                  className={`w-full rounded-xl transition-all ${
+                    errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="Confirm your password"
+                />
+              </div>
+              {errors.confirmPassword && (
+                <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
+              )}
+            </div>
+          </>
+        )}
 
         {/* Submit error */}
         {errors.submit && (
@@ -347,33 +413,35 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({ onSwitchToLogin
         )}
 
         {/* Submit button */}
-        <Button
-          type="submit"
-          disabled={isLoading}
-          size="lg"
-          className="w-full py-3 px-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-        >
-          {isLoading ? (
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-          ) : (
-            <>
-              <span>Create Account</span>
-              <ArrowRight className="w-4 h-4" />
-            </>
-          )}
+        <Button type="submit" disabled={isLoading} size="lg" className="w-full rounded-xl">
+          Save Changes
         </Button>
+
+        {/* Cancel button when editing */}
+        {isEditing && isCompleted && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setIsEditing(false);
+              // Reset form data to initial values
+              handleInputChange({
+                target: { name: 'firstName', value: initialData.firstName },
+              } as any);
+              handleInputChange({
+                target: { name: 'lastName', value: initialData.lastName },
+              } as any);
+              handleInputChange({ target: { name: 'email', value: initialData.email } } as any);
+            }}
+            className="w-full rounded-xl"
+          >
+            Cancel
+          </Button>
+        )}
       </form>
 
       {/* Social login*/}
-      <SocialAuthButtons disabled={isLoading} />
-
-      {/* Encryption Setup Modal - shows after successful signup */}
-      {showEncryptionSetup && (
-        <EncryptionPasswordSetup
-          onComplete={handleEncryptionSetupComplete}
-          onCancel={handleSkipEncryption}
-        />
-      )}
+      {!isCompleted && <SocialAuthButtons disabled={isLoading} />}
     </>
   );
 };

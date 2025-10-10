@@ -6,6 +6,8 @@ export interface User {
   uid: string;
   email: string | null;
   displayName: string | null;
+  firstName: string | null;
+  lastName: string | null;
   photoURL?: string | null;
 
   encryption?: {
@@ -104,7 +106,6 @@ export interface BlockchainVerification {
   blockchainNetwork: string; //blockchain network, e.g. ethereum, solana
   timestamp: number; //when it was recorded
   isVerified: boolean; //whether blockchain verification passed. May change this to a credit system of sorts in the future
-  previousRecordHash?: string;
 }
 
 export type AIProcessingStatus =
@@ -163,6 +164,7 @@ export interface FileObject {
   storagePath?: string;
   downloadURL?: string;
   recordHash?: string; //has of the record content
+  previousRecordHash?: string; //to establish chain of records in case they are edited
   processingStage?: ProcessingStages;
   uploadInProgress?: boolean; // for managing upload process
 

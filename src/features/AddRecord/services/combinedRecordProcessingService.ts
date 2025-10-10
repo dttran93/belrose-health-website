@@ -12,6 +12,7 @@ import {
 } from '@/features/Encryption/encryptionConfig';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { FileObject, VirtualFileInput, BelroseFields, ProcessingStages } from '@/types/core';
+import { RecordHashService } from '@/features/ViewEditRecord/services/generateRecordHash';
 
 export interface ProcessedRecord {
   extractedText?: string | null;
@@ -142,7 +143,7 @@ export class CombinedRecordProcessingService {
       };
 
       try {
-        result.recordHash = await BlockchainService.generateRecordHash(completeRecord);
+        result.recordHash = await RecordHashService.generateRecordHash(completeRecord);
 
         console.log(`✅ Record hash generated for: ${fileObj.fileName}`, {
           hash: result.recordHash.substring(0, 12) + '...',
@@ -314,7 +315,7 @@ export class CombinedRecordProcessingService {
     };
 
     try {
-      result.recordHash = await BlockchainService.generateRecordHash(virtualFileForHash);
+      result.recordHash = await RecordHashService.generateRecordHash(virtualFileForHash);
 
       console.log(`✅ Record hash generated for virtual file: ${fileName}`, {
         hash: result.recordHash.substring(0, 12) + '...',

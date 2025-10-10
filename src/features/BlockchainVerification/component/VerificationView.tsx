@@ -1,21 +1,21 @@
 import React, { useState } from 'react';
 import { FileObject, BlockchainVerification } from '@/types/core';
 import { useBlockchainVerification } from '@/features/BlockchainVerification/hooks/useBlockchainVerification';
-import { BlockchainService } from '@/features/BlockchainVerification/service/blockchainService';
-import { 
+import { RecordHashService } from '@/features/ViewEditRecord/services/generateRecordHash';
+import {
   ArrowLeft,
-  Shield, 
-  Hash, 
-  Calendar, 
-  User, 
-  Network, 
-  Copy, 
-  Check, 
+  Shield,
+  Hash,
+  Calendar,
+  User,
+  Network,
+  Copy,
+  Check,
   AlertCircle,
   Play,
   RefreshCw,
   Info,
-  ExternalLink
+  ExternalLink,
 } from 'lucide-react';
 
 interface VerificationViewProps {
@@ -23,32 +23,28 @@ interface VerificationViewProps {
   onBack: () => void;
 }
 
-export const VerificationView: React.FC<VerificationViewProps> = ({
-  record,
-  onBack
-}) => {
+export const VerificationView: React.FC<VerificationViewProps> = ({ record, onBack }) => {
   const [copySuccess, setCopySuccess] = useState<string>('');
   const [isGeneratingHash, setIsGeneratingHash] = useState(false);
   const [newlyGeneratedHash, setNewlyGeneratedHash] = useState<string>('');
   const [error, setError] = useState<string>('');
 
   const { getVerificationStatus } = useBlockchainVerification();
-  
+
   const verification = record.blockchainVerification;
   const status = getVerificationStatus(record);
 
-  const recordHash = record.recordHash
+  const recordHash = record.recordHash;
 
-  console.log("active record", {record},
-  "record hash", {recordHash});
+  console.log('active record', { record }, 'record hash', { recordHash });
 
   // Generate a new hash for comparison
   const generateNewHash = async () => {
     setIsGeneratingHash(true);
     setError('');
-    
+
     try {
-      const hash = await BlockchainService.generateRecordHash(record);
+      const hash = await RecordHashService.generateRecordHash(record);
       setNewlyGeneratedHash(hash);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate hash');
@@ -77,7 +73,6 @@ export const VerificationView: React.FC<VerificationViewProps> = ({
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-4">
-
             <div className="flex items-center gap-3">
               <Shield className="w-5 h-5" />
               <div>
@@ -96,7 +91,6 @@ export const VerificationView: React.FC<VerificationViewProps> = ({
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
-
         {/* Record Hash Always Present*/}
         <div className="mb-6 p-6 bg-blue-50 border border-blue-200 rounded-lg max-w mx-auto">
           <div className="flex items-center justify-between mb-3">
@@ -105,19 +99,19 @@ export const VerificationView: React.FC<VerificationViewProps> = ({
               onClick={() => copyToClipboard(newlyGeneratedHash, 'previewHash')}
               className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors"
             >
-              {copySuccess === 'previewHash' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copySuccess === 'previewHash' ? (
+                <Check className="w-4 h-4" />
+              ) : (
+                <Copy className="w-4 h-4" />
+              )}
             </button>
           </div>
           <p className="font-mono text-sm break-all text-blue-900 bg-white p-3 rounded border mb-3">
-            {newlyGeneratedHash}
             {recordHash}
           </p>
         </div>
 
-
-
         <div className="space-y-8">
-
           {/* Error Display */}
           {error && (
             <div className="p-6 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
@@ -161,7 +155,11 @@ export const VerificationView: React.FC<VerificationViewProps> = ({
                           onClick={() => copyToClipboard(verification.blockchainTxId, 'txId')}
                           className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded transition-colors"
                         >
-                          {copySuccess === 'txId' ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                          {copySuccess === 'txId' ? (
+                            <Check className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <Copy className="w-4 h-4" />
+                          )}
                         </button>
                       </div>
                       <p className="text-gray-900 font-mono text-sm break-all bg-white p-3 rounded border">
@@ -198,10 +196,16 @@ export const VerificationView: React.FC<VerificationViewProps> = ({
                             <span className="font-medium text-gray-700">Provider Signature</span>
                           </div>
                           <button
-                            onClick={() => copyToClipboard(verification.providerSignature!, 'signature')}
+                            onClick={() =>
+                              copyToClipboard(verification.providerSignature!, 'signature')
+                            }
                             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded transition-colors"
                           >
-                            {copySuccess === 'signature' ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                            {copySuccess === 'signature' ? (
+                              <Check className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <Copy className="w-4 h-4" />
+                            )}
                           </button>
                         </div>
                         <p className="text-gray-900 font-mono text-sm break-all bg-white p-3 rounded border">
@@ -226,76 +230,96 @@ export const VerificationView: React.FC<VerificationViewProps> = ({
                       disabled={isGeneratingHash}
                       className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                     >
-                      {isGeneratingHash ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                      {isGeneratingHash ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Play className="w-4 h-4" />
+                      )}
                       {isGeneratingHash ? 'Generating...' : 'Generate Current Hash'}
                     </button>
                   </div>
 
                   <div className="space-y-6">
                     {/* Original Hash */}
-                    {recordHash && ( 
-                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="font-medium text-green-800">Original Hash (Blockchain)</span>
-                        <button
-                          onClick={() => copyToClipboard(recordHash, 'originalHash')}
-                          className="p-2 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors"
-                        >
-                          {copySuccess === 'originalHash' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                        </button>
+                    {recordHash && (
+                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="font-medium text-green-800">
+                            Original Hash (Blockchain)
+                          </span>
+                          <button
+                            onClick={() => copyToClipboard(recordHash, 'originalHash')}
+                            className="p-2 text-green-600 hover:text-green-700 hover:bg-green-100 rounded transition-colors"
+                          >
+                            {copySuccess === 'originalHash' ? (
+                              <Check className="w-4 h-4" />
+                            ) : (
+                              <Copy className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                        <p className="font-mono text-sm break-all text-green-900 bg-white p-3 rounded border">
+                          {recordHash}
+                        </p>
                       </div>
-                      <p className="font-mono text-sm break-all text-green-900 bg-white p-3 rounded border">
-                        {recordHash}
-                      </p>
-                    </div>
                     )}
 
                     {/* Current Hash (if generated) */}
                     {newlyGeneratedHash && (
-                      <div className={`p-4 border rounded-lg ${
-                        newlyGeneratedHash === recordHash 
-                          ? 'bg-green-50 border-green-200' 
-                          : 'bg-red-50 border-red-200'
-                      }`}>
+                      <div
+                        className={`p-4 border rounded-lg ${
+                          newlyGeneratedHash === recordHash
+                            ? 'bg-green-50 border-green-200'
+                            : 'bg-red-50 border-red-200'
+                        }`}
+                      >
                         <div className="flex items-center justify-between mb-3">
-                          <span className={`font-medium ${
-                            newlyGeneratedHash === recordHash 
-                              ? 'text-green-800' 
-                              : 'text-red-800'
-                          }`}>
+                          <span
+                            className={`font-medium ${
+                              newlyGeneratedHash === recordHash ? 'text-green-800' : 'text-red-800'
+                            }`}
+                          >
                             Current Hash
                           </span>
                           <button
                             onClick={() => copyToClipboard(newlyGeneratedHash, 'currentHash')}
                             className={`p-2 rounded transition-colors ${
-                              newlyGeneratedHash === recordHash 
-                                ? 'text-green-600 hover:text-green-700 hover:bg-green-100' 
+                              newlyGeneratedHash === recordHash
+                                ? 'text-green-600 hover:text-green-700 hover:bg-green-100'
                                 : 'text-red-600 hover:text-red-700 hover:bg-red-100'
                             }`}
                           >
-                            {copySuccess === 'currentHash' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                            {copySuccess === 'currentHash' ? (
+                              <Check className="w-4 h-4" />
+                            ) : (
+                              <Copy className="w-4 h-4" />
+                            )}
                           </button>
                         </div>
-                        <p className={`font-mono text-sm break-all bg-white p-3 rounded border ${
-                          newlyGeneratedHash === recordHash 
-                            ? 'text-green-900' 
-                            : 'text-red-900'
-                        }`}>
+                        <p
+                          className={`font-mono text-sm break-all bg-white p-3 rounded border ${
+                            newlyGeneratedHash === recordHash ? 'text-green-900' : 'text-red-900'
+                          }`}
+                        >
                           {newlyGeneratedHash}
                         </p>
-                        
+
                         {/* Hash Comparison Result */}
-                        <div className={`mt-4 p-3 rounded-lg flex items-center gap-3 ${
-                          newlyGeneratedHash === recordHash 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
+                        <div
+                          className={`mt-4 p-3 rounded-lg flex items-center gap-3 ${
+                            newlyGeneratedHash === recordHash
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}
+                        >
                           {newlyGeneratedHash === recordHash ? (
                             <>
                               <Check className="w-5 h-5 flex-shrink-0" />
                               <div>
                                 <p className="font-medium">Hashes Match</p>
-                                <p className="text-sm opacity-90">Content is verified and hasn't been modified</p>
+                                <p className="text-sm opacity-90">
+                                  Content is verified and hasn't been modified
+                                </p>
                               </div>
                             </>
                           ) : (
@@ -303,7 +327,9 @@ export const VerificationView: React.FC<VerificationViewProps> = ({
                               <AlertCircle className="w-5 h-5 flex-shrink-0" />
                               <div>
                                 <p className="font-medium">Hashes Don't Match</p>
-                                <p className="text-sm opacity-90">Content may have been modified since verification</p>
+                                <p className="text-sm opacity-90">
+                                  Content may have been modified since verification
+                                </p>
                               </div>
                             </>
                           )}
@@ -321,11 +347,13 @@ export const VerificationView: React.FC<VerificationViewProps> = ({
                 <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Shield className="w-10 h-10 text-gray-400" />
                 </div>
-                <h2 className="text-2xl font-medium text-gray-900 mb-4">No Blockchain Verification</h2>
+                <h2 className="text-2xl font-medium text-gray-900 mb-4">
+                  No Blockchain Verification
+                </h2>
                 <p className="text-gray-600 mb-8 max-w-md mx-auto">
-                  This record doesn't have blockchain verification yet. Generate a hash preview to see what verification would look like.
+                  This record doesn't have blockchain verification yet. Generate a hash preview to
+                  see what verification would look like.
                 </p>
-
               </div>
             </div>
           )}

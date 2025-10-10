@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'; // optional: use clsx/tailwind-merge helper if
 
 interface InputFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
   /** The name of the field, used for form data binding */
-  name: string;
+  name?: string;
   /** The label text displayed above the input */
   label?: string;
   /** The left icon component (like <User />, <Mail />, <Lock />) */

@@ -27,6 +27,7 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
     // Verification properties
     originalFileHash: data.originalFileHash,
     recordHash: data.recordHash,
+    previousRecordHash: data.previousRecordHash,
 
     // FHIR properties
     fhirData: data.fhirData,
