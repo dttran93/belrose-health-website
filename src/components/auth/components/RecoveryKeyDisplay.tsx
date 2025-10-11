@@ -114,32 +114,39 @@ export const RecoveryKeyDisplay: React.FC<RecoveryKeyDisplayProps> = ({
         </ul>
       </div>
 
-      {/* Acknowledgment */}
-      <label className="flex items-start space-x-3 cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
-        <input
-          type="checkbox"
-          checked={acknowledged}
-          onChange={e => setAcknowledged(e.target.checked)}
-          className="mt-1"
-        />
-        <span className="text-sm">
-          <span className="block p-1">
-            <b>I acknowledge that:</b>
-          </span>
-          <span className="block p-1">I have saved my recovery key in a secure location.</span>
-          <span className="block p-1">
-            Without this key, I cannot recover my data if I forget my encryption password.
-          </span>
-          <span className="block p-1">
-            Belrose cannot access encryption passwords or recovery keys.
-          </span>
-        </span>
-      </label>
+      {recoveryKey && (
+        <>
+          {/* Acknowledgment */}
+          <label
+            className={`flex items-start space-x-3 cursor-pointer p-3 rounded-lg ${
+              isCompleted ? 'bg-green-50 border-green-500 border-2' : 'border hover:bg-gray-50'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={acknowledged || isCompleted}
+              onChange={e => setAcknowledged(e.target.checked)}
+            />
+            <span className="text-sm">
+              <span className="block p-1">
+                <b>I acknowledge that:</b>
+              </span>
+              <span className="block p-1">I have saved my recovery key in a secure location.</span>
+              <span className="block p-1">
+                Without this key, I cannot recover my data if I forget my encryption password.
+              </span>
+              <span className="block p-1">
+                Belrose cannot access encryption passwords or recovery keys.
+              </span>
+            </span>
+          </label>
 
-      {/* Complete Button */}
-      <Button onClick={handleComplete} disabled={!acknowledged} className="w-full py-3">
-        Continue
-      </Button>
+          {/* Complete Button */}
+          <Button onClick={handleComplete} disabled={!acknowledged} className="w-full py-3">
+            Continue
+          </Button>
+        </>
+      )}
     </div>
   );
 };

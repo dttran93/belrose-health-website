@@ -80,7 +80,10 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
             <Lock className="w-8 h-8 text-white" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900">Account Created</h2>
-          <p className="text-gray-600 mt-2">Your Belrose account has been successfully created.</p>
+          <p className="text-gray-600 mt-2">
+            This account coordinates all the tools necessary for you to own and manage your health
+            data.
+          </p>
         </div>
 
         {/* Completed Banner */}
@@ -251,7 +254,7 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
             <div className="flex-1">
               <p className="font-semibold text-blue-900">Editing Account Information</p>
               <p className="text-sm text-blue-700 mt-1">
-                Make your changes and click "Save Changes" when done.
+                Make your changes and click "Submit" when done.
               </p>
             </div>
           </div>
@@ -414,7 +417,7 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
 
         {/* Submit button */}
         <Button type="submit" disabled={isLoading} size="lg" className="w-full rounded-xl">
-          Save Changes
+          Submit
         </Button>
 
         {/* Cancel button when editing */}

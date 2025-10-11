@@ -12,6 +12,7 @@ interface WalletSetupProps {
   encryptionPassword: string; // Passed from previous step
   onComplete: (data: { walletAddress: string; walletType: 'generated' | 'metamask' }) => void;
   isCompleted: boolean;
+  initialWalletData?: { walletAddress?: string; walletType?: 'generated' | 'metamask' };
 }
 
 type WalletChoice = 'generated' | 'metamask' | null;
@@ -19,12 +20,19 @@ type WalletChoice = 'generated' | 'metamask' | null;
 export const WalletSetup: React.FC<WalletSetupProps> = ({
   userId,
   encryptionPassword,
+  initialWalletData,
   onComplete,
   isCompleted = false,
 }) => {
-  const [walletChoice, setWalletChoice] = useState<WalletChoice>(null);
+  console.log(initialWalletData);
+
+  const [walletChoice, setWalletChoice] = useState<WalletChoice>(
+    initialWalletData?.walletType || null
+  );
   const [metaMaskConnected, setMetaMaskConnected] = useState(false);
-  const [connectedAddress, setConnectedAddress] = useState<string>('');
+  const [connectedAddress, setConnectedAddress] = useState<string>(
+    initialWalletData?.walletAddress || ''
+  );
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
 
@@ -37,7 +45,6 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
       setMetaMaskConnected(true);
       setConnectedAddress(connection.address);
       setWalletChoice('metamask');
-      toast.success('MetaMask connected successfully');
     } catch (err: any) {
       setError(err.message || 'Failed to connect MetaMask');
     } finally {
@@ -102,17 +109,37 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-full mb-4">
-          <Wallet className="w-8 h-8 text-white" />
-        </div>
-        <h2 className="text-2xl font-bold text-gray-900">Setup Blockchain Wallet</h2>
-        <p className="text-gray-600 mt-2">
-          The blockchain is needed to manage the completeness and accuracy of your records for
-          third-parties.
-        </p>
-      </div>
+      {!isCompleted && (
+        <>
+          {/* Header */}
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-full mb-4">
+              <Wallet className="w-8 h-8 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">Setup Blockchain Wallet</h2>
+            <p className="text-gray-600 mt-2">
+              The blockchain is needed to manage the completeness and accuracy of your records for
+              third-parties.
+            </p>
+          </div>
+        </>
+      )}
+
+      {isCompleted && (
+        <>
+          {/* Header */}
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-full mb-4">
+              <Wallet className="w-8 h-8 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">Blockchain Wallet Connected</h2>
+            <p className="text-gray-600 mt-2">
+              The blockchain is needed to manage the completeness and accuracy of your records for
+              third-parties.
+            </p>
+          </div>
+        </>
+      )}
 
       {/* Info Box */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -183,7 +210,7 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
               <h4 className="font-semibold text-gray-900 mb-1">Connect MetaMask</h4>
               <p className="text-sm text-gray-600">
                 {metaMaskConnected
-                  ? `Connected: ${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)}`
+                  ? `Address: ${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)}`
                   : 'Use your existing wallet, more secure'}
               </p>
             </div>
@@ -192,7 +219,7 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
       </div>
 
       {/*Connected Wallet Display */}
-      {connectedAddress && (
+      {initialWalletData?.walletAddress && initialWalletData?.walletType && (
         <div className="bg-green-50 border-2 border-green-500 rounded-lg p-4">
           <div className="flex items-start space-x-3">
             <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
@@ -201,15 +228,20 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
             <div className="flex-1">
               <div className="flex items-center space-x-2 mb-1">
                 <h4 className="font-semibold text-green-900">
-                  {walletChoice === 'generated' ? 'Wallet Generated' : 'MetaMask Connected'}
+                  {initialWalletData.walletType === 'generated'
+                    ? 'Wallet Generated'
+                    : 'MetaMask Connected'}
                 </h4>
               </div>
-              <p className="text-sm text-green-800 font-mono break-all">{connectedAddress}</p>
+              <p className="text-sm text-green-800 font-mono break-all">
+                {initialWalletData.walletAddress}
+              </p>
               <p className="text-xs text-green-700 mt-2">
-                {walletChoice === 'generated'
+                {initialWalletData.walletType === 'generated'
                   ? 'Your wallet has been securely generated and encrypted'
                   : 'Your MetaMask wallet is ready to use'}
               </p>
+              <p className="text-xs text-green-700 mt-2">You can connect other wallets in app</p>
             </div>
           </div>
         </div>
@@ -222,18 +254,24 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
         </div>
       )}
 
-      <div className="flex space-x-3">
-        <Button onClick={handleSubmit} disabled={isProcessing || !walletChoice} className="w-full">
-          {isProcessing ? (
-            <>
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
-              Creating wallet...
-            </>
-          ) : (
-            'Continue'
-          )}
-        </Button>
-      </div>
+      {!isCompleted && (
+        <div className="flex space-x-3">
+          <Button
+            onClick={handleSubmit}
+            disabled={isProcessing || !walletChoice}
+            className="w-full"
+          >
+            {isProcessing ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
+                Creating wallet...
+              </>
+            ) : (
+              'Connect Wallet'
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

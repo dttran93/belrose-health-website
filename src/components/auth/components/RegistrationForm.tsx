@@ -44,10 +44,12 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     lastName: '',
     encryptionPassword: '',
     walletAddress: '',
-    walletType: '' as 'generated' | 'metamask' | '',
+    walletType: '' as 'generated' | 'metamask' | undefined,
     recoveryKey: '',
     acknowledgedRecoveryKey: false,
   });
+
+  console.log(registrationData);
 
   const steps: StepConfig[] = [
     {
@@ -190,12 +192,22 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
                   <div className="flex-1">
                     <div
                       className={`font-semibold transition-all duration-300 ${
-                        isCurrent ? 'text-chart-4 text-lg' : 'text-secondary text-base'
+                        isCompleted
+                          ? `text-chart-3`
+                          : isCurrent
+                          ? 'text-chart-4 text-lg'
+                          : 'text-secondary text-base'
                       }`}
                     >
                       {step.title}
                     </div>
-                    {isCurrent && <p className="text-chart-4 text-sm mt-1">{step.subtitle}</p>}
+                    {isCurrent && (
+                      <p
+                        className={`text-sm mt-1 ${isCompleted ? `text-chart-3` : `text-chart-4`}`}
+                      >
+                        {step.subtitle}
+                      </p>
+                    )}
                   </div>
                 </div>
               );
@@ -226,6 +238,10 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
               <WalletSetup
                 userId={registrationData.userId}
                 encryptionPassword={registrationData.encryptionPassword}
+                initialWalletData={{
+                  walletAddress: registrationData.walletAddress,
+                  walletType: registrationData.walletType,
+                }}
                 onComplete={data => handleStepComplete(3, data)}
                 isCompleted={isStepCompleted(3)}
               />
