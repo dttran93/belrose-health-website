@@ -1,4 +1,4 @@
-// functions/src/index.ts - ALL FUNCTIONS CONVERTED TO V2
+// functions/src/index.ts
 
 import { defineSecret } from 'firebase-functions/params';
 import { CallableRequest, HttpsError, onCall, onRequest } from 'firebase-functions/v2/https';
@@ -18,8 +18,10 @@ import {
   CreateSessionResponse,
   CheckStatusRequest,
   CheckStatusResponse,
+  CreateVerificationSessionRequest,
 } from './index.types';
 import * as admin from 'firebase-admin';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { generateWallet, encryptPrivateKey } from './services/backendWalletService';
 import * as crypto from 'crypto';
 
@@ -298,7 +300,7 @@ export const createWallet = onRequest({ cors: true }, async (req: Request, res: 
       return;
     }
 
-    const db = admin.firestore();
+    const db = getFirestore();
     const userRef = db.collection('users').doc(userId);
     const userDoc = await userRef.get();
 
@@ -369,7 +371,7 @@ export const getEncryptedWallet = onRequest({ cors: true }, async (req: Request,
     const decodedToken = await admin.auth().verifyIdToken(token);
     const userId = decodedToken.uid;
 
-    const db = admin.firestore();
+    const db = getFirestore();
     const userDoc = await db.collection('users').doc(userId).get();
 
     if (!userDoc.exists) {
@@ -401,15 +403,27 @@ export const getEncryptedWallet = onRequest({ cors: true }, async (req: Request,
 
 // ==================== PERSONA FUNCTIONS (V2) ====================
 
-export const createVerificationSession = onCall(
+export const createVerificationSession = onCall<
+  CreateVerificationSessionRequest,
+  Promise<CreateSessionResponse>
+>(
   { secrets: [personaKey] },
-  async (request: CallableRequest): Promise<CreateSessionResponse> => {
+  async (
+    request: CallableRequest<CreateVerificationSessionRequest>
+  ): Promise<CreateSessionResponse> => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'User must be authenticated to verify identity');
     }
 
     const userId = request.auth.uid;
+    const { templateId } = request.data;
+
+    if (!templateId) {
+      throw new HttpsError('invalid-argument', 'templateId is required');
+    }
+
     console.log('📝 Creating verification session for user:', userId);
+    console.log('📋 Using template:', templateId);
 
     try {
       const PERSONA_API_KEY = personaKey.value();
@@ -430,6 +444,7 @@ export const createVerificationSession = onCall(
           data: {
             attributes: {
               reference_id: userId,
+              inquiry_template_id: templateId,
             },
           },
         }),
@@ -442,17 +457,21 @@ export const createVerificationSession = onCall(
       }
 
       const personaData: PersonaInquiryResponse = await response.json();
-      console.log('✅ Verification session created:', personaData.data.id);
+      const inquiryId = personaData.data.id;
 
-      await admin.firestore().collection('verifications').doc(userId).set({
-        inquiryId: personaData.data.id,
+      console.log('✅ Inquiry created:', inquiryId);
+
+      const db = getFirestore();
+      await db.collection('verifications').doc(userId).set({
+        inquiryId: inquiryId,
         status: 'pending',
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
       });
 
+      // Return the inquiry ID as the "token" - Persona Client can use this
       return {
-        sessionToken: personaData.data.attributes.session_token,
-        inquiryId: personaData.data.id,
+        sessionToken: inquiryId, // Use inquiry ID directly
+        inquiryId: inquiryId,
       };
     } catch (error: any) {
       console.error('❌ Error creating verification session:', error);
@@ -519,18 +538,18 @@ export const checkVerificationStatus = onCall<CheckStatusRequest, Promise<CheckS
 
         console.log('✅ User verified successfully:', userId);
 
-        const db = admin.firestore();
+        const db = getFirestore();
         const batch = db.batch();
 
         batch.update(db.collection('users').doc(userId), {
           identityVerified: true,
           verifiedData: verifiedData,
-          verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+          verifiedAt: FieldValue.serverTimestamp(),
         });
 
         batch.update(db.collection('verifications').doc(userId), {
           status: 'approved',
-          completedAt: admin.firestore.FieldValue.serverTimestamp(),
+          completedAt: FieldValue.serverTimestamp(),
         });
 
         await batch.commit();
@@ -539,9 +558,10 @@ export const checkVerificationStatus = onCall<CheckStatusRequest, Promise<CheckS
       } else {
         console.log('❌ Verification not approved:', status);
 
-        await admin.firestore().collection('verifications').doc(userId).update({
+        const db = getFirestore();
+        await db.collection('verifications').doc(userId).update({
           status: status,
-          completedAt: admin.firestore.FieldValue.serverTimestamp(),
+          completedAt: FieldValue.serverTimestamp(),
         });
 
         return { verified: false, reason: status };
@@ -603,18 +623,18 @@ export const personaWebhook = onRequest(
         return;
       }
 
-      const db = admin.firestore();
+      const db = getFirestore();
 
       switch (status) {
         case 'approved':
           console.log('✅ Webhook: User verified', userId);
           await db.collection('verifications').doc(userId).update({
             status: 'approved',
-            completedAt: admin.firestore.FieldValue.serverTimestamp(),
+            completedAt: FieldValue.serverTimestamp(),
           });
           await db.collection('users').doc(userId).update({
             identityVerified: true,
-            verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+            verifiedAt: FieldValue.serverTimestamp(),
           });
           break;
 
@@ -622,7 +642,7 @@ export const personaWebhook = onRequest(
           console.log('❌ Webhook: Verification declined', userId);
           await db.collection('verifications').doc(userId).update({
             status: 'declined',
-            completedAt: admin.firestore.FieldValue.serverTimestamp(),
+            completedAt: FieldValue.serverTimestamp(),
           });
           break;
 
@@ -630,7 +650,7 @@ export const personaWebhook = onRequest(
           console.log('⏳ Webhook: Manual review needed', userId);
           await db.collection('verifications').doc(userId).update({
             status: 'needs_review',
-            reviewRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
+            reviewRequestedAt: FieldValue.serverTimestamp(),
           });
           break;
 

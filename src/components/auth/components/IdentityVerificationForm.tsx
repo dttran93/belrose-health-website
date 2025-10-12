@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Shield, CheckCircle, AlertCircle, FileText, Camera, Clock } from 'lucide-react';
-
-// Mock types for demo - replace with your actual types
-type VerificationStatus = 'idle' | 'loading' | 'verifying' | 'complete' | 'error';
+import PersonaAdapter from '@/features/IdentityVerification/adapters/PersonaAdapter';
+import type { VerificationStatus, VerificationResult } from '@/types/identity';
+import { Button } from '@/components/ui/Button';
 
 interface IdentityVerificationProps {
   userId: string;
@@ -27,11 +27,31 @@ const IdentityVerificationForm: React.FC<IdentityVerificationProps> = ({
   isActivated = false,
 }) => {
   const [status, setStatus] = useState<VerificationStatus>('idle');
+  const [showPersona, setShowPersona] = useState(false);
 
   const handleStartVerification = () => {
     setStatus('loading');
-    // This will trigger PersonaAdapter
+    setShowPersona(true);
     console.log('Starting verification for user:', userId);
+  };
+
+  const handleVerificationSuccess = (result: VerificationResult) => {
+    console.log('✅ Verification completed successfully:', result);
+    setStatus('complete');
+    setShowPersona(false);
+    onSuccess(result);
+  };
+
+  const handleVerificationError = (error: Error) => {
+    console.error('❌ Verification failed:', error);
+    setStatus('error');
+    setShowPersona(false);
+    onError(error);
+  };
+
+  const handleStatusChange = (newStatus: VerificationStatus) => {
+    console.log('Status changed:', newStatus);
+    setStatus(newStatus);
   };
 
   const getStatusMessage = () => {
@@ -253,28 +273,31 @@ const IdentityVerificationForm: React.FC<IdentityVerificationProps> = ({
         <>
           {/* Action Button */}
           {status === 'idle' && (
-            <button
+            <Button
               onClick={handleStartVerification}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+              className="w-full py-3 px-4 rounded-lg flex items-center justify-center space-x-2"
             >
               <Camera className="w-5 h-5" />
               <span>Start Identity Verification</span>
-            </button>
+            </Button>
           )}
 
           {status === 'error' && (
-            <button
-              onClick={handleStartVerification}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
-            >
+            <Button onClick={handleStartVerification} className="w-full py-3 px-4 rounded-lg">
               Try Again
-            </button>
+            </Button>
           )}
-
-          {/* This is where PersonaAdapter will actually render when integrated */}
-          <div id="persona-container" className="hidden">
-            {/* PersonaAdapter component will be rendered here */}
-          </div>
+          {/* Persona Adapter*/}
+          {showPersona && (
+            <div id="persona-container">
+              <PersonaAdapter
+                userId={userId}
+                onStatusChange={handleStatusChange}
+                onSuccess={handleVerificationSuccess}
+                onError={handleVerificationError}
+              />
+            </div>
+          )}
         </>
       )}
     </div>

@@ -280,7 +280,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
                   onError={handleVerificationError}
                   isCompleted={verificationComplete}
                   initialVerifiedData={verifiedData ?? undefined}
-                  isActivated={isStepCompleted(1)}
+                  isActivated={true}
                 />
               </div>
             )}

@@ -1,6 +1,6 @@
 export type VerificationStatus = 'idle' | 'loading' | 'verifying' | 'complete' | 'error';
 
-export type VerificationProvider = 'persona' | 'onfido';
+export type VerificationProvider = 'persona'; //Add others in the future
 
 export interface VerifiedData {
   firstName: string;
@@ -8,7 +8,7 @@ export interface VerifiedData {
   dateOfBirth: string;
   address: string;
   postcode?: string;
-  verified: boolean;
+  verified?: boolean;
 }
 
 export interface VerificationResult {
@@ -26,3 +26,7 @@ export interface VerificationAdapterProps {
 }
 
 export type VerificationAdapter = React.ComponentType<VerificationAdapterProps>;
+
+export interface CreateVerificationSessionRequest {
+  templateId: string;
+}

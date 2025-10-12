@@ -1,23 +1,25 @@
+// src/features/IdentityVerification/adapters/PersonaAdapter.tsx
+
 import React, { useEffect, useRef } from 'react';
+import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
+import { auth } from '@/firebase/config';
 import type { VerificationAdapterProps, VerificationResult } from '@/types/identity';
 
-// Persona SDK types (you'd get these from @persona/client or define them)
+// Persona SDK types
 interface PersonaClient {
   open: () => void;
   close: () => void;
 }
 
 interface PersonaConfig {
-  templateId: string;
   environmentId: string;
-  sessionToken: string;
+  inquiryId: string;
   onLoad?: () => void;
   onComplete?: (event: { inquiryId: string; status: string }) => void;
   onCancel?: () => void;
   onError?: (error: Error) => void;
 }
 
-// Extend the Window interface to include Persona
 declare global {
   interface Window {
     Persona?: {
@@ -39,51 +41,93 @@ const PersonaAdapter: React.FC<VerificationAdapterProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const clientRef = useRef<PersonaClient | null>(null);
+  const functionsRef = useRef(getFunctions());
+
+  // Connect to emulator in development - only run once
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      try {
+        connectFunctionsEmulator(functionsRef.current, '127.0.0.1', 5001);
+        console.log('🔧 Connected to Firebase Functions Emulator');
+      } catch (error) {
+        // Emulator already connected, ignore
+        console.log('Emulator already connected');
+      }
+    }
+  }, []);
+
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
+    if (hasInitialized.current) return; //to prevent re-initialization
+
     const initializeVerification = async (): Promise<void> => {
+      hasInitialized.current = true;
       try {
         onStatusChange('loading');
 
-        // Call YOUR backend endpoint
-        const response = await fetch('/api/identity/create-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        // Check if user is authenticated
+        const user = auth.currentUser;
+        if (!user) {
+          throw new Error('User must be authenticated to verify identity');
         }
 
-        const { sessionToken, inquiryId }: CreateSessionResponse = await response.json();
+        console.log('🔐 User authenticated, calling createVerificationSession...');
+
+        const templateId = import.meta.env.VITE_PERSONA_TEMPLATE_ID;
+
+        if (!templateId) {
+          throw new Error('VITE_PERSONA_TEMPLATE_ID not configured in .env.local');
+        }
+
+        // Call Firebase Cloud Function
+        const createSession = httpsCallable<{ templateId: string }, CreateSessionResponse>(
+          functionsRef.current,
+          'createVerificationSession'
+        );
+
+        console.log('📞 Calling Firebase function...');
+        const result = await createSession({ templateId });
+        const { sessionToken, inquiryId } = result.data;
+
+        console.log('✅ Session created:', {
+          inquiryId,
+          hasToken: !!sessionToken,
+          tokenLength: sessionToken?.length,
+          templateIdUsed: templateId, // Make sure this matches what you expect
+        });
 
         // Check if Persona SDK is loaded
         if (!window.Persona) {
-          throw new Error('Persona SDK not loaded. Add the script tag to your HTML.');
+          throw new Error(
+            'Persona SDK not loaded. Add this to your index.html: ' +
+              '<script src="https://cdn.withpersona.com/dist/persona-v4.5.0.js"></script>'
+          );
         }
 
         // Initialize Persona's UI
         const client = new window.Persona.Client({
-          templateId: import.meta.env.VITE_PERSONA_TEMPLATE_ID || 'itmpl_XXXXXXXXXXXX',
           environmentId: import.meta.env.VITE_PERSONA_ENVIRONMENT_ID || 'env_XXXXXXXXXXXX',
-          sessionToken,
+          inquiryId: sessionToken,
 
           onLoad: () => {
+            console.log('📋 Persona verification UI loaded');
             onStatusChange('verifying');
           },
 
           onComplete: ({ inquiryId, status }) => {
+            console.log('✅ Persona verification completed:', { inquiryId, status });
             onStatusChange('complete');
             handleVerificationComplete(inquiryId, status);
           },
 
           onCancel: () => {
+            console.log('❌ User cancelled verification');
             onStatusChange('idle');
           },
 
           onError: error => {
-            console.error('Persona error:', error);
+            console.error('❌ Persona verification error:', error);
             onStatusChange('error');
             onError(error);
           },
@@ -91,33 +135,36 @@ const PersonaAdapter: React.FC<VerificationAdapterProps> = ({
 
         clientRef.current = client;
         client.open();
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to initialize verification:', error);
+        console.error('Error details:', error.message);
         onStatusChange('error');
         onError(error instanceof Error ? error : new Error('Unknown error'));
+        hasInitialized.current = false;
       }
     };
 
     const handleVerificationComplete = async (inquiryId: string, status: string): Promise<void> => {
       try {
-        const response = await fetch('/api/identity/verification-complete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, inquiryId, status }),
-        });
+        console.log('🔍 Checking verification status with backend...');
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        // Call Firebase Cloud Function to check status
+        const checkStatus = httpsCallable<{ inquiryId: string }, VerificationResult>(
+          functionsRef.current,
+          'checkVerificationStatus'
+        );
 
-        const result: VerificationResult = await response.json();
+        const result = await checkStatus({ inquiryId });
+        const verificationResult = result.data;
 
-        if (result.verified) {
-          onSuccess(result);
+        if (verificationResult.verified) {
+          console.log('✅ Identity verified successfully:', verificationResult.data);
+          onSuccess(verificationResult);
         } else {
-          onError(new Error(result.reason || 'Verification failed'));
+          console.error('❌ Verification failed:', verificationResult.reason);
+          onError(new Error(verificationResult.reason || 'Verification failed'));
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error processing verification:', error);
         onError(error instanceof Error ? error : new Error('Unknown error'));
       }
@@ -130,18 +177,13 @@ const PersonaAdapter: React.FC<VerificationAdapterProps> = ({
       if (clientRef.current) {
         clientRef.current = null;
       }
+      hasInitialized.current = false;
     };
-  }, [userId, onStatusChange, onSuccess, onError]);
+  }, [userId]);
 
   return (
     <div ref={containerRef} className="persona-container">
-      <button
-        onClick={() => clientRef.current?.open()}
-        className="start-verification-btn"
-        type="button"
-      >
-        Start Verification
-      </button>
+      {/* Persona will render its modal here */}
     </div>
   );
 };

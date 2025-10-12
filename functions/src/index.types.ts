@@ -195,3 +195,7 @@ export interface CheckStatusResponse {
   data?: VerifiedData;
   reason?: string;
 }
+
+export interface CreateVerificationSessionRequest {
+  templateId: string;
+}
