@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { authService } from '@/services/authServices';
 import { useAuthForm } from '../hooks/useAuthForm';
 import { SocialAuthButtons } from './ui/SocialAuthButtons';
-import { PasswordStrengthIndicator } from '@/components/auth/components/ui/PasswordSTrengthIndicator';
+import { PasswordStrengthIndicator } from '@/components/auth/components/ui/PasswordStrengthIndicator';
 import {
   validatePassword,
   validatePasswordConfirmation,

@@ -19,7 +19,6 @@ export interface BaseRequest {
 
 export interface FHIRConversionRequest extends BaseRequest {
   documentText: string;
-  documentType?: string;
 }
 
 export interface FHIRConversionResponse {
@@ -28,35 +27,6 @@ export interface FHIRConversionResponse {
     resource: any;
   }>;
   [key: string]: any;
-}
-
-// ==================== MEDICAL DETECTION TYPES ====================
-
-export interface MedicalDetectionRequest extends BaseRequest {
-  documentText: string;
-}
-
-export interface MedicalDetectionResponse {
-  isMedical: boolean;
-  confidence: number;
-  documentType: 
-    | 'medical_record'
-    | 'lab_results' 
-    | 'radiology_report'
-    | 'prescription'
-    | 'discharge_summary'
-    | 'consultation_notes'
-    | 'medical_imaging'
-    | 'insurance_document'
-    | 'business_document'
-    | 'invoice'
-    | 'receipt'
-    | 'personal_document'
-    | 'unknown';
-  reasoning: string;
-  medicalSpecialty?: string | null;
-  suggestion: string;
-  detectedAt?: string;
 }
 
 // ==================== IMAGE ANALYSIS TYPES ====================
@@ -76,7 +46,6 @@ export interface ImageAnalysisRequest {
 export interface ImageAnalysisResponse {
   isMedical?: boolean;
   confidence?: number;
-  documentType?: string;
   reasoning?: string;
   suggestion?: string;
   extractedText?: string;
@@ -165,17 +134,13 @@ export interface ClaudeResponse {
 // ==================== ERROR TYPES ====================
 
 export class CloudFunctionError extends Error {
-  constructor(
-    message: string,
-    public code: string,
-    public statusCode: number = 500
-  ) {
+  constructor(message: string, public code: string, public statusCode: number = 500) {
     super(message);
     this.name = 'CloudFunctionError';
   }
 }
 
-export type ErrorCode = 
+export type ErrorCode =
   | 'INVALID_REQUEST'
   | 'MISSING_DATA'
   | 'CLAUDE_API_ERROR'
@@ -189,4 +154,44 @@ export interface HealthCheckResponse {
   status: 'OK' | 'ERROR';
   timestamp: string;
   version?: string;
+}
+
+// ==================== ID VERIFICATION TYPES ====================
+
+export interface PersonaInquiryResponse {
+  data: {
+    id: string;
+    attributes: {
+      session_token: string;
+      status: 'created' | 'pending' | 'approved' | 'declined' | 'needs_review';
+      name_first?: string;
+      name_last?: string;
+      birthdate?: string;
+      address_street_1?: string;
+      address_postal_code?: string;
+    };
+  };
+}
+
+export interface VerifiedData {
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  address: string;
+  postcode: string;
+}
+
+export interface CreateSessionResponse {
+  sessionToken: string;
+  inquiryId: string;
+}
+
+export interface CheckStatusRequest {
+  inquiryId: string;
+}
+
+export interface CheckStatusResponse {
+  verified: boolean;
+  data?: VerifiedData;
+  reason?: string;
 }

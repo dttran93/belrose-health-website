@@ -161,7 +161,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
   return (
     <div className="min-h-screen bg-secondary from-blue-50 to-indigo-100 flex">
       {/* LEFT SIDE - Progress Tracker */}
-      <div className="w-1/4 bg-primary p-12 flex flex-col justify-between">
+      <div className="w-1/3 2xl:w-1/4 bg-primary p-12 flex flex-col justify-between">
         <div>
           <h1 className="text-3xl font-bold text-secondary mb-2">Join Belrose</h1>
           <p className="text-secondary mb-12">Your secure health data platform</p>
@@ -232,6 +232,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
               <EncryptionPasswordSetup
                 onComplete={data => handleStepComplete(2, data)}
                 isCompleted={isStepCompleted(2)}
+                isActivated={isStepCompleted(1)}
               />
             )}
             {currentStep === 3 && (
@@ -244,6 +245,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
                 }}
                 onComplete={data => handleStepComplete(3, data)}
                 isCompleted={isStepCompleted(3)}
+                isActivated={isStepCompleted(2)}
               />
             )}
 
@@ -252,6 +254,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
                 recoveryKey={registrationData.recoveryKey}
                 onComplete={data => handleStepComplete(4, data)}
                 isCompleted={isStepCompleted(4)}
+                isActivated={isStepCompleted(2)}
               />
             )}
             {currentStep === 5 && <div>Placeholder for Step 5: Identity Verification</div>}

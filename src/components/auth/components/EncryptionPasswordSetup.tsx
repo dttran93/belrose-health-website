@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Eye, EyeOff, Lock, AlertCircle, LaptopMinimalCheck } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
-import PasswordStrengthIndicator from './ui/PasswordSTrengthIndicator';
+import PasswordStrengthIndicator from './ui/PasswordStrengthIndicator';
 import {
   validatePassword,
   validatePasswordConfirmation,
@@ -16,11 +16,13 @@ import InputField from './ui/InputField';
 interface EncryptionPasswordSetupProps {
   onComplete: (data: { encryptionPassword: string; recoveryKey: string }) => void;
   isCompleted: boolean;
+  isActivated: boolean;
 }
 
 export const EncryptionPasswordSetup: React.FC<EncryptionPasswordSetupProps> = ({
   onComplete,
   isCompleted = false,
+  isActivated = false,
 }) => {
   const [encryptionPassword, setEncryptionPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -151,79 +153,95 @@ export const EncryptionPasswordSetup: React.FC<EncryptionPasswordSetupProps> = (
             </div>
           </div>
 
+          {/* Pre-Activation Info Box*/}
+          {!isActivated && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-start space-x-3">
+                <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-yellow-900 flex-1">
+                  <p className="font-semibold mb-2">
+                    Create your Belrose Account (Step 1) before setting your Encryption Password
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Form */}
-          <div className="space-y-4">
-            <div>
-              <label
-                htmlFor="encryptionPassword"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Encryption Password
-              </label>
-              <div className="relative">
-                <InputField
-                  id="encryptionPassword"
-                  type={showPassword ? 'text' : 'password'}
-                  value={encryptionPassword}
-                  onChange={handlePasswordChange}
-                  className="w-full px-4 py-3"
-                  placeholder="At least 12 characters"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+          {isActivated && (
+            <div className="space-y-4">
+              <div>
+                <label
+                  htmlFor="encryptionPassword"
+                  className="block text-sm font-medium text-gray-700 mb-2"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
+                  Encryption Password
+                </label>
+                <div className="relative">
+                  <InputField
+                    id="encryptionPassword"
+                    type={showPassword ? 'text' : 'password'}
+                    value={encryptionPassword}
+                    onChange={handlePasswordChange}
+                    className="w-full px-4 py-3"
+                    placeholder="At least 12 characters"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                <PasswordStrengthIndicator password={encryptionPassword} showFeedback={true} />
               </div>
-              <PasswordStrengthIndicator password={encryptionPassword} showFeedback={true} />
-            </div>
 
-            <div>
-              <label
-                htmlFor="confirmPassword"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Confirm Password
-              </label>
-              <InputField
-                id="confirmPassword"
-                type={showPassword ? 'text' : 'password'}
-                value={confirmPassword}
-                onChange={e => {
-                  setConfirmPassword(e.target.value);
-                  setError('');
-                }}
-                className="w-full px-4 py-3"
-                placeholder="Confirm your password"
-              />
-            </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start space-x-2">
-                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-800">{error}</p>
+              <div>
+                <label
+                  htmlFor="confirmPassword"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  Confirm Password
+                </label>
+                <InputField
+                  id="confirmPassword"
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={e => {
+                    setConfirmPassword(e.target.value);
+                    setError('');
+                  }}
+                  className="w-full px-4 py-3"
+                  placeholder="Confirm your password"
+                />
               </div>
-            )}
 
-            <div className="flex space-x-3">
-              <Button
-                onClick={handleSubmit}
-                disabled={isProcessing || !encryptionPassword || !confirmPassword}
-                className="flex-1"
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
-                    Setting up...
-                  </>
-                ) : (
-                  'Continue'
-                )}
-              </Button>
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start space-x-2">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-800">{error}</p>
+                </div>
+              )}
+
+              <div className="flex space-x-3">
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isProcessing || !encryptionPassword || !confirmPassword}
+                  className="flex-1"
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
+                      Setting up...
+                    </>
+                  ) : (
+                    'Continue'
+                  )}
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </>
       )}
     </div>

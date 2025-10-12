@@ -13,6 +13,7 @@ interface WalletSetupProps {
   onComplete: (data: { walletAddress: string; walletType: 'generated' | 'metamask' }) => void;
   isCompleted: boolean;
   initialWalletData?: { walletAddress?: string; walletType?: 'generated' | 'metamask' };
+  isActivated: boolean;
 }
 
 type WalletChoice = 'generated' | 'metamask' | null;
@@ -23,6 +24,7 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
   initialWalletData,
   onComplete,
   isCompleted = false,
+  isActivated = false,
 }) => {
   console.log(initialWalletData);
 
@@ -155,68 +157,85 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
         </div>
       </div>
 
-      {/* Wallet Options */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <button
-          type="button"
-          onClick={() => setWalletChoice('generated')}
-          disabled={isProcessing}
-          className={`p-6 border-2 rounded-lg text-left transition-all ${
-            walletChoice === 'generated'
-              ? 'border-blue-500 bg-blue-50'
-              : 'border-gray-200 hover:border-blue-300'
-          }`}
-        >
-          <div className="flex items-start space-x-4">
-            <div
-              className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                walletChoice === 'generated' ? 'bg-blue-500' : 'bg-gray-200'
-              }`}
-            >
-              <Zap
-                className={`w-6 h-6 ${
-                  walletChoice === 'generated' ? 'text-white' : 'text-gray-600'
-                }`}
-              />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center space-x-2 mb-1">
-                <h4 className="font-semibold text-gray-900">Auto-Generate</h4>
-              </div>
-              <p className="text-sm text-gray-600">Easy secure setup, works immediately</p>
-            </div>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => !metaMaskConnected && handleConnectMetaMask()}
-          disabled={isProcessing}
-          className={`p-6 border-2 rounded-lg text-left transition-all ${
-            walletChoice === 'metamask'
-              ? 'border-orange-500 bg-orange-50'
-              : 'border-gray-200 hover:border-orange-300'
-          }`}
-        >
-          <div className="flex items-start space-x-4">
-            <div
-              className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                walletChoice === 'metamask' ? 'bg-orange-500' : 'bg-gray-200'
-              }`}
-            >
-              <span className="text-2xl">🦊</span>
-            </div>
-            <div className="flex-1">
-              <h4 className="font-semibold text-gray-900 mb-1">Connect MetaMask</h4>
-              <p className="text-sm text-gray-600">
-                {metaMaskConnected
-                  ? `Address: ${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)}`
-                  : 'Use your existing wallet, more secure'}
+      {/* Pre-Activation Info Box*/}
+      {!isActivated && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-yellow-900 flex-1">
+              <p className="font-semibold mb-2">
+                Create your Belrose Account (Step 1) and set your Encryption (Step 2) Before
+                connecting your wallet.
               </p>
             </div>
           </div>
-        </button>
-      </div>
+        </div>
+      )}
+
+      {/* Wallet Options */}
+      {isActivated && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button
+            type="button"
+            onClick={() => setWalletChoice('generated')}
+            disabled={isProcessing}
+            className={`p-6 border-2 rounded-lg text-left transition-all ${
+              walletChoice === 'generated'
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-200 hover:border-blue-300'
+            }`}
+          >
+            <div className="flex items-start space-x-4">
+              <div
+                className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                  walletChoice === 'generated' ? 'bg-blue-500' : 'bg-gray-200'
+                }`}
+              >
+                <Zap
+                  className={`w-6 h-6 ${
+                    walletChoice === 'generated' ? 'text-white' : 'text-gray-600'
+                  }`}
+                />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-1">
+                  <h4 className="font-semibold text-gray-900">Auto-Generate</h4>
+                </div>
+                <p className="text-sm text-gray-600">Easy secure setup, works immediately</p>
+              </div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => !metaMaskConnected && handleConnectMetaMask()}
+            disabled={isProcessing}
+            className={`p-6 border-2 rounded-lg text-left transition-all ${
+              walletChoice === 'metamask'
+                ? 'border-orange-500 bg-orange-50'
+                : 'border-gray-200 hover:border-orange-300'
+            }`}
+          >
+            <div className="flex items-start space-x-4">
+              <div
+                className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                  walletChoice === 'metamask' ? 'bg-orange-500' : 'bg-gray-200'
+                }`}
+              >
+                <span className="text-2xl">🦊</span>
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-gray-900 mb-1">Connect MetaMask</h4>
+                <p className="text-sm text-gray-600">
+                  {metaMaskConnected
+                    ? `Address: ${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)}`
+                    : 'Use your existing wallet, more secure'}
+                </p>
+              </div>
+            </div>
+          </button>
+        </div>
+      )}
 
       {/*Connected Wallet Display */}
       {initialWalletData?.walletAddress && initialWalletData?.walletType && (
@@ -254,7 +273,7 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
         </div>
       )}
 
-      {!isCompleted && (
+      {!isCompleted && isActivated && (
         <div className="flex space-x-3">
           <Button
             onClick={handleSubmit}
