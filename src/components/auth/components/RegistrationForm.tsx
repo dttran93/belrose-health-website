@@ -19,6 +19,8 @@ import EncryptionPasswordSetup from './EncryptionPasswordSetup';
 import { RecoveryKeyDisplay } from './RecoveryKeyDisplay';
 import WalletSetup from './WalletSetup';
 import { getFirestore, doc, setDoc } from 'firebase/firestore';
+import IdentityVerificationForm from './IdentityVerificationForm';
+import { VerificationResult, VerifiedData } from '@/types/identity';
 
 interface StepConfig {
   number: number;
@@ -35,6 +37,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
   const navigate = useNavigate();
   const location = useLocation();
   const [currentStep, setCurrentStep] = useState<number>(1);
+  const [verificationComplete, setVerificationComplete] = useState(false);
+  const [verifiedData, setVerifiedData] = useState<VerifiedData | null>(null);
 
   // Store data from all steps
   const [registrationData, setRegistrationData] = useState({
@@ -99,8 +103,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         // Step 4 is completed if a recovery Key has been created/saved. Maybe change to if they've acknowledged? But I guess there's technically not a lot for them to do here...
         return !!registrationData.acknowledgedRecoveryKey;
       case 5:
-        //TO BE UPDATED WITH ID VERIFICATION THING
-        return true;
+        return !!verificationComplete;
       default:
         return false;
     }
@@ -156,6 +159,18 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         duration: 5000,
       });
     }
+  };
+
+  const handleVerificationSuccess = (result: VerificationResult) => {
+    console.log('Verification successful!', result);
+    setVerifiedData(result.data ?? null);
+    setVerificationComplete(true);
+    // Save to your state/database
+  };
+
+  const handleVerificationError = (error: Error) => {
+    console.error('Verification failed:', error);
+    toast.error(`Verification failed: ${error.message}`);
   };
 
   return (
@@ -257,7 +272,18 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
                 isActivated={isStepCompleted(2)}
               />
             )}
-            {currentStep === 5 && <div>Placeholder for Step 5: Identity Verification</div>}
+            {currentStep === 5 && (
+              <div>
+                <IdentityVerificationForm
+                  userId={registrationData.userId}
+                  onSuccess={handleVerificationSuccess}
+                  onError={handleVerificationError}
+                  isCompleted={verificationComplete}
+                  initialVerifiedData={verifiedData ?? undefined}
+                  isActivated={isStepCompleted(1)}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

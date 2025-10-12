@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import { WalletService } from '@/features/BlockchainVerification/service/walletService';
 import { UserWalletService } from '@/features/BlockchainVerification/service/userWalletService';
+import { auth } from '@/firebase/config';
 
 interface WalletSetupProps {
   userId: string;
@@ -26,6 +27,7 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
   isCompleted = false,
   isActivated = false,
 }) => {
+  //DEBUG
   console.log(initialWalletData);
 
   const [walletChoice, setWalletChoice] = useState<WalletChoice>(
@@ -66,11 +68,17 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
 
     try {
       if (walletChoice === 'generated') {
-        const token = localStorage.getItem('authToken');
+        const user = auth.currentUser;
+        if (!user) {
+          throw new Error('Not authenticated');
+        }
+
+        const token = await user.getIdToken();
+
         const response = await fetch(
           import.meta.env.DEV
-            ? 'http://127.0.0.1:5001/belrose-health/us-central1/createWallet'
-            : 'https://us-central1-belrose-health.cloudfunctions.net/createWallet',
+            ? 'http://127.0.0.1:5001/belrose-757fe/us-central1/createWallet'
+            : 'https://us-central1-belrose-757fe.cloudfunctions.net/createWallet',
           {
             method: 'POST',
             headers: {
@@ -84,7 +92,10 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
           }
         );
 
-        if (!response.ok) throw new Error('Failed to create wallet');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create wallet');
+        }
 
         const data = await response.json();
         toast.success('Wallet created successfully!');
@@ -164,7 +175,7 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
             <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-yellow-900 flex-1">
               <p className="font-semibold mb-2">
-                Create your Belrose Account (Step 1) and set your Encryption (Step 2) Before
+                Create your Belrose Account (Step 1) and set your Encryption (Step 2) before
                 connecting your wallet.
               </p>
             </div>
@@ -239,7 +250,7 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
 
       {/*Connected Wallet Display */}
       {initialWalletData?.walletAddress && initialWalletData?.walletType && (
-        <div className="bg-green-50 border-2 border-green-500 rounded-lg p-4">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <div className="flex items-start space-x-3">
             <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
               <Check className="w-6 h-6 text-white" />
