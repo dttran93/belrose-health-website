@@ -152,8 +152,8 @@ const IdentityVerificationForm: React.FC<IdentityVerificationProps> = ({
           <div className="text-sm text-blue-900">
             <p className="font-semibold mb-1">Optional, but</p>
             <p className="text-blue-800">
-              If you want us to request your medical records from the NHS, we need to verify your
-              identity. This is a one-time process that takes about 2-3 minutes.
+              If you want us to get your medical records for you, we need to verify your identity.
+              This is a one-time process that takes about 2-3 minutes.
             </p>
           </div>
         </div>

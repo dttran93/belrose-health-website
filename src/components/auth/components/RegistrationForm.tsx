@@ -18,7 +18,7 @@ import BelroseAccountForm from './BelroseAccountForm';
 import EncryptionPasswordSetup from './EncryptionPasswordSetup';
 import { RecoveryKeyDisplay } from './RecoveryKeyDisplay';
 import WalletSetup from './WalletSetup';
-import { getFirestore, doc, setDoc } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, updateDoc } from 'firebase/firestore';
 import IdentityVerificationForm from './IdentityVerificationForm';
 import { VerificationResult, VerifiedData } from '@/types/identity';
 
@@ -114,9 +114,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
   };
 
   const handleStepComplete = (stepNumber: number, data: any) => {
-    //DEBUG
-    console.log('📥 handleStepComplete received:', { stepNumber, data });
-
     setRegistrationData(prev => ({
       ...prev,
       ...data,
@@ -136,12 +133,14 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
       const db = getFirestore();
       const userDocRef = doc(db, 'users', registrationData.userId);
 
-      await setDoc(userDocRef, {
+      await updateDoc(userDocRef, {
         email: registrationData.email,
         firstName: registrationData.firstName,
         lastName: registrationData.lastName,
         walletAddress: registrationData.walletAddress,
         walletType: registrationData.walletType,
+        isVerified: verificationComplete,
+        verifiedData: verifiedData,
         createdAt: new Date(),
       });
 
@@ -280,7 +279,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
                   onError={handleVerificationError}
                   isCompleted={verificationComplete}
                   initialVerifiedData={verifiedData ?? undefined}
-                  isActivated={true}
+                  isActivated={isStepCompleted(1)}
                 />
               </div>
             )}
@@ -337,6 +336,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
             <Button
               variant="secondary"
               type="submit"
+              onClick={handleCompleteRegistration}
               disabled={!canProceed()}
               className="rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
             >

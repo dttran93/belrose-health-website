@@ -403,11 +403,11 @@ export class EncryptionService {
   }
 
   // =================== HELPER METHODS =========================
-  private static arrayBufferToBase64(buffer: ArrayBuffer): string {
+  public static arrayBufferToBase64(buffer: ArrayBuffer): string {
     return btoa(String.fromCharCode(...new Uint8Array(buffer)));
   }
 
-  private static base64ToArrayBuffer(base64: string): ArrayBuffer {
+  public static base64ToArrayBuffer(base64: string): ArrayBuffer {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {

@@ -3,10 +3,11 @@ import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { EncryptionService } from './encryptionService';
+import { KeyManagementService } from '@/features/Sharing/keyManagementService';
 
 export class EncryptionSetupService {
   /**
-   * Initialize encryption for a user (first time setup)
+   * Initialize encryption for a user, including RSA key for sharing
    */
   static async setupEncryption(password: string): Promise<string> {
     const auth = getAuth();
@@ -28,6 +29,13 @@ export class EncryptionSetupService {
     const recoveryKey = EncryptionService.generateRecoveryKey();
     const recoveryHash = await EncryptionService.hashPassword(recoveryKey, salt);
 
+    // Generate RSA key pair for Sharing
+    const { publicKey, privateKey } = await KeyManagementService.generateUserKeyPair();
+
+    // Encrypt the RSA private key with the user's password
+    const masterKey = await EncryptionService.deriveKeyFromPassword(password, salt);
+    const encryptedPrivateKeyData = await EncryptionService.encryptText(privateKey, masterKey);
+
     // Save to Firestore
     const userRef = doc(db, 'users', user.uid);
     await updateDoc(userRef, {
@@ -36,6 +44,9 @@ export class EncryptionSetupService {
       'encryption.passwordHash': passwordHash,
       'encryption.recoveryKeyHash': recoveryHash,
       'encryption.setupAt': new Date().toISOString(),
+      publicKey: publicKey, // Public key (anyone can see)
+      encryptedPrivateKey: EncryptionService.arrayBufferToBase64(encryptedPrivateKeyData.encrypted),
+      privateKeyIV: EncryptionService.arrayBufferToBase64(encryptedPrivateKeyData.iv),
     });
 
     console.log('Encryption setup completed for user:', user.uid);
