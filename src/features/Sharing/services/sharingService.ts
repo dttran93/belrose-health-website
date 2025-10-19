@@ -19,15 +19,15 @@ import { ethers } from 'ethers';
 
 export interface ShareRecordRequest {
   recordId: string;
-  providerWalletAddress?: string;
-  providerEmail?: string; // Optional: to look up provider
+  receiverWalletAddress?: string;
+  receiverEmail?: string;
 }
 
 export interface SharedRecord {
   recordId: string;
-  patientId: string;
-  providerId: string;
-  providerWalletAddress: string;
+  ownerId: string;
+  receiverId: string;
+  receiverWalletAddress: string;
   wrappedKeyId: string;
   permissionHash: string;
   isActive: boolean;
@@ -37,7 +37,7 @@ export interface SharedRecord {
 
 export class SharingService {
   /**
-   * Share a record with a healthcare provider
+   * Share a record with another user (family, provider, researcher, etc.)
    */
   static async shareRecord(request: ShareRecordRequest): Promise<void> {
     const auth = getAuth();
@@ -48,8 +48,9 @@ export class SharingService {
       throw new Error('User not authenticated');
     }
 
-    if (!request.providerEmail && !request.providerWalletAddress) {
-      throw new Error('Either provider email or wallet address must be provided');
+    // Validate that at least one identifier is provided
+    if (!request.receiverEmail && !request.receiverWalletAddress) {
+      throw new Error('Either receiver email or wallet address must be provided');
     }
 
     // Get the master key from session
@@ -77,21 +78,21 @@ export class SharingService {
 
     console.log('✅ Record found and ownership verified');
 
-    // 2. Get provider's information
-    const getProvider = async () => {
+    // 2. Get receiver's information
+    const getReceiver = async () => {
       const usersRef = collection(db, 'users');
       let q;
 
-      if (request.providerEmail) {
-        q = query(usersRef, where('email', '==', request.providerEmail));
+      if (request.receiverEmail) {
+        q = query(usersRef, where('email', '==', request.receiverEmail));
       } else {
-        q = query(usersRef, where('walletAddress', '==', request.providerWalletAddress));
+        q = query(usersRef, where('walletAddress', '==', request.receiverWalletAddress));
       }
 
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty || !querySnapshot.docs[0]) {
-        throw new Error('Provider not found');
+        throw new Error('Receiver not found');
       }
 
       const doc = querySnapshot.docs[0];
@@ -101,17 +102,17 @@ export class SharingService {
       };
     };
 
-    const provider = await getProvider();
-    const providerId = provider.id;
-    const providerData = provider.data;
+    const receiver = await getReceiver();
+    const receiverId = receiver.id;
+    const receiverData = receiver.data;
 
-    if (!providerData.publicKey) {
-      throw new Error('Provider has not set up encryption keys');
+    if (!receiverData.publicKey) {
+      throw new Error('Receiver has not set up encryption keys');
     }
 
-    console.log('✅ Provider found:', providerId);
+    console.log('✅ Receiver found:', receiverId);
 
-    // 3. Decrypt the record's AES key using patient's master key
+    // 3. Decrypt the record's AES key using owner's master key
     const encryptedKeyData = EncryptionService.base64ToArrayBuffer(recordData.encryptedKey);
     const recordKey = await EncryptionService.importKey(
       await EncryptionService.decryptKeyWithMasterKey(encryptedKeyData, masterKey)
@@ -119,17 +120,17 @@ export class SharingService {
 
     console.log('✅ Record key decrypted');
 
-    // 4. Wrap the record key with provider's RSA public key
-    const providerPublicKey = await KeyManagementService.importPublicKey(providerData.publicKey);
-    const wrappedKeyForProvider = await KeyManagementService.wrapKey(recordKey, providerPublicKey);
+    // 4. Wrap the record key with receiver's RSA public key
+    const receiverPublicKey = await KeyManagementService.importPublicKey(receiverData.publicKey);
+    const wrappedKeyForReceiver = await KeyManagementService.wrapKey(recordKey, receiverPublicKey);
 
-    console.log('✅ Key wrapped for provider');
+    console.log('✅ Key wrapped for receiver');
 
     // 5. Create permission hash for blockchain
     const permissionData = {
       recordId: request.recordId,
-      patientAddress: user.uid, // Or use wallet address if you prefer
-      providerAddress: providerData.walletAddress,
+      ownerAddress: user.uid,
+      receiverAddress: receiverData.walletAddress,
       timestamp: Date.now(),
     };
     const permissionHash = ethers.id(JSON.stringify(permissionData));
@@ -137,13 +138,13 @@ export class SharingService {
     console.log('✅ Permission hash created:', permissionHash);
 
     // 6. Store wrapped key in Firestore
-    const wrappedKeyId = `${request.recordId}_${providerId}`;
+    const wrappedKeyId = `${request.recordId}_${receiverId}`;
     const wrappedKeyRef = doc(db, 'wrappedKeys', wrappedKeyId);
 
     await setDoc(wrappedKeyRef, {
       recordId: request.recordId,
-      userId: providerId,
-      wrappedKey: wrappedKeyForProvider,
+      userId: receiverId,
+      wrappedKey: wrappedKeyForReceiver,
       permissionHash: permissionHash,
       createdAt: new Date(),
       isActive: true,
@@ -156,9 +157,9 @@ export class SharingService {
 
     await setDoc(accessPermissionRef, {
       recordId: request.recordId,
-      patientId: user.uid,
-      providerId: providerId,
-      providerWalletAddress: providerData.walletAddress,
+      ownerId: user.uid,
+      receiverId: receiverId,
+      receiverWalletAddress: receiverData.walletAddress,
       isActive: true,
       grantedAt: new Date(),
       revokedAt: null,
@@ -168,7 +169,7 @@ export class SharingService {
 
     // 8. TODO: Store permission hash on blockchain
     // This will be done in the next step when we integrate with your smart contract
-    // await this.storePermissionOnBlockchain(permissionHash, recordData.recordHash, providerData.walletAddress);
+    // await this.storePermissionOnBlockchain(permissionHash, recordData.recordHash, receiverData.walletAddress);
 
     console.log('✅ Record shared successfully!');
   }
@@ -176,7 +177,7 @@ export class SharingService {
   /**
    * Revoke access to a record
    */
-  static async revokeAccess(recordId: string, providerId: string): Promise<void> {
+  static async revokeAccess(recordId: string, receiverId: string): Promise<void> {
     const auth = getAuth();
     const db = getFirestore();
     const user = auth.currentUser;
@@ -188,7 +189,7 @@ export class SharingService {
     console.log('🔄 Revoking access for record:', recordId);
 
     // 1. Get the wrapped key
-    const wrappedKeyId = `${recordId}_${providerId}`;
+    const wrappedKeyId = `${recordId}_${receiverId}`;
     const wrappedKeyRef = doc(db, 'wrappedKeys', wrappedKeyId);
     const wrappedKeyDoc = await getDoc(wrappedKeyRef);
 
@@ -223,7 +224,7 @@ export class SharingService {
   }
 
   /**
-   * Get all records shared by the current user
+   * Get all records shared by the current user (as owner)
    */
   static async getSharedRecords(): Promise<SharedRecord[]> {
     const auth = getAuth();
@@ -235,7 +236,7 @@ export class SharingService {
     }
 
     const accessPermissionsRef = collection(db, 'accessPermissions');
-    const q = query(accessPermissionsRef, where('patientId', '==', user.uid));
+    const q = query(accessPermissionsRef, where('ownerId', '==', user.uid));
 
     const querySnapshot = await getDocs(q);
 
@@ -243,10 +244,10 @@ export class SharingService {
       const data = doc.data();
       return {
         recordId: data.recordId,
-        patientId: data.patientId,
-        providerId: data.providerId,
-        providerWalletAddress: data.providerWalletAddress,
-        wrappedKeyId: `${data.recordId}_${data.providerId}`,
+        ownerId: data.ownerId,
+        receiverId: data.receiverId,
+        receiverWalletAddress: data.receiverWalletAddress,
+        wrappedKeyId: `${data.recordId}_${data.receiverId}`,
         permissionHash: doc.id,
         isActive: data.isActive,
         grantedAt: data.grantedAt.toDate(),
@@ -256,7 +257,7 @@ export class SharingService {
   }
 
   /**
-   * Get all records shared WITH the current user (as a provider)
+   * Get all records shared with the current user (as receiver)
    */
   static async getRecordsSharedWithMe(): Promise<SharedRecord[]> {
     const auth = getAuth();
@@ -270,7 +271,7 @@ export class SharingService {
     const accessPermissionsRef = collection(db, 'accessPermissions');
     const q = query(
       accessPermissionsRef,
-      where('providerId', '==', user.uid),
+      where('receiverId', '==', user.uid),
       where('isActive', '==', true)
     );
 
@@ -280,10 +281,10 @@ export class SharingService {
       const data = doc.data();
       return {
         recordId: data.recordId,
-        patientId: data.patientId,
-        providerId: data.providerId,
-        providerWalletAddress: data.providerWalletAddress,
-        wrappedKeyId: `${data.recordId}_${data.providerId}`,
+        ownerId: data.ownerId,
+        receiverId: data.receiverId,
+        receiverWalletAddress: data.receiverWalletAddress,
+        wrappedKeyId: `${data.recordId}_${data.receiverId}`,
         permissionHash: doc.id,
         isActive: data.isActive,
         grantedAt: data.grantedAt.toDate(),
@@ -293,12 +294,12 @@ export class SharingService {
   }
 
   /**
-   * Check if a provider has access to a specific record
+   * Check if a receiver has access to a specific record
    */
-  static async checkAccess(recordId: string, providerId: string): Promise<boolean> {
+  static async checkAccess(recordId: string, receiverId: string): Promise<boolean> {
     const db = getFirestore();
 
-    const wrappedKeyId = `${recordId}_${providerId}`;
+    const wrappedKeyId = `${recordId}_${receiverId}`;
     const wrappedKeyRef = doc(db, 'wrappedKeys', wrappedKeyId);
     const wrappedKeyDoc = await getDoc(wrappedKeyRef);
 
@@ -308,20 +309,5 @@ export class SharingService {
 
     const data = wrappedKeyDoc.data();
     return data.isActive === true;
-  }
-
-  /**
-   * Helper method to add to EncryptionService if not already there
-   * This unwraps the master key encryption on record keys
-   */
-  private static async decryptKeyWithMasterKey(
-    encryptedKeyData: ArrayBuffer,
-    masterKey: CryptoKey
-  ): Promise<ArrayBuffer> {
-    const data = new Uint8Array(encryptedKeyData);
-    const iv = data.slice(0, 12); // Assuming 12-byte IV for AES-GCM
-    const encrypted = data.slice(12);
-
-    return await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, masterKey, encrypted);
   }
 }

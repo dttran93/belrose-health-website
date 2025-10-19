@@ -21,8 +21,8 @@ export const ShareRecordDialog: React.FC<ShareRecordDialogProps> = ({
   onSuccess,
 }) => {
   const [shareMethod, setShareMethod] = useState<'email' | 'wallet'>('email');
-  const [providerEmail, setProviderEmail] = useState('');
-  const [providerWallet, setProviderWallet] = useState('');
+  const [receiverEmail, setReceiverEmail] = useState('');
+  const [receiverWallet, setReceiverWallet] = useState('');
   const { shareRecord, isSharing } = useSharing();
 
   const handleShare = async () => {
@@ -30,19 +30,19 @@ export const ShareRecordDialog: React.FC<ShareRecordDialogProps> = ({
       if (shareMethod === 'email') {
         await shareRecord({
           recordId,
-          providerEmail,
+          receiverEmail,
         });
       } else {
         await shareRecord({
           recordId,
-          providerWalletAddress: providerWallet,
+          receiverWalletAddress: receiverWallet,
         });
       }
 
       onSuccess?.();
       onClose();
-      setProviderEmail('');
-      setProviderWallet('');
+      setReceiverEmail('');
+      setReceiverWallet('');
     } catch (error) {
       // Error handled in hook
     }
@@ -105,8 +105,8 @@ export const ShareRecordDialog: React.FC<ShareRecordDialogProps> = ({
               </label>
               <input
                 type="email"
-                value={providerEmail}
-                onChange={e => setProviderEmail(e.target.value)}
+                value={receiverEmail}
+                onChange={e => setReceiverEmail(e.target.value)}
                 placeholder="doctor@example.com"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               />
@@ -118,8 +118,8 @@ export const ShareRecordDialog: React.FC<ShareRecordDialogProps> = ({
               </label>
               <input
                 type="text"
-                value={providerWallet}
-                onChange={e => setProviderWallet(e.target.value)}
+                value={receiverWallet}
+                onChange={e => setReceiverWallet(e.target.value)}
                 placeholder="0x..."
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               />
@@ -137,8 +137,8 @@ export const ShareRecordDialog: React.FC<ShareRecordDialogProps> = ({
             className="flex-1"
             disabled={
               isSharing ||
-              (shareMethod === 'email' && !providerEmail) ||
-              (shareMethod === 'wallet' && !providerWallet)
+              (shareMethod === 'email' && !receiverEmail) ||
+              (shareMethod === 'wallet' && !receiverWallet)
             }
           >
             {isSharing ? 'Sharing...' : 'Share Record'}
