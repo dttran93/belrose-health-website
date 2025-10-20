@@ -22,6 +22,24 @@ contract HealthRecordVerification {
         address indexed medicalVerifier,
         uint256 timestamp
     );
+
+    //Event for Access Grant/Revoking
+
+    event AccessGranted(
+        string indexed permissionHash,
+        address indexed owner,
+        address indexed receiver,
+        string recordId,
+        uint256 timestamp
+    );
+
+    event AccessRevoked(
+        string indexed permissionHash,
+        address indexed owner,
+        address indexed receiver,
+        string recordId,
+        uint256 timestamp
+    );
     
     // Structure for each record
     struct RecordVerification {
@@ -34,21 +52,31 @@ contract HealthRecordVerification {
         bool exists;             // Whether this record exists
         bool isVerified;         // Whether a medical verifier has attested to it
     }
+
+    // Sharing Structure
+    struct AccessPermission {
+        string permissionHash;
+        address owner;
+        address receiver;
+        string recordId;
+        uint256 grantedAt;
+        uint256 revokedAt;
+        bool isActive;
+        bool exists;
+    }
     
     // Storage: hash -> record info
     mapping(string => RecordVerification) public recordVerifications;
-    
-    // Array of all hashes (for counting/listing)
-    string[] public allRecordHashes;
-    
-    // Total count
-    uint256 public totalRecords;
-    
-    // Records by patient address
-    mapping(address => string[]) public recordsByPatient;
-    
-    // Records by medical verifier
-    mapping(address => string[]) public recordsByVerifier;
+    string[] public allRecordHashes; // Array of all hashes (for counting/listing)
+    uint256 public totalRecords; // Total count
+    mapping(address => string[]) public recordsByPatient;  // Records by patient address
+    mapping(address => string[]) public recordsByVerifier; // Records by medical verifier
+
+    // Storage for Sharing
+    mapping(string => AccessPermission) public accessPermissions;
+    mapping(address => string[]) public permissionsByOwner;
+    mapping(address => string[]) public permissionsByReceiver;
+    uint256 public totalPermissions;
     
     /**
      * Store a medical record hash on the blockchain
@@ -211,5 +239,143 @@ contract HealthRecordVerification {
         }
         
         return (total, verified);
+    }
+
+    // ========== SHARING FUNCTIONS ==========
+    
+    /**
+     * Grant access to a record
+     * @param permissionHash Hash of the permission details (from frontend)
+     * @param recordId The internal record ID
+     * @param receiver Address of the person receiving access
+     */
+    function grantAccess(
+        string memory permissionHash,
+        string memory recordId,
+        address receiver
+    ) external {
+        require(bytes(permissionHash).length > 0, "Permission hash cannot be empty");
+        require(bytes(recordId).length > 0, "Record ID cannot be empty");
+        require(receiver != address(0), "Receiver address cannot be zero");
+        require(receiver != msg.sender, "Cannot share with yourself");
+        require(!accessPermissions[permissionHash].exists, "Permission already exists");
+        
+        accessPermissions[permissionHash] = AccessPermission({
+            permissionHash: permissionHash,
+            owner: msg.sender,
+            receiver: receiver,
+            recordId: recordId,
+            grantedAt: block.timestamp,
+            revokedAt: 0,
+            isActive: true,
+            exists: true
+        });
+        
+        permissionsByOwner[msg.sender].push(permissionHash);
+        permissionsByReceiver[receiver].push(permissionHash);
+        totalPermissions++;
+        
+        emit AccessGranted(permissionHash, msg.sender, receiver, recordId, block.timestamp);
+    }
+    
+    /**
+     * Revoke access to a record
+     * @param permissionHash The permission hash to revoke
+     */
+    function revokeAccess(string memory permissionHash) external {
+        require(accessPermissions[permissionHash].exists, "Permission does not exist");
+        require(accessPermissions[permissionHash].owner == msg.sender, "Only owner can revoke");
+        require(accessPermissions[permissionHash].isActive, "Already revoked");
+        
+        accessPermissions[permissionHash].isActive = false;
+        accessPermissions[permissionHash].revokedAt = block.timestamp;
+        
+        emit AccessRevoked(
+            permissionHash,
+            msg.sender,
+            accessPermissions[permissionHash].receiver,
+            accessPermissions[permissionHash].recordId,
+            block.timestamp
+        );
+    }
+    
+    /**
+     * Check if access is currently active
+     * @param permissionHash The permission hash to check
+     */
+    function checkAccess(string memory permissionHash) 
+        external 
+        view 
+        returns (
+            bool isActive,
+            address owner,
+            address receiver,
+            string memory recordId,
+            uint256 grantedAt,
+            uint256 revokedAt
+        ) 
+    {
+        AccessPermission memory permission = accessPermissions[permissionHash];
+        return (
+            permission.isActive,
+            permission.owner,
+            permission.receiver,
+            permission.recordId,
+            permission.grantedAt,
+            permission.revokedAt
+        );
+    }
+    
+    /**
+     * Get all permissions granted by an owner
+     */
+    function getPermissionsByOwner(address owner) 
+        external 
+        view 
+        returns (string[] memory) 
+    {
+        return permissionsByOwner[owner];
+    }
+    
+    /**
+     * Get all permissions for a receiver
+     */
+    function getPermissionsByReceiver(address receiver) 
+        external 
+        view 
+        returns (string[] memory) 
+    {
+        return permissionsByReceiver[receiver];
+    }
+    
+    /**
+     * Get total number of permissions (active and revoked)
+     */
+    function getTotalPermissions() external view returns (uint256) {
+        return totalPermissions;
+    }
+    
+    /**
+     * Get permission statistics for an owner
+     * @param owner The owner's address
+     * @return total Total permissions granted
+     * @return active How many are still active
+     */
+    function getOwnerStats(address owner) 
+        external 
+        view 
+        returns (uint256 total, uint256 active) 
+    {
+        string[] memory ownerPermissions = permissionsByOwner[owner];
+        total = ownerPermissions.length;
+        active = 0;
+        
+        for (uint256 i = 0; i < ownerPermissions.length; i++) {
+            if (accessPermissions[ownerPermissions[i]].isActive) {
+                active++;
+            }
+        }
+        
+        return (total, active);
     }
 }

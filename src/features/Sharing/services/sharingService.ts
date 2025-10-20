@@ -5,6 +5,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  deleteDoc,
   updateDoc,
   collection,
   query,
@@ -16,6 +17,7 @@ import { EncryptionService } from '@/features/Encryption/services/encryptionServ
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { KeyManagementService } from './keyManagementService';
 import { ethers } from 'ethers';
+import { SharingContractService } from '@/features/BlockchainVerification/service/sharingContractService';
 
 export interface ShareRecordRequest {
   recordId: string;
@@ -167,9 +169,28 @@ export class SharingService {
 
     console.log('✅ Access permission stored');
 
-    // 8. TODO: Store permission hash on blockchain
-    // This will be done in the next step when we integrate with your smart contract
-    // await this.storePermissionOnBlockchain(permissionHash, recordData.recordHash, receiverData.walletAddress);
+    // 8. Store permission hash on blockchain
+    try {
+      console.log('🔗 Storing permission on blockchain...');
+      const txHash = await SharingContractService.grantAccessOnChain(
+        permissionHash,
+        request.recordId,
+        receiverData.walletAddress
+      );
+      console.log('✅ Blockchain transaction:', txHash);
+
+      // Optionally store the transaction hash in Firestore
+      await updateDoc(accessPermissionRef, {
+        blockchainTxHash: txHash,
+        onChain: true,
+      });
+    } catch (error) {
+      console.error('❌ Blockchain transaction failed:', error);
+      // Clean up Firestore if blockchain fails
+      await deleteDoc(wrappedKeyRef);
+      await deleteDoc(accessPermissionRef);
+      throw new Error('Failed to store permission on blockchain: ' + (error as Error).message);
+    }
 
     console.log('✅ Record shared successfully!');
   }
@@ -217,8 +238,22 @@ export class SharingService {
 
     console.log('✅ Access permission revoked');
 
-    // 4. TODO: Revoke permission on blockchain
-    // await this.revokePermissionOnBlockchain(wrappedKeyData.permissionHash);
+    // 4. Revoke permission on blockchain
+    try {
+      console.log('🔗 Revoking permission on blockchain...');
+      const txHash = await SharingContractService.revokeAccessOnChain(
+        wrappedKeyData.permissionHash
+      );
+      console.log('✅ Blockchain transaction:', txHash);
+
+      // Optionally store the revocation tx hash
+      await updateDoc(accessPermissionRef, {
+        revocationTxHash: txHash,
+      });
+    } catch (error) {
+      console.error('❌ Blockchain transaction failed:', error);
+      throw new Error('Failed to revoke on blockchain: ' + (error as Error).message);
+    }
 
     console.log('✅ Access revoked successfully!');
   }
