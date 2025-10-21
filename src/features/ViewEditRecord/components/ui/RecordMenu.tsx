@@ -1,14 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  MoreHorizontal, 
-  Edit3, 
-  Share2, 
-  Download, 
-  Copy, 
+import {
+  MoreHorizontal,
+  Edit3,
+  Share2,
+  Download,
+  Copy,
   Eye,
-  Archive, 
+  Archive,
   Trash2,
-  LucideIcon, 
+  LucideIcon,
   GitBranch,
   Shield,
 } from 'lucide-react';
@@ -35,7 +35,7 @@ type MenuItem = MenuOption | MenuDivider;
 interface HealthRecordMenuProps {
   // Required props
   record: any; // Your FileObject type
-  
+
   // Action handlers - parent provides these
   onEdit?: (record: any) => void;
   onShare?: (record: any) => void;
@@ -44,12 +44,12 @@ interface HealthRecordMenuProps {
   onView?: (record: any) => void;
   onVersion?: (record: any) => void;
   onViewVerification?: (record: any) => void;
-  
+
   // Customization props
   triggerIcon?: LucideIcon;
   triggerClassName?: string;
   menuClassName?: string;
-  
+
   // Configuration - what actions to show
   showEdit?: boolean;
   showShare?: boolean;
@@ -60,7 +60,7 @@ interface HealthRecordMenuProps {
   showDelete?: boolean;
   showVersions?: boolean;
   showVerification?: boolean;
-  
+
   // Additional menu items from parent
   additionalItems?: MenuItem[];
 }
@@ -74,8 +74,8 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
   onVersion,
   onViewVerification,
   triggerIcon: TriggerIcon = MoreHorizontal,
-  triggerClassName = "p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors",
-  menuClassName = "absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[160px]",
+  triggerClassName = 'p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors',
+  menuClassName = 'absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[160px]',
   showEdit = true,
   showShare = true,
   showDownload = true,
@@ -84,7 +84,7 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
   showDelete = true,
   showVersions = true,
   showVerification = true,
-  additionalItems = []
+  additionalItems = [],
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -94,9 +94,9 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
-        menuRef.current && 
+        menuRef.current &&
         !menuRef.current.contains(event.target as Node) &&
-        buttonRef.current && 
+        buttonRef.current &&
         !buttonRef.current.contains(event.target as Node)
       ) {
         setIsOpen(false);
@@ -138,7 +138,7 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
     if (onViewVerification) {
       onViewVerification(record);
     }
-  }
+  };
 
   // Wrapper for parent handlers
   const createHandler = (handler?: (record: any) => void) => {
@@ -160,7 +160,7 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
         key: 'view',
         label: 'View Record',
         icon: Eye,
-        onClick: createHandler(onView)
+        onClick: createHandler(onView),
       });
     }
 
@@ -170,7 +170,7 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
         key: 'edit',
         label: 'Edit Record',
         icon: Edit3,
-        onClick: createHandler(onEdit)
+        onClick: createHandler(onEdit),
       });
     }
 
@@ -180,7 +180,7 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
         key: 'versions',
         label: 'View Versions',
         icon: GitBranch,
-        onClick: createHandler(onVersion)
+        onClick: createHandler(onVersion),
       });
     }
 
@@ -190,7 +190,7 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
         key: 'share',
         label: 'Share Record',
         icon: Share2,
-        onClick: createHandler(onShare)
+        onClick: createHandler(onShare),
       });
     }
 
@@ -200,7 +200,7 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
         key: 'download',
         label: 'Download File',
         icon: Download,
-        onClick: handleDownload
+        onClick: handleDownload,
       });
     }
 
@@ -210,7 +210,7 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
         key: 'copy',
         label: 'Copy FHIR Data',
         icon: Copy,
-        onClick: handleCopyData
+        onClick: handleCopyData,
       });
     }
 
@@ -219,8 +219,8 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
         key: 'verification',
         label: 'View Verification',
         icon: Shield,
-        onClick:handleViewVerification
-      })
+        onClick: handleViewVerification,
+      });
     }
 
     // Add any additional items from parent
@@ -229,7 +229,7 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
     }
 
     // Add divider before destructive actions if we have any non-destructive items
-    if (items.length > 0 && ( showDelete)) {
+    if (items.length > 0 && showDelete) {
       items.push({ type: 'divider', key: 'divider-1' });
     }
 
@@ -240,7 +240,7 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
         label: 'Delete Record',
         icon: Trash2,
         onClick: createHandler(onDelete),
-        destructive: true
+        destructive: true,
       });
     }
 
@@ -266,21 +266,16 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
       >
         <TriggerIcon className="w-4 h-4" />
       </button>
-      
+
       {isOpen && (
         <div className={menuClassName}>
           {menuItems.map((item, index) => {
             if (item.type === 'divider') {
-              return (
-                <hr 
-                  key={item.key || `divider-${index}`} 
-                  className="my-1 border-gray-200" 
-                />
-              );
+              return <hr key={item.key || `divider-${index}`} className="my-1 border-gray-200" />;
             }
 
             const menuOption = item as MenuOption;
-            
+
             return (
               <button
                 key={menuOption.key}
@@ -289,20 +284,12 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
                 className={`
                   w-full px-4 py-2 text-left text-sm hover:bg-gray-100 
                   flex items-center gap-3 transition-colors
-                  ${menuOption.destructive 
-                    ? 'text-red-600 hover:bg-red-50' 
-                    : 'text-gray-700'
-                  }
-                  ${menuOption.disabled 
-                    ? 'opacity-50 cursor-not-allowed' 
-                    : 'cursor-pointer'
-                  }
+                  ${menuOption.destructive ? 'text-red-600 hover:bg-red-50' : 'text-gray-700'}
+                  ${menuOption.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                   ${menuOption.className || ''}
                 `}
               >
-                {menuOption.icon && (
-                  <menuOption.icon className="w-4 h-4 flex-shrink-0" />
-                )}
+                {menuOption.icon && <menuOption.icon className="w-4 h-4 flex-shrink-0" />}
                 <span>{menuOption.label}</span>
               </button>
             );

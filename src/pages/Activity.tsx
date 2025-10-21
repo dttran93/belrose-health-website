@@ -1,22 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import useFileManager from '@/features/AddRecord/hooks/useFileManager';
-import { 
-  Search, 
-  Filter, 
-  Upload, 
+import {
+  Search,
+  Filter,
+  Upload,
   FileText,
   Loader2,
   AlertCircle,
   List,
   Eye,
-  ArrowLeft
+  ArrowLeft,
 } from 'lucide-react';
 import { HealthRecordCard } from '@/features/ViewEditRecord/components/ui/RecordCard';
 import HealthRecordFull from '@/features/ViewEditRecord/components/RecordFull';
 import { useCompleteRecords } from '@/features/ViewEditRecord/hooks/useAllUserRecords';
 import { useAuthContext } from '@/components/auth/AuthContext';
 import { FileObject } from '@/types/core';
+import { ShareRecordDialog } from '@/features/Sharing/components/ShareRecordDialog';
 
 interface PatientRecordsListProps {
   onViewRecord?: (record: FileObject) => void;
@@ -33,16 +34,18 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
   onDownloadRecord,
   onShareRecord,
   onDeleteRecord,
-  onAddNewRecord
+  onAddNewRecord,
 }) => {
   const { user } = useAuthContext();
   const { records, loading, error } = useCompleteRecords(user?.uid);
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [viewMode, setViewMode] = useState<'summary' | 'detailed'>('summary');
   const [selectedRecord, setSelectedRecord] = useState<FileObject | null>(null);
   const [editMode, setEditMode] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [recordToShare, setRecordToShare] = useState<FileObject | null>(null);
 
   const { updateFirestoreRecord, deleteFileFromFirebase } = useFileManager();
 
@@ -51,14 +54,14 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
     setViewMode('detailed');
     setEditMode(true);
 
-    if(onEditRecord) {
+    if (onEditRecord) {
       onEditRecord(record);
     }
-  }
+  };
   useEffect(() => {
     if (selectedRecord && selectedRecord.id) {
       const updatedRecord = records.find(r => r.id === selectedRecord.id);
-      if(updatedRecord) {
+      if (updatedRecord) {
         setSelectedRecord(updatedRecord);
       }
     }
@@ -66,68 +69,82 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
 
   const handleSaveRecord = async (updatedRecord: FileObject) => {
     try {
-      if(!updatedRecord.id) {
-        throw new Error('Cannot save record - no document ID found')
+      if (!updatedRecord.id) {
+        throw new Error('Cannot save record - no document ID found');
       }
 
       //Update the record in Firestore with both FHIR data and belroseFields
       await updateFirestoreRecord(updatedRecord.id, {
         fhirData: updatedRecord.fhirData,
         belroseFields: updatedRecord.belroseFields,
-        lastModified: new Date().toISOString()
+        lastModified: new Date().toISOString(),
       });
 
       console.log('Record saved successfully');
       toast.success(`💾 Record saved for ${updatedRecord.belroseFields?.title}`, {
         description: 'Record updates saved to cloud storage',
         duration: 4000,
-      }) 
-
-      } catch (error) {
-        console.error('Failed to save record: ', error);
-        toast.error(`Failed to save ${updatedRecord.belroseFields?.title}`, {
-          description: error instanceof Error ? error.message : 'Unknown error occurred',
-          duration: 4000,
-        })
-      }
+      });
+    } catch (error) {
+      console.error('Failed to save record: ', error);
+      toast.error(`Failed to save ${updatedRecord.belroseFields?.title}`, {
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        duration: 4000,
+      });
     }
+  };
 
   //Handle Delete record
   const handleDeleteRecord = async (record: FileObject) => {
-    if (!confirm(`Are you sure you want to delete "${record.belroseFields?.title}"? This cannot be undone.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete "${record.belroseFields?.title}"? This cannot be undone.`
+      )
+    ) {
       return;
-    }  
-    
-    try {
-        if(!record.id) {
-          throw new Error('Cannot save record - no document ID found')
-        }
+    }
 
-        await deleteFileFromFirebase(record.id);
-        console.log('Record deleted successfully');
-        toast.success(`💾 Deleted for ${record.belroseFields?.title}`, {
-          description: 'Entry deleted from record',
-          duration: 4000,
-        })
-        setViewMode('summary');
-        setEditMode(false); 
-      } catch (error) {
-        console.error('Failed to delete record: ', error);
-        toast.error(`Failed to delete ${record.belroseFields?.title}`, {
-          description: error instanceof Error ? error.message : 'Unknown error occurred',
-          duration: 4000,
-      })}
-    };
+    try {
+      if (!record.id) {
+        throw new Error('Cannot save record - no document ID found');
+      }
+
+      await deleteFileFromFirebase(record.id);
+      console.log('Record deleted successfully');
+      toast.success(`💾 Deleted for ${record.belroseFields?.title}`, {
+        description: 'Entry deleted from record',
+        duration: 4000,
+      });
+      setViewMode('summary');
+      setEditMode(false);
+    } catch (error) {
+      console.error('Failed to delete record: ', error);
+      toast.error(`Failed to delete ${record.belroseFields?.title}`, {
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        duration: 4000,
+      });
+    }
+  };
 
   // Handle view record - switch to detailed view
   const handleViewRecord = (record: FileObject) => {
     setSelectedRecord(record);
     setViewMode('detailed');
-    
+
     // Call the original onViewRecord if provided (for any external logic)
     if (onViewRecord) {
       onViewRecord(record);
     }
+  };
+
+  const handleShareRecord = (record: FileObject) => {
+    setRecordToShare(record);
+    setShareDialogOpen(true);
+  };
+
+  const handleCloseShareDialog = () => {
+    setShareDialogOpen(false);
+    setRecordToShare(null);
   };
 
   // Handle back to summary
@@ -139,12 +156,12 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
   // Filter and search records
   const filteredRecords = records.filter(record => {
     const fileName = record.fileName || '';
-    const matchesSearch = fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (record.sourceType || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesFilter = filterType === 'all' || 
-                         record.sourceType === filterType;
-    
+    const matchesSearch =
+      fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (record.sourceType || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesFilter = filterType === 'all' || record.sourceType === filterType;
+
     return matchesSearch && matchesFilter;
   });
 
@@ -152,18 +169,16 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
   const sortedRecords = filteredRecords.sort((a, b) => {
     const dateA = a.lastModified ? new Date(a.lastModified) : null;
     const dateB = b.lastModified ? new Date(b.lastModified) : null;
-    
+
     if (!dateA && !dateB) return 0;
     if (!dateA) return 1;
     if (!dateB) return -1;
-    
+
     return dateB.getTime() - dateA.getTime();
   });
 
   // Get unique document types for filter dropdown
-  const sourceTypes = Array.from(
-    new Set(records.map(record => record.sourceType).filter(Boolean))
-  );
+  const sourceTypes = Array.from(new Set(records.map(record => record.sourceType).filter(Boolean)));
 
   // Loading state
   if (loading) {
@@ -200,9 +215,7 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 py-12 text-center">
           <div className="text-6xl mb-6">📄</div>
-          <h2 className="text-2xl font-semibold text-gray-900 mb-3">
-            No Health Records Found
-          </h2>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-3">No Health Records Found</h2>
           <p className="text-gray-600 mb-8 max-w-md mx-auto">
             Start building your comprehensive health record by uploading your medical documents.
           </p>
@@ -221,12 +234,15 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
   // If we're in detailed view, show the full record component
   if (viewMode === 'detailed' && selectedRecord) {
     return (
-      <HealthRecordFull 
+      <HealthRecordFull
         record={selectedRecord}
-        onBack={() => {handleBackToSummary(); setEditMode(false);}}
+        onBack={() => {
+          handleBackToSummary();
+          setEditMode(false);
+        }}
         onEdit={onEditRecord}
         onDownload={onDownloadRecord}
-        onShare={onShareRecord}
+        onShare={handleShareRecord}
         onDelete={handleDeleteRecord}
         onSave={handleSaveRecord}
         initialEditMode={editMode}
@@ -244,7 +260,8 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Your Health Records</h1>
               <p className="text-gray-600 mt-1">
-                {records.length} record{records.length !== 1 ? 's' : ''} in your comprehensive health record
+                {records.length} record{records.length !== 1 ? 's' : ''} in your comprehensive
+                health record
               </p>
             </div>
             <button
@@ -267,14 +284,14 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
               type="text"
               placeholder="Search records..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={e => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-3 py-2 bg-background border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          
+
           <select
             value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
+            onChange={e => setFilterType(e.target.value)}
             className="px-3 py-2 bg-background border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Types</option>
@@ -304,19 +321,33 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
           </div>
         ) : (
           <div className="space-y-4">
-            {sortedRecords.map((record) => (
+            {sortedRecords.map(record => (
               <HealthRecordCard
                 key={record.id}
                 record={record}
                 onView={handleViewRecord}
                 onEdit={handleEditRecord}
                 onDelete={handleDeleteRecord}
+                onShare={handleShareRecord}
                 className="max-w-none" // Full width for list view
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* Share Dialog */}
+      {recordToShare && (
+        <ShareRecordDialog
+          recordId={recordToShare.id}
+          recordName={recordToShare.fileName || 'Unknown Record'}
+          isOpen={shareDialogOpen}
+          onClose={handleCloseShareDialog}
+          onSuccess={() => {
+            handleCloseShareDialog();
+          }}
+        />
+      )}
     </div>
   );
 };

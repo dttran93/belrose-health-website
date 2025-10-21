@@ -16,6 +16,7 @@ import { AuthProvider } from './components/auth/AuthContext';
 import { LayoutProvider } from './components/app/LayoutProvider';
 import SettingsPage from './pages/Settings';
 import { EncryptionGate } from './features/Encryption/components/EncryptionGate';
+import SharedRecords from './pages/SharedRecords';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
@@ -49,6 +50,7 @@ const App: React.FC = (): React.JSX.Element => {
                             <Route path="activity" element={<PatientRecordsList />} />
                             <Route path="addrecord" element={<AddRecord />} />
                             <Route path="settings" element={<SettingsPage />} />
+                            <Route path="share-records" element={<SharedRecords />} />
                           </Routes>
                         </Layout>
                       </LayoutProvider>

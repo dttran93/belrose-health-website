@@ -1,7 +1,17 @@
 // /features/Auth/components/BelroseAccountForm.tsx
 
 import React, { useState, useEffect } from 'react';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, User, Edit2, CheckCircle } from 'lucide-react';
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  User,
+  Edit2,
+  CheckCircle,
+  UserPen,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import { authService } from '@/services/authServices';
@@ -268,7 +278,7 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
             {/* Header */}
             <div className="text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-full mb-4">
-                <Lock className="w-8 h-8 text-white" />
+                <UserPen className="w-8 h-8 text-white" />
               </div>
               <h2 className="text-2xl font-bold text-gray-900">Create Belrose Account</h2>
               <p className="text-gray-600 mt-2">

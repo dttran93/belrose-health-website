@@ -3,7 +3,7 @@ import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { EncryptionService } from './encryptionService';
-import { KeyManagementService } from '@/features/Sharing/keyManagementService';
+import { KeyManagementService } from '@/features/Sharing/services/keyManagementService';
 
 export class EncryptionSetupService {
   /**
@@ -49,7 +49,7 @@ export class EncryptionSetupService {
       privateKeyIV: EncryptionService.arrayBufferToBase64(encryptedPrivateKeyData.iv),
     });
 
-    console.log('Encryption setup completed for user:', user.uid);
+    console.log('Encryption and RSA setup completed for user:', user.uid);
 
     // Return recovery key to show user ONE TIME
     return recoveryKey;

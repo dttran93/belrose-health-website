@@ -1,15 +1,15 @@
 import React from 'react';
-import { Button } from "@/components/ui/Button";
+import { Button } from '@/components/ui/Button';
 import { X, Ellipsis } from 'lucide-react';
 import { FileObject, BelroseFields } from '@/types/core';
-import HealthRecordMenu from "./RecordMenu";
-import { VerificationBadge } from "@/features/BlockchainVerification/component/VerificationBadge";
-import { RecordVersion } from "@/features/ViewEditRecord/services/versionControlService.types";
+import HealthRecordMenu from './RecordMenu';
+import { VerificationBadge } from '@/features/BlockchainVerification/component/VerificationBadge';
+import { RecordVersion } from '@/features/ViewEditRecord/services/versionControlService.types';
 
 // Component for editable belrose fields
 const EditableBelroseFields = ({
-  editedBelroseFields, 
-  updateBelroseField
+  editedBelroseFields,
+  updateBelroseField,
 }: {
   editedBelroseFields: BelroseFields;
   updateBelroseField: (field: keyof BelroseFields, value: string) => void;
@@ -21,7 +21,7 @@ const EditableBelroseFields = ({
         <input
           type="text"
           value={editedBelroseFields.title || ''}
-          onChange={(e) => updateBelroseField('title', e.target.value)}
+          onChange={e => updateBelroseField('title', e.target.value)}
           className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
           placeholder="Enter record title..."
         />
@@ -31,28 +31,30 @@ const EditableBelroseFields = ({
         <input
           type="text"
           value={editedBelroseFields.visitType || ''}
-          onChange={(e) => updateBelroseField('visitType', e.target.value)}
+          onChange={e => updateBelroseField('visitType', e.target.value)}
           className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
           placeholder="e.g., Follow-up Appointment, Lab Results..."
         />
       </div>
-      
+
       <div className="col-span-3">
         <label className="block text-sm font-medium text-white/90 mb-1">Completed Date</label>
         <input
           type="date"
-          value={editedBelroseFields.completedDate ? editedBelroseFields.completedDate.split('T')[0] : ''}
-          onChange={(e) => updateBelroseField('completedDate', e.target.value)}
+          value={
+            editedBelroseFields.completedDate ? editedBelroseFields.completedDate.split('T')[0] : ''
+          }
+          onChange={e => updateBelroseField('completedDate', e.target.value)}
           className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
         />
       </div>
-      
+
       <div className="col-span-3">
         <label className="block text-sm font-medium text-white/90 mb-1">Patient</label>
         <input
           type="text"
           value={editedBelroseFields.patient || ''}
-          onChange={(e) => updateBelroseField('patient', e.target.value)}
+          onChange={e => updateBelroseField('patient', e.target.value)}
           className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
           placeholder="Patient Name..."
         />
@@ -63,29 +65,29 @@ const EditableBelroseFields = ({
         <input
           type="text"
           value={editedBelroseFields.provider || ''}
-          onChange={(e) => updateBelroseField('provider', e.target.value)}
+          onChange={e => updateBelroseField('provider', e.target.value)}
           className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
           placeholder="Provider name..."
         />
       </div>
-      
+
       <div className="col-span-3">
         <label className="block text-sm font-medium text-white/90 mb-1">Institution</label>
         <input
           type="text"
           value={editedBelroseFields.institution || ''}
-          onChange={(e) => updateBelroseField('institution', e.target.value)}
+          onChange={e => updateBelroseField('institution', e.target.value)}
           className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
           placeholder="Healthcare institution..."
         />
       </div>
     </div>
-    
+
     <div>
       <label className="block text-sm font-medium text-white/90 mb-1">Summary</label>
       <textarea
         value={editedBelroseFields.summary || ''}
-        onChange={(e) => updateBelroseField('summary', e.target.value)}
+        onChange={e => updateBelroseField('summary', e.target.value)}
         rows={2}
         className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
         placeholder="Brief summary of the record..."
@@ -103,6 +105,7 @@ interface RecordHeaderProps {
   editedBelroseFields: BelroseFields;
   onEdit?: (record: FileObject) => void;
   onDelete?: (record: FileObject) => void;
+  onShare?: (record: FileObject) => void;
   onViewVerification?: (record: FileObject) => void;
   onVersionMode?: (record: string) => void;
   onExit: () => void;
@@ -120,12 +123,13 @@ export const RecordHeader: React.FC<RecordHeaderProps> = ({
   editedBelroseFields,
   onEdit,
   onDelete,
+  onShare,
   onViewVerification,
   onVersionMode,
   onExit,
   onReturnToCurrent,
   onEnterEditMode,
-  updateBelroseField
+  updateBelroseField,
 }) => {
   const handleViewVerification = (record: FileObject) => {
     onViewVerification?.(record);
@@ -149,10 +153,10 @@ export const RecordHeader: React.FC<RecordHeaderProps> = ({
               </>
             )}
           </div>
-          
+
           <div className="flex items-center">
             <VerificationBadge fileObject={record} />
-            <HealthRecordMenu 
+            <HealthRecordMenu
               record={record}
               triggerIcon={Ellipsis}
               showView={false}
@@ -160,14 +164,15 @@ export const RecordHeader: React.FC<RecordHeaderProps> = ({
               onEdit={!isEditMode ? onEnterEditMode : undefined}
               onVersion={!isVersionView ? onVersionMode : undefined}
               onDelete={onDelete}
+              onShare={onShare}
               onViewVerification={handleViewVerification}
             />
-            <Button 
-              variant="default" 
+            <Button
+              variant="default"
               className="p-2 w-8 h-8 hover:bg-white/20 transition-colors"
               onClick={onExit}
             >
-              <X className="w-5 h-5"/>
+              <X className="w-5 h-5" />
             </Button>
           </div>
         </div>
@@ -189,13 +194,15 @@ export const RecordHeader: React.FC<RecordHeaderProps> = ({
                 </div>
               </div>
             </div>
-            
+
             <div className="flex text-sm text-white items-start gap-4 my-2">
               <div>
-                {displayRecord.belroseFields?.completedDate} • {displayRecord.belroseFields?.patient} • {displayRecord.belroseFields?.provider} • {displayRecord.belroseFields?.institution}
+                {displayRecord.belroseFields?.completedDate} •{' '}
+                {displayRecord.belroseFields?.patient} • {displayRecord.belroseFields?.provider} •{' '}
+                {displayRecord.belroseFields?.institution}
               </div>
             </div>
-            
+
             <div className="flex justify-left text-white/50 text-left">
               <p>{displayRecord.belroseFields?.summary}</p>
             </div>

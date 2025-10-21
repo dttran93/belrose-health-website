@@ -178,7 +178,9 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
       <div className="w-1/3 2xl:w-1/4 bg-primary p-12 flex flex-col justify-between">
         <div>
           <h1 className="text-3xl font-bold text-secondary mb-2">Join Belrose</h1>
-          <p className="text-secondary mb-12">Your secure health data platform</p>
+          <p className="text-secondary mb-12">
+            Your it takes less than 10 minutes to create your secure health data platform
+          </p>
 
           {/* Progress Steps */}
           <div className="space-y-8">

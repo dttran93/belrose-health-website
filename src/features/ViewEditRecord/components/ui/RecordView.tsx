@@ -1,28 +1,30 @@
+// This is the healthrecord content of the record, FHIR Formatted, JSON, and Original Text. Combines with the record header to create the full record
+
 import React, { useState } from 'react';
-import { Button } from "@/components/ui/Button";
+import { Button } from '@/components/ui/Button';
 import { Share2, ClipboardPlus, Code, FileInput } from 'lucide-react';
 import { FileObject } from '@/types/core';
-import { TabNavigation } from "@/features/AddRecord/components/ui/TabNavigation";
-import FHIRRecord from "@/features/ViewEditRecord/components/ui/FHIRRecord"; 
+import { TabNavigation } from '@/features/AddRecord/components/ui/TabNavigation';
+import FHIRRecord from '@/features/ViewEditRecord/components/ui/FHIRRecord';
 
 export type TabType = 'record' | 'data' | 'original';
 
 const tabs = [
-  { 
-    id: 'record', 
+  {
+    id: 'record',
     label: 'Full Record',
-    icon: ClipboardPlus
+    icon: ClipboardPlus,
   },
-  { 
-    id: 'data', 
+  {
+    id: 'data',
     label: 'JSON Data',
-    icon: Code
+    icon: Code,
   },
-  { 
-    id: 'original', 
+  {
+    id: 'original',
     label: 'Original Data',
-    icon: FileInput
-  }
+    icon: FileInput,
+  },
 ];
 
 interface RecordViewProps {
@@ -42,11 +44,11 @@ export const RecordView: React.FC<RecordViewProps> = ({
   onDataChange,
   className = '',
   activeTab: externalActiveTab,
-  onTabChange: externalOnTabChange
+  onTabChange: externalOnTabChange,
 }) => {
-    const [internalActiveTab, setInternalActiveTab] = useState<TabType>('record');
-    const activeTab = externalActiveTab || internalActiveTab;
-    const setActiveTab = externalOnTabChange || setInternalActiveTab;
+  const [internalActiveTab, setInternalActiveTab] = useState<TabType>('record');
+  const activeTab = externalActiveTab || internalActiveTab;
+  const setActiveTab = externalOnTabChange || setInternalActiveTab;
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId as TabType);
@@ -55,18 +57,14 @@ export const RecordView: React.FC<RecordViewProps> = ({
   return (
     <div className={className}>
       {/* Tab Navigation */}
-      <TabNavigation 
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-      />
+      <TabNavigation tabs={tabs} activeTab={activeTab} onTabChange={handleTabChange} />
 
       {/* Tab Content */}
       <div>
         {/* Full Record Tab - FHIR Resources */}
         {activeTab === 'record' && (
           <div className="space-y-6">
-            <FHIRRecord 
+            <FHIRRecord
               fhirData={record.fhirData}
               editable={editable}
               onFhirChanged={onFhirChanged}
@@ -85,9 +83,7 @@ export const RecordView: React.FC<RecordViewProps> = ({
               {record ? (
                 <div>
                   <div className="flex justify-between items-center mb-4 pb-2 border-b">
-                    <span className="text-sm font-medium text-gray-600">
-                      Full Record Data
-                    </span>
+                    <span className="text-sm font-medium text-gray-600">Full Record Data</span>
                     <Button
                       variant="outline"
                       onClick={() => navigator.clipboard.writeText(JSON.stringify(record, null, 2))}
@@ -136,8 +132,8 @@ export const RecordView: React.FC<RecordViewProps> = ({
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-semibold text-gray-900">Original File</h2>
                   <div className="flex space-x-2">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => window.open(record.downloadURL, '_blank')}
                       className="flex items-center space-x-2"
                     >
@@ -155,12 +151,12 @@ export const RecordView: React.FC<RecordViewProps> = ({
                         try {
                           const response = await fetch(record.downloadURL);
                           const blob = await response.blob();
-                          
+
                           const link = document.createElement('a');
                           link.href = URL.createObjectURL(blob);
                           link.download = record.fileName || 'document';
                           link.click();
-                          
+
                           URL.revokeObjectURL(link.href);
                         } catch (error) {
                           console.error('Download failed:', error);
@@ -174,45 +170,46 @@ export const RecordView: React.FC<RecordViewProps> = ({
                     </Button>
                   </div>
                 </div>
-                
+
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="flex items-center space-x-3 mb-4">
                     <FileInput className="w-6 h-6 text-gray-500" />
                     <div>
                       <p className="font-medium text-gray-900">
-                        {record.fileName || record.name || 'Original Document'}
+                        {record.fileName || 'Original Document'}
                       </p>
                       <p className="text-sm text-gray-500">
-                        {record.fileType || record.type} • {
-                          record.fileSize ? `${(record.fileSize / 1024).toFixed(1)} KB` : 
-                          record.size ? `${(record.size / 1024).toFixed(1)} KB` : 
-                          'Unknown size'
-                        }
+                        {record.fileType} •{' '}
+                        {record.fileSize
+                          ? `${(record.fileSize / 1024).toFixed(1)} KB`
+                          : 'Unknown size'}
                       </p>
                     </div>
                   </div>
-                  
+
                   {/* Embedded Document Viewer */}
                   <div className="border rounded-lg overflow-hidden bg-white">
-                    {(record.fileType?.includes('image') || record.type?.includes('image')) ? (
+                    {record.fileType?.includes('image') ? (
                       // Image preview
-                      <img 
-                        src={record.downloadURL} 
-                        alt={record.fileName || record.name || 'Document preview'}
+                      <img
+                        src={record.downloadURL}
+                        alt={record.fileName || 'Document preview'}
                         className="w-full max-h-96 object-contain"
                       />
-                    ) : (record.fileType === 'application/pdf' || record.type === 'application/pdf') ? (
+                    ) : record.fileType === 'application/pdf' ? (
                       // PDF embed
                       <iframe
                         src={`${record.downloadURL}#toolbar=0&navpanes=0&scrollbar=1`}
                         className="w-full h-96"
-                        title={record.fileName || record.name || 'PDF preview'}
+                        title={record.fileName || 'PDF preview'}
                       />
                     ) : (
                       // Fallback for other file types
                       <div className="p-8 text-center">
                         <FileInput className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-600 mb-2">Preview not available for this file type</p>
+                        <p className="text-gray-600 mb-2">
+                          Preview not available for this file type
+                        </p>
                         <p className="text-sm text-gray-500">Click "Open" to view in a new tab</p>
                       </div>
                     )}
@@ -227,7 +224,8 @@ export const RecordView: React.FC<RecordViewProps> = ({
                 <FileInput className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No Original Data</h3>
                 <p className="text-gray-600">
-                  This record doesn't have any original text submissions, extracted text, or file attachments.
+                  This record doesn't have any original text submissions, extracted text, or file
+                  attachments.
                 </p>
               </div>
             )}
