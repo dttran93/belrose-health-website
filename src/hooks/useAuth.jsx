@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { authService } from '@/services/authServices';
+import { authService } from '@/components/auth/services/authServices';
 
 export const useAuth = () => {
   // Use single state object instead of separate states

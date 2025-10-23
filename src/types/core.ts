@@ -5,6 +5,7 @@ import { ReactNode } from 'react';
 export interface User {
   uid: string;
   email: string | null;
+  emailVerified?: boolean;
   displayName: string | null;
   firstName: string | null;
   lastName: string | null;
@@ -47,6 +48,7 @@ export interface LocationState {
 export interface UserProfile extends User {
   createdAt: any;
   updatedAt: any;
+  emailVerifiedAt?: any;
 
   generatedWallet?: {
     address: string;

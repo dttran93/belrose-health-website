@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
-import { authService } from '@/services/authServices';
+import { authService } from '@/components/auth/services/authServices';
 import { useAuthForm } from '../hooks/useAuthForm';
 import { SocialAuthButtons } from './ui/SocialAuthButtons';
 import { PasswordStrengthIndicator } from '@/components/auth/components/ui/PasswordStrengthIndicator';
@@ -23,6 +23,7 @@ import {
   validatePasswordConfirmation,
 } from '@/components/auth/utils/PasswordStrength';
 import InputField from './ui/InputField';
+import { EmailVerificationBanner } from './EmailVerificationBanner';
 
 interface BelroseAccountFormData {
   email: string;
@@ -103,7 +104,7 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
             <div className="flex-1">
               <p className="font-semibold text-green-900">Step Complete</p>
               <p className="text-sm text-green-700 mt-1">
-                Your account information has been saved and verified.
+                Your account information has been saved.
               </p>
             </div>
           </div>

@@ -1,10 +1,11 @@
 // src/services/authService.ts
-import { 
+import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
   sendPasswordResetEmail,
+  sendEmailVerification,
   updateProfile,
   FacebookAuthProvider,
   GithubAuthProvider,
@@ -12,9 +13,9 @@ import {
   onAuthStateChanged,
   User,
   UserCredential,
-  Unsubscribe
+  Unsubscribe,
 } from 'firebase/auth';
-import { auth } from '../firebase/config';
+import { auth } from '../../../firebase/config';
 import { UserService } from './userService';
 
 const googleProvider = new GoogleAuthProvider();
@@ -32,15 +33,27 @@ export const authService = {
    */
   signUp: async (email: string, password: string, displayName?: string): Promise<User> => {
     try {
-      const userCredential: UserCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
+      const userCredential: UserCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
       if (displayName) {
         await updateProfile(userCredential.user, { displayName });
       }
 
+      // Send verification email
+      await sendEmailVerification(userCredential.user, {
+        url: window.location.origin + '/verify-email', // Redirect URL after verification
+        handleCodeInApp: false,
+      });
+
+      console.log('✅ Verification email sent to:', email);
+
       // Create Firestore user document
       await UserService.createUserDocument(userCredential.user);
-      
+
       console.log('User registered and profile created successfully');
       return userCredential.user;
     } catch (error) {
@@ -50,15 +63,62 @@ export const authService = {
   },
 
   /**
+   * Resend verification email
+   */
+  resendVerificationEmail: async (): Promise<void> => {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('No user is currently signed in');
+    }
+
+    if (user.emailVerified) {
+      throw new Error('Email is already verified');
+    }
+
+    try {
+      await sendEmailVerification(user, {
+        url: window.location.origin + '/verify-email',
+        handleCodeInApp: false,
+      });
+      console.log('✅ Verification email resent');
+    } catch (error) {
+      console.error('Failed to resend verification email:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Check if current user's email is verified
+   */
+  isEmailVerified: (): boolean => {
+    const user = auth.currentUser;
+    return user?.emailVerified || false;
+  },
+
+  /**
+   * Reload user to get latest emailVerified status
+   */
+  reloadUser: async (): Promise<void> => {
+    const user = auth.currentUser;
+    if (user) {
+      await user.reload();
+    }
+  },
+
+  /**
    * Sign in with email and password
    */
   signIn: async (email: string, password: string): Promise<User> => {
     try {
-      const userCredential: UserCredential = await signInWithEmailAndPassword(auth, email, password);
-      
+      const userCredential: UserCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
       // Ensure user document exists (safety net for existing users)
       await UserService.createUserDocument(userCredential.user);
-      
+
       return userCredential.user;
     } catch (error) {
       console.error('Sign in failed:', error);
@@ -72,10 +132,10 @@ export const authService = {
   signInWithGoogle: async (): Promise<User> => {
     try {
       const result: UserCredential = await signInWithPopup(auth, googleProvider);
-      
+
       // Create or update user document for social login
       await UserService.createUserDocument(result.user);
-      
+
       return result.user;
     } catch (error) {
       console.error('Google sign in failed:', error);
@@ -89,10 +149,10 @@ export const authService = {
   signInWithFacebook: async (): Promise<User> => {
     try {
       const result: UserCredential = await signInWithPopup(auth, facebookProvider);
-      
+
       // Create or update user document for social login
       await UserService.createUserDocument(result.user);
-      
+
       return result.user;
     } catch (error) {
       console.error('Facebook sign in failed:', error);
@@ -106,10 +166,10 @@ export const authService = {
   signInWithGitHub: async (): Promise<User> => {
     try {
       const result: UserCredential = await signInWithPopup(auth, githubProvider);
-      
+
       // Create or update user document for social login
       await UserService.createUserDocument(result.user);
-      
+
       return result.user;
     } catch (error) {
       console.error('GitHub sign in failed:', error);
@@ -185,11 +245,11 @@ export const authService = {
 
     try {
       await updateProfile(user, updates);
-      
+
       // Also update Firestore document
       if (updates.displayName) {
         await UserService.updateUserProfile(user.uid, {
-          displayName: updates.displayName
+          displayName: updates.displayName,
         });
       }
     } catch (error) {
@@ -223,11 +283,11 @@ export const authService = {
    * Wait for auth to initialize
    */
   waitForAuth: (): Promise<User | null> => {
-    return new Promise((resolve) => {
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
+    return new Promise(resolve => {
+      const unsubscribe = onAuthStateChanged(auth, user => {
         unsubscribe();
         resolve(user);
       });
     });
-  }
+  },
 };

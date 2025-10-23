@@ -1,15 +1,15 @@
-import { useState, useEffect, ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { useState, useEffect, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import DesktopSidebar from '@/components/app/DesktopSidebar';
 import MobileSidebar from '@/components/app/MobileSidebar';
 import MobileHeader from '@/components/app/MobileHeader';
 import ResizeHandle from '@/components/ui/ResizeHandle';
-import AIChatPanel from '@/components/ai/AIChatPanel';
-import useMediaQuery from "@/hooks/useMediaQuery";
-import { healthRecords, healthCategories } from "@/components/app/navigation";
+import AIChatPanel from '@/features/ai/AIChatPanel';
+import useMediaQuery from '@/hooks/useMediaQuery';
+import { healthRecords, healthCategories } from '@/components/app/navigation';
 import { useAuthContext } from '@/components/auth/AuthContext';
-import { authService } from '@/services/authServices'
+import { authService } from '@/components/auth/services/authServices';
 import { useLayout } from '@/components/app/LayoutProvider';
 
 interface AppLayoutProps {
@@ -18,9 +18,12 @@ interface AppLayoutProps {
 
 // Main Layout Component
 function AppLayout({ children }: AppLayoutProps) {
-
   const { user } = useAuthContext();
   const { header, footer } = useLayout();
+
+  // If no user, something went wrong. Error message just in case. But should be hanlded by ProtectedRoute.tsx
+  if (!user) return null;
+
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
@@ -34,31 +37,31 @@ function AppLayout({ children }: AppLayoutProps) {
       await authService.signOut();
       navigate('/'); // Navigate after successful logout
     } catch (error) {
-      toast.error("Failed to sign out. Please try again.");
+      toast.error('Failed to sign out. Please try again.');
     }
-  }
+  };
 
   const handleSettings = () => {
-    navigate('/dashboard/settings')
-  }
+    navigate('/dashboard/settings');
+  };
 
   const handleHelp = () => {
-    window.open('https://help.example.com', '_blank')
-  }
+    window.open('https://help.example.com', '_blank');
+  };
 
   const handleAIPanelResize = (deltaX: number) => {
     setAIPanelWidth(prev => {
-      const newWidth = prev + deltaX
-      return Math.min(Math.max(newWidth, 300), 800) // Min 300px, Max 800px
-    })
-  }
+      const newWidth = prev + deltaX;
+      return Math.min(Math.max(newWidth, 300), 800); // Min 300px, Max 800px
+    });
+  };
 
   // Close mobile sidebar when switching to desktop
   useEffect(() => {
     if (isDesktop) {
-      setIsMobileOpen(false)
+      setIsMobileOpen(false);
     }
-  }, [isDesktop])
+  }, [isDesktop]);
 
   if (isDesktop) {
     // Desktop Layout with AI Panel
@@ -66,7 +69,7 @@ function AppLayout({ children }: AppLayoutProps) {
       <div className="h-screen flex overflow-hidden">
         {/* Sidebar */}
         <div className="flex-shrink-0">
-          <DesktopSidebar 
+          <DesktopSidebar
             isCollapsed={isDesktopCollapsed}
             onToggle={() => setIsDesktopCollapsed(!isDesktopCollapsed)}
             user={user}
@@ -80,30 +83,21 @@ function AppLayout({ children }: AppLayoutProps) {
             isAIOpen={isAIOpen}
           />
         </div>
-        
+
         {/* Main Content Area */}
         <div className="flex flex-col flex-1 overflow-hidden">
+          {/* Conditional Header */}
+          {header && <div className="border-b border-gray-200 bg-white shadow-sm">{header}</div>}
 
-        {/* Conditional Header */}
-        {header && (
-          <div className="border-b border-gray-200 bg-white shadow-sm">
-            {header}
-          </div>
-        )}
-          
-        {/* Content and AI Panel */}
-        <div className="flex flex-1 overflow-hidden">
-          <main className="flex-1 p-6 overflow-auto bg-gray-50">
-            {children}
-          </main>
-            
-          {/* Resize Handle */}
-          {isAIOpen && !isAIFullscreen && (
-            <ResizeHandle onResize={handleAIPanelResize} />
-          )}
+          {/* Content and AI Panel */}
+          <div className="flex flex-1 overflow-hidden">
+            <main className="flex-1 p-6 overflow-auto bg-gray-50">{children}</main>
+
+            {/* Resize Handle */}
+            {isAIOpen && !isAIFullscreen && <ResizeHandle onResize={handleAIPanelResize} />}
 
             {/* AI Panel */}
-            <AIChatPanel 
+            <AIChatPanel
               isOpen={isAIOpen}
               onToggle={() => setIsAIOpen(!isAIOpen)}
               width={aiPanelWidth}
@@ -112,24 +106,19 @@ function AppLayout({ children }: AppLayoutProps) {
               onFullscreenToggle={() => setIsAIFullscreen(!isAIFullscreen)}
             />
           </div>
-          
+
           {/* Conditional Footer */}
-          {footer && (
-            <div className="border-t border-gray-200 bg-white shadow-sm">
-              {footer}
-            </div>
-          )}
+          {footer && <div className="border-t border-gray-200 bg-white shadow-sm">{footer}</div>}
         </div>
       </div>
-    )
+    );
   }
 
   // Mobile Layout
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      
       {/*Mobile Header */}
-      <MobileHeader 
+      <MobileHeader
         user={user}
         onMenuToggle={() => setIsMobileOpen(true)}
         onLogout={handleLogout}
@@ -139,8 +128,8 @@ function AppLayout({ children }: AppLayoutProps) {
       />
 
       {/* Mobile Sidebar */}
-      <MobileSidebar 
-        isOpen={isMobileOpen} 
+      <MobileSidebar
+        isOpen={isMobileOpen}
         onClose={() => setIsMobileOpen(false)}
         user={user}
         onToggleAI={() => setIsAIOpen(!isAIOpen)}
@@ -155,15 +144,11 @@ function AppLayout({ children }: AppLayoutProps) {
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
         {!isAIOpen ? (
-          <main className="flex-1 p-6 overflow-auto">
-            {children}
-          </main>
+          <main className="flex-1 p-6 overflow-auto">{children}</main>
         ) : (
           <>
-            <main className="flex-1 p-6 overflow-auto lg:block hidden">
-              {children}
-            </main>
-            <AIChatPanel 
+            <main className="flex-1 p-6 overflow-auto lg:block hidden">{children}</main>
+            <AIChatPanel
               isOpen={isAIOpen}
               onToggle={() => setIsAIOpen(!isAIOpen)}
               width={aiPanelWidth}
@@ -176,13 +161,9 @@ function AppLayout({ children }: AppLayoutProps) {
       </div>
 
       {/* Conditional Footer */}
-        {footer && (
-          <div className="border-t border-gray-200 bg-white shadow-sm">
-            {footer}
-          </div>
-        )}
+      {footer && <div className="border-t border-gray-200 bg-white shadow-sm">{footer}</div>}
     </div>
-  )
+  );
 }
 
-export default AppLayout
+export default AppLayout;

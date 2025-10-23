@@ -12,7 +12,7 @@ const Index: React.FC = () => {
   useEffect(() => {
     const handleScroll = () => {
       const elements = document.querySelectorAll('.animate-fade-in');
-      elements.forEach((el) => {
+      elements.forEach(el => {
         const rect = el.getBoundingClientRect();
         const isVisible = rect.top <= window.innerHeight * 0.8;
         if (isVisible) {

@@ -1,20 +1,13 @@
 // src/services/userService.ts
-import { 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
-  getFirestore,
-  serverTimestamp 
-} from 'firebase/firestore';
-import { User } from 'firebase/auth';
+import { doc, setDoc, getDoc, updateDoc, getFirestore, serverTimestamp } from 'firebase/firestore';
+import { User as FirebaseUser } from 'firebase/auth';
 import { UserProfile } from '@/types/core';
 
 export class UserService {
   /**
    * Create a new user document in Firestore after registration
    */
-  static async createUserDocument(user: User): Promise<void> {
+  static async createUserDocument(user: FirebaseUser): Promise<void> {
     const db = getFirestore();
     const userRef = doc(db, 'users', user.uid);
 
@@ -22,19 +15,33 @@ export class UserService {
     const userDoc = await getDoc(userRef);
     if (userDoc.exists()) {
       console.log('User document already exists for:', user.uid);
+
+      // Update email verification status
+      await updateDoc(userRef, {
+        emailVerified: user.emailVerified,
+        updatedAt: serverTimestamp(),
+      });
       return;
     }
 
-    const userData: UserProfile = {
+    // parse displayName to get firstName and lastName
+    const nameParts = (user.displayName || '').split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    const userData: Partial<UserProfile> = {
       uid: user.uid,
       email: user.email || '',
+      emailVerified: user.emailVerified,
       displayName: user.displayName || '',
+      firstName: firstName || '',
+      lastName: lastName || '',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       preferences: {
         blockchainVerificationEnabled: true,
-        autoConnectWallet: false
-      }
+        autoConnectWallet: false,
+      },
     };
 
     try {
@@ -43,6 +50,26 @@ export class UserService {
     } catch (error) {
       console.error('Error creating user document:', error);
       throw new Error('Failed to create user profile');
+    }
+  }
+
+  /**
+   * Update email verification status
+   */
+  static async updateEmailVerificationStatus(uid: string, verified: boolean): Promise<void> {
+    const db = getFirestore();
+    const userRef = doc(db, 'users', uid);
+
+    try {
+      await updateDoc(userRef, {
+        emailVerified: verified,
+        emailVerifiedAt: verified ? serverTimestamp() : null,
+        updatedAt: serverTimestamp(),
+      });
+      console.log('Email verification status updated for:', uid);
+    } catch (error) {
+      console.error('Error updating email verification status:', error);
+      throw error;
     }
   }
 
@@ -68,17 +95,14 @@ export class UserService {
   /**
    * Update user profile
    */
-  static async updateUserProfile(
-    uid: string, 
-    updates: Partial<UserProfile>
-  ): Promise<void> {
+  static async updateUserProfile(uid: string, updates: Partial<UserProfile>): Promise<void> {
     const db = getFirestore();
     const userRef = doc(db, 'users', uid);
 
     try {
       await updateDoc(userRef, {
         ...updates,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
       console.log('User profile updated successfully for:', uid);
     } catch (error) {

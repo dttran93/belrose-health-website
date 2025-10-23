@@ -1,7 +1,7 @@
 // src/features/ViewEditRecord/service/userWalletService.ts
 import { doc, updateDoc, getFirestore, serverTimestamp } from 'firebase/firestore';
 import { WalletService, AuthMethod } from '@/features/BlockchainVerification/service/walletService';
-import { UserService } from '@/services/userService';
+import { UserService } from '@/components/auth/services/userService';
 
 export class UserWalletService {
   /**
@@ -33,15 +33,15 @@ export class UserWalletService {
       authMethod: AuthMethod.METAMASK, // Since we're only using MetaMask now
       connectedAt: new Date().toISOString(),
       lastUsed: new Date().toISOString(),
-      balance: walletInfo.balance || undefined
+      balance: walletInfo.balance || undefined,
     };
 
     try {
       await updateDoc(userRef, {
         connectedWallet: walletData,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
-      
+
       console.log('Wallet linked to account:', walletInfo.address);
     } catch (error) {
       console.error('Failed to link wallet:', error);
@@ -59,7 +59,7 @@ export class UserWalletService {
     try {
       await updateDoc(userRef, {
         'connectedWallet.lastUsed': new Date().toISOString(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
     } catch (error) {
       console.warn('Failed to update wallet last used:', error);
@@ -76,9 +76,9 @@ export class UserWalletService {
     try {
       await updateDoc(userRef, {
         connectedWallet: null,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
-      
+
       console.log('Wallet unlinked from account');
     } catch (error) {
       console.error('Failed to unlink wallet:', error);
@@ -105,17 +105,14 @@ export class UserWalletService {
   /**
    * Enable/disable blockchain verification preference
    */
-  static async updateBlockchainPreference(
-    userId: string, 
-    enabled: boolean
-  ): Promise<void> {
+  static async updateBlockchainPreference(userId: string, enabled: boolean): Promise<void> {
     const db = getFirestore();
     const userRef = doc(db, 'users', userId);
 
     try {
       await updateDoc(userRef, {
         'preferences.blockchainVerificationEnabled': enabled,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
     } catch (error) {
       console.error('Failed to update blockchain preference:', error);
@@ -172,7 +169,7 @@ export class UserWalletService {
       await updateDoc(userRef, {
         'connectedWallet.balance': walletInfo.balance || null,
         'connectedWallet.lastUsed': new Date().toISOString(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
     } catch (error) {
       console.warn('Failed to update wallet balance:', error);

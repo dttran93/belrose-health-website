@@ -21,6 +21,8 @@ import WalletSetup from './WalletSetup';
 import { getFirestore, doc, setDoc, updateDoc } from 'firebase/firestore';
 import IdentityVerificationForm from './IdentityVerificationForm';
 import { VerificationResult, VerifiedData } from '@/types/identity';
+import { EmailVerificationBanner } from './EmailVerificationBanner';
+import { getAuth } from 'firebase/auth';
 
 interface StepConfig {
   number: number;
@@ -91,7 +93,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
   const isStepCompleted = (stepNumber: number): boolean => {
     switch (stepNumber) {
       case 1:
-        //Step 1 is done if we have a userId and email
+        //Step 1 is done if we have a userId and email and email verification
         return !!(registrationData.userId && registrationData.email);
       case 2:
         //Step 2 is complete if encryption password is set
@@ -129,6 +131,70 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
 
   const handleCompleteRegistration = async () => {
     try {
+      //Check if email is verified
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+
+      // Reload user to get the latest verification status
+      if (currentUser) {
+        await currentUser.reload();
+      }
+
+      if (currentUser && !currentUser.emailVerified) {
+        // Show confirmation dialog
+        const shouldContinue = window.confirm(
+          '⚠️ Email Not Verified\n\n' +
+            'Your email address has not been verified yet. ' +
+            'Email verification is important for:\n' +
+            '• Sharing records with others\n' +
+            '• Account recovery\n' +
+            '• Security notifications\n\n' +
+            'Are you sure you want to continue without verifying?'
+        );
+
+        if (!shouldContinue) {
+          // User wants to verify first - stay on current step
+          toast.info('Please verify your email', {
+            description: 'Check your inbox for the verification link, then click "I\'ve Verified"',
+            duration: 5000,
+          });
+          return;
+        }
+
+        // User chose to continue anyway
+        toast.warning('Continuing without email verification', {
+          description: 'You can verify your email later in account settings',
+          duration: 4000,
+        });
+      }
+
+      // Check identity verification
+      if (!verificationComplete) {
+        const shouldContinueWithoutIdentity = window.confirm(
+          '⚠️ Identity Not Verified\n\n' +
+            'You have not completed identity verification. ' +
+            'Identity verification:\n' +
+            '• Allows us to request your records if you want \n' +
+            '• Gives you a higher trust score for shared records\n' +
+            'Are you sure you want to skip identity verification?'
+        );
+
+        if (!shouldContinueWithoutIdentity) {
+          // Go back to Step 5
+          setCurrentStep(5);
+          toast.info('Complete identity verification', {
+            description: 'This helps others trust your shared health records',
+            duration: 5000,
+          });
+          return;
+        }
+
+        toast.warning('Skipping identity verification', {
+          description: 'You can verify your identity later in account settings',
+          duration: 4000,
+        });
+      }
+
       //Save user profile data to Firestore
       const db = getFirestore();
       const userDocRef = doc(db, 'users', registrationData.userId);
@@ -233,8 +299,14 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
       </div>
 
       {/* RIGHT SIDE - Content Area */}
-      <div className="flex-1 p-12 flex items-center justify-center">
-        <div className="w-full max-w-lg">
+      <div className="flex-1 p-6 flex flex-col items-center justify-center">
+        {/* Email Verification Banner - Shows on steps 2-5 after account creation */}
+        {isStepCompleted(1) && (
+          <div className="mb-3">
+            <EmailVerificationBanner />
+          </div>
+        )}
+        <div className="w-full max-w-lg mb-14">
           <div className="bg-white rounded-2xl shadow-2xl p-8">
             {/* Render current step */}
             {currentStep === 1 && (

@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import LoginForm from '@/components/auth/components/LoginForm';
 import RegistrationForm from '@/components/auth/components/RegistrationForm';
 
 const Auth: React.FC = () => {
-  const [isLogin, setIsLogin] = useState<boolean>(true);
+  const location = useLocation();
+  const showRegistration = location.state?.showRegistration || false;
+  const [isLogin, setIsLogin] = useState<boolean>(!showRegistration);
 
   return (
     <>

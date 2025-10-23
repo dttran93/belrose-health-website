@@ -1,8 +1,8 @@
-import { X, Bot } from "lucide-react";
-import NavItem from "../ui/NavItem";
-import UserMenuButton from "../ui/UserMenuButton";
-import {NavigationItem } from "./navigation";
-import { User } from "@/types/core";
+import { X, Bot } from 'lucide-react';
+import NavItem from '../ui/NavItem';
+import UserMenuButton from '../ui/UserMenuButton';
+import { NavigationItem } from './navigation';
+import { User } from '@/types/core';
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -17,23 +17,33 @@ interface MobileSidebarProps {
   onHelp?: () => void;
 }
 
-function MobileSidebar({ isOpen, onClose, user, onToggleAI, isAIOpen, healthRecords, healthCategories, onLogout, onSettings, onHelp, }: MobileSidebarProps) {
+function MobileSidebar({
+  isOpen,
+  onClose,
+  user,
+  onToggleAI,
+  isAIOpen,
+  healthRecords,
+  healthCategories,
+  onLogout,
+  onSettings,
+  onHelp,
+}: MobileSidebarProps) {
   return (
     <div>
       {/* Backdrop */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden" onClick={onClose} />
       )}
-      
+
       {/* Sidebar */}
-      <div className={`
+      <div
+        className={`
         fixed top-0 left-0 h-full w-80 bg-primary text-white z-50 
         transform transition-transform duration-300 lg:hidden flex flex-col
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
+      `}
+      >
         {/* Header */}
         <div className="flex-shrink-0 p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -57,14 +67,15 @@ function MobileSidebar({ isOpen, onClose, user, onToggleAI, isAIOpen, healthReco
             <div className="mb-4">
               <button
                 onClick={() => {
-                  onToggleAI()
-                  onClose()
+                  onToggleAI();
+                  onClose();
                 }}
                 className={`
                   w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
-                  ${isAIOpen 
-                    ? 'bg-blue-500 text-white font-medium' 
-                    : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                  ${
+                    isAIOpen
+                      ? 'bg-blue-500 text-white font-medium'
+                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                   }
                 `}
               >
@@ -79,7 +90,7 @@ function MobileSidebar({ isOpen, onClose, user, onToggleAI, isAIOpen, healthReco
                 Health Records
               </h3>
               <div className="space-y-1">
-                {healthRecords.map((item) => (
+                {healthRecords.map(item => (
                   <NavItem key={item.title} item={item} onClick={onClose} />
                 ))}
               </div>
@@ -91,7 +102,7 @@ function MobileSidebar({ isOpen, onClose, user, onToggleAI, isAIOpen, healthReco
                 Health Categories
               </h3>
               <div className="space-y-1">
-                {healthCategories.map((item) => (
+                {healthCategories.map(item => (
                   <NavItem key={item.title} item={item} onClick={onClose} />
                 ))}
               </div>
@@ -101,17 +112,17 @@ function MobileSidebar({ isOpen, onClose, user, onToggleAI, isAIOpen, healthReco
 
         {/* Mobile User Info */}
         <div className="">
-            <UserMenuButton 
-            user={user} 
-            isCollapsed={false} 
+          <UserMenuButton
+            user={user}
+            isCollapsed={false}
             onLogout={onLogout}
             onSettings={onSettings}
             onHelp={onHelp}
-            />
+          />
         </div>
-        </div>
+      </div>
     </div>
-  )
+  );
 }
 
 export default MobileSidebar;

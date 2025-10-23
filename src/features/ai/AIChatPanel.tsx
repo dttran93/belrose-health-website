@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
-import { X, Bot, Send, Maximize2, Minimize2 } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { X, Bot, Send, Maximize2, Minimize2 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 
 interface Message {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant';
   content: String;
 }
 
@@ -16,51 +16,59 @@ interface AIChatPanelProps {
   onFullscreenToggle: () => void;
 }
 
-function AIChatPanel({ isOpen, onToggle, width, onWidthChange, isFullscreen, onFullscreenToggle }: AIChatPanelProps) {
-  const [prompt, setPrompt] = useState<string>('')
+function AIChatPanel({
+  isOpen,
+  onToggle,
+  width,
+  onWidthChange,
+  isFullscreen,
+  onFullscreenToggle,
+}: AIChatPanelProps) {
+  const [prompt, setPrompt] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Hello! I\'m your AI assistant. How can I help you with your medical records today?'
-    }
-  ])
-  const [isLoading, setIsLoading] = useState<boolean>(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+      content: "Hello! I'm your AI assistant. How can I help you with your medical records today?",
+    },
+  ]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
-  useEffect(scrollToBottom, [messages])
+  useEffect(scrollToBottom, [messages]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (!prompt.trim() || isLoading) return
+    e.preventDefault();
+    if (!prompt.trim() || isLoading) return;
 
-    const userMessage: Message = { role: 'user', content: prompt }
-    setMessages(prev => [...prev, userMessage])
-    setPrompt('')
-    setIsLoading(true)
+    const userMessage: Message = { role: 'user', content: prompt };
+    setMessages(prev => [...prev, userMessage]);
+    setPrompt('');
+    setIsLoading(true);
 
     // Simulate AI response (replace with actual AI integration)
     setTimeout(() => {
       const aiResponse: Message = {
         role: 'assistant',
-        content: `I understand you're asking about: "${prompt}". This is a simulated response. In a real implementation, this would connect to your AI service to analyze medical data and provide insights.`
-      }
-      setMessages(prev => [...prev, aiResponse])
-      setIsLoading(false)
-    }, 1000)
-  }
+        content: `I understand you're asking about: "${prompt}". This is a simulated response. In a real implementation, this would connect to your AI service to analyze medical data and provide insights.`,
+      };
+      setMessages(prev => [...prev, aiResponse]);
+      setIsLoading(false);
+    }, 1000);
+  };
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   return (
-    <div 
+    <div
       className={`
-        ${isFullscreen 
-          ? 'fixed inset-0 z-50 bg-white' 
-          : 'flex flex-col border-l border-gray-200 bg-white'
+        ${
+          isFullscreen
+            ? 'fixed inset-0 z-50 bg-white'
+            : 'flex flex-col border-l border-gray-200 bg-white'
         }
       `}
       style={!isFullscreen ? { width: `${width}px` } : {}}
@@ -75,7 +83,7 @@ function AIChatPanel({ isOpen, onToggle, width, onWidthChange, isFullscreen, onF
           <button
             onClick={onFullscreenToggle}
             className="p-1.5 rounded hover:bg-gray-200 text-gray-600"
-            title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
@@ -99,10 +107,7 @@ function AIChatPanel({ isOpen, onToggle, width, onWidthChange, isFullscreen, onF
             <div
               className={`
                 max-w-[80%] p-3 rounded-lg
-                ${message.role === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-900'
-                }
+                ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-900'}
               `}
             >
               <p className="text-sm whitespace-pre-wrap">{message.content}</p>
@@ -128,7 +133,7 @@ function AIChatPanel({ isOpen, onToggle, width, onWidthChange, isFullscreen, onF
           <input
             type="text"
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
+            onChange={e => setPrompt(e.target.value)}
             placeholder="Ask about patient data, medications, trends..."
             className="flex-1 bg-background px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             disabled={isLoading}
@@ -146,7 +151,7 @@ function AIChatPanel({ isOpen, onToggle, width, onWidthChange, isFullscreen, onF
         </p>
       </div>
     </div>
-  )
+  );
 }
 
-export default AIChatPanel
+export default AIChatPanel;
