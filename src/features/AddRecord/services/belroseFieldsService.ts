@@ -3,7 +3,7 @@ import {
   AIProcessingResult,
   AIProcessingConfig,
   AIProcessingError,
-  DEFAULT_AI_CONFIG
+  DEFAULT_AI_CONFIG,
 } from './aiRecordProcessingService.type';
 
 // ==================== AI RECORD PROCESSING SERVICE ====================
@@ -45,13 +45,13 @@ export class AIRecordProcessingService {
       const response = await fetch(this.config.apiEndpoint, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           fhirData: input.fhirData,
           fileName: input.fileName,
-          extractedText: input.extractedText
-        })
+          extractedText: input.extractedText,
+        }),
       });
 
       if (!response.ok) {
@@ -60,20 +60,16 @@ export class AIRecordProcessingService {
       }
 
       const result = await response.json();
-      
+
       // Basic validation that we got the expected fields
       if (!this.isValidResult(result)) {
         throw new Error('AI service returned invalid response format');
       }
 
       return result;
-
     } catch (error) {
       console.error('AI service call failed:', error);
-      throw new AIProcessingError(
-        'AI processing failed',
-        error
-      );
+      throw new AIProcessingError('AI processing failed', error);
     }
   }
 
@@ -126,17 +122,17 @@ export async function processRecordWithAI(
   } = {}
 ): Promise<AIProcessingResult> {
   const config: AIProcessingConfig = {};
-  
+
   if (options.apiEndpoint) {
-    config.apiEndpoint = 'https://us-central1-belrose-757fe.cloudfunctions.net/processFHIRWithAI';
+    config.apiEndpoint = 'https://us-central1-belrose-757fe.cloudfunctions.net/createBelroseFields';
   }
 
   const service = new AIRecordProcessingService(config);
-  
+
   return service.processRecord({
     fhirData,
     fileName: options.fileName,
-    extractedText: options.extractedText
+    extractedText: options.extractedText,
   });
 }
 

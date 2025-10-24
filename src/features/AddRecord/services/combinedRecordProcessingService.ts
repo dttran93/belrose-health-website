@@ -2,8 +2,7 @@
 import { toast } from 'sonner';
 import DocumentProcessorService from './documentProcessorService';
 import { convertToFHIR } from './fhirConversionService';
-import { processRecordWithAI } from './aiRecordProcessingService';
-import { BlockchainService } from '@/features/BlockchainVerification/service/blockchainService';
+import { processRecordWithAI } from './belroseFieldsService';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import {
   isEncryptionEnabled,

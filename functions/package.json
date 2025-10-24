@@ -17,6 +17,7 @@
   "main": "lib/index.js",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.0",
+    "@sendgrid/mail": "^8.1.6",
     "cors": "^2.8.5",
     "ethers": "^6.15.0",
     "firebase-admin": "^12.6.0",

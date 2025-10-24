@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { FileObject } from '@/types/core';
 import { useSharing } from '../hooks/useSharing';
 import { SharedRecord } from '../services/sharingService';
+import { toast } from 'sonner';
 
 interface ShareRecordViewProps {
   record: FileObject;
@@ -47,11 +48,18 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({ record, onBack
           recordId: record.id,
           receiverEmail,
         });
+
+        // Success! Record was shared
+        toast.success('Record shared successfully!', {
+          description: `${receiverEmail} can now access this record.`,
+        });
       } else {
         await shareRecord({
           recordId: record.id,
           receiverWalletAddress: receiverWallet,
         });
+
+        toast.success('Record shared successfully!');
       }
 
       // Clear inputs and reload
@@ -59,7 +67,26 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({ record, onBack
       setReceiverWallet('');
       await loadSharedWith();
     } catch (error) {
-      // Error handled in hook
+      const err = error as Error;
+
+      // Check if this is an invitation scenario
+      if (err.message.includes('sent an invitation') || err.message.includes('sent a reminder')) {
+        // This is actually a "success" - we sent an invitation
+        toast.info('Invitation Sent', {
+          description: err.message,
+          duration: 7000,
+        });
+
+        // Still clear the input since we took action
+        setReceiverEmail('');
+        setReceiverWallet('');
+      } else {
+        // This is a real error
+        toast.error('Unable to Share', {
+          description: err.message,
+          duration: 6000,
+        });
+      }
     }
   };
 

@@ -18,6 +18,7 @@ import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionK
 import { KeyManagementService } from './keyManagementService';
 import { ethers } from 'ethers';
 import { SharingContractService } from '@/features/BlockchainVerification/service/sharingContractService';
+import { EmailInvitationService } from './emailInvitationService';
 
 export interface ShareRecordRequest {
   recordId: string;
@@ -80,7 +81,6 @@ export class SharingService {
 
     console.log('✅ Record found and ownership verified');
 
-    // 2. Get receiver's information
     const getReceiver = async () => {
       const usersRef = collection(db, 'users');
       let q;
@@ -93,14 +93,80 @@ export class SharingService {
 
       const querySnapshot = await getDocs(q);
 
+      // ✅ CASE 1: Receiver doesn't exist at all
       if (querySnapshot.empty || !querySnapshot.docs[0]) {
-        throw new Error('Receiver not found');
+        if (request.receiverEmail) {
+          // Send signup invitation
+          console.log('📧 Receiver not found. Sending signup invitation...');
+
+          try {
+            const result = await EmailInvitationService.sendShareInvitation({
+              senderName: user.displayName || user.email || 'A Belrose user',
+              senderEmail: user.email || '',
+              receiverEmail: request.receiverEmail,
+              recordName: recordData.fileName || 'a health record',
+            });
+
+            throw new Error(
+              `We sent an invitation to ${request.receiverEmail}! They'll need to create a Belrose account and verify their email before you can share with them.`
+            );
+          } catch (inviteError) {
+            // If invitation sending fails, still throw a helpful error
+            throw new Error(
+              'Receiver not found. They need a Belrose account to receive shared records. Please ask them to sign up at belrosehealth.com'
+            );
+          }
+        } else {
+          throw new Error(
+            'Receiver not found. They need a Belrose account to receive shared records.'
+          );
+        }
       }
 
       const doc = querySnapshot.docs[0];
+      const data = doc.data();
+
+      // ✅ CASE 2: Email not verified
+      if (request.receiverEmail && data.emailVerified === false) {
+        console.log('📧 Email not verified. Sending verification reminder...');
+
+        try {
+          const result = await EmailInvitationService.sendShareInvitation({
+            senderName: user.displayName || user.email || 'A Belrose user',
+            senderEmail: user.email || '',
+            receiverEmail: request.receiverEmail,
+            recordName: recordData.fileName || 'a health record',
+          });
+
+          throw new Error(
+            `We sent a reminder to ${request.receiverEmail}! They'll need to verify their email before you can share with them. We've asked them to check their inbox.`
+          );
+        } catch (inviteError) {
+          throw new Error(
+            `${request.receiverEmail} hasn't verified their email yet. We tried to send them a reminder, but you may want to contact them directly.`
+          );
+        }
+      }
+
+      // ✅ CASE 3: Email verification status unknown (for safety)
+      if (request.receiverEmail && data.emailVerified === undefined) {
+        console.warn('⚠️ Email verification status unknown for user');
+        throw new Error(
+          `Unable to confirm if ${request.receiverEmail} has verified their email. Please ask them to verify and try again.`
+        );
+      }
+
+      // ✅ CASE 4: No encryption keys set up
+      if (!data.publicKey) {
+        throw new Error(
+          'Receiver has not completed their account setup (encryption keys missing). Please ask them to complete their registration.'
+        );
+      }
+
+      // ✅ ALL CHECKS PASSED!
       return {
         id: doc.id,
-        data: doc.data(),
+        data: data,
       };
     };
 

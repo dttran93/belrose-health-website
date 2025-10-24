@@ -72,6 +72,8 @@ export interface ImageAnalysisResponse {
 
 export interface FHIRProcessingRequest {
   fhirData: any;
+  extractedText?: string;
+  originalText?: string;
   fileName?: string;
   analysis?: FHIRAnalysis;
 }

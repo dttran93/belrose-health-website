@@ -35,7 +35,7 @@ export interface AIProcessingConfig {
  * Default configuration
  */
 export const DEFAULT_AI_CONFIG: Required<AIProcessingConfig> = {
-  apiEndpoint: 'https://us-central1-belrose-757fe.cloudfunctions.net/processFHIRWithAI'
+  apiEndpoint: 'https://us-central1-belrose-757fe.cloudfunctions.net/createBelroseFields',
 };
 
 // ==================== ERROR HANDLING ====================

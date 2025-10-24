@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { FileUploadService } from '@/features/AddRecord/services/fileUploadService';
 import { FileObject, FileStatus, AIProcessingStatus, VirtualFileInput } from '@/types/core';
 import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
-import { processRecordWithAI } from '@/features/AddRecord/services/aiRecordProcessingService';
+import { processRecordWithAI } from '@/features/AddRecord/services/belroseFieldsService';
 
 import {
   AddFilesOptions,
