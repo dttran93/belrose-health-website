@@ -4,7 +4,7 @@ import {
   AIProcessingConfig,
   AIProcessingError,
   DEFAULT_AI_CONFIG,
-} from './aiRecordProcessingService.type';
+} from './belroseFieldsService.type';
 
 // ==================== AI RECORD PROCESSING SERVICE ====================
 

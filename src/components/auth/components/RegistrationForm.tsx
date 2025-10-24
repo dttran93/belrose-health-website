@@ -9,7 +9,6 @@ import {
   ArrowRight,
   ArrowLeft,
   RotateCcwKey,
-  IdCard,
 } from 'lucide-react';
 import { useNavigate, useLocation, data } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -18,11 +17,7 @@ import BelroseAccountForm from './BelroseAccountForm';
 import EncryptionPasswordSetup from './EncryptionPasswordSetup';
 import { RecoveryKeyDisplay } from './RecoveryKeyDisplay';
 import WalletSetup from './WalletSetup';
-import { getFirestore, doc, setDoc, updateDoc } from 'firebase/firestore';
-import IdentityVerificationForm from './IdentityVerificationForm';
-import { VerificationResult, VerifiedData } from '@/types/identity';
-import { EmailVerificationBanner } from './EmailVerificationBanner';
-import { getAuth } from 'firebase/auth';
+import { getFirestore, doc, updateDoc } from 'firebase/firestore';
 
 interface StepConfig {
   number: number;
@@ -37,10 +32,7 @@ interface RegistrationFormProps {
 
 const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [currentStep, setCurrentStep] = useState<number>(1);
-  const [verificationComplete, setVerificationComplete] = useState(false);
-  const [verifiedData, setVerifiedData] = useState<VerifiedData | null>(null);
 
   // Store data from all steps
   const [registrationData, setRegistrationData] = useState({
@@ -82,12 +74,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
       subtitle: 'Save your recovery key for your encryption and blockchain wallet',
       icon: RotateCcwKey,
     },
-    {
-      number: 5,
-      title: 'Identity Verification',
-      subtitle: "Verify you're a real person (optional)",
-      icon: IdCard,
-    },
   ];
 
   const isStepCompleted = (stepNumber: number): boolean => {
@@ -104,14 +90,12 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
       case 4:
         // Step 4 is completed if a recovery Key has been created/saved. Maybe change to if they've acknowledged? But I guess there's technically not a lot for them to do here...
         return !!registrationData.acknowledgedRecoveryKey;
-      case 5:
-        return !!verificationComplete;
       default:
         return false;
     }
   };
 
-  const canProceed = (): Boolean => {
+  const canCompleteRegistration = (): Boolean => {
     return isStepCompleted(1) && isStepCompleted(2) && isStepCompleted(3) && isStepCompleted(4);
   };
 
@@ -121,81 +105,20 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
       ...data,
     }));
 
-    // Move to next step or complete registration
+    // Move to next step
     if (stepNumber < steps.length) {
       setCurrentStep(stepNumber + 1);
-    } else {
-      handleCompleteRegistration();
     }
   };
 
   const handleCompleteRegistration = async () => {
+    if (!canCompleteRegistration()) {
+      toast.error('Please complete all steps before continuing');
+      return;
+    }
+
     try {
-      //Check if email is verified
-      const auth = getAuth();
-      const currentUser = auth.currentUser;
-
-      // Reload user to get the latest verification status
-      if (currentUser) {
-        await currentUser.reload();
-      }
-
-      if (currentUser && !currentUser.emailVerified) {
-        // Show confirmation dialog
-        const shouldContinue = window.confirm(
-          '⚠️ Email Not Verified\n\n' +
-            'Your email address has not been verified yet. ' +
-            'Email verification is important for:\n' +
-            '• Sharing records with others\n' +
-            '• Account recovery\n' +
-            '• Security notifications\n\n' +
-            'Are you sure you want to continue without verifying?'
-        );
-
-        if (!shouldContinue) {
-          // User wants to verify first - stay on current step
-          toast.info('Please verify your email', {
-            description: 'Check your inbox for the verification link, then click "I\'ve Verified"',
-            duration: 5000,
-          });
-          return;
-        }
-
-        // User chose to continue anyway
-        toast.warning('Continuing without email verification', {
-          description: 'You can verify your email later in account settings',
-          duration: 4000,
-        });
-      }
-
-      // Check identity verification
-      if (!verificationComplete) {
-        const shouldContinueWithoutIdentity = window.confirm(
-          '⚠️ Identity Not Verified\n\n' +
-            'You have not completed identity verification. ' +
-            'Identity verification:\n' +
-            '• Allows us to request your records if you want \n' +
-            '• Gives you a higher trust score for shared records\n' +
-            'Are you sure you want to skip identity verification?'
-        );
-
-        if (!shouldContinueWithoutIdentity) {
-          // Go back to Step 5
-          setCurrentStep(5);
-          toast.info('Complete identity verification', {
-            description: 'This helps others trust your shared health records',
-            duration: 5000,
-          });
-          return;
-        }
-
-        toast.warning('Skipping identity verification', {
-          description: 'You can verify your identity later in account settings',
-          duration: 4000,
-        });
-      }
-
-      //Save user profile data to Firestore
+      // Save core account data to Firestore
       const db = getFirestore();
       const userDocRef = doc(db, 'users', registrationData.userId);
 
@@ -205,18 +128,26 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         lastName: registrationData.lastName,
         walletAddress: registrationData.walletAddress,
         walletType: registrationData.walletType,
-        isVerified: verificationComplete,
-        verifiedData: verifiedData,
+        // Verification fields will be updated later in the verification flow
+        isEmailVerified: false,
+        isIdentityVerified: false,
         createdAt: new Date(),
       });
 
-      toast.success('Registration complete!', {
-        description: 'Welcome to Belrose!',
+      toast.success('Account created successfully!', {
+        description: "Now let's verify your account",
         duration: 3000,
       });
 
-      const from = location.state?.from?.pathname || '/dashboard';
-      navigate(from, { replace: true });
+      // Navigate to verification hub instead of dashboard
+      navigate('/verification', {
+        replace: true,
+        state: {
+          userId: registrationData.userId,
+          email: registrationData.email,
+          fromRegistration: true,
+        },
+      });
     } catch (error) {
       console.error('Error completing registration:', error);
       toast.error('Failed to complete registration', {
@@ -226,18 +157,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     }
   };
 
-  const handleVerificationSuccess = (result: VerificationResult) => {
-    console.log('Verification successful!', result);
-    setVerifiedData(result.data ?? null);
-    setVerificationComplete(true);
-    // Save to your state/database
-  };
-
-  const handleVerificationError = (error: Error) => {
-    console.error('Verification failed:', error);
-    toast.error(`Verification failed: ${error.message}`);
-  };
-
   return (
     <div className="min-h-screen bg-secondary from-blue-50 to-indigo-100 flex">
       {/* LEFT SIDE - Progress Tracker */}
@@ -245,7 +164,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         <div>
           <h1 className="text-3xl font-bold text-secondary mb-2">Join Belrose</h1>
           <p className="text-secondary mb-12">
-            Your it takes less than 10 minutes to create your secure health data platform
+            Your it takes less than minutes to create your secure health data platform
           </p>
 
           {/* Progress Steps */}
@@ -300,12 +219,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
 
       {/* RIGHT SIDE - Content Area */}
       <div className="flex-1 p-6 flex flex-col items-center justify-center">
-        {/* Email Verification Banner - Shows on steps 2-5 after account creation */}
-        {isStepCompleted(1) && (
-          <div className="mb-3">
-            <EmailVerificationBanner />
-          </div>
-        )}
         <div className="w-full max-w-lg mb-14">
           <div className="bg-white rounded-2xl shadow-2xl p-8">
             {/* Render current step */}
@@ -344,18 +257,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
                 isCompleted={isStepCompleted(4)}
                 isActivated={isStepCompleted(2)}
               />
-            )}
-            {currentStep === 5 && (
-              <div>
-                <IdentityVerificationForm
-                  userId={registrationData.userId}
-                  onSuccess={handleVerificationSuccess}
-                  onError={handleVerificationError}
-                  isCompleted={verificationComplete}
-                  initialVerifiedData={verifiedData ?? undefined}
-                  isActivated={isStepCompleted(1)}
-                />
-              </div>
             )}
           </div>
         </div>
@@ -401,8 +302,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <Button
-              onClick={() => setCurrentStep(Math.min(currentStep + 1, 5))}
-              disabled={currentStep === 5}
+              onClick={() => setCurrentStep(Math.min(currentStep + 1, 4))}
+              disabled={currentStep === 4}
               className="px-4 py-2 rounded-lg hover:bg-secondary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <ArrowRight className="w-5 h-5" />
@@ -411,7 +312,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
               variant="secondary"
               type="submit"
               onClick={handleCompleteRegistration}
-              disabled={!canProceed()}
+              disabled={!canCompleteRegistration()}
               className="rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
             >
               <span>Complete Registration</span>

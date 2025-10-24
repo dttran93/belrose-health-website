@@ -23,7 +23,6 @@ import {
   validatePasswordConfirmation,
 } from '@/components/auth/utils/PasswordStrength';
 import InputField from './ui/InputField';
-import { EmailVerificationBanner } from './EmailVerificationBanner';
 
 interface BelroseAccountFormData {
   email: string;
