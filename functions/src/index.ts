@@ -12,6 +12,7 @@ export { analyzeImageWithAI } from './handlers/image';
 // ==================== MEDICAL DATA PROCESSING FUNCTIONS ====================
 export { convertToFHIR } from './handlers/convertToFHIR';
 export { createBelroseFields } from './handlers/belroseFields';
+export { createDetailedNarrative } from './handlers/belroseNarrative';
 
 // ==================== WALLET FUNCTIONS ====================
 export { createWallet, getEncryptedWallet } from './handlers/wallet';
@@ -24,7 +25,7 @@ export {
 } from './handlers/verification';
 
 // ==================== EMAIL FUNCTIONS ====================
-export { sendShareInvitationEmail } from './sendShareInvitationEmail';
+export { sendShareInvitationEmail } from './handlers/sendShareInvitationEmail';
 
 // ==================== HEALTH CHECK ====================
 export { health, healthDetailed } from './handlers/healthCheck';

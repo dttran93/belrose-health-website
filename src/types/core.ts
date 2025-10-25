@@ -88,7 +88,8 @@ export interface BelroseFields {
   // Core display fields - these are what users see in list views
   visitType?: string; // e.g., "Follow-up Appointment", "Lab Results", "Imaging Study"
   title?: string; // Short descriptive title (e.g., "Cardiology Follow-up")
-  summary?: string; // Slightly longer summary, main information a future reader would need to know
+  summary?: string; // Tweet-length summary, main information a future reader would need to know
+  detailedNarrative?: string; //detailed information on the medical interaction. derived from FHIR, but human readable
 
   // Key dates and people
   completedDate?: string; // ISO date string - the main date for this record
@@ -165,8 +166,8 @@ export interface FileObject {
   isVirtual?: boolean; //for virtual files
   storagePath?: string;
   downloadURL?: string;
-  recordHash?: string; //has of the record content
-  previousRecordHash?: string; //to establish chain of records in case they are edited
+  recordHash?: string | null; //has of the record content
+  previousRecordHash?: string | null; //to establish chain of records in case they are edited
   processingStage?: ProcessingStages;
   uploadInProgress?: boolean; // for managing upload process
 

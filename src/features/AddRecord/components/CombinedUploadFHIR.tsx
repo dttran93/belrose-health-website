@@ -1,10 +1,20 @@
 import React, { useState, useCallback } from 'react';
-import { FileText, Upload, Code, MessageSquare, AlertCircle, CheckCircle, ExternalLink, RefreshCw, X } from 'lucide-react';
+import {
+  FileText,
+  Upload,
+  Code,
+  MessageSquare,
+  AlertCircle,
+  CheckCircle,
+  ExternalLink,
+  RefreshCw,
+  X,
+} from 'lucide-react';
 import FileUploadZone from './ui/FileUploadZone';
 import { FileListItem } from './FileListItem';
 import { TabNavigation } from './ui/TabNavigation';
 import { toast } from 'sonner';
-import { FileObject, FileStatus } from '@/types/core';
+import { FileObject } from '@/types/core';
 import { Button } from '@/components/ui/Button';
 
 // Import the fixed types
@@ -13,21 +23,21 @@ import type { FHIRWithValidation } from '../services/fhirConversionService.type'
 import { UploadResult } from '../services/shared.types';
 
 const TABS = [
-  { 
-    id: 'upload', 
+  {
+    id: 'upload',
     label: 'File Upload',
-    icon: Upload 
+    icon: Upload,
   },
-  { 
-    id: 'text', 
+  {
+    id: 'text',
     label: 'Text Input',
-    icon: MessageSquare 
+    icon: MessageSquare,
   },
-  { 
-    id: 'fhir', 
+  {
+    id: 'fhir',
     label: 'FHIR Data',
-    icon: Code 
-  }
+    icon: Code,
+  },
 ];
 
 const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
@@ -40,7 +50,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   getStats,
   updateFileStatus,
   onReview,
-  
+
   // Direct upload functions
   addFhirAsVirtualFile,
   uploadFiles,
@@ -52,14 +62,12 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   fhirData,
   onFHIRConverted,
 
-  
   // Configuration props
   acceptedTypes = ['.pdf', '.docx', '.doc', '.txt', '.jpg', '.jpeg', '.png'] as string[],
   maxFiles = 5,
   maxSizeBytes = 10 * 1024 * 1024, // 10MB
-  className = ''
+  className = '',
 }) => {
-
   //DEBUG LOGGING
   console.log('🔍 CombinedUploadFHIR props check:');
   console.log('🔍 updateFileStatus:', typeof updateFileStatus, updateFileStatus);
@@ -68,8 +76,8 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('upload');
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId as TabType);
-  }
-  
+  };
+
   // FHIR input state
   const [fhirText, setFhirText] = useState<string>('');
   const [fhirValidation, setFhirValidation] = useState<FHIRValidation | null>(null);
@@ -100,7 +108,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   const handleStartOver = () => {
     // Remove all files
     files.forEach(file => removeFileFromLocal(file.id));
-    
+
     // Reset form states
     setFhirText('');
     setFhirValidation(null);
@@ -108,32 +116,35 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
     setPatientName('');
     setSubmitting(false);
     setSubmittingText(false);
-    
+
     // Reset to upload tab
     setActiveTab('upload');
   };
 
-  //Cancels uploads and deletes any files from session. 
+  //Cancels uploads and deletes any files from session.
   const handleCancelandDelete = () => {
     // Remove all files
     files.forEach(file => removeFile(file.id));
   };
 
-  const handleConfirm = useCallback((fileId: string) => {
-    //Confirm individual item and remove from processing list
-    console.log(`File Confirmed, Removing individual file from processing list: ${fileId}`);
-    removeFileFromLocal(fileId);
-  }, [removeFileFromLocal]);
+  const handleConfirm = useCallback(
+    (fileId: string) => {
+      //Confirm individual item and remove from processing list
+      console.log(`File Confirmed, Removing individual file from processing list: ${fileId}`);
+      removeFileFromLocal(fileId);
+    },
+    [removeFileFromLocal]
+  );
 
   // Validate FHIR JSON
   const validateFhirJson = (jsonString: string): FHIRValidation => {
     try {
       const parsed = JSON.parse(jsonString);
-      
+
       if (!parsed.resourceType) {
         return { valid: false, error: 'Missing resourceType field' };
       }
-      
+
       if (parsed.resourceType === 'Bundle') {
         if (!parsed.entry || !Array.isArray(parsed.entry)) {
           return { valid: false, error: 'Bundle must have an entry array' };
@@ -141,18 +152,18 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
         const resourceTypes = parsed.entry
           .map((e: any) => e.resource?.resourceType)
           .filter((type: any): type is string => typeof type === 'string') as string[];
-        
-        return { 
-          valid: true, 
+
+        return {
+          valid: true,
           resourceType: 'Bundle',
           entryCount: parsed.entry.length,
-          resourceTypes: [...new Set(resourceTypes)]
+          resourceTypes: [...new Set(resourceTypes)],
         };
       } else {
-        return { 
-          valid: true, 
+        return {
+          valid: true,
           resourceType: parsed.resourceType,
-          isSingleResource: true
+          isSingleResource: true,
         };
       }
     } catch (error) {
@@ -164,7 +175,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   // Handle FHIR text changes
   const handleFhirTextChange = (value: string): void => {
     setFhirText(value);
-    
+
     if (value.trim()) {
       const validation = validateFhirJson(value);
       setFhirValidation(validation);
@@ -175,421 +186,419 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
 
   // Submit FHIR data and immediately upload to Firestore
   const handleFileComplete = async (fileItem: FileObject): Promise<void> => {
-      console.log('🚨 handleFileComplete called for:', fileItem.fileName, 'status:', fileItem.status);
-      
-      if (!updateFileStatus) {
-          console.error('❌ updateFileStatus is not available in handleFileComplete');
-          return;
-      }
-      
-      // 🔧 GET LATEST FILE STATE - The fileItem parameter might be stale!
-      const latestFile = files.find(f => f.id === fileItem.id);
-      if (!latestFile) {
-          console.error('❌ Could not find latest file state for:', fileItem.id);
-          return;
-      }
-      
-      console.log('🔍 Latest file state:', {
-          name: latestFile.fileName,
-          status: latestFile.status,
-          aiStatus: latestFile.aiProcessingStatus,
-          hasBelroseFields: !!latestFile.belroseFields,
-          belroseFields: latestFile.belroseFields
-      });
-      
-      // Use shouldAutoUpload with latest file state
-      if (!shouldAutoUpload(latestFile)) {
-          console.log(`⏭️ File not ready for upload: ${latestFile.fileName}`);
-          console.log(`   Status: ${latestFile.status}, AI Status: ${latestFile.aiProcessingStatus}`);
-          return;
-      }
-      
-      // 🚨 PREVENT MULTIPLE UPLOADS - Enhanced checks
-        if (latestFile.firestoreId || latestFile.uploadInProgress === true) {
-          console.log('⏭️ Skipping upload - already processed (local check):', {
-              documentId: latestFile.id,
-              uploadInProgress: latestFile.uploadInProgress
-          });
-          return;
-      }
-      
-      // Check global state
-      if (savingToFirestore.has(latestFile.id)) {
-          console.log('⏳ Upload already in progress (global check):', latestFile.fileName);
-          return;
-      }
-            
-      // Only upload if file has extracted text
-      if (latestFile.extractedText) {
-          try {
-              // Mark as upload in progress
-              updateFileStatus(latestFile.id, 'uploading', { uploadInProgress: true });
-              
-              console.log('🚀 Auto-uploading completed file with ALL data:', latestFile.fileName);
-              console.log('🏥 File has FHIR data:', !!latestFile.fhirData);
-              console.log('🤖 AI Status:', latestFile.aiProcessingStatus);
-              console.log('📊 Has BelroseFields:', !!latestFile.belroseFields);
-              console.log('📋 BelroseFields content:', latestFile.belroseFields);
-              
-              // Upload with LATEST file state (including belroseFields!)
-              const uploadResults: UploadResult[] = await uploadFiles([latestFile.id]);
-              
-              if (uploadResults && uploadResults[0]?.success) {
-                  console.log('✅ File with ALL data uploaded successfully!', latestFile.fileName);
-                  
-                  updateFileStatus(latestFile.id, 'completed', {
-                      firestoreId: uploadResults[0].documentId,
-                      uploadedAt: new Date().toISOString(),
-                      uploadInProgress: false
-                  });
-                  
-                  // Enhanced success message with AI info
-                  const aiInfo = latestFile.belroseFields?.visitType 
-                      ? `Classified as: ${latestFile.belroseFields.visitType}`
-                      : 'Processing completed';
-                      
-                  toast.success(`🎯 ${latestFile.fileName} uploaded successfully!`, {
-                      description: aiInfo,
-                      duration: 4000
-                  });
-                  
-                  console.log('🎯 Complete pipeline: File → Text → FHIR → AI → Firebase ✅');
-                  
-              } else {
-                  throw new Error('Upload failed - no success result');
-              }
-          } catch (error) {
-              console.error('🔍 Error in handleFileComplete:', error);
-              updateFileStatus(latestFile.id, 'completed', {
-                  error: `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                  uploadInProgress: false
-              });
-              
-              toast.error(`Failed to upload ${latestFile.fileName}`, {
-                  description: error instanceof Error ? error.message : 'Upload failed',
-                  duration: 5000
-              });
-          }
-      } else {
-          console.log('ℹ️ File completed without extracted text, skipping upload:', latestFile.fileName);
-      }
-  };
+    console.log('🚨 handleFileComplete called for:', fileItem.fileName, 'status:', fileItem.status);
 
-const handleTextSubmit = async (): Promise<void> => {
-  if (!plainText.trim()) return;
-
-  setSubmittingText(true);
-  try {
-    console.log('🎯 Converting plain text to FHIR...');
-    let fhirData: FHIRWithValidation;
-
-    if (convertTextToFHIR) {
-      fhirData = await convertTextToFHIR(plainText, patientName || undefined);
-    } else {
-      // Fallback: Create a simple FHIR Bundle with the text as a note
-      fhirData = {
-        resourceType: 'Bundle',
-        type: 'collection',
-        entry: [
-          {
-            resource: {
-              resourceType: 'DocumentReference',
-              status: 'current',
-              content: [{
-                attachment: {
-                  contentType: 'text/plain',
-                  data: btoa(plainText)
-                }
-              }],
-              description: `Medical note${patientName ? ` for ${patientName}` : ''}`,
-              date: new Date().toISOString()
-            }
-          }
-        ],
-        _validation: {
-          isValid: true,
-          hasErrors: false,
-          hasWarnings: false,
-          errors: [],
-          warnings: [],
-          info: [],
-          validatedAt: new Date().toISOString(),
-          validatorVersion: '1.0.0'
-        }
-      };
+    if (!updateFileStatus) {
+      console.error('❌ updateFileStatus is not available in handleFileComplete');
+      return;
     }
 
-    // Create virtual file - hook will handle AI processing, hashing, encryption
-    await addFhirAsVirtualFile(fhirData, {
-      fileName: `Medical Note${patientName ? ` - ${patientName}` : ''} - ${new Date().toLocaleDateString()}`,
-      sourceType: 'Plain Text Submission',
-      originalText: plainText.trim(),
-      autoUpload: true,
+    // 🔧 GET LATEST FILE STATE - The fileItem parameter might be stale!
+    const latestFile = files.find(f => f.id === fileItem.id);
+    if (!latestFile) {
+      console.error('❌ Could not find latest file state for:', fileItem.id);
+      return;
+    }
+
+    console.log('🔍 Latest file state:', {
+      name: latestFile.fileName,
+      status: latestFile.status,
+      aiStatus: latestFile.aiProcessingStatus,
+      hasBelroseFields: !!latestFile.belroseFields,
+      belroseFields: latestFile.belroseFields,
     });
 
-    console.log('✅ Plain text converted to FHIR successfully');
-    toast.success('✅ Medical note saved successfully!', {
-      description: 'Your note has been converted to FHIR and saved to your health record',
-      duration: 4000,
-    });
+    // Use shouldAutoUpload with latest file state
+    if (!shouldAutoUpload(latestFile)) {
+      console.log(`⏭️ File not ready for upload: ${latestFile.fileName}`);
+      console.log(`   Status: ${latestFile.status}, AI Status: ${latestFile.aiProcessingStatus}`);
+      return;
+    }
 
-    // Clear the form
-    setPlainText('');
-    setPatientName('');
-    
-  } catch (error) {
-    console.error('❌ Error converting text to FHIR:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    toast.error(`Failed to convert text to FHIR: ${errorMessage}`, {duration: 6000});
-  } finally {
-    setSubmittingText(false);
-  }
-};
+    // 🚨 PREVENT MULTIPLE UPLOADS - Enhanced checks
+    if (latestFile.firestoreId || latestFile.uploadInProgress === true) {
+      console.log('⏭️ Skipping upload - already processed (local check):', {
+        documentId: latestFile.id,
+        uploadInProgress: latestFile.uploadInProgress,
+      });
+      return;
+    }
 
-const handleFhirSubmit = async (): Promise<void> => {
-  if (!fhirText.trim() || !fhirValidation?.valid) return;
-  
-  setSubmitting(true);
-  try {
-    const fhirData: FHIRWithValidation = JSON.parse(fhirText);
-    
-    console.log('🎯 Submitting FHIR data directly to Firestore');
-    
-    // Create virtual file - hook will handle AI processing, hashing, encryption
-    await addFhirAsVirtualFile(fhirData, {
-      fileName: `Manual FHIR Input - ${fhirData.resourceType}`,
-      sourceType: 'Manual FHIR JSON Submission',
-      originalText: fhirText.trim(),
-      autoUpload: true,
-    });
-    
-    console.log('✅ FHIR data uploaded successfully');
-    
-    // Clear the form
-    setFhirText('');
-    setFhirValidation(null);
-    
-    // Show success message
-    toast.success('✅ FHIR data uploaded successfully!', {
-      description: 'Your FHIR Data is now in your Comprehensive Health Record',
-      duration: 4000,
-    });
-    
-  } catch (error) {
-    console.error('❌ Error submitting FHIR data:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    toast.error(`Failed to upload FHIR data: ${errorMessage}`, {
-      duration: 6000,
-    });
-  } finally {
-    setSubmitting(false);
-  }
-};
+    // Check global state
+    if (savingToFirestore.has(latestFile.id)) {
+      console.log('⏳ Upload already in progress (global check):', latestFile.fileName);
+      return;
+    }
 
-const handleRetryFile = (fileItem: FileObject): void => {
-  retryFile(fileItem.id);
-};
+    // Only upload if file has extracted text
+    if (latestFile.extractedText) {
+      try {
+        // Mark as upload in progress
+        updateFileStatus(latestFile.id, 'uploading', { uploadInProgress: true });
 
-return (
-  <div className={`space-y-6 ${className}`}>
-    {/* Main Container */}
-    <div className="bg-white rounded-lg shadow-sm border">
-      <div className="p-4 border-b">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
-              <FileText className="w-5 h-5 text-blue-600" />
-              <span>Add Health Records</span>
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              {hasFiles 
-                ? 'Processing your files...' 
-                : 'Upload documents, type medical notes, or input FHIR data - everything gets saved automatically'
-              }
-            </p>
-          </div>
-          
-          {/* Add More Files Button - only show when files are present - resets to the main page */}
-          {hasFiles && (
-            <div className="flex items-center space-x-2 px-4 py-2">
-              <Button
-                variant="outline"
-                onClick={() => {handleCancelandDelete(); handleStartOver();}}
-              >
-                <X className="w-4 h-4"/>
-                <span>Cancel Upload</span>
-              </Button>
-              <Button
-                variant="default"
-                onClick={handleStartOver}
-              >
-                <RefreshCw className="w-4 h-4" />
-                <span>Add More Files</span>
-              </Button>
+        console.log('🚀 Auto-uploading completed file with ALL data:', latestFile.fileName);
+        console.log('🏥 File has FHIR data:', !!latestFile.fhirData);
+        console.log('🤖 AI Status:', latestFile.aiProcessingStatus);
+        console.log('📊 Has BelroseFields:', !!latestFile.belroseFields);
+        console.log('📋 BelroseFields content:', latestFile.belroseFields);
+
+        // Upload with LATEST file state (including belroseFields!)
+        const uploadResults: UploadResult[] = await uploadFiles([latestFile.id]);
+
+        if (uploadResults && uploadResults[0]?.success) {
+          console.log('✅ File with ALL data uploaded successfully!', latestFile.fileName);
+
+          updateFileStatus(latestFile.id, 'completed', {
+            firestoreId: uploadResults[0].documentId,
+            uploadedAt: new Date().toISOString(),
+            uploadInProgress: false,
+          });
+
+          // Enhanced success message with AI info
+          const aiInfo = latestFile.belroseFields?.visitType
+            ? `Classified as: ${latestFile.belroseFields.visitType}`
+            : 'Processing completed';
+
+          toast.success(`🎯 ${latestFile.fileName} uploaded successfully!`, {
+            description: aiInfo,
+            duration: 4000,
+          });
+
+          console.log('🎯 Complete pipeline: File → Text → FHIR → AI → Firebase ✅');
+        } else {
+          throw new Error('Upload failed - no success result');
+        }
+      } catch (error) {
+        console.error('🔍 Error in handleFileComplete:', error);
+        updateFileStatus(latestFile.id, 'completed', {
+          error: `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          uploadInProgress: false,
+        });
+
+        toast.error(`Failed to upload ${latestFile.fileName}`, {
+          description: error instanceof Error ? error.message : 'Upload failed',
+          duration: 5000,
+        });
+      }
+    } else {
+      console.log(
+        'ℹ️ File completed without extracted text, skipping upload:',
+        latestFile.fileName
+      );
+    }
+  };
+
+  const handleTextSubmit = async (): Promise<void> => {
+    if (!plainText.trim()) return;
+
+    setSubmittingText(true);
+    try {
+      console.log('🎯 Converting plain text to FHIR...');
+      let fhirData: FHIRWithValidation;
+
+      if (convertTextToFHIR) {
+        fhirData = await convertTextToFHIR(plainText, patientName || undefined);
+      } else {
+        // Fallback: Create a simple FHIR Bundle with the text as a note
+        fhirData = {
+          resourceType: 'Bundle',
+          type: 'collection',
+          entry: [
+            {
+              resource: {
+                resourceType: 'DocumentReference',
+                status: 'current',
+                content: [
+                  {
+                    attachment: {
+                      contentType: 'text/plain',
+                      data: btoa(plainText),
+                    },
+                  },
+                ],
+                description: `Medical note${patientName ? ` for ${patientName}` : ''}`,
+                date: new Date().toISOString(),
+              },
+            },
+          ],
+          _validation: {
+            isValid: true,
+            hasErrors: false,
+            hasWarnings: false,
+            errors: [],
+            warnings: [],
+            info: [],
+            validatedAt: new Date().toISOString(),
+            validatorVersion: '1.0.0',
+          },
+        };
+      }
+
+      // Create virtual file - hook will handle AI processing, hashing, encryption
+      await addFhirAsVirtualFile(fhirData, {
+        fileName: `Medical Note${
+          patientName ? ` - ${patientName}` : ''
+        } - ${new Date().toLocaleDateString()}`,
+        sourceType: 'Plain Text Submission',
+        originalText: plainText.trim(),
+        autoUpload: true,
+      });
+
+      console.log('✅ Plain text converted to FHIR successfully');
+      toast.success('✅ Medical note saved successfully!', {
+        description: 'Your note has been converted to FHIR and saved to your health record',
+        duration: 4000,
+      });
+
+      // Clear the form
+      setPlainText('');
+      setPatientName('');
+    } catch (error) {
+      console.error('❌ Error converting text to FHIR:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Failed to convert text to FHIR: ${errorMessage}`, { duration: 6000 });
+    } finally {
+      setSubmittingText(false);
+    }
+  };
+
+  const handleFhirSubmit = async (): Promise<void> => {
+    if (!fhirText.trim() || !fhirValidation?.valid) return;
+
+    setSubmitting(true);
+    try {
+      const fhirData: FHIRWithValidation = JSON.parse(fhirText);
+
+      console.log('🎯 Submitting FHIR data directly to Firestore');
+
+      // Create virtual file - hook will handle AI processing, hashing, encryption
+      await addFhirAsVirtualFile(fhirData, {
+        fileName: `Manual FHIR Input - ${fhirData.resourceType}`,
+        sourceType: 'Manual FHIR JSON Submission',
+        originalText: fhirText.trim(),
+        autoUpload: true,
+      });
+
+      console.log('✅ FHIR data uploaded successfully');
+
+      // Clear the form
+      setFhirText('');
+      setFhirValidation(null);
+
+      // Show success message
+      toast.success('✅ FHIR data uploaded successfully!', {
+        description: 'Your FHIR Data is now in your Comprehensive Health Record',
+        duration: 4000,
+      });
+    } catch (error) {
+      console.error('❌ Error submitting FHIR data:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Failed to upload FHIR data: ${errorMessage}`, {
+        duration: 6000,
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRetryFile = (fileItem: FileObject): void => {
+    retryFile(fileItem.id);
+  };
+
+  return (
+    <div className={`space-y-6 ${className}`}>
+      {/* Main Container */}
+      <div className="bg-white rounded-lg shadow-sm border">
+        <div className="p-4 border-b">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
+                <FileText className="w-5 h-5 text-blue-600" />
+                <span>Add Health Records</span>
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                {hasFiles
+                  ? 'Processing your files...'
+                  : 'Upload documents, type medical notes, or input FHIR data - everything gets saved automatically'}
+              </p>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* 🔥 CONDITIONAL CONTENT: Files OR Input Interface */}
-      {hasFiles ? (
-        /* FILE PROCESSING VIEW */
-        <>
-          <div className="p-4 border-b bg-blue-50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {allFilesCompleted ? 'All Files Processed!' : 'Processing Files'}
-                </h3>
-              </div>
-              <div className="text-sm text-gray-600">
-                {stats.completed} of {stats.total} completed
-                {stats.processing > 0 && (
-                  <span className="ml-2 text-blue-600 font-medium">
-                    ({stats.processing} processing)
-                  </span>
-                )}
-                {hasErrors && (
-                  <span className="ml-2 text-red-600 font-medium">
-                    ({stats.errors} errors)
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 space-y-4 max-h-[75vh] overflow-y-auto">
-            {/* File List */}
-            {files.map((fileItem: FileObject) => {
-              const fhirResult = fileItem.fhirData ? {
-                success: true,
-                fhirData: fileItem.fhirData,
-                error: undefined
-              } : undefined;
-
-              return (
-                <FileListItem
-                  key={fileItem.id}
-                  fileItem={fileItem}
-                  fhirResult={fhirResult}
-                  onConfirm={handleConfirm}
-                  onRemove={removeFile}
-                  onRetry={handleRetryFile}
-                  onComplete={handleFileComplete}
-                  showFHIRResults={true}
-                  onReview={onReview}
-                />
-              );
-            })}
-          </div>
-
-          {/* Success/Actions Footer */}
-          {allFilesCompleted && (
-            <div className="bg-green-50 px-4 py-3 border-t border-green-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2 text-green-800">
-                  <CheckCircle className="w-5 h-5" />
-                  <span className="font-medium">All files processed successfully!</span>
-                </div>
-                <a 
-                  href="/edit-fhir" 
-                  className="flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
+            {/* Add More Files Button - only show when files are present - resets to the main page */}
+            {hasFiles && (
+              <div className="flex items-center space-x-2 px-4 py-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    handleCancelandDelete();
+                    handleStartOver();
+                  }}
                 >
-                  <span>View Records</span>
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-              </div>
-            </div>
-          )}
-        </>
-      ) : (
-        /* INPUT INTERFACE */
-        <>
-          <div className="p-4 pb-0">
-            <TabNavigation 
-              tabs={TABS}
-              activeTab={activeTab}
-              onTabChange={handleTabChange}
-            />
-          </div>
-          
-          <div className="p-6">
-            {/* File Upload Tab */}
-            {activeTab === 'upload' && (
-              <div>
-                <FileUploadZone
-                  onFilesSelected={handleFilesSelected}
-                  acceptedTypes={acceptedTypes}
-                  maxFiles={maxFiles}
-                  maxSizeBytes={maxSizeBytes}
-                  title="Drop medical documents here or click to upload"
-                  subtitle="Files will be processed and automatically saved to your cloud storage"
-                />
+                  <X className="w-4 h-4" />
+                  <span>Cancel Upload</span>
+                </Button>
+                <Button variant="default" onClick={handleStartOver}>
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Add More Files</span>
+                </Button>
               </div>
             )}
+          </div>
+        </div>
 
-            {/* Plain Text Input Tab */}
-            {activeTab === 'text' && (
-              <div className="space-y-4">
+        {/* 🔥 CONDITIONAL CONTENT: Files OR Input Interface */}
+        {hasFiles ? (
+          /* FILE PROCESSING VIEW */
+          <>
+            <div className="p-4 border-b bg-blue-50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {allFilesCompleted ? 'All Files Processed!' : 'Processing Files'}
+                  </h3>
+                </div>
+                <div className="text-sm text-gray-600">
+                  {stats.completed} of {stats.total} completed
+                  {stats.processing > 0 && (
+                    <span className="ml-2 text-blue-600 font-medium">
+                      ({stats.processing} processing)
+                    </span>
+                  )}
+                  {hasErrors && (
+                    <span className="ml-2 text-red-600 font-medium">({stats.errors} errors)</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 space-y-4 max-h-[75vh] overflow-y-auto">
+              {/* File List */}
+              {files.map((fileItem: FileObject) => {
+                const fhirResult = fileItem.fhirData
+                  ? {
+                      success: true,
+                      fhirData: fileItem.fhirData,
+                      error: undefined,
+                    }
+                  : undefined;
+
+                return (
+                  <FileListItem
+                    key={fileItem.id}
+                    fileItem={fileItem}
+                    fhirResult={fhirResult}
+                    onConfirm={handleConfirm}
+                    onRemove={removeFile}
+                    onRetry={handleRetryFile}
+                    onComplete={handleFileComplete}
+                    showFHIRResults={true}
+                    onReview={onReview}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Success/Actions Footer */}
+            {allFilesCompleted && (
+              <div className="bg-green-50 px-4 py-3 border-t border-green-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 text-green-800">
+                    <CheckCircle className="w-5 h-5" />
+                    <span className="font-medium">All files processed successfully!</span>
+                  </div>
+                  <a
+                    href="/edit-fhir"
+                    className="flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    <span>View Records</span>
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          /* INPUT INTERFACE */
+          <>
+            <div className="p-4 pb-0">
+              <TabNavigation tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+            </div>
+
+            <div className="p-6">
+              {/* File Upload Tab */}
+              {activeTab === 'upload' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Medical Note or Description
-                  </label>
-                  <textarea
-                    value={plainText}
-                    onChange={(e) => setPlainText(e.target.value)}
-                    placeholder={
-                      `Describe what happened during the medical visit...
+                  <FileUploadZone
+                    onFilesSelected={handleFilesSelected}
+                    acceptedTypes={acceptedTypes}
+                    maxFiles={maxFiles}
+                    maxSizeBytes={maxSizeBytes}
+                    title="Drop medical documents here or click to upload"
+                    subtitle="Files will be processed and automatically saved to your cloud storage"
+                  />
+                </div>
+              )}
+
+              {/* Plain Text Input Tab */}
+              {activeTab === 'text' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Medical Note or Description
+                    </label>
+                    <textarea
+                      value={plainText}
+                      onChange={e => setPlainText(e.target.value)}
+                      placeholder={`Describe what happened during the medical visit...
 
   Examples:
   • "Had routine checkup with Dr. Smith. Blood pressure was 120/80. Everything looks normal."
   • "Visited urgent care for sore throat. Prescribed amoxicillin 500mg, take twice daily for 10 days."
   • "Follow-up appointment for diabetes. HbA1c improved to 7.2%. Continue current medication."
   • "Annual physical exam completed. All vitals within normal range. Recommended yearly mammogram."`}
-                    className="w-full bg-background min-h-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                    disabled={submittingText}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-500">
-                    Your text will be automatically converted to medical FHIR format and saved.
+                      className="w-full bg-background min-h-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      disabled={submittingText}
+                    />
                   </div>
-                  
-                  <button
-                    onClick={handleTextSubmit}
-                    disabled={!plainText.trim() || submittingText}
-                    className={`px-6 py-2 rounded-lg font-medium ${
-                      plainText.trim() && !submittingText
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    }`}
-                  >
-                    {submittingText ? (
-                      <div className="flex items-center space-x-2">
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>Converting...</span>
-                      </div>
-                    ) : (
-                      'Save Medical Note'
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
 
-            {/* FHIR Input Tab */}
-            {activeTab === 'fhir' && (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    FHIR JSON Data
-                  </label>
-                  <textarea
-                    value={fhirText}
-                    onChange={(e) => handleFhirTextChange(e.target.value)}
-                    placeholder={`Paste your FHIR JSON here...
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-500">
+                      Your text will be automatically converted to medical FHIR format and saved.
+                    </div>
+
+                    <button
+                      onClick={handleTextSubmit}
+                      disabled={!plainText.trim() || submittingText}
+                      className={`px-6 py-2 rounded-lg font-medium ${
+                        plainText.trim() && !submittingText
+                          ? 'bg-blue-600 text-white hover:bg-blue-700'
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      {submittingText ? (
+                        <div className="flex items-center space-x-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Converting...</span>
+                        </div>
+                      ) : (
+                        'Save Medical Note'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* FHIR Input Tab */}
+              {activeTab === 'fhir' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      FHIR JSON Data
+                    </label>
+                    <textarea
+                      value={fhirText}
+                      onChange={e => handleFhirTextChange(e.target.value)}
+                      placeholder={`Paste your FHIR JSON here...
 
 Example:
 {
@@ -605,74 +614,78 @@ Example:
   }
 ]
 }`}
-                    className="w-full h-64 px-3 py-2 bg-background border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                    disabled={submitting}
-                  />
-                </div>
-
-                {/* Validation Display */}
-                {fhirValidation && (
-                  <div className={`p-3 rounded-lg border ${
-                    fhirValidation.valid 
-                      ? 'bg-green-50 border-green-200' 
-                      : 'bg-red-50 border-red-200'
-                  }`}>
-                    <div className="flex items-center space-x-2">
-                      {fhirValidation.valid ? (
-                        <CheckCircle className="w-5 h-5 text-green-600" />
-                      ) : (
-                        <AlertCircle className="w-5 h-5 text-red-600" />
-                      )}
-                      <span className={`font-medium ${
-                        fhirValidation.valid ? 'text-green-800' : 'text-red-800'
-                      }`}>
-                        {fhirValidation.valid ? 'Valid FHIR Data' : 'Invalid FHIR Data'}
-                      </span>
-                    </div>
-                    
-                    {fhirValidation.error && (
-                      <p className="text-red-700 text-sm mt-1">{fhirValidation.error}</p>
-                    )}
-                    
-                    {fhirValidation.valid && (
-                      <div className="text-green-700 text-sm mt-1">
-                        Resource Type: {fhirValidation.resourceType}
-                        {fhirValidation.entryCount && (
-                          <span> • {fhirValidation.entryCount} entries</span>
-                        )}
-                      </div>
-                    )}
+                      className="w-full h-64 px-3 py-2 bg-background border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                      disabled={submitting}
+                    />
                   </div>
-                )}
 
-                <div className="flex justify-end">
-                  <button
-                    onClick={handleFhirSubmit}
-                    disabled={!fhirValidation?.valid || submitting}
-                    className={`px-6 py-2 rounded-lg font-medium ${
-                      fhirValidation?.valid && !submitting
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    }`}
-                  >
-                    {submitting ? (
+                  {/* Validation Display */}
+                  {fhirValidation && (
+                    <div
+                      className={`p-3 rounded-lg border ${
+                        fhirValidation.valid
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-red-50 border-red-200'
+                      }`}
+                    >
                       <div className="flex items-center space-x-2">
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>Uploading...</span>
+                        {fhirValidation.valid ? (
+                          <CheckCircle className="w-5 h-5 text-green-600" />
+                        ) : (
+                          <AlertCircle className="w-5 h-5 text-red-600" />
+                        )}
+                        <span
+                          className={`font-medium ${
+                            fhirValidation.valid ? 'text-green-800' : 'text-red-800'
+                          }`}
+                        >
+                          {fhirValidation.valid ? 'Valid FHIR Data' : 'Invalid FHIR Data'}
+                        </span>
                       </div>
-                    ) : (
-                      'Upload FHIR Data'
-                    )}
-                  </button>
+
+                      {fhirValidation.error && (
+                        <p className="text-red-700 text-sm mt-1">{fhirValidation.error}</p>
+                      )}
+
+                      {fhirValidation.valid && (
+                        <div className="text-green-700 text-sm mt-1">
+                          Resource Type: {fhirValidation.resourceType}
+                          {fhirValidation.entryCount && (
+                            <span> • {fhirValidation.entryCount} entries</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleFhirSubmit}
+                      disabled={!fhirValidation?.valid || submitting}
+                      className={`px-6 py-2 rounded-lg font-medium ${
+                        fhirValidation?.valid && !submitting
+                          ? 'bg-blue-600 text-white hover:bg-blue-700'
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      {submitting ? (
+                        <div className="flex items-center space-x-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Uploading...</span>
+                        </div>
+                      ) : (
+                        'Upload FHIR Data'
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        </>
-      )}
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
 };
 
 export default CombinedUploadFHIR;

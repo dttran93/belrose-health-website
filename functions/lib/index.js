@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.healthDetailed = exports.health = exports.sendShareInvitationEmail = exports.personaWebhook = exports.checkVerificationStatus = exports.createVerificationSession = exports.getEncryptedWallet = exports.createWallet = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = void 0;
+exports.healthDetailed = exports.health = exports.sendShareInvitationEmail = exports.personaWebhook = exports.checkVerificationStatus = exports.createVerificationSession = exports.getEncryptedWallet = exports.createWallet = exports.createDetailedNarrative = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = void 0;
 // functions/src/index.ts
 const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin
@@ -48,6 +48,8 @@ var convertToFHIR_1 = require("./handlers/convertToFHIR");
 Object.defineProperty(exports, "convertToFHIR", { enumerable: true, get: function () { return convertToFHIR_1.convertToFHIR; } });
 var belroseFields_1 = require("./handlers/belroseFields");
 Object.defineProperty(exports, "createBelroseFields", { enumerable: true, get: function () { return belroseFields_1.createBelroseFields; } });
+var belroseNarrative_1 = require("./handlers/belroseNarrative");
+Object.defineProperty(exports, "createDetailedNarrative", { enumerable: true, get: function () { return belroseNarrative_1.createDetailedNarrative; } });
 // ==================== WALLET FUNCTIONS ====================
 var wallet_1 = require("./handlers/wallet");
 Object.defineProperty(exports, "createWallet", { enumerable: true, get: function () { return wallet_1.createWallet; } });
@@ -58,7 +60,7 @@ Object.defineProperty(exports, "createVerificationSession", { enumerable: true, 
 Object.defineProperty(exports, "checkVerificationStatus", { enumerable: true, get: function () { return verification_1.checkVerificationStatus; } });
 Object.defineProperty(exports, "personaWebhook", { enumerable: true, get: function () { return verification_1.personaWebhook; } });
 // ==================== EMAIL FUNCTIONS ====================
-var sendShareInvitationEmail_1 = require("./sendShareInvitationEmail");
+var sendShareInvitationEmail_1 = require("./handlers/sendShareInvitationEmail");
 Object.defineProperty(exports, "sendShareInvitationEmail", { enumerable: true, get: function () { return sendShareInvitationEmail_1.sendShareInvitationEmail; } });
 // ==================== HEALTH CHECK ====================
 var healthCheck_1 = require("./handlers/healthCheck");

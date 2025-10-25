@@ -174,26 +174,21 @@ export const BelroseRecord: React.FC<BelroseRecordProps> = ({
             placeholder="Enter a brief summary..."
           />
         ) : (
-          <p className="text-gray-700 leading-relaxed text-base">{Data.summary}</p>
+          <p className="text-gray-700 text-left leading-relaxed text-base">{Data.summary}</p>
         )}
       </div>
 
       {/* Detailed Narrative Section */}
       {Data.detailedNarrative && (
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 overflow-hidden">
+        <div className="bg-chart-4/10 rounded-xl border border-gray-200 p-6">
           {/* Header */}
-          <div className="bg-chart-4/5 bg-opacity-80 backdrop-blur-sm px-6 py-4 border-b border-blue-200">
-            <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              Detailed Clinical Record
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Complete narrative of the encounter and clinical findings
-            </p>
-          </div>
+          <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Detailed Clinical Record
+          </h2>
 
           {/* Content */}
-          <div className="p-6">
+          <div>
             {editable ? (
               <textarea
                 value={editedData.detailedNarrative || ''}
@@ -203,12 +198,10 @@ export const BelroseRecord: React.FC<BelroseRecordProps> = ({
                 placeholder="Enter detailed narrative..."
               />
             ) : (
-              <div className="bg-white rounded-lg p-6 shadow-sm">
-                <div className="prose prose-sm max-w-none">
-                  <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
-                    {Data.detailedNarrative}
-                  </p>
-                </div>
+              <div className="prose prose-sm max-w-none">
+                <p className="text-gray-800 text-left leading-relaxed whitespace-pre-wrap">
+                  {Data.detailedNarrative}
+                </p>
               </div>
             )}
           </div>

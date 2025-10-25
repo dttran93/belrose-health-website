@@ -25,15 +25,18 @@ export interface RecordVersion {
   authorName?: string;
   commitMessage?: string;
   changes: Change[]; // Updated to use Change instead of ChangeSet
-  
+
   fileObjectSnapshot: {
     fhirData?: any;
     belroseFields?: any;
     extractedText?: string | null;
     originalText?: string | null;
     blockchainVerification?: any;
+    recordHash?: string | null;
+    previousRecordHash?: string | null;
+    originalFileHash?: string | null;
   };
-  
+
   checksum: string;
   isInitialVersion: boolean;
 }

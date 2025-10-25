@@ -13,12 +13,12 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "types" : ["node"]
+    "types": ["node"]
   },
   "compileOnSave": true,
   "include": [
-    "src/**/*"
-, "../src/features/AddRecord/services/belroseNarrativeService.ts"  ],
+    "src/**/*.ts"
+  ],
   "exclude": [
     "node_modules",
     "lib"

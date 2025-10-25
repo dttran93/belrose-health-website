@@ -254,70 +254,216 @@ Use BOTH the FHIR data AND this text to ensure completeness. If there's informat
 
 GUIDELINES:
 
-1. ADAPT TO CONTENT TYPE:
-   - Simple records (prescriptions, routine labs, eyeglasses): Keep it concise (1-3 paragraphs)
-   - Complex encounters (procedures, diagnoses, ER visits): Use detailed narrative with logical sections (3-6 paragraphs)
-   - Use your judgment on what level of detail best serves the reader
+1. CHOOSE THE RIGHT FORMAT FOR EACH TYPE OF DATA:
 
-2. ORGANIZE NATURALLY:
-   - For encounters/visits, consider organizing by:
-     * Reason for visit / Chief complaint
-     * History and clinical findings
-     * Assessment/diagnosis
-     * Treatment plan and follow-up
-   - For results/reports, focus on:
-     * What was tested/done
-     * Key findings and values
-     * Clinical significance and interpretation
-   - For prescriptions/orders, simply state:
-     * What was prescribed/ordered
-     * Dosage/specifications and instructions
-     * Purpose/indication
+   **Use STRUCTURED LISTS for:**
+   - Medications/Prescriptions (drug, dose, route, frequency, indication)
+   - Vision prescriptions (sphere, cylinder, axis for each eye)
+   - Vital signs (BP, HR, temp, etc.)
+   - Lab results with multiple values
+   - Immunization details (vaccine, lot, route, site)
+   - Allergies (allergen, reaction, severity)
+   - Technical specifications or measurements
+   
+   **Use NARRATIVE for:**
+   - Clinical context and reasoning
+   - Patient history and symptoms
+   - Physical examination findings
+   - Assessment and clinical interpretation
+   - Treatment plans and recommendations
+   - Follow-up instructions
 
-3. WRITING STYLE:
-   - Write in clear, professional prose - not bullet points or form fields
-   - Be clear and concise, not overly wordy or verbose
-   - Use medical terminology where appropriate, but explain complex terms in parentheses
-   - Maintain clinical accuracy while being readable by patients
-   - Use past tense for completed encounters ("The patient presented with...")
-   - Use present tense for current states and findings ("Blood pressure is 120/80")
-   - Avoid overly technical jargon unless necessary
-   - Write as a coherent narrative, not a list of facts
+   **Use HYBRID (narrative intro + structured data) for:**
+   - Complex procedures (narrative description, then structured details)
+   - Lab results with clinical context (brief interpretation, then values)
 
-4. COMPLETENESS AND ACCURACY:
-   - Include all clinically significant information from the FHIR data
-   - Reference specific values, measurements, and medications with details
-   - If the original text contains important context missing from FHIR, incorporate it
-   - Note any uncertainties, pending results, or unclear information
-   - Include follow-up instructions and next steps if present
-   - Do not infer or add any information that isn't clear from the record and information provided
+2. FORMATTING STRUCTURED DATA:
 
-5. OMIT:
+   For medications, use this format:
+   
+   Medication: [Drug name]
+   Dose: [Amount and unit]
+   Route: [Administration method]
+   Frequency: [How often]
+   Indication: [Why prescribed]
+   Duration: [If specified]
+
+   For vision prescriptions, use this format:
+   
+   Right Eye (OD):
+     Sphere (SPH): [value]
+     Cylinder (CYL): [value]
+     Axis: [degrees]°
+     
+   Left Eye (OS):
+     Sphere (SPH): [value]
+     Cylinder (CYL): [value]
+     Axis: [degrees]°
+     
+   Additional: [PD, add power, prism, etc.]
+
+   For vital signs, use this format:
+   
+   Blood Pressure: [value] mmHg
+   Heart Rate: [value] bpm
+   Temperature: [value]°F ([Celsius]°C)
+   Respiratory Rate: [value] breaths/min
+   O2 Saturation: [value]% [on room air/supplemental O2]
+
+   For lab results, use this format:
+   
+   [Panel Name]:
+     [Test]: [value] [unit] (normal: [range])
+     [Test]: [value] [unit] (normal: [range])
+
+3. ADAPT COMPLEXITY TO CONTENT:
+   - Simple records (prescriptions, routine results): Brief intro + structured data
+   - Medium complexity (procedures, visits): Balanced narrative and structure
+   - Complex encounters (ER visits, surgeries): Detailed narrative with embedded structured sections
+
+4. ORGANIZATION:
+   
+   For encounters/visits:
+   - Start with narrative context (chief complaint, history)
+   - Use structured format for vitals, labs, medications
+   - Return to narrative for assessment, plan, follow-up
+   
+   For results/reports:
+   - Brief narrative context (what was tested, why)
+   - Structured presentation of values
+   - Narrative interpretation and significance
+   
+   For prescriptions/orders:
+   - Structured medication details
+   - Brief narrative context if needed (indication, special instructions)
+
+5. WRITING STYLE:
+   - Use clear, professional language
+   - Include medical terminology with plain-language explanations when helpful
+   - Include normal ranges for lab values when available
+   - Flag abnormal values or critical findings
+   - Use consistent formatting within each structured section
+   - Maintain clinical accuracy
+
+6. COMPLETENESS:
+   - Include all clinically significant information
+   - Reference specific values and measurements
+   - Note any uncertainties or pending results
+   - Include follow-up instructions
+   - Do not infer information not present in the source data
+
+7. OMIT:
    - Administrative metadata (system IDs, database identifiers)
-   - Information already clearly stated in the basic fields (visitType, title, etc.)
-   - Technical FHIR structure details irrelevant to the clinical story
-   - Redundant statements
+   - Redundant information already in basic fields
+   - Technical FHIR structure details
+   - Unnecessary repetition
 
-EXAMPLES OF DIFFERENT COMPLEXITY LEVELS:
+EXAMPLES:
 
-[Simple Record - Eyeglasses Prescription]
-"Eyeglasses prescription issued for correction of myopia and astigmatism. Right eye: -2.50 sphere, -0.75 cylinder at 180 degrees. Left eye: -2.25 sphere, -1.00 cylinder at 175 degrees. Pupillary distance measured at 63mm. Patient advised to use for full-time wear."
+[Simple - Eyeglasses Prescription]
+This prescription corrects myopia and astigmatism for both eyes.
 
-[Medium Record - Routine Lab Results]
-"Routine laboratory testing was performed as part of an annual health screening. Complete blood count showed all values within normal ranges, with hemoglobin at 14.2 g/dL, white blood cell count at 7,200 cells/μL, and platelet count at 245,000/μL. Comprehensive metabolic panel revealed normal kidney and liver function. Fasting glucose was 92 mg/dL, indicating good glycemic control. Lipid panel showed total cholesterol of 185 mg/dL, LDL cholesterol of 110 mg/dL, HDL cholesterol of 55 mg/dL, and triglycerides of 100 mg/dL. All results are within normal limits and consistent with good overall health. No follow-up testing required at this time."
+Right Eye (OD):
+  Sphere (SPH): -2.50
+  Cylinder (CYL): -0.75
+  Axis: 180°
 
-[Complex Record - Emergency Department Visit]
-"The patient presented to the emergency department with acute chest pain radiating to the left arm, accompanied by shortness of breath and diaphoresis. Symptoms began approximately 2 hours prior to arrival while the patient was at rest, with pain rated 8 out of 10 in severity. The patient denied any recent trauma, illness, or similar prior episodes.
+Left Eye (OS):
+  Sphere (SPH): -2.25
+  Cylinder (CYL): -1.00
+  Axis: 175°
 
-Initial assessment revealed blood pressure of 156/94 mmHg, heart rate of 102 beats per minute, respiratory rate of 20 breaths per minute, and oxygen saturation of 94% on room air. Electrocardiogram demonstrated ST-segment elevation in leads II, III, and aVF, consistent with acute inferior ST-elevation myocardial infarction (STEMI). Initial cardiac troponin I level was markedly elevated at 2.4 ng/mL, further confirming acute myocardial injury.
+Pupillary Distance (PD): 63mm
 
-The patient was immediately given aspirin 325mg, clopidogrel 600mg loading dose, and sublingual nitroglycerin, which provided partial pain relief. The cardiology service was consulted emergently, and the patient was taken directly to the cardiac catheterization laboratory. Coronary angiography revealed 95% occlusion of the right coronary artery. Successful percutaneous coronary intervention with drug-eluting stent placement was performed to the culprit lesion.
+Recommended for full-time wear.
 
-Post-procedure, the patient was hemodynamically stable with complete resolution of chest pain. The patient was admitted to the cardiac care unit for continued monitoring and medical optimization. Medications initiated included dual antiplatelet therapy with aspirin and ticagrelor, high-intensity statin therapy with atorvastatin 80mg daily, beta-blocker with metoprolol, and ACE inhibitor with lisinopril. Cardiac rehabilitation referral was placed for outpatient follow-up. The patient was counseled on lifestyle modifications including smoking cessation, dietary changes, and the importance of medication adherence."
+[Simple - Medication Prescription]
+Medication: Lisinopril
+Dose: 10mg
+Route: Oral
+Frequency: Once daily in the morning
+Indication: Blood pressure management
+Refills: 5 (90-day supply)
+
+Take consistently at the same time each day. May cause dizziness initially. Contact provider if persistent cough develops.
+
+[Medium - Routine Lab Results]
+Routine laboratory testing was performed as part of annual health screening. All results are within normal limits and indicate good overall health.
+
+Complete Blood Count:
+  Hemoglobin: 14.2 g/dL (normal: 13.5-17.5)
+  WBC: 7,200 cells/μL (normal: 4,000-11,000)
+  Platelets: 245,000/μL (normal: 150,000-400,000)
+
+Comprehensive Metabolic Panel:
+  Glucose (fasting): 92 mg/dL (normal: 70-100)
+  Creatinine: 0.9 mg/dL (normal: 0.6-1.2)
+  ALT: 28 U/L (normal: 7-56)
+  AST: 24 U/L (normal: 10-40)
+
+Lipid Panel:
+  Total Cholesterol: 185 mg/dL (normal: <200)
+  LDL: 110 mg/dL (optimal: <100)
+  HDL: 55 mg/dL (normal: >40)
+  Triglycerides: 100 mg/dL (normal: <150)
+
+The lipid panel shows well-controlled cholesterol levels. Continue current diet and exercise routine. No follow-up testing required at this time.
+
+[Complex - Emergency Department Visit]
+The patient presented to the emergency department with acute chest pain radiating to the left arm, accompanied by shortness of breath and diaphoresis. Symptoms began approximately 2 hours prior to arrival while at rest, with pain rated 8/10 in severity. No recent trauma, illness, or similar prior episodes were reported.
+
+Initial Vital Signs:
+  Blood Pressure: 156/94 mmHg
+  Heart Rate: 102 bpm
+  Respiratory Rate: 20 breaths/min
+  Temperature: 98.4°F (36.9°C)
+  O2 Saturation: 94% on room air
+
+Electrocardiogram demonstrated ST-segment elevation in leads II, III, and aVF, consistent with acute inferior ST-elevation myocardial infarction (STEMI). Initial cardiac biomarkers were significantly elevated:
+
+Cardiac Labs:
+  Troponin I: 2.4 ng/mL (normal: <0.04) - CRITICAL
+  CK-MB: 45 U/L (normal: <5) - ELEVATED
+
+Immediate Treatment:
+  Medication: Aspirin
+  Dose: 325mg
+  Route: Oral (chewed)
+  
+  Medication: Clopidogrel
+  Dose: 600mg loading dose
+  Route: Oral
+  
+  Medication: Nitroglycerin
+  Dose: 0.4mg
+  Route: Sublingual
+  
+The medications provided partial pain relief. The cardiology service was consulted emergently, and the patient was taken directly to the cardiac catheterization laboratory.
+
+Cardiac Catheterization Findings:
+  Culprit Vessel: Right coronary artery (RCA)
+  Stenosis: 95% occlusion
+  Intervention: Drug-eluting stent placement
+  Result: Successful revascularization, TIMI 3 flow restored
+
+Post-procedure, the patient was hemodynamically stable with complete resolution of chest pain. The patient was admitted to the cardiac care unit for continued monitoring.
+
+Discharge Medications:
+  1. Aspirin 81mg - Once daily, indefinitely
+  2. Ticagrelor 90mg - Twice daily, minimum 12 months
+  3. Atorvastatin 80mg - Once daily at bedtime
+  4. Metoprolol succinate 50mg - Once daily
+  5. Lisinopril 10mg - Once daily
+
+Follow-up Plan:
+- Cardiology appointment in 1 week
+- Cardiac rehabilitation referral placed
+- Lifestyle counseling provided: smoking cessation, dietary modifications, medication adherence
+- Return to ED immediately for recurrent chest pain, shortness of breath, or other concerning symptoms
 
 OUTPUT FORMAT:
-Return ONLY the narrative text itself. Do not include any JSON formatting, markdown headers, or preamble. Write the narrative directly as prose that can be displayed to the user.
+Return the complete presentation as formatted above. Use clear section breaks, consistent indentation for structured data, and maintain professional medical documentation standards. Do not include JSON formatting, excessive markdown, or unnecessary preamble.
 
-Generate the detailed narrative now:
+Generate the detailed presentation now:
   `.trim();
 }
