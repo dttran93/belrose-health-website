@@ -2,18 +2,24 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { Share2, ClipboardPlus, Code, FileInput } from 'lucide-react';
-import { FileObject } from '@/types/core';
+import { Share2, ClipboardPlus, Code, FileInput, Computer, Info } from 'lucide-react';
+import { FileObject, BelroseFields } from '@/types/core';
 import { TabNavigation } from '@/features/AddRecord/components/ui/TabNavigation';
 import FHIRRecord from '@/features/ViewEditRecord/components/ui/FHIRRecord';
+import BelroseRecord from './BelroseRecord';
 
-export type TabType = 'record' | 'data' | 'original';
+export type TabType = 'record' | 'fhir' | 'data' | 'original';
 
 const tabs = [
   {
     id: 'record',
     label: 'Full Record',
     icon: ClipboardPlus,
+  },
+  {
+    id: 'fhir',
+    label: 'FHIR Format',
+    icon: Computer,
   },
   {
     id: 'data',
@@ -31,7 +37,8 @@ interface RecordViewProps {
   record: FileObject;
   editable?: boolean;
   onFhirChanged?: (hasChanges: boolean) => void;
-  onDataChange?: (updatedData: any) => void;
+  onFhirDataChange?: (updatedData: any) => void;
+  onBelroseFieldsChange?: (updateFields: BelroseFields) => void;
   className?: string;
   activeTab?: TabType;
   onTabChange?: (tabId: TabType) => void;
@@ -41,7 +48,8 @@ export const RecordView: React.FC<RecordViewProps> = ({
   record,
   editable = false,
   onFhirChanged,
-  onDataChange,
+  onFhirDataChange,
+  onBelroseFieldsChange,
   className = '',
   activeTab: externalActiveTab,
   onTabChange: externalOnTabChange,
@@ -61,14 +69,25 @@ export const RecordView: React.FC<RecordViewProps> = ({
 
       {/* Tab Content */}
       <div>
-        {/* Full Record Tab - FHIR Resources */}
+        {/* Belrose Record*/}
         {activeTab === 'record' && (
+          <div className="space-y-6">
+            <BelroseRecord
+              Data={record.belroseFields}
+              editable={editable}
+              onDataChange={onBelroseFieldsChange}
+            />
+          </div>
+        )}
+
+        {/* FHIR Resources Tab*/}
+        {activeTab === 'fhir' && (
           <div className="space-y-6">
             <FHIRRecord
               fhirData={record.fhirData}
               editable={editable}
               onFhirChanged={onFhirChanged}
-              onDataChange={onDataChange}
+              onDataChange={onFhirDataChange}
             />
           </div>
         )}
@@ -76,6 +95,20 @@ export const RecordView: React.FC<RecordViewProps> = ({
         {/* JSON Tab */}
         {activeTab === 'data' && (
           <div className="space-y-6">
+            {editable && (
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Info className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <div className="text-center flex-1">
+                    <h3 className="text-primary font-medium mb-1">Editing Record</h3>
+                    <p className="text-primary text-sm">
+                      The JSON data will be updated automatically when you edit either FHIR or
+                      Record data.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-900">JSON Data</h2>
             </div>
@@ -107,6 +140,19 @@ export const RecordView: React.FC<RecordViewProps> = ({
         {activeTab === 'original' && (
           <div className="space-y-6">
             {/* Original Text Submission */}
+            {editable && (
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Info className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <div className="text-center flex-1">
+                    <h3 className="text-primary font-medium mb-1">Editing Record</h3>
+                    <p className="text-primary text-sm">
+                      Upload a new record to add or change original text/files.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             {record.originalText && (
               <div className="flex flex-col">
                 <h2 className="text-xl font-semibold text-gray-900">Original Text Submission</h2>

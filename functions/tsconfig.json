@@ -18,7 +18,7 @@
   "compileOnSave": true,
   "include": [
     "src/**/*"
-  ],
+, "../src/features/AddRecord/services/belroseNarrativeService.ts"  ],
   "exclude": [
     "node_modules",
     "lib"

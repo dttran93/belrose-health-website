@@ -116,8 +116,8 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
     setHasFhirChanges(hasChanges);
   };
 
-  const updateBelroseField = (field: keyof BelroseFields, value: string) => {
-    setEditedBelroseFields(prev => ({ ...prev, [field]: value }));
+  const handleBelroseFieldsChange = (updatedFields: BelroseFields) => {
+    setEditedBelroseFields(updatedFields);
     setHasUnsavedChanges(true);
   };
 
@@ -219,7 +219,6 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
           isEditMode={viewMode === 'edit'}
           isVersionView={viewMode === 'version-detail'}
           viewingVersion={viewingVersion}
-          editedBelroseFields={editedBelroseFields}
           onEdit={onEdit}
           onDelete={onDelete}
           onShare={handleViewShare}
@@ -228,7 +227,6 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
           onExit={handleExit}
           onReturnToCurrent={handleBackToRecord}
           onEnterEditMode={handleEnterEditMode}
-          updateBelroseField={updateBelroseField}
         />
       </div>
 
@@ -250,7 +248,8 @@ export const RecordFull: React.FC<HealthRecordFullProps> = ({
             record={displayRecord}
             editable={viewMode === 'edit'}
             onFhirChanged={handleFhirChanged}
-            onDataChange={handleFhirDataChange}
+            onFhirDataChange={handleFhirDataChange}
+            onBelroseFieldsChange={handleBelroseFieldsChange}
             activeTab={activeTab}
             onTabChange={setActiveTab}
           />

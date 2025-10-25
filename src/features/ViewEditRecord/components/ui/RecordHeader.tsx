@@ -1,100 +1,10 @@
 import React from 'react';
 import { Button } from '@/components/ui/Button';
-import { X, Ellipsis } from 'lucide-react';
+import { X, Ellipsis, Info } from 'lucide-react';
 import { FileObject, BelroseFields } from '@/types/core';
 import HealthRecordMenu from './RecordMenu';
 import { VerificationBadge } from '@/features/BlockchainVerification/component/VerificationBadge';
 import { RecordVersion } from '@/features/ViewEditRecord/services/versionControlService.types';
-
-// Component for editable belrose fields
-const EditableBelroseFields = ({
-  editedBelroseFields,
-  updateBelroseField,
-}: {
-  editedBelroseFields: BelroseFields;
-  updateBelroseField: (field: keyof BelroseFields, value: string) => void;
-}) => (
-  <div className="space-y-4">
-    <div className="grid grid-cols-12 gap-4">
-      <div className="col-span-10">
-        <label className="block text-sm font-medium text-white/90 mb-1">Title</label>
-        <input
-          type="text"
-          value={editedBelroseFields.title || ''}
-          onChange={e => updateBelroseField('title', e.target.value)}
-          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
-          placeholder="Enter record title..."
-        />
-      </div>
-      <div className="col-span-2">
-        <label className="block text-sm font-medium text-white/90 mb-1">Visit Type</label>
-        <input
-          type="text"
-          value={editedBelroseFields.visitType || ''}
-          onChange={e => updateBelroseField('visitType', e.target.value)}
-          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
-          placeholder="e.g., Follow-up Appointment, Lab Results..."
-        />
-      </div>
-
-      <div className="col-span-3">
-        <label className="block text-sm font-medium text-white/90 mb-1">Completed Date</label>
-        <input
-          type="date"
-          value={
-            editedBelroseFields.completedDate ? editedBelroseFields.completedDate.split('T')[0] : ''
-          }
-          onChange={e => updateBelroseField('completedDate', e.target.value)}
-          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
-        />
-      </div>
-
-      <div className="col-span-3">
-        <label className="block text-sm font-medium text-white/90 mb-1">Patient</label>
-        <input
-          type="text"
-          value={editedBelroseFields.patient || ''}
-          onChange={e => updateBelroseField('patient', e.target.value)}
-          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
-          placeholder="Patient Name..."
-        />
-      </div>
-
-      <div className="col-span-3">
-        <label className="block text-sm font-medium text-white/90 mb-1">Provider</label>
-        <input
-          type="text"
-          value={editedBelroseFields.provider || ''}
-          onChange={e => updateBelroseField('provider', e.target.value)}
-          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
-          placeholder="Provider name..."
-        />
-      </div>
-
-      <div className="col-span-3">
-        <label className="block text-sm font-medium text-white/90 mb-1">Institution</label>
-        <input
-          type="text"
-          value={editedBelroseFields.institution || ''}
-          onChange={e => updateBelroseField('institution', e.target.value)}
-          className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
-          placeholder="Healthcare institution..."
-        />
-      </div>
-    </div>
-
-    <div>
-      <label className="block text-sm font-medium text-white/90 mb-1">Summary</label>
-      <textarea
-        value={editedBelroseFields.summary || ''}
-        onChange={e => updateBelroseField('summary', e.target.value)}
-        rows={2}
-        className="w-full px-3 py-2 text-sm bg-white/10 border border-white/20 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
-        placeholder="Brief summary of the record..."
-      />
-    </div>
-  </div>
-);
 
 interface RecordHeaderProps {
   record: FileObject;
@@ -102,7 +12,6 @@ interface RecordHeaderProps {
   isEditMode: boolean;
   isVersionView: boolean;
   viewingVersion: RecordVersion | null;
-  editedBelroseFields: BelroseFields;
   onEdit?: (record: FileObject) => void;
   onDelete?: (record: FileObject) => void;
   onShare?: (record: FileObject) => void;
@@ -111,7 +20,6 @@ interface RecordHeaderProps {
   onExit: () => void;
   onReturnToCurrent?: () => void;
   onEnterEditMode: () => void;
-  updateBelroseField: (field: keyof BelroseFields, value: string) => void;
 }
 
 export const RecordHeader: React.FC<RecordHeaderProps> = ({
@@ -120,7 +28,6 @@ export const RecordHeader: React.FC<RecordHeaderProps> = ({
   isEditMode,
   isVersionView,
   viewingVersion,
-  editedBelroseFields,
   onEdit,
   onDelete,
   onShare,
@@ -129,7 +36,6 @@ export const RecordHeader: React.FC<RecordHeaderProps> = ({
   onExit,
   onReturnToCurrent,
   onEnterEditMode,
-  updateBelroseField,
 }) => {
   const handleViewVerification = (record: FileObject) => {
     onViewVerification?.(record);
@@ -151,6 +57,11 @@ export const RecordHeader: React.FC<RecordHeaderProps> = ({
                   {displayRecord.sourceType}
                 </span>
               </>
+            )}
+            {isEditMode && (
+              <span className="px-2 py-1 text-xs font-medium bg-yellow-500/20 text-yellow-100 rounded border border-yellow-500/30">
+                Editing Mode
+              </span>
             )}
           </div>
 
@@ -179,13 +90,21 @@ export const RecordHeader: React.FC<RecordHeaderProps> = ({
 
         {/* Content Area */}
         {isEditMode ? (
-          <div className="mt-4">
-            <EditableBelroseFields
-              editedBelroseFields={editedBelroseFields}
-              updateBelroseField={updateBelroseField}
-            />
+          // Edit Mode Banner
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Info className="w-5 h-5 text-yellow-300 flex-shrink-0 mt-0.5" />
+              <div className="text-center flex-1">
+                <h3 className="text-yellow-100 font-medium mb-1">Editing Record</h3>
+                <p className="text-yellow-200/80 text-sm">
+                  Scroll down to edit the record details, FHIR data, and other fields. Changes are
+                  saved when you click the Save button.
+                </p>
+              </div>
+            </div>
           </div>
         ) : (
+          // View Mode - Normal Header
           <>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4 text-white">

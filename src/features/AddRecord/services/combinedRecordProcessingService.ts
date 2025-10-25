@@ -12,6 +12,7 @@ import {
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { FileObject, VirtualFileInput, BelroseFields, ProcessingStages } from '@/types/core';
 import { RecordHashService } from '@/features/ViewEditRecord/services/generateRecordHash';
+import { generateDetailedNarrative } from './belroseNarrativeService';
 
 export interface ProcessedRecord {
   extractedText?: string | null;
@@ -126,6 +127,46 @@ export class CombinedRecordProcessingService {
       } else {
         result.aiProcessingStatus = 'not_needed';
         onStageUpdate?.('Completing...', { aiProcessingStatus: 'not_needed' });
+      }
+
+      //Generate Detailed Narrative from BelroseFields/FHIR Data/OriginalOrExtracted Text
+      if (result.belroseFields && result.fhirData) {
+        console.log(`📖 Step 3B: Generating detailed narrative for: ${fileObj.fileName}`);
+
+        try {
+          const narrativeResult = await generateDetailedNarrative(result.fhirData, {
+            belroseFields: {
+              visitType: result.belroseFields.visitType,
+              title: result.belroseFields.title,
+              summary: result.belroseFields.summary,
+              completedDate: result.belroseFields.completedDate,
+              provider: result.belroseFields.provider,
+              institution: result.belroseFields.institution,
+              patient: result.belroseFields.patient,
+            },
+            fileName: fileObj.fileName,
+            extractedText: result.extractedText || undefined,
+          });
+
+          // Add the detailed narrative to belroseFields
+          result.belroseFields.detailedNarrative = narrativeResult.detailedNarrative;
+
+          console.log(
+            `✅ Detailed narrative generated for: ${fileObj.fileName} (${narrativeResult.detailedNarrative.length} chars)`
+          );
+
+          toast.success(`📖 Detailed narrative generated for ${fileObj.fileName}`, {
+            duration: 3000,
+          });
+        } catch (error: any) {
+          console.error(`❌ Narrative generation failed for ${fileObj.fileName}:`, error);
+
+          // Not critical - we still have basic fields and FHIR data
+          toast.info(`Detailed narrative unavailable for ${fileObj.fileName}`, {
+            description: 'Basic summary is still available',
+            duration: 3000,
+          });
+        }
       }
 
       // STEP 4: Generate record hash (plaintext, before encryption)
@@ -291,6 +332,35 @@ export class CombinedRecordProcessingService {
       result.aiProcessingStatus = virtualData.aiProcessingStatus || 'completed';
     } else {
       result.aiProcessingStatus = 'not_needed';
+    }
+
+    // Generate Detailed Narrative for Virtual Files
+    if (result.belroseFields && virtualData.fhirData) {
+      console.log(`📖 Generating detailed narrative for virtual file: ${fileName}`);
+
+      try {
+        const narrativeResult = await generateDetailedNarrative(virtualData.fhirData, {
+          belroseFields: {
+            visitType: result.belroseFields.visitType,
+            title: result.belroseFields.title,
+            summary: result.belroseFields.summary,
+            completedDate: result.belroseFields.completedDate,
+            provider: result.belroseFields.provider,
+            institution: result.belroseFields.institution,
+            patient: result.belroseFields.patient,
+          },
+          fileName: fileName,
+          originalText: virtualData.originalText,
+        });
+
+        result.belroseFields.detailedNarrative = narrativeResult.detailedNarrative;
+
+        console.log(
+          `✅ Detailed narrative generated for virtual file: ${fileName} (${narrativeResult.detailedNarrative.length} chars)`
+        );
+      } catch (error: any) {
+        console.error(`❌ Narrative generation failed for virtual file ${fileName}:`, error);
+      }
     }
 
     // STEP 2: Generate record hash
