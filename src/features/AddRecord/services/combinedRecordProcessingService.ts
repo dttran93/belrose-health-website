@@ -104,11 +104,6 @@ export class CombinedRecordProcessingService {
           result.aiProcessingStatus = 'completed';
 
           console.log(`✅ AI processing completed for: ${fileObj.fileName}`, aiResult);
-
-          toast.success(`🤖 AI analysis completed for ${fileObj.fileName}`, {
-            description: `Classified as: ${aiResult.visitType}`,
-            duration: 3000,
-          });
         } catch (error: any) {
           console.error(`❌ AI processing failed for ${fileObj.fileName}:`, error);
 
@@ -155,17 +150,11 @@ export class CombinedRecordProcessingService {
             `✅ Detailed narrative generated for: ${fileObj.fileName} (${narrativeResult.detailedNarrative.length} chars)`
           );
 
-          toast.success(`📖 Detailed narrative generated for ${fileObj.fileName}`, {
+          toast.success(`🤖 AI analysis and detailed narrative completed for ${fileObj.fileName}`, {
             duration: 3000,
           });
         } catch (error: any) {
           console.error(`❌ Narrative generation failed for ${fileObj.fileName}:`, error);
-
-          // Not critical - we still have basic fields and FHIR data
-          toast.info(`Detailed narrative unavailable for ${fileObj.fileName}`, {
-            description: 'Basic summary is still available',
-            duration: 3000,
-          });
         }
       }
 

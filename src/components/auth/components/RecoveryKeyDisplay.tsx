@@ -7,18 +7,20 @@ import { toast } from 'sonner';
 
 interface RecoveryKeyDisplayProps {
   recoveryKey: string;
-  onComplete: (data: { acknowledgedRecoveryKey: boolean }) => void;
+  onAcknowledge: (acknowledged: boolean) => void;
+  onComplete: () => void;
   isCompleted: boolean;
   isActivated: boolean;
 }
 
 export const RecoveryKeyDisplay: React.FC<RecoveryKeyDisplayProps> = ({
   recoveryKey,
+  onAcknowledge,
   onComplete,
   isCompleted = false,
   isActivated = false,
 }) => {
-  const [acknowledged, setAcknowledged] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(isCompleted);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(recoveryKey);
@@ -49,12 +51,17 @@ export const RecoveryKeyDisplay: React.FC<RecoveryKeyDisplayProps> = ({
     toast.success('Recovery key downloaded');
   };
 
+  const handleCheckboxChange = (checked: boolean) => {
+    setAcknowledged(checked);
+    onAcknowledge(checked);
+  };
+
   const handleComplete = () => {
     if (!acknowledged) {
       toast.error('Please confirm you have saved your recovery key');
       return;
     }
-    onComplete({ acknowledgedRecoveryKey: true });
+    onComplete();
   };
 
   return (
@@ -67,7 +74,7 @@ export const RecoveryKeyDisplay: React.FC<RecoveryKeyDisplayProps> = ({
         <h2 className="text-2xl font-bold text-gray-900">Save Your Recovery Key</h2>
         <p className="text-gray-600 mt-2">
           This 24-word recovery key is the ONLY way to recover your data if you forget your
-          encryption password.
+          password.
         </p>
       </div>
 
@@ -78,8 +85,8 @@ export const RecoveryKeyDisplay: React.FC<RecoveryKeyDisplayProps> = ({
             <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-yellow-900 flex-1">
               <p className="font-semibold mb-2">
-                Create your Belrose Account, Encryption Password, and connect your Blockchain Wallet
-                (Steps 1-3) to receive your Recovery Key.
+                Create your Belrose Account and connect your Blockchain Wallet (Steps 1-2) to
+                receive your Recovery Key.
               </p>
             </div>
           </div>
@@ -131,7 +138,7 @@ export const RecoveryKeyDisplay: React.FC<RecoveryKeyDisplayProps> = ({
             <input
               type="checkbox"
               checked={acknowledged || isCompleted}
-              onChange={e => setAcknowledged(e.target.checked)}
+              onChange={e => handleCheckboxChange(e.target.checked)}
               className="m-2 w-6 h-6 cursor-pointer"
             />
             <label
@@ -147,7 +154,7 @@ export const RecoveryKeyDisplay: React.FC<RecoveryKeyDisplayProps> = ({
                   I have saved my recovery key in a secure location.
                 </span>
                 <span className="block p-1">
-                  Without this key, I cannot recover my data if I forget my encryption password.
+                  Without this key, I cannot recover my data if I forget my password.
                 </span>
                 <span className="block p-1">
                   Belrose cannot access encryption passwords or recovery keys.
@@ -158,7 +165,7 @@ export const RecoveryKeyDisplay: React.FC<RecoveryKeyDisplayProps> = ({
 
           {/* Complete Button */}
           <Button onClick={handleComplete} disabled={!acknowledged} className="w-full py-3">
-            Continue
+            Complete Registration
           </Button>
         </>
       )}

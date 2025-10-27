@@ -42,6 +42,7 @@ interface BelroseAccountFormProps {
     email: string;
     firstName: string;
     lastName: string;
+    password: string;
   }) => void;
   initialData: any;
   isCompleted?: boolean;
@@ -199,6 +200,7 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
         email: formData.email.trim(),
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
+        password: formData.password,
       });
       setIsEditing(false);
       toast.success('Information updated successfully');
@@ -222,6 +224,7 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
         email: trimmedEmail,
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
+        password: formData.password,
       });
     } catch (error) {
       console.error('Auth error:', error);

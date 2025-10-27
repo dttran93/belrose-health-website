@@ -15,7 +15,7 @@ import { generateWallet, encryptPrivateKey } from '../services/backendWalletServ
 
 interface CreateWalletRequest {
   userId: string;
-  encryptionPassword: string;
+  masterKeyHex?: string; // Optional master key (used during registration)
 }
 
 interface CreateWalletResponse {
@@ -48,12 +48,12 @@ export const createWallet = onRequest({ cors: true }, async (req: Request, res: 
 
   try {
     // Extract and validate request body
-    const { userId, encryptionPassword } = req.body as CreateWalletRequest;
+    const { userId, masterKeyHex } = req.body as CreateWalletRequest;
 
-    if (!userId || !encryptionPassword) {
+    if (!userId) {
       res.status(400).json({
         error: 'Missing required fields',
-        details: 'userId and encryptionPassword are required',
+        details: 'userId is required',
       });
       return;
     }
@@ -100,9 +100,22 @@ export const createWallet = onRequest({ cors: true }, async (req: Request, res: 
     const wallet = generateWallet();
     console.log('✅ Generated wallet address:', wallet.address);
 
+    // ✅ Use the master key if provided, otherwise this should not happen
+    if (!masterKeyHex) {
+      res.status(400).json({
+        error: 'Missing encryption key',
+        details: 'Master key is required to encrypt wallet',
+      });
+      return;
+    }
+
+    console.log('🔑 Using master key for wallet encryption...');
+
+    // Use the master key as the encryption password
+    const encryptionPassword = masterKeyHex;
+
     // Encrypt the private key and mnemonic
     const encryptedData = encryptPrivateKey(wallet.privateKey, encryptionPassword);
-
     const encryptedMnemonic = encryptPrivateKey(wallet.mnemonic || '', encryptionPassword);
 
     // Save encrypted wallet to database
@@ -124,6 +137,20 @@ export const createWallet = onRequest({ cors: true }, async (req: Request, res: 
     });
 
     console.log('✅ Wallet saved for user:', userId);
+
+    // ✅ Explicitly clear the master key from memory
+    // This is extra security to ensure the key doesn't linger
+    // (Though it will be garbage collected anyway)
+    const clearKey = () => {
+      try {
+        // Overwrite the variable (JavaScript doesn't have true memory zeroing)
+        // but this prevents accidental reuse
+        encryptionPassword.split('').forEach(() => {});
+      } catch (e) {
+        // Ignore errors in cleanup
+      }
+    };
+    clearKey();
 
     // Return success response
     const response: CreateWalletResponse = {

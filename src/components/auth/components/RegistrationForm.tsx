@@ -10,14 +10,14 @@ import {
   ArrowLeft,
   RotateCcwKey,
 } from 'lucide-react';
-import { useNavigate, useLocation, data } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import BelroseAccountForm from './BelroseAccountForm';
-import EncryptionPasswordSetup from './EncryptionPasswordSetup';
 import { RecoveryKeyDisplay } from './RecoveryKeyDisplay';
 import WalletSetup from './WalletSetup';
 import { getFirestore, doc, updateDoc } from 'firebase/firestore';
+import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 
 interface StepConfig {
   number: number;
@@ -33,6 +33,7 @@ interface RegistrationFormProps {
 const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<number>(1);
+  const [acknowledgeRecoveryKey, setAcknowledgeRecoveryKey] = useState<boolean>(false);
 
   // Store data from all steps
   const [registrationData, setRegistrationData] = useState({
@@ -40,11 +41,14 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     email: '',
     firstName: '',
     lastName: '',
-    encryptionPassword: '',
+    password: '',
     walletAddress: '',
     walletType: '' as 'generated' | 'metamask' | undefined,
     recoveryKey: '',
+    recoveryKeyHash: '',
     acknowledgedRecoveryKey: false,
+    encryptedMasterKey: '',
+    masterKeyIV: '',
   });
 
   console.log(registrationData);
@@ -58,18 +62,12 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     },
     {
       number: 2,
-      title: 'Encryption Setup',
-      subtitle: 'Protect your health records',
-      icon: Lock,
-    },
-    {
-      number: 3,
       title: 'Blockchain Connection',
       subtitle: 'Connect your blockchain wallet',
       icon: Wallet,
     },
     {
-      number: 4,
+      number: 3,
       title: 'Recovery Key',
       subtitle: 'Save your recovery key for your encryption and blockchain wallet',
       icon: RotateCcwKey,
@@ -82,13 +80,10 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         //Step 1 is done if we have a userId and email and email verification
         return !!(registrationData.userId && registrationData.email);
       case 2:
-        //Step 2 is complete if encryption password is set
-        return !!registrationData.encryptionPassword;
-      case 3:
-        // Step 3 is complete if wallet address and type are set
+        // Step 2 is complete if wallet address and type are set
         return !!(registrationData.walletAddress && registrationData.walletType);
-      case 4:
-        // Step 4 is completed if a recovery Key has been created/saved. Maybe change to if they've acknowledged? But I guess there's technically not a lot for them to do here...
+      case 3:
+        // Step 3 is completed if a recovery Key has been created/saved and acknowledged Recovery Key.
         return !!registrationData.acknowledgedRecoveryKey;
       default:
         return false;
@@ -96,17 +91,67 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
   };
 
   const canCompleteRegistration = (): Boolean => {
-    return isStepCompleted(1) && isStepCompleted(2) && isStepCompleted(3) && isStepCompleted(4);
+    return isStepCompleted(1) && isStepCompleted(2) && isStepCompleted(3);
   };
 
-  const handleStepComplete = (stepNumber: number, data: any) => {
-    setRegistrationData(prev => ({
-      ...prev,
-      ...data,
-    }));
+  const handleStepComplete = async (stepNumber: number, data: any) => {
+    // If completing step 1, generate and encrypt the master key
+    if (stepNumber === 1 && data.password) {
+      try {
+        console.log('🔐 Setting up encryption...');
 
-    // Move to next step
-    if (stepNumber < steps.length) {
+        // 1. Generate master encryption key
+        const masterKey = await EncryptionKeyManager.generateMasterKey();
+        console.log('✓ Master key generated');
+
+        // 2. Wrap it with password
+        const { encryptedKey, iv } = await EncryptionKeyManager.wrapMasterKeyWithPassword(
+          masterKey,
+          data.password,
+          data.userId
+        );
+        console.log('✓ Master key encrypted');
+
+        // 3. Generate recovery key (24 words) and hash
+        const recoveryKey = await EncryptionKeyManager.generateRecoveryKeyFromMasterKey(masterKey);
+        console.log('✓ Recovery key generated');
+        const recoveryKeyHash = await EncryptionKeyManager.hashRecoveryKey(recoveryKey);
+
+        // 4. Store master key in session for registration process
+        EncryptionKeyManager.setSessionKey(masterKey);
+
+        // 5. Update registration data with all encryption info
+        setRegistrationData(prev => ({
+          ...prev,
+          ...data,
+          encryptedMasterKey: encryptedKey,
+          masterKeyIV: iv,
+          recoveryKey: recoveryKey,
+          recoveryKeyHash: recoveryKeyHash,
+        }));
+
+        toast.success('Account and encryption setup complete!', {
+          description: 'Your security is configured',
+        });
+      } catch (error) {
+        console.error('❌ Error setting up encryption:', error);
+        toast.error('Failed to set up encryption');
+        return; // Don't proceed if encryption setup fails
+      }
+    } else {
+      // For other steps, just update data normally
+      setRegistrationData(prev => ({
+        ...prev,
+        ...data,
+      }));
+    }
+
+    // If last step, trigger complete registration. Else go to next step.
+    if (stepNumber === steps.length) {
+      setTimeout(() => {
+        handleCompleteRegistration();
+      }, 0);
+    } else {
       setCurrentStep(stepNumber + 1);
     }
   };
@@ -128,6 +173,9 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         lastName: registrationData.lastName,
         walletAddress: registrationData.walletAddress,
         walletType: registrationData.walletType,
+        encryptedMasterKey: registrationData.encryptedMasterKey,
+        masterKeyIV: registrationData.masterKeyIV,
+        recoveryKeyHash: registrationData.recoveryKeyHash,
         // Verification fields will be updated later in the verification flow
         isEmailVerified: false,
         isIdentityVerified: false,
@@ -157,6 +205,13 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     }
   };
 
+  const handleRecoveryKeyAcknowledged = (acknowledged: boolean) => {
+    setRegistrationData(prev => ({
+      ...prev,
+      acknowledgedRecoveryKey: acknowledged,
+    }));
+  };
+
   return (
     <div className="min-h-screen bg-secondary from-blue-50 to-indigo-100 flex">
       {/* LEFT SIDE - Progress Tracker */}
@@ -164,7 +219,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         <div>
           <h1 className="text-3xl font-bold text-secondary mb-2">Join Belrose</h1>
           <p className="text-secondary mb-12">
-            Your it takes less than minutes to create your secure health data platform
+            It takes less than 5 minutes to create your secure health data platform
           </p>
 
           {/* Progress Steps */}
@@ -230,32 +285,25 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
               />
             )}
             {currentStep === 2 && (
-              <EncryptionPasswordSetup
+              <WalletSetup
+                userId={registrationData.userId}
+                initialWalletData={{
+                  walletAddress: registrationData.walletAddress,
+                  walletType: registrationData.walletType,
+                }}
                 onComplete={data => handleStepComplete(2, data)}
                 isCompleted={isStepCompleted(2)}
                 isActivated={isStepCompleted(1)}
               />
             )}
-            {currentStep === 3 && (
-              <WalletSetup
-                userId={registrationData.userId}
-                encryptionPassword={registrationData.encryptionPassword}
-                initialWalletData={{
-                  walletAddress: registrationData.walletAddress,
-                  walletType: registrationData.walletType,
-                }}
-                onComplete={data => handleStepComplete(3, data)}
-                isCompleted={isStepCompleted(3)}
-                isActivated={isStepCompleted(2)}
-              />
-            )}
 
-            {currentStep === 4 && (
+            {currentStep === 3 && (
               <RecoveryKeyDisplay
                 recoveryKey={registrationData.recoveryKey}
-                onComplete={data => handleStepComplete(4, data)}
-                isCompleted={isStepCompleted(4)}
-                isActivated={isStepCompleted(2)}
+                onAcknowledge={handleRecoveryKeyAcknowledged}
+                onComplete={handleCompleteRegistration}
+                isCompleted={isStepCompleted(3)}
+                isActivated={isStepCompleted(1)}
               />
             )}
           </div>
@@ -303,7 +351,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
             </Button>
             <Button
               onClick={() => setCurrentStep(Math.min(currentStep + 1, 4))}
-              disabled={currentStep === 4}
+              disabled={currentStep === 3}
               className="px-4 py-2 rounded-lg hover:bg-secondary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <ArrowRight className="w-5 h-5" />

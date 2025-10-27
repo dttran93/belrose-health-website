@@ -13,8 +13,8 @@ export interface User {
 
   encryption?: {
     enabled: boolean;
-    salt: string; // base64 encoded
-    passwordHash: string; // for verification only
+    encryptedMasterKey: string;
+    masterKeyIV: string;
     recoveryKeyHash: string; // for recovery key verification
     setupAt: string;
     lastUnlockedAt?: string; // track usage
@@ -49,6 +49,8 @@ export interface UserProfile extends User {
   createdAt: any;
   updatedAt: any;
   emailVerifiedAt?: any;
+  encryptedMasterKey?: string; // Encrypted with password-derived KEK
+  masterKeyIV?: string; // IV for the encrypted master key
 
   generatedWallet?: {
     address: string;

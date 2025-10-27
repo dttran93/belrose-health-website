@@ -7,10 +7,10 @@ import { toast } from 'sonner';
 import { WalletService } from '@/features/BlockchainVerification/service/walletService';
 import { UserWalletService } from '@/features/BlockchainVerification/service/userWalletService';
 import { auth } from '@/firebase/config';
+import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 
 interface WalletSetupProps {
   userId: string;
-  encryptionPassword: string; // Passed from previous step
   onComplete: (data: { walletAddress: string; walletType: 'generated' | 'metamask' }) => void;
   isCompleted: boolean;
   initialWalletData?: { walletAddress?: string; walletType?: 'generated' | 'metamask' };
@@ -21,7 +21,6 @@ type WalletChoice = 'generated' | 'metamask' | null;
 
 export const WalletSetup: React.FC<WalletSetupProps> = ({
   userId,
-  encryptionPassword,
   initialWalletData,
   onComplete,
   isCompleted = false,
@@ -75,6 +74,21 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
 
         const token = await user.getIdToken();
 
+        // ✅ Get the master key from the session (set during registration)
+        const masterKey = EncryptionKeyManager.getSessionKey();
+        if (!masterKey) {
+          throw new Error('Encryption key not available. Please restart registration.');
+        }
+
+        // Convert master key to hex string for transmission
+        const masterKeyBytes = await window.crypto.subtle.exportKey('raw', masterKey);
+        const masterKeyArray = new Uint8Array(masterKeyBytes);
+        const masterKeyHex = Array.from(masterKeyArray)
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+
+        console.log('🔑 Sending wallet creation request with master key...');
+
         const response = await fetch(
           import.meta.env.DEV
             ? 'http://127.0.0.1:5001/belrose-757fe/us-central1/createWallet'
@@ -87,7 +101,7 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
             },
             body: JSON.stringify({
               userId,
-              encryptionPassword, // Uses password from props
+              masterKeyHex, // ✅ Send the master key for encryption
             }),
           }
         );
@@ -98,6 +112,7 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
         }
 
         const data = await response.json();
+        console.log('✅ Wallet created successfully');
         toast.success('Wallet created successfully!');
 
         onComplete({
@@ -114,6 +129,7 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
         });
       }
     } catch (err: any) {
+      console.error('❌ Wallet setup error:', err);
       setError(err.message || 'Failed to setup wallet');
     } finally {
       setIsProcessing(false);
@@ -155,18 +171,20 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
       )}
 
       {/* Info Box */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start space-x-3">
-          <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-blue-900">
-            <p className="font-semibold mb-1">Protected by your encryption password</p>
-            <p className="text-blue-800">
-              You can connect your own wallet or auto-generate a wallet with the same encryption
-              password you just created.
-            </p>
+      {isActivated && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-blue-900">
+              <p className="font-semibold mb-1">Protected by your password</p>
+              <p className="text-blue-800">
+                You can connect your own wallet or auto-generate a wallet with the same password you
+                just created.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Pre-Activation Info Box*/}
       {!isActivated && (
@@ -175,8 +193,7 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
             <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-yellow-900 flex-1">
               <p className="font-semibold mb-2">
-                Create your Belrose Account (Step 1) and set your Encryption (Step 2) before
-                connecting your wallet.
+                Create your Belrose Account (Step 1) before connecting your wallet.
               </p>
             </div>
           </div>

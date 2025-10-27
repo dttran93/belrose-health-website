@@ -8,8 +8,8 @@ import { authService } from '@/components/auth/services/authServices';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthForm } from '../hooks/useAuthForm';
 import { SocialAuthButtons } from './ui/SocialAuthButtons';
-import { EncryptionPasswordPrompt } from '@/features/Encryption/components/EncryptionPasswordPrompt';
-import { EncryptionSetupService } from '@/features/Encryption/services/encryptionSetupService';
+import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
 
 interface LoginFormData {
   email: string;
@@ -35,7 +35,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
     });
 
   const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [loginStep, setLoginStep] = useState<'credentials' | 'encryption'>('credentials');
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
@@ -63,24 +62,49 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
     const trimmedEmail = formData.email.trim();
 
     try {
+      // 1. Sign in with Firebase
       const user = await authService.signIn(trimmedEmail, formData.password);
-      console.log('User logged in:', user);
+      console.log('✅ Firebase authentication successful:', user.uid);
 
-      const encryptionMetadata = await EncryptionSetupService.getEncryptionMetadata();
+      // 2. Get user's encrypted master key from Firestore
+      const db = getFirestore();
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
 
-      if (encryptionMetadata?.enabled) {
-        setLoginStep('encryption');
-      } else {
-        toast.success('Login successful!', {
-          description: 'Welcome back! You have logged in.',
-          duration: 3000,
-        });
-
-        const from = location.state?.from?.pathname || '/dashboard';
-        navigate(from, { replace: true });
+      if (!userDoc.exists()) {
+        throw new Error('User data not found');
       }
+
+      const userData = userDoc.data();
+      console.log('📄 User data retrieved');
+
+      // 3. Check if user has encryption set up
+      if (userData.encryptedMasterKey && userData.masterKeyIV) {
+        console.log('🔐 Initializing encryption session...');
+
+        // 4. Unwrap the master encryption key using the login password
+        await EncryptionKeyManager.initializeSessionWithPassword(
+          userData.encryptedMasterKey,
+          userData.masterKeyIV,
+          formData.password,
+          user.uid
+        );
+
+        console.log('✅ Encryption session initialized successfully');
+      } else {
+        console.warn('⚠️ User does not have encryption set up');
+      }
+
+      // 5. Success! Navigate to dashboard
+      toast.success('Login successful!', {
+        description: 'Welcome back!',
+        duration: 3000,
+      });
+
+      const from = location.state?.from?.pathname || '/dashboard';
+      navigate(from, { replace: true });
     } catch (error) {
-      console.error('Auth error:', error);
+      console.error('❌ Login error:', error);
       const firebaseError = error as FirebaseError;
 
       let errorMessage = 'An error occurred. Please try again.';
@@ -94,6 +118,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
           break;
         case 'auth/invalid-email':
           errorMessage = 'Invalid email address format.';
+          break;
+        case 'auth/invalid-credential':
+          errorMessage = 'Invalid email or password.';
           break;
         case 'auth/too-many-requests':
           errorMessage = 'Too many failed attempts. Please try again later.';
@@ -112,19 +139,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
       setIsLoading(false);
     }
   };
-
-  const handleEncryptionUnlocked = () => {
-    toast.success('Login successful!', {
-      description: 'Welcome back!',
-      duration: 3000,
-    });
-    const from = location.state?.from?.pathname || '/dashboard';
-    navigate(from, { replace: true });
-  };
-
-  if (loginStep === 'encryption') {
-    return <EncryptionPasswordPrompt onUnlocked={handleEncryptionUnlocked} />;
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-card">
