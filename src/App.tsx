@@ -19,6 +19,7 @@ import { EncryptionGate } from './features/Encryption/components/EncryptionGate'
 import SharedRecords from './pages/SharedRecords';
 import VerificationHub from './pages/VerificationHub';
 import { AccountRecovery } from './components/auth/components/AccountRecovery';
+import EmailVerifiedPage from './pages/EmailVerified';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
@@ -41,7 +42,7 @@ const App: React.FC = (): React.JSX.Element => {
               <Route path="/auth" element={<Auth />} />
               <Route path="/recover-account" element={<AccountRecovery />} />
               <Route path="/verification" element={<VerificationHub />} />
-
+              <Route path="/verify-email" element={<EmailVerifiedPage />} />
               <Route
                 path="/dashboard/*"
                 element={

@@ -1,7 +1,7 @@
 // /features/Auth/components/LoginForm.tsx
 
 import React, { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, User } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, User, CheckCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import { authService } from '@/components/auth/services/authServices';
@@ -35,6 +35,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
     });
 
   const [showPassword, setShowPassword] = useState<boolean>(false);
+
+  // Check if user came from email verification
+  const emailVerified = location.state?.emailVerified;
+  const verificationMessage = location.state?.message;
+  const [showBanner, setShowBanner] = useState<boolean>(!!emailVerified);
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
@@ -143,6 +148,37 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-card">
       <div className="w-full max-w-md">
+        {/* Email Verification Success Banner */}
+        {showBanner && (
+          <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-4 animate-in fade-in slide-in-from-top-4 duration-500 shadow-lg">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start space-x-3 flex-1">
+                <div className="flex-shrink-0 mt-0.5">
+                  <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center animate-in zoom-in duration-500 delay-200">
+                    <CheckCircle className="w-5 h-5 text-white" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-green-900 font-semibold text-sm mb-1">
+                    Email Verified Successfully!
+                  </h3>
+                  <p className="text-green-700 text-sm">
+                    {verificationMessage ||
+                      'Your email has been verified. Sign in to continue to your dashboard.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBanner(false)}
+                className="flex-shrink-0 text-green-600 hover:text-green-800 transition-colors ml-2"
+                aria-label="Close banner"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">

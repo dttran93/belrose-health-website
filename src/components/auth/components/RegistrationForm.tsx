@@ -51,8 +51,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     masterKeyIV: '',
   });
 
-  console.log(registrationData);
-
   const steps: StepConfig[] = [
     {
       number: 1,
