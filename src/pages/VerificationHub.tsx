@@ -75,7 +75,8 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
       if (userId) {
         const userDocRef = doc(db, 'users', userId);
         await updateDoc(userDocRef, {
-          isEmailVerified: true,
+          emailVerified: true,
+          emailVerifiedAt: new Date().toISOString(),
         });
       }
     } else {

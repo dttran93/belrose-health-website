@@ -175,7 +175,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         masterKeyIV: registrationData.masterKeyIV,
         recoveryKeyHash: registrationData.recoveryKeyHash,
         // Verification fields will be updated later in the verification flow
-        isEmailVerified: false,
+        emailVerified: false,
         isIdentityVerified: false,
         createdAt: new Date(),
       });

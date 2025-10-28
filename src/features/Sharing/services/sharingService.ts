@@ -198,7 +198,7 @@ export class SharingService {
     const permissionData = {
       recordId: request.recordId,
       ownerAddress: user.uid,
-      receiverAddress: receiverData.walletAddress,
+      receiverAddress: receiverData.connectedWallet?.address,
       timestamp: Date.now(),
     };
     const permissionHash = ethers.id(JSON.stringify(permissionData));
@@ -227,7 +227,7 @@ export class SharingService {
       recordId: request.recordId,
       ownerId: user.uid,
       receiverId: receiverId,
-      receiverWalletAddress: receiverData.walletAddress,
+      receiverWalletAddress: receiverData.connectedWallet?.address,
       isActive: true,
       grantedAt: new Date(),
       revokedAt: null,
