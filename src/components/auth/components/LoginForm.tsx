@@ -22,9 +22,10 @@ interface FirebaseError extends Error {
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
+  onForgotPassword: () => void;
 }
 
-const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
+const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onForgotPassword }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -243,6 +244,17 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
                   )}
                 </button>
               </div>
+              {/* Forgot Password Link */}
+              <div className="mt-1 flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={onForgotPassword}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </div>
+
               {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
             </div>
 
