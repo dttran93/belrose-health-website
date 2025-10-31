@@ -223,7 +223,7 @@ export class EncryptionService {
       console.log(`    ✓ File encrypted (${encrypted.byteLength} bytes)`);
     }
 
-    // Encrypt extracted text (always exists)
+    // Encrypt extracted text
     if (extractedText) {
       console.log('  🔒 Encrypting extracted text...');
       const textResult = await this.encryptText(extractedText, fileKey);
@@ -459,7 +459,7 @@ export class EncryptionService {
     return result.buffer;
   }
 
-  private static async decryptKeyWithMasterKey(
+  public static async decryptKeyWithMasterKey(
     encryptedKeyData: ArrayBuffer,
     masterKey: CryptoKey
   ): Promise<ArrayBuffer> {

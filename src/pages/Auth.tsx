@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import LoginForm from '@/components/auth/components/LoginForm';
 import RegistrationForm from '@/components/auth/components/RegistrationForm';
-import ForgotPasswordPage from '@/components/auth/components/ForgotPasswordPage';
+import AccountRecovery from '@/components/auth/components/AccountRecovery';
 
-type AuthPageState = 'login' | 'registration' | 'forgotPassword' | 'accountRecovery';
+type AuthPageState = 'login' | 'registration' | 'accountRecovery';
 
 const Auth: React.FC = () => {
   const location = useLocation();
@@ -18,7 +18,7 @@ const Auth: React.FC = () => {
       {currentView === 'login' && (
         <LoginForm
           onSwitchToRegister={() => setCurrentView('registration')}
-          onForgotPassword={() => setCurrentView('forgotPassword')}
+          onForgotPassword={() => setCurrentView('accountRecovery')}
         />
       )}
 
@@ -26,14 +26,9 @@ const Auth: React.FC = () => {
         <RegistrationForm onSwitchToLogin={() => setCurrentView('login')} />
       )}
 
-      {currentView === 'forgotPassword' && (
-        <ForgotPasswordPage
-          onBackToLogin={() => setCurrentView('login')}
-          onSwitchToRecovery={() => setCurrentView('accountRecovery')}
-        />
+      {currentView === 'accountRecovery' && (
+        <AccountRecovery onBackToLogin={() => setCurrentView('login')} />
       )}
-
-      {currentView === 'accountRecovery' && <span>Placeholder</span>}
     </>
   );
 };
