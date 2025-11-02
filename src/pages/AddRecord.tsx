@@ -5,7 +5,9 @@ import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionServi
 import { ExportService } from '@/features/AddRecord/services/exportService';
 import { FileObject } from '@/types/core';
 import { toast } from 'sonner';
-import HealthRecordFull from '@/features/ViewEditRecord/components/RecordFull';
+import RecordFull from '@/features/ViewEditRecord/components/ui/RecordFull';
+import { useAuthContext } from '@/components/auth/AuthContext';
+import { useRecordFileActions } from '@/features/ViewEditRecord/hooks/useRecordFileActions';
 
 // Import components
 import CombinedUploadFHIR from '@/features/AddRecord/components/CombinedUploadFHIR';
@@ -54,6 +56,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
   console.log('🔄 AddRecord component rendering');
   const hookResult = useFileManager();
   console.log('📁 Files from hook:', hookResult.files.length);
+  const { user } = useAuthContext();
 
   const {
     files,
@@ -76,6 +79,42 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
     shouldAutoUpload,
     reset: resetFileUpload,
   } = useFileManager();
+
+  const { handleCopyRecord, handleDownloadRecord } = useRecordFileActions();
+
+  // ==================== DELETE FUNCTION ====================
+  const handleDeleteRecord = async (record: FileObject) => {
+    if (
+      !confirm(
+        `Are you sure you want to delete "${record.belroseFields?.title}"? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      if (!record.id) {
+        throw new Error('Cannot delete record - no document ID found');
+      }
+
+      // Use the existing removeFileComplete function from useFileManager
+      await removeFileComplete(record.id);
+
+      toast.success(`Deleted ${record.belroseFields?.title}`, {
+        description: 'Entry deleted from record',
+        duration: 4000,
+      });
+
+      // Return to file list
+      setReviewMode({ active: false, record: null });
+    } catch (error) {
+      console.error('Failed to delete record:', error);
+      toast.error(`Failed to delete ${record.belroseFields?.title}`, {
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        duration: 4000,
+      });
+    }
+  };
 
   const {
     fhirData,
@@ -130,6 +169,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
     setReviewMode({ active: true, record: fileRecord });
   };
 
+  //Important because if you just use the normal Save, it will make a second copy
   const handleSaveFromReview = async (updatedRecord: FileObject) => {
     try {
       const documentId = updatedRecord.id;
@@ -233,12 +273,15 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
 
   if (reviewMode.active && reviewMode.record) {
     return (
-      <HealthRecordFull
+      <RecordFull
         record={reviewMode.record}
-        initialEditMode={true}
+        initialViewMode={'edit'}
         comingFromAddRecord={true}
         onBack={() => setReviewMode({ active: false, record: null })}
         onSave={handleSaveFromReview}
+        onCopy={handleCopyRecord}
+        onDelete={handleDeleteRecord}
+        onDownload={handleDownloadRecord}
       />
     );
   }

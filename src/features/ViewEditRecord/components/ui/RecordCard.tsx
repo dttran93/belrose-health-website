@@ -4,15 +4,20 @@ import { Button } from '@/components/ui/Button';
 import { FileObject } from '@/types/core';
 import HealthRecordMenu from '@/features/ViewEditRecord/components/ui/RecordMenu';
 import { VerificationBadge } from '@/features/BlockchainVerification/component/VerificationBadge';
+import { RecordVersion } from '../../services/versionControlService.types';
 
 interface HealthRecordCardProps {
   record: FileObject;
   onView?: (record: FileObject) => void;
   onEdit?: (record: FileObject) => void;
-  onDownload?: (record: FileObject) => void;
-  onShare?: (record: FileObject) => void;
-  onDelete?: (record: FileObject) => void;
   onVersions?: (record: FileObject) => void;
+  onShare?: (record: FileObject) => void;
+  onViewVerification?: (record: FileObject) => void;
+
+  onDownload?: (record: FileObject) => void;
+  onCopy?: (record: FileObject) => void;
+  onDelete?: (record: FileObject) => void;
+
   className?: string;
   showActions?: boolean;
   showMenu?: boolean;
@@ -50,8 +55,12 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
   record,
   onView,
   onEdit,
-  onDelete,
+  onShare,
   onVersions,
+  onViewVerification,
+  onDownload,
+  onCopy,
+  onDelete,
   className = '',
 }) => {
   // Get the display name - your hook provides fileName
@@ -79,10 +88,15 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
             <HealthRecordMenu
               record={record}
               triggerIcon={Ellipsis}
-              showView={true}
               triggerClassName="mx-1 p-2 rounded-3xl hover:bg-gray-100"
-              onDelete={onDelete}
+              onView={onView}
+              onEdit={onEdit}
               onVersion={onVersions}
+              onShare={onShare}
+              onViewVerification={onViewVerification}
+              onDownload={onDownload}
+              onCopy={onCopy}
+              onDelete={onDelete}
             />
           </div>
         </div>

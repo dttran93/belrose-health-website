@@ -32,18 +32,21 @@ interface MenuDivider {
 
 type MenuItem = MenuOption | MenuDivider;
 
-interface HealthRecordMenuProps {
+interface RecordMenuProps {
   // Required props
   record: any; // Your FileObject type
 
   // Action handlers - parent provides these
-  onEdit?: (record: any) => void;
-  onShare?: (record: any) => void;
-  onDelete?: (record: any) => void;
-  onArchive?: (record: any) => void;
   onView?: (record: any) => void;
+  onEdit?: (record: any) => void;
   onVersion?: (record: any) => void;
+  onShare?: any;
   onViewVerification?: (record: any) => void;
+
+  //File Management Props
+  onDownload?: (record: any) => void;
+  onCopy?: (record: any) => void;
+  onDelete?: (record: any) => void;
 
   // Customization props
   triggerIcon?: LucideIcon;
@@ -65,14 +68,29 @@ interface HealthRecordMenuProps {
   additionalItems?: MenuItem[];
 }
 
-const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
+/**
+ * View Record
+ * Edit Record
+ * Version History
+ * Share Record
+ * Verify Record
+ * ---------------
+ * Download Record
+ * Copy Data
+ * ---------------
+ * Delete Record
+ */
+
+const RecordMenu: React.FC<RecordMenuProps> = ({
   record,
   onView,
   onEdit,
-  onShare,
-  onDelete,
   onVersion,
+  onShare,
   onViewVerification,
+  onDownload,
+  onCopy,
+  onDelete,
   triggerIcon: TriggerIcon = MoreHorizontal,
   triggerClassName = 'p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors',
   menuClassName = 'absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[160px]',
@@ -80,7 +98,7 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
   showShare = true,
   showDownload = true,
   showCopy = true,
-  showView = false, // Usually false for full view, true for cards
+  showView = true,
   showDelete = true,
   showVersions = true,
   showVerification = true,
@@ -133,13 +151,6 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
     setIsOpen(false);
   };
 
-  const handleViewVerification = () => {
-    setIsOpen(false);
-    if (onViewVerification) {
-      onViewVerification(record);
-    }
-  };
-
   // Wrapper for parent handlers
   const createHandler = (handler?: (record: any) => void) => {
     return () => {
@@ -178,7 +189,7 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
     if (showVersions && onVersion) {
       items.push({
         key: 'versions',
-        label: 'View Versions',
+        label: 'Version History',
         icon: GitBranch,
         onClick: createHandler(onVersion),
       });
@@ -194,32 +205,37 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
       });
     }
 
+    if (showVerification && onViewVerification) {
+      items.push({
+        key: 'verification',
+        label: 'Verify Record',
+        icon: Shield,
+        onClick: createHandler(onViewVerification),
+      });
+    }
+
+    // Add divider before copy/download to divide from the menu items for record editing/viewing/verification
+    if (items.length > 0 && showDelete) {
+      items.push({ type: 'divider', key: 'divider-1' });
+    }
+
     // Download action (internal handler)
-    if (showDownload && record.downloadURL) {
+    if (showDownload && onDownload) {
       items.push({
         key: 'download',
         label: 'Download File',
         icon: Download,
-        onClick: handleDownload,
+        onClick: createHandler(onDownload),
       });
     }
 
     // Copy action (internal handler)
-    if (showCopy && record.fhirData) {
+    if (showCopy && onCopy) {
       items.push({
         key: 'copy',
-        label: 'Copy FHIR Data',
+        label: 'Copy Data',
         icon: Copy,
-        onClick: handleCopyData,
-      });
-    }
-
-    if (showVerification) {
-      items.push({
-        key: 'verification',
-        label: 'View Verification',
-        icon: Shield,
-        onClick: handleViewVerification,
+        onClick: createHandler(onCopy),
       });
     }
 
@@ -300,4 +316,4 @@ const HealthRecordMenu: React.FC<HealthRecordMenuProps> = ({
   );
 };
 
-export default HealthRecordMenu;
+export default RecordMenu;

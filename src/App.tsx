@@ -8,7 +8,7 @@ import NotFound from './pages/NotFound';
 import Auth from './pages/Auth';
 import Layout from './components/app/Layout';
 import Dashboard from './pages/Dashboard';
-import PatientRecordsList from './pages/Activity';
+import AllRecords from './pages/AllRecords';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AddRecord from './pages/AddRecord';
 import './App.css';
@@ -50,8 +50,8 @@ const App: React.FC = (): React.JSX.Element => {
                         <Layout>
                           <Routes>
                             <Route index element={<Dashboard />} />
-                            <Route path="activity" element={<PatientRecordsList />} />
-                            <Route path="addrecord" element={<AddRecord />} />
+                            <Route path="all-records" element={<AllRecords />} />
+                            <Route path="add-record" element={<AddRecord />} />
                             <Route path="settings" element={<SettingsPage />} />
                             <Route path="share-records" element={<SharedRecords />} />
                           </Routes>

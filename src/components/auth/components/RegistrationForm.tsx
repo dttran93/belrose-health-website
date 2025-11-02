@@ -169,11 +169,13 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         email: registrationData.email,
         firstName: registrationData.firstName,
         lastName: registrationData.lastName,
-        walletAddress: registrationData.walletAddress,
-        walletType: registrationData.walletType,
-        encryptedMasterKey: registrationData.encryptedMasterKey,
-        masterKeyIV: registrationData.masterKeyIV,
-        recoveryKeyHash: registrationData.recoveryKeyHash,
+        encryption: {
+          enabled: true,
+          encryptedMasterKey: registrationData.encryptedMasterKey,
+          masterKeyIV: registrationData.masterKeyIV,
+          recoveryKeyHash: registrationData.recoveryKeyHash,
+          setupAt: new Date().toISOString(),
+        },
         // Verification fields will be updated later in the verification flow
         emailVerified: false,
         isIdentityVerified: false,

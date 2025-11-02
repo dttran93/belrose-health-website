@@ -1,5 +1,4 @@
 // src/components/auth/components/RecoveryKeyForm.tsx
-// CORRECT VERSION using EncryptionKeyManager
 
 import React, { useState } from 'react';
 import { KeyRound, CheckCircle, Eye, EyeOff, AlertCircle } from 'lucide-react';
@@ -161,22 +160,11 @@ export const RecoveryKeyForm: React.FC<RecoveryKeyFormProps> = ({ onBackToLogin 
         user.uid
       );
 
-      // Hash the new password for verification purposes
-      const encoder = new TextEncoder();
-      const passwordData = new Uint8Array([
-        ...encoder.encode(newPassword),
-        ...encoder.encode(user.uid),
-      ]);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', passwordData);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const passwordHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
       // Update Firestore with new wrapped key and password hash
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
         'encryption.encryptedMasterKey': encryptedKey,
         'encryption.masterKeyIV': iv,
-        'encryption.passwordHash': passwordHash,
         'encryption.lastPasswordUpdate': new Date().toISOString(),
       });
 

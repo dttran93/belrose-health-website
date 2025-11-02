@@ -1,90 +1,139 @@
 import React, { useState, useEffect } from 'react';
-import { toast } from 'sonner';
-import useFileManager from '@/features/AddRecord/hooks/useFileManager';
-import {
-  Search,
-  Filter,
-  Upload,
-  FileText,
-  Loader2,
-  AlertCircle,
-  List,
-  Eye,
-  ArrowLeft,
-} from 'lucide-react';
+import { Search, Upload, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { HealthRecordCard } from '@/features/ViewEditRecord/components/ui/RecordCard';
-import HealthRecordFull from '@/features/ViewEditRecord/components/RecordFull';
-import { useCompleteRecords } from '@/features/ViewEditRecord/hooks/useAllUserRecords';
+import RecordFull from '@/features/ViewEditRecord/components/ui/RecordFull';
 import { useAuthContext } from '@/components/auth/AuthContext';
 import { FileObject } from '@/types/core';
-import { ShareRecordDialog } from '@/features/Sharing/components/ShareRecordDialog';
+import useFileManager from '@/features/AddRecord/hooks/useFileManager';
+import { toast } from 'sonner';
 
-interface PatientRecordsListProps {
-  onViewRecord?: (record: FileObject) => void;
-  onEditRecord?: (record: FileObject) => void;
-  onDownloadRecord?: (record: FileObject) => void;
-  onShareRecord?: (record: FileObject) => void;
-  onDeleteRecord?: (record: FileObject) => void;
+interface RecordsListProps {
+  records: FileObject[];
+  loading: boolean;
+  error: any;
+
+  // Action handlers from useRecordActions hook
+  handleDownloadRecord: (record: FileObject) => void;
+  handleCopyRecord: (record: FileObject) => void;
+
+  // Additional props
   onAddNewRecord?: () => void;
 }
 
-export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
-  onViewRecord,
-  onEditRecord,
-  onDownloadRecord,
-  onShareRecord,
-  onDeleteRecord,
+export const RecordsList: React.FC<RecordsListProps> = ({
+  // Handlers
+  handleDownloadRecord,
+  handleCopyRecord,
+
+  // Additional props
   onAddNewRecord,
+  records,
+  loading,
+  error,
 }) => {
   const { user } = useAuthContext();
-  const { records, loading, error } = useCompleteRecords(user?.uid);
-
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [viewMode, setViewMode] = useState<'summary' | 'detailed'>('summary');
   const [selectedRecord, setSelectedRecord] = useState<FileObject | null>(null);
   const [editMode, setEditMode] = useState(false);
-  const [shareDialogOpen, setShareDialogOpen] = useState(false);
-  const [recordToShare, setRecordToShare] = useState<FileObject | null>(null);
+  // Track what view RecordFull should open in ('record', 'versions', 'verification', 'share')
+  const [initialRecordView, setInitialRecordView] = useState<
+    'record' | 'edit' | 'versions' | 'verification' | 'share'
+  >('record');
 
-  const { updateFirestoreRecord, deleteFileFromFirebase } = useFileManager();
+  // ================== VIEW HANDLERS ==========================
+  /**
+   * Opens a record in detailed view mode
+   */
+  const handleViewRecord = (record: FileObject) => {
+    setSelectedRecord(record);
+    setViewMode('detailed');
+    setEditMode(false);
+    setInitialRecordView('record'); // Open in normal record view
+  };
 
+  /**
+   * Opens a record in edit mode
+   */
   const handleEditRecord = (record: FileObject) => {
     setSelectedRecord(record);
     setViewMode('detailed');
     setEditMode(true);
-
-    if (onEditRecord) {
-      onEditRecord(record);
-    }
+    setInitialRecordView('edit'); // Open in normal record view
   };
-  useEffect(() => {
-    if (selectedRecord && selectedRecord.id) {
-      const updatedRecord = records.find(r => r.id === selectedRecord.id);
-      if (updatedRecord) {
-        setSelectedRecord(updatedRecord);
-      }
-    }
-  }, [records, selectedRecord]);
 
+  /**
+   * Opens version history view for a record
+   */
+  const handleViewVersions = (record: FileObject) => {
+    setSelectedRecord(record);
+    setViewMode('detailed');
+    setEditMode(false);
+    setInitialRecordView('versions'); // Open in versions view
+    console.log('View versions for:', record);
+  };
+
+  /**
+   * Opens share page for a record
+   */
+  const handleSharePage = (record: FileObject) => {
+    setSelectedRecord(record);
+    setViewMode('detailed');
+    setEditMode(false);
+    setInitialRecordView('share'); // Open in share view
+    console.log('View share page for:', record);
+  };
+
+  /**
+   * Opens blockchain verification view for a record
+   */
+  const handleViewVerification = (record: FileObject) => {
+    setSelectedRecord(record);
+    setViewMode('detailed');
+    setEditMode(false);
+    setInitialRecordView('verification'); // Open in verification view
+    console.log('View verification for:', record);
+  };
+
+  // Get file manager functions for Firestore operations
+  const { updateFirestoreRecord, deleteFileFromFirebase } = useFileManager();
+
+  /**
+   * Returns to the summary list view
+   */
+  const handleBackToSummary = () => {
+    setViewMode('summary');
+    setSelectedRecord(null);
+    setEditMode(false);
+  };
+
+  /**
+   * Saves changes to a record in Firestore
+   */
   const handleSaveRecord = async (updatedRecord: FileObject) => {
     try {
       if (!updatedRecord.id) {
         throw new Error('Cannot save record - no document ID found');
       }
 
-      //Update the record in Firestore with both FHIR data and belroseFields
+      // Update the record in Firestore with both FHIR data and belroseFields
       await updateFirestoreRecord(updatedRecord.id, {
         fhirData: updatedRecord.fhirData,
         belroseFields: updatedRecord.belroseFields,
         lastModified: new Date().toISOString(),
       });
 
+      setSelectedRecord(updatedRecord);
+
       console.log('Record saved successfully');
       toast.success(`💾 Record saved for ${updatedRecord.belroseFields?.title}`, {
         description: 'Record updates saved to cloud storage',
         duration: 4000,
       });
+
+      // Exit edit mode after successful save
+      setEditMode(false);
     } catch (error) {
       console.error('Failed to save record: ', error);
       toast.error(`Failed to save ${updatedRecord.belroseFields?.title}`, {
@@ -94,8 +143,15 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
     }
   };
 
-  //Handle Delete record
+  // ============================================
+  // DELETE ACTIONS
+  // ============================================
+
+  /**
+   * Deletes a record after confirmation
+   */
   const handleDeleteRecord = async (record: FileObject) => {
+    // Ask for confirmation before deleting
     if (
       !confirm(
         `Are you sure you want to delete "${record.belroseFields?.title}"? This cannot be undone.`
@@ -106,17 +162,18 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
 
     try {
       if (!record.id) {
-        throw new Error('Cannot save record - no document ID found');
+        throw new Error('Cannot delete record - no document ID found');
       }
 
       await deleteFileFromFirebase(record.id);
       console.log('Record deleted successfully');
-      toast.success(`💾 Deleted for ${record.belroseFields?.title}`, {
+      toast.success(`Deleted ${record.belroseFields?.title}`, {
         description: 'Entry deleted from record',
         duration: 4000,
       });
-      setViewMode('summary');
-      setEditMode(false);
+
+      // Return to summary view after deletion
+      handleBackToSummary();
     } catch (error) {
       console.error('Failed to delete record: ', error);
       toast.error(`Failed to delete ${record.belroseFields?.title}`, {
@@ -126,32 +183,15 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
     }
   };
 
-  // Handle view record - switch to detailed view
-  const handleViewRecord = (record: FileObject) => {
-    setSelectedRecord(record);
-    setViewMode('detailed');
-
-    // Call the original onViewRecord if provided (for any external logic)
-    if (onViewRecord) {
-      onViewRecord(record);
+  // Keep selectedRecord in sync with records updates
+  useEffect(() => {
+    if (selectedRecord && selectedRecord.id) {
+      const updatedRecord = records.find(r => r.id === selectedRecord.id);
+      if (updatedRecord) {
+        console.log('Record updated in list:', updatedRecord);
+      }
     }
-  };
-
-  const handleShareRecord = (record: FileObject) => {
-    setRecordToShare(record);
-    setShareDialogOpen(true);
-  };
-
-  const handleCloseShareDialog = () => {
-    setShareDialogOpen(false);
-    setRecordToShare(null);
-  };
-
-  // Handle back to summary
-  const handleBackToSummary = () => {
-    setViewMode('summary');
-    setSelectedRecord(null);
-  };
+  }, [records, selectedRecord]);
 
   // Filter and search records
   const filteredRecords = records.filter(record => {
@@ -234,18 +274,14 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
   // If we're in detailed view, show the full record component
   if (viewMode === 'detailed' && selectedRecord) {
     return (
-      <HealthRecordFull
+      <RecordFull
         record={selectedRecord}
-        onBack={() => {
-          handleBackToSummary();
-          setEditMode(false);
-        }}
-        onEdit={onEditRecord}
-        onDownload={onDownloadRecord}
-        onShare={handleShareRecord}
+        onDownload={handleDownloadRecord}
+        onCopy={handleCopyRecord}
         onDelete={handleDeleteRecord}
+        onBack={handleBackToSummary}
         onSave={handleSaveRecord}
-        initialEditMode={editMode}
+        initialViewMode={initialRecordView}
       />
     );
   }
@@ -327,29 +363,20 @@ export const PatientRecordsList: React.FC<PatientRecordsListProps> = ({
                 record={record}
                 onView={handleViewRecord}
                 onEdit={handleEditRecord}
+                onVersions={handleViewVersions}
+                onShare={handleSharePage}
+                onViewVerification={handleViewVerification}
                 onDelete={handleDeleteRecord}
-                onShare={handleShareRecord}
-                className="max-w-none" // Full width for list view
+                onCopy={handleCopyRecord}
+                onDownload={handleDownloadRecord}
+                className="max-w-none"
               />
             ))}
           </div>
         )}
       </div>
-
-      {/* Share Dialog */}
-      {recordToShare && (
-        <ShareRecordDialog
-          recordId={recordToShare.id}
-          recordName={recordToShare.fileName || 'Unknown Record'}
-          isOpen={shareDialogOpen}
-          onClose={handleCloseShareDialog}
-          onSuccess={() => {
-            handleCloseShareDialog();
-          }}
-        />
-      )}
     </div>
   );
 };
 
-export default PatientRecordsList;
+export default RecordsList;

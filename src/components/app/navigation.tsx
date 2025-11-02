@@ -20,8 +20,8 @@ export interface NavigationItem {
 
 export const healthRecords: NavigationItem[] = [
   { title: 'Overview', url: '/dashboard', icon: Activity },
-  { title: 'Activity', url: '/dashboard/activity', icon: Clipboard },
-  { title: 'Add Record', url: '/dashboard/addrecord', icon: FilePlus2 },
+  { title: 'All Records', url: '/dashboard/all-records', icon: Clipboard },
+  { title: 'Add Record', url: '/dashboard/add-record', icon: FilePlus2 },
   { title: 'Share Records', url: '/dashboard/share-records', icon: Share2 },
 ];
 
