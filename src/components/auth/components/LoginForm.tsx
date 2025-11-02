@@ -85,13 +85,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onForgotPassw
       console.log('📄 User data retrieved');
 
       // 3. Check if user has encryption set up
-      if (userData.encryptedMasterKey && userData.masterKeyIV) {
+      if (userData.encryption.encryptedMasterKey && userData.encryption.masterKeyIV) {
         console.log('🔐 Initializing encryption session...');
 
         // 4. Unwrap the master encryption key using the login password
         await EncryptionKeyManager.initializeSessionWithPassword(
-          userData.encryptedMasterKey,
-          userData.masterKeyIV,
+          userData.encryption.encryptedMasterKey,
+          userData.encryption.masterKeyIV,
           formData.password,
           user.uid
         );

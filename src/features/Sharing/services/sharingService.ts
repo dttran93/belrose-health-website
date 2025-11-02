@@ -65,7 +65,7 @@ export class SharingService {
     console.log('🔄 Starting share process for record:', request.recordId);
 
     // 1. Get the record
-    const recordRef = doc(db, 'records', request.recordId);
+    const recordRef = doc(db, 'users', user.uid, 'files', request.recordId);
     const recordDoc = await getDoc(recordRef);
 
     if (!recordDoc.exists()) {
@@ -223,11 +223,14 @@ export class SharingService {
     // 7. Store access permission record
     const accessPermissionRef = doc(db, 'accessPermissions', permissionHash);
 
+    const receiverWalletAddress =
+      receiverData.connectedWallet?.address || receiverData.generatedWallet?.address || '';
+
     await setDoc(accessPermissionRef, {
       recordId: request.recordId,
       ownerId: user.uid,
       receiverId: receiverId,
-      receiverWalletAddress: receiverData.connectedWallet?.address,
+      receiverWalletAddress: receiverWalletAddress,
       isActive: true,
       grantedAt: new Date(),
       revokedAt: null,
@@ -241,7 +244,7 @@ export class SharingService {
       const txHash = await SharingContractService.grantAccessOnChain(
         permissionHash,
         request.recordId,
-        receiverData.walletAddress
+        receiverWalletAddress // ✅ Use the same wallet address variable
       );
       console.log('✅ Blockchain transaction:', txHash);
 

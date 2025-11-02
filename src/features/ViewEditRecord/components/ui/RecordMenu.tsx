@@ -216,7 +216,7 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
 
     // Add divider before copy/download to divide from the menu items for record editing/viewing/verification
     if (items.length > 0 && showDelete) {
-      items.push({ type: 'divider', key: 'divider-1' });
+      items.push({ type: 'divider', key: 'divider-${record.id}' });
     }
 
     // Download action (internal handler)
