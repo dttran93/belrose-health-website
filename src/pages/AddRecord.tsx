@@ -2,62 +2,23 @@ import React, { useState } from 'react';
 import useFileManager from '@/features/AddRecord/hooks/useFileManager';
 import { useFHIRConversion } from '@/features/AddRecord/hooks/useFHIRConversion';
 import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
-import { ExportService } from '@/features/AddRecord/services/exportService';
 import { FileObject } from '@/types/core';
 import { toast } from 'sonner';
 import RecordFull from '@/features/ViewEditRecord/components/ui/RecordFull';
-import { useAuthContext } from '@/components/auth/AuthContext';
 import { useRecordFileActions } from '@/features/ViewEditRecord/hooks/useRecordFileActions';
-
-// Import components
 import CombinedUploadFHIR from '@/features/AddRecord/components/CombinedUploadFHIR';
 
-// ==================== TYPE DEFINITIONS ====================
-
-/**
- * Props for the AddRecord component (currently none, but good for future extensibility)
- */
 interface AddRecordProps {
   className?: string;
-}
-
-/**
- * Shape of the export data that gets downloaded
- */
-interface ExportData {
-  files: any[]; // Using any[] since processedFiles type varies
-  stats: {
-    files: any; // Return type from getStats()
-  };
-  exportedAt: string;
 }
 
 // ==================== COMPONENT ====================
 
 /**
- * AddRecord Component
- *
  * Main page component for uploading and managing health records.
- * Handles both file uploads and direct FHIR input, with automatic
- * cloud storage and export capabilities.
- *
- * Key Features:
- * - File drag & drop upload
- * - Direct FHIR data input
- * - Automatic cloud storage
- * - Export all data as JSON
- * - Real-time upload status
- * - Deduplication service
+ * Handles both file uploads and direct FHIR input
  */
 const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
-  // CONSOLIDATED FILE MANAGEMENT: Single source of truth for all file operations
-
-  //DEBUGGING
-  console.log('🔄 AddRecord component rendering');
-  const hookResult = useFileManager();
-  console.log('📁 Files from hook:', hookResult.files.length);
-  const { user } = useAuthContext();
-
   const {
     files,
     processedFiles,
@@ -67,8 +28,6 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
     removeFileComplete,
     retryFile,
     updateFileStatus,
-    clearAll,
-    enhancedClearAll,
     uploadFiles,
     updateFirestoreRecord,
     getStats,
@@ -169,7 +128,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
     setReviewMode({ active: true, record: fileRecord });
   };
 
-  //Important because if you just use the normal Save, it will make a second copy
+  //Separate handle Save, important because if you just use the normal Save, it will make a second copy
   const handleSaveFromReview = async (updatedRecord: FileObject) => {
     try {
       const documentId = updatedRecord.id;
@@ -230,44 +189,6 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
       toast.error('Failed to save record', { duration: 4000 });
     }
   };
-
-  // Export service instance
-  const exportService = new ExportService();
-
-  // ==================== EVENT HANDLERS ====================
-
-  /**
-   * Download all processed data as JSON
-   * Includes files and statistics
-   */
-  const downloadAllData = (): void => {
-    const exportData: ExportData = {
-      files: processedFiles,
-      stats: {
-        files: getStats(),
-      },
-      exportedAt: new Date().toISOString(),
-    };
-
-    exportService.downloadData(exportData, 'belrose-health-records');
-  };
-
-  /**
-   * Reset everything and refresh the page
-   * Provides a clean slate for new uploads
-   */
-  const resetAll = (): void => {
-    resetFileUpload();
-    window.location.reload(); // Fresh start
-  };
-
-  // ==================== COMPUTED VALUES ====================
-
-  // Check if we have any data to show download/reset buttons
-  const hasData = files.length > 0 || savedToFirestoreCount > 0;
-
-  // Check if we're in a success state (no files left, but some saved)
-  const isSuccessState = files.length === 0 && savedToFirestoreCount > 0;
 
   // ==================== RENDER JSX ====================
 

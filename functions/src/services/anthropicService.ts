@@ -50,8 +50,8 @@ const ANTHROPIC_VERSION = '2023-06-01';
 
 // Default models for different use cases
 export const MODELS = {
-  SONNET: 'claude-3-5-sonnet-20241022', // Best for complex tasks
-  HAIKU: 'claude-3-haiku-20240307', // Fast and cost-effective
+  SONNET: 'claude-sonnet-4-5-20250929', // Best for complex tasks
+  HAIKU: 'claude-haiku-4-5-20251001', // Fast and cost-effective
 } as const;
 
 // Default options

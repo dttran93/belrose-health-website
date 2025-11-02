@@ -143,10 +143,6 @@ export const RecordsList: React.FC<RecordsListProps> = ({
     }
   };
 
-  // ============================================
-  // DELETE ACTIONS
-  // ============================================
-
   /**
    * Deletes a record after confirmation
    */
