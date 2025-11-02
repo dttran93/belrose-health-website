@@ -61,18 +61,25 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   ): FileObject => {
     return {
       ...originalRecord,
+
+      //Restored Data from Snapshot
       fhirData: version.fileObjectSnapshot.fhirData,
       belroseFields: version.fileObjectSnapshot.belroseFields,
       extractedText: version.fileObjectSnapshot.extractedText,
       originalText: version.fileObjectSnapshot.originalText,
       blockchainVerification: version.fileObjectSnapshot.blockchainVerification ?? null,
-      recordHash: version.fileObjectSnapshot.recordHash ?? null,
-      previousRecordHash: version.fileObjectSnapshot.previousRecordHash ?? null,
-      originalFileHash: version.fileObjectSnapshot.originalFileHash ?? null,
+
+      // Get Hashes from Version Metadata
+      recordHash: version.recordHash ?? null,
+      previousRecordHash: version.previousRecordHash ?? null,
+      originalFileHash: version.originalFileHash ?? null,
 
       versionInfo: {
-        versionId: version.versionId,
-        timestamp: version.timestamp,
+        versionId: version.id,
+        versionNumber: version.versionNumber,
+        timestamp: version.editedAt.toDate().toISOString(),
+        editedBy: version.editedBy,
+        editedByName: version.editedByName,
         isHistoricalView: true,
       },
     };
@@ -186,8 +193,8 @@ export const RecordFull: React.FC<RecordFullProps> = ({
               <div className="flex items-center justify-between">
                 <div className="ml-3 flex items-center gap-2 text-yellow-100">
                   <span className="text-sm font-medium text-primary">
-                    Viewing historical version from{' '}
-                    {new Date(viewingVersion.timestamp).toLocaleString()}
+                    Viewing historical version #{viewingVersion.versionNumber} from{' '}
+                    {viewingVersion.editedAt.toDate().toLocaleString()}
                   </span>
                   {viewingVersion.commitMessage && (
                     <span className="text-xs opacity-75">• {viewingVersion.commitMessage}</span>

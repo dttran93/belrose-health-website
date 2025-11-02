@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '@/components/auth/AuthContext';
 import { useRecordFileActions } from '@/features/ViewEditRecord/hooks/useRecordFileActions';
 import { RecordsList } from '@/features/ViewEditRecord/components/RecordsList';
-import { useCompleteRecords } from '@/features/ViewEditRecord/hooks/useAllUserRecords';
+import { useAllUserRecords } from '@/features/ViewEditRecord/hooks/useAllUserRecords';
 
 /**
  * AllRecords Component - Main container for viewing and managing health records
@@ -14,7 +14,7 @@ import { useCompleteRecords } from '@/features/ViewEditRecord/hooks/useAllUserRe
 export const AllRecords: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthContext();
-  const { records, loading, error } = useCompleteRecords(user?.uid);
+  const { records, loading, error } = useAllUserRecords(user?.uid);
 
   // Get all record actions from the centralized hook
   const recordActions = useRecordFileActions();

@@ -13,22 +13,26 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
   fileObject,
   size = 'md',
   showDetails = false,
-  onClick
+  onClick,
 }) => {
   const { getVerificationStatus, canUseBlockchainVerification } = useBlockchainVerification();
-  
+
   //if can't use blockchain verification, it's self-reported
   if (!canUseBlockchainVerification(fileObject)) {
-    return <div className="bg-red-100 text-red-800 border-red-200 rounded-full text-xs px-2 py-1 m-1">Self-Reported</div>;
+    return (
+      <div className="bg-red-100 text-red-800 border-red-200 rounded-full text-xs px-2 py-1 m-1">
+        Self-Reported
+      </div>
+    );
   }
 
   const { status, message, icon } = getVerificationStatus(fileObject);
-  
+
   // Size classes
   const sizeClasses = {
     sm: 'px-2 py-1 text-xs',
-    md: 'px-3 py-1 text-sm', 
-    lg: 'px-4 py-2 text-base'
+    md: 'px-3 py-1 text-sm',
+    lg: 'px-4 py-2 text-base',
   };
 
   // Status-based styling
@@ -55,11 +59,7 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
   `.trim();
 
   return (
-    <div 
-      className={badgeClasses}
-      onClick={onClick}
-      title={showDetails ? undefined : message}
-    >
+    <div className={badgeClasses} onClick={onClick} title={showDetails ? undefined : message}>
       <span>{icon}</span>
       {showDetails ? (
         <span>{message}</span>
@@ -82,16 +82,15 @@ interface VerificationDetailsProps {
 
 export const VerificationDetails: React.FC<VerificationDetailsProps> = ({ fileObject }) => {
   const verification = fileObject.blockchainVerification;
-  
+
   if (!verification) {
     return (
       <div className="p-4 bg-gray-50 rounded-lg">
         <h4 className="font-medium text-gray-900 mb-2">No Blockchain Verification</h4>
         <p className="text-sm text-gray-600">
-          {fileObject.isProviderRecord 
+          {fileObject.isProviderRecord
             ? 'This provider record should have blockchain verification but none was found.'
-            : 'This self-reported record does not require blockchain verification.'
-          }
+            : 'This self-reported record does not require blockchain verification.'}
         </p>
       </div>
     );
@@ -100,7 +99,7 @@ export const VerificationDetails: React.FC<VerificationDetailsProps> = ({ fileOb
   return (
     <div className="p-4 bg-gray-50 rounded-lg space-y-3">
       <h4 className="font-medium text-gray-900">Blockchain Verification Details</h4>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
         <div>
           <span className="font-medium text-gray-700">Status:</span>
@@ -108,46 +107,42 @@ export const VerificationDetails: React.FC<VerificationDetailsProps> = ({ fileOb
             <VerificationBadge fileObject={fileObject} showDetails />
           </div>
         </div>
-        
+
         <div>
           <span className="font-medium text-gray-700">Network:</span>
           <p className="text-gray-600 mt-1">{verification.blockchainNetwork}</p>
         </div>
-        
+
         <div>
           <span className="font-medium text-gray-700">Transaction ID:</span>
           <p className="text-gray-600 mt-1 font-mono text-xs break-all">
             {verification.blockchainTxId}
           </p>
         </div>
-        
+
         <div>
           <span className="font-medium text-gray-700">Recorded:</span>
-          <p className="text-gray-600 mt-1">
-            {new Date(verification.timestamp).toLocaleString()}
-          </p>
+          <p className="text-gray-600 mt-1">{new Date(verification.timestamp).toLocaleString()}</p>
         </div>
-        
+
         {verification.signerId && (
           <div>
             <span className="font-medium text-gray-700">Signed by:</span>
             <p className="text-gray-600 mt-1">{verification.signerId}</p>
           </div>
         )}
-        
+
         <div>
           <span className="font-medium text-gray-700">Record Hash:</span>
-          <p className="text-gray-600 mt-1 font-mono text-xs break-all">
-            {verification.recordHash}
-          </p>
+          <p className="text-gray-600 mt-1 font-mono text-xs break-all">{fileObject.recordHash}</p>
         </div>
       </div>
-      
+
       {fileObject.isProviderRecord && (
         <div className="pt-2 border-t border-gray-200">
           <p className="text-xs text-gray-500">
-            This provider record is cryptographically verified and cannot be tampered with.
-            Any changes would invalidate the blockchain verification.
+            This provider record is cryptographically verified and cannot be tampered with. Any
+            changes would invalidate the blockchain verification.
           </p>
         </div>
       )}

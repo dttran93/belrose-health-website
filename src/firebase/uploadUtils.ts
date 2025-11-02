@@ -1,3 +1,5 @@
+// src/firebase/uploadUtils.ts
+
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import {
   getFirestore,
@@ -9,7 +11,8 @@ import {
   getDoc,
   getDocs,
   DocumentReference,
-  DocumentSnapshot,
+  query,
+  where,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import type { FileObject } from '@/types/core';
@@ -39,7 +42,7 @@ export interface DeleteResult {
   success: boolean;
   deletedFromStorage: boolean;
   deletedFromFirestore: boolean;
-  deletedVersions: true;
+  deletedVersions: boolean;
 }
 
 // ==================== UPLOAD FUNCTIONS ====================
@@ -63,10 +66,8 @@ export async function uploadUserFile(fileObj: FileObject): Promise<UploadUserFil
   // Handle virtual files (no actual file to upload)
   if (fileObj.isVirtual) {
     console.log('🎯 Processing virtual file - skipping file upload');
-
-    // For virtual files, we just save metadata without uploading to storage
     return {
-      downloadURL: null, // No file was uploaded
+      downloadURL: null,
       filePath: null,
       isVirtual: true,
     };
@@ -83,7 +84,7 @@ export async function uploadUserFile(fileObj: FileObject): Promise<UploadUserFil
   const filePath = `users/${user.uid}/uploads/${Date.now()}_${fileName}`;
   const fileRef = ref(storage, filePath);
 
-  // Add metadata (e.g., content type, custom fields)
+  // Add metadata
   const metadata = {
     contentType: file.type,
     customMetadata: {
@@ -94,12 +95,8 @@ export async function uploadUserFile(fileObj: FileObject): Promise<UploadUserFil
   };
 
   try {
-    // Upload file with metadata
     await uploadBytes(fileRef, file, metadata);
-
-    // Get download URL
     const downloadURL = await getDownloadURL(fileRef);
-
     return { downloadURL, filePath };
   } catch (error: any) {
     console.error('Error uploading file:', error);
@@ -119,34 +116,67 @@ export async function saveFileMetadataToFirestore({
   if (!user) throw new Error('User not authenticated');
 
   try {
+    // SubjectId is OPTIONAL initially
+    const subjectId = fileObj.subjectId;
+
+    // Owners default to just the uploader if not specified
+    let owners = fileObj.owners;
+
+    if (!owners || owners.length === 0) {
+      owners = [user.uid];
+      console.log('📋 No owners specified, defaulting to uploader:', owners);
+    }
+
+    // If subjectId IS provided, ensure they're in owners
+    if (subjectId && !owners.includes(subjectId)) {
+      console.warn('⚠️ Subject was not in owners array, adding them automatically');
+      owners.push(subjectId);
+    }
+
     const documentData = {
       ...fileObj,
       file: undefined,
       downloadURL,
       storagePath: filePath,
+
+      // OWNERSHIP FIELDS
       uploadedBy: user.uid,
+      uploadedByName: user.displayName || user.email || 'Unknown User',
+
+      // SubjectId is optional - only set if provided
+      ...(subjectId && {
+        subjectId: subjectId,
+        subjectName: fileObj.subjectName || 'Unknown Subject',
+      }),
+
+      owners: owners,
+
+      // TIMESTAMPS
       uploadedAt: new Date(),
+      createdAt: new Date(),
     };
 
+    // Clean undefined fields
     Object.keys(documentData).forEach(key => {
       if (documentData[key as keyof typeof documentData] === undefined) {
         delete documentData[key as keyof typeof documentData];
       }
     });
 
-    console.log('📄 Saving to Firestore:', {
+    console.log('📄 Saving to global records collection:', {
       fileName: documentData.fileName,
+      uploadedBy: documentData.uploadedBy,
+      subjectId: documentData.subjectId || '(not set)',
+      owners: documentData.owners,
       hasBlockchainVerification: !!documentData.blockchainVerification,
-      blockchainVerificationData: documentData.blockchainVerification,
       hasBelroseFields: !!documentData.belroseFields,
       hasFhirData: !!documentData.fhirData,
-      allFields: Object.keys(documentData),
     });
 
-    const docRef: DocumentReference = await addDoc(
-      collection(db, 'users', user.uid, 'files'),
-      documentData
-    );
+    // 🆕 Save to GLOBAL records collection
+    const docRef: DocumentReference = await addDoc(collection(db, 'records'), documentData);
+
+    console.log('✅ Record saved to global collection with ID:', docRef.id);
     return docRef.id;
   } catch (error: any) {
     console.error('Error saving file metadata:', error);
@@ -177,6 +207,7 @@ export const updateFirestoreRecord = async (
     'recordHash',
     'previousRecordHash',
   ];
+
   const filteredData = Object.keys(updateData)
     .filter(key => allowedFields.includes(key))
     .reduce((obj, key) => {
@@ -188,7 +219,7 @@ export const updateFirestoreRecord = async (
     throw new Error('No valid fields to update');
   }
 
-  // Add timestamp if not already present
+  // Add timestamp
   if (!filteredData.lastModified) {
     filteredData.lastModified = new Date().toISOString();
   }
@@ -196,187 +227,148 @@ export const updateFirestoreRecord = async (
   console.log('🔄 Updating Firestore with filtered data:', filteredData);
 
   try {
-    // Step 1: Get current document state for version control
-    const docRef = doc(db, 'users', user.uid, 'files', documentId);
+    // Update in global records collection
+    const docRef = doc(db, 'records', documentId);
     const currentDoc = await getDoc(docRef);
-    const currentFileObject = currentDoc.exists() ? currentDoc.data() : null;
 
-    if (!currentFileObject) {
+    if (!currentDoc.exists()) {
       throw new Error('Document not found');
+    }
+
+    const currentData = currentDoc.data();
+
+    // Verify user is an owner
+    const owners = currentData.owners || [currentData.uploadedBy];
+    if (!owners.includes(user.uid)) {
+      throw new Error('You do not have permission to update this record');
     }
 
     const originalFileObjectForVersioning = JSON.parse(
       JSON.stringify({
-        ...currentFileObject,
+        ...currentData,
         id: documentId,
       })
     );
 
-    // Step 2: Check updatedFileObject for hash generation
     const updatedFileObject = {
-      ...currentFileObject,
+      ...currentData,
       ...filteredData,
       id: documentId,
     };
 
-    //Stuff that should be hashed is also stuff that should be encrypted. Including originalFileHash
-    const hashRelevantFields = [
-      'fileName',
-      'fhirData',
-      'belroseFields',
-      'customData',
-      'extractedText',
-      'originalText',
-      'originalFileHash',
-    ];
-    const needsHashUpdate = hashRelevantFields.some(
-      field =>
-        filteredData.hasOwnProperty(field) &&
-        JSON.stringify(filteredData[field]) !== JSON.stringify(currentFileObject[field])
-    );
+    // Generate new record hash
+    let newRecordHash: string | undefined;
+    let previousHash: string | undefined;
 
-    if (needsHashUpdate) {
-      console.log('🔐 Content changed, regenerating recordHash...');
+    try {
+      newRecordHash = await RecordHashService.generateRecordHash(updatedFileObject);
+      previousHash = currentData.recordHash;
 
-      try {
-        const newRecordHash = await RecordHashService.generateRecordHash(updatedFileObject);
+      console.log('🔗 Generated new record hash:', {
+        newHash: newRecordHash.substring(0, 12) + '...',
+        previousHash: previousHash ? previousHash.substring(0, 12) + '...' : 'none',
+      });
 
-        filteredData.recordHash = newRecordHash;
-        filteredData.previousRecordHash = currentFileObject.recordHash || null;
-        filteredData.lastModified = new Date().toISOString();
-
-        updatedFileObject.recordHash = newRecordHash;
-        updatedFileObject.previousRecordHash = currentFileObject.recordHash || null;
-
-        console.log('✅ New recordHash generated:', newRecordHash.substring(0, 12) + '...');
-        console.log(
-          '📎 Previous hash stored:',
-          currentFileObject.recordHash?.substring(0, 12) + '...' || 'none'
-        );
-      } catch (hashError) {
-        console.error('⚠️ Failed to generate recordHash:', hashError);
-        console.warn('⚠️ Proceeding with update without hash regeneration');
-      }
-    } else {
-      console.log('ℹ️ No hash-relevant fields changed, keeping existing hash');
+      filteredData.recordHash = newRecordHash;
+      filteredData.previousRecordHash = previousHash;
+    } catch (hashError) {
+      console.warn('⚠️ Failed to generate record hash:', hashError);
     }
 
-    // Step 3: Update the main document
+    // Update the document
     await updateDoc(docRef, filteredData);
-    console.log('✅ Updated fields:', Object.keys(filteredData));
 
-    // Step 4: Create version. Initialize if needed or just add new version
-    const { VersionControlService } = await import(
-      '@/features/ViewEditRecord/services/versionControlService'
-    );
-    const versionControl = new VersionControlService();
-    const versionControlRecord = await versionControl.getVersionControlRecord(documentId);
-
-    if (!versionControlRecord) {
-      console.log('🔧 No version control exists, initializing with original data...');
-      await versionControl.initializeVersioning(documentId, originalFileObjectForVersioning);
-      await versionControl.createVersion(
-        documentId,
-        updatedFileObject,
-        commitMessage || `Record updated`
+    // Create version history (if using version control)
+    try {
+      const { VersionControlService } = await import(
+        '@/features/ViewEditRecord/services/versionControlService'
       );
-    } else {
-      await versionControl.createVersion(
-        documentId,
-        updatedFileObject,
-        commitMessage || `Record updated`
-      );
-
-      console.log(`✅ Version created for update`);
+      const versionService = new VersionControlService();
+      await versionService.createVersion(documentId, updatedFileObject, commitMessage);
+      console.log('✅ Version history created');
+    } catch (versionError) {
+      console.warn('⚠️ Failed to create version history:', versionError);
     }
+
+    console.log('✅ Firestore record updated successfully');
   } catch (error: any) {
-    console.error('❌ Error updating document:', error);
-    throw new Error(`Failed to update document: ${error.message}`);
+    console.error('Error updating Firestore record:', error);
+    throw new Error(`Failed to update record: ${error.message}`);
   }
 };
 
 // ==================== DELETE FUNCTIONS ====================
 
-/**
- * Delete a file from Firebase Storage
- */
-export async function deleteFromStorage(filePath: string | null): Promise<void> {
-  if (!filePath) {
-    console.log('🎯 No storage path provided - skipping storage deletion (likely virtual file)');
-    return; // Virtual files don't have storage files to delete
-  }
-
+async function deleteFromStorage(storagePath: string): Promise<void> {
   const storage = getStorage();
-  const auth = getAuth();
-  const user = auth.currentUser;
-
-  if (!user) throw new Error('User not authenticated');
+  const fileRef = ref(storage, storagePath);
 
   try {
-    const fileRef = ref(storage, filePath);
     await deleteObject(fileRef);
-    console.log('✅ File deleted from storage:', filePath);
+    console.log('✅ File deleted from storage:', storagePath);
   } catch (error: any) {
-    // If file doesn't exist in storage, that's okay (might be virtual file)
-    if (error.code === 'storage/object-not-found') {
-      console.log('ℹ️ File not found in storage (likely virtual file):', filePath);
-      return;
-    }
-    console.error('Error deleting file from storage:', error);
-    throw new Error(`Failed to delete file from storage: ${error.message}`);
+    console.error('Error deleting from storage:', error);
+    throw new Error(`Failed to delete from storage: ${error.message}`);
   }
 }
 
-/**
- * Delete a document from Firestore
- */
-export async function deleteFromFirestore(documentId: string): Promise<void> {
+async function deleteFromFirestore(documentId: string): Promise<void> {
   const db = getFirestore();
   const auth = getAuth();
   const user = auth.currentUser;
 
   if (!user) throw new Error('User not authenticated');
-  if (!documentId) throw new Error('Document ID is required');
 
   try {
-    const docRef = doc(db, 'users', user.uid, 'files', documentId);
+    // Delete from global records collection
+    const docRef = doc(db, 'records', documentId);
+    const docSnap = await getDoc(docRef);
+
+    if (!docSnap.exists()) {
+      throw new Error('Document not found');
+    }
+
+    const docData = docSnap.data();
+
+    // Verify user is an owner or the subject
+    const owners = docData.owners || [docData.uploadedBy];
+    const isOwner = owners.includes(user.uid);
+    const isSubject = docData.subjectId === user.uid;
+
+    if (!isOwner && !isSubject) {
+      throw new Error('You do not have permission to delete this record');
+    }
+
     await deleteDoc(docRef);
     console.log('✅ Document deleted from Firestore:', documentId);
   } catch (error: any) {
-    console.error('Error deleting document from Firestore:', error);
-    throw new Error(`Failed to delete document from Firestore: ${error.message}`);
+    console.error('Error deleting from Firestore:', error);
+    throw new Error(`Failed to delete from Firestore: ${error.message}`);
   }
 }
 
-/**
- * Get file metadata to determine what needs to be deleted
- */
-export async function getFileMetadata(documentId: string): Promise<FileObject> {
+async function getFileMetadata(documentId: string): Promise<any> {
   const db = getFirestore();
   const auth = getAuth();
   const user = auth.currentUser;
 
   if (!user) throw new Error('User not authenticated');
-  if (!documentId) throw new Error('Document ID is required');
 
   try {
-    const docRef = doc(db, 'users', user.uid, 'files', documentId);
-    const docSnap: DocumentSnapshot = await getDoc(docRef);
+    // 🆕 Get from global records collection
+    const docRef = doc(db, 'records', documentId);
+    const docSnap = await getDoc(docRef);
 
-    if (docSnap.exists()) {
-      return docSnap.data() as FileObject;
-    } else {
+    if (!docSnap.exists()) {
       throw new Error('Document not found');
     }
+
+    return docSnap.data();
   } catch (error: any) {
     console.error('Error getting file metadata:', error);
     throw new Error(`Failed to get file metadata: ${error.message}`);
   }
 }
-
-/**
- * Delete all version history for record
- * */
 
 export async function deleteRecordVersions(documentId: string): Promise<void> {
   const auth = getAuth();
@@ -389,31 +381,20 @@ export async function deleteRecordVersions(documentId: string): Promise<void> {
   try {
     console.log('🗑️ Deleting all versions for document:', documentId);
 
-    // Delete the main version control document
-    const versionControlRef = doc(db, `users/${user.uid}/recordVersions`, documentId);
-    await deleteDoc(versionControlRef);
-    console.log('✅ Deleted version control document');
+    // 🆕 Delete from GLOBAL recordVersions collection
+    const q = query(collection(db, 'recordVersions'), where('recordId', '==', documentId));
 
-    // Delete all individual versions
-    const versionsCollectionRef = collection(
-      db,
-      `users/${user.uid}/recordVersions/${documentId}/versions`
-    );
-    const versionsSnapshot = await getDocs(versionsCollectionRef);
-
-    const deletePromises = versionsSnapshot.docs.map(versionDoc => deleteDoc(versionDoc.ref));
-
+    const snapshot = await getDocs(q);
+    const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
     await Promise.all(deletePromises);
-    console.log(`✅ Deleted ${versionsSnapshot.docs.length} version documents`);
+
+    console.log(`✅ Deleted ${snapshot.docs.length} version documents`);
   } catch (error: any) {
     console.error('❌ Error deleting versions:', error);
-    throw new Error(`Failed to delete version history: ${error.message}`);
+    console.warn('⚠️ Continuing despite version deletion error');
   }
 }
 
-/**
- * Complete file deletion - removes both storage file and Firestore document
- */
 export async function deleteFileComplete(documentId: string): Promise<DeleteResult> {
   const auth = getAuth();
   const user = auth.currentUser;
@@ -422,7 +403,6 @@ export async function deleteFileComplete(documentId: string): Promise<DeleteResu
   if (!documentId) throw new Error('Document ID is required');
 
   try {
-    // First, get the file metadata to find the storage path
     const fileMetadata = await getFileMetadata(documentId);
     const storagePath = fileMetadata.storagePath;
 
@@ -431,15 +411,29 @@ export async function deleteFileComplete(documentId: string): Promise<DeleteResu
     // Delete from storage (if it exists)
     let deletedFromStorage = false;
     if (storagePath) {
-      await deleteFromStorage(storagePath);
-      deletedFromStorage = true;
+      try {
+        await deleteFromStorage(storagePath);
+        deletedFromStorage = true;
+      } catch (storageError) {
+        console.warn('⚠️ Failed to delete from storage, continuing...', storageError);
+        // Continue even if storage deletion fails
+      }
     } else {
       console.log('🎯 No storage path found - virtual file, skipping storage deletion');
     }
 
-    // Delete from Firestore
+    // Delete versions (best effort - don't fail if this fails)
+    let deletedVersions = false;
+    try {
+      await deleteRecordVersions(documentId);
+      deletedVersions = true;
+    } catch (versionError) {
+      console.warn('⚠️ Failed to delete versions, continuing...', versionError);
+      // Continue even if version deletion fails
+    }
+
+    // Delete from Firestore (this is the critical operation)
     await deleteFromFirestore(documentId);
-    await deleteRecordVersions(documentId);
 
     console.log('✅ Complete file deletion successful:', documentId);
 
@@ -447,7 +441,7 @@ export async function deleteFileComplete(documentId: string): Promise<DeleteResu
       success: true,
       deletedFromStorage,
       deletedFromFirestore: true,
-      deletedVersions: true,
+      deletedVersions,
     };
   } catch (error: any) {
     console.error('Error in complete file deletion:', error);
@@ -457,19 +451,13 @@ export async function deleteFileComplete(documentId: string): Promise<DeleteResu
 
 // ==================== COMBINED WORKFLOWS ====================
 
-/**
- * Combined function for complete file upload workflow
- */
 export async function uploadFileComplete(fileObj: FileObject): Promise<UploadFileCompleteResult> {
   try {
-    // Upload file to storage (or handle virtual files)
     const { downloadURL, filePath } = await uploadUserFile(fileObj);
-
-    // Save metadata to Firestore
     const documentId = await saveFileMetadataToFirestore({
       downloadURL,
       filePath,
-      fileObj, // Pass the whole fileObj instead of just file
+      fileObj,
     });
 
     return { documentId, downloadURL, filePath };

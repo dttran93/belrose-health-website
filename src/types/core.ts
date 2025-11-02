@@ -154,24 +154,45 @@ export interface VirtualFileInput {
 }
 
 export interface FileObject {
+  // === CORE IDENTIFICATION, (EXCLUDES FILE NAME, IN ENCRYPTED HEALTH DATA SECTION BELOW) ===
   id: string; //fileId. Generated in useFileManager via createFileObject() or addVirtualFile(). file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}
   firestoreId?: string; //Id for firestore set after upload
+
+  // === FILE PROPERTIES (EXCLUDES FILE, IN ENCRYPTED HEALTH DATA SECTION BELOW)===
   fileSize: number; //file size. Set in createFileObject in useFileManager.ts. file.size for real files
   fileType: string; //file type. Set in createFileObject in useFileManager.ts. file.type for real files or application/fhir+json for virtual - NEVER undefined
+
+  // === OWNERSHIP AND PERMISSIONS ===
+  uploadedBy?: string; // User ID of who created/uploaded the record (for audit trail)
+  uploadedByName?: string; //Display name of subject (for UI)
+  subjectId?: string; // User ID of who the record is About (ultimate owner)
+  subjectName?: string; //Display name of subject (for UI)
+  owners?: string[]; // Array of user IDs with full acecss (read, update, delete, share)
+
+  // === PROCESSING STATUS ===
   status: FileStatus; //Processing property. Initially set as pending. Then pending/processing... see below
   error?: string; //Failed processing
-  originalFileHash?: string | null; //hash of the original file that was uploaded
-  uploadedAt?: string | number;
-  wordCount?: number; //calculated during text extraction
-  sourceType?: SourceType;
-  lastModified?: string; //Filetracking for UI state management.
-  isVirtual?: boolean; //for virtual files
-  storagePath?: string;
-  downloadURL?: string;
-  recordHash?: string | null; //has of the record content
-  previousRecordHash?: string | null; //to establish chain of records in case they are edited
+  aiProcessingStatus?: AIProcessingStatus; //For Belrose Fields
   processingStage?: ProcessingStages;
   uploadInProgress?: boolean; // for managing upload process
+
+  // === VERIFICATION AND SECURITY ===
+  originalFileHash?: string | null; //hash of the original file that was uploaded
+  recordHash?: string | null; //has of the record content
+  previousRecordHash?: string | null; //to establish chain of records in case they are edited
+  blockchainVerification?: BlockchainVerification;
+  isProviderRecord?: boolean; // CAN PROBABLY REMOVE THIS
+
+  // === METADATA ===
+  sourceType?: SourceType;
+  isVirtual?: boolean; //for virtual files
+  downloadURL?: string;
+  storagePath?: string;
+
+  // === TIMESTAMPS ===
+  uploadedAt?: string | number;
+  wordCount?: number; //calculated during text extraction
+  lastModified?: string; //Filetracking for UI state management.
 
   // PLAIN TEXT PERSONAL HEALTH DATA, MUST BE ENCRYPTED
   fileName: string; //file name or custom name for virtual files. set by createFileObject() in useFileManager.ts
@@ -182,19 +203,15 @@ export interface FileObject {
   belroseFields?: BelroseFields; //AI enriched fields for easy labeling within the Belrose App
   customData?: any; //for non-medical data that may come in different formats, but not be particularly suited to FHIR format
 
-  //For processing Belrose, AI enriched Fields
-  aiProcessingStatus?: AIProcessingStatus;
-
   //For versioning purposes
   versionInfo?: {
     versionId?: string;
+    versionNumber?: number;
     timestamp?: string;
+    editedBy?: string;
+    editedByName?: string;
     isHistoricalView?: true;
   };
-
-  //Blockchain Verification
-  blockchainVerification?: BlockchainVerification;
-  isProviderRecord?: boolean;
 
   encryptedData?: {
     encryptedKey: string; // Single key for all encrypted data (Base64)

@@ -1,6 +1,6 @@
 // src/features/ViewEditRecord/services/VersionControlService.types.ts
 
-import { FileObject } from '@/types/core';
+import { Timestamp } from 'firebase/firestore';
 
 // ==================== MAIN VERSION CONTROL TYPES ====================
 
@@ -18,27 +18,32 @@ export interface VersionControlRecord {
 }
 
 export interface RecordVersion {
-  versionId: string;
-  parentVersion?: string;
-  timestamp: string;
-  author: string;
-  authorName?: string;
-  commitMessage?: string;
-  changes: Change[]; // Updated to use Change instead of ChangeSet
+  id?: string; // Firestore document ID
+  recordId: string; //Link to parent record
+  versionNumber: number; //Sequential version number
 
+  // Who and when
+  editedBy: string; //User ID
+  editedByName: string; //Display name
+  editedAt: Timestamp; //Firestore timestamp
+
+  // What changed
+  changes: Change[];
+  commitMessage?: string;
+
+  // Integrity
+  previousRecordHash?: string | undefined;
+  recordHash: string;
+  originalFileHash?: string | null;
+
+  // Full snapshot for restoration
   fileObjectSnapshot: {
     fhirData?: any;
     belroseFields?: any;
     extractedText?: string | null;
     originalText?: string | null;
     blockchainVerification?: any;
-    recordHash?: string | null;
-    previousRecordHash?: string | null;
-    originalFileHash?: string | null;
   };
-
-  checksum: string;
-  isInitialVersion: boolean;
 }
 
 // Consolidated Change interface with all needed properties
