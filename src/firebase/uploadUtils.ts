@@ -143,9 +143,9 @@ export async function saveFileMetadataToFirestore({
       uploadedBy: user.uid,
       uploadedByName: user.displayName || user.email || 'Unknown User',
 
-      // SubjectId is optional - only set if provided
+      // SubjectId always include subjectId, even if null
+      subjectId: subjectId || null,
       ...(subjectId && {
-        subjectId: subjectId,
         subjectName: fileObj.subjectName || 'Unknown Subject',
       }),
 
@@ -166,7 +166,7 @@ export async function saveFileMetadataToFirestore({
     console.log('📄 Saving to global records collection:', {
       fileName: documentData.fileName,
       uploadedBy: documentData.uploadedBy,
-      subjectId: documentData.subjectId || '(not set)',
+      subjectId: documentData.subjectId || null,
       owners: documentData.owners,
       hasBlockchainVerification: !!documentData.blockchainVerification,
       hasBelroseFields: !!documentData.belroseFields,

@@ -271,8 +271,8 @@ export const RecordFull: React.FC<RecordFullProps> = ({
                 <div className="text-center flex-1">
                   <h3 className="text-yellow-100 font-medium mb-1">Editing Record</h3>
                   <p className="text-yellow-200/80 text-sm">
-                    Scroll down to edit the record details, FHIR data, and other fields. Changes are
-                    saved when you click the Save button.
+                    Scroll down to edit your records, FHIR data, and other fields. Hash fields will
+                    recalculate when you refresh the page.
                   </p>
                 </div>
               </div>

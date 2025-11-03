@@ -103,7 +103,7 @@ export const RecordView: React.FC<RecordViewProps> = ({
                     <h3 className="text-primary font-medium mb-1">Editing Record</h3>
                     <p className="text-primary text-sm">
                       The JSON data will be updated automatically when you edit either FHIR or
-                      Record data.
+                      Record data. Hash fields will recalculate when you refresh the page.
                     </p>
                   </div>
                 </div>
