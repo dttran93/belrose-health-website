@@ -1,10 +1,11 @@
+// src/features/ViewEditRecord/components/VersionHistory.tsx
+
 import React, { useState, useEffect } from 'react';
-import { 
-  Clock, 
-  User, 
-  RotateCcw, 
-  Eye, 
-  MessageCircle, 
+import {
+  Clock,
+  User,
+  RotateCcw,
+  Eye,
   ChevronDown,
   ChevronRight,
   GitBranch,
@@ -12,19 +13,15 @@ import {
   AlertTriangle,
   CheckCircle,
   SquareDashedMousePointer,
-  ArrowLeft
+  ArrowLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import { VersionControlService } from '../services/versionControlService';
-import {
-  RecordVersion,
-  VersionControlRecord,
-  VersionHistoryProps,
-} from '../services/versionControlService.types';
+import { RecordVersion, VersionHistoryProps } from '../services/versionControlService.types';
 
-export const VersionHistory: React.FC<VersionHistoryProps> = ({ 
-  documentId, 
+export const VersionHistory: React.FC<VersionHistoryProps> = ({
+  documentId,
   onVersionSelect,
   onViewVersion,
   onRollback,
@@ -35,7 +32,6 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
   getSelectionInfo,
 }) => {
   const [versions, setVersions] = useState<RecordVersion[]>([]);
-  const [versionControlRecord, setVersionControlRecord] = useState<VersionControlRecord | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedVersions, setExpandedVersions] = useState<Set<string>>(new Set());
@@ -45,18 +41,14 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
 
   const refreshVersions = async () => {
     if (!documentId) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
-      const [versionsData, controlRecord] = await Promise.all([
-        versionControl.getVersionHistory(documentId),
-        versionControl.getVersionControlRecord(documentId)
-      ]);
-      
+      const versionsData = await versionControl.getVersionHistory(documentId);
+
       setVersions(versionsData);
-      setVersionControlRecord(controlRecord);
       onVersionsLoaded?.(versionsData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -66,14 +58,21 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
   };
 
   const handleRollback = async (versionId: string, version: RecordVersion) => {
-    if (!confirm(`Are you sure you want to rollback to the version from ${new Date(version.timestamp).toLocaleString()}?`)) {
+    // Firestore Timestamp, need to convert
+    const versionDate = version.editedAt?.toDate?.() || new Date();
+
+    if (
+      !confirm(
+        `Are you sure you want to rollback to the version from ${versionDate.toLocaleString()}?`
+      )
+    ) {
       return;
     }
 
     setIsRollingBack(versionId);
     try {
       await versionControl.rollbackToVersion(documentId, versionId);
-      toast.success(`Rolled back to version from ${new Date(version.timestamp).toLocaleString()}`);
+      toast.success(`Rolled back to version from ${versionDate.toLocaleString()}`);
       onRollback?.(versionId);
       await refreshVersions();
     } catch (error) {
@@ -101,11 +100,11 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
     setExpandedVersions(newExpanded);
   };
 
-  const formatTimeAgo = (timestamp: string): string => {
+  const formatTimeAgo = (editedAt: any): string => {
     const now = new Date();
-    const then = new Date(timestamp);
+    const then = editedAt?.toDate?.() || new Date(editedAt);
     const diffInHours = (now.getTime() - then.getTime()) / (1000 * 60 * 60);
-    
+
     if (diffInHours < 1) return 'Just now';
     if (diffInHours < 24) return `${Math.floor(diffInHours)}h ago`;
     if (diffInHours < 168) return `${Math.floor(diffInHours / 24)}d ago`;
@@ -114,11 +113,11 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
 
   const getChangesSummary = (changes: any[]): string => {
     if (changes.length === 0) return 'Initial version';
-    
+
     const operations = {
       create: changes.filter(c => c.operation === 'create').length,
       update: changes.filter(c => c.operation === 'update').length,
-      delete: changes.filter(c => c.operation === 'delete').length
+      delete: changes.filter(c => c.operation === 'delete').length,
     };
 
     const parts: string[] = [];
@@ -161,11 +160,11 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
     return (
       <div className="flex flex-col">
         <div className="flex justify-end">
-            <Button onClick={onBack} className="w-8 h-8 border-none bg-transparent hover:bg-gray-200">
+          <Button onClick={onBack} className="w-8 h-8 border-none bg-transparent hover:bg-gray-200">
             <ArrowLeft className="text-primary" />
           </Button>
         </div>
-        <div className="text-center text-gray-500">
+        <div className="text-center text-gray-500 p-8">
           <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
           <p>No version history available</p>
           <p className="text-sm mt-1">Versions will appear here after edits are made</p>
@@ -187,25 +186,25 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
             {versions.length} version{versions.length !== 1 ? 's' : ''}
           </div>
           {selectedVersions.length > 0 && (
-            <div className="text-xs text-gray-500">
-              ({selectedVersions.length} selected)
-            </div>
+            <div className="text-xs text-gray-500">({selectedVersions.length} selected)</div>
           )}
           <Button onClick={onBack} className="w-8 h-8 border-none bg-transparent hover:bg-gray-200">
             <ArrowLeft className="text-primary" />
           </Button>
         </div>
       </div>
-      
+
       {/* Version List */}
       <div className="space-y-2">
         {versions.map((version, index) => {
-          const isExpanded = expandedVersions.has(version.versionId);
+          // Use id instead of versionId for the new structure
+          const versionId = version.id || '';
+          const isExpanded = expandedVersions.has(versionId);
           const isCurrent = index === 0;
-          const selectionInfo = getSelectionInfo?.(version.versionId);
+          const selectionInfo = getSelectionInfo?.(versionId);
           const isSelected = !!selectionInfo;
 
-          // Dynamic styling based on selection
+          // 🎨 Dynamic styling based on selection (restored from old version)
           let containerClasses = 'border rounded-lg transition-all duration-200 ';
           if (isCurrent && !isSelected) {
             containerClasses += 'border-green-200 bg-green-50';
@@ -216,18 +215,20 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
           }
 
           return (
-            <div key={version.versionId} className={containerClasses}>
+            <div key={versionId} className={containerClasses}>
               {/* Version Header */}
               <div className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3">
-                    {/* Selection Indicator */}
+                    {/* 🔵 Selection Indicator (restored from old version) */}
                     {isSelected && (
-                      <div className={`w-5 h-5 rounded-full ${selectionInfo.badgeClass} text-white text-xs font-bold flex items-center justify-center mt-0.5 flex-shrink-0`}>
+                      <div
+                        className={`w-5 h-5 rounded-full ${selectionInfo.badgeClass} text-white text-xs font-bold flex items-center justify-center mt-0.5 flex-shrink-0`}
+                      >
                         {selectionInfo.order}
                       </div>
                     )}
-                    
+
                     <div className="flex-1">
                       {/* Version Info */}
                       <div className="flex items-center gap-2 mb-2">
@@ -238,49 +239,53 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                           </span>
                         )}
                         {isSelected && (
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${selectionInfo.bgClass} ${selectionInfo.textClass}`}>
+                          <span
+                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${selectionInfo.bgClass} ${selectionInfo.textClass}`}
+                          >
                             Selected #{selectionInfo.order}
                           </span>
                         )}
                         <span className="text-sm text-gray-600">
-                          {formatTimeAgo(version.timestamp)}
+                          {formatTimeAgo(version.editedAt)}
                         </span>
                       </div>
 
                       {/* Commit Message */}
-                      <div className="flex items-start gap-2 mb-2">
-                        <MessageCircle className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                        <span className="text-sm font-medium">
-                          {version.commitMessage || 'No commit message'}
-                        </span>
-                      </div>
+                      {version.commitMessage && (
+                        <div className="flex items-start gap-2 mb-2">
+                          <span className="text-sm font-medium">{version.commitMessage}</span>
+                        </div>
+                      )}
 
                       {/* Author and Changes */}
                       <div className="flex items-center gap-4 text-xs text-gray-600">
                         <div className="flex items-center gap-1">
                           <User className="w-3 h-3" />
-                          {version.authorName || 'Unknown'}
+                          {version.editedByName || 'Unknown'}
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {new Date(version.timestamp).toLocaleString()}
+                          {version.editedAt?.toDate?.()?.toLocaleString() || 'Unknown time'}
                         </div>
-                        <div>
-                          {getChangesSummary(version.changes)}
-                        </div>
+                        <div>{getChangesSummary(version.changes)}</div>
                       </div>
                     </div>
                   </div>
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 ml-4">
+                    {/* 🔘 Select Button (restored from old version) */}
                     {(versions.length > 1 || !isCurrent) && (
                       <>
                         <Button
-                          variant={isSelected ? "default" : "outline"}
+                          variant={isSelected ? 'default' : 'outline'}
                           size="sm"
                           onClick={() => handleSelectVersion(version)}
-                          className={`px-2 py-1 h-auto ${isSelected ? `${selectionInfo.badgeClass} hover:opacity-90 text-white` : ''}`}
+                          className={`px-2 py-1 h-auto ${
+                            isSelected
+                              ? `${selectionInfo.badgeClass} hover:opacity-90 text-white`
+                              : ''
+                          }`}
                         >
                           <SquareDashedMousePointer className="w-3 h-3 mr-1" />
                           {isSelected ? `Selected #${selectionInfo?.order}` : 'Select'}
@@ -288,40 +293,40 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
 
                         {!isCurrent && (
                           <>
-                          <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewVersion(version)}
-                          className="px-2 py-1 h-auto"
-                        >
-                          <Eye className="w-3 h-3 mr-1" />
-                          View
-                        </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewVersion(version)}
+                              className="px-2 py-1 h-auto"
+                            >
+                              <Eye className="w-3 h-3 mr-1" />
+                              View
+                            </Button>
 
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRollback(version.versionId, version)}
-                            disabled={isRollingBack === version.versionId}
-                            className="px-2 py-1 h-auto"
-                          >
-                            {isRollingBack === version.versionId ? (
-                              <div className="animate-spin rounded-full h-3 w-3 border-2 border-blue-500 border-t-transparent mr-1" />
-                            ) : (
-                              <RotateCcw className="w-3 h-3 mr-1" />
-                            )}
-                            Rollback
-                          </Button>
-                        </>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRollback(versionId, version)}
+                              disabled={isRollingBack === versionId}
+                              className="px-2 py-1 h-auto"
+                            >
+                              {isRollingBack === versionId ? (
+                                <div className="animate-spin rounded-full h-3 w-3 border-2 border-blue-500 border-t-transparent mr-1" />
+                              ) : (
+                                <RotateCcw className="w-3 h-3 mr-1" />
+                              )}
+                              Rollback
+                            </Button>
+                          </>
                         )}
                       </>
                     )}
-                    
+
                     {version.changes.length > 0 && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => toggleExpanded(version.versionId)}
+                        onClick={() => toggleExpanded(versionId)}
                         className="px-1 py-1 h-auto"
                       >
                         {isExpanded ? (
@@ -340,21 +345,22 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                     <h4 className="text-sm font-medium mb-2">Changes:</h4>
                     <div className="space-y-1">
                       {version.changes.map((change, changeIndex) => (
-                        <div 
+                        <div
                           key={changeIndex}
                           className={`text-xs p-2 rounded ${
-                            change.operation === 'create' ? 'bg-green-100 text-green-800' :
-                            change.operation === 'update' ? 'bg-blue-100 text-blue-800' :
-                            'bg-red-100 text-red-800'
+                            change.operation === 'create'
+                              ? 'bg-green-100 text-green-800'
+                              : change.operation === 'update'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-red-100 text-red-800'
                           }`}
                         >
                           <div className="font-medium">
-                            {change.operation.charAt(0).toUpperCase() + change.operation.slice(1)}: {change.path}
+                            {change.operation.charAt(0).toUpperCase() + change.operation.slice(1)}:{' '}
+                            {change.path}
                           </div>
                           {change.description && (
-                            <div className="mt-1 opacity-75">
-                              {change.description}
-                            </div>
+                            <div className="mt-1 opacity-75">{change.description}</div>
                           )}
                         </div>
                       ))}

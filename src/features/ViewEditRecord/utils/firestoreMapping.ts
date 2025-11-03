@@ -42,9 +42,14 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
 
     // Edit tracking properties
     editedByUser: data.editedByUser || false,
-    lastEditedAt: data.lastEditedAt,
-    lastEditDescription: data.lastEditDescription,
     blockchainVerification: data.blockchainVerification || undefined,
+
+    // Ownership Fields
+    uploadedBy: data.uploadedBy,
+    uploadedByName: data.uploadedByName,
+    owners: data.owners || [],
+    subjectId: data.subjectId,
+    subjectName: data.subjectName,
   } as FileObject;
 };
 

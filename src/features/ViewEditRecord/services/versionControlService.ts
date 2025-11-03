@@ -50,7 +50,7 @@ export class VersionControlService {
     console.log('📝 Creating version for record:', recordId);
 
     try {
-      const previousVersions = await this.getVersions(recordId, 1);
+      const previousVersions = await this.getVersions(recordId);
       const previousVersion = previousVersions[0];
       const versionNumber = previousVersion ? previousVersion.versionNumber + 1 : 1;
 
@@ -64,9 +64,12 @@ export class VersionControlService {
           originalText: updatedRecord.originalText ?? null,
           blockchainVerification: updatedRecord.blockchainVerification ?? null,
         });
+
+        // 🔧 Clean any undefined values from changes
+        changes = this.cleanUndefinedValues(changes);
       }
 
-      const version: RecordVersion = {
+      const version: any = {
         recordId,
         versionNumber,
 
@@ -79,10 +82,8 @@ export class VersionControlService {
         changes: changes,
         commitMessage: commitMessage || this.generateAutoCommitMessage(changes),
 
-        // 🎯 Integrity at parent level
+        // 🎯 Integrity at parent level - only include if they exist
         recordHash: updatedRecord.recordHash || '',
-        previousRecordHash: updatedRecord.previousRecordHash || undefined,
-        originalFileHash: updatedRecord.originalFileHash || undefined,
 
         // Full snapshot (data only, no metadata)
         fileObjectSnapshot: {
@@ -93,6 +94,14 @@ export class VersionControlService {
           blockchainVerification: updatedRecord.blockchainVerification ?? null,
         },
       };
+
+      // Only add these fields if they have actual values (not undefined)
+      if (updatedRecord.previousRecordHash) {
+        version.previousRecordHash = updatedRecord.previousRecordHash;
+      }
+      if (updatedRecord.originalFileHash) {
+        version.originalFileHash = updatedRecord.originalFileHash;
+      }
 
       const versionRef = await addDoc(collection(this.db, 'recordVersions'), version);
 
@@ -277,7 +286,11 @@ export class VersionControlService {
   /**
    * Compare two versions
    */
-  async compareVersions(versionId1: string, versionId2: string): Promise<VersionDiff> {
+  async compareVersions(
+    recordId: string,
+    versionId1: string,
+    versionId2: string
+  ): Promise<VersionDiff> {
     const version1 = await this.getVersion(versionId1);
     const version2 = await this.getVersion(versionId2);
 
@@ -383,5 +396,27 @@ export class VersionControlService {
 
     const changedFields = new Set(changes.map(c => c.path.split('.')[0]));
     return `${totalChanges} change(s) across ${changedFields.size} field(s)`;
+  }
+
+  /**
+   * Clean undefined values from objects recursively
+   * Firestore doesn't allow undefined - must be null or omitted
+   */
+  private cleanUndefinedValues(data: any): any {
+    if (Array.isArray(data)) {
+      return data.map(item => this.cleanUndefinedValues(item));
+    }
+
+    if (data !== null && typeof data === 'object') {
+      const cleaned: any = {};
+      for (const key in data) {
+        if (data[key] !== undefined) {
+          cleaned[key] = this.cleanUndefinedValues(data[key]);
+        }
+      }
+      return cleaned;
+    }
+
+    return data === undefined ? null : data;
   }
 }

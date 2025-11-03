@@ -29,7 +29,7 @@ interface UseAllUserRecordsReturn {
  * - Records where the user is in the owners array
  * - Records where the user is the subject (subjectId === userId)
  *
- * 🆕 Now queries from the GLOBAL 'records' collection instead of user-specific subcollections
+ * Now queries from the GLOBAL 'records' collection instead of user-specific subcollections
  */
 export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
   const [records, setRecords] = useState<FileObject[]>([]);
@@ -49,7 +49,7 @@ export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
 
     const db = getFirestore();
 
-    // 🆕 Query the GLOBAL records collection
+    // Query the GLOBAL records collection
     // Get records where the user is:
     // 1. The uploader (uploadedBy)
     // 2. In the owners array
@@ -89,7 +89,17 @@ export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
           });
 
           // Use shared mapping function
-          return mapFirestoreToFileObject(doc.id, data);
+          const mapped = mapFirestoreToFileObject(doc.id, data);
+
+          // 🔍 DEBUG: Check if mapping preserves uploadedBy
+          console.log(`🔍 Mapped record ${doc.id}:`, {
+            hasUploadedBy: !!mapped.uploadedBy,
+            uploadedByValue: mapped.uploadedBy,
+            hasOwners: !!mapped.owners,
+            ownersValue: mapped.owners,
+          });
+
+          return mapped;
         });
 
         // Additional filtering in memory (belt and suspenders approach)
@@ -97,7 +107,7 @@ export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
           const hasAccess =
             record.uploadedBy === userId ||
             record.owners?.includes(userId) ||
-            record.subjectId === userId;
+            (record.subjectId && record.subjectId === userId); // Only check subjectId if it exists
 
           if (!hasAccess) {
             console.warn('⚠️ Record slipped through query filter:', record.id);
