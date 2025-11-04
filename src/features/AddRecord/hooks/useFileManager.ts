@@ -2,8 +2,6 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { FileUploadService } from '@/features/AddRecord/services/fileUploadService';
 import { FileObject, FileStatus, AIProcessingStatus, VirtualFileInput } from '@/types/core';
-import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
-import { processRecordWithAI } from '@/features/AddRecord/services/belroseFieldsService';
 
 import {
   AddFilesOptions,
@@ -168,43 +166,6 @@ export function useFileManager(): UseFileManagerTypes {
   );
 
   // ==================== FILE PROCESSING ====================
-
-  const convertTextToFHIR = async (extractedText: string, fileName: string) => {
-    try {
-      return await convertToFHIR(extractedText);
-    } catch (error) {
-      console.error('FHIR conversion failed:', error);
-      throw error; // Re-throw so the caller can handle it
-    }
-  };
-
-  const processWithAI = useCallback(async (fileObj: FileObject) => {
-    console.log(`🤖 Starting AI processing for: ${fileObj.fileName}`);
-
-    try {
-      // Call AI service
-      const aiResult = await processRecordWithAI(fileObj.fhirData, {
-        fileName: fileObj.fileName,
-        extractedText: fileObj.extractedText || undefined,
-      });
-
-      console.log(`✅ AI processing completed for: ${fileObj.fileName}`, aiResult);
-
-      // 🔥 RETURN the result instead of updating status
-      return {
-        success: true,
-        result: aiResult,
-      };
-    } catch (error: any) {
-      console.error(`❌ AI processing failed for ${fileObj.fileName}:`, error);
-
-      // 🔥 RETURN the error instead of updating status
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-  }, []);
 
   const processFile = useCallback(
     async (fileObj: FileObject) => {

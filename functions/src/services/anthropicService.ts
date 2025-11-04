@@ -156,6 +156,12 @@ export class AnthropicService {
         outputTokens: data.usage.output_tokens,
       });
 
+      // ✨ Check if response was truncated
+      if (data.stop_reason === 'max_tokens') {
+        console.warn('⚠️ Response was truncated at max_tokens limit!');
+        console.warn('⚠️ The JSON response may be incomplete.');
+      }
+
       return data;
     } catch (error) {
       console.error('❌ Anthropic API request failed:', error);
@@ -205,16 +211,15 @@ export class AnthropicService {
    * Utility: Clean markdown JSON formatting that Claude sometimes adds
    */
   static cleanMarkdownJson(content: string): string {
-    // Remove ```json ... ``` wrappers if present
-    if (content.includes('```json')) {
-      const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
-      if (jsonMatch) return jsonMatch[1];
-    } else if (content.includes('```')) {
-      const jsonMatch = content.match(/```\n([\s\S]*?)\n```/);
-      if (jsonMatch) return jsonMatch[1];
-    }
+    let cleaned = content.trim();
 
-    return content.trim();
+    // Remove opening code fence (more permissive)
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '');
+
+    // Remove closing code fence (more permissive)
+    cleaned = cleaned.replace(/\s*```\s*$/i, '');
+
+    return cleaned.trim();
   }
 
   /**

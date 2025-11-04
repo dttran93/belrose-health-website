@@ -1,6 +1,13 @@
 // src/firebase/uploadUtils.ts
 
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+  getMetadata,
+} from 'firebase/storage';
 import {
   getFirestore,
   collection,
@@ -24,6 +31,7 @@ export interface UploadUserFileResult {
   downloadURL: string | null;
   filePath: string | null;
   isVirtual?: boolean;
+  needsMove?: boolean;
 }
 
 export interface SaveMetadataParams {
@@ -50,11 +58,9 @@ export interface DeleteResult {
 export async function uploadUserFile(fileObj: FileObject): Promise<UploadUserFileResult> {
   console.log('📄 uploadUserFile received:', {
     hasFile: !!fileObj.file,
-    hasFileProperty: 'file' in fileObj,
     fileName: fileObj.fileName,
     isVirtual: fileObj.isVirtual,
-    extractedText: !!fileObj.extractedText,
-    allKeys: Object.keys(fileObj),
+    hasEncryptedData: !!fileObj.encryptedData,
   });
 
   const storage = getStorage();
@@ -73,68 +79,139 @@ export async function uploadUserFile(fileObj: FileObject): Promise<UploadUserFil
     };
   }
 
-  //Check for encrypted file data
+  // Check for encrypted file data
   if (fileObj.encryptedData?.file?.encrypted) {
-    console.log('🔒 Uploading ENCRYPTED file to storage');
+    console.log('🔒 Uploading ENCRYPTED file to temp storage');
 
-    //Convert encryptedArrayBuffer to Blob for upload
     const encryptedBlob = new Blob([fileObj.encryptedData.file.encrypted], {
-      type: 'application/octet-stream', // Generic binary type for encrypted data
+      type: 'application/octet-stream',
     });
 
-    // Upload encrypted Blob to storage
-    const fileName = fileObj.fileName || 'encrypted_file';
-    const filePath = `users/${user.uid}/encrypted_files/${Date.now()}_${fileName}.encrypted`;
-    const fileRef = ref(storage, filePath);
+    // Upload to temp location first (will move after getting recordId)
+    const tempId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const tempPath = `temp/${user.uid}/${tempId}.encrypted`;
+    const fileRef = ref(storage, tempPath);
+
     const metadata = {
       contentType: 'application/octet-stream',
       customMetadata: {
         uploadedBy: user.uid,
-        originalFilename: fileName,
-        description: 'Encrypted user upload',
         encrypted: 'true',
+        tempUpload: 'true',
+        uploadedAt: new Date().toISOString(),
       },
     };
 
     try {
       await uploadBytes(fileRef, encryptedBlob, metadata);
       const downloadURL = await getDownloadURL(fileRef);
-      console.log('✅ Encrypted file uploaded successfully');
-      return { downloadURL, filePath };
+      console.log('✅ Encrypted file uploaded to temp location');
+
+      return {
+        downloadURL,
+        filePath: tempPath,
+        needsMove: true, // ✨ Flag that this needs to be moved
+      };
     } catch (error: any) {
       console.error('❌ Error uploading encrypted file:', error);
       throw new Error(`Failed to upload encrypted file: ${error.message}`);
     }
   }
 
-  // Handle regular, unencrypted files
+  // Handle regular unencrypted files (also to temp location)
   const file = fileObj.file;
   if (!file) {
-    throw new Error('No file found in fileObj. Expected fileObj.file to contain the File object.');
+    throw new Error('No file found in fileObj.');
   }
 
-  // Organize files by user ID
-  const fileName = fileObj.fileName || file.name;
-  const filePath = `users/${user.uid}/uploads/${Date.now()}_${fileName}`;
-  const fileRef = ref(storage, filePath);
+  console.log('📁 Uploading regular file to temp storage');
 
-  // Add metadata
+  const tempId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const extension = file.name.split('.').pop() || 'file';
+  const tempPath = `temp/${user.uid}/${tempId}.${extension}`;
+  const fileRef = ref(storage, tempPath);
+
   const metadata = {
     contentType: file.type,
     customMetadata: {
       uploadedBy: user.uid,
-      originalFilename: fileName,
-      description: 'User upload',
+      originalFilename: fileObj.fileName || file.name,
+      tempUpload: 'true',
+      uploadedAt: new Date().toISOString(),
     },
   };
 
   try {
     await uploadBytes(fileRef, file, metadata);
     const downloadURL = await getDownloadURL(fileRef);
-    return { downloadURL, filePath };
+
+    return {
+      downloadURL,
+      filePath: tempPath,
+      needsMove: true,
+    };
   } catch (error: any) {
     console.error('Error uploading file:', error);
     throw new Error(`Failed to upload file: ${error.message}`);
+  }
+}
+
+/**
+ * Move file from temp location to final record-based location
+ */
+export async function moveFileToFinalLocation(
+  tempPath: string,
+  recordId: string
+): Promise<{ downloadURL: string; filePath: string }> {
+  const storage = getStorage();
+
+  const tempRef = ref(storage, tempPath);
+
+  // Determine final file name
+  const tempFileName = tempPath.split('/').pop() || 'file';
+  const finalPath = `records/${recordId}/${tempFileName}`;
+  const finalRef = ref(storage, finalPath);
+
+  console.log(`📦 Moving file from temp to final location:`, {
+    from: tempPath,
+    to: finalPath,
+    recordId,
+  });
+
+  try {
+    // Get the temp file's download URL and fetch it
+    const tempDownloadURL = await getDownloadURL(tempRef);
+    const response = await fetch(tempDownloadURL);
+    const blob = await response.blob();
+
+    // Get original metadata
+    const tempMetadata = await getMetadata(tempRef);
+    const { tempUpload, ...cleanedMetadata } = tempMetadata.customMetadata || {};
+
+    // Upload to final location with updated metadata
+    await uploadBytes(finalRef, blob, {
+      contentType: tempMetadata.contentType,
+      customMetadata: {
+        ...cleanedMetadata, // Spread the cleaned metadata (without tempUpload)
+        movedAt: new Date().toISOString(),
+        finalLocation: 'true',
+      },
+    });
+
+    // Delete temp file
+    await deleteObject(tempRef);
+    console.log('✅ File moved successfully, temp file deleted');
+
+    // Get final download URL
+    const finalDownloadURL = await getDownloadURL(finalRef);
+
+    return {
+      downloadURL: finalDownloadURL,
+      filePath: finalPath,
+    };
+  } catch (error: any) {
+    console.error('❌ Error moving file to final location:', error);
+    throw new Error(`Failed to move file: ${error.message}`);
   }
 }
 
@@ -167,8 +244,9 @@ export async function saveFileMetadataToFirestore({
       owners.push(subjectId);
     }
 
+    const isEncrypted = !!fileObj.encryptedData || !!fileObj.isEncrypted;
+
     const documentData: any = {
-      fileName: fileObj.fileName,
       fileSize: fileObj.fileSize,
       fileType: fileObj.fileType,
       downloadURL,
@@ -185,6 +263,7 @@ export async function saveFileMetadataToFirestore({
 
       // ✨ ENCRYPTION METADATA (if encrypted)
       ...(fileObj.encryptedData && {
+        isEncrypted: true,
         // The wrapped AES key that encrypted everything
         encryptedKey: fileObj.encryptedData.encryptedKey,
 
@@ -230,13 +309,11 @@ export async function saveFileMetadataToFirestore({
               iv: fileObj.encryptedData.belroseFields.iv, // base64
             }
           : undefined,
-
-        // Mark as encrypted
-        isEncrypted: true,
       }),
 
       // ✨ PLAINTEXT METADATA (only if NOT encrypted)
-      ...(!fileObj.encryptedData && {
+      ...(!isEncrypted && {
+        fileName: fileObj.fileName,
         extractedText: fileObj.extractedText,
         wordCount: fileObj.wordCount,
         fhirData: fileObj.fhirData,
@@ -266,20 +343,46 @@ export async function saveFileMetadataToFirestore({
     });
 
     console.log('📄 Saving to global records collection:', {
-      fileName: documentData.fileName,
+      fileName: documentData.fileName || '[ENCRYPTED]',
       uploadedBy: documentData.uploadedBy,
-      subjectId: documentData.subjectId || null,
-      owners: documentData.owners,
       isEncrypted: !!documentData.isEncrypted,
       hasEncryptedKey: !!documentData.encryptedKey,
-      hasBlockchainVerification: !!documentData.blockchainVerification,
     });
 
     // Save to GLOBAL records collection
     const docRef = await addDoc(collection(db, 'records'), documentData);
+    const recordId = docRef.id;
 
-    console.log('✅ Record saved to global collection with ID:', docRef.id);
-    return docRef.id;
+    console.log('✅ Record saved to global collection with ID:', recordId);
+
+    //If file was uploaded to temp location, move to final location
+    if (filePath && filePath.startsWith('temp/')) {
+      console.log('📦 File is in temp location, moving to final location...');
+
+      try {
+        const { downloadURL: finalURL, filePath: finalPath } = await moveFileToFinalLocation(
+          filePath,
+          recordId
+        );
+
+        // Update the document with final paths
+        await updateDoc(doc(db, 'records', recordId), {
+          downloadURL: finalURL,
+          storagePath: finalPath,
+        });
+
+        console.log('✅ File moved to final location and document updated:', {
+          finalPath,
+          recordId,
+        });
+      } catch (moveError) {
+        console.error('⚠️ Failed to move file to final location:', moveError);
+        // Don't fail the whole operation - file is still accessible at temp location
+        // You could add a background job to retry failed moves later
+      }
+    }
+
+    return recordId;
   } catch (error: any) {
     console.error('Error saving file metadata:', error);
     throw new Error(`Failed to save file metadata: ${error.message}`);
