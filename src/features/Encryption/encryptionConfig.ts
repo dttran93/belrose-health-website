@@ -3,7 +3,7 @@
 export const ENCRYPTION_CONFIG = {
   // ==================== FEATURE FLAG ====================
   // Set to false during development, true for production
-  enabled: false, // ← START WITH THIS FALSE!
+  enabled: true, // ← START WITH THIS FALSE!
 
   // ==================== ENCRYPTION SETTINGS ====================
   algorithm: 'AES-GCM' as const,

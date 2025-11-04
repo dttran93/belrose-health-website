@@ -73,7 +73,41 @@ export async function uploadUserFile(fileObj: FileObject): Promise<UploadUserFil
     };
   }
 
-  // Handle regular files
+  //Check for encrypted file data
+  if (fileObj.encryptedData?.file?.encrypted) {
+    console.log('🔒 Uploading ENCRYPTED file to storage');
+
+    //Convert encryptedArrayBuffer to Blob for upload
+    const encryptedBlob = new Blob([fileObj.encryptedData.file.encrypted], {
+      type: 'application/octet-stream', // Generic binary type for encrypted data
+    });
+
+    // Upload encrypted Blob to storage
+    const fileName = fileObj.fileName || 'encrypted_file';
+    const filePath = `users/${user.uid}/encrypted_files/${Date.now()}_${fileName}.encrypted`;
+    const fileRef = ref(storage, filePath);
+    const metadata = {
+      contentType: 'application/octet-stream',
+      customMetadata: {
+        uploadedBy: user.uid,
+        originalFilename: fileName,
+        description: 'Encrypted user upload',
+        encrypted: 'true',
+      },
+    };
+
+    try {
+      await uploadBytes(fileRef, encryptedBlob, metadata);
+      const downloadURL = await getDownloadURL(fileRef);
+      console.log('✅ Encrypted file uploaded successfully');
+      return { downloadURL, filePath };
+    } catch (error: any) {
+      console.error('❌ Error uploading encrypted file:', error);
+      throw new Error(`Failed to upload encrypted file: ${error.message}`);
+    }
+  }
+
+  // Handle regular, unencrypted files
   const file = fileObj.file;
   if (!file) {
     throw new Error('No file found in fileObj. Expected fileObj.file to contain the File object.');
@@ -133,23 +167,91 @@ export async function saveFileMetadataToFirestore({
       owners.push(subjectId);
     }
 
-    const documentData = {
-      ...fileObj,
-      file: undefined,
+    const documentData: any = {
+      fileName: fileObj.fileName,
+      fileSize: fileObj.fileSize,
+      fileType: fileObj.fileType,
       downloadURL,
       storagePath: filePath,
 
       // OWNERSHIP FIELDS
       uploadedBy: user.uid,
       uploadedByName: user.displayName || user.email || 'Unknown User',
-
-      // SubjectId always include subjectId, even if null
       subjectId: subjectId || null,
       ...(subjectId && {
         subjectName: fileObj.subjectName || 'Unknown Subject',
       }),
-
       owners: owners,
+
+      // ✨ ENCRYPTION METADATA (if encrypted)
+      ...(fileObj.encryptedData && {
+        // The wrapped AES key that encrypted everything
+        encryptedKey: fileObj.encryptedData.encryptedKey,
+
+        // Encrypted file name (so we can display it when decrypted)
+        encryptedFileName: fileObj.encryptedData.fileName
+          ? {
+              encrypted: fileObj.encryptedData.fileName.encrypted, // base64
+              iv: fileObj.encryptedData.fileName.iv, // base64
+            }
+          : undefined,
+
+        // IV for the encrypted file in Storage (needed to decrypt it later)
+        encryptedFileIV: fileObj.encryptedData.file?.iv,
+
+        // Encrypted extracted text
+        encryptedExtractedText: fileObj.encryptedData.extractedText
+          ? {
+              encrypted: fileObj.encryptedData.extractedText.encrypted, // base64
+              iv: fileObj.encryptedData.extractedText.iv, // base64
+            }
+          : undefined,
+
+        // Encrypted original text
+        encryptedOriginalText: fileObj.encryptedData.originalText
+          ? {
+              encrypted: fileObj.encryptedData.originalText.encrypted, // base64
+              iv: fileObj.encryptedData.originalText.iv, // base64
+            }
+          : undefined,
+
+        // Encrypted FHIR data
+        encryptedFhirData: fileObj.encryptedData.fhirData
+          ? {
+              encrypted: fileObj.encryptedData.fhirData.encrypted, // base64
+              iv: fileObj.encryptedData.fhirData.iv, // base64
+            }
+          : undefined,
+
+        // Encrypted Belrose fields
+        encryptedBelroseFields: fileObj.encryptedData.belroseFields
+          ? {
+              encrypted: fileObj.encryptedData.belroseFields.encrypted, // base64
+              iv: fileObj.encryptedData.belroseFields.iv, // base64
+            }
+          : undefined,
+
+        // Mark as encrypted
+        isEncrypted: true,
+      }),
+
+      // ✨ PLAINTEXT METADATA (only if NOT encrypted)
+      ...(!fileObj.encryptedData && {
+        extractedText: fileObj.extractedText,
+        wordCount: fileObj.wordCount,
+        fhirData: fileObj.fhirData,
+        belroseFields: fileObj.belroseFields,
+        originalText: fileObj.originalText,
+      }),
+
+      // OTHER FIELDS (always included)
+      status: fileObj.status,
+      sourceType: fileObj.sourceType,
+      isVirtual: fileObj.isVirtual,
+      aiProcessingStatus: fileObj.aiProcessingStatus,
+      recordHash: fileObj.recordHash,
+      originalFileHash: fileObj.originalFileHash,
+      blockchainVerification: fileObj.blockchainVerification,
 
       // TIMESTAMPS
       uploadedAt: new Date(),
@@ -158,8 +260,8 @@ export async function saveFileMetadataToFirestore({
 
     // Clean undefined fields
     Object.keys(documentData).forEach(key => {
-      if (documentData[key as keyof typeof documentData] === undefined) {
-        delete documentData[key as keyof typeof documentData];
+      if (documentData[key] === undefined) {
+        delete documentData[key];
       }
     });
 
@@ -168,13 +270,13 @@ export async function saveFileMetadataToFirestore({
       uploadedBy: documentData.uploadedBy,
       subjectId: documentData.subjectId || null,
       owners: documentData.owners,
+      isEncrypted: !!documentData.isEncrypted,
+      hasEncryptedKey: !!documentData.encryptedKey,
       hasBlockchainVerification: !!documentData.blockchainVerification,
-      hasBelroseFields: !!documentData.belroseFields,
-      hasFhirData: !!documentData.fhirData,
     });
 
-    // 🆕 Save to GLOBAL records collection
-    const docRef: DocumentReference = await addDoc(collection(db, 'records'), documentData);
+    // Save to GLOBAL records collection
+    const docRef = await addDoc(collection(db, 'records'), documentData);
 
     console.log('✅ Record saved to global collection with ID:', docRef.id);
     return docRef.id;

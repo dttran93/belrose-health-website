@@ -206,7 +206,7 @@ export class EncryptionService {
     console.log('  🔒 Encrypting file name...');
     const fileNameResult = await this.encryptText(fileName, fileKey);
     result.fileName = {
-      encrypted: fileNameResult.encrypted,
+      encrypted: this.arrayBufferToBase64(fileNameResult.encrypted),
       iv: this.arrayBufferToBase64(fileNameResult.iv),
     };
     console.log(`    ✓ File name encrypted (${fileNameResult.encrypted.byteLength} bytes)`);
@@ -228,7 +228,7 @@ export class EncryptionService {
       console.log('  🔒 Encrypting extracted text...');
       const textResult = await this.encryptText(extractedText, fileKey);
       result.extractedText = {
-        encrypted: textResult.encrypted,
+        encrypted: this.arrayBufferToBase64(textResult.encrypted),
         iv: this.arrayBufferToBase64(textResult.iv),
       };
       console.log(`    ✓ Extracted text encrypted (${textResult.encrypted.byteLength} bytes)`);
@@ -239,7 +239,7 @@ export class EncryptionService {
       console.log('  🔒 Encrypting original text...');
       const originalTextResult = await this.encryptText(originalText, fileKey);
       result.originalText = {
-        encrypted: originalTextResult.encrypted,
+        encrypted: this.arrayBufferToBase64(originalTextResult.encrypted),
         iv: this.arrayBufferToBase64(originalTextResult.iv),
       };
       console.log(
@@ -252,7 +252,7 @@ export class EncryptionService {
       console.log('  🔒 Encrypting FHIR data...');
       const fhirResult = await this.encryptJSON(fhirData, fileKey);
       result.fhirData = {
-        encrypted: fhirResult.encrypted,
+        encrypted: this.arrayBufferToBase64(fhirResult.encrypted),
         iv: this.arrayBufferToBase64(fhirResult.iv),
       };
       console.log(`    ✓ FHIR data encrypted (${fhirResult.encrypted.byteLength} bytes)`);
@@ -263,7 +263,7 @@ export class EncryptionService {
       console.log('  🔒 Encrypting Belrose fields...');
       const belroseResult = await this.encryptJSON(belroseFields, fileKey);
       result.belroseFields = {
-        encrypted: belroseResult.encrypted,
+        encrypted: this.arrayBufferToBase64(belroseResult.encrypted),
         iv: this.arrayBufferToBase64(belroseResult.iv),
       };
       console.log(`    ✓ Belrose fields encrypted (${belroseResult.encrypted.byteLength} bytes)`);
@@ -274,7 +274,7 @@ export class EncryptionService {
       console.log('  🔒 Encrypting custom data...');
       const customDataResult = await this.encryptJSON(customData, fileKey);
       result.customData = {
-        encrypted: customDataResult.encrypted,
+        encrypted: this.arrayBufferToBase64(customDataResult.encrypted),
         iv: this.arrayBufferToBase64(customDataResult.iv),
       };
       console.log(`    ✓ Custom data encrypted (${customDataResult.encrypted.byteLength} bytes)`);
@@ -438,7 +438,7 @@ export class EncryptionService {
     return new Uint8Array([...binaryString].map(char => char.charCodeAt(0)));
   }
 
-  private static async encryptKeyWithMasterKey(
+  static async encryptKeyWithMasterKey(
     fileKey: CryptoKey,
     masterKey: CryptoKey
   ): Promise<ArrayBuffer> {

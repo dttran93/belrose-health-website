@@ -18,6 +18,8 @@ import { RecoveryKeyDisplay } from './RecoveryKeyDisplay';
 import WalletSetup from './WalletSetup';
 import { getFirestore, doc, updateDoc } from 'firebase/firestore';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
+import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
+import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 
 interface StepConfig {
   number: number;
@@ -49,6 +51,9 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     acknowledgedRecoveryKey: false,
     encryptedMasterKey: '',
     masterKeyIV: '',
+    publicKey: '',
+    encryptedPrivateKey: '',
+    encryptedPrivateKeyIV: '',
   });
 
   const steps: StepConfig[] = [
@@ -115,10 +120,23 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         console.log('✓ Recovery key generated');
         const recoveryKeyHash = await EncryptionKeyManager.hashRecoveryKey(recoveryKey);
 
-        // 4. Store master key in session for registration process
+        // 4. generate RSA key pair for sharing
+        const { publicKey, privateKey } = await SharingKeyManagementService.generateUserKeyPair();
+        console.log('✓ RSA key pair generated');
+
+        // 5. Encrypt RSA private key with master key
+        const privateKeyBytes = SharingKeyManagementService.base64ToArrayBuffer(privateKey);
+        const { encrypted: encryptedPrivateKeyBuffer, iv: privateKeyIV } =
+          await EncryptionService.encryptFile(privateKeyBytes, masterKey);
+        const encryptedPrivateKey =
+          EncryptionService.arrayBufferToBase64(encryptedPrivateKeyBuffer);
+        const encryptedPrivateKeyIV = EncryptionService.arrayBufferToBase64(privateKeyIV);
+        console.log('✓ Private key encrypted');
+
+        // 6. Store master key in session for registration process
         EncryptionKeyManager.setSessionKey(masterKey);
 
-        // 5. Update registration data with all encryption info
+        // 7. Update registration data with all encryption info
         setRegistrationData(prev => ({
           ...prev,
           ...data,
@@ -126,6 +144,9 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
           masterKeyIV: iv,
           recoveryKey: recoveryKey,
           recoveryKeyHash: recoveryKeyHash,
+          publicKey: publicKey,
+          encryptedPrivateKey: encryptedPrivateKey,
+          encryptedPrivateKeyIV: encryptedPrivateKeyIV,
         }));
 
         toast.success('Account and encryption setup complete!', {
@@ -169,10 +190,13 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         email: registrationData.email,
         firstName: registrationData.firstName,
         lastName: registrationData.lastName,
+        publicKey: registrationData.publicKey,
         encryption: {
           enabled: true,
           encryptedMasterKey: registrationData.encryptedMasterKey,
           masterKeyIV: registrationData.masterKeyIV,
+          encryptedPrivateKey: registrationData.encryptedPrivateKey,
+          encryptedPrivateKeyIV: registrationData.encryptedPrivateKeyIV,
           recoveryKeyHash: registrationData.recoveryKeyHash,
           setupAt: new Date().toISOString(),
         },

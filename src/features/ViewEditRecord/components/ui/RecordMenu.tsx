@@ -127,30 +127,6 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
     }
   }, [isOpen]);
 
-  // Internal handlers for UI-only operations
-  const handleDownload = () => {
-    if (record.downloadURL) {
-      const link = document.createElement('a');
-      link.href = record.downloadURL;
-      link.download = record.fileName || record.name || 'document';
-      link.click();
-    }
-    setIsOpen(false);
-  };
-
-  const handleCopyData = async () => {
-    try {
-      if (record.fhirData) {
-        await navigator.clipboard.writeText(JSON.stringify(record.fhirData, null, 2));
-        // You could add a toast notification here
-        console.log('FHIR data copied to clipboard');
-      }
-    } catch (error) {
-      console.error('Failed to copy data:', error);
-    }
-    setIsOpen(false);
-  };
-
   // Wrapper for parent handlers
   const createHandler = (handler?: (record: any) => void) => {
     return () => {

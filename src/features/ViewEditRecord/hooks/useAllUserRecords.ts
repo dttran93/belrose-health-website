@@ -14,6 +14,9 @@ import {
 } from 'firebase/firestore';
 import { FileObject } from '@/types/core';
 import mapFirestoreToFileObject from '@/features/ViewEditRecord/utils/firestoreMapping';
+import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
+import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
+import { toast } from 'sonner';
 
 interface UseAllUserRecordsReturn {
   records: FileObject[];
@@ -30,6 +33,7 @@ interface UseAllUserRecordsReturn {
  * - Records where the user is the subject (subjectId === userId)
  *
  * Now queries from the GLOBAL 'records' collection instead of user-specific subcollections
+ * Also handles decryption of encrypted records
  */
 export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
   const [records, setRecords] = useState<FileObject[]>([]);
@@ -50,10 +54,6 @@ export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
     const db = getFirestore();
 
     // Query the GLOBAL records collection
-    // Get records where the user is:
-    // 1. The uploader (uploadedBy)
-    // 2. In the owners array
-    // 3. The subject (subjectId)
     const recordsRef = collection(db, 'records');
 
     const q = query(
@@ -71,55 +71,103 @@ export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
     // Set up real-time listener
     const unsubscribe = onSnapshot(
       q,
-      (snapshot: QuerySnapshot<DocumentData>) => {
+      async (snapshot: QuerySnapshot<DocumentData>) => {
         console.log(`📦 Received ${snapshot.docs.length} records from global collection`);
 
-        const accessibleRecords: FileObject[] = snapshot.docs.map(doc => {
-          const data = doc.data();
+        try {
+          const accessibleRecords: FileObject[] = snapshot.docs.map(doc => {
+            const data = doc.data();
 
-          // Log ownership info for debugging
-          console.log(`📄 Record ${doc.id}:`, {
-            fileName: data.fileName,
-            uploadedBy: data.uploadedBy,
-            owners: data.owners,
-            subjectId: data.subjectId,
-            userIsOwner: data.owners?.includes(userId),
-            userIsSubject: data.subjectId === userId,
-            userIsUploader: data.uploadedBy === userId,
+            // Log ownership info for debugging
+            console.log(`📄 Record ${doc.id}:`, {
+              fileName: data.fileName || data.encryptedFileName ? '[ENCRYPTED]' : '[NO NAME]',
+              uploadedBy: data.uploadedBy,
+              owners: data.owners,
+              subjectId: data.subjectId,
+              isEncrypted: !!data.isEncrypted,
+              userIsOwner: data.owners?.includes(userId),
+              userIsSubject: data.subjectId === userId,
+              userIsUploader: data.uploadedBy === userId,
+            });
+
+            // Use shared mapping function
+            const mapped = mapFirestoreToFileObject(doc.id, data);
+
+            // 🔍 DEBUG: Check if mapping preserves uploadedBy
+            console.log(`🔍 Mapped record ${doc.id}:`, {
+              hasUploadedBy: !!mapped.uploadedBy,
+              uploadedByValue: mapped.uploadedBy,
+              hasOwners: !!mapped.owners,
+              ownersValue: mapped.owners,
+              isEncrypted: !!(data as any).isEncrypted,
+            });
+
+            return mapped;
           });
 
-          // Use shared mapping function
-          const mapped = mapFirestoreToFileObject(doc.id, data);
+          // Additional filtering in memory
+          const filteredRecords = accessibleRecords.filter(record => {
+            const hasAccess =
+              record.uploadedBy === userId ||
+              record.owners?.includes(userId) ||
+              (record.subjectId && record.subjectId === userId);
 
-          // 🔍 DEBUG: Check if mapping preserves uploadedBy
-          console.log(`🔍 Mapped record ${doc.id}:`, {
-            hasUploadedBy: !!mapped.uploadedBy,
-            uploadedByValue: mapped.uploadedBy,
-            hasOwners: !!mapped.owners,
-            ownersValue: mapped.owners,
+            if (!hasAccess) {
+              console.warn('⚠️ Record slipped through query filter:', record.id);
+            }
+
+            return hasAccess;
           });
 
-          return mapped;
-        });
+          console.log(`✅ Processed ${filteredRecords.length} accessible records`);
 
-        // Additional filtering in memory (belt and suspenders approach)
-        const filteredRecords = accessibleRecords.filter(record => {
-          const hasAccess =
-            record.uploadedBy === userId ||
-            record.owners?.includes(userId) ||
-            (record.subjectId && record.subjectId === userId); // Only check subjectId if it exists
+          // ✨ NEW: Decrypt encrypted records
+          const hasEncryptedRecords = filteredRecords.some((record: any) => record.isEncrypted);
 
-          if (!hasAccess) {
-            console.warn('⚠️ Record slipped through query filter:', record.id);
+          if (hasEncryptedRecords) {
+            console.log('🔓 Decrypting encrypted records...');
+
+            // Check if encryption session is active
+            const masterKey = EncryptionKeyManager.getSessionKey();
+            if (!masterKey) {
+              console.warn('⚠️ Encrypted records found but no encryption session active');
+              toast.warning(
+                'Some records are encrypted. Please unlock your encryption to view them.'
+              );
+              // Still show the records, but they'll have encrypted data
+              setRecords(filteredRecords);
+              setLoading(false);
+              return;
+            }
+
+            try {
+              // Decrypt all records (will skip unencrypted ones automatically)
+              const decryptedRecords = await RecordDecryptionService.decryptRecords(
+                filteredRecords as any
+              );
+
+              console.log(`✅ Successfully decrypted ${decryptedRecords.length} records`);
+              setRecords(decryptedRecords as FileObject[]);
+            } catch (decryptError) {
+              console.error('❌ Failed to decrypt records:', decryptError);
+              toast.error(
+                'Failed to decrypt some records. Please try unlocking your encryption again.'
+              );
+
+              // Still show the records even if decryption fails
+              setRecords(filteredRecords);
+            }
+          } else {
+            console.log('📄 No encrypted records found, using records as-is');
+            setRecords(filteredRecords);
           }
 
-          return hasAccess;
-        });
-
-        console.log(`✅ Processed ${filteredRecords.length} accessible records`);
-
-        setRecords(filteredRecords);
-        setLoading(false);
+          setLoading(false);
+        } catch (processingError) {
+          console.error('❌ Error processing records:', processingError);
+          setError(processingError as Error);
+          setLoading(false);
+        }
       },
       err => {
         console.error('❌ Error fetching records from global collection:', err);

@@ -1,6 +1,6 @@
-// src/features/Sharing/services/keyManagementService.ts
+// src/features/Sharing/services/sharingKeyManagementService.ts
 
-export class KeyManagementService {
+export class SharingKeyManagementService {
   /**
    * Generate RSA key pair for a new user
    * Call this during user registration
@@ -103,7 +103,7 @@ export class KeyManagementService {
   }
 
   // Helper functions
-  private static arrayBufferToBase64(buffer: ArrayBuffer): string {
+  static arrayBufferToBase64(buffer: ArrayBuffer): string {
     const bytes = new Uint8Array(buffer);
     let binary = Array.from(bytes)
       .map(byte => String.fromCharCode(byte))
@@ -111,7 +111,7 @@ export class KeyManagementService {
     return btoa(binary);
   }
 
-  private static base64ToArrayBuffer(base64: string): ArrayBuffer {
+  static base64ToArrayBuffer(base64: string): ArrayBuffer {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {

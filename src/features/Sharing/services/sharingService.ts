@@ -15,7 +15,7 @@ import {
 import { getAuth } from 'firebase/auth';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
-import { KeyManagementService } from './keyManagementService';
+import { SharingKeyManagementService } from './sharingKeyManagementService';
 import { ethers } from 'ethers';
 import { SharingContractService } from '@/features/BlockchainVerification/service/sharingContractService';
 import { EmailInvitationService } from './emailInvitationService';
@@ -65,7 +65,7 @@ export class SharingService {
     console.log('🔄 Starting share process for record:', request.recordId);
 
     // 1. Get the record
-    const recordRef = doc(db, 'users', user.uid, 'files', request.recordId);
+    const recordRef = doc(db, 'records', request.recordId);
     const recordDoc = await getDoc(recordRef);
 
     if (!recordDoc.exists()) {
@@ -75,7 +75,7 @@ export class SharingService {
     const recordData = recordDoc.data();
 
     // Verify the user owns this record
-    if (recordData.patientId !== user.uid) {
+    if (!recordData.owners || !recordData.owners.includes(user.uid)) {
       throw new Error('You do not own this record');
     }
 
@@ -85,13 +85,20 @@ export class SharingService {
       const usersRef = collection(db, 'users');
       let q;
 
+      console.log('🔍 Looking up receiver with:', {
+        email: request.receiverEmail,
+        wallet: request.receiverWalletAddress,
+      });
+
       if (request.receiverEmail) {
         q = query(usersRef, where('email', '==', request.receiverEmail));
       } else {
         q = query(usersRef, where('walletAddress', '==', request.receiverWalletAddress));
       }
 
+      console.log('🔍 Executing query...');
       const querySnapshot = await getDocs(q);
+      console.log('✅ Query completed. Results:', querySnapshot.size);
 
       // ✅ CASE 1: Receiver doesn't exist at all
       if (querySnapshot.empty || !querySnapshot.docs[0]) {
@@ -180,6 +187,12 @@ export class SharingService {
 
     console.log('✅ Receiver found:', receiverId);
 
+    console.log('🔍 Checking record data:', {
+      hasEncryptedKey: !!recordData.encryptedKey,
+      encryptedKeyType: typeof recordData.encryptedKey,
+      encryptedKeyPreview: recordData.encryptedKey?.substring?.(0, 100),
+    });
+
     // 3. Decrypt the record's AES key using owner's master key
     const encryptedKeyData = EncryptionService.base64ToArrayBuffer(recordData.encryptedKey);
     const recordKey = await EncryptionService.importKey(
@@ -188,9 +201,20 @@ export class SharingService {
 
     console.log('✅ Record key decrypted');
 
+    console.log('🔍 Checking receiver public key:', {
+      hasPublicKey: !!receiverData.publicKey,
+      publicKeyType: typeof receiverData.publicKey,
+      publicKeyPreview: receiverData.publicKey?.substring?.(0, 100),
+    });
+
     // 4. Wrap the record key with receiver's RSA public key
-    const receiverPublicKey = await KeyManagementService.importPublicKey(receiverData.publicKey);
-    const wrappedKeyForReceiver = await KeyManagementService.wrapKey(recordKey, receiverPublicKey);
+    const receiverPublicKey = await SharingKeyManagementService.importPublicKey(
+      receiverData.publicKey
+    );
+    const wrappedKeyForReceiver = await SharingKeyManagementService.wrapKey(
+      recordKey,
+      receiverPublicKey
+    );
 
     console.log('✅ Key wrapped for receiver');
 
@@ -209,6 +233,13 @@ export class SharingService {
     const wrappedKeyId = `${request.recordId}_${receiverId}`;
     const wrappedKeyRef = doc(db, 'wrappedKeys', wrappedKeyId);
 
+    console.log('📝 About to create wrapped key:', {
+      wrappedKeyId,
+      recordId: request.recordId,
+      userId: receiverId,
+      currentUser: user.uid,
+    });
+
     await setDoc(wrappedKeyRef, {
       recordId: request.recordId,
       userId: receiverId,
@@ -225,6 +256,13 @@ export class SharingService {
 
     const receiverWalletAddress =
       receiverData.connectedWallet?.address || receiverData.generatedWallet?.address || '';
+
+    console.log('📝 About to create access permission:', {
+      permissionHash,
+      recordId: request.recordId,
+      ownerId: user.uid,
+      receiverId,
+    });
 
     await setDoc(accessPermissionRef, {
       recordId: request.recordId,

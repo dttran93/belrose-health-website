@@ -203,6 +203,19 @@ export interface FileObject {
   belroseFields?: BelroseFields; //AI enriched fields for easy labeling within the Belrose App
   customData?: any; //for non-medical data that may come in different formats, but not be particularly suited to FHIR format
 
+  // Individual encrypted fields (as stored in Firestore)
+  encryptedFileName?: { encrypted: string; iv: string };
+  encryptedExtractedText?: { encrypted: string; iv: string };
+  encryptedOriginalText?: { encrypted: string; iv: string };
+  encryptedFhirData?: { encrypted: string; iv: string };
+  encryptedBelroseFields?: { encrypted: string; iv: string };
+  encryptedCustomData?: { encrypted: string; iv: string };
+
+  // Encryption fields at ROOT level (as stored in Firestore)
+  isEncrypted?: boolean;
+  encryptedKey?: string; // The wrapped AES key (needed for decryption & sharing!)
+  encryptedFileIV?: string; // IV for the file stored in Firebase Storage
+
   //For versioning purposes
   versionInfo?: {
     versionId?: string;

@@ -7,7 +7,7 @@ import { FileObject } from '@/types/core';
 const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject => {
   return {
     id: docId,
-    fileName: data.fileName || 'Unknown File',
+    fileName: data.fileName || (data.encryptedFileName ? '[ENCRYPTED]' : 'Unknown File'),
     fileSize: data.fileSize || 0,
     fileType: data.fileType || 'application/octet-stream',
     status: 'completed', // Files in Firestore are assumed completed
@@ -16,12 +16,23 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
     // File storage properties
     downloadURL: data.downloadURL,
 
-    // Processing properties
+    // ✨ ENCRYPTION FLAGS - Must be preserved!
+    isEncrypted: data.isEncrypted || false,
+    encryptedKey: data.encryptedKey,
+    encryptedFileIV: data.encryptedFileIV,
+
+    // ✨ ENCRYPTED FIELDS - Pass through for decryption service
+    encryptedFileName: data.encryptedFileName,
+    encryptedExtractedText: data.encryptedExtractedText,
+    encryptedOriginalText: data.encryptedOriginalText,
+    encryptedFhirData: data.encryptedFhirData,
+    encryptedBelroseFields: data.encryptedBelroseFields,
+
+    // Processing properties (plaintext for unencrypted, will be populated by decryption)
     extractedText: data.extractedText,
     wordCount: data.wordCount,
     sourceType: data.sourceType,
     isVirtual: data.isVirtual,
-
     originalText: data.originalText,
 
     // Verification properties
@@ -29,10 +40,10 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
     recordHash: data.recordHash,
     previousRecordHash: data.previousRecordHash,
 
-    // FHIR properties
+    // FHIR properties (plaintext for unencrypted, will be populated by decryption)
     fhirData: data.fhirData,
 
-    // AI enrichment properties
+    // AI enrichment properties (plaintext for unencrypted, will be populated by decryption)
     belroseFields: data.belroseFields || undefined,
     aiProcessingStatus: data.aiProcessingStatus || undefined,
 
