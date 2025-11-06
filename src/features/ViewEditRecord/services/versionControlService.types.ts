@@ -1,4 +1,4 @@
-// src/features/ViewEditRecord/services/VersionControlService.types.ts
+// src/features/ViewEditRecord/services/versionControlService.types.ts
 
 import { Timestamp } from 'firebase/firestore';
 
@@ -17,15 +17,59 @@ export interface VersionControlRecord {
   };
 }
 
+// 🆕 Encrypted snapshot structure
+export interface EncryptedSnapshot {
+  // Encrypted data (these are objects with {encrypted: string, iv: string})
+  encryptedFileName?: {
+    encrypted: string;
+    iv: string;
+  };
+  encryptedExtractedText?: {
+    encrypted: string;
+    iv: string;
+  };
+  encryptedOriginalText?: {
+    encrypted: string;
+    iv: string;
+  };
+  encryptedFhirData?: {
+    encrypted: string;
+    iv: string;
+  };
+  encryptedBelroseFields?: {
+    encrypted: string;
+    iv: string;
+  };
+
+  // The encrypted file-level key
+  encryptedKey: string;
+
+  // Flag for type discrimination
+  isEncrypted: true;
+}
+
+// Plain snapshot structure
+export interface PlainSnapshot {
+  // Plain data
+  fileName?: string;
+  extractedText?: string | null;
+  originalText?: string | null;
+  fhirData?: any;
+  belroseFields?: any;
+
+  // Flag for type discrimination
+  isEncrypted: false;
+}
+
 export interface RecordVersion {
   id?: string; // Firestore document ID
-  recordId: string; //Link to parent record
-  versionNumber: number; //Sequential version number
+  recordId: string; // Link to parent record
+  versionNumber: number; // Sequential version number
 
   // Who and when
-  editedBy: string; //User ID
-  editedByName: string; //Display name
-  editedAt: Timestamp; //Firestore timestamp
+  editedBy: string; // User ID
+  editedByName: string; // Display name
+  editedAt: Timestamp; // Firestore timestamp
 
   // What changed
   changes: Change[];
@@ -36,14 +80,8 @@ export interface RecordVersion {
   recordHash: string;
   originalFileHash?: string | null;
 
-  // Full snapshot for restoration
-  fileObjectSnapshot: {
-    fhirData?: any;
-    belroseFields?: any;
-    extractedText?: string | null;
-    originalText?: string | null;
-    blockchainVerification?: any;
-  };
+  // Snapshot - can be either encrypted or plain
+  recordSnapshot: EncryptedSnapshot | PlainSnapshot;
 }
 
 // Consolidated Change interface with all needed properties
@@ -53,8 +91,6 @@ export interface Change {
   oldValue?: any;
   newValue?: any;
   description?: string;
-  fieldType?: string; // Optional for backward compatibility
-  timestamp?: string; // Optional for backward compatibility
 }
 
 // Type alias for backward compatibility
@@ -63,7 +99,7 @@ export type ChangeSet = Change;
 export interface VersionDiff {
   olderVersionId: string;
   newerVersionId: string;
-  changes: Change[]; // Updated to use Change
+  changes: Change[];
   summary: string;
   timestamp: string;
 }

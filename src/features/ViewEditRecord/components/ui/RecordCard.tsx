@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/Button';
 import { FileObject } from '@/types/core';
 import HealthRecordMenu from '@/features/ViewEditRecord/components/ui/RecordMenu';
 import { VerificationBadge } from '@/features/BlockchainVerification/component/VerificationBadge';
-import { RecordVersion } from '../../services/versionControlService.types';
 
 interface HealthRecordCardProps {
   record: FileObject;

@@ -24,6 +24,8 @@ import {
 import { getAuth } from 'firebase/auth';
 import type { FileObject } from '@/types/core';
 import { RecordHashService } from '@/features/ViewEditRecord/services/generateRecordHash';
+import { EncryptionService } from '@/features/Encryption/services/encryptionService';
+import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 
 // ==================== TYPE DEFINITIONS ====================
 
@@ -401,38 +403,10 @@ export const updateFirestoreRecord = async (
   if (!user) throw new Error('User not authenticated');
   if (!documentId) throw new Error('Document ID is required');
 
-  // Filter allowed fields
-  const allowedFields = [
-    'fhirData',
-    'belroseFields',
-    'extractedText',
-    'originalText',
-    'lastModified',
-    'blockchainVerification',
-    'recordHash',
-    'previousRecordHash',
-  ];
-
-  const filteredData = Object.keys(updateData)
-    .filter(key => allowedFields.includes(key))
-    .reduce((obj, key) => {
-      obj[key] = updateData[key];
-      return obj;
-    }, {} as any);
-
-  if (Object.keys(filteredData).length === 0) {
-    throw new Error('No valid fields to update');
-  }
-
-  // Add timestamp
-  if (!filteredData.lastModified) {
-    filteredData.lastModified = new Date().toISOString();
-  }
-
-  console.log('🔄 Updating Firestore with filtered data:', filteredData);
+  console.log('🔄 Starting record update...', { documentId, isEncrypted: updateData.isEncrypted });
 
   try {
-    // Update in global records collection
+    // Get current document
     const docRef = doc(db, 'records', documentId);
     const currentDoc = await getDoc(docRef);
 
@@ -448,26 +422,132 @@ export const updateFirestoreRecord = async (
       throw new Error('You do not have permission to update this record');
     }
 
-    const originalFileObjectForVersioning = JSON.parse(
-      JSON.stringify({
-        ...currentData,
-        id: documentId,
-      })
-    );
+    // 🔒 Check if this is an encrypted record
+    const isEncryptedRecord = !!currentData.isEncrypted;
 
+    let filteredData: any = {};
+
+    if (isEncryptedRecord) {
+      console.log('🔐 Processing encrypted record update...');
+
+      // Get the user's master key from session
+      const masterKey = EncryptionKeyManager.getSessionKey();
+      if (!masterKey) {
+        throw new Error('Please unlock your encryption to save changes.');
+      }
+
+      // Get the record's encrypted file key and decrypt it
+      const encryptedKeyData = EncryptionService.base64ToArrayBuffer(currentData.encryptedKey);
+      const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(
+        encryptedKeyData,
+        masterKey
+      );
+      const fileKey = await EncryptionService.importKey(fileKeyData);
+
+      console.log('✓ File key decrypted');
+
+      // Re-encrypt the updated fields
+      const fieldsToEncrypt: any = {};
+
+      // Encrypt fileName if it changed
+      if (updateData.fileName !== undefined) {
+        const encrypted = await EncryptionService.encryptText(updateData.fileName, fileKey);
+        fieldsToEncrypt.encryptedFileName = {
+          encrypted: EncryptionService.arrayBufferToBase64(encrypted.encrypted),
+          iv: EncryptionService.arrayBufferToBase64(encrypted.iv),
+        };
+      }
+
+      // Encrypt fhirData if it changed
+      if (updateData.fhirData !== undefined) {
+        const encrypted = await EncryptionService.encryptJSON(updateData.fhirData, fileKey);
+        fieldsToEncrypt.encryptedFhirData = {
+          encrypted: EncryptionService.arrayBufferToBase64(encrypted.encrypted),
+          iv: EncryptionService.arrayBufferToBase64(encrypted.iv),
+        };
+      }
+
+      // Encrypt belroseFields if it changed
+      if (updateData.belroseFields !== undefined) {
+        const encrypted = await EncryptionService.encryptJSON(updateData.belroseFields, fileKey);
+        fieldsToEncrypt.encryptedBelroseFields = {
+          encrypted: EncryptionService.arrayBufferToBase64(encrypted.encrypted),
+          iv: EncryptionService.arrayBufferToBase64(encrypted.iv),
+        };
+      }
+
+      // Encrypt extractedText if it changed
+      if (updateData.extractedText !== undefined) {
+        const encrypted = await EncryptionService.encryptText(updateData.extractedText, fileKey);
+        fieldsToEncrypt.encryptedExtractedText = {
+          encrypted: EncryptionService.arrayBufferToBase64(encrypted.encrypted),
+          iv: EncryptionService.arrayBufferToBase64(encrypted.iv),
+        };
+      }
+
+      // Encrypt originalText if it changed
+      if (updateData.originalText !== undefined) {
+        const encrypted = await EncryptionService.encryptText(updateData.originalText, fileKey);
+        fieldsToEncrypt.encryptedOriginalText = {
+          encrypted: EncryptionService.arrayBufferToBase64(encrypted.encrypted),
+          iv: EncryptionService.arrayBufferToBase64(encrypted.iv),
+        };
+      }
+
+      // Add encrypted fields to update
+      filteredData = {
+        ...fieldsToEncrypt,
+        lastModified: new Date().toISOString(),
+      };
+
+      // ❌ DO NOT update plaintext fields for encrypted records
+      // They should remain as placeholders or null
+
+      console.log('✅ Encrypted fields prepared for update:', Object.keys(fieldsToEncrypt));
+    } else {
+      console.log('📝 Processing plaintext record update...');
+
+      // For plaintext records, use the old logic
+      const allowedFields = [
+        'fileName',
+        'fhirData',
+        'belroseFields',
+        'extractedText',
+        'originalText',
+        'lastModified',
+        'blockchainVerification',
+        'recordHash',
+        'previousRecordHash',
+      ];
+
+      filteredData = Object.keys(updateData)
+        .filter(key => allowedFields.includes(key))
+        .reduce((obj, key) => {
+          obj[key] = updateData[key];
+          return obj;
+        }, {} as any);
+
+      if (Object.keys(filteredData).length === 0) {
+        throw new Error('No valid fields to update');
+      }
+
+      // Add timestamp
+      if (!filteredData.lastModified) {
+        filteredData.lastModified = new Date().toISOString();
+      }
+    }
+
+    // Prepare data for version control
     const updatedFileObject = {
       ...currentData,
-      ...filteredData,
+      ...updateData, // Use plaintext for version control (will be encrypted in createVersion)
       id: documentId,
     };
 
     // Generate new record hash
-    let newRecordHash: string | undefined;
-    let previousHash: string | undefined;
-
     try {
-      newRecordHash = await RecordHashService.generateRecordHash(updatedFileObject);
-      previousHash = currentData.recordHash;
+      const newRecordHash = await RecordHashService.generateRecordHash(updatedFileObject);
+      const previousHash = currentData.recordHash;
 
       console.log('🔗 Generated new record hash:', {
         newHash: newRecordHash.substring(0, 12) + '...',
@@ -480,10 +560,15 @@ export const updateFirestoreRecord = async (
       console.warn('⚠️ Failed to generate record hash:', hashError);
     }
 
+    console.log('🔄 Updating Firestore with filtered data:', {
+      fields: Object.keys(filteredData),
+      isEncrypted: isEncryptedRecord,
+    });
+
     // Update the document
     await updateDoc(docRef, filteredData);
 
-    // Create version history (if using version control)
+    // Create version history
     try {
       const { VersionControlService } = await import(
         '@/features/ViewEditRecord/services/versionControlService'
@@ -497,7 +582,7 @@ export const updateFirestoreRecord = async (
 
     console.log('✅ Firestore record updated successfully');
   } catch (error: any) {
-    console.error('Error updating Firestore record:', error);
+    console.error('❌ Error updating Firestore record:', error);
     throw new Error(`Failed to update record: ${error.message}`);
   }
 };

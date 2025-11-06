@@ -19,6 +19,8 @@ import { getAuth } from 'firebase/auth';
 import { FileObject } from '@/types/core';
 import { diff as jsonDiff, IChange } from 'json-diff-ts';
 import { RecordVersion, VersionDiff, RollbackResult, Change } from './versionControlService.types';
+import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
+import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 
 // ==================== MAIN VERSION CONTROL SERVICE ====================
 
@@ -48,22 +50,32 @@ export class VersionControlService {
     if (!this.currentUser) throw new Error('User not authenticated');
 
     console.log('📝 Creating version for record:', recordId);
+    console.log('  - Is encrypted:', !!updatedRecord.isEncrypted);
 
     try {
       const previousVersions = await this.getVersions(recordId);
       const previousVersion = previousVersions[0];
       const versionNumber = previousVersion ? previousVersion.versionNumber + 1 : 1;
 
+      if (previousVersions.length === 0) {
+        console.log('📦 No previous versions found — creating initial version first...');
+        await this.initializeVersioning(recordId, updatedRecord);
+      }
+
       // Calculate changes if there's a previous version
       let changes: Change[] = [];
       if (previousVersion) {
-        changes = this.calculateDifferences(previousVersion.fileObjectSnapshot, {
+        // Decrypt previous version to compare with current
+        const previousSnapshot = await this.decryptVersionSnapshot(previousVersion);
+        const currentSnapshot = {
+          fileName: updatedRecord.fileName,
           fhirData: updatedRecord.fhirData ?? null,
           belroseFields: updatedRecord.belroseFields ?? null,
           extractedText: updatedRecord.extractedText ?? null,
           originalText: updatedRecord.originalText ?? null,
-          blockchainVerification: updatedRecord.blockchainVerification ?? null,
-        });
+        };
+
+        changes = this.calculateDifferences(previousSnapshot, currentSnapshot);
 
         // 🔧 Clean any undefined values from changes
         changes = this.cleanUndefinedValues(changes);
@@ -82,18 +94,47 @@ export class VersionControlService {
         changes: changes,
         commitMessage: commitMessage || this.generateAutoCommitMessage(changes),
 
-        // 🎯 Integrity at parent level - only include if they exist
+        // 🎯 Integrity at parent level
         recordHash: updatedRecord.recordHash || '',
+      };
 
-        // Full snapshot (data only, no metadata)
-        fileObjectSnapshot: {
-          fhirData: updatedRecord.fhirData ?? null,
-          belroseFields: updatedRecord.belroseFields ?? null,
+      // Store encrypted snapshot if record is encrypted, otherwise store plain
+      if (updatedRecord.isEncrypted) {
+        console.log('  🔐 Storing encrypted snapshot...');
+
+        version.recordSnapshot = {
+          // Encrypted data fields
+          encryptedFileName: updatedRecord.encryptedFileName,
+          encryptedExtractedText: updatedRecord.encryptedExtractedText,
+          encryptedOriginalText: updatedRecord.encryptedOriginalText,
+          encryptedFhirData: updatedRecord.encryptedFhirData,
+          encryptedBelroseFields: updatedRecord.encryptedBelroseFields,
+
+          // The encrypted key for this version
+          encryptedKey: updatedRecord.encryptedKey,
+
+          // Metadata
+          isEncrypted: true,
+        };
+
+        console.log('  ✅ Encrypted snapshot stored:', version.recordSnapshot);
+      } else {
+        console.log('  📝 Storing plain snapshot...');
+
+        version.recordSnapshot = {
+          fileName: updatedRecord.fileName,
           extractedText: updatedRecord.extractedText ?? null,
           originalText: updatedRecord.originalText ?? null,
-          blockchainVerification: updatedRecord.blockchainVerification ?? null,
-        },
-      };
+          fhirData: updatedRecord.fhirData ?? null,
+          belroseFields: updatedRecord.belroseFields ?? null,
+
+          isEncrypted: false,
+          fileType: updatedRecord.fileType,
+          fileSize: updatedRecord.fileSize,
+        };
+
+        console.log('  ✅ Plain snapshot stored');
+      }
 
       // Only add these fields if they have actual values (not undefined)
       if (updatedRecord.previousRecordHash) {
@@ -103,7 +144,9 @@ export class VersionControlService {
         version.originalFileHash = updatedRecord.originalFileHash;
       }
 
-      const versionRef = await addDoc(collection(this.db, 'recordVersions'), version);
+      const cleanedVersion = this.cleanUndefinedValues(version);
+
+      const versionRef = await addDoc(collection(this.db, 'recordVersions'), cleanedVersion);
 
       console.log('✅ Version created:', versionRef.id);
       return versionRef.id;
@@ -111,6 +154,55 @@ export class VersionControlService {
       console.error('❌ Failed to create version:', error);
       throw new Error(`Failed to create version: ${error.message}`);
     }
+  }
+
+  /**
+   * Create an initial version snapshot when none exist yet
+   */
+  private async initializeVersioning(recordId: string, recordData: FileObject): Promise<string> {
+    if (!this.currentUser) throw new Error('User not authenticated');
+
+    const version: any = {
+      recordId,
+      versionNumber: 1,
+      editedBy: this.userId,
+      editedByName: this.currentUser.displayName || this.currentUser.email || 'Unknown User',
+      editedAt: Timestamp.now(),
+      commitMessage: 'Initial version (auto-created)',
+      recordHash: recordData.recordHash || '',
+      changes: [],
+    };
+
+    // Store a snapshot of the record (encrypted or not)
+    if (recordData.isEncrypted) {
+      version.recordSnapshot = {
+        encryptedFileName: recordData.encryptedFileName ?? null,
+        encryptedExtractedText: recordData.encryptedExtractedText ?? null,
+        encryptedOriginalText: recordData.encryptedOriginalText ?? null,
+        encryptedFhirData: recordData.encryptedFhirData ?? null,
+        encryptedBelroseFields: recordData.encryptedBelroseFields ?? null,
+        encryptedKey: recordData.encryptedKey ?? null,
+        isEncrypted: true,
+        fileType: recordData.fileType ?? null,
+        fileSize: recordData.fileSize ?? null,
+      };
+    } else {
+      version.recordSnapshot = {
+        fileName: recordData.fileName ?? null,
+        extractedText: recordData.extractedText ?? null,
+        originalText: recordData.originalText ?? null,
+        fhirData: recordData.fhirData ?? null,
+        belroseFields: recordData.belroseFields ?? null,
+        isEncrypted: false,
+        fileType: recordData.fileType ?? null,
+        fileSize: recordData.fileSize ?? null,
+      };
+    }
+
+    const cleaned = this.cleanUndefinedValues(version);
+    const docRef = await addDoc(collection(this.db, 'recordVersions'), cleaned);
+    console.log('🆕 Initial version created:', docRef.id);
+    return docRef.id;
   }
 
   /**
@@ -168,6 +260,65 @@ export class VersionControlService {
     } catch (error: any) {
       console.error('❌ Failed to get version:', error);
       throw new Error(`Failed to get version: ${error.message}`);
+    }
+  }
+
+  /**
+   * Decrypt a version's snapshot for viewing or comparison
+   * Returns plaintext data whether version is encrypted or not
+   */
+  private async decryptVersionSnapshot(version: RecordVersion): Promise<any> {
+    // If the version isn't encrypted, return the plain data
+    if (!version.recordSnapshot.isEncrypted) {
+      console.log('✓ Version is not encrypted, using plain data');
+
+      return {
+        fileName: version.recordSnapshot.fileName ?? null,
+        fhirData: version.recordSnapshot.fhirData ?? null,
+        belroseFields: version.recordSnapshot.belroseFields ?? null,
+        extractedText: version.recordSnapshot.extractedText ?? null,
+        originalText: version.recordSnapshot.originalText ?? null,
+      };
+    }
+
+    console.log(`🔓 Decrypting version ${version.versionNumber}...`);
+
+    // Check if encryption session is active
+    const masterKey = EncryptionKeyManager.getSessionKey();
+    if (!masterKey) {
+      throw new Error(
+        'Cannot decrypt version: No active encryption session. Please unlock your encryption.'
+      );
+    }
+
+    try {
+      // Build an encrypted record object from the version snapshot
+      const encryptedRecord = {
+        encryptedFileName: version.recordSnapshot.encryptedFileName,
+        encryptedExtractedText: version.recordSnapshot.encryptedExtractedText,
+        encryptedOriginalText: version.recordSnapshot.encryptedOriginalText,
+        encryptedFhirData: version.recordSnapshot.encryptedFhirData,
+        encryptedBelroseFields: version.recordSnapshot.encryptedBelroseFields,
+        encryptedKey: version.recordSnapshot.encryptedKey,
+        isEncrypted: true,
+      };
+
+      // Use your existing decryption service
+      const decryptedData = await RecordDecryptionService.decryptRecord(encryptedRecord);
+
+      console.log(`✅ Version ${version.versionNumber} decrypted successfully`);
+
+      // Return in the format expected by diff/display
+      return {
+        fileName: decryptedData.fileName ?? null,
+        fhirData: decryptedData.fhirData ?? null,
+        belroseFields: decryptedData.belroseFields ?? null,
+        extractedText: decryptedData.extractedText ?? null,
+        originalText: decryptedData.originalText ?? null,
+      };
+    } catch (error: any) {
+      console.error(`❌ Failed to decrypt version ${version.versionNumber}:`, error);
+      throw new Error(`Failed to decrypt version: ${error.message}`);
     }
   }
 
@@ -236,12 +387,15 @@ export class VersionControlService {
         `Before restoring to version ${version.versionNumber}`
       );
 
+      // Decrypt the version snapshot if needed
+      const restoredData = await this.decryptVersionSnapshot(version);
+
       // Optionally update the main record
       if (updateMainRecord) {
         const { updateFirestoreRecord } = await import('@/firebase/uploadUtils');
         await updateFirestoreRecord(
           recordId,
-          version.fileObjectSnapshot,
+          restoredData,
           `Restored to version ${version.versionNumber}`
         );
       }
@@ -250,7 +404,7 @@ export class VersionControlService {
 
       return {
         versionId: versionId,
-        restoredData: version.fileObjectSnapshot,
+        restoredData: restoredData,
       };
     } catch (error: any) {
       console.error('❌ Failed to restore version:', error);
@@ -298,14 +452,28 @@ export class VersionControlService {
       throw new Error('One or both versions not found');
     }
 
+    console.log('🔍 Comparing versions:', {
+      v1: version1.versionNumber,
+      v2: version2.versionNumber,
+      v1Encrypted: version1.recordSnapshot?.isEncrypted,
+      v2Encrypted: version2.recordSnapshot?.isEncrypted,
+    });
+
+    // Decrypt both versions before comparing
+    const decryptedSnapshot1 = await this.decryptVersionSnapshot(version1);
+    const decryptedSnapshot2 = await this.decryptVersionSnapshot(version2);
+
     // Ensure we're comparing the right order (older -> newer)
     const [olderVersion, newerVersion] =
       version1.versionNumber < version2.versionNumber ? [version1, version2] : [version2, version1];
 
-    const changes = this.calculateDifferences(
-      olderVersion.fileObjectSnapshot,
-      newerVersion.fileObjectSnapshot
-    );
+    const [olderSnapshot, newerSnapshot] =
+      version1.versionNumber < version2.versionNumber
+        ? [decryptedSnapshot1, decryptedSnapshot2]
+        : [decryptedSnapshot2, decryptedSnapshot1];
+
+    // Now compare the DECRYPTED data
+    const changes = this.calculateDifferences(olderSnapshot, newerSnapshot);
 
     return {
       olderVersionId: olderVersion.id || '',

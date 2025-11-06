@@ -1,5 +1,3 @@
-import { ExtractionSource } from "./visionExtractService.types";
-
 export interface TextExtractionResult {
   text: string;
   method: string;
@@ -7,7 +5,16 @@ export interface TextExtractionResult {
   wordCount?: number;
   processingTime?: 'fast' | 'medium' | 'slow' | 'failed';
   fallbackReason?: string;
-  source?: 'ai_vision' | 'ocr_fallback' | 'pdf_parser' | 'word_parser' | 'plain_text' | 'hybrid' | 'failed' | 'error' | string;
+  source?:
+    | 'ai_vision'
+    | 'ocr_fallback'
+    | 'pdf_parser'
+    | 'word_parser'
+    | 'plain_text'
+    | 'hybrid'
+    | 'failed'
+    | 'error'
+    | string;
   extractedText?: string;
 
   // For vision service compatibility
@@ -45,18 +52,18 @@ export interface UploadResult {
   success: boolean;
   error?: string;
   fileId?: string;
-  
+
   // Firebase details
   documentId?: string;
   downloadURL?: string | null;
   filePath?: string | null;
   uploadedAt?: Date;
   fileSize?: number;
-  
+
   // Legacy compatibility fields (keep for backward compatibility)
-  firestoreId?: string;        // Legacy alias for documentId
-  savedAt?: string;            // Legacy timestamp format
-  fileHash?: string;           // Legacy field
+  firestoreId?: string; // Legacy alias for documentId
+  savedAt?: string; // Legacy timestamp format
+  originalFileHash?: string; // Legacy field
 }
 
 /**

@@ -1,13 +1,13 @@
-import { saveFileMetadataToFirestore, uploadUserFile, deleteFileComplete } from '@/firebase/uploadUtils';
+import { saveFileMetadataToFirestore, uploadUserFile } from '@/firebase/uploadUtils';
 import { FileObject } from '@/types/core';
-import { 
-  UploadResult, 
-  UploadProgress, 
-  UploadOptions, 
+import {
+  UploadResult,
+  UploadProgress,
+  UploadOptions,
   FHIRUpdateData,
   IFileUploadService,
   FileUploadError,
-  UploadErrorCode
+  UploadErrorCode,
 } from './fileUploadService.types';
 
 /**
@@ -17,7 +17,7 @@ import {
 export class FileUploadService implements IFileUploadService {
   // Track upload progress for multiple files
   private uploadProgressMap: Map<string, UploadProgress> = new Map();
-  
+
   // Track active upload operations for cancellation
   private activeUploads: Map<string, AbortController> = new Map();
 
@@ -26,7 +26,7 @@ export class FileUploadService implements IFileUploadService {
    */
   async uploadSingleFile(fileObj: FileObject, options: UploadOptions = {}): Promise<UploadResult> {
     console.log('📤 Starting single file upload:', fileObj.fileName);
-    
+
     try {
       // Handle virtual files differently
       if (fileObj.isVirtual) {
@@ -35,10 +35,9 @@ export class FileUploadService implements IFileUploadService {
 
       // Regular file upload
       return await this.handleRegularFileUpload(fileObj, options);
-      
     } catch (error: any) {
       console.error(`❌ Upload failed for ${fileObj.fileName}:`, error);
-      
+
       // Convert to our custom error type
       const uploadError = this.createUploadError(error, fileObj.id);
       throw uploadError;
@@ -48,39 +47,45 @@ export class FileUploadService implements IFileUploadService {
   /**
    * Handle virtual file upload (no actual file to upload to storage)
    */
-  private async handleVirtualFileUpload(fileObj: FileObject, options: UploadOptions): Promise<UploadResult> {
+  private async handleVirtualFileUpload(
+    fileObj: FileObject,
+    options: UploadOptions
+  ): Promise<UploadResult> {
     console.log('🎯 Processing virtual file upload:', fileObj.fileName);
-    
+
     //DEBUG
     console.log('🔍 FileUploadService received virtual file:', {
       hasBlockchainVerification: !!fileObj.blockchainVerification,
       blockchainData: fileObj.blockchainVerification,
-      allKeys: Object.keys(fileObj)
+      allKeys: Object.keys(fileObj),
     });
 
     // For virtual files, we only save metadata to Firestore
     const firestoreDoc = await saveFileMetadataToFirestore({
       downloadURL: null, // No file in storage
-      filePath: null,    // No storage path
-      fileObj: fileObj
+      filePath: null, // No storage path
+      fileObj: fileObj,
     });
 
     return {
       documentId: firestoreDoc,
-      firestoreId: firestoreDoc,  // Legacy compatibility
+      firestoreId: firestoreDoc, // Legacy compatibility
       downloadURL: '', // Empty for virtual files
-      filePath: '',    // Empty for virtual files
+      filePath: '', // Empty for virtual files
       uploadedAt: new Date(),
       savedAt: new Date().toISOString(), // Legacy compatibility
       fileSize: fileObj.fileSize,
-      success: true
+      success: true,
     };
   }
 
   /**
    * Handle regular file upload to Firebase Storage
    */
-  private async handleRegularFileUpload(fileObj: FileObject, options: UploadOptions): Promise<UploadResult> {
+  private async handleRegularFileUpload(
+    fileObj: FileObject,
+    options: UploadOptions
+  ): Promise<UploadResult> {
     if (!fileObj.file) {
       throw new FileUploadError(
         'No file found in fileObj for regular upload',
@@ -90,27 +95,27 @@ export class FileUploadService implements IFileUploadService {
     }
 
     console.log('📁 Processing regular file upload:', fileObj.fileName);
-    
+
     // Upload file to Firebase Storage
     const { downloadURL, filePath } = await uploadUserFile(fileObj);
-    
+
     // Save metadata to Firestore
     const firestoreDoc = await saveFileMetadataToFirestore({
       downloadURL,
       filePath,
-      fileObj: fileObj
+      fileObj: fileObj,
     });
 
     return {
       documentId: firestoreDoc,
-      firestoreId: firestoreDoc,  // Legacy compatibility
+      firestoreId: firestoreDoc, // Legacy compatibility
       downloadURL,
       filePath,
       uploadedAt: new Date(),
       savedAt: new Date().toISOString(), // Legacy compatibility
       fileSize: fileObj.fileSize,
       originalFileHash: fileObj.originalFileHash,
-      success: true
+      success: true,
     };
   }
 
@@ -118,12 +123,12 @@ export class FileUploadService implements IFileUploadService {
    * Upload file with retry logic and progress tracking
    */
   async uploadWithRetry(
-    fileObj: FileObject, 
-    maxRetries: number = 3, 
+    fileObj: FileObject,
+    maxRetries: number = 3,
     onProgress?: (status: 'uploading' | 'success' | 'error', data: any) => void
   ): Promise<UploadResult> {
     const fileId = fileObj.id;
-    
+
     // Setup abort controller for cancellation
     const abortController = new AbortController();
     this.activeUploads.set(fileId, abortController);
@@ -141,49 +146,49 @@ export class FileUploadService implements IFileUploadService {
             fileId,
             bytesTransferred: 0,
             totalBytes: fileObj.fileSize,
-            percentComplete: 0
+            percentComplete: 0,
           });
 
           onProgress?.('uploading', attempt + 1);
-          
+
           const result = await this.uploadSingleFile(fileObj);
-          
+
           // Update final progress
           this.updateProgress(fileId, {
             fileId,
             bytesTransferred: fileObj.fileSize,
             totalBytes: fileObj.fileSize,
-            percentComplete: 100
+            percentComplete: 100,
           });
 
           onProgress?.('success', result);
-          
+
           console.log(`✅ Upload successful for ${fileObj.fileName} after ${attempt + 1} attempts`);
           return result;
-          
         } catch (error: any) {
           console.error(`💥 Upload attempt ${attempt + 1} failed for ${fileObj.fileName}:`, error);
-          
+
           // If this was the last attempt, give up
           if (attempt === maxRetries) {
             onProgress?.('error', error);
             throw new FileUploadError(
-              `Failed to upload ${fileObj.fileName} after ${maxRetries + 1} attempts: ${error.message}`,
+              `Failed to upload ${fileObj.fileName} after ${maxRetries + 1} attempts: ${
+                error.message
+              }`,
               this.getErrorCode(error),
               fileId
             );
           }
-          
+
           // Exponential backoff: 1s, 2s, 4s
           const delay = Math.pow(2, attempt) * 1000;
           console.log(`⏳ Retrying upload in ${delay}ms...`);
           await this.delay(delay);
         }
       }
-      
+
       // This should never be reached, but TypeScript requires it
       throw new FileUploadError('Unexpected error in retry loop', 'UNKNOWN_ERROR', fileId);
-      
     } finally {
       // Cleanup
       this.activeUploads.delete(fileId);
@@ -192,7 +197,7 @@ export class FileUploadService implements IFileUploadService {
   }
 
   /**
-   * Main upload method - this is what useFileUpload calls
+   * Main upload method - this is what useFileManager calls
    */
   async uploadFile(fileObj: FileObject, options: UploadOptions = {}): Promise<UploadResult> {
     return await this.uploadWithRetry(fileObj, 3, (status, data) => {
@@ -204,23 +209,22 @@ export class FileUploadService implements IFileUploadService {
    * Update a Firestore record with new data
    */
   async updateRecord(fileId: string, data: Record<string, any>): Promise<void> {
-  try {
-    console.log('📝 Updating Firestore record:', fileId, data);
-    
-    const { updateFirestoreRecord } = await import('@/firebase/uploadUtils');
-    await updateFirestoreRecord(fileId, data);
+    try {
+      console.log('📝 Updating Firestore record:', fileId, data);
 
-    console.log('✅ updateFirestoreRecord completed successfully!');   
+      const { updateFirestoreRecord } = await import('@/firebase/uploadUtils');
+      await updateFirestoreRecord(fileId, data);
 
-  } catch (error: any) {
-    console.error('❌ DETAILED ERROR in updateRecord:', error);
-    throw new FileUploadError(
-      `Failed to update record: ${error.message}`,
-      'UPDATE_FAILED',
-      fileId
-    );
+      console.log('✅ updateFirestoreRecord completed successfully!');
+    } catch (error: any) {
+      console.error('❌ DETAILED ERROR in updateRecord:', error);
+      throw new FileUploadError(
+        `Failed to update record: ${error.message}`,
+        'UPDATE_FAILED',
+        fileId
+      );
+    }
   }
-}
 
   /**
    * Update Firestore record with FHIR data
@@ -229,7 +233,7 @@ export class FileUploadService implements IFileUploadService {
     const updateData: FHIRUpdateData = {
       fhirData: fhirData,
       fhirConvertedAt: new Date().toISOString(),
-      processingStatus: 'fhir_converted'
+      processingStatus: 'fhir_converted',
     };
 
     await this.updateRecord(documentId, updateData);
@@ -241,17 +245,16 @@ export class FileUploadService implements IFileUploadService {
   async deleteFile(documentId: string): Promise<void> {
     try {
       console.log('🗑️ FileUploadService deleting from Firebase:', documentId);
-      
+
       const { deleteFileComplete } = await import('@/firebase/uploadUtils');
       const result = await deleteFileComplete(documentId);
-      
+
       console.log('✅ Firebase deletion completed:', {
         documentId,
         deletedFromStorage: result.deletedFromStorage,
         deletedFromFirestore: result.deletedFromFirestore,
         deletedVersions: result.deletedVersions,
       });
-      
     } catch (error: any) {
       console.error('❌ Firebase deletion failed:', error);
       throw new FileUploadError(
@@ -261,7 +264,7 @@ export class FileUploadService implements IFileUploadService {
       );
     }
   }
-  
+
   /**
    * Cancel an active upload
    */
@@ -291,7 +294,7 @@ export class FileUploadService implements IFileUploadService {
   private createUploadError(error: any, fileId?: string): FileUploadError {
     const code = this.getErrorCode(error);
     const message = error.message || 'Unknown upload error';
-    
+
     return new FileUploadError(message, code, fileId);
   }
 
@@ -334,14 +337,14 @@ export class FileUploadService implements IFileUploadService {
    */
   cleanup(): void {
     // Cancel all active uploads
-    this.activeUploads.forEach((controller) => {
+    this.activeUploads.forEach(controller => {
       controller.abort();
     });
-    
+
     // Clear all tracking
     this.activeUploads.clear();
     this.uploadProgressMap.clear();
-    
+
     console.log('🧹 FileUploadService cleaned up');
   }
 }

@@ -11,6 +11,8 @@ import { VerificationBadge } from '@/features/BlockchainVerification/component/V
 import RecordView from './RecordView';
 import { TabType } from './RecordView';
 import { ShareRecordView } from '@/features/Sharing/components/ShareRecordView';
+import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
+import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 
 type ViewMode = 'record' | 'edit' | 'versions' | 'version-detail' | 'verification' | 'share';
 
@@ -54,8 +56,76 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     record.belroseFields || {}
   );
   const [viewingVersion, setViewingVersion] = useState<RecordVersion | null>(null);
+  const [decryptedVersionData, setDecryptedVersionData] = useState<any>(null);
+
+  /**
+   * Decrypt a version's snapshot if it's encrypted
+   */
+  const decryptVersionSnapshot = async (version: RecordVersion): Promise<any> => {
+    // If not encrypted, return plain data directly
+    if (!version.recordSnapshot.isEncrypted) {
+      return {
+        fileName: version.recordSnapshot.fileName ?? null,
+        fhirData: version.recordSnapshot.fhirData ?? null,
+        belroseFields: version.recordSnapshot.belroseFields ?? null,
+        extractedText: version.recordSnapshot.extractedText ?? null,
+        originalText: version.recordSnapshot.originalText ?? null,
+      };
+    }
+
+    // Check if encryption session is active
+    const masterKey = EncryptionKeyManager.getSessionKey();
+    if (!masterKey) {
+      throw new Error('Please unlock your encryption to view this version.');
+    }
+
+    // Decrypt the version
+    const encryptedRecord = {
+      encryptedFileName: version.recordSnapshot.encryptedFileName,
+      encryptedExtractedText: version.recordSnapshot.encryptedExtractedText,
+      encryptedOriginalText: version.recordSnapshot.encryptedOriginalText,
+      encryptedFhirData: version.recordSnapshot.encryptedFhirData,
+      encryptedBelroseFields: version.recordSnapshot.encryptedBelroseFields,
+      encryptedKey: version.recordSnapshot.encryptedKey,
+      isEncrypted: true,
+    };
+
+    const decryptedData = await RecordDecryptionService.decryptRecord(encryptedRecord);
+
+    return {
+      fileName: decryptedData.fileName ?? null,
+      fhirData: decryptedData.fhirData ?? null,
+      belroseFields: decryptedData.belroseFields ?? null,
+      extractedText: decryptedData.extractedText ?? null,
+      originalText: decryptedData.originalText ?? null,
+    };
+  };
+
+  // Helper to convert editedAt to ISO string (handles both Timestamp and Date)
+  const getTimestampString = (editedAt: any): string => {
+    if (!editedAt) return new Date().toISOString();
+
+    // If it's a Firestore Timestamp, call .toDate()
+    if (editedAt.toDate && typeof editedAt.toDate === 'function') {
+      return editedAt.toDate().toISOString();
+    }
+
+    // If it's already a Date, use it directly
+    if (editedAt instanceof Date) {
+      return editedAt.toISOString();
+    }
+
+    // If it's a string, return as-is
+    if (typeof editedAt === 'string') {
+      return editedAt;
+    }
+
+    // Fallback
+    return new Date().toISOString();
+  };
 
   const reconstructFileObjectFromVersion = (
+    versionData: any,
     version: RecordVersion,
     originalRecord: FileObject
   ): FileObject => {
@@ -63,21 +133,20 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       ...originalRecord,
 
       //Restored Data from Snapshot
-      fhirData: version.fileObjectSnapshot.fhirData,
-      belroseFields: version.fileObjectSnapshot.belroseFields,
-      extractedText: version.fileObjectSnapshot.extractedText,
-      originalText: version.fileObjectSnapshot.originalText,
-      blockchainVerification: version.fileObjectSnapshot.blockchainVerification ?? null,
+      fhirData: versionData.fhirData,
+      belroseFields: versionData.belroseFields,
+      extractedText: versionData.extractedText,
+      originalText: versionData.originalText,
 
       // Get Hashes from Version Metadata
       recordHash: version.recordHash ?? null,
-      previousRecordHash: version.previousRecordHash ?? null,
-      originalFileHash: version.originalFileHash ?? null,
+      previousRecordHash: originalRecord.recordHash ?? null,
+      originalFileHash: originalRecord.originalFileHash ?? null,
 
       versionInfo: {
         versionId: version.id,
         versionNumber: version.versionNumber,
-        timestamp: version.editedAt.toDate().toISOString(),
+        timestamp: getTimestampString(version.editedAt),
         editedBy: version.editedBy,
         editedByName: version.editedByName,
         isHistoricalView: true,
@@ -86,8 +155,8 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   };
 
   const displayRecord =
-    viewMode === 'version-detail' && viewingVersion
-      ? reconstructFileObjectFromVersion(viewingVersion, record)
+    viewMode === 'version-detail' && viewingVersion && decryptedVersionData
+      ? reconstructFileObjectFromVersion(decryptedVersionData, viewingVersion, record)
       : record;
 
   // View Mode Handlers
@@ -109,14 +178,25 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     setViewMode('share');
   };
 
-  const handleViewVersion = (version: RecordVersion) => {
-    setViewingVersion(version);
-    setViewMode('version-detail');
+  const handleViewVersion = async (version: RecordVersion) => {
+    try {
+      // Decrypt the version data
+      const decryptedData = await decryptVersionSnapshot(version);
+
+      // Store both the version and its decrypted data
+      setViewingVersion(version);
+      setDecryptedVersionData(decryptedData);
+      setViewMode('version-detail');
+    } catch (error: any) {
+      console.error('Failed to view version:', error);
+      alert(error.message || 'Failed to view version. Please try again.');
+    }
   };
 
   const handleBackToRecord = () => {
     setViewMode('record');
     setViewingVersion(null);
+    setDecryptedVersionData(null); //Clear decrypted data
   };
 
   // DATA HANDLERS
@@ -194,7 +274,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
                 <div className="ml-3 flex items-center gap-2 text-yellow-100">
                   <span className="text-sm font-medium text-primary">
                     Viewing historical version #{viewingVersion.versionNumber} from{' '}
-                    {viewingVersion.editedAt.toDate().toLocaleString()}
+                    {getTimestampString(viewingVersion.editedAt)}
                   </span>
                   {viewingVersion.commitMessage && (
                     <span className="text-xs opacity-75">• {viewingVersion.commitMessage}</span>
