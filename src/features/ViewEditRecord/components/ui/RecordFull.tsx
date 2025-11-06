@@ -13,6 +13,7 @@ import { TabType } from './RecordView';
 import { ShareRecordView } from '@/features/Sharing/components/ShareRecordView';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
+import { toISOString, formatTimestamp } from '@/utils/dataFormattingUtils';
 
 type ViewMode = 'record' | 'edit' | 'versions' | 'version-detail' | 'verification' | 'share';
 
@@ -101,29 +102,6 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     };
   };
 
-  // Helper to convert editedAt to ISO string (handles both Timestamp and Date)
-  const getTimestampString = (editedAt: any): string => {
-    if (!editedAt) return new Date().toISOString();
-
-    // If it's a Firestore Timestamp, call .toDate()
-    if (editedAt.toDate && typeof editedAt.toDate === 'function') {
-      return editedAt.toDate().toISOString();
-    }
-
-    // If it's already a Date, use it directly
-    if (editedAt instanceof Date) {
-      return editedAt.toISOString();
-    }
-
-    // If it's a string, return as-is
-    if (typeof editedAt === 'string') {
-      return editedAt;
-    }
-
-    // Fallback
-    return new Date().toISOString();
-  };
-
   const reconstructFileObjectFromVersion = (
     versionData: any,
     version: RecordVersion,
@@ -146,7 +124,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       versionInfo: {
         versionId: version.id,
         versionNumber: version.versionNumber,
-        timestamp: getTimestampString(version.editedAt),
+        timestamp: toISOString(version.editedAt),
         editedBy: version.editedBy,
         editedByName: version.editedByName,
         isHistoricalView: true,
@@ -274,7 +252,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
                 <div className="ml-3 flex items-center gap-2 text-yellow-100">
                   <span className="text-sm font-medium text-primary">
                     Viewing historical version #{viewingVersion.versionNumber} from{' '}
-                    {getTimestampString(viewingVersion.editedAt)}
+                    {formatTimestamp(viewingVersion.editedAt, 'long')}
                   </span>
                   {viewingVersion.commitMessage && (
                     <span className="text-xs opacity-75">• {viewingVersion.commitMessage}</span>

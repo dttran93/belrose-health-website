@@ -14,11 +14,17 @@ import {
   CheckCircle,
   SquareDashedMousePointer,
   ArrowLeft,
+  Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import { VersionControlService } from '../services/versionControlService';
-import { RecordVersion, VersionHistoryProps } from '../services/versionControlService.types';
+import {
+  RecordVersion,
+  VersionHistoryProps,
+  Change,
+} from '../services/versionControlService.types';
+import { formatTimestamp } from '@/utils/dataFormattingUtils';
 
 export const VersionHistory: React.FC<VersionHistoryProps> = ({
   documentId,
@@ -36,6 +42,10 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [expandedVersions, setExpandedVersions] = useState<Set<string>>(new Set());
   const [isRollingBack, setIsRollingBack] = useState<string | null>(null);
+
+  // 🆕 Track decrypted changes for each version
+  const [decryptedChanges, setDecryptedChanges] = useState<Map<string, Change[]>>(new Map());
+  const [decryptingVersions, setDecryptingVersions] = useState<Set<string>>(new Set());
 
   const versionControl = new VersionControlService();
 
@@ -90,34 +100,92 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
     onViewVersion?.(version);
   };
 
-  const toggleExpanded = (versionId: string) => {
+  // 🆕 Toggle expanded and decrypt changes if needed
+  const toggleExpanded = async (versionId: string, version: RecordVersion) => {
     const newExpanded = new Set(expandedVersions);
+
     if (newExpanded.has(versionId)) {
+      // Collapsing - just remove from expanded set
       newExpanded.delete(versionId);
+      setExpandedVersions(newExpanded);
     } else {
+      // Expanding - need to decrypt if encrypted
       newExpanded.add(versionId);
+      setExpandedVersions(newExpanded);
+
+      // If changes are encrypted and not yet decrypted, decrypt them
+      if (version.hasEncryptedChanges && !decryptedChanges.has(versionId)) {
+        await decryptVersionChanges(versionId, version);
+      }
     }
-    setExpandedVersions(newExpanded);
   };
 
-  const formatTimeAgo = (editedAt: any): string => {
-    const now = new Date();
-    const then = editedAt?.toDate?.() || new Date(editedAt);
-    const diffInHours = (now.getTime() - then.getTime()) / (1000 * 60 * 60);
+  // 🆕 Decrypt changes for a specific version
+  const decryptVersionChanges = async (versionId: string, version: RecordVersion) => {
+    setDecryptingVersions(prev => new Set(prev).add(versionId));
 
-    if (diffInHours < 1) return 'Just now';
-    if (diffInHours < 24) return `${Math.floor(diffInHours)}h ago`;
-    if (diffInHours < 168) return `${Math.floor(diffInHours / 24)}d ago`;
-    return then.toLocaleDateString();
+    try {
+      const changes = await versionControl.getVersionChanges(version);
+      setDecryptedChanges(prev => new Map(prev).set(versionId, changes));
+    } catch (err) {
+      console.error('Failed to decrypt changes:', err);
+      toast.error(
+        err instanceof Error && err.message.includes('encryption session')
+          ? 'Please unlock your encryption to view detailed changes'
+          : 'Failed to decrypt changes'
+      );
+    } finally {
+      setDecryptingVersions(prev => {
+        const next = new Set(prev);
+        next.delete(versionId);
+        return next;
+      });
+    }
   };
 
-  const getChangesSummary = (changes: any[]): string => {
-    if (changes.length === 0) return 'Initial version';
+  // 🆕 Get changes for display (encrypted or plain)
+  const getDisplayChanges = (version: RecordVersion): Change[] | null => {
+    const versionId = version.id || '';
+
+    // If encrypted, return decrypted changes (or null if not yet decrypted)
+    if (version.hasEncryptedChanges) {
+      return decryptedChanges.get(versionId) || null;
+    }
+
+    // Otherwise return plain changes
+    return version.changes || [];
+  };
+
+  // 🆕 Get changes count for summary
+  const getChangesCount = (version: RecordVersion): number => {
+    if (version.hasEncryptedChanges) {
+      // If we've decrypted, use that count
+      const changes = decryptedChanges.get(version.id || '');
+      if (changes) return changes.length;
+
+      // Otherwise, we don't know the count without decrypting
+      return 0;
+    }
+
+    return version.changes?.length || 0;
+  };
+
+  const getChangesSummary = (version: RecordVersion): string => {
+    const displayChanges = getDisplayChanges(version);
+
+    // If changes are encrypted but not yet decrypted
+    if (version.hasEncryptedChanges && !displayChanges) {
+      return 'Encrypted changes (expand to view)';
+    }
+
+    if (!displayChanges || displayChanges.length === 0) {
+      return 'Initial version';
+    }
 
     const operations = {
-      create: changes.filter(c => c.operation === 'create').length,
-      update: changes.filter(c => c.operation === 'update').length,
-      delete: changes.filter(c => c.operation === 'delete').length,
+      create: displayChanges.filter(c => c.operation === 'create').length,
+      update: displayChanges.filter(c => c.operation === 'update').length,
+      delete: displayChanges.filter(c => c.operation === 'delete').length,
     };
 
     const parts: string[] = [];
@@ -197,14 +265,16 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
       {/* Version List */}
       <div className="space-y-2">
         {versions.map((version, index) => {
-          // Use id instead of versionId for the new structure
           const versionId = version.id || '';
           const isExpanded = expandedVersions.has(versionId);
           const isCurrent = index === 0;
           const selectionInfo = getSelectionInfo?.(versionId);
           const isSelected = !!selectionInfo;
+          const displayChanges = getDisplayChanges(version);
+          const hasChanges = getChangesCount(version) > 0 || version.hasEncryptedChanges;
+          const isDecrypting = decryptingVersions.has(versionId);
 
-          // 🎨 Dynamic styling based on selection (restored from old version)
+          // 🎨 Dynamic styling based on selection
           let containerClasses = 'border rounded-lg transition-all duration-200 ';
           if (isCurrent && !isSelected) {
             containerClasses += 'border-green-200 bg-green-50';
@@ -220,7 +290,7 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
               <div className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3">
-                    {/* 🔵 Selection Indicator (restored from old version) */}
+                    {/* 🔵 Selection Indicator */}
                     {isSelected && (
                       <div
                         className={`w-5 h-5 rounded-full ${selectionInfo.badgeClass} text-white text-xs font-bold flex items-center justify-center mt-0.5 flex-shrink-0`}
@@ -245,8 +315,15 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                             Selected #{selectionInfo.order}
                           </span>
                         )}
+                        {/* 🆕 Encrypted indicator */}
+                        {version.hasEncryptedChanges && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            <Lock className="w-3 h-3 mr-1" />
+                            Encrypted
+                          </span>
+                        )}
                         <span className="text-sm text-gray-600">
-                          {formatTimeAgo(version.editedAt)}
+                          {formatTimestamp(version.editedAt, 'relative')}
                         </span>
                       </div>
 
@@ -265,16 +342,16 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {version.editedAt?.toDate?.()?.toLocaleString() || 'Unknown time'}
+                          {formatTimestamp(version.editedAt, 'short') || 'Unknown time'}
                         </div>
-                        <div>{getChangesSummary(version.changes)}</div>
+                        <div>{getChangesSummary(version)}</div>
                       </div>
                     </div>
                   </div>
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 ml-4">
-                    {/* 🔘 Select Button (restored from old version) */}
+                    {/* 🔘 Select Button */}
                     {(versions.length > 1 || !isCurrent) && (
                       <>
                         <Button
@@ -322,11 +399,12 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                       </>
                     )}
 
-                    {version.changes.length > 0 && (
+                    {/* 🆕 Updated expand button - only show if there are changes */}
+                    {hasChanges && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => toggleExpanded(versionId)}
+                        onClick={() => toggleExpanded(versionId, version)}
                         className="px-1 py-1 h-auto"
                       >
                         {isExpanded ? (
@@ -339,32 +417,49 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                   </div>
                 </div>
 
-                {/* Expanded Changes */}
-                {isExpanded && version.changes.length > 0 && (
+                {/* 🆕 Expanded Changes - handles encrypted/plain/loading states */}
+                {isExpanded && (
                   <div className="mt-3 pt-3 border-t border-gray-200">
                     <h4 className="text-sm font-medium mb-2">Changes:</h4>
-                    <div className="space-y-1">
-                      {version.changes.map((change, changeIndex) => (
-                        <div
-                          key={changeIndex}
-                          className={`text-xs p-2 rounded ${
-                            change.operation === 'create'
-                              ? 'bg-green-100 text-green-800'
-                              : change.operation === 'update'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}
-                        >
-                          <div className="font-medium">
-                            {change.operation.charAt(0).toUpperCase() + change.operation.slice(1)}:{' '}
-                            {change.path}
+
+                    {/* Loading state while decrypting */}
+                    {isDecrypting && (
+                      <div className="flex items-center gap-2 text-gray-600 p-4">
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
+                        Decrypting changes...
+                      </div>
+                    )}
+
+                    {/* Show changes if available */}
+                    {!isDecrypting && displayChanges && displayChanges.length > 0 && (
+                      <div className="space-y-1">
+                        {displayChanges.map((change, changeIndex) => (
+                          <div
+                            key={changeIndex}
+                            className={`text-xs p-2 rounded ${
+                              change.operation === 'create'
+                                ? 'bg-green-100 text-green-800'
+                                : change.operation === 'update'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}
+                          >
+                            <div className="font-medium">
+                              {change.operation.charAt(0).toUpperCase() + change.operation.slice(1)}
+                              : {change.path}
+                            </div>
+                            {change.description && (
+                              <div className="mt-1 opacity-75">{change.description}</div>
+                            )}
                           </div>
-                          {change.description && (
-                            <div className="mt-1 opacity-75">{change.description}</div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* No changes */}
+                    {!isDecrypting && displayChanges && displayChanges.length === 0 && (
+                      <div className="text-sm text-gray-500 p-2">No changes in this version</div>
+                    )}
                   </div>
                 )}
               </div>

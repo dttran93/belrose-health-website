@@ -1,5 +1,5 @@
 import React from 'react';
-import { cn } from '@/lib/utils'; // optional: use clsx/tailwind-merge helper if you have one
+import { cn } from '@/utils/utils'; // optional: use clsx/tailwind-merge helper if you have one
 
 interface InputFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
   /** The name of the field, used for form data binding */

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { FileObject } from '@/types/core';
 import HealthRecordMenu from '@/features/ViewEditRecord/components/ui/RecordMenu';
 import { VerificationBadge } from '@/features/BlockchainVerification/component/VerificationBadge';
+import { formatTimestamp } from '@/utils/dataFormattingUtils';
 
 interface HealthRecordCardProps {
   record: FileObject;
@@ -21,27 +22,6 @@ interface HealthRecordCardProps {
   showActions?: boolean;
   showMenu?: boolean;
 }
-
-// Helper functions
-const formatDate = (timestamp: any): string => {
-  if (!timestamp) return 'Unknown Date';
-
-  // Handle Firestore timestamps
-  if (timestamp.toDate && typeof timestamp.toDate === 'function') {
-    return timestamp.toDate().toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  }
-
-  // Handle regular dates
-  return new Date(timestamp).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-};
 
 export const getFileExtension = (fileName?: string): string => {
   if (!fileName) return 'Unknown';
@@ -111,7 +91,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
         {/* Date Information */}
         <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
           <Calendar className="w-4 h-4" />
-          <span>{record.belroseFields?.completedDate}</span>
+          <span>{formatTimestamp(record.belroseFields?.completedDate, 'date-short')}</span>
         </div>
 
         {/* Provider/Institution Information */}

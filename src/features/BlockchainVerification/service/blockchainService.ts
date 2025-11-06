@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import { FileObject, BlockchainVerification } from '@/types/core';
-import { removeUndefinedValues } from '@/lib/utils';
+import { removeUndefinedValues } from '@/utils/dataFormattingUtils';
 import { RecordHashService } from '@/features/ViewEditRecord/services/generateRecordHash';
 
 // Your deployed contract address

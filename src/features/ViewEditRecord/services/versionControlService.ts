@@ -21,6 +21,7 @@ import { diff as jsonDiff, IChange } from 'json-diff-ts';
 import { RecordVersion, VersionDiff, RollbackResult, Change } from './versionControlService.types';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
+import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 
 // ==================== MAIN VERSION CONTROL SERVICE ====================
 
@@ -65,7 +66,6 @@ export class VersionControlService {
       // Calculate changes if there's a previous version
       let changes: Change[] = [];
       if (previousVersion) {
-        // Decrypt previous version to compare with current
         const previousSnapshot = await this.decryptVersionSnapshot(previousVersion);
         const currentSnapshot = {
           fileName: updatedRecord.fileName,
@@ -76,67 +76,71 @@ export class VersionControlService {
         };
 
         changes = this.calculateDifferences(previousSnapshot, currentSnapshot);
-
-        // 🔧 Clean any undefined values from changes
         changes = this.cleanUndefinedValues(changes);
       }
 
       const version: any = {
         recordId,
         versionNumber,
-
-        // Who and when
         editedBy: this.userId,
         editedByName: this.currentUser.displayName || this.currentUser.email || 'Unknown User',
         editedAt: Timestamp.now(),
-
-        // Changes
-        changes: changes,
-        commitMessage: commitMessage || this.generateAutoCommitMessage(changes),
-
-        // 🎯 Integrity at parent level
         recordHash: updatedRecord.recordHash || '',
       };
 
-      // Store encrypted snapshot if record is encrypted, otherwise store plain
+      // Handle changes encryption
+      if (updatedRecord.isEncrypted && changes.length > 0) {
+        console.log('  🔐 Encrypting changes array...');
+
+        // Encrypt the changes using the record's DEK
+        version.encryptedChanges = await this.encryptChanges(changes, updatedRecord.encryptedKey!);
+        version.hasEncryptedChanges = true;
+
+        // Generate commit message BEFORE encrypting (we still have the changes array)
+        version.commitMessage = commitMessage || this.generateAutoCommitMessage(changes);
+
+        console.log('  ✅ Changes encrypted');
+      } else if (changes.length > 0) {
+        console.log('  📝 Storing plain changes...');
+
+        // For unencrypted records, store changes in plain text
+        version.changes = changes;
+        version.hasEncryptedChanges = false;
+        version.commitMessage = commitMessage || this.generateAutoCommitMessage(changes);
+      } else {
+        // No changes (initial version or no diff)
+        version.changes = [];
+        version.hasEncryptedChanges = false;
+        version.commitMessage = commitMessage || 'No changes';
+      }
+
+      // Store encrypted or plain snapshot
       if (updatedRecord.isEncrypted) {
         console.log('  🔐 Storing encrypted snapshot...');
-
         version.recordSnapshot = {
-          // Encrypted data fields
           encryptedFileName: updatedRecord.encryptedFileName,
           encryptedExtractedText: updatedRecord.encryptedExtractedText,
           encryptedOriginalText: updatedRecord.encryptedOriginalText,
           encryptedFhirData: updatedRecord.encryptedFhirData,
           encryptedBelroseFields: updatedRecord.encryptedBelroseFields,
-
-          // The encrypted key for this version
           encryptedKey: updatedRecord.encryptedKey,
-
-          // Metadata
           isEncrypted: true,
         };
-
-        console.log('  ✅ Encrypted snapshot stored:', version.recordSnapshot);
       } else {
         console.log('  📝 Storing plain snapshot...');
-
         version.recordSnapshot = {
           fileName: updatedRecord.fileName,
           extractedText: updatedRecord.extractedText ?? null,
           originalText: updatedRecord.originalText ?? null,
           fhirData: updatedRecord.fhirData ?? null,
           belroseFields: updatedRecord.belroseFields ?? null,
-
           isEncrypted: false,
           fileType: updatedRecord.fileType,
           fileSize: updatedRecord.fileSize,
         };
-
-        console.log('  ✅ Plain snapshot stored');
       }
 
-      // Only add these fields if they have actual values (not undefined)
+      // Add optional fields
       if (updatedRecord.previousRecordHash) {
         version.previousRecordHash = updatedRecord.previousRecordHash;
       }
@@ -145,7 +149,6 @@ export class VersionControlService {
       }
 
       const cleanedVersion = this.cleanUndefinedValues(version);
-
       const versionRef = await addDoc(collection(this.db, 'recordVersions'), cleanedVersion);
 
       console.log('✅ Version created:', versionRef.id);
@@ -261,6 +264,33 @@ export class VersionControlService {
       console.error('❌ Failed to get version:', error);
       throw new Error(`Failed to get version: ${error.message}`);
     }
+  }
+
+  /**
+   * Get changes for a version, decrypting if necessary
+   * Returns the actual Change[] array that can be displayed
+   */
+  async getVersionChanges(version: RecordVersion): Promise<Change[]> {
+    // If changes are encrypted, decrypt them
+    if (version.hasEncryptedChanges && version.encryptedChanges) {
+      // Type guard: ensure we have an encrypted snapshot
+      if (!version.recordSnapshot.isEncrypted) {
+        throw new Error('Cannot decrypt changes: Version has encrypted changes but plain snapshot');
+      }
+
+      if (!version.recordSnapshot.encryptedKey) {
+        throw new Error('Cannot decrypt changes: Missing encryption key');
+      }
+
+      // ✅ TypeScript now knows this is an EncryptedSnapshot
+      return await this.decryptChanges(
+        version.encryptedChanges,
+        version.recordSnapshot.encryptedKey
+      );
+    }
+
+    // Otherwise return plain changes (unencrypted records or legacy versions)
+    return version.changes || [];
   }
 
   /**
@@ -482,6 +512,84 @@ export class VersionControlService {
       summary: this.generateDiffSummary(changes),
       timestamp: new Date().toISOString(),
     };
+  }
+
+  /*=============================================================
+ENCRYPTION/DECRYPTION HELPERS
+===============================================================*/
+  /**
+   * Encrypt changes array using the record's data encryption key
+   */
+  private async encryptChanges(changes: Change[], encryptedRecordKey: string): Promise<string> {
+    console.log('🔐 Encrypting changes array...');
+
+    // Get master key from session
+    const masterKey = EncryptionKeyManager.getSessionKey();
+    if (!masterKey) {
+      throw new Error('Cannot encrypt changes: No active encryption session');
+    }
+
+    // Unwrap the record's DEK using EncryptionService
+    const keyData = EncryptionService.base64ToArrayBuffer(encryptedRecordKey);
+    const recordDEKData = await EncryptionService.decryptKeyWithMasterKey(keyData, masterKey);
+    const recordDEK = await EncryptionService.importKey(recordDEKData);
+
+    // Serialize changes to JSON string
+    const changesJson = JSON.stringify(changes);
+
+    // Encrypt using your EncryptionService
+    const { encrypted, iv } = await EncryptionService.encryptText(changesJson, recordDEK);
+
+    // Combine encrypted data and IV into a single base64 string
+    // Format: [IV][encrypted data] - same pattern you use for other encrypted fields
+    const combined = new Uint8Array(iv.byteLength + encrypted.byteLength);
+    combined.set(new Uint8Array(iv), 0);
+    combined.set(new Uint8Array(encrypted), iv.byteLength);
+
+    const encryptedChanges = EncryptionService.arrayBufferToBase64(combined.buffer);
+
+    console.log('✅ Changes encrypted successfully');
+    return encryptedChanges;
+  }
+
+  /**
+   * Decrypt changes array for viewing
+   */
+  private async decryptChanges(
+    encryptedChanges: string,
+    encryptedRecordKey: string
+  ): Promise<Change[]> {
+    console.log('🔓 Decrypting changes array...');
+
+    // Get master key from session
+    const masterKey = EncryptionKeyManager.getSessionKey();
+    if (!masterKey) {
+      throw new Error(
+        'Cannot decrypt changes: No active encryption session. Please unlock your encryption.'
+      );
+    }
+
+    // Unwrap the record's DEK
+    const keyData = EncryptionService.base64ToArrayBuffer(encryptedRecordKey);
+    const recordDEKData = await EncryptionService.decryptKeyWithMasterKey(keyData, masterKey);
+    const recordDEK = await EncryptionService.importKey(recordDEKData);
+
+    // Decode the combined base64 string
+    const combined = EncryptionService.base64ToArrayBuffer(encryptedChanges);
+
+    // Split into IV and encrypted data (IV is first 12 bytes for GCM)
+    const ivLength = 12; // ENCRYPTION_CONFIG.ivLength
+    const iv = combined.slice(0, ivLength);
+    const encrypted = combined.slice(ivLength);
+
+    // Decrypt using your EncryptionService
+    const changesJson = await EncryptionService.decryptText(encrypted, recordDEK, iv);
+
+    // Parse back to Change array
+    const changes: Change[] = JSON.parse(changesJson);
+
+    console.log(`✅ Decrypted ${changes.length} changes`);
+    return changes;
   }
 
   // ==================== UTILITY METHODS ====================

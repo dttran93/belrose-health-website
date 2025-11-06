@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Calendar, User, Stethoscope, Building2, FileText, Clock } from 'lucide-react';
 import { BelroseFields } from '@/types/core';
+import { formatTimestamp } from '@/utils/dataFormattingUtils';
 
 interface BelroseRecordProps {
   Data: BelroseFields | undefined;
@@ -92,11 +93,7 @@ export const BelroseRecord: React.FC<BelroseRecordProps> = ({
             />
           ) : (
             <p className="text-base font-semibold text-gray-900">
-              {new Date(Data.completedDate || '').toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })}
+              {formatTimestamp(Data.completedDate, 'date-short')}
             </p>
           )}
         </div>
