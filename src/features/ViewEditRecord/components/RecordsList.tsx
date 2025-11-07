@@ -6,6 +6,7 @@ import { useAuthContext } from '@/components/auth/AuthContext';
 import { FileObject } from '@/types/core';
 import useFileManager from '@/features/AddRecord/hooks/useFileManager';
 import { toast } from 'sonner';
+import { toDate } from '@/utils/dataFormattingUtils';
 
 interface RecordsListProps {
   records: FileObject[];
@@ -18,6 +19,8 @@ interface RecordsListProps {
 
   // Additional props
   onAddNewRecord?: () => void;
+  autoOpenRecordId?: string | null;
+  autoOpenInEditMode?: boolean;
 }
 
 export const RecordsList: React.FC<RecordsListProps> = ({
@@ -30,6 +33,10 @@ export const RecordsList: React.FC<RecordsListProps> = ({
   records,
   loading,
   error,
+
+  //Auto-open props
+  autoOpenRecordId,
+  autoOpenInEditMode = false,
 }) => {
   const { user } = useAuthContext();
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,8 +48,36 @@ export const RecordsList: React.FC<RecordsListProps> = ({
   const [initialRecordView, setInitialRecordView] = useState<
     'record' | 'edit' | 'versions' | 'verification' | 'share'
   >('record');
+  const [comingFromAddRecord, setComingFromAddRecord] = useState(false);
 
   // ================== VIEW HANDLERS ==========================
+
+  /*
+   * Auto-opens record when navigating from AddRecord
+   */
+  useEffect(() => {
+    if (autoOpenRecordId && records.length > 0) {
+      const recordToOpen = records.find(r => r.id === autoOpenRecordId);
+
+      if (recordToOpen) {
+        console.log('🎯 Auto-opening record:', recordToOpen.id, 'Edit mode:', autoOpenInEditMode);
+
+        // Directly set the state instead of calling the handlers
+        setSelectedRecord(recordToOpen);
+        setViewMode('detailed');
+        setEditMode(autoOpenInEditMode);
+        setInitialRecordView(autoOpenInEditMode ? 'edit' : 'record');
+        setComingFromAddRecord(true);
+      } else {
+        console.log('❌ Record not found:', autoOpenRecordId);
+        console.log(
+          '📋 Available records:',
+          records.map(r => r.id)
+        );
+      }
+    }
+  }, [autoOpenRecordId, autoOpenInEditMode, records]); // Remove selectedRecord from dependencies
+
   /**
    * Opens a record in detailed view mode
    */
@@ -202,9 +237,16 @@ export const RecordsList: React.FC<RecordsListProps> = ({
   });
 
   // Sort records by date (newest first)
-  const sortedRecords = filteredRecords.sort((a, b) => {
-    const dateA = a.lastModified ? new Date(a.lastModified) : null;
-    const dateB = b.lastModified ? new Date(b.lastModified) : null;
+  const sortedRecords = [...filteredRecords].sort((a, b) => {
+    const dateA = toDate(a.createdAt);
+    const dateB = toDate(b.createdAt);
+
+    console.log('Comparing:', {
+      aTitle: a.belroseFields?.title,
+      dateA,
+      bTitle: b.belroseFields?.title,
+      dateB,
+    });
 
     if (!dateA && !dateB) return 0;
     if (!dateA) return 1;
@@ -278,6 +320,7 @@ export const RecordsList: React.FC<RecordsListProps> = ({
         onBack={handleBackToSummary}
         onSave={handleSaveRecord}
         initialViewMode={initialRecordView}
+        comingFromAddRecord={comingFromAddRecord}
       />
     );
   }

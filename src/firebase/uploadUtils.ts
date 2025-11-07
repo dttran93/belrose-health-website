@@ -9,7 +9,6 @@ import {
   getMetadata,
 } from 'firebase/storage';
 import {
-  getFirestore,
   collection,
   addDoc,
   doc,
@@ -20,8 +19,11 @@ import {
   DocumentReference,
   query,
   where,
+  serverTimestamp,
+  Timestamp,
 } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { db } from './config';
+import { auth } from './config';
 import type { FileObject } from '@/types/core';
 import { RecordHashService } from '@/features/ViewEditRecord/services/generateRecordHash';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
@@ -70,7 +72,6 @@ export async function uploadUserFile(
   });
 
   const storage = getStorage();
-  const auth = getAuth();
   const user = auth.currentUser;
   if (!user) throw new Error('User not authenticated');
 
@@ -135,8 +136,6 @@ export async function createFirestoreRecord({
   filePath,
   fileObj,
 }: SaveMetadataParams): Promise<string> {
-  const db = getFirestore();
-  const auth = getAuth();
   const user = auth.currentUser;
 
   if (!user) throw new Error('User not authenticated');
@@ -223,11 +222,12 @@ export async function createFirestoreRecord({
     blockchainVerification: fileObj.blockchainVerification,
 
     // TIMESTAMPS
-    uploadedAt: new Date(),
-    createdAt: new Date(),
+    uploadedAt: Timestamp.now(),
+    createdAt: Timestamp.now(),
   };
 
   // Save to GLOBAL records collection
+  console.log('📄 Saving documentData:', documentData);
   const docRef = await addDoc(collection(db, 'records'), removeUndefinedValues(documentData));
   return docRef.id;
 }
@@ -237,45 +237,57 @@ export const updateFirestoreRecord = async (
   updateData: any,
   commitMessage?: string
 ): Promise<void> => {
-  const db = getFirestore();
-  const auth = getAuth();
   const user = auth.currentUser;
-
   if (!user) throw new Error('User not authenticated');
   if (!documentId) throw new Error('Document ID is required');
-
   console.log('🔄 Starting record update...', { documentId });
-
   try {
     //Get current document
     const docRef = doc(db, 'records', documentId);
-    const currentDoc = await getDoc(docRef);
+    console.log('📖 Attempting to read document...', {
+      collection: 'records',
+      docId: documentId,
+      userId: user.uid,
+    });
+    let currentDoc;
+    try {
+      currentDoc = await getDoc(docRef);
+      console.log('✅ Document retrieved successfully:', {
+        exists: currentDoc.exists(),
+        hasData: !!currentDoc.data(),
+      });
+    } catch (readError: any) {
+      console.error('❌ Failed to READ document:', readError);
+      console.error('❌ Read error details:', {
+        code: readError.code,
+        message: readError.message,
+        name: readError.name,
+      });
+      throw readError;
+    }
     if (!currentDoc.exists()) throw new Error('Document not found');
-
     const currentData = currentDoc.data();
-
+    //DEBUG
+    console.log('👑 Ownership check:', {
+      owners: currentData.owners,
+      uploadedBy: currentData.uploadedBy,
+      user: user.uid,
+    });
     // Verify user is an owner
     const owners = currentData.owners || [currentData.uploadedBy];
     if (!owners.includes(user.uid)) {
       throw new Error('You do not have permission to update this record');
     }
-
-    //FilteredData will be what's ultimately passed to Firestore function
-    let filteredData: any = {};
-
     // Check if Encrypted, if not throw error
     if (!currentData.isEncrypted) {
       throw new Error('Cannot update a non-encrypted record. All updates must be encrypted.');
     }
-
     console.log('🔐 Processing encrypted record update...');
-
     // Get the user's master key from session
     const masterKey = EncryptionKeyManager.getSessionKey();
     if (!masterKey) {
       throw new Error('Please unlock your encryption to save changes.');
     }
-
     // Get the record's encrypted file key and decrypt it
     const encryptedKeyData = EncryptionService.base64ToArrayBuffer(currentData.encryptedKey);
     const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(
@@ -283,9 +295,7 @@ export const updateFirestoreRecord = async (
       masterKey
     );
     const fileKey = await EncryptionService.importKey(fileKeyData);
-
     console.log('✓ File key decrypted');
-
     //Encrypt updated Fields
     const fieldsToEncrypt: any = {};
     for (const key of ['fileName', 'fhirData', 'belroseFields', 'extractedText', 'originalText']) {
@@ -294,24 +304,20 @@ export const updateFirestoreRecord = async (
           key === 'fileName' || key === 'extractedText' || key === 'originalText'
             ? await EncryptionService.encryptText(updateData[key], fileKey)
             : await EncryptionService.encryptJSON(updateData[key], fileKey);
-
         fieldsToEncrypt[`encrypted${key.charAt(0).toUpperCase() + key.slice(1)}`] = {
           encrypted: EncryptionService.arrayBufferToBase64(encrypted.encrypted),
           iv: EncryptionService.arrayBufferToBase64(encrypted.iv),
         };
       }
     }
-
-    filteredData = {
+    //FilteredData will be what's ultimately passed to Firestore function
+    const filteredData: any = {
       ...fieldsToEncrypt,
-      lastModified: new Date().toISOString(),
+      lastModified: serverTimestamp(),
     };
-
     console.log('✅ Encrypted fields prepared for update:', Object.keys(fieldsToEncrypt));
-
     // Prepare data for version control
     const updatedFileObject = { ...currentData, ...updateData, id: documentId };
-
     // Generate new record hash
     try {
       const newRecordHash = await RecordHashService.generateRecordHash(updatedFileObject);
@@ -321,7 +327,6 @@ export const updateFirestoreRecord = async (
     } catch (hashError) {
       console.warn('⚠️ Failed to generate record hash:', hashError);
     }
-
     // Create version history
     const encryptedUpdatedFileObject = {
       ...currentData,
@@ -339,8 +344,8 @@ export const updateFirestoreRecord = async (
     } catch (versionError) {
       console.warn('⚠️ Failed to create version history:', versionError);
     }
-
     // Update Firestore
+    console.log('🔍 FINAL DATA BEING SENT TO FIRESTORE:', removeUndefinedValues(filteredData));
     await updateDoc(docRef, removeUndefinedValues(filteredData));
     console.log('✅ Firestore record updated successfully');
   } catch (error: any) {
@@ -365,8 +370,6 @@ async function deleteFromStorage(storagePath: string): Promise<void> {
 }
 
 async function deleteFromFirestore(documentId: string): Promise<void> {
-  const db = getFirestore();
-  const auth = getAuth();
   const user = auth.currentUser;
 
   if (!user) throw new Error('User not authenticated');
@@ -400,8 +403,6 @@ async function deleteFromFirestore(documentId: string): Promise<void> {
 }
 
 async function getFileMetadata(documentId: string): Promise<any> {
-  const db = getFirestore();
-  const auth = getAuth();
   const user = auth.currentUser;
 
   if (!user) throw new Error('User not authenticated');
@@ -423,12 +424,9 @@ async function getFileMetadata(documentId: string): Promise<any> {
 }
 
 export async function deleteRecordVersions(documentId: string): Promise<void> {
-  const auth = getAuth();
   const user = auth.currentUser;
   if (!user) throw new Error('User not authenticated');
   if (!documentId) throw new Error('Document ID is required');
-
-  const db = getFirestore();
 
   try {
     console.log('🗑️ Deleting all versions for document:', documentId);
@@ -448,7 +446,6 @@ export async function deleteRecordVersions(documentId: string): Promise<void> {
 }
 
 export async function deleteFileComplete(documentId: string): Promise<DeleteResult> {
-  const auth = getAuth();
   const user = auth.currentUser;
 
   if (!user) throw new Error('User not authenticated');
@@ -513,8 +510,6 @@ export async function updateFirestoreStorageInfo(
   downloadURL: string | null,
   filePath: string | null
 ): Promise<void> {
-  const db = getFirestore();
-  const auth = getAuth();
   const user = auth.currentUser;
 
   if (!user) throw new Error('User not authenticated');
@@ -525,7 +520,7 @@ export async function updateFirestoreStorageInfo(
     await updateDoc(docRef, {
       downloadURL,
       storagePath: filePath,
-      lastModified: new Date().toISOString(),
+      lastModified: serverTimestamp(),
     });
 
     console.log('✅ Firestore storage info updated:', documentId);

@@ -13,6 +13,7 @@ import {
 import { VirtualFileResult } from '../components/CombinedUploadFHIR.type';
 import { UploadResult } from '../services/shared.types';
 import { CombinedRecordProcessingService } from '../services/combinedRecordProcessingService';
+import { useAuthContext } from '@/components/auth/AuthContext';
 
 /**
  * A comprehensive file upload hook that handles:
@@ -26,6 +27,7 @@ import { CombinedRecordProcessingService } from '../services/combinedRecordProce
 export function useFileManager(): UseFileManagerTypes {
   // ==================== STATE MANAGEMENT ====================
 
+  const { user } = useAuthContext(); // user.uid is usually the unique ID
   const [files, setFiles] = useState<FileObject[]>(() => {
     // Try to restore from sessionStorage on mount
     if (typeof window !== 'undefined' && window.sessionStorage) {
@@ -503,6 +505,8 @@ export function useFileManager(): UseFileManagerTypes {
 
           updateFileStatus(fileObj.id, 'completed', {
             firestoreId: result.documentId,
+            uploadedAt: result.uploadedAt?.toISOString() || new Date().toISOString(),
+            owners: [fileObj.uploadedBy!],
           });
 
           // 🎉 SUCCESS TOAST HERE
@@ -568,6 +572,8 @@ export function useFileManager(): UseFileManagerTypes {
         fileType: virtualData.fileType || 'application/json',
         status: 'completed',
         uploadedAt: new Date().toISOString(),
+        uploadedBy: user?.uid,
+        subjectId: virtualData.subjectId || null,
         originalText: virtualData.originalText,
         wordCount: virtualData.wordCount || 0,
         sourceType: virtualData.sourceType,
@@ -633,6 +639,8 @@ export function useFileManager(): UseFileManagerTypes {
           updateFileStatus(generatedFileId, 'completed', {
             firestoreId: uploadResult.documentId,
             uploadedAt: uploadResult.uploadedAt?.toISOString() || new Date().toISOString(),
+            owners: [virtualFile.uploadedBy || 'unknown_user'],
+            subjectId: virtualFile.subjectId || null,
           });
 
           toast.success(`📁 ${virtualFile.fileName} uploaded successfully!`, {

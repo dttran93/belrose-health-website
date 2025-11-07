@@ -161,11 +161,12 @@ export interface FileObject {
   // === FILE PROPERTIES (EXCLUDES FILE, IN ENCRYPTED HEALTH DATA SECTION BELOW)===
   fileSize: number; //file size. Set in createFileObject in useFileManager.ts. file.size for real files
   fileType: string; //file type. Set in createFileObject in useFileManager.ts. file.type for real files or application/fhir+json for virtual - NEVER undefined
+  wordCount?: number; //calculated during text extraction
 
   // === OWNERSHIP AND PERMISSIONS ===
   uploadedBy?: string; // User ID of who created/uploaded the record (for audit trail)
   uploadedByName?: string; //Display name of subject (for UI)
-  subjectId?: string; // User ID of who the record is About (ultimate owner)
+  subjectId?: string | null; // User ID of who the record is About (ultimate owner)
   subjectName?: string; //Display name of subject (for UI)
   owners?: string[]; // Array of user IDs with full acecss (read, update, delete, share)
 
@@ -190,9 +191,9 @@ export interface FileObject {
   storagePath?: string;
 
   // === TIMESTAMPS ===
-  uploadedAt?: string | number;
-  wordCount?: number; //calculated during text extraction
-  lastModified?: string; //Filetracking for UI state management.
+  uploadedAt?: Date;
+  createdAt?: Date;
+  lastModified?: Date; //Filetracking for UI state management.
 
   // PLAIN TEXT PERSONAL HEALTH DATA, MUST BE ENCRYPTED
   fileName: string; //file name or custom name for virtual files. set by createFileObject() in useFileManager.ts
@@ -226,6 +227,7 @@ export interface FileObject {
     isHistoricalView?: true;
   };
 
+  //Used during processing, ArrayBuffers are in memory. But roo-level encrypted Fiels are for retrieval in Firestore
   encryptedData?: {
     encryptedKey: string; // Single key for all encrypted data (Base64)
 

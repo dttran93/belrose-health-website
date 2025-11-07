@@ -64,7 +64,7 @@ export const convertToFHIR = onRequest(
       const prompt = getFHIRConversionPrompt(documentText);
       const responseText = await anthropicService.sendTextMessage(prompt, {
         model: MODELS.SONNET, // Use smart model for complex conversion
-        maxTokens: 4000,
+        maxTokens: 8000,
         temperature: 0.1,
       });
 

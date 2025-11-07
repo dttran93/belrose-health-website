@@ -57,7 +57,7 @@ export const MODELS = {
 // Default options
 const DEFAULT_OPTIONS = {
   temperature: 0.1, // Low temperature for consistent, factual outputs
-  maxTokens: 4000,
+  maxTokens: 8000,
 } as const;
 
 /**
@@ -227,6 +227,15 @@ export class AnthropicService {
    */
   static parseJSONResponse<T>(content: string): T {
     const cleaned = this.cleanMarkdownJson(content);
+
+    // --- Check for incomplete JSON (truncated at end) ---
+    const trimmed = cleaned.trim();
+    const lastChar = trimmed[trimmed.length - 1];
+
+    if (lastChar !== '}' && lastChar !== ']') {
+      console.warn('⚠️ JSON response appears truncated:', trimmed.slice(-50));
+      throw new Error('Incomplete JSON response from Anthropic API');
+    }
 
     try {
       return JSON.parse(cleaned) as T;

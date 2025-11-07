@@ -53,7 +53,7 @@ exports.convertToFHIR = (0, https_1.onRequest)({
         const prompt = (0, prompts_1.getFHIRConversionPrompt)(documentText);
         const responseText = await anthropicService.sendTextMessage(prompt, {
             model: anthropicService_1.MODELS.SONNET, // Use smart model for complex conversion
-            maxTokens: 4000,
+            maxTokens: 8000,
             temperature: 0.1,
         });
         // Parse the AI response into FHIR format

@@ -199,13 +199,8 @@ export class VersionControlService {
         isEncrypted: true,
       };
 
-      // Add optional fields
-      if (updatedRecord.previousRecordHash) {
-        version.previousRecordHash = updatedRecord.previousRecordHash;
-      }
-      if (updatedRecord.originalFileHash) {
-        version.originalFileHash = updatedRecord.originalFileHash;
-      }
+      //recordHash and previousRecordHash are handled in uploadUtils functions don't need them here.
+      version.originalFileHash = latestVersion.originalFileHash;
 
       const cleanedVersion = this.cleanUndefinedValues(version);
       const versionRef = await addDoc(collection(this.db, 'recordVersions'), cleanedVersion);
