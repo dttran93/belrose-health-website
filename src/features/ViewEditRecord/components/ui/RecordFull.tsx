@@ -193,7 +193,6 @@ export const RecordFull: React.FC<RecordFullProps> = ({
 
   // SAVE AND CANCEL HANDLERS
   const hasAnyChanges = hasUnsavedChanges || hasFhirChanges;
-  const shouldDisableSave = comingFromAddRecord ? false : !hasAnyChanges;
 
   const handleSaveRecord = () => {
     const updatedRecord = {
@@ -402,11 +401,22 @@ export const RecordFull: React.FC<RecordFullProps> = ({
             </div>
 
             <div className="flex gap-3">
-              <Button variant="outline" onClick={handleCancelEdit}>
-                <X className="w-4 h-4" />
-                Cancel
-              </Button>
-              <Button onClick={handleSaveRecord} disabled={shouldDisableSave}>
+              {comingFromAddRecord ? (
+                <>
+                  {/* Buttons when coming from "Add Record" */}
+                  <Button onClick={handleCancelEdit} disabled={hasAnyChanges}>
+                    Confirm
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={handleCancelEdit}>
+                    <X className="w-4 h-4" />
+                    Cancel
+                  </Button>
+                </>
+              )}
+              <Button onClick={handleSaveRecord} disabled={!hasAnyChanges}>
                 <Save className="w-4 h-4" />
                 Save Changes
               </Button>

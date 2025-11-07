@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import RecordFull from '@/features/ViewEditRecord/components/ui/RecordFull';
 import { useRecordFileActions } from '@/features/ViewEditRecord/hooks/useRecordFileActions';
 import CombinedUploadFHIR from '@/features/AddRecord/components/CombinedUploadFHIR';
+import { useAuthContext } from '@/components/auth/AuthContext';
 
 interface AddRecordProps {
   className?: string;
@@ -19,6 +20,7 @@ interface AddRecordProps {
  * Handles both file uploads and direct FHIR input
  */
 const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
+  const { user } = useAuthContext();
   const {
     files,
     processedFiles,
@@ -128,65 +130,33 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
     setReviewMode({ active: true, record: fileRecord });
   };
 
-  //Separate handle Save, important because if you just use the normal Save, it will make a second copy
-  const handleSaveFromReview = async (updatedRecord: FileObject) => {
+  /**
+   * Saves changes to a record in Firestore
+   */
+  const handleSaveRecord = async (updatedRecord: FileObject) => {
     try {
-      const documentId = updatedRecord.id;
-
-      if (!documentId) {
+      if (!updatedRecord.id) {
         throw new Error('Cannot save record - no document ID found');
       }
 
-      const currentFile = files.find(f => f.id === documentId);
-      if (!currentFile) {
-        throw new Error('File not found in local state');
-      }
-
-      console.log('🔍 Current file state:', {
-        id: currentFile.id,
-        status: currentFile.status,
-        firestoreId: currentFile.firestoreId,
-        hasFirestoreId: !!currentFile.firestoreId,
-      });
-
-      // ✅ Use the Firestore document ID, not the file ID
-      if (currentFile.firestoreId) {
-        console.log('📝 Document exists in Firestore, updating with ID:', currentFile.firestoreId);
-
-        // 🔥 KEY CHANGE: Use currentFile.firestoreId instead of documentId
-        await updateFirestoreRecord(currentFile.firestoreId, {
-          fhirData: updatedRecord.fhirData,
-          belroseFields: updatedRecord.belroseFields,
-          lastModified: new Date().toISOString(),
-        });
-      } else {
-        console.log('📤 No firestoreId found - uploading for the first time');
-
-        // Update local state with the edited data
-        updateFileStatus(updatedRecord.id, 'uploading', {
-          fhirData: updatedRecord.fhirData,
-          belroseFields: updatedRecord.belroseFields,
-          lastModified: new Date().toISOString(),
-        });
-
-        // Upload to Firestore for the first time
-        await uploadFiles([updatedRecord.id]);
-      }
-
-      // Update local state to reflect the save
-      updateFileStatus(updatedRecord.id, 'completed', {
+      // Update the record in Firestore with both FHIR data and belroseFields
+      await updateFirestoreRecord(updatedRecord.id, {
         fhirData: updatedRecord.fhirData,
         belroseFields: updatedRecord.belroseFields,
         lastModified: new Date().toISOString(),
       });
 
-      toast.success(`Record "${updatedRecord.belroseFields?.title}" saved successfully`, {
+      console.log('Record saved successfully');
+      toast.success(`💾 Record saved for ${updatedRecord.belroseFields?.title}`, {
+        description: 'Record updates saved to cloud storage',
         duration: 4000,
       });
-      setReviewMode({ active: false, record: null });
     } catch (error) {
-      console.error('Failed to save record:', error);
-      toast.error('Failed to save record', { duration: 4000 });
+      console.error('Failed to save record: ', error);
+      toast.error(`Failed to save ${updatedRecord.belroseFields?.title}`, {
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        duration: 4000,
+      });
     }
   };
 
@@ -199,7 +169,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
         initialViewMode={'edit'}
         comingFromAddRecord={true}
         onBack={() => setReviewMode({ active: false, record: null })}
-        onSave={handleSaveFromReview}
+        onSave={handleSaveRecord}
         onCopy={handleCopyRecord}
         onDelete={handleDeleteRecord}
         onDownload={handleDownloadRecord}

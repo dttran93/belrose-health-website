@@ -1,4 +1,4 @@
-import { saveFileMetadataToFirestore, uploadUserFile } from '@/firebase/uploadUtils';
+import { createFirestoreRecord, uploadFileComplete } from '@/firebase/uploadUtils';
 import { FileObject } from '@/types/core';
 import {
   UploadResult,
@@ -61,7 +61,7 @@ export class FileUploadService implements IFileUploadService {
     });
 
     // For virtual files, we only save metadata to Firestore
-    const firestoreDoc = await saveFileMetadataToFirestore({
+    const firestoreDoc = await createFirestoreRecord({
       downloadURL: null, // No file in storage
       filePath: null, // No storage path
       fileObj: fileObj,
@@ -97,10 +97,10 @@ export class FileUploadService implements IFileUploadService {
     console.log('📁 Processing regular file upload:', fileObj.fileName);
 
     // Upload file to Firebase Storage
-    const { downloadURL, filePath } = await uploadUserFile(fileObj);
+    const { downloadURL, filePath } = await uploadFileComplete(fileObj);
 
     // Save metadata to Firestore
-    const firestoreDoc = await saveFileMetadataToFirestore({
+    const firestoreDoc = await createFirestoreRecord({
       downloadURL,
       filePath,
       fileObj: fileObj,

@@ -26,6 +26,7 @@ import type { FileObject } from '@/types/core';
 import { RecordHashService } from '@/features/ViewEditRecord/services/generateRecordHash';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
+import { removeUndefinedValues } from '@/utils/dataFormattingUtils';
 
 // ==================== TYPE DEFINITIONS ====================
 
@@ -57,7 +58,10 @@ export interface DeleteResult {
 
 // ==================== UPLOAD FUNCTIONS ====================
 
-export async function uploadUserFile(fileObj: FileObject): Promise<UploadUserFileResult> {
+export async function uploadUserFile(
+  fileObj: FileObject,
+  documentId: string
+): Promise<UploadUserFileResult> {
   console.log('📄 uploadUserFile received:', {
     hasFile: !!fileObj.file,
     fileName: fileObj.fileName,
@@ -68,7 +72,6 @@ export async function uploadUserFile(fileObj: FileObject): Promise<UploadUserFil
   const storage = getStorage();
   const auth = getAuth();
   const user = auth.currentUser;
-
   if (!user) throw new Error('User not authenticated');
 
   // Handle virtual files (no actual file to upload)
@@ -81,143 +84,53 @@ export async function uploadUserFile(fileObj: FileObject): Promise<UploadUserFil
     };
   }
 
-  // Check for encrypted file data
-  if (fileObj.encryptedData?.file?.encrypted) {
-    console.log('🔒 Uploading ENCRYPTED file to temp storage');
-
-    const encryptedBlob = new Blob([fileObj.encryptedData.file.encrypted], {
-      type: 'application/octet-stream',
-    });
-
-    // Upload to temp location first (will move after getting recordId)
-    const tempId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const tempPath = `temp/${user.uid}/${tempId}.encrypted`;
-    const fileRef = ref(storage, tempPath);
-
-    const metadata = {
-      contentType: 'application/octet-stream',
-      customMetadata: {
-        uploadedBy: user.uid,
-        encrypted: 'true',
-        tempUpload: 'true',
-        uploadedAt: new Date().toISOString(),
-      },
-    };
-
-    try {
-      await uploadBytes(fileRef, encryptedBlob, metadata);
-      const downloadURL = await getDownloadURL(fileRef);
-      console.log('✅ Encrypted file uploaded to temp location');
-
-      return {
-        downloadURL,
-        filePath: tempPath,
-        needsMove: true, // ✨ Flag that this needs to be moved
-      };
-    } catch (error: any) {
-      console.error('❌ Error uploading encrypted file:', error);
-      throw new Error(`Failed to upload encrypted file: ${error.message}`);
-    }
+  // --- Validate encryption ---
+  const encryptedFile = fileObj.encryptedData?.file?.encrypted;
+  if (!encryptedFile) {
+    throw new Error(
+      '🔒 Encryption required: fileObj must be fully encrypted before uploadUserFile is called.'
+    );
   }
+  console.log('🚀 Uploading encrypted file to Firebase Storage...');
 
-  // Handle regular unencrypted files (also to temp location)
-  const file = fileObj.file;
-  if (!file) {
-    throw new Error('No file found in fileObj.');
-  }
+  // Prepare encrypted blob
+  const encryptedBlob = new Blob([encryptedFile], {
+    type: 'application/octet-stream',
+  });
 
-  console.log('📁 Uploading regular file to temp storage');
-
-  const tempId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  const extension = file.name.split('.').pop() || 'file';
-  const tempPath = `temp/${user.uid}/${tempId}.${extension}`;
-  const fileRef = ref(storage, tempPath);
+  //Set for storage
+  const uniqueId = fileObj.id || `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const finalPath = `records/${documentId}/${uniqueId}.encrypted`;
+  const fileRef = ref(storage, finalPath);
 
   const metadata = {
-    contentType: file.type,
+    contentType: 'application/octet-stream',
     customMetadata: {
       uploadedBy: user.uid,
-      originalFilename: fileObj.fileName || file.name,
-      tempUpload: 'true',
+      encrypted: 'true',
       uploadedAt: new Date().toISOString(),
+      recordId: documentId,
+      localFileId: fileObj.id || uniqueId,
     },
   };
 
+  //Upload encrypted Blob
   try {
-    await uploadBytes(fileRef, file, metadata);
+    await uploadBytes(fileRef, encryptedBlob, metadata);
     const downloadURL = await getDownloadURL(fileRef);
+    console.log('✅ Encrypted file uploaded directly to final storage:', finalPath);
 
     return {
       downloadURL,
-      filePath: tempPath,
-      needsMove: true,
-    };
-  } catch (error: any) {
-    console.error('Error uploading file:', error);
-    throw new Error(`Failed to upload file: ${error.message}`);
-  }
-}
-
-/**
- * Move file from temp location to final record-based location
- */
-export async function moveFileToFinalLocation(
-  tempPath: string,
-  recordId: string
-): Promise<{ downloadURL: string; filePath: string }> {
-  const storage = getStorage();
-
-  const tempRef = ref(storage, tempPath);
-
-  // Determine final file name
-  const tempFileName = tempPath.split('/').pop() || 'file';
-  const finalPath = `records/${recordId}/${tempFileName}`;
-  const finalRef = ref(storage, finalPath);
-
-  console.log(`📦 Moving file from temp to final location:`, {
-    from: tempPath,
-    to: finalPath,
-    recordId,
-  });
-
-  try {
-    // Get the temp file's download URL and fetch it
-    const tempDownloadURL = await getDownloadURL(tempRef);
-    const response = await fetch(tempDownloadURL);
-    const blob = await response.blob();
-
-    // Get original metadata
-    const tempMetadata = await getMetadata(tempRef);
-    const { tempUpload, ...cleanedMetadata } = tempMetadata.customMetadata || {};
-
-    // Upload to final location with updated metadata
-    await uploadBytes(finalRef, blob, {
-      contentType: tempMetadata.contentType,
-      customMetadata: {
-        ...cleanedMetadata, // Spread the cleaned metadata (without tempUpload)
-        movedAt: new Date().toISOString(),
-        finalLocation: 'true',
-      },
-    });
-
-    // Delete temp file
-    await deleteObject(tempRef);
-    console.log('✅ File moved successfully, temp file deleted');
-
-    // Get final download URL
-    const finalDownloadURL = await getDownloadURL(finalRef);
-
-    return {
-      downloadURL: finalDownloadURL,
       filePath: finalPath,
     };
   } catch (error: any) {
-    console.error('❌ Error moving file to final location:', error);
-    throw new Error(`Failed to move file: ${error.message}`);
+    console.error('❌ Error uploading encrypted file:', error);
+    throw new Error(`Failed to upload encrypted file: ${error.message}`);
   }
 }
 
-export async function saveFileMetadataToFirestore({
+export async function createFirestoreRecord({
   downloadURL,
   filePath,
   fileObj,
@@ -228,167 +141,95 @@ export async function saveFileMetadataToFirestore({
 
   if (!user) throw new Error('User not authenticated');
 
-  try {
-    // SubjectId is OPTIONAL initially
-    const subjectId = fileObj.subjectId;
-
-    // Owners default to just the uploader if not specified
-    let owners = fileObj.owners;
-
-    if (!owners || owners.length === 0) {
-      owners = [user.uid];
-      console.log('📋 No owners specified, defaulting to uploader:', owners);
-    }
-
-    // If subjectId IS provided, ensure they're in owners
-    if (subjectId && !owners.includes(subjectId)) {
-      console.warn('⚠️ Subject was not in owners array, adding them automatically');
-      owners.push(subjectId);
-    }
-
-    const isEncrypted = !!fileObj.encryptedData || !!fileObj.isEncrypted;
-
-    const documentData: any = {
-      fileSize: fileObj.fileSize,
-      fileType: fileObj.fileType,
-      downloadURL,
-      storagePath: filePath,
-
-      // OWNERSHIP FIELDS
-      uploadedBy: user.uid,
-      uploadedByName: user.displayName || user.email || 'Unknown User',
-      subjectId: subjectId || null,
-      ...(subjectId && {
-        subjectName: fileObj.subjectName || 'Unknown Subject',
-      }),
-      owners: owners,
-
-      // ✨ ENCRYPTION METADATA (if encrypted)
-      ...(fileObj.encryptedData && {
-        isEncrypted: true,
-        // The wrapped AES key that encrypted everything
-        encryptedKey: fileObj.encryptedData.encryptedKey,
-
-        // Encrypted file name (so we can display it when decrypted)
-        encryptedFileName: fileObj.encryptedData.fileName
-          ? {
-              encrypted: fileObj.encryptedData.fileName.encrypted, // base64
-              iv: fileObj.encryptedData.fileName.iv, // base64
-            }
-          : undefined,
-
-        // IV for the encrypted file in Storage (needed to decrypt it later)
-        encryptedFileIV: fileObj.encryptedData.file?.iv,
-
-        // Encrypted extracted text
-        encryptedExtractedText: fileObj.encryptedData.extractedText
-          ? {
-              encrypted: fileObj.encryptedData.extractedText.encrypted, // base64
-              iv: fileObj.encryptedData.extractedText.iv, // base64
-            }
-          : undefined,
-
-        // Encrypted original text
-        encryptedOriginalText: fileObj.encryptedData.originalText
-          ? {
-              encrypted: fileObj.encryptedData.originalText.encrypted, // base64
-              iv: fileObj.encryptedData.originalText.iv, // base64
-            }
-          : undefined,
-
-        // Encrypted FHIR data
-        encryptedFhirData: fileObj.encryptedData.fhirData
-          ? {
-              encrypted: fileObj.encryptedData.fhirData.encrypted, // base64
-              iv: fileObj.encryptedData.fhirData.iv, // base64
-            }
-          : undefined,
-
-        // Encrypted Belrose fields
-        encryptedBelroseFields: fileObj.encryptedData.belroseFields
-          ? {
-              encrypted: fileObj.encryptedData.belroseFields.encrypted, // base64
-              iv: fileObj.encryptedData.belroseFields.iv, // base64
-            }
-          : undefined,
-      }),
-
-      // ✨ PLAINTEXT METADATA (only if NOT encrypted)
-      ...(!isEncrypted && {
-        fileName: fileObj.fileName,
-        extractedText: fileObj.extractedText,
-        wordCount: fileObj.wordCount,
-        fhirData: fileObj.fhirData,
-        belroseFields: fileObj.belroseFields,
-        originalText: fileObj.originalText,
-      }),
-
-      // OTHER FIELDS (always included)
-      status: fileObj.status,
-      sourceType: fileObj.sourceType,
-      isVirtual: fileObj.isVirtual,
-      aiProcessingStatus: fileObj.aiProcessingStatus,
-      recordHash: fileObj.recordHash,
-      originalFileHash: fileObj.originalFileHash,
-      blockchainVerification: fileObj.blockchainVerification,
-
-      // TIMESTAMPS
-      uploadedAt: new Date(),
-      createdAt: new Date(),
-    };
-
-    // Clean undefined fields
-    Object.keys(documentData).forEach(key => {
-      if (documentData[key] === undefined) {
-        delete documentData[key];
-      }
-    });
-
-    console.log('📄 Saving to global records collection:', {
-      fileName: documentData.fileName || '[ENCRYPTED]',
-      uploadedBy: documentData.uploadedBy,
-      isEncrypted: !!documentData.isEncrypted,
-      hasEncryptedKey: !!documentData.encryptedKey,
-    });
-
-    // Save to GLOBAL records collection
-    const docRef = await addDoc(collection(db, 'records'), documentData);
-    const recordId = docRef.id;
-
-    console.log('✅ Record saved to global collection with ID:', recordId);
-
-    //If file was uploaded to temp location, move to final location
-    if (filePath && filePath.startsWith('temp/')) {
-      console.log('📦 File is in temp location, moving to final location...');
-
-      try {
-        const { downloadURL: finalURL, filePath: finalPath } = await moveFileToFinalLocation(
-          filePath,
-          recordId
-        );
-
-        // Update the document with final paths
-        await updateDoc(doc(db, 'records', recordId), {
-          downloadURL: finalURL,
-          storagePath: finalPath,
-        });
-
-        console.log('✅ File moved to final location and document updated:', {
-          finalPath,
-          recordId,
-        });
-      } catch (moveError) {
-        console.error('⚠️ Failed to move file to final location:', moveError);
-        // Don't fail the whole operation - file is still accessible at temp location
-        // You could add a background job to retry failed moves later
-      }
-    }
-
-    return recordId;
-  } catch (error: any) {
-    console.error('Error saving file metadata:', error);
-    throw new Error(`Failed to save file metadata: ${error.message}`);
+  // Must be encrypted
+  if (!fileObj.encryptedData) {
+    throw new Error('File must be encrypted before saving metadata.');
   }
+
+  //Owners default to uploader if not specified
+  const owners = fileObj.owners && fileObj.owners.length > 0 ? fileObj.owners : [user.uid];
+  //if there's a sujbectId and the owners doesn't have subjectId, then add subjectId
+  if (fileObj.subjectId && !owners.includes(fileObj.subjectId)) owners.push(fileObj.subjectId);
+
+  const documentData: any = {
+    fileSize: fileObj.fileSize,
+    fileType: fileObj.fileType,
+    downloadURL,
+    storagePath: filePath,
+
+    // OWNERSHIP FIELDS
+    uploadedBy: user.uid,
+    uploadedByName: user.displayName || user.email || 'Unknown User',
+    subjectId: fileObj.subjectId || null,
+    ...(fileObj.subjectId && {
+      subjectName: fileObj.subjectName || 'Unknown Subject',
+    }),
+    owners: owners,
+
+    isEncrypted: true,
+    encryptedKey: fileObj.encryptedData.encryptedKey,
+    isVirtual: fileObj.isVirtual,
+
+    encryptedFileName: fileObj.encryptedData.fileName
+      ? {
+          encrypted: fileObj.encryptedData.fileName.encrypted,
+          iv: fileObj.encryptedData.fileName.iv,
+        }
+      : undefined,
+
+    encryptedExtractedText: fileObj.encryptedData.extractedText
+      ? {
+          encrypted: fileObj.encryptedData.extractedText.encrypted,
+          iv: fileObj.encryptedData.extractedText.iv,
+        }
+      : undefined,
+
+    encryptedOriginalText: fileObj.encryptedData.originalText
+      ? {
+          encrypted: fileObj.encryptedData.originalText.encrypted,
+          iv: fileObj.encryptedData.originalText.iv,
+        }
+      : undefined,
+
+    encryptedFhirData: fileObj.encryptedData.fhirData
+      ? {
+          encrypted: fileObj.encryptedData.fhirData.encrypted,
+          iv: fileObj.encryptedData.fhirData.iv,
+        }
+      : undefined,
+
+    encryptedBelroseFields: fileObj.encryptedData.belroseFields
+      ? {
+          encrypted: fileObj.encryptedData.belroseFields.encrypted,
+          iv: fileObj.encryptedData.belroseFields.iv,
+        }
+      : undefined,
+
+    encryptedCustomData: fileObj.encryptedData.customData
+      ? {
+          encrypted: fileObj.encryptedData.customData.encrypted,
+          iv: fileObj.encryptedData.customData.iv,
+        }
+      : undefined,
+
+    encryptedFileIV: fileObj.encryptedData.file?.iv,
+
+    // File Metadata
+    sourceType: fileObj.sourceType,
+    wordCount: fileObj.wordCount,
+    aiProcessingStatus: fileObj.aiProcessingStatus,
+    recordHash: fileObj.recordHash,
+    originalFileHash: fileObj.originalFileHash,
+    blockchainVerification: fileObj.blockchainVerification,
+
+    // TIMESTAMPS
+    uploadedAt: new Date(),
+    createdAt: new Date(),
+  };
+
+  // Save to GLOBAL records collection
+  const docRef = await addDoc(collection(db, 'records'), removeUndefinedValues(documentData));
+  return docRef.id;
 }
 
 export const updateFirestoreRecord = async (
@@ -403,16 +244,13 @@ export const updateFirestoreRecord = async (
   if (!user) throw new Error('User not authenticated');
   if (!documentId) throw new Error('Document ID is required');
 
-  console.log('🔄 Starting record update...', { documentId, isEncrypted: updateData.isEncrypted });
+  console.log('🔄 Starting record update...', { documentId });
 
   try {
-    // Get current document
+    //Get current document
     const docRef = doc(db, 'records', documentId);
     const currentDoc = await getDoc(docRef);
-
-    if (!currentDoc.exists()) {
-      throw new Error('Document not found');
-    }
+    if (!currentDoc.exists()) throw new Error('Document not found');
 
     const currentData = currentDoc.data();
 
@@ -422,159 +260,76 @@ export const updateFirestoreRecord = async (
       throw new Error('You do not have permission to update this record');
     }
 
-    // 🔒 Check if this is an encrypted record
-    const isEncryptedRecord = !!currentData.isEncrypted;
-
+    //FilteredData will be what's ultimately passed to Firestore function
     let filteredData: any = {};
 
-    if (isEncryptedRecord) {
-      console.log('🔐 Processing encrypted record update...');
+    // Check if Encrypted, if not throw error
+    if (!currentData.isEncrypted) {
+      throw new Error('Cannot update a non-encrypted record. All updates must be encrypted.');
+    }
 
-      // Get the user's master key from session
-      const masterKey = EncryptionKeyManager.getSessionKey();
-      if (!masterKey) {
-        throw new Error('Please unlock your encryption to save changes.');
-      }
+    console.log('🔐 Processing encrypted record update...');
 
-      // Get the record's encrypted file key and decrypt it
-      const encryptedKeyData = EncryptionService.base64ToArrayBuffer(currentData.encryptedKey);
-      const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(
-        encryptedKeyData,
-        masterKey
-      );
-      const fileKey = await EncryptionService.importKey(fileKeyData);
+    // Get the user's master key from session
+    const masterKey = EncryptionKeyManager.getSessionKey();
+    if (!masterKey) {
+      throw new Error('Please unlock your encryption to save changes.');
+    }
 
-      console.log('✓ File key decrypted');
+    // Get the record's encrypted file key and decrypt it
+    const encryptedKeyData = EncryptionService.base64ToArrayBuffer(currentData.encryptedKey);
+    const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(
+      encryptedKeyData,
+      masterKey
+    );
+    const fileKey = await EncryptionService.importKey(fileKeyData);
 
-      // Re-encrypt the updated fields
-      const fieldsToEncrypt: any = {};
+    console.log('✓ File key decrypted');
 
-      // Encrypt fileName if it changed
-      if (updateData.fileName !== undefined) {
-        const encrypted = await EncryptionService.encryptText(updateData.fileName, fileKey);
-        fieldsToEncrypt.encryptedFileName = {
+    //Encrypt updated Fields
+    const fieldsToEncrypt: any = {};
+    for (const key of ['fileName', 'fhirData', 'belroseFields', 'extractedText', 'originalText']) {
+      if (updateData[key] !== undefined) {
+        const encrypted =
+          key === 'fileName' || key === 'extractedText' || key === 'originalText'
+            ? await EncryptionService.encryptText(updateData[key], fileKey)
+            : await EncryptionService.encryptJSON(updateData[key], fileKey);
+
+        fieldsToEncrypt[`encrypted${key.charAt(0).toUpperCase() + key.slice(1)}`] = {
           encrypted: EncryptionService.arrayBufferToBase64(encrypted.encrypted),
           iv: EncryptionService.arrayBufferToBase64(encrypted.iv),
         };
-      }
-
-      // Encrypt fhirData if it changed
-      if (updateData.fhirData !== undefined) {
-        const encrypted = await EncryptionService.encryptJSON(updateData.fhirData, fileKey);
-        fieldsToEncrypt.encryptedFhirData = {
-          encrypted: EncryptionService.arrayBufferToBase64(encrypted.encrypted),
-          iv: EncryptionService.arrayBufferToBase64(encrypted.iv),
-        };
-      }
-
-      // Encrypt belroseFields if it changed
-      if (updateData.belroseFields !== undefined) {
-        const encrypted = await EncryptionService.encryptJSON(updateData.belroseFields, fileKey);
-        fieldsToEncrypt.encryptedBelroseFields = {
-          encrypted: EncryptionService.arrayBufferToBase64(encrypted.encrypted),
-          iv: EncryptionService.arrayBufferToBase64(encrypted.iv),
-        };
-      }
-
-      // Encrypt extractedText if it changed
-      if (updateData.extractedText !== undefined) {
-        const encrypted = await EncryptionService.encryptText(updateData.extractedText, fileKey);
-        fieldsToEncrypt.encryptedExtractedText = {
-          encrypted: EncryptionService.arrayBufferToBase64(encrypted.encrypted),
-          iv: EncryptionService.arrayBufferToBase64(encrypted.iv),
-        };
-      }
-
-      // Encrypt originalText if it changed
-      if (updateData.originalText !== undefined) {
-        const encrypted = await EncryptionService.encryptText(updateData.originalText, fileKey);
-        fieldsToEncrypt.encryptedOriginalText = {
-          encrypted: EncryptionService.arrayBufferToBase64(encrypted.encrypted),
-          iv: EncryptionService.arrayBufferToBase64(encrypted.iv),
-        };
-      }
-
-      // Add encrypted fields to update
-      filteredData = {
-        ...fieldsToEncrypt,
-        lastModified: new Date().toISOString(),
-      };
-
-      console.log('✅ Encrypted fields prepared for update:', Object.keys(fieldsToEncrypt));
-    } else {
-      console.log('📝 Processing plaintext record update...');
-
-      // For plaintext records, use the old logic
-      const allowedFields = [
-        'fileName',
-        'fhirData',
-        'belroseFields',
-        'extractedText',
-        'originalText',
-        'lastModified',
-        'blockchainVerification',
-        'recordHash',
-        'previousRecordHash',
-      ];
-
-      filteredData = Object.keys(updateData)
-        .filter(key => allowedFields.includes(key))
-        .reduce((obj, key) => {
-          obj[key] = updateData[key];
-          return obj;
-        }, {} as any);
-
-      if (Object.keys(filteredData).length === 0) {
-        throw new Error('No valid fields to update');
-      }
-
-      // Add timestamp
-      if (!filteredData.lastModified) {
-        filteredData.lastModified = new Date().toISOString();
       }
     }
 
-    // Prepare data for version control (includes the NEW data)
-    const updatedFileObject = {
-      ...currentData,
-      ...updateData, // Use plaintext for version control (will be encrypted in createVersion)
-      id: documentId,
+    filteredData = {
+      ...fieldsToEncrypt,
+      lastModified: new Date().toISOString(),
     };
+
+    console.log('✅ Encrypted fields prepared for update:', Object.keys(fieldsToEncrypt));
+
+    // Prepare data for version control
+    const updatedFileObject = { ...currentData, ...updateData, id: documentId };
 
     // Generate new record hash
     try {
       const newRecordHash = await RecordHashService.generateRecordHash(updatedFileObject);
-      const previousHash = currentData.recordHash;
-
-      console.log('🔗 Generated new record hash:', {
-        newHash: newRecordHash.substring(0, 12) + '...',
-        previousHash: previousHash ? previousHash.substring(0, 12) + '...' : 'none',
-      });
-
       filteredData.recordHash = newRecordHash;
-      filteredData.previousRecordHash = previousHash;
-
-      // Also add to updatedFileObject for version control
-      updatedFileObject.recordHash = newRecordHash;
-      updatedFileObject.previousRecordHash = previousHash;
+      filteredData.previousRecordHash = currentData.recordHash;
+      console.log('🔗 Record hash updated');
     } catch (hashError) {
       console.warn('⚠️ Failed to generate record hash:', hashError);
     }
 
-    // CREATE VERSION HISTORY FIRST (before updating Firestore)
-
-    //Merge the newly encrypted fields into the updatedSnapshot
+    // Create version history
     const encryptedUpdatedFileObject = {
       ...currentData,
-      ...filteredData, // contains freshly encrypted ciphertexts
+      ...filteredData,
       id: documentId,
       isEncrypted: true,
     };
-
     try {
-      console.log(
-        '📸 Creating version snapshot AFTER Encryption, but BEFORE updating Firestore...'
-      );
       const { VersionControlService } = await import(
         '@/features/ViewEditRecord/services/versionControlService'
       );
@@ -583,17 +338,10 @@ export const updateFirestoreRecord = async (
       console.log('✅ Version history created');
     } catch (versionError) {
       console.warn('⚠️ Failed to create version history:', versionError);
-      // Don't throw - we still want to update the record
     }
 
-    // Update Firestore (after version is created)
-    console.log('🔄 Updating Firestore with filtered data:', {
-      fields: Object.keys(filteredData),
-      isEncrypted: isEncryptedRecord,
-    });
-
-    await updateDoc(docRef, filteredData);
-
+    // Update Firestore
+    await updateDoc(docRef, removeUndefinedValues(filteredData));
     console.log('✅ Firestore record updated successfully');
   } catch (error: any) {
     console.error('❌ Error updating Firestore record:', error);
@@ -753,20 +501,77 @@ export async function deleteFileComplete(documentId: string): Promise<DeleteResu
   }
 }
 
+/**
+ * Helper function to update Firestore document with storage information.
+ * Needed because we want to organize storage by Firestore document ID (records/{docId}/...).
+ * But we don't have documentID until we create the firestore doc
+ * So uploadFileComplete starts with creating file, then upload to path,
+ * finally updating the doc with storage details using this function.
+ */
+export async function updateFirestoreStorageInfo(
+  documentId: string,
+  downloadURL: string | null,
+  filePath: string | null
+): Promise<void> {
+  const db = getFirestore();
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  if (!user) throw new Error('User not authenticated');
+  if (!documentId) throw new Error('Document ID is required');
+
+  try {
+    const docRef = doc(db, 'records', documentId);
+    await updateDoc(docRef, {
+      downloadURL,
+      storagePath: filePath,
+      lastModified: new Date().toISOString(),
+    });
+
+    console.log('✅ Firestore storage info updated:', documentId);
+  } catch (error: any) {
+    console.error('❌ Error updating Firestore storage info:', error);
+    throw new Error(`Failed to update storage info: ${error.message}`);
+  }
+}
+
 // ==================== COMBINED WORKFLOWS ====================
 
+/**
+ * Complete file upload workflow:
+ * 1. Create Firestore document (gets permanent ID)
+ * 2. Upload file to storage (organized by Firestore ID)
+ * 3. Update Firestore with storage details
+ *
+ * This ensures the global record repository structure where records
+ * exist independently and can be accessed by multiple users (multi-tenant)
+ */
 export async function uploadFileComplete(fileObj: FileObject): Promise<UploadFileCompleteResult> {
   try {
-    const { downloadURL, filePath } = await uploadUserFile(fileObj);
-    const documentId = await saveFileMetadataToFirestore({
-      downloadURL,
-      filePath,
+    console.log('🚀 Starting complete file upload workflow...');
+
+    // STEP 1: Create Firestore document FIRST to get permanent ID
+    const documentId = await createFirestoreRecord({
+      downloadURL: null, // Will be updated after upload
+      filePath: null, // Will be updated after upload
       fileObj,
     });
 
+    console.log('✅ Firestore document created:', documentId);
+
+    // STEP 2: Upload file to storage using the Firestore document ID
+    const { downloadURL, filePath, isVirtual } = await uploadUserFile(fileObj, documentId);
+
+    // STEP 3: Update Firestore with storage details (if not virtual)
+    if (!isVirtual && downloadURL && filePath) {
+      await updateFirestoreStorageInfo(documentId, downloadURL, filePath);
+    }
+
+    console.log('✅ Complete upload workflow finished:', documentId);
+
     return { documentId, downloadURL, filePath };
   } catch (error: any) {
-    console.error('Error in complete file upload:', error);
+    console.error('❌ Error in complete file upload:', error);
     throw error;
   }
 }
