@@ -57,6 +57,14 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
 
     try {
       const versionsData = await versionControl.getVersionHistory(documentId);
+      console.log(
+        '🔍 Versions loaded:',
+        versionsData.map(v => ({
+          versionNumber: v.versionNumber,
+          commitMessage: v.commitMessage,
+          id: v.id,
+        }))
+      );
 
       setVersions(versionsData);
       onVersionsLoaded?.(versionsData);
@@ -313,13 +321,6 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                             className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${selectionInfo.bgClass} ${selectionInfo.textClass}`}
                           >
                             Selected #{selectionInfo.order}
-                          </span>
-                        )}
-                        {/* 🆕 Encrypted indicator */}
-                        {version.hasEncryptedChanges && (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            <Lock className="w-3 h-3 mr-1" />
-                            Encrypted
                           </span>
                         )}
                         <span className="text-sm text-gray-600">

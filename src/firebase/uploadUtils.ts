@@ -500,9 +500,6 @@ export const updateFirestoreRecord = async (
         lastModified: new Date().toISOString(),
       };
 
-      // ❌ DO NOT update plaintext fields for encrypted records
-      // They should remain as placeholders or null
-
       console.log('✅ Encrypted fields prepared for update:', Object.keys(fieldsToEncrypt));
     } else {
       console.log('📝 Processing plaintext record update...');
@@ -537,7 +534,7 @@ export const updateFirestoreRecord = async (
       }
     }
 
-    // Prepare data for version control
+    // Prepare data for version control (includes the NEW data)
     const updatedFileObject = {
       ...currentData,
       ...updateData, // Use plaintext for version control (will be encrypted in createVersion)
@@ -556,29 +553,46 @@ export const updateFirestoreRecord = async (
 
       filteredData.recordHash = newRecordHash;
       filteredData.previousRecordHash = previousHash;
+
+      // Also add to updatedFileObject for version control
+      updatedFileObject.recordHash = newRecordHash;
+      updatedFileObject.previousRecordHash = previousHash;
     } catch (hashError) {
       console.warn('⚠️ Failed to generate record hash:', hashError);
     }
 
+    // CREATE VERSION HISTORY FIRST (before updating Firestore)
+
+    //Merge the newly encrypted fields into the updatedSnapshot
+    const encryptedUpdatedFileObject = {
+      ...currentData,
+      ...filteredData, // contains freshly encrypted ciphertexts
+      id: documentId,
+      isEncrypted: true,
+    };
+
+    try {
+      console.log(
+        '📸 Creating version snapshot AFTER Encryption, but BEFORE updating Firestore...'
+      );
+      const { VersionControlService } = await import(
+        '@/features/ViewEditRecord/services/versionControlService'
+      );
+      const versionService = new VersionControlService();
+      await versionService.createVersion(documentId, encryptedUpdatedFileObject, commitMessage);
+      console.log('✅ Version history created');
+    } catch (versionError) {
+      console.warn('⚠️ Failed to create version history:', versionError);
+      // Don't throw - we still want to update the record
+    }
+
+    // Update Firestore (after version is created)
     console.log('🔄 Updating Firestore with filtered data:', {
       fields: Object.keys(filteredData),
       isEncrypted: isEncryptedRecord,
     });
 
-    // Update the document
     await updateDoc(docRef, filteredData);
-
-    // Create version history
-    try {
-      const { VersionControlService } = await import(
-        '@/features/ViewEditRecord/services/versionControlService'
-      );
-      const versionService = new VersionControlService();
-      await versionService.createVersion(documentId, updatedFileObject, commitMessage);
-      console.log('✅ Version history created');
-    } catch (versionError) {
-      console.warn('⚠️ Failed to create version history:', versionError);
-    }
 
     console.log('✅ Firestore record updated successfully');
   } catch (error: any) {

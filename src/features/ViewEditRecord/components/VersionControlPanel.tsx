@@ -108,6 +108,15 @@ export const VersionControlPanel: React.FC<VersionControlPanelProps> = ({
   };
 
   console.log('Version Array', versions.length);
+  console.log(
+    'Fetched versions:',
+    versions.map(v => ({
+      id: v.id,
+      versionNumber: v.versionNumber,
+      createdAt: v.editedAt?.toDate?.() || v.editedAt,
+      record: v.recordSnapshot,
+    }))
+  );
 
   return (
     <div className={`space-y-4 ${className}`}>
