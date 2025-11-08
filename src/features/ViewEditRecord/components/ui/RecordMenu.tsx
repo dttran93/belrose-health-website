@@ -11,6 +11,8 @@ import {
   LucideIcon,
   GitBranch,
   Shield,
+  FileLock,
+  UserLock,
 } from 'lucide-react';
 
 // Types for the menu system
@@ -40,8 +42,9 @@ interface RecordMenuProps {
   onView?: (record: any) => void;
   onEdit?: (record: any) => void;
   onVersion?: (record: any) => void;
-  onShare?: any;
+  onShare?: (record: any) => void;
   onViewVerification?: (record: any) => void;
+  onPermissions?: (record: any) => void;
 
   //File Management Props
   onDownload?: (record: any) => void;
@@ -63,6 +66,7 @@ interface RecordMenuProps {
   showDelete?: boolean;
   showVersions?: boolean;
   showVerification?: boolean;
+  showPermissions?: boolean;
 
   // Additional menu items from parent
   additionalItems?: MenuItem[];
@@ -74,6 +78,7 @@ interface RecordMenuProps {
  * Version History
  * Share Record
  * Verify Record
+ * Manage Permissions
  * ---------------
  * Download Record
  * Copy Data
@@ -88,6 +93,7 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
   onVersion,
   onShare,
   onViewVerification,
+  onPermissions,
   onDownload,
   onCopy,
   onDelete,
@@ -102,6 +108,7 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
   showDelete = true,
   showVersions = true,
   showVerification = true,
+  showPermissions = true,
   additionalItems = [],
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -187,6 +194,15 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
         label: 'Verify Record',
         icon: Shield,
         onClick: createHandler(onViewVerification),
+      });
+    }
+
+    if (showPermissions && onPermissions) {
+      items.push({
+        key: 'permissions',
+        label: 'Permissions',
+        icon: UserLock,
+        onClick: createHandler(onPermissions),
       });
     }
 

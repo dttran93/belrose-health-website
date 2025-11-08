@@ -14,8 +14,16 @@ import { ShareRecordView } from '@/features/Sharing/components/ShareRecordView';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 import { toISOString, formatTimestamp } from '@/utils/dataFormattingUtils';
+import PermissionsManager from '@/features/Permissions/component/PermissionManager';
 
-type ViewMode = 'record' | 'edit' | 'versions' | 'version-detail' | 'verification' | 'share';
+type ViewMode =
+  | 'record'
+  | 'edit'
+  | 'versions'
+  | 'version-detail'
+  | 'verification'
+  | 'share'
+  | 'permissions';
 
 interface RecordFullProps {
   record: FileObject;
@@ -30,7 +38,7 @@ interface RecordFullProps {
 
   //Navigation Props
   onBack: (record: FileObject) => void; //for returning to the previous screen, could be different so need a prop
-  initialViewMode?: 'record' | 'edit' | 'versions' | 'verification' | 'share'; //version-detail can never be the initial view, since it only comes from versions
+  initialViewMode?: 'record' | 'edit' | 'versions' | 'verification' | 'permissions' | 'share'; //version-detail can never be the initial view, since it only comes from versions
   comingFromAddRecord?: boolean; //so the Save button is activated when coming from the AddRecord screen, otherwise it'd be disabled and the user is stuck
 }
 
@@ -154,6 +162,10 @@ export const RecordFull: React.FC<RecordFullProps> = ({
 
   const handleSharePage = () => {
     setViewMode('share');
+  };
+
+  const handlePermissionManager = () => {
+    setViewMode('permissions');
   };
 
   const handleViewVersion = async (version: RecordVersion) => {
@@ -305,6 +317,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
                 onViewVerification={
                   viewMode !== 'verification' ? handleViewVerification : undefined
                 }
+                onPermissions={viewMode !== 'permissions' ? handlePermissionManager : undefined}
                 onDownload={onDownload}
                 onCopy={onCopy}
                 onDelete={onDelete}
@@ -384,6 +397,12 @@ export const RecordFull: React.FC<RecordFullProps> = ({
             activeTab={activeTab}
             onTabChange={setActiveTab}
           />
+        </div>
+      )}
+
+      {viewMode === 'permissions' && (
+        <div className="px-4 py-2">
+          <PermissionsManager record={displayRecord} onBack={handleBackToRecord} />
         </div>
       )}
 

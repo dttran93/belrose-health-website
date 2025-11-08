@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   FileText,
   Upload,
@@ -71,6 +71,9 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   //DEBUG LOGGING
   console.log('🔍 CombinedUploadFHIR props check:');
   console.log('🔍 updateFileStatus:', typeof updateFileStatus, updateFileStatus);
+
+  // Add a ref to track files currently being uploaded
+  const uploadingFiles = useRef<Set<string>>(new Set());
 
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('upload');
@@ -188,37 +191,29 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   const handleFileComplete = async (fileItem: FileObject): Promise<void> => {
     console.log('🚨 handleFileComplete called for:', fileItem.fileName, 'status:', fileItem.status);
 
-    if (!updateFileStatus) {
-      console.error('❌ updateFileStatus is not available in handleFileComplete');
-      return;
-    }
-
-    // 🔧 GET LATEST FILE STATE - The fileItem parameter might be stale!
+    // 🔧 GET LATEST FILE STATE
     const latestFile = files.find(f => f.id === fileItem.id);
     if (!latestFile) {
       console.error('❌ Could not find latest file state for:', fileItem.id);
       return;
     }
 
-    console.log('🔍 Latest file state:', {
-      name: latestFile.fileName,
-      status: latestFile.status,
-      aiStatus: latestFile.aiProcessingStatus,
-      hasBelroseFields: !!latestFile.belroseFields,
-      belroseFields: latestFile.belroseFields,
-    });
+    // 🚨 REF-BASED DEDUPLICATION - Check this FIRST
+    if (uploadingFiles.current.has(latestFile.id)) {
+      console.log('⏭️ Skipping - upload already in progress (ref check):', latestFile.fileName);
+      return;
+    }
 
     // Use shouldAutoUpload with latest file state
     if (!shouldAutoUpload(latestFile)) {
       console.log(`⏭️ File not ready for upload: ${latestFile.fileName}`);
-      console.log(`   Status: ${latestFile.status}, AI Status: ${latestFile.aiProcessingStatus}`);
       return;
     }
 
-    // 🚨 PREVENT MULTIPLE UPLOADS - Enhanced checks
+    // Check if already uploaded to Firestore
     if (latestFile.firestoreId || latestFile.uploadInProgress === true) {
-      console.log('⏭️ Skipping upload - already processed (local check):', {
-        documentId: latestFile.id,
+      console.log('⏭️ Skipping upload - already uploaded:', {
+        firestoreId: latestFile.firestoreId, // ← Fixed the log
         uploadInProgress: latestFile.uploadInProgress,
       });
       return;
@@ -233,16 +228,15 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
     // Only upload if file has extracted text
     if (latestFile.extractedText) {
       try {
+        // 🔒 ADD TO REF SET IMMEDIATELY
+        uploadingFiles.current.add(latestFile.id);
+
         // Mark as upload in progress
         updateFileStatus(latestFile.id, 'uploading', { uploadInProgress: true });
 
         console.log('🚀 Auto-uploading completed file with ALL data:', latestFile.fileName);
-        console.log('🏥 File has FHIR data:', !!latestFile.fhirData);
-        console.log('🤖 AI Status:', latestFile.aiProcessingStatus);
-        console.log('📊 Has BelroseFields:', !!latestFile.belroseFields);
-        console.log('📋 BelroseFields content:', latestFile.belroseFields);
 
-        // Upload with LATEST file state (including belroseFields!)
+        // Upload with LATEST file state
         const uploadResults: UploadResult[] = await uploadFiles([latestFile.id]);
 
         if (uploadResults && uploadResults[0]?.success) {
@@ -250,11 +244,9 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
 
           updateFileStatus(latestFile.id, 'completed', {
             firestoreId: uploadResults[0].documentId,
-            uploadedAt: new Date().toISOString(),
             uploadInProgress: false,
           });
 
-          // Enhanced success message with AI info
           const aiInfo = latestFile.belroseFields?.visitType
             ? `Classified as: ${latestFile.belroseFields.visitType}`
             : 'Processing completed';
@@ -279,12 +271,10 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
           description: error instanceof Error ? error.message : 'Upload failed',
           duration: 5000,
         });
+      } finally {
+        // 🔓 ALWAYS REMOVE FROM REF SET
+        uploadingFiles.current.delete(latestFile.id);
       }
-    } else {
-      console.log(
-        'ℹ️ File completed without extracted text, skipping upload:',
-        latestFile.fileName
-      );
     }
   };
 

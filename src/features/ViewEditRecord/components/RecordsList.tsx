@@ -46,7 +46,7 @@ export const RecordsList: React.FC<RecordsListProps> = ({
   const [editMode, setEditMode] = useState(false);
   // Track what view RecordFull should open in ('record', 'versions', 'verification', 'share')
   const [initialRecordView, setInitialRecordView] = useState<
-    'record' | 'edit' | 'versions' | 'verification' | 'share'
+    'record' | 'edit' | 'versions' | 'verification' | 'permissions' | 'share'
   >('record');
   const [comingFromAddRecord, setComingFromAddRecord] = useState(false);
 
@@ -128,6 +128,17 @@ export const RecordsList: React.FC<RecordsListProps> = ({
     setViewMode('detailed');
     setEditMode(false);
     setInitialRecordView('verification'); // Open in verification view
+    console.log('View verification for:', record);
+  };
+
+  /**
+   * Opens permission manager view for a record
+   */
+  const handlePermissionManager = (record: FileObject) => {
+    setSelectedRecord(record);
+    setViewMode('detailed');
+    setEditMode(false);
+    setInitialRecordView('permissions'); // Open in verification view
     console.log('View verification for:', record);
   };
 
@@ -405,6 +416,7 @@ export const RecordsList: React.FC<RecordsListProps> = ({
                 onVersions={handleViewVersions}
                 onShare={handleSharePage}
                 onViewVerification={handleViewVerification}
+                onPermissions={handlePermissionManager}
                 onDelete={handleDeleteRecord}
                 onCopy={handleCopyRecord}
                 onDownload={handleDownloadRecord}

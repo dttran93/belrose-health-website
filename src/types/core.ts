@@ -1,3 +1,4 @@
+import { Timestamp } from 'firebase/firestore';
 import { ReactNode } from 'react';
 
 // ==================== USER & AUTHENTICATION ====================
@@ -191,9 +192,9 @@ export interface FileObject {
   storagePath?: string;
 
   // === TIMESTAMPS ===
-  uploadedAt?: Date;
-  createdAt?: Date;
-  lastModified?: Date; //Filetracking for UI state management.
+  uploadedAt?: Timestamp;
+  createdAt?: Timestamp;
+  lastModified?: Timestamp; //Filetracking for UI state management.
 
   // PLAIN TEXT PERSONAL HEALTH DATA, MUST BE ENCRYPTED
   fileName: string; //file name or custom name for virtual files. set by createFileObject() in useFileManager.ts

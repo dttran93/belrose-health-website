@@ -60,6 +60,8 @@ export interface DeleteResult {
   deletedFromStorage: boolean;
   deletedFromFirestore: boolean;
   deletedVersions: boolean;
+  deletedAccessPermissions: boolean;
+  deletedWrappedKeys: boolean;
 }
 
 // ==================== UPLOAD FUNCTIONS ====================
@@ -226,7 +228,7 @@ export async function createFirestoreRecord({
     blockchainVerification: fileObj.blockchainVerification,
 
     // TIMESTAMPS
-    uploadedAt: Timestamp.now(),
+    uploadedAt: fileObj.uploadedAt || Timestamp.now(),
     createdAt: Timestamp.now(),
   };
 
@@ -449,6 +451,52 @@ export async function deleteRecordVersions(documentId: string): Promise<void> {
   }
 }
 
+// Delete access permissions for a record
+export async function deleteAccessPermissions(documentId: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('User not authenticated');
+  if (!documentId) throw new Error('Document ID is required');
+
+  try {
+    console.log('🗑️ Deleting access permissions for document:', documentId);
+
+    // Query all access permissions where recordId matches
+    const q = query(collection(db, 'accessPermissions'), where('recordId', '==', documentId));
+
+    const snapshot = await getDocs(q);
+    const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+    await Promise.all(deletePromises);
+
+    console.log(`✅ Deleted ${snapshot.docs.length} access permission documents`);
+  } catch (error: any) {
+    console.error('❌ Error deleting access permissions:', error);
+    console.warn('⚠️ Continuing despite access permission deletion error');
+  }
+}
+
+// Delete wrapped keys for a record
+export async function deleteWrappedKeys(documentId: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('User not authenticated');
+  if (!documentId) throw new Error('Document ID is required');
+
+  try {
+    console.log('🗑️ Deleting wrapped keys for document:', documentId);
+
+    // Query all wrapped keys where recordId matches
+    const q = query(collection(db, 'wrappedKeys'), where('recordId', '==', documentId));
+
+    const snapshot = await getDocs(q);
+    const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+    await Promise.all(deletePromises);
+
+    console.log(`✅ Deleted ${snapshot.docs.length} wrapped key documents`);
+  } catch (error: any) {
+    console.error('❌ Error deleting wrapped keys:', error);
+    console.warn('⚠️ Continuing despite wrapped key deletion error');
+  }
+}
+
 export async function deleteFileComplete(documentId: string): Promise<DeleteResult> {
   const user = auth.currentUser;
 
@@ -485,6 +533,24 @@ export async function deleteFileComplete(documentId: string): Promise<DeleteResu
       // Continue even if version deletion fails
     }
 
+    // Delete access permissions (best effort)
+    let deletedAccessPermissions = false;
+    try {
+      await deleteAccessPermissions(documentId);
+      deletedAccessPermissions = true;
+    } catch (permissionError) {
+      console.warn('⚠️ Failed to delete access permissions, continuing...', permissionError);
+    }
+
+    // Delete wrapped keys (best effort)
+    let deletedWrappedKeys = false;
+    try {
+      await deleteWrappedKeys(documentId);
+      deletedWrappedKeys = true;
+    } catch (keyError) {
+      console.warn('⚠️ Failed to delete wrapped keys, continuing...', keyError);
+    }
+
     // Delete from Firestore (this is the critical operation)
     await deleteFromFirestore(documentId);
 
@@ -495,6 +561,8 @@ export async function deleteFileComplete(documentId: string): Promise<DeleteResu
       deletedFromStorage,
       deletedFromFirestore: true,
       deletedVersions,
+      deletedAccessPermissions,
+      deletedWrappedKeys,
     };
   } catch (error: any) {
     console.error('Error in complete file deletion:', error);
