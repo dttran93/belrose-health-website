@@ -236,3 +236,45 @@ export const removeUndefinedValues = <T>(data: T): T => {
   // Handle primitives (convert undefined to null)
   return (data === undefined ? null : data) as T;
 };
+
+/* 
+====================================================================
+BASE64 TO ARRAYBUFFER FORMATTING
+====================================================================
+Base64 is how text is represented using 64 safe characters (A-Z, a-z, 0-9, +, /)
+ArrayBuffer is a raw binary format used for processing in JavaScript. 
+
+Process is usually: 
+1. User uploads a file in ArrayBuffer/Blob format
+2. Convert to base64 for storage
+3. retrieve as base64
+4. convert back to ArrayBuffer for processing in browser
+
+*/
+
+export class DataFormattingUtils {
+  /**
+   * Converts an ArrayBuffer to a base64 string.
+   * Useful for storing/transmitting binary data (like encryption keys or ciphertext) as text.
+   */
+  static arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    const binary = Array.from(bytes)
+      .map(byte => String.fromCharCode(byte))
+      .join('');
+    return btoa(binary);
+  }
+
+  /**
+   * Converts a base64 string back to an ArrayBuffer.
+   * Used to decode stored/transmitted encryption data back to binary format.
+   */
+  static base64ToArrayBuffer(base64: string): ArrayBuffer {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+}

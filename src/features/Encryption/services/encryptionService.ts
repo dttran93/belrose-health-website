@@ -1,6 +1,7 @@
 // src/services/encryptionService.ts
 import { ENCRYPTION_CONFIG } from '../encryptionConfig';
 import * as bip39 from 'bip39';
+import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 
 export class EncryptionService {
   /**
@@ -206,8 +207,8 @@ export class EncryptionService {
     console.log('  🔒 Encrypting file name...');
     const fileNameResult = await this.encryptText(fileName, fileKey);
     result.fileName = {
-      encrypted: this.arrayBufferToBase64(fileNameResult.encrypted),
-      iv: this.arrayBufferToBase64(fileNameResult.iv),
+      encrypted: arrayBufferToBase64(fileNameResult.encrypted),
+      iv: arrayBufferToBase64(fileNameResult.iv),
     };
     console.log(`    ✓ File name encrypted (${fileNameResult.encrypted.byteLength} bytes)`);
 
@@ -218,7 +219,7 @@ export class EncryptionService {
       const { encrypted, iv } = await this.encryptFile(fileData, fileKey);
       result.file = {
         encrypted,
-        iv: this.arrayBufferToBase64(iv),
+        iv: arrayBufferToBase64(iv),
       };
       console.log(`    ✓ File encrypted (${encrypted.byteLength} bytes)`);
     }
@@ -228,8 +229,8 @@ export class EncryptionService {
       console.log('  🔒 Encrypting extracted text...');
       const textResult = await this.encryptText(extractedText, fileKey);
       result.extractedText = {
-        encrypted: this.arrayBufferToBase64(textResult.encrypted),
-        iv: this.arrayBufferToBase64(textResult.iv),
+        encrypted: arrayBufferToBase64(textResult.encrypted),
+        iv: arrayBufferToBase64(textResult.iv),
       };
       console.log(`    ✓ Extracted text encrypted (${textResult.encrypted.byteLength} bytes)`);
     }
@@ -239,8 +240,8 @@ export class EncryptionService {
       console.log('  🔒 Encrypting original text...');
       const originalTextResult = await this.encryptText(originalText, fileKey);
       result.originalText = {
-        encrypted: this.arrayBufferToBase64(originalTextResult.encrypted),
-        iv: this.arrayBufferToBase64(originalTextResult.iv),
+        encrypted: arrayBufferToBase64(originalTextResult.encrypted),
+        iv: arrayBufferToBase64(originalTextResult.iv),
       };
       console.log(
         `    ✓ Original text encrypted (${originalTextResult.encrypted.byteLength} bytes)`
@@ -252,8 +253,8 @@ export class EncryptionService {
       console.log('  🔒 Encrypting FHIR data...');
       const fhirResult = await this.encryptJSON(fhirData, fileKey);
       result.fhirData = {
-        encrypted: this.arrayBufferToBase64(fhirResult.encrypted),
-        iv: this.arrayBufferToBase64(fhirResult.iv),
+        encrypted: arrayBufferToBase64(fhirResult.encrypted),
+        iv: arrayBufferToBase64(fhirResult.iv),
       };
       console.log(`    ✓ FHIR data encrypted (${fhirResult.encrypted.byteLength} bytes)`);
     }
@@ -263,8 +264,8 @@ export class EncryptionService {
       console.log('  🔒 Encrypting Belrose fields...');
       const belroseResult = await this.encryptJSON(belroseFields, fileKey);
       result.belroseFields = {
-        encrypted: this.arrayBufferToBase64(belroseResult.encrypted),
-        iv: this.arrayBufferToBase64(belroseResult.iv),
+        encrypted: arrayBufferToBase64(belroseResult.encrypted),
+        iv: arrayBufferToBase64(belroseResult.iv),
       };
       console.log(`    ✓ Belrose fields encrypted (${belroseResult.encrypted.byteLength} bytes)`);
     }
@@ -274,8 +275,8 @@ export class EncryptionService {
       console.log('  🔒 Encrypting custom data...');
       const customDataResult = await this.encryptJSON(customData, fileKey);
       result.customData = {
-        encrypted: this.arrayBufferToBase64(customDataResult.encrypted),
-        iv: this.arrayBufferToBase64(customDataResult.iv),
+        encrypted: arrayBufferToBase64(customDataResult.encrypted),
+        iv: arrayBufferToBase64(customDataResult.iv),
       };
       console.log(`    ✓ Custom data encrypted (${customDataResult.encrypted.byteLength} bytes)`);
     }
@@ -283,7 +284,7 @@ export class EncryptionService {
     // Encrypt the file key with user's master key
     console.log('  🔒 Encrypting file key with user master key...');
     const encryptedKeyData = await this.encryptKeyWithMasterKey(fileKey, userKey);
-    result.encryptedKey = this.arrayBufferToBase64(encryptedKeyData);
+    result.encryptedKey = arrayBufferToBase64(encryptedKeyData);
     console.log('    ✓ File key encrypted');
 
     console.log('✅ Complete record encryption finished');
@@ -317,7 +318,7 @@ export class EncryptionService {
     console.log('🔓 Starting complete record decryption...');
 
     // Decrypt the file key
-    const keyData = this.base64ToArrayBuffer(encryptedKey);
+    const keyData = base64ToArrayBuffer(encryptedKey);
     const fileKeyData = await this.decryptKeyWithMasterKey(keyData, userKey);
     const fileKey = await this.importKey(fileKeyData);
     console.log('  ✓ File key decrypted');
@@ -328,7 +329,7 @@ export class EncryptionService {
     result.fileName = await this.decryptText(
       encryptedData.fileName.encrypted,
       fileKey,
-      this.base64ToArrayBuffer(encryptedData.fileName.iv)
+      base64ToArrayBuffer(encryptedData.fileName.iv)
     );
     console.log(`    ✓ File name decrypted: ${result.fileName}`);
 
@@ -338,7 +339,7 @@ export class EncryptionService {
       result.file = await this.decryptFile(
         encryptedData.file.encrypted,
         fileKey,
-        this.base64ToArrayBuffer(encryptedData.file.iv)
+        base64ToArrayBuffer(encryptedData.file.iv)
       );
       console.log(`    ✓ File decrypted (${result.file.byteLength} bytes)`);
     }
@@ -349,7 +350,7 @@ export class EncryptionService {
       result.extractedText = await this.decryptText(
         encryptedData.extractedText.encrypted,
         fileKey,
-        this.base64ToArrayBuffer(encryptedData.extractedText.iv)
+        base64ToArrayBuffer(encryptedData.extractedText.iv)
       );
       console.log(`    ✓ Extracted text decrypted (${result.extractedText.length} chars)`);
     }
@@ -360,7 +361,7 @@ export class EncryptionService {
       result.originalText = await this.decryptText(
         encryptedData.originalText.encrypted,
         fileKey,
-        this.base64ToArrayBuffer(encryptedData.originalText.iv)
+        base64ToArrayBuffer(encryptedData.originalText.iv)
       );
       console.log(`    ✓ Original text decrypted (${result.originalText.length} chars)`);
     }
@@ -371,7 +372,7 @@ export class EncryptionService {
       result.fhirData = await this.decryptJSON(
         encryptedData.fhirData.encrypted,
         fileKey,
-        this.base64ToArrayBuffer(encryptedData.fhirData.iv)
+        base64ToArrayBuffer(encryptedData.fhirData.iv)
       );
       console.log('    ✓ FHIR data decrypted');
     }
@@ -382,7 +383,7 @@ export class EncryptionService {
       result.belroseFields = await this.decryptJSON(
         encryptedData.belroseFields.encrypted,
         fileKey,
-        this.base64ToArrayBuffer(encryptedData.belroseFields.iv)
+        base64ToArrayBuffer(encryptedData.belroseFields.iv)
       );
       console.log('    ✓ Belrose fields decrypted');
     }
@@ -393,7 +394,7 @@ export class EncryptionService {
       result.customData = await this.decryptJSON(
         encryptedData.customData.encrypted,
         fileKey,
-        this.base64ToArrayBuffer(encryptedData.customData.iv)
+        base64ToArrayBuffer(encryptedData.customData.iv)
       );
       console.log('    ✓ Custom data decrypted');
     }
@@ -403,18 +404,6 @@ export class EncryptionService {
   }
 
   // =================== HELPER METHODS =========================
-  public static arrayBufferToBase64(buffer: ArrayBuffer): string {
-    return btoa(String.fromCharCode(...new Uint8Array(buffer)));
-  }
-
-  public static base64ToArrayBuffer(base64: string): ArrayBuffer {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes.buffer;
-  }
 
   /**
    * Generate a random salt for password-based key derivation
