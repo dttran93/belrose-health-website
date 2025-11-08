@@ -169,7 +169,7 @@ export interface FileObject {
   uploadedByName?: string; //Display name of subject (for UI)
   subjectId?: string | null; // User ID of who the record is About (ultimate owner)
   subjectName?: string; //Display name of subject (for UI)
-  owners?: string[]; // Array of user IDs with full acecss (read, update, delete, share)
+  owners: string[]; // Array of user IDs with full acecss (read, update, delete, share)
 
   // === PROCESSING STATUS ===
   status: FileStatus; //Processing property. Initially set as pending. Then pending/processing... see below

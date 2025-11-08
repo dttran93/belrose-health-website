@@ -14,6 +14,7 @@ import { VirtualFileResult } from '../components/CombinedUploadFHIR.type';
 import { UploadResult } from '../services/shared.types';
 import { CombinedRecordProcessingService } from '../services/combinedRecordProcessingService';
 import { useAuthContext } from '@/components/auth/AuthContext';
+import { Timestamp } from 'firebase/firestore';
 
 /**
  * A comprehensive file upload hook that handles:
@@ -93,7 +94,7 @@ export function useFileManager(): UseFileManagerTypes {
       fileSize: file.size,
       fileType: file.type,
       status: 'pending' as FileStatus,
-      uploadedAt: new Date().toISOString(),
+      uploadedAt: Timestamp.now(),
       extractedText: '',
       wordCount: 0,
       sourceType: 'File Upload',
@@ -505,7 +506,7 @@ export function useFileManager(): UseFileManagerTypes {
 
           updateFileStatus(fileObj.id, 'completed', {
             firestoreId: result.documentId,
-            uploadedAt: result.uploadedAt?.toISOString() || new Date().toISOString(),
+            uploadedAt: result.uploadedAt || Timestamp.now(),
             owners: [fileObj.uploadedBy!],
           });
 
@@ -571,7 +572,7 @@ export function useFileManager(): UseFileManagerTypes {
         fileSize: virtualData.fileSize || 0,
         fileType: virtualData.fileType || 'application/json',
         status: 'completed',
-        uploadedAt: new Date().toISOString(),
+        uploadedAt: Timestamp.now(),
         uploadedBy: user?.uid,
         subjectId: virtualData.subjectId || null,
         originalText: virtualData.originalText,
@@ -638,7 +639,7 @@ export function useFileManager(): UseFileManagerTypes {
 
           updateFileStatus(generatedFileId, 'completed', {
             firestoreId: uploadResult.documentId,
-            uploadedAt: uploadResult.uploadedAt?.toISOString() || new Date().toISOString(),
+            uploadedAt: uploadResult.uploadedAt || Timestamp.now(),
             owners: [virtualFile.uploadedBy || 'unknown_user'],
             subjectId: virtualFile.subjectId || null,
           });
