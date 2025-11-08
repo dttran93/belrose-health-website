@@ -2,10 +2,12 @@
 
 import { EncryptionService } from './encryptionService';
 import { EncryptionKeyManager } from './encryptionKeyManager';
+import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 
 export interface EncryptedRecord {
   isEncrypted: boolean;
   encryptedKey?: string;
+  fileName?: string;
   encryptedFileName?: { encrypted: string; iv: string };
   encryptedExtractedText?: { encrypted: string; iv: string };
   encryptedOriginalText?: { encrypted: string; iv: string };
@@ -33,7 +35,7 @@ export class RecordDecryptionService {
     // If not encrypted, return as-is
     if (!encryptedRecord.isEncrypted || !encryptedRecord.encryptedKey) {
       console.log('📄 Record is not encrypted, returning as-is');
-      return encryptedRecord as unknown as DecryptedRecord;
+      return encryptedRecord as DecryptedRecord;
     }
 
     console.log('🔓 Decrypting record...');
@@ -46,7 +48,7 @@ export class RecordDecryptionService {
 
     try {
       // 1. Decrypt the file's AES key using the master key
-      const encryptedKeyData = EncryptionService.base64ToArrayBuffer(encryptedRecord.encryptedKey);
+      const encryptedKeyData = base64ToArrayBuffer(encryptedRecord.encryptedKey);
       const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(
         encryptedKeyData,
         masterKey
@@ -62,9 +64,9 @@ export class RecordDecryptionService {
       // Decrypt file name
       if (encryptedRecord.encryptedFileName) {
         decryptedData.fileName = await EncryptionService.decryptText(
-          EncryptionService.base64ToArrayBuffer(encryptedRecord.encryptedFileName.encrypted),
+          base64ToArrayBuffer(encryptedRecord.encryptedFileName.encrypted),
           fileKey,
-          EncryptionService.base64ToArrayBuffer(encryptedRecord.encryptedFileName.iv)
+          base64ToArrayBuffer(encryptedRecord.encryptedFileName.iv)
         );
         console.log('✓ File name decrypted');
       }
@@ -72,9 +74,9 @@ export class RecordDecryptionService {
       // Decrypt extracted text
       if (encryptedRecord.encryptedExtractedText) {
         decryptedData.extractedText = await EncryptionService.decryptText(
-          EncryptionService.base64ToArrayBuffer(encryptedRecord.encryptedExtractedText.encrypted),
+          base64ToArrayBuffer(encryptedRecord.encryptedExtractedText.encrypted),
           fileKey,
-          EncryptionService.base64ToArrayBuffer(encryptedRecord.encryptedExtractedText.iv)
+          base64ToArrayBuffer(encryptedRecord.encryptedExtractedText.iv)
         );
         console.log('✓ Extracted text decrypted');
       }
@@ -82,9 +84,9 @@ export class RecordDecryptionService {
       // Decrypt original text
       if (encryptedRecord.encryptedOriginalText) {
         decryptedData.originalText = await EncryptionService.decryptText(
-          EncryptionService.base64ToArrayBuffer(encryptedRecord.encryptedOriginalText.encrypted),
+          base64ToArrayBuffer(encryptedRecord.encryptedOriginalText.encrypted),
           fileKey,
-          EncryptionService.base64ToArrayBuffer(encryptedRecord.encryptedOriginalText.iv)
+          base64ToArrayBuffer(encryptedRecord.encryptedOriginalText.iv)
         );
         console.log('✓ Original text decrypted');
       }
@@ -92,9 +94,9 @@ export class RecordDecryptionService {
       // Decrypt FHIR data
       if (encryptedRecord.encryptedFhirData) {
         decryptedData.fhirData = await EncryptionService.decryptJSON(
-          EncryptionService.base64ToArrayBuffer(encryptedRecord.encryptedFhirData.encrypted),
+          base64ToArrayBuffer(encryptedRecord.encryptedFhirData.encrypted),
           fileKey,
-          EncryptionService.base64ToArrayBuffer(encryptedRecord.encryptedFhirData.iv)
+          base64ToArrayBuffer(encryptedRecord.encryptedFhirData.iv)
         );
         console.log('✓ FHIR data decrypted');
       }
@@ -102,9 +104,9 @@ export class RecordDecryptionService {
       // Decrypt Belrose fields
       if (encryptedRecord.encryptedBelroseFields) {
         decryptedData.belroseFields = await EncryptionService.decryptJSON(
-          EncryptionService.base64ToArrayBuffer(encryptedRecord.encryptedBelroseFields.encrypted),
+          base64ToArrayBuffer(encryptedRecord.encryptedBelroseFields.encrypted),
           fileKey,
-          EncryptionService.base64ToArrayBuffer(encryptedRecord.encryptedBelroseFields.iv)
+          base64ToArrayBuffer(encryptedRecord.encryptedBelroseFields.iv)
         );
         console.log('✓ Belrose fields decrypted');
       }

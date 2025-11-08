@@ -20,6 +20,7 @@ import { getFirestore, doc, updateDoc } from 'firebase/firestore';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
+import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 
 interface StepConfig {
   number: number;
@@ -125,12 +126,11 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         console.log('✓ RSA key pair generated');
 
         // 5. Encrypt RSA private key with master key
-        const privateKeyBytes = SharingKeyManagementService.base64ToArrayBuffer(privateKey);
+        const privateKeyBytes = base64ToArrayBuffer(privateKey);
         const { encrypted: encryptedPrivateKeyBuffer, iv: privateKeyIV } =
           await EncryptionService.encryptFile(privateKeyBytes, masterKey);
-        const encryptedPrivateKey =
-          EncryptionService.arrayBufferToBase64(encryptedPrivateKeyBuffer);
-        const encryptedPrivateKeyIV = EncryptionService.arrayBufferToBase64(privateKeyIV);
+        const encryptedPrivateKey = arrayBufferToBase64(encryptedPrivateKeyBuffer);
+        const encryptedPrivateKeyIV = arrayBufferToBase64(privateKeyIV);
         console.log('✓ Private key encrypted');
 
         // 6. Store master key in session for registration process

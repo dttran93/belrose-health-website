@@ -22,6 +22,7 @@ import { RecordVersion, VersionDiff, RollbackResult, Change } from './versionCon
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
+import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 
 // ==================== MAIN VERSION CONTROL SERVICE ====================
 
@@ -522,7 +523,7 @@ ENCRYPTION/DECRYPTION HELPERS
     }
 
     // Unwrap the record's DEK using EncryptionService
-    const keyData = EncryptionService.base64ToArrayBuffer(encryptedRecordKey);
+    const keyData = base64ToArrayBuffer(encryptedRecordKey);
     const recordDEKData = await EncryptionService.decryptKeyWithMasterKey(keyData, masterKey);
     const recordDEK = await EncryptionService.importKey(recordDEKData);
 
@@ -538,7 +539,7 @@ ENCRYPTION/DECRYPTION HELPERS
     combined.set(new Uint8Array(iv), 0);
     combined.set(new Uint8Array(encrypted), iv.byteLength);
 
-    const encryptedChanges = EncryptionService.arrayBufferToBase64(combined.buffer);
+    const encryptedChanges = arrayBufferToBase64(combined.buffer);
 
     console.log('✅ Changes encrypted successfully');
     return encryptedChanges;
@@ -562,12 +563,12 @@ ENCRYPTION/DECRYPTION HELPERS
     }
 
     // Unwrap the record's DEK
-    const keyData = EncryptionService.base64ToArrayBuffer(encryptedRecordKey);
+    const keyData = base64ToArrayBuffer(encryptedRecordKey);
     const recordDEKData = await EncryptionService.decryptKeyWithMasterKey(keyData, masterKey);
     const recordDEK = await EncryptionService.importKey(recordDEKData);
 
     // Decode the combined base64 string
-    const combined = EncryptionService.base64ToArrayBuffer(encryptedChanges);
+    const combined = base64ToArrayBuffer(encryptedChanges);
 
     // Split into IV and encrypted data (IV is first 12 bytes for GCM)
     const ivLength = 12; // ENCRYPTION_CONFIG.ivLength

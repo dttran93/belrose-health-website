@@ -1,6 +1,7 @@
 // features/Encryption/services/encryptionKeyManager.ts
 import { EncryptionService } from './encryptionService';
 import * as bip39 from 'bip39';
+import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 
 /**
  * Manages the user's master encryption key lifecycle
@@ -90,8 +91,8 @@ export class EncryptionKeyManager {
     );
 
     return {
-      encryptedKey: EncryptionService.arrayBufferToBase64(encryptedData),
-      iv: EncryptionService.arrayBufferToBase64(iv.buffer),
+      encryptedKey: arrayBufferToBase64(encryptedData),
+      iv: arrayBufferToBase64(iv.buffer),
     };
   }
 
@@ -108,8 +109,8 @@ export class EncryptionKeyManager {
     // Derive KEK from password
     const kek = await this.deriveKEKFromPassword(password, userId);
 
-    const encryptedKey = EncryptionService.base64ToArrayBuffer(encryptedKeyData);
-    const iv = EncryptionService.base64ToArrayBuffer(ivData);
+    const encryptedKey = base64ToArrayBuffer(encryptedKeyData);
+    const iv = base64ToArrayBuffer(ivData);
 
     // Decrypt the key data
     const decryptedKeyData = await crypto.subtle.decrypt(
@@ -306,14 +307,14 @@ export class EncryptionKeyManager {
     if (!this.sessionKey) return null;
 
     const keyData = await crypto.subtle.exportKey('raw', this.sessionKey);
-    return EncryptionService.arrayBufferToBase64(keyData);
+    return arrayBufferToBase64(keyData);
   }
 
   /**
    * Import and set session key from exported string
    */
   static async importAndSetSessionKey(exportedKey: string): Promise<void> {
-    const keyData = EncryptionService.base64ToArrayBuffer(exportedKey);
+    const keyData = base64ToArrayBuffer(exportedKey);
 
     this.sessionKey = await crypto.subtle.importKey(
       'raw',

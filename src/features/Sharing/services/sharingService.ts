@@ -19,6 +19,7 @@ import { SharingKeyManagementService } from './sharingKeyManagementService';
 import { ethers } from 'ethers';
 import { SharingContractService } from '@/features/BlockchainVerification/service/sharingContractService';
 import { EmailInvitationService } from './emailInvitationService';
+import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 
 export interface ShareRecordRequest {
   recordId: string;
@@ -194,7 +195,7 @@ export class SharingService {
     });
 
     // 3. Decrypt the record's AES key using owner's master key
-    const encryptedKeyData = EncryptionService.base64ToArrayBuffer(recordData.encryptedKey);
+    const encryptedKeyData = base64ToArrayBuffer(recordData.encryptedKey);
     const recordKey = await EncryptionService.importKey(
       await EncryptionService.decryptKeyWithMasterKey(encryptedKeyData, masterKey)
     );

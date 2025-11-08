@@ -1,5 +1,5 @@
 // src/features/Sharing/services/sharingKeyManagementService.ts
-import { DataFormattingUtils } from '@/utils/dataFormattingUtils';
+import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 
 export class SharingKeyManagementService {
   /**
@@ -23,11 +23,11 @@ export class SharingKeyManagementService {
 
     // Export public key (store in Firestore - public!)
     const publicKeyData = await crypto.subtle.exportKey('spki', keyPair.publicKey);
-    const publicKeyBase64 = DataFormattingUtils.arrayBufferToBase64(publicKeyData);
+    const publicKeyBase64 = arrayBufferToBase64(publicKeyData);
 
     // Export private key (encrypt with user's master key and store!)
     const privateKeyData = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
-    const privateKeyBase64 = DataFormattingUtils.arrayBufferToBase64(privateKeyData);
+    const privateKeyBase64 = arrayBufferToBase64(privateKeyData);
 
     return {
       publicKey: publicKeyBase64,
@@ -39,7 +39,7 @@ export class SharingKeyManagementService {
    * Import public key from base64
    */
   static async importPublicKey(base64Key: string): Promise<CryptoKey> {
-    const keyData = DataFormattingUtils.base64ToArrayBuffer(base64Key);
+    const keyData = base64ToArrayBuffer(base64Key);
     return await crypto.subtle.importKey(
       'spki',
       keyData,
@@ -56,7 +56,7 @@ export class SharingKeyManagementService {
    * Import private key from base64
    */
   static async importPrivateKey(base64Key: string): Promise<CryptoKey> {
-    const keyData = DataFormattingUtils.base64ToArrayBuffer(base64Key);
+    const keyData = base64ToArrayBuffer(base64Key);
     return await crypto.subtle.importKey(
       'pkcs8',
       keyData,
@@ -77,7 +77,7 @@ export class SharingKeyManagementService {
     const wrappedKey = await crypto.subtle.wrapKey('raw', aesKey, rsaPublicKey, {
       name: 'RSA-OAEP',
     });
-    return DataFormattingUtils.arrayBufferToBase64(wrappedKey);
+    return arrayBufferToBase64(wrappedKey);
   }
 
   /**
@@ -85,7 +85,7 @@ export class SharingKeyManagementService {
    * This is what the doctor does to decrypt
    */
   static async unwrapKey(wrappedKeyBase64: string, rsaPrivateKey: CryptoKey): Promise<CryptoKey> {
-    const wrappedKeyBytes = DataFormattingUtils.base64ToArrayBuffer(wrappedKeyBase64);
+    const wrappedKeyBytes = base64ToArrayBuffer(wrappedKeyBase64);
 
     return await crypto.subtle.unwrapKey(
       'raw',

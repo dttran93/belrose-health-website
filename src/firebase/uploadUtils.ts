@@ -28,7 +28,11 @@ import type { FileObject } from '@/types/core';
 import { RecordHashService } from '@/features/ViewEditRecord/services/generateRecordHash';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
-import { removeUndefinedValues } from '@/utils/dataFormattingUtils';
+import {
+  removeUndefinedValues,
+  arrayBufferToBase64,
+  base64ToArrayBuffer,
+} from '@/utils/dataFormattingUtils';
 
 // ==================== TYPE DEFINITIONS ====================
 
@@ -289,7 +293,7 @@ export const updateFirestoreRecord = async (
       throw new Error('Please unlock your encryption to save changes.');
     }
     // Get the record's encrypted file key and decrypt it
-    const encryptedKeyData = EncryptionService.base64ToArrayBuffer(currentData.encryptedKey);
+    const encryptedKeyData = base64ToArrayBuffer(currentData.encryptedKey);
     const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(
       encryptedKeyData,
       masterKey
@@ -305,8 +309,8 @@ export const updateFirestoreRecord = async (
             ? await EncryptionService.encryptText(updateData[key], fileKey)
             : await EncryptionService.encryptJSON(updateData[key], fileKey);
         fieldsToEncrypt[`encrypted${key.charAt(0).toUpperCase() + key.slice(1)}`] = {
-          encrypted: EncryptionService.arrayBufferToBase64(encrypted.encrypted),
-          iv: EncryptionService.arrayBufferToBase64(encrypted.iv),
+          encrypted: arrayBufferToBase64(encrypted.encrypted),
+          iv: arrayBufferToBase64(encrypted.iv),
         };
       }
     }
