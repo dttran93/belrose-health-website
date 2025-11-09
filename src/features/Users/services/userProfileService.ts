@@ -1,21 +1,11 @@
-import { getFirestore, doc, getDoc, DocumentData } from 'firebase/firestore';
-
-// Type for user profile data
-export interface UserProfile {
-  uid: string;
-  displayName?: string;
-  email?: string;
-  photoURL?: string;
-  affiliations?: string[];
-  createdAt?: any;
-  // Add any other fields you have in your user documents
-}
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { BelroseUserProfile } from '@/types/core';
 
 /**
  * In-memory cache for user profiles to reduce database calls
  * Cache expires after 5 minutes
  */
-const userCache = new Map<string, { data: UserProfile; timestamp: number }>();
+const userCache = new Map<string, { data: BelroseUserProfile; timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 /**
@@ -29,7 +19,7 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 export async function getUserProfile(
   userId: string,
   forceRefresh: boolean = false
-): Promise<UserProfile | null> {
+): Promise<BelroseUserProfile | null> {
   // Check cache first (unless force refresh)
   if (!forceRefresh) {
     const cached = userCache.get(userId);
@@ -48,9 +38,12 @@ export async function getUserProfile(
       return null;
     }
 
-    const userData = userDoc.data() as UserProfile;
-    const profile: UserProfile = {
+    const userData = userDoc.data() as BelroseUserProfile;
+    const profile: BelroseUserProfile = {
       uid: userId,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      updatedAt: userData.updatedAt,
       displayName: userData.displayName || 'Unknown User',
       email: userData.email,
       photoURL: userData.photoURL,
@@ -78,8 +71,8 @@ export async function getUserProfile(
  * @param userIds - Array of Firebase Auth UIDs
  * @returns Map of userId to UserProfile
  */
-export async function getUserProfiles(userIds: string[]): Promise<Map<string, UserProfile>> {
-  const profiles = new Map<string, UserProfile>();
+export async function getUserProfiles(userIds: string[]): Promise<Map<string, BelroseUserProfile>> {
+  const profiles = new Map<string, BelroseUserProfile>();
 
   // Use Promise.all to fetch all profiles in parallel
   const results = await Promise.all(

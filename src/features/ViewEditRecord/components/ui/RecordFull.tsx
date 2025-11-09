@@ -252,9 +252,9 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto bg-background rounded-2xl shadow-xl overflow-hidden">
+    <div className="max-w-7xl mx-auto bg-background rounded-2xl shadow-xl rounded-lg">
       {/* ===== HEADER SECTION ===== */}
-      <div className="bg-primary">
+      <div className="bg-primary rounded-lg">
         {/* Version View Banner - for Viewing Old Versions */}
         {viewMode === 'version-detail' && viewingVersion && (
           <LayoutSlot slot="header">
@@ -283,7 +283,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
         )}
 
         {/* Main Header */}
-        <div className="bg-primary px-8 py-6">
+        <div className="bg-primary px-8 py-6 rounded-t-lg">
           {/* Top Row - Badges and Actions */}
           <div className="flex items-center justify-between space-x-1 mb-3">
             <div className="flex items-center gap-2">
@@ -461,7 +461,9 @@ export const RecordFull: React.FC<RecordFullProps> = ({
         </LayoutSlot>
       )}
 
-      {viewMode === 'share' && <ShareRecordView record={record} onBack={handleBackToRecord} />}
+      {viewMode === 'share' && (
+        <ShareRecordView record={record} onBack={handleBackToRecord} isAddMode={true} />
+      )}
 
       {viewMode === 'verification' && (
         <VerificationView record={record} onBack={handleBackToRecord} />

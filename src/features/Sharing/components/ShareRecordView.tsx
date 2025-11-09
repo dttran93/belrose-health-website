@@ -1,43 +1,110 @@
 // src/features/Sharing/components/ShareRecordView.tsx
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Share2, Mail, Wallet, Users, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Share2, Mail, Wallet, X, Key, HelpCircle, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { FileObject } from '@/types/core';
+import { FileObject, BelroseUserProfile } from '@/types/core';
 import { useSharing } from '../hooks/useSharing';
-import { SharedRecord } from '../services/sharingService';
 import { toast } from 'sonner';
+import { collection, getDocs, getFirestore, query, where } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { getUserProfiles } from '@/features/Users/services/userProfileService';
+import * as Tooltip from '@radix-ui/react-tooltip';
+import UserCard from '@/features/Users/components/ui/UserCard';
 
 interface ShareRecordViewProps {
   record: FileObject;
   onBack: () => void;
+  onAddMode?: () => void;
+  isAddMode: boolean;
 }
 
-export const ShareRecordView: React.FC<ShareRecordViewProps> = ({ record, onBack }) => {
+// Type for access permission data from Firestore
+interface AccessPermissionData {
+  id: string; // The document ID (permissionHash)
+  recordId: string;
+  ownerId: string;
+  receiverId: string;
+  receiverWalletAddress: string;
+  isActive: boolean;
+  grantedAt: any; // Firestore Timestamp
+  revokedAt?: any;
+  blockchainTxHash?: string;
+  onChain?: boolean;
+}
+
+export const ShareRecordView: React.FC<ShareRecordViewProps> = ({
+  record,
+  onBack,
+  onAddMode,
+  isAddMode,
+}) => {
   const [shareMethod, setShareMethod] = useState<'email' | 'wallet'>('email');
   const [receiverEmail, setReceiverEmail] = useState('');
   const [receiverWallet, setReceiverWallet] = useState('');
-  const [sharedWith, setSharedWith] = useState<SharedRecord[]>([]);
-  const [isLoadingShared, setIsLoadingShared] = useState(true);
+  const [loadingShared, setLoadingShared] = useState(true);
+  const [accessPermissions, setAccessPermissions] = useState<AccessPermissionData[]>([]);
+  const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
 
   const { shareRecord, revokeAccess, getSharedRecords, isSharing, isRevoking } = useSharing();
 
-  // Load who this record is already shared with
+  // Fetch access permissions for this record
   useEffect(() => {
-    loadSharedWith();
-  }, []);
+    fetchAccessPermissions();
+  }, [record.id]);
 
-  const loadSharedWith = async () => {
-    setIsLoadingShared(true);
+  const fetchAccessPermissions = async () => {
+    if (!record.id) return;
+
+    setLoadingShared(true);
     try {
-      const allShared = await getSharedRecords();
-      // Filter to only this record
-      const thisRecordShared = allShared.filter(s => s.recordId === record.id);
-      setSharedWith(thisRecordShared);
+      const db = getFirestore();
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+        console.error('No authenticated user');
+        return;
+      }
+
+      const accessPermissionsRef = collection(db, 'accessPermissions');
+
+      // Query by ownerId (current user) instead of recordId
+      // Then filter client-side for this specific record
+      const q = query(
+        accessPermissionsRef,
+        where('ownerId', '==', currentUser.uid),
+        where('isActive', '==', true)
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      // Filter client-side for this specific record
+      const permissions: AccessPermissionData[] = querySnapshot.docs
+        .map(
+          doc =>
+            ({
+              id: doc.id,
+              ...doc.data(),
+            } as AccessPermissionData)
+        )
+        .filter(permission => permission.recordId === record.id);
+
+      setAccessPermissions(permissions);
+
+      // Fetch user profiles for all owners and receivers
+      const userIds = new Set<string>();
+
+      // Add receivers from permissions
+      permissions.forEach(permission => userIds.add(permission.receiverId));
+
+      // Fetch all user profiles at once
+      const profiles = await getUserProfiles(Array.from(userIds));
+      setUserProfiles(profiles);
     } catch (error) {
-      console.error('Failed to load shared records:', error);
+      console.error('Error fetching access permissions:', error);
     } finally {
-      setIsLoadingShared(false);
+      setLoadingShared(false);
     }
   };
 
@@ -65,7 +132,7 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({ record, onBack
       // Clear inputs and reload
       setReceiverEmail('');
       setReceiverWallet('');
-      await loadSharedWith();
+      await fetchAccessPermissions();
     } catch (error) {
       const err = error as Error;
 
@@ -97,197 +164,207 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({ record, onBack
 
     try {
       await revokeAccess(record.id, receiverId);
-      await loadSharedWith();
+      await fetchAccessPermissions();
     } catch (error) {
       console.error('Failed to revoke access:', error);
     }
   };
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="flex justify-between items-center gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <Share2 className="w-6 h-6 text-primary" />
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Share Record</h2>
-            <p className="text-sm text-gray-600">Share with family, doctors, or researchers</p>
+    <div>
+      {isAddMode && (
+        <>
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4 pb-2 border-b">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <Share2 className="w-5 h-5" />
+              Share Record
+            </h3>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={onBack}
+                className="w-8 h-8 border-none bg-transparent hover:bg-gray-200"
+              >
+                <ArrowLeft className="text-primary" />
+              </Button>
+            </div>
           </div>
-        </div>
-        <Button onClick={onBack} className="w-8 h-8 border-none bg-transparent hover:bg-gray-200">
-          <ArrowLeft className="w-4 h-4 text-primary" />
-        </Button>
-      </div>
+        </>
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column: Share Form */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Share with Someone</h3>
+      <div className="flex flex-col lg:flex-row gap-6">
+        {isAddMode && (
+          <>
+            {/* Left Column: Share Form */}
+            <div className="bg-white rounded-lg border border-gray-200 p-6 flex-1 lg:basis-1/2">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Share with Someone</h3>
 
-          {/* Record Info */}
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <p className="text-sm text-gray-600 mb-1">Sharing:</p>
-            <p className="font-medium text-gray-900">{record.fileName || 'Unknown Record'}</p>
-            <p className="text-xs text-gray-500 mt-1">Record ID: {record.id}</p>
-          </div>
-
-          {/* Share Method Tabs */}
-          <div className="flex gap-2 mb-6">
-            <button
-              onClick={() => setShareMethod('email')}
-              className={`flex-1 py-3 px-4 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors ${
-                shareMethod === 'email'
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              <Mail className="w-5 h-5" />
-              <span>Email</span>
-            </button>
-            <button
-              onClick={() => setShareMethod('wallet')}
-              className={`flex-1 py-3 px-4 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors ${
-                shareMethod === 'wallet'
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              <Wallet className="w-5 h-5" />
-              <span>Wallet</span>
-            </button>
-          </div>
-
-          {/* Input Field */}
-          <div className="mb-6">
-            {shareMethod === 'email' ? (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Receiver's Email Address
-                </label>
-                <input
-                  type="email"
-                  value={receiverEmail}
-                  onChange={e => setReceiverEmail(e.target.value)}
-                  placeholder="doctor@example.com"
-                  className="w-full px-4 py-3 bg-background border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                />
+              {/* Record Info */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <p className="text-sm text-gray-600 mb-1">Sharing:</p>
+                <p className="font-medium text-gray-900">{record.fileName || 'Unknown Record'}</p>
+                <p className="text-xs text-gray-500 mt-1">Record ID: {record.id}</p>
               </div>
-            ) : (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Receiver's Wallet Address
-                </label>
-                <input
-                  type="text"
-                  value={receiverWallet}
-                  onChange={e => setReceiverWallet(e.target.value)}
-                  placeholder="0x..."
-                  className="w-full px-4 py-3 bg-background border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm"
-                />
-              </div>
-            )}
-          </div>
 
-          {/* Share Button */}
-          <Button
-            onClick={handleShare}
-            disabled={
-              isSharing ||
-              (shareMethod === 'email' && !receiverEmail) ||
-              (shareMethod === 'wallet' && !receiverWallet)
-            }
-            className="w-full py-3"
-          >
-            {isSharing ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                Sharing...
-              </>
-            ) : (
-              <>
-                <Share2 className="w-4 h-4 mr-2" />
-                Share Record
-              </>
-            )}
-          </Button>
-        </div>
+              {/* Share Method Tabs */}
+              <div className="flex gap-2 mb-6">
+                <button
+                  onClick={() => setShareMethod('email')}
+                  className={`flex-1 py-3 px-4 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors ${
+                    shareMethod === 'email'
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <Mail className="w-5 h-5" />
+                  <span>Email</span>
+                </button>
+                <button
+                  onClick={() => setShareMethod('wallet')}
+                  className={`flex-1 py-3 px-4 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors ${
+                    shareMethod === 'wallet'
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <Wallet className="w-5 h-5" />
+                  <span>Wallet</span>
+                </button>
+              </div>
+
+              {/* Input Field */}
+              <div className="mb-6">
+                {shareMethod === 'email' ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Receiver's Email Address
+                    </label>
+                    <input
+                      type="email"
+                      value={receiverEmail}
+                      onChange={e => setReceiverEmail(e.target.value)}
+                      placeholder="doctor@example.com"
+                      className="w-full px-4 py-3 bg-background border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Receiver's Wallet Address
+                    </label>
+                    <input
+                      type="text"
+                      value={receiverWallet}
+                      onChange={e => setReceiverWallet(e.target.value)}
+                      placeholder="0x..."
+                      className="w-full px-4 py-3 bg-background border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Share Button */}
+              <Button
+                onClick={handleShare}
+                disabled={
+                  isSharing ||
+                  (shareMethod === 'email' && !receiverEmail) ||
+                  (shareMethod === 'wallet' && !receiverWallet)
+                }
+                className="w-full py-3"
+              >
+                {isSharing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                    Sharing...
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="w-4 h-4 mr-2" />
+                    Share Record
+                  </>
+                )}
+              </Button>
+            </div>
+          </>
+        )}
 
         {/* Right Column: Currently Shared With */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Currently Shared With</h3>
-            <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
-              {sharedWith.length} {sharedWith.length === 1 ? 'person' : 'people'}
-            </span>
+        <div className="mb-4 border border-gray-200 rounded-lg flex-1 lg:basis-1/2">
+          <div className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Share2 className="w-5 h-5 text-gray-700" />
+              <span className="font-semibold text-gray-900">Viewers</span>
+              <span className="text-xs bg-chart-4/20 text-chart-4 px-2 py-1 rounded-full">
+                {accessPermissions.length}
+              </span>
+            </div>
+            {!isAddMode && (
+              <div className="flex items-center gap-2">
+                <Tooltip.Provider>
+                  <Tooltip.Root>
+                    <Tooltip.Trigger asChild>
+                      <button className="inline-flex items-center ml-1">
+                        <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full flex items-center">
+                          View Access
+                          <HelpCircle className="w-4 h-4 ml-1" />
+                        </span>
+                      </button>
+                    </Tooltip.Trigger>
+                    <Tooltip.Portal>
+                      <Tooltip.Content
+                        className="bg-gray-900 text-white rounded-lg p-4 max-w-sm shadow-xl z-50"
+                        sideOffset={5}
+                      >
+                        <p className="font-semibold mb-2 text-sm">
+                          Viewers are granted record access by Owners or Record Subjects:
+                        </p>
+                        <ol className="list-decimal list-inside space-y-1 text-xs">
+                          <li>Viewers can view, verify, or dispute records.</li>
+                          <li>They may not edit, share, or delete records.</li>
+                          <li>
+                            Their access may be revoked at any time by Owners or Record Subjects.
+                          </li>
+                        </ol>
+                        <Tooltip.Arrow className="fill-gray-900" />
+                      </Tooltip.Content>
+                    </Tooltip.Portal>
+                  </Tooltip.Root>
+                </Tooltip.Provider>
+                <button className="rounded-full hover:bg-gray-300">
+                  <Plus onClick={onAddMode} />
+                </button>
+              </div>
+            )}
           </div>
 
-          {isLoadingShared ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-            </div>
-          ) : sharedWith.length === 0 ? (
-            <div className="text-center py-12">
-              <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-600">Not shared with anyone yet</p>
-              <p className="text-sm text-gray-500 mt-1">Share this record to give someone access</p>
-            </div>
-          ) : (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {sharedWith.map(shared => (
-                <div
-                  key={shared.receiverId}
-                  className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/70 rounded-full flex items-center justify-center text-white text-xs font-semibold">
-                          {shared.receiverWalletAddress.slice(2, 4).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900 text-sm">
-                            {shared.receiverWalletAddress.slice(0, 6)}...
-                            {shared.receiverWalletAddress.slice(-4)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 text-xs">
-                        <div className="flex items-center gap-1 text-gray-600">
-                          <Clock className="w-3 h-3" />
-                          <span>{new Date(shared.grantedAt).toLocaleDateString()}</span>
-                        </div>
-
-                        {shared.isActive ? (
-                          <span className="flex items-center gap-1 text-green-600">
-                            <CheckCircle className="w-3 h-3" />
-                            <span className="font-medium">Active</span>
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1 text-red-600">
-                            <XCircle className="w-3 h-3" />
-                            <span className="font-medium">Revoked</span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {shared.isActive && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleRevoke(shared.receiverId)}
-                        disabled={isRevoking}
-                        className="text-red-600 border-red-300 hover:bg-red-50 text-xs"
-                      >
-                        Revoke
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="p-4">
+            {loadingShared ? (
+              <div className="flex justify-center items-center py-8">
+                <p className="text-gray-500">Loading shared access...</p>
+              </div>
+            ) : accessPermissions.length > 0 ? (
+              <div className="space-y-3 mt-4">
+                {accessPermissions.map(permission => {
+                  const receiverProfile = userProfiles.get(permission.receiverId);
+                  return (
+                    <UserCard
+                      user={receiverProfile}
+                      onView={() => {}}
+                      onDelete={() => handleRevoke(receiverProfile!.uid)}
+                      variant="default"
+                      color="amber"
+                    />
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex justify-between items-center mt-4">
+                <p className="text-gray-600">Record Has Not Been Shared</p>
+                <Button>Share Record</Button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
