@@ -1,7 +1,7 @@
 // src/features/Auth/components/RecoveryKeyDisplay.tsx
 
 import React, { useState } from 'react';
-import { CheckCircle, AlertCircle, Download, Copy, RotateCcwKey } from 'lucide-react';
+import { AlertCircle, Download, Copy, RotateCcwKey } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 

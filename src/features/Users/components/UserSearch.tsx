@@ -5,6 +5,7 @@ import { Search, X, Loader2, User, Mail, Hash } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
 import { BelroseUserProfile } from '@/types/core';
+import UserCard from './ui/UserCard';
 
 interface UserSearchProps {
   onUserSelect: (user: BelroseUserProfile) => void;
@@ -109,7 +110,7 @@ export const UserSearch: React.FC<UserSearchProps> = ({
               onKeyPress={handleKeyPress}
               placeholder={placeholder}
               autoFocus={autoFocus}
-              className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full bg-input px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             />
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             {searchQuery && (
@@ -188,32 +189,18 @@ export const UserSearch: React.FC<UserSearchProps> = ({
         <div className="space-y-2">
           <p className="text-xs text-gray-600 font-medium">Search Results:</p>
           {searchResults.map(user => (
-            <div
+            <UserCard
               key={user.uid}
-              onClick={() => handleSelectUser(user)}
-              className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 hover:border-primary cursor-pointer transition-all group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                  <User className="w-6 h-6 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">
-                    {user.displayName || 'No name'}
-                  </p>
-                  <p className="text-sm text-gray-600 truncate">{user.email}</p>
-                  {user.affiliations && user.affiliations.length > 0 && (
-                    <p className="text-xs text-gray-500 mt-1 truncate">
-                      {user.affiliations.join(', ')}
-                    </p>
-                  )}
-                  <p className="text-xs text-gray-400 mt-1 truncate">ID: {user.uid}</p>
-                </div>
-                <div className="text-xs text-gray-400 group-hover:text-primary transition-colors">
-                  Click to select →
-                </div>
-              </div>
-            </div>
+              user={user}
+              onView={() => {}}
+              onDelete={() => {}}
+              onCardClick={() => {}}
+              variant="default"
+              color="amber"
+              menuType="acceptOrCancel"
+              onAccept={() => handleSelectUser(user)}
+              onCancel={handleClear}
+            />
           ))}
         </div>
       )}

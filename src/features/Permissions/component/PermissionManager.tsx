@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { UserLock, ArrowLeft } from 'lucide-react';
 import { FileObject } from '@/types/core';
 import { Button } from '@/components/ui/Button';
-import { RecordSubjectManagement } from './RecordSubjectManagement';
-import OwnerManagement from './OwnerManagement';
+import { OwnerManagement } from './OwnerManagement';
+import AdminManagement from './AdministratorManagement';
 import { ShareRecordView } from '@/features/Sharing/components/ShareRecordView';
 
 interface PermissionsManagerProps {
@@ -16,6 +16,7 @@ type PermissionViewMode = 'manager' | 'add-subject' | 'add-owner' | 'share';
 export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ record, onBack }) => {
   const [viewMode, setViewMode] = useState<PermissionViewMode>('manager');
 
+  // handlers for navigating Permission Manager component
   const handleAddSubject = () => {
     setViewMode('add-subject');
   };
@@ -54,7 +55,7 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ record, 
 
       {/* Record Subject Section */}
       {(viewMode === 'manager' || viewMode === 'add-subject') && (
-        <RecordSubjectManagement
+        <OwnerManagement
           record={record}
           subject={record.subjectId}
           onSuccess={() => {}}
@@ -66,10 +67,9 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ record, 
 
       {/* Owners Section */}
       {(viewMode === 'manager' || viewMode === 'add-owner') && (
-        <OwnerManagement
+        <AdminManagement
           record={record}
           currentOwners={record.owners!}
-          onSuccess={() => {}}
           onBack={handleManagerScreen}
           onAddMode={handleAddOwner}
           isAddMode={viewMode === 'add-owner'}

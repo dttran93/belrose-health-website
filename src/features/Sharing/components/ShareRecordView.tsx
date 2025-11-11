@@ -291,7 +291,7 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({
 
         {/* Right Column: Currently Shared With */}
         <div className="mb-4 border border-gray-200 rounded-lg flex-1 lg:basis-1/2">
-          <div className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between">
+          <div className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between rounded-t-lg">
             <div className="flex items-center gap-2">
               <Share2 className="w-5 h-5 text-gray-700" />
               <span className="font-semibold text-gray-900">Viewers</span>
@@ -317,13 +317,13 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({
                         sideOffset={5}
                       >
                         <p className="font-semibold mb-2 text-sm">
-                          Viewers are granted record access by Owners or Record Subjects:
+                          Viewers are granted record access by Owners or Administrators:
                         </p>
                         <ol className="list-decimal list-inside space-y-1 text-xs">
                           <li>Viewers can view, verify, or dispute records.</li>
                           <li>They may not edit, share, or delete records.</li>
                           <li>
-                            Their access may be revoked at any time by Owners or Record Subjects.
+                            Their access may be revoked at any time by Owners or Administrators.
                           </li>
                         </ol>
                         <Tooltip.Arrow className="fill-gray-900" />
@@ -349,6 +349,7 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({
                   const receiverProfile = userProfiles.get(permission.receiverId);
                   return (
                     <UserCard
+                      key={permission.receiverId}
                       user={receiverProfile}
                       onView={() => {}}
                       onDelete={() => handleRevoke(receiverProfile!.uid)}

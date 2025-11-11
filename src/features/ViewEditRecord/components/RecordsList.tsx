@@ -24,15 +24,15 @@ interface RecordsListProps {
 }
 
 export const RecordsList: React.FC<RecordsListProps> = ({
-  // Handlers
-  handleDownloadRecord,
-  handleCopyRecord,
-
   // Additional props
   onAddNewRecord,
   records,
   loading,
   error,
+
+  // Handlers
+  handleDownloadRecord,
+  handleCopyRecord,
 
   //Auto-open props
   autoOpenRecordId,
@@ -227,10 +227,11 @@ export const RecordsList: React.FC<RecordsListProps> = ({
 
   // Keep selectedRecord in sync with records updates
   useEffect(() => {
-    if (selectedRecord && selectedRecord.id) {
+    if (selectedRecord && records.length > 0) {
       const updatedRecord = records.find(r => r.id === selectedRecord.id);
-      if (updatedRecord) {
-        console.log('Record updated in list:', updatedRecord);
+      if (updatedRecord && updatedRecord !== selectedRecord) {
+        console.log('🔄 Syncing selected record with fresh list data.');
+        setSelectedRecord(updatedRecord);
       }
     }
   }, [records, selectedRecord]);

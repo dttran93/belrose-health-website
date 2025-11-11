@@ -15,7 +15,7 @@ export const AllRecords: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthContext();
-  const { records, loading, error } = useAllUserRecords(user?.uid);
+  const { records, loading, error, refetchRecords } = useAllUserRecords(user?.uid);
 
   const [autoOpenRecordId, setAutoOpenRecordId] = useState<string | null>(null);
   const [autoOpenInEditMode, setAutoOpenInEditMode] = useState(false);

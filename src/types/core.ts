@@ -7,6 +7,7 @@ export interface User {
   uid: string;
   email: string | null;
   emailVerified?: boolean;
+  isIdentityVerified?: boolean;
   displayName: string | null;
   firstName: string | null;
   lastName: string | null;
@@ -46,7 +47,7 @@ export interface LocationState {
   };
 }
 
-export interface UserProfile extends User {
+export interface BelroseUserProfile extends User {
   createdAt: any;
   updatedAt: any;
   emailVerifiedAt?: any;
@@ -83,6 +84,9 @@ export interface UserProfile extends User {
     blockchainVerificationEnabled: boolean;
     autoConnectWallet: boolean;
   };
+
+  //Other Info
+  affiliations?: [string] | [];
 }
 
 // ==================== HEALTH RECORDS FILE ====================
@@ -169,7 +173,7 @@ export interface FileObject {
   uploadedByName?: string; //Display name of subject (for UI)
   subjectId?: string | null; // User ID of who the record is About (ultimate owner)
   subjectName?: string; //Display name of subject (for UI)
-  owners: string[]; // Array of user IDs with full acecss (read, update, delete, share)
+  owners?: string[]; // Array of user IDs with full acecss (read, update, delete, share)
 
   // === PROCESSING STATUS ===
   status: FileStatus; //Processing property. Initially set as pending. Then pending/processing... see below

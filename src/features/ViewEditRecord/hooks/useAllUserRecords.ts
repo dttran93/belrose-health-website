@@ -22,6 +22,7 @@ interface UseAllUserRecordsReturn {
   records: FileObject[];
   loading: boolean;
   error: Error | null;
+  refetchRecords: () => void;
 }
 
 /**
@@ -39,6 +40,11 @@ export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
   const [records, setRecords] = useState<FileObject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const refetchRecords = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
 
   useEffect(() => {
     if (!userId) {
@@ -181,7 +187,7 @@ export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
       console.log('🧹 Cleaning up records listener');
       unsubscribe();
     };
-  }, [userId]);
+  }, [userId, refreshTrigger]);
 
-  return { records, loading, error };
+  return { records, loading, error, refetchRecords };
 };
