@@ -5,29 +5,22 @@ import type { Request, Response } from 'express';
 import { defineSecret } from 'firebase-functions/params';
 import { AnthropicService, MODELS } from '../services/anthropicService';
 import { getDetailedNarrativePrompt } from '../utils/prompts';
+import type { BelroseFields } from '../../../src/types/core';
 
 // Define the secret
 const anthropicKey = defineSecret('ANTHROPIC_KEY');
 
 // ==================== TYPE DEFINITIONS ====================
 
-interface DetailedNarrativeRequest {
+export interface DetailedNarrativeInput {
   fhirData: any;
-  belroseFields?: {
-    visitType?: string;
-    title?: string;
-    summary?: string;
-    completedDate?: string;
-    provider?: string;
-    institution?: string;
-    patient?: string;
-  };
+  belroseFields?: BelroseFields;
   fileName?: string;
   extractedText?: string;
   originalText?: string;
 }
 
-interface DetailedNarrativeResponse {
+export interface DetailedNarrative {
   detailedNarrative: string;
 }
 
@@ -57,7 +50,7 @@ export const createDetailedNarrative = onRequest(
 
       // Extract and validate request body
       const { fhirData, belroseFields, fileName, extractedText, originalText } =
-        req.body as DetailedNarrativeRequest;
+        req.body as DetailedNarrativeInput;
 
       if (!fhirData) {
         res.status(400).json({ error: 'fhirData is required' });
@@ -109,11 +102,11 @@ export const createDetailedNarrative = onRequest(
 async function generateNarrativeWithAI(
   fhirData: any,
   apiKey: string,
-  belroseFields?: DetailedNarrativeRequest['belroseFields'],
+  belroseFields?: DetailedNarrativeInput['belroseFields'],
   fileName?: string,
   extractedText?: string,
   originalText?: string
-): Promise<DetailedNarrativeResponse> {
+): Promise<DetailedNarrative> {
   const anthropicService = new AnthropicService(apiKey);
 
   // Build the prompt with all context
@@ -155,9 +148,9 @@ async function generateNarrativeWithAI(
  * Create a fallback narrative when AI generation fails
  */
 function createFallbackNarrative(
-  belroseFields?: DetailedNarrativeRequest['belroseFields'],
+  belroseFields?: DetailedNarrativeInput['belroseFields'],
   fileName?: string
-): DetailedNarrativeResponse {
+): DetailedNarrative {
   const title = belroseFields?.title || fileName || 'Health Record';
   const date = belroseFields?.completedDate || new Date().toISOString().split('T')[0];
   const provider = belroseFields?.provider || 'Healthcare Provider';

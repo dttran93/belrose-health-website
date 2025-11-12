@@ -58,20 +58,12 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   shouldAutoUpload,
   savingToFirestore,
 
-  //FHIR props
-  fhirData,
-  onFHIRConverted,
-
   // Configuration props
   acceptedTypes = ['.pdf', '.docx', '.doc', '.txt', '.jpg', '.jpeg', '.png'] as string[],
   maxFiles = 5,
   maxSizeBytes = 10 * 1024 * 1024, // 10MB
   className = '',
 }) => {
-  //DEBUG LOGGING
-  console.log('🔍 CombinedUploadFHIR props check:');
-  console.log('🔍 updateFileStatus:', typeof updateFileStatus, updateFileStatus);
-
   // Add a ref to track files currently being uploaded
   const uploadingFiles = useRef<Set<string>>(new Set());
 
@@ -88,7 +80,6 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
 
   // Plain text input state
   const [plainText, setPlainText] = useState<string>('');
-  const [patientName, setPatientName] = useState<string>('');
   const [submittingText, setSubmittingText] = useState<boolean>(false);
 
   // Determine which section to show. Input section if no files. FileList if yes files
@@ -116,7 +107,6 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
     setFhirText('');
     setFhirValidation(null);
     setPlainText('');
-    setPatientName('');
     setSubmitting(false);
     setSubmittingText(false);
 
@@ -287,7 +277,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
       let fhirData: FHIRWithValidation;
 
       if (convertTextToFHIR) {
-        fhirData = await convertTextToFHIR(plainText, patientName || undefined);
+        fhirData = await convertTextToFHIR(plainText);
       } else {
         // Fallback: Create a simple FHIR Bundle with the text as a note
         fhirData = {
@@ -306,7 +296,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
                     },
                   },
                 ],
-                description: `Medical note${patientName ? ` for ${patientName}` : ''}`,
+                description: `Medical note`,
                 date: new Date().toISOString(),
               },
             },
@@ -326,9 +316,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
 
       // Create virtual file - hook will handle AI processing, hashing, encryption
       await addFhirAsVirtualFile(fhirData, {
-        fileName: `Medical Note${
-          patientName ? ` - ${patientName}` : ''
-        } - ${new Date().toLocaleDateString()}`,
+        fileName: `Medical Note - ${new Date().toLocaleDateString()}`,
         sourceType: 'Plain Text Submission',
         originalText: plainText.trim(),
         autoUpload: true,
@@ -342,7 +330,6 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
 
       // Clear the form
       setPlainText('');
-      setPatientName('');
     } catch (error) {
       console.error('❌ Error converting text to FHIR:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

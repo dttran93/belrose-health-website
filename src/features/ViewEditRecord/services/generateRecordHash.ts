@@ -1,10 +1,22 @@
 import { FileObject } from '@/types/core';
 
+//These are the only lines that are hashed.
+export type HashableFileContent = Pick<
+  FileObject,
+  | 'fileName'
+  | 'extractedText'
+  | 'originalText'
+  | 'originalFileHash'
+  | 'fhirData'
+  | 'belroseFields'
+  | 'customData'
+>;
+
 export class RecordHashService {
   /**
    * Generate a hash of the medical record content
    */
-  static async generateRecordHash(fileObject: FileObject): Promise<string> {
+  static async generateRecordHash(fileObject: HashableFileContent): Promise<string> {
     const hashableContent = {
       // Only Core content that affects record integrity
       fileName: fileObject.fileName || null,

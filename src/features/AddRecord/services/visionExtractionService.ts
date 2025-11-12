@@ -6,7 +6,7 @@ import {
   CompressionResult,
   IVisionExtractionService,
   VisionAnalysisOptions,
-  CompressionOptions
+  CompressionOptions,
 } from './visionExtractService.types';
 
 /**
@@ -14,13 +14,15 @@ import {
  * Simplified for MVP - focuses on text extraction only
  */
 class VisionExtractionService implements IVisionExtractionService {
-
   /**
    * Extract text from images using AI Vision with OCR fallback
    */
-  async extractImageText(file: File, options: VisionAnalysisOptions = {}): Promise<TextExtractionResult> {
+  async extractImageText(
+    file: File,
+    options: VisionAnalysisOptions = {}
+  ): Promise<TextExtractionResult> {
     console.log('Starting AI Vision image text extraction for:', file.name);
-    
+
     // Validate input
     if (!this.canProcess(file)) {
       throw new Error(`File type ${file.type} is not supported for vision processing`);
@@ -30,11 +32,11 @@ class VisionExtractionService implements IVisionExtractionService {
       // Try AI Vision first for better accuracy
       const visionResult = await aiImageService.extractTextFromImage(file);
 
-console.log('🔍 VisionService: Full AI result object:', visionResult);
-console.log('🔍 VisionService: Object keys:', Object.keys(visionResult));
-console.log('🔍 VisionService: extractedText value:', visionResult.extractedText);
-console.log('🔍 VisionService: text value:', visionResult.text);
-      
+      console.log('🔍 VisionService: Full AI result object:', visionResult);
+      console.log('🔍 VisionService: Object keys:', Object.keys(visionResult));
+      console.log('🔍 VisionService: extractedText value:', visionResult.extractedText);
+      console.log('🔍 VisionService: text value:', visionResult.text);
+
       // Handle the new TextExtractionResult format
       return {
         text: visionResult.text || '',
@@ -43,16 +45,15 @@ console.log('🔍 VisionService: text value:', visionResult.text);
         processingTime: 'fast',
         source: 'ai_vision',
         success: visionResult.success,
-        wordCount: visionResult.wordCount
+        wordCount: visionResult.wordCount,
       };
-      
     } catch (visionError: any) {
       console.warn('AI Vision failed, falling back to Tesseract OCR:', visionError);
-      
+
       try {
         // Fallback to traditional OCR
         const ocrText = await extractImageTextOCR(file);
-        
+
         return {
           text: ocrText,
           method: 'tesseract_ocr',
@@ -61,7 +62,7 @@ console.log('🔍 VisionService: text value:', visionResult.text);
           fallbackReason: visionError.message,
           source: 'ocr_fallback',
           success: true,
-          wordCount: ocrText.split(/\s+/).length
+          wordCount: ocrText.split(/\s+/).length,
         };
       } catch (ocrError: any) {
         console.error('Both AI Vision and OCR failed:', ocrError);
@@ -83,7 +84,7 @@ console.log('🔍 VisionService: text value:', visionResult.text);
   getProcessingRecommendation(file: File): ProcessingRecommendation {
     const fileSize = file.size;
     const fileType = file.type;
-    
+
     // Validate that it's an image
     if (!this.canProcess(file)) {
       return {
@@ -91,10 +92,10 @@ console.log('🔍 VisionService: text value:', visionResult.text);
         recommendation: `File type ${fileType} is not supported for vision processing`,
         estimatedTime: 'N/A',
         shouldCompress: false,
-        canProcess: false
+        canProcess: false,
       };
     }
-    
+
     // Large images may benefit from compression before processing
     if (fileSize > 5 * 1024 * 1024) {
       return {
@@ -103,10 +104,10 @@ console.log('🔍 VisionService: text value:', visionResult.text);
         estimatedTime: '5-15 seconds',
         shouldCompress: true,
         canProcess: true,
-        priority: 'high'
+        priority: 'high',
       };
     }
-    
+
     // High-quality formats work well with AI Vision
     if (['image/png', 'image/jpeg', 'image/jpg'].includes(fileType)) {
       return {
@@ -115,10 +116,10 @@ console.log('🔍 VisionService: text value:', visionResult.text);
         estimatedTime: '2-8 seconds',
         shouldCompress: false,
         canProcess: true,
-        priority: 'medium'
+        priority: 'medium',
       };
     }
-    
+
     // Other formats may work better with hybrid approach
     return {
       approach: 'hybrid',
@@ -126,7 +127,7 @@ console.log('🔍 VisionService: text value:', visionResult.text);
       estimatedTime: '5-20 seconds',
       shouldCompress: false,
       canProcess: true,
-      priority: 'low'
+      priority: 'low',
     };
   }
 
@@ -134,11 +135,10 @@ console.log('🔍 VisionService: text value:', visionResult.text);
    * Compress image if needed before processing
    */
   async compressImageIfNeeded(
-    file: File, 
+    file: File,
     maxSize: number = 2 * 1024 * 1024,
     options: CompressionOptions = {}
   ): Promise<File> {
-    
     if (file.size <= maxSize) {
       console.log(`Image ${file.name} is already under size limit (${file.size} bytes)`);
       return file; // No compression needed
@@ -149,7 +149,7 @@ console.log('🔍 VisionService: text value:', visionResult.text);
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      
+
       if (!ctx) {
         reject(new Error('Failed to get canvas 2D context'));
         return;
@@ -161,17 +161,17 @@ console.log('🔍 VisionService: text value:', visionResult.text);
         try {
           // Calculate new dimensions (maintain aspect ratio)
           const compressionRatio = Math.sqrt(maxSize / file.size);
-          
+
           // Apply max width/height constraints if specified
           let newWidth = img.width * compressionRatio;
           let newHeight = img.height * compressionRatio;
-          
+
           if (options.maxWidth && newWidth > options.maxWidth) {
             const widthRatio = options.maxWidth / newWidth;
             newWidth = options.maxWidth;
             newHeight = newHeight * widthRatio;
           }
-          
+
           if (options.maxHeight && newHeight > options.maxHeight) {
             const heightRatio = options.maxHeight / newHeight;
             newHeight = options.maxHeight;
@@ -187,20 +187,28 @@ console.log('🔍 VisionService: text value:', visionResult.text);
           // Convert back to file
           const outputFormat = options.format || file.type;
           const quality = options.quality || 0.8;
-          
-          canvas.toBlob((blob) => {
-            if (blob) {
-              const compressedFile = new File([blob], file.name, {
-                type: outputFormat,
-                lastModified: file.lastModified
-              });
-              
-              console.log(`Image compressed: ${file.size} → ${compressedFile.size} bytes (${Math.round((1 - compressedFile.size / file.size) * 100)}% reduction)`);
-              resolve(compressedFile);
-            } else {
-              reject(new Error('Image compression failed - blob creation returned null'));
-            }
-          }, outputFormat, quality);
+
+          canvas.toBlob(
+            blob => {
+              if (blob) {
+                const compressedFile = new File([blob], file.name, {
+                  type: outputFormat,
+                  lastModified: file.lastModified,
+                });
+
+                console.log(
+                  `Image compressed: ${file.size} → ${compressedFile.size} bytes (${Math.round(
+                    (1 - compressedFile.size / file.size) * 100
+                  )}% reduction)`
+                );
+                resolve(compressedFile);
+              } else {
+                reject(new Error('Image compression failed - blob creation returned null'));
+              }
+            },
+            outputFormat,
+            quality
+          );
         } catch (error) {
           reject(new Error(`Image compression failed: ${error}`));
         }
@@ -209,7 +217,7 @@ console.log('🔍 VisionService: text value:', visionResult.text);
       img.onerror = () => {
         reject(new Error('Failed to load image for compression'));
       };
-      
+
       // Create object URL for the image
       img.src = URL.createObjectURL(file);
     });
@@ -219,20 +227,20 @@ console.log('🔍 VisionService: text value:', visionResult.text);
    * Batch process multiple images for text extraction
    */
   async processImageBatch(
-    files: File[], 
+    files: File[],
     options: VisionAnalysisOptions = {}
   ): Promise<TextExtractionResult[]> {
     console.log(`Starting batch processing of ${files.length} images`);
-    
+
     const results: TextExtractionResult[] = [];
-    
+
     for (const file of files) {
       try {
         const result = await this.extractImageText(file, options);
         results.push(result);
       } catch (error: any) {
         console.error(`Batch processing failed for ${file.name}:`, error);
-        
+
         // Add failed result
         results.push({
           text: '',
@@ -242,11 +250,11 @@ console.log('🔍 VisionService: text value:', visionResult.text);
           source: 'error',
           success: false,
           error: error.message,
-          wordCount: 0
+          wordCount: 0,
         });
       }
     }
-    
+
     return results;
   }
 
@@ -255,12 +263,12 @@ console.log('🔍 VisionService: text value:', visionResult.text);
    */
   validateImageFile(file: File): { valid: boolean; error?: string; warnings?: string[] } {
     const warnings: string[] = [];
-    
+
     // Check if it's an image
     if (!file.type.startsWith('image/')) {
       return {
         valid: false,
-        error: `File type ${file.type} is not an image`
+        error: `File type ${file.type} is not an image`,
       };
     }
 
@@ -269,7 +277,7 @@ console.log('🔍 VisionService: text value:', visionResult.text);
     if (file.size > maxSize) {
       return {
         valid: false,
-        error: `Image file too large (${Math.round(file.size / 1024 / 1024)}MB > 50MB)`
+        error: `Image file too large (${Math.round(file.size / 1024 / 1024)}MB > 50MB)`,
       };
     }
 
@@ -291,28 +299,25 @@ console.log('🔍 VisionService: text value:', visionResult.text);
 
     return {
       valid: true,
-      warnings: warnings.length > 0 ? warnings : undefined
+      warnings: warnings.length > 0 ? warnings : undefined,
     };
   }
 
   /**
    * Get compression statistics for a file
    */
-  async getCompressionPreview(
-    file: File, 
-    targetSize: number
-  ): Promise<CompressionResult> {
+  async getCompressionPreview(file: File, targetSize: number): Promise<CompressionResult> {
     const compressionRatio = Math.sqrt(targetSize / file.size);
-    
+
     // Create a temporary canvas to estimate dimensions
     return new Promise((resolve, reject) => {
       const img = new Image();
-      
+
       img.onload = () => {
         const newWidth = Math.round(img.width * compressionRatio);
         const newHeight = Math.round(img.height * compressionRatio);
         const estimatedSize = Math.round(file.size * compressionRatio * compressionRatio);
-        
+
         resolve({
           compressedFile: file, // Placeholder - actual compression not performed
           originalSize: file.size,
@@ -320,10 +325,10 @@ console.log('🔍 VisionService: text value:', visionResult.text);
           compressionRatio: compressionRatio,
           newDimensions: { width: newWidth, height: newHeight },
           originalDimensions: { width: img.width, height: img.height },
-          estimatedQualityLoss: Math.round((1 - compressionRatio) * 100)
+          estimatedQualityLoss: Math.round((1 - compressionRatio) * 100),
         });
       };
-      
+
       img.onerror = () => reject(new Error('Failed to load image for compression preview'));
       img.src = URL.createObjectURL(file);
     });
@@ -332,16 +337,19 @@ console.log('🔍 VisionService: text value:', visionResult.text);
   /**
    * Extract text with automatic image optimization
    */
-  async extractTextOptimized(file: File, options: VisionAnalysisOptions = {}): Promise<TextExtractionResult> {
+  async extractTextOptimized(
+    file: File,
+    options: VisionAnalysisOptions = {}
+  ): Promise<TextExtractionResult> {
     // Get processing recommendation
     const recommendation = this.getProcessingRecommendation(file);
-    
+
     // Compress if recommended
     let processFile = file;
     if (recommendation.shouldCompress) {
       processFile = await this.compressImageIfNeeded(file);
     }
-    
+
     // Extract text with optimized file
     return await this.extractImageText(processFile, options);
   }
@@ -359,9 +367,5 @@ export default visionExtractionService;
 export { VisionExtractionService };
 
 // Export individual methods for backward compatibility
-export const {
-  extractImageText,
-  canProcess,
-  getProcessingRecommendation,
-  compressImageIfNeeded
-} = visionExtractionService;
+export const { extractImageText, canProcess, getProcessingRecommendation, compressImageIfNeeded } =
+  visionExtractionService;

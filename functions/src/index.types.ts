@@ -99,46 +99,6 @@ export interface FHIRProcessingResponse {
   patient: string;
 }
 
-// ==================== DETAILED NARRATIVE TYPES ====================
-
-export interface NarrativeGenerationInput {
-  fhirData: any;
-  belroseFields?: {
-    visitType?: string;
-    title?: string;
-    summary?: string;
-    completedDate?: string;
-    provider?: string;
-    institution?: string;
-    patient?: string;
-  };
-  fileName?: string;
-  extractedText?: string;
-  originalText?: string;
-}
-
-export interface NarrativeGenerationResult {
-  detailedNarrative: string;
-}
-
-export interface NarrativeGenerationConfig {
-  apiEndpoint?: string;
-}
-
-export const DEFAULT_NARRATIVE_CONFIG: Required<NarrativeGenerationConfig> = {
-  apiEndpoint: 'https://us-central1-belrose-757fe.cloudfunctions.net/createDetailedNarrative',
-};
-
-/**
- * Custom error class for narrative generation
- */
-export class NarrativeGenerationError extends Error {
-  constructor(message: string, public originalError?: any) {
-    super(message);
-    this.name = 'NarrativeGenerationError';
-  }
-}
-
 // ==================== CLAUDE API TYPES ====================
 
 export interface ClaudeMessage {

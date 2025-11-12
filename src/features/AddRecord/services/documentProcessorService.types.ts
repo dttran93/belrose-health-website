@@ -25,7 +25,7 @@ export interface IDocumentProcessorService {
 
 // ==================== UTILITY TYPES ====================
 
-export type SupportedFileType = 
+export type SupportedFileType =
   | 'application/pdf'
   | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   | 'application/msword'
@@ -33,20 +33,6 @@ export type SupportedFileType =
   | 'image/jpeg'
   | 'image/png'
   | 'image/jpg';
-
-export type ProcessingStep = 
-  | 'text_extraction_started'
-  | 'text_extraction_completed'
-  | 'ai_vision_analysis'
-  | 'ai_vision_completed'
-  | 'ai_vision_failed'
-  | 'image_text_extraction'
-  | 'image_compression'
-  | 'image_text_completed'
-  | 'document_text_extraction'
-  | 'document_text_completed'
-  | 'processing_completed'
-  | 'processing_failed';
 
 // ==================== TYPE GUARDS ====================
 
@@ -58,7 +44,7 @@ export function isValidFileType(type: string): type is SupportedFileType {
     'text/plain',
     'image/jpeg',
     'image/png',
-    'image/jpg'
+    'image/jpg',
   ];
   return supportedTypes.includes(type as SupportedFileType);
 }

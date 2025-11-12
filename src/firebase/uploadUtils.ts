@@ -40,7 +40,6 @@ export interface UploadUserFileResult {
   downloadURL: string | null;
   filePath: string | null;
   isVirtual?: boolean;
-  needsMove?: boolean;
 }
 
 export interface SaveMetadataParams {
@@ -151,10 +150,18 @@ export async function createFirestoreRecord({
     throw new Error('File must be encrypted before saving metadata.');
   }
 
-  //Owners default to uploader if not specified
-  const owners = fileObj.owners && fileObj.owners.length > 0 ? fileObj.owners : [user.uid];
-  //if there's a sujbectId and the owners doesn't have subjectId, then add subjectId
-  if (fileObj.subjectId && !owners.includes(fileObj.subjectId)) owners.push(fileObj.subjectId);
+  //Administrators default to uploader if not specified
+  let administrators =
+    fileObj.administrators && fileObj.administrators.length > 0
+      ? fileObj.administrators
+      : [user.uid];
+
+  // If there are owners, ensure they're all included in administrators
+  if (fileObj.owners && fileObj.owners.length > 0) {
+    // Add any owners that aren't already in administrators
+    const ownersToAdd = fileObj.owners.filter(owner => !administrators.includes(owner));
+    administrators = [...administrators, ...ownersToAdd];
+  }
 
   const documentData: any = {
     fileSize: fileObj.fileSize,
@@ -165,11 +172,8 @@ export async function createFirestoreRecord({
     // OWNERSHIP FIELDS
     uploadedBy: user.uid,
     uploadedByName: user.displayName || user.email || 'Unknown User',
-    subjectId: fileObj.subjectId || null,
-    ...(fileObj.subjectId && {
-      subjectName: fileObj.subjectName || 'Unknown Subject',
-    }),
-    owners: owners,
+    owners: fileObj.owners || [],
+    administrators: administrators,
 
     isEncrypted: true,
     encryptedKey: fileObj.encryptedData.encryptedKey,

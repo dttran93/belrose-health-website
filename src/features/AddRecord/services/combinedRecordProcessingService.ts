@@ -11,8 +11,12 @@ import {
 } from '@/features/Encryption/encryptionConfig';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { FileObject, VirtualFileInput, BelroseFields, ProcessingStages } from '@/types/core';
-import { RecordHashService } from '@/features/ViewEditRecord/services/generateRecordHash';
+import {
+  RecordHashService,
+  HashableFileContent,
+} from '@/features/ViewEditRecord/services/generateRecordHash';
 import { generateDetailedNarrative } from './belroseNarrativeService';
+import { Timestamp } from 'firebase/firestore';
 
 export interface ProcessedRecord {
   extractedText?: string | null;
@@ -85,10 +89,13 @@ export class CombinedRecordProcessingService {
         onStageUpdate?.('AI analyzing content...', { aiProcessingStatus: 'processing' });
 
         try {
-          const aiResult = await processRecordWithAI(result.fhirData, {
+          const BelroseFieldInputs = {
+            fhirData: result.fhirData,
             fileName: fileObj.fileName,
             extractedText: result.extractedText || undefined,
-          });
+          };
+
+          const aiResult = await processRecordWithAI(BelroseFieldInputs);
 
           result.belroseFields = {
             visitType: aiResult.visitType,
@@ -98,7 +105,6 @@ export class CombinedRecordProcessingService {
             provider: aiResult.provider,
             patient: aiResult.patient,
             institution: aiResult.institution,
-            aiProcessedAt: new Date().toISOString(),
           };
 
           result.aiProcessingStatus = 'completed';
@@ -106,11 +112,6 @@ export class CombinedRecordProcessingService {
           console.log(`✅ AI processing completed for: ${fileObj.fileName}`, aiResult);
         } catch (error: any) {
           console.error(`❌ AI processing failed for ${fileObj.fileName}:`, error);
-
-          result.belroseFields = {
-            aiFailureReason: error.message,
-            aiProcessedAt: new Date().toISOString(),
-          };
 
           result.aiProcessingStatus = 'failed';
 
@@ -129,19 +130,13 @@ export class CombinedRecordProcessingService {
         console.log(`📖 Step 3B: Generating detailed narrative for: ${fileObj.fileName}`);
 
         try {
-          const narrativeResult = await generateDetailedNarrative(result.fhirData, {
-            belroseFields: {
-              visitType: result.belroseFields.visitType,
-              title: result.belroseFields.title,
-              summary: result.belroseFields.summary,
-              completedDate: result.belroseFields.completedDate,
-              provider: result.belroseFields.provider,
-              institution: result.belroseFields.institution,
-              patient: result.belroseFields.patient,
-            },
+          const detailedNarrativeInput = {
+            fhirData: result.fhirData,
+            belroseFields: result.belroseFields,
             fileName: fileObj.fileName,
             extractedText: result.extractedText || undefined,
-          });
+          };
+          const narrativeResult = await generateDetailedNarrative(detailedNarrativeInput);
 
           // Add the detailed narrative to belroseFields
           result.belroseFields.detailedNarrative = narrativeResult.detailedNarrative;
@@ -162,17 +157,16 @@ export class CombinedRecordProcessingService {
       console.log(`🔗 Step 4: Generating record hash for: ${fileObj.fileName}`);
       onStageUpdate?.('Generating record hash...');
 
-      const completeRecord: FileObject = {
-        ...fileObj,
-        extractedText: result.extractedText,
-        wordCount: result.wordCount,
-        fhirData: result.fhirData,
-        belroseFields: result.belroseFields,
-        status: 'processing',
-      };
-
       try {
-        result.recordHash = await RecordHashService.generateRecordHash(completeRecord);
+        result.recordHash = await RecordHashService.generateRecordHash({
+          fileName: fileObj.fileName,
+          extractedText: result.extractedText,
+          originalText: fileObj.originalText,
+          originalFileHash: fileObj.originalFileHash,
+          fhirData: result.fhirData,
+          belroseFields: result.belroseFields,
+          customData: fileObj.customData,
+        });
 
         console.log(`✅ Record hash generated for: ${fileObj.fileName}`, {
           hash: result.recordHash.substring(0, 12) + '...',
@@ -278,10 +272,13 @@ export class CombinedRecordProcessingService {
       onStageUpdate?.('AI analyzing content...');
 
       try {
-        const aiResult = await processRecordWithAI(virtualData.fhirData, {
+        const virtualBelroseFieldInputs = {
+          fhirData: virtualData.fhirData,
           fileName: fileName,
-          extractedText: virtualData.originalText,
-        });
+          originalText: virtualData.originalText,
+        };
+
+        const aiResult = await processRecordWithAI(virtualBelroseFieldInputs);
 
         result.belroseFields = {
           visitType: aiResult.visitType,
@@ -291,7 +288,6 @@ export class CombinedRecordProcessingService {
           provider: aiResult.provider,
           patient: aiResult.patient,
           institution: aiResult.institution,
-          aiProcessedAt: new Date().toISOString(),
         };
 
         result.aiProcessingStatus = 'completed';
@@ -302,12 +298,6 @@ export class CombinedRecordProcessingService {
         });
       } catch (error: any) {
         console.error(`❌ AI processing failed for virtual file ${fileName}:`, error);
-
-        result.belroseFields = {
-          aiFailureReason: error.message,
-          aiProcessedAt: new Date().toISOString(),
-        };
-
         result.aiProcessingStatus = 'failed';
 
         toast.error(`AI analysis failed for ${fileName}`, {
@@ -328,19 +318,12 @@ export class CombinedRecordProcessingService {
       console.log(`📖 Generating detailed narrative for virtual file: ${fileName}`);
 
       try {
-        const narrativeResult = await generateDetailedNarrative(virtualData.fhirData, {
-          belroseFields: {
-            visitType: result.belroseFields.visitType,
-            title: result.belroseFields.title,
-            summary: result.belroseFields.summary,
-            completedDate: result.belroseFields.completedDate,
-            provider: result.belroseFields.provider,
-            institution: result.belroseFields.institution,
-            patient: result.belroseFields.patient,
-          },
-          fileName: fileName,
-          originalText: virtualData.originalText,
-        });
+        const virtualDetailedNarrativeInput = {
+          fhirData: result.fhirData,
+          belroseFields: result.belroseFields,
+          extractedText: result.extractedText || undefined,
+        };
+        const narrativeResult = await generateDetailedNarrative(virtualDetailedNarrativeInput);
 
         result.belroseFields.detailedNarrative = narrativeResult.detailedNarrative;
 
@@ -356,20 +339,12 @@ export class CombinedRecordProcessingService {
     console.log('🔗 Generating record hash for virtual file:', fileName);
     onStageUpdate?.('Generating record hash...');
 
-    const virtualFileForHash: FileObject = {
-      id: virtualData.id || '',
+    const virtualFileForHash: HashableFileContent = {
       fileName: fileName,
-      fileSize: virtualData.fileSize || 0,
-      fileType: virtualData.fileType || 'application/json',
-      status: 'completed',
-      uploadedAt: new Date().toISOString(),
       originalText: virtualData.originalText,
-      wordCount: virtualData.wordCount || 0,
-      isVirtual: true,
       fhirData: virtualData.fhirData,
-      file: undefined,
       belroseFields: result.belroseFields,
-      aiProcessingStatus: result.aiProcessingStatus,
+      customData: virtualData.customData,
     };
 
     try {

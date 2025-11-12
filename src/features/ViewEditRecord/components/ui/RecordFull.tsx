@@ -61,8 +61,8 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [hasFhirChanges, setHasFhirChanges] = useState(false);
   const [currentFhirData, setCurrentFhirData] = useState(record.fhirData);
-  const [editedBelroseFields, setEditedBelroseFields] = useState<BelroseFields>(
-    record.belroseFields || {}
+  const [editedBelroseFields, setEditedBelroseFields] = useState<BelroseFields | undefined>(
+    record.belroseFields
   );
   const [viewingVersion, setViewingVersion] = useState<RecordVersion | null>(null);
   const [decryptedVersionData, setDecryptedVersionData] = useState<any>(null);
@@ -149,7 +149,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   const handleEnterEditMode = () => {
     setViewMode('edit');
     setActiveTab('record');
-    setEditedBelroseFields(record.belroseFields || {});
+    setEditedBelroseFields(record.belroseFields || undefined);
   };
 
   const handleViewVersionHistory = () => {
@@ -228,7 +228,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     setHasUnsavedChanges(false);
     setHasFhirChanges(false);
     setCurrentFhirData(record.fhirData);
-    setEditedBelroseFields(record.belroseFields || {});
+    setEditedBelroseFields(record.belroseFields || undefined);
   };
 
   const handleExit = () => {

@@ -74,35 +74,43 @@ export function useFileManager(): UseFileManagerTypes {
 
   const generateId = () => `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-  const createFileObject = useCallback(async (file: File, id?: string): Promise<FileObject> => {
-    console.log(`📁 Creating file object for: ${file.name}`);
+  const createFileObject = useCallback(
+    async (file: File, id?: string): Promise<FileObject> => {
+      console.log(`📁 Creating file object for: ${file.name}`);
 
-    // Hash the original file immediately
-    let originalFileHash: string | null = null;
-    try {
-      originalFileHash = await hashOriginalFile(file);
-    } catch (error) {
-      console.warn(`⚠️ Could not hash file ${file.name}:`, error);
-      // Continue without hash rather than failing entirely
-      originalFileHash = null;
-    }
+      if (!user) {
+        throw new Error('User must be authenticated to create file object');
+      }
 
-    return {
-      id: id || generateId(),
-      file,
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type,
-      status: 'pending' as FileStatus,
-      uploadedAt: Timestamp.now(),
-      extractedText: '',
-      wordCount: 0,
-      sourceType: 'File Upload',
-      isVirtual: false,
-      aiProcessingStatus: 'not_needed' as AIProcessingStatus,
-      originalFileHash,
-    };
-  }, []);
+      // Hash the original file immediately
+      let originalFileHash: string | null = null;
+      try {
+        originalFileHash = await hashOriginalFile(file);
+      } catch (error) {
+        console.warn(`⚠️ Could not hash file ${file.name}:`, error);
+        // Continue without hash rather than failing entirely
+        originalFileHash = null;
+      }
+
+      return {
+        id: id || generateId(),
+        file,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        status: 'pending' as FileStatus,
+        uploadedAt: Timestamp.now(),
+        extractedText: '',
+        wordCount: 0,
+        sourceType: 'File Upload',
+        isVirtual: false,
+        aiProcessingStatus: 'not_needed' as AIProcessingStatus,
+        originalFileHash,
+        administrators: [user.uid],
+      };
+    },
+    [user]
+  );
 
   const hashOriginalFile = async (file: File): Promise<string> => {
     try {
@@ -556,6 +564,10 @@ export function useFileManager(): UseFileManagerTypes {
       recordHash?: string;
       virtualFile: FileObject; // ← Add this
     }> => {
+      // Guard clause for user
+      if (!user) {
+        throw new Error('User must be authenticated to add virtual file');
+      }
       const fileId = virtualData.id || generateId();
       const fileName = virtualData.fileName || `Virtual File ${fileId}`;
 
@@ -581,19 +593,20 @@ export function useFileManager(): UseFileManagerTypes {
         isVirtual: true,
         fhirData: virtualData.fhirData,
         file: undefined,
-        belroseFields: result.belroseFields, // ← Has the processed data
+        belroseFields: result.belroseFields,
         aiProcessingStatus: result.aiProcessingStatus,
         recordHash: result.recordHash,
         encryptedData: result.encryptedData,
+        administrators: virtualData.administrators || [user.uid],
       };
 
       // Add to state
       setFiles(prev => [...prev, virtualFile]);
       console.log(`✅ Added virtual file: ${virtualFile.fileName}`);
 
-      return { fileId, recordHash: result.recordHash, virtualFile }; // ← Return it
+      return { fileId, recordHash: result.recordHash, virtualFile };
     },
-    [setFiles]
+    [setFiles, user]
   );
 
   const addFhirAsVirtualFile = useCallback(
