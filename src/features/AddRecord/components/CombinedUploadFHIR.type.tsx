@@ -57,38 +57,42 @@ export interface CombinedUploadFHIRProps {
   addFiles: (fileList: FileList, options?: AddFilesOptions) => void;
   removeFile: (fileId: string) => Promise<void>;
   removeFileFromLocal: (fileId: string) => void;
-  
+
   // Updated: Hook provides Promise<void>, takes fileId: string
   retryFile: (fileId: string) => Promise<void>;
-  
+
   // Updated: Hook provides the full FileStats interface
   getStats: () => FileStats;
 
-  updateFileStatus: (fileId: string, status: FileStatus, additionalData?: Partial<FileObject>) => void;
+  updateFileStatus: (
+    fileId: string,
+    status: FileStatus,
+    additionalData?: Partial<FileObject>
+  ) => void;
   onReview: (fileItem: FileObject) => void;
-  
+  processFile: (fileObj: FileObject) => Promise<FileObject>;
+
   // Direct upload functions - UPDATED to match hook
   addFhirAsVirtualFile: (
-    fhirData: FHIRWithValidation, 
-    options?: VirtualFileInput & { autoUpload?: boolean}
+    fhirData: FHIRWithValidation,
+    options?: VirtualFileInput & { autoUpload?: boolean }
   ) => Promise<VirtualFileResult>;
-  
+
   // Updated: Hook takes fileIds array, returns Promise<void>
   // Component should extract IDs from files and rely on state updates
-  uploadFiles: (fileIds?: string[]) => Promise<UploadResult[]>;
-  shouldAutoUpload: (file:FileObject) => boolean;
+  uploadFiles: (filesToUpload: FileObject[]) => Promise<UploadResult[]>;
   savingToFirestore: Set<string>;
-  
+
   // 🔥 ADD FHIR PROPS
-  fhirData?: Map<string, FHIRWithValidation>
+  fhirData?: Map<string, FHIRWithValidation>;
   onFHIRConverted?: (fileId: string, uploadResult: any, fileObj?: FileObject) => Promise<void>;
-  
+
   // Configuration props
   acceptedTypes?: string[];
   maxFiles?: number;
   maxSizeBytes?: number;
   className?: string;
-  
+
   convertTextToFHIR?: (text: string, patientName?: string) => Promise<FHIRWithValidation>;
 }
 
@@ -105,14 +109,13 @@ export interface FileListItemProps {
   };
   onRemove: (fileId: string) => void;
   onConfirm: (fileId: string) => void;
-  
+
   // Updated: FileListItem should pass FileItem, but retryFile expects fileId
   // We'll handle the conversion in the component
   onRetry: (fileItem: FileObject) => void;
   onForceConvert?: (fileItem: FileObject) => void;
-  onComplete?: (fileItem: FileObject) => void;
   showFHIRResults?: boolean;
-  onReview?: (fileItem: FileObject) => void;
+  onReview: (fileItem: FileObject) => void;
 }
 
 // ============================================================================

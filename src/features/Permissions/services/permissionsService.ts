@@ -25,29 +25,38 @@ export class PermissionsService {
     const db = getFirestore();
     const recordRef = doc(db, 'records', recordId);
 
-    // First, check if the current user is an owner
     const recordDoc = await getDoc(recordRef);
-    if (!recordDoc.exists()) {
-      throw new Error('Record not found');
-    }
+    if (!recordDoc.exists()) throw new Error('Record not found');
 
     const recordData = recordDoc.data();
-    if (!recordData.owners?.includes(currentUser.uid)) {
-      throw new Error('Only owners can add other owners');
+    const owners: string[] = recordData.owners || [];
+    const admins: string[] = recordData.administrators || [];
+
+    console.log('📝 Current ownership data', { owners, admins, currentUser: currentUser.uid });
+
+    // Determine who can add owners
+    const canAddOwner =
+      owners.length > 0
+        ? owners.includes(currentUser.uid) // Only owners if owners array not empty
+        : admins.includes(currentUser.uid); // Admins if owners array is empty
+
+    if (!canAddOwner) {
+      throw new Error('You do not have permission to add owners');
     }
 
-    // Check if user is already an owner
-    if (recordData.owners?.includes(userId)) {
+    if (owners.includes(userId)) {
       throw new Error('User is already an owner');
     }
 
-    // Add the user to the owners array
+    console.log('✅ Adding owner:', userId);
+
     await updateDoc(recordRef, {
       owners: arrayUnion(userId),
-      administrators: arrayUnion(userId), //add it to administrators as well
+      administrators: arrayUnion(userId), // optional: only if you want them admin too
     });
-  }
 
+    console.log('✅ Owner added successfully');
+  }
   /**
    * Add an administrator to a record
    * @param recordId - The record ID

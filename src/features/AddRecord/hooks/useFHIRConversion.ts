@@ -15,7 +15,7 @@ import type { FHIRWithValidation, FHIRBundle } from '../services/fhirConversionS
 export const useFHIRConversion = (
   processedFiles: FileObject[],
   updateFirestoreRecord?: (fileId: string, data: any) => void,
-  uploadFiles?: () => Promise<any[]>, // Updated type signature
+  uploadFiles?: (filesToUpload: FileObject[]) => Promise<any[]>, // Updated type signature
   removeProcessedFile?: (fileId: string) => void
 ): FHIRConversionHookReturn => {
   const [fhirData, setFhirData] = useState<Map<string, FHIRWithValidation>>(new Map());
@@ -127,7 +127,7 @@ export const useFHIRConversion = (
         console.log('Uploading file to Firebase storage...');
         try {
           console.log('Calling uploadFiles (no parameters)');
-          const uploadResults = await uploadFiles(); // No parameters
+          const uploadResults = await uploadFiles([originalFile]);
           console.log('Upload completed successfully:', uploadResults);
 
           // Get the document ID from the first (and only) upload result

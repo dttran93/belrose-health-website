@@ -40,7 +40,7 @@ export class CombinedRecordProcessingService {
    * 2. Convert to FHIR
    * 3. AI processing
    * 4. Generate record hash
-   * 5. Encrypt (if enabled)
+   * 5. Encrypt
    */
   static async processUploadedFile(
     fileObj: FileObject,
@@ -319,9 +319,9 @@ export class CombinedRecordProcessingService {
 
       try {
         const virtualDetailedNarrativeInput = {
-          fhirData: result.fhirData,
+          fhirData: virtualData.fhirData,
           belroseFields: result.belroseFields,
-          extractedText: result.extractedText || undefined,
+          originalText: virtualData.originalText || undefined,
         };
         const narrativeResult = await generateDetailedNarrative(virtualDetailedNarrativeInput);
 
@@ -397,6 +397,12 @@ export class CombinedRecordProcessingService {
       }
     }
 
-    return result;
+    return {
+      fhirData: virtualData.fhirData,
+      belroseFields: result.belroseFields,
+      aiProcessingStatus: result.aiProcessingStatus,
+      recordHash: result.recordHash,
+      encryptedData: result.encryptedData,
+    };
   }
 }

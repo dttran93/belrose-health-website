@@ -212,7 +212,23 @@ export function useFileManager(): UseFileManagerTypes {
           aiProcessingStatus: result.aiProcessingStatus,
         });
 
+        // Create the updated file object
+        const updatedFile: FileObject = {
+          ...fileObj,
+          status: 'completed',
+          processingStage: undefined,
+          extractedText: result.extractedText,
+          wordCount: result.wordCount,
+          fhirData: result.fhirData,
+          belroseFields: result.belroseFields,
+          recordHash: result.recordHash,
+          encryptedData: result.encryptedData,
+          aiProcessingStatus: result.aiProcessingStatus,
+        };
+
         console.log(`🎉 Complete processing pipeline finished for: ${fileObj.fileName}`);
+
+        return updatedFile;
       } catch (error: any) {
         console.error(`💥 Processing failed for ${fileObj.fileName}:`, error);
         updateFileStatus(fileObj.id, 'error', {
@@ -220,29 +236,12 @@ export function useFileManager(): UseFileManagerTypes {
           processingStage: undefined,
           aiProcessingStatus: 'not_needed',
         });
+
+        throw error;
       }
     },
     [updateFileStatus]
   );
-
-  // Also add this helper function to prevent auto-upload during processing
-  const shouldAutoUpload = useCallback((file: FileObject): boolean => {
-    //skip already uploaded files
-    if (file.firestoreId) return false;
-    const fileCompleted = file.status === 'completed';
-    const aiStatus = file.aiProcessingStatus || 'not_needed';
-    const needsAI = !!file.fhirData;
-
-    if (!needsAI) {
-      return fileCompleted && aiStatus === 'not_needed';
-    }
-
-    // 🔥 KEY: If FHIR data exists, require belroseFields
-    const hasBelroseFields = !!file.belroseFields && Object.keys(file.belroseFields).length > 0;
-    const aiCompleted = aiStatus === 'completed';
-
-    return fileCompleted && aiCompleted && hasBelroseFields;
-  }, []);
 
   // ==================== ADD FILES ====================
 
@@ -303,20 +302,8 @@ export function useFileManager(): UseFileManagerTypes {
         console.log(`✅ Added ${newFiles.length} files. Total: ${combined.length}`);
         return combined;
       });
-
-      // Auto-process if enabled
-      if (autoProcess) {
-        console.log('🔄 Auto-processing enabled, starting file processing...');
-        for (const fileObj of newFiles) {
-          try {
-            await processFile(fileObj);
-          } catch (error) {
-            console.error(`❌ Auto-processing failed for ${fileObj.fileName}:`, error);
-          }
-        }
-      }
     },
-    [setFiles, processFile]
+    [setFiles]
   );
 
   // ================ FILE DELETION =========================
@@ -485,11 +472,7 @@ export function useFileManager(): UseFileManagerTypes {
   // ==================== FIRESTORE OPERATIONS ====================
 
   const uploadFiles = useCallback(
-    async (fileIds?: string[]): Promise<UploadResult[]> => {
-      const filesToUpload = fileIds
-        ? files.filter(f => fileIds.includes(f.id))
-        : files.filter(f => f.status === 'completed' && !f.firestoreId);
-
+    async (filesToUpload: FileObject[]): Promise<UploadResult[]> => {
       if (filesToUpload.length === 0) {
         console.log('📤 No files ready for upload');
         return [];
@@ -570,7 +553,7 @@ export function useFileManager(): UseFileManagerTypes {
       const results = await Promise.all(uploadPromises);
       return results;
     },
-    [files, savingToFirestore, updateFileStatus]
+    [savingToFirestore, updateFileStatus]
   );
 
   // ==================== VIRTUAL FILE SUPPORT ====================
@@ -653,6 +636,13 @@ export function useFileManager(): UseFileManagerTypes {
         recordHash,
         virtualFile,
       } = await addVirtualFile(virtualFileInput);
+
+      console.log('🧩 virtualFile AFTER addVirtualFile:', {
+        hasEncryptedData: !!virtualFile.encryptedData,
+        encryptedDataKeys: virtualFile.encryptedData
+          ? Object.keys(virtualFile.encryptedData)
+          : Object.keys(virtualFile || {}),
+      });
 
       // 🔥 AUTO-UPLOAD if requested
       if (options.autoUpload) {
@@ -773,9 +763,6 @@ export function useFileManager(): UseFileManagerTypes {
     // Firestore operations
     uploadFiles,
     updateFirestoreRecord,
-
-    //Helper function
-    shouldAutoUpload,
 
     // Computed values
     getStats,

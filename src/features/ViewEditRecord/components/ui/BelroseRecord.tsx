@@ -15,7 +15,18 @@ export const BelroseRecord: React.FC<BelroseRecordProps> = ({
   editable = false,
   onDataChange,
 }) => {
-  const [editedData, setEditedData] = useState(Data || {});
+  const defaultBelroseFields: BelroseFields = {
+    visitType: '',
+    title: '',
+    patient: '',
+    provider: '',
+    institution: '',
+    completedDate: '',
+    summary: '',
+    detailedNarrative: '',
+  };
+
+  const [editedData, setEditedData] = useState<BelroseFields>(Data || defaultBelroseFields);
 
   // Update editedData when Data changes (important for when switching between records)
   React.useEffect(() => {

@@ -360,9 +360,9 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({
                 })}
               </div>
             ) : (
-              <div className="flex justify-between items-center mt-4">
+              <div className="flex justify-between items-center">
                 <p className="text-gray-600">Record Has Not Been Shared</p>
-                <Button>Share Record</Button>
+                {!isAddMode && <Button onClick={onAddMode}>Share Record</Button>}
               </div>
             )}
           </div>

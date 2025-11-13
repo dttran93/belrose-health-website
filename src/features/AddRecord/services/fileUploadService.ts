@@ -3,12 +3,12 @@ import { FileObject } from '@/types/core';
 import {
   UploadResult,
   UploadProgress,
-  UploadOptions,
   FHIRUpdateData,
   IFileUploadService,
   FileUploadError,
   UploadErrorCode,
 } from './fileUploadService.types';
+import { Timestamp } from 'firebase/firestore';
 
 /**
  * Service for handling file uploads to Firebase Storage and Firestore
@@ -24,17 +24,17 @@ export class FileUploadService implements IFileUploadService {
   /**
    * Upload a single file to Firebase Storage and save metadata to Firestore
    */
-  async uploadSingleFile(fileObj: FileObject, options: UploadOptions = {}): Promise<UploadResult> {
+  async uploadSingleFile(fileObj: FileObject): Promise<UploadResult> {
     console.log('📤 Starting single file upload:', fileObj.fileName);
 
     try {
       // Handle virtual files differently
       if (fileObj.isVirtual) {
-        return await this.handleVirtualFileUpload(fileObj, options);
+        return await this.handleVirtualFileUpload(fileObj);
       }
 
       // Regular file upload
-      return await this.handleRegularFileUpload(fileObj, options);
+      return await this.handleRegularFileUpload(fileObj);
     } catch (error: any) {
       console.error(`❌ Upload failed for ${fileObj.fileName}:`, error);
 
@@ -47,10 +47,7 @@ export class FileUploadService implements IFileUploadService {
   /**
    * Handle virtual file upload (no actual file to upload to storage)
    */
-  private async handleVirtualFileUpload(
-    fileObj: FileObject,
-    options: UploadOptions
-  ): Promise<UploadResult> {
+  private async handleVirtualFileUpload(fileObj: FileObject): Promise<UploadResult> {
     console.log('🎯 Processing virtual file upload:', fileObj.fileName);
 
     //DEBUG
@@ -60,7 +57,7 @@ export class FileUploadService implements IFileUploadService {
       allKeys: Object.keys(fileObj),
     });
 
-    // For virtual files, we only save metadata to Firestore
+    // For virtual files, we only save metadata to Firestore. Different than uploadFileComplete which requires File
     const firestoreDoc = await createFirestoreRecord({
       downloadURL: null, // No file in storage
       filePath: null, // No storage path
@@ -69,11 +66,9 @@ export class FileUploadService implements IFileUploadService {
 
     return {
       documentId: firestoreDoc,
-      firestoreId: firestoreDoc, // Legacy compatibility
       downloadURL: '', // Empty for virtual files
       filePath: '', // Empty for virtual files
-      uploadedAt: new Date(),
-      savedAt: new Date().toISOString(), // Legacy compatibility
+      uploadedAt: Timestamp.now(),
       fileSize: fileObj.fileSize,
       success: true,
     };
@@ -82,10 +77,7 @@ export class FileUploadService implements IFileUploadService {
   /**
    * Handle regular file upload to Firebase Storage
    */
-  private async handleRegularFileUpload(
-    fileObj: FileObject,
-    options: UploadOptions
-  ): Promise<UploadResult> {
+  private async handleRegularFileUpload(fileObj: FileObject): Promise<UploadResult> {
     if (!fileObj.file) {
       throw new FileUploadError(
         'No file found in fileObj for regular upload',
@@ -97,22 +89,13 @@ export class FileUploadService implements IFileUploadService {
     console.log('📁 Processing regular file upload:', fileObj.fileName);
 
     // Upload file to Firebase Storage
-    const { downloadURL, filePath } = await uploadFileComplete(fileObj);
-
-    // Save metadata to Firestore
-    const firestoreDoc = await createFirestoreRecord({
-      downloadURL,
-      filePath,
-      fileObj: fileObj,
-    });
+    const { documentId, downloadURL, filePath } = await uploadFileComplete(fileObj);
 
     return {
-      documentId: firestoreDoc,
-      firestoreId: firestoreDoc, // Legacy compatibility
+      documentId,
       downloadURL,
       filePath,
-      uploadedAt: new Date(),
-      savedAt: new Date().toISOString(), // Legacy compatibility
+      uploadedAt: Timestamp.now(),
       fileSize: fileObj.fileSize,
       originalFileHash: fileObj.originalFileHash,
       success: true,
@@ -199,7 +182,7 @@ export class FileUploadService implements IFileUploadService {
   /**
    * Main upload method - this is what useFileManager calls
    */
-  async uploadFile(fileObj: FileObject, options: UploadOptions = {}): Promise<UploadResult> {
+  async uploadFile(fileObj: FileObject): Promise<UploadResult> {
     return await this.uploadWithRetry(fileObj, 3, (status, data) => {
       console.log(`📊 Upload ${status} for ${fileObj.fileName}:`, data);
     });

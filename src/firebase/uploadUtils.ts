@@ -248,56 +248,55 @@ export const updateFirestoreRecord = async (
   commitMessage?: string
 ): Promise<void> => {
   const user = auth.currentUser;
+
   if (!user) throw new Error('User not authenticated');
   if (!documentId) throw new Error('Document ID is required');
   console.log('🔄 Starting record update...', { documentId });
+
   try {
-    //Get current document
+    // Get current document
     const docRef = doc(db, 'records', documentId);
     console.log('📖 Attempting to read document...', {
       collection: 'records',
       docId: documentId,
       userId: user.uid,
     });
-    let currentDoc;
-    try {
-      currentDoc = await getDoc(docRef);
-      console.log('✅ Document retrieved successfully:', {
-        exists: currentDoc.exists(),
-        hasData: !!currentDoc.data(),
-      });
-    } catch (readError: any) {
-      console.error('❌ Failed to READ document:', readError);
-      console.error('❌ Read error details:', {
-        code: readError.code,
-        message: readError.message,
-        name: readError.name,
-      });
-      throw readError;
-    }
+
+    const currentDoc = await getDoc(docRef);
+
     if (!currentDoc.exists()) throw new Error('Document not found');
     const currentData = currentDoc.data();
-    //DEBUG
+
+    // DEBUG
     console.log('👑 Ownership check:', {
       owners: currentData.owners,
+      administrators: currentData.administrators,
       uploadedBy: currentData.uploadedBy,
       user: user.uid,
     });
-    // Verify user is an owner
-    const owners = currentData.owners || [currentData.uploadedBy];
-    if (!owners.includes(user.uid)) {
+
+    // Verify user is an owner or administrator
+    const owners: string[] = currentData.owners || [currentData.uploadedBy];
+    const administrators: string[] = currentData.administrators || [];
+    const isOwner = owners.includes(user.uid);
+    const isAdmin = administrators.includes(user.uid);
+
+    if (!isOwner && !isAdmin) {
       throw new Error('You do not have permission to update this record');
     }
+
     // Check if Encrypted, if not throw error
     if (!currentData.isEncrypted) {
       throw new Error('Cannot update a non-encrypted record. All updates must be encrypted.');
     }
+
     console.log('🔐 Processing encrypted record update...');
     // Get the user's master key from session
     const masterKey = EncryptionKeyManager.getSessionKey();
     if (!masterKey) {
       throw new Error('Please unlock your encryption to save changes.');
     }
+
     // Get the record's encrypted file key and decrypt it
     const encryptedKeyData = base64ToArrayBuffer(currentData.encryptedKey);
     const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(
@@ -306,7 +305,8 @@ export const updateFirestoreRecord = async (
     );
     const fileKey = await EncryptionService.importKey(fileKeyData);
     console.log('✓ File key decrypted');
-    //Encrypt updated Fields
+
+    // Encrypt updated Fields
     const fieldsToEncrypt: any = {};
     for (const key of ['fileName', 'fhirData', 'belroseFields', 'extractedText', 'originalText']) {
       if (updateData[key] !== undefined) {
@@ -320,14 +320,18 @@ export const updateFirestoreRecord = async (
         };
       }
     }
-    //FilteredData will be what's ultimately passed to Firestore function
+
+    // FilteredData will be what's ultimately passed to Firestore function
     const filteredData: any = {
       ...fieldsToEncrypt,
       lastModified: serverTimestamp(),
     };
+
     console.log('✅ Encrypted fields prepared for update:', Object.keys(fieldsToEncrypt));
+
     // Prepare data for version control
     const updatedFileObject = { ...currentData, ...updateData, id: documentId };
+
     // Generate new record hash
     try {
       const newRecordHash = await RecordHashService.generateRecordHash(updatedFileObject);
@@ -337,6 +341,7 @@ export const updateFirestoreRecord = async (
     } catch (hashError) {
       console.warn('⚠️ Failed to generate record hash:', hashError);
     }
+
     // Create version history
     const encryptedUpdatedFileObject = {
       ...currentData,
@@ -354,6 +359,7 @@ export const updateFirestoreRecord = async (
     } catch (versionError) {
       console.warn('⚠️ Failed to create version history:', versionError);
     }
+
     // Update Firestore
     console.log('🔍 FINAL DATA BEING SENT TO FIRESTORE:', removeUndefinedValues(filteredData));
     await updateDoc(docRef, removeUndefinedValues(filteredData));

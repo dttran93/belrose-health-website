@@ -193,7 +193,7 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
                     user={adminProfile}
                     onView={handleAddOwner}
                     variant="default"
-                    color="primary"
+                    color="red"
                   />
                 );
               })}

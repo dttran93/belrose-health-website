@@ -74,7 +74,7 @@ const colorClasses: Record<
     border: 'border-chart-3',
   },
   red: {
-    bg: 'bg-red-50',
+    bg: 'bg-red-100',
     iconBg: 'bg-red-200',
     icon: 'text-red-700',
     border: 'border-red-200',

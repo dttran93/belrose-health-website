@@ -462,7 +462,9 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       )}
 
       {viewMode === 'share' && (
-        <ShareRecordView record={record} onBack={handleBackToRecord} isAddMode={true} />
+        <div className="p-6">
+          <ShareRecordView record={record} onBack={handleBackToRecord} isAddMode={true} />
+        </div>
       )}
 
       {viewMode === 'verification' && (

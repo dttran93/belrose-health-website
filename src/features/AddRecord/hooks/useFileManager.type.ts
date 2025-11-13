@@ -1,4 +1,4 @@
-import { AIProcessingStatus, FileObject, FileStatus } from '@/types/core';
+import { AIProcessingStatus, FileObject, FileStatus, VirtualFileInput } from '@/types/core';
 import { UploadResult } from '../services/shared.types';
 import { VirtualFileResult } from '../components/CombinedUploadFHIR.type';
 import { BlockchainVerification } from '@/types/core';
@@ -9,25 +9,6 @@ export interface AddFilesOptions {
   maxFiles?: number;
   maxSizeBytes?: number;
   autoProcess?: boolean;
-}
-
-export interface VirtualFileData {
-  id?: string;
-  name?: string;  // Made optional to match usage
-  size?: number;
-  type?: string;
-  extractedText?: string;
-  wordCount?: number;
-  documentType?: "Plain Text Submission" | "Manual FHIR JSON Submission" | "File Upload";
-  fhirData?: any;
-  belroseFields?: any;
-  aiProcessingStatus?: AIProcessingStatus;
-  signerId?: string;
-  providerSignature?: string;
-  blockchainNetwork?: string;
-  blockchainVerification?: BlockchainVerification;
-  autoUpload?: boolean; 
-  [key: string]: any; // Allow additional properties
 }
 
 export interface FileStats {
@@ -49,42 +30,45 @@ export interface UseFileManagerTypes {
   // Core state
   files: FileObject[];
   processedFiles: FileObject[];
-  firestoreData: Map<string, any>;
   savingToFirestore: Set<string>;
-  
+
   // File management actions
-  addFiles: (fileList: FileList, options?: AddFilesOptions) => void;
+  addFiles: (fileList: FileList, options?: AddFilesOptions) => Promise<void>;
   removeFileFromLocal: (fileId: string) => void;
   deleteFileFromFirebase: (documentId: string) => Promise<void>;
   cancelFileUpload: (fileId: string) => void;
   removeFileComplete: (fileId: string) => Promise<void>;
   retryFile: (fileId: string) => Promise<void>;
   clearAll: () => void;
-  enhancedClearAll: () => Promise<void>;   
-  processFile: (fileObj: FileObject) => Promise<void>;
-  
+  enhancedClearAll: () => Promise<void>;
+  processFile: (fileObj: FileObject) => Promise<FileObject>;
+
   // FHIR integration
   setFHIRConversionCallback: (callback: FHIRConversionCallback) => void;
   setResetProcessCallback: (callback: ResetProcessCallback) => void;
-  
+
   // Status updates
-  updateFileStatus: (fileId: string, status: FileStatus, additionalData?: Partial<FileObject>) => void;
-  
+  updateFileStatus: (
+    fileId: string,
+    status: FileStatus,
+    additionalData?: Partial<FileObject>
+  ) => void;
+
   // Firestore operations
-  uploadFiles: (fileIds?: string[]) => Promise<UploadResult[]>;
+  uploadFiles: (filesToUpload: FileObject[]) => Promise<UploadResult[]>;
   updateFirestoreRecord: (fileId: string, data: any) => Promise<void>;
-  
-  shouldAutoUpload: (file: FileObject) => boolean;
 
   // Computed values
   getStats: () => FileStats;
   savedToFirestoreCount: number;
   savingCount: number;
-  
+
   // Virtual file support
-  addVirtualFile: (virtualData: VirtualFileData) => Promise<{ fileId: string; blockchainVerification?: BlockchainVerification }>;
-  addFhirAsVirtualFile: (fhirData: any, options?: VirtualFileData) => Promise<VirtualFileResult>;
-  
+  addVirtualFile: (
+    virtualData: VirtualFileInput
+  ) => Promise<{ fileId: string; blockchainVerification?: BlockchainVerification }>;
+  addFhirAsVirtualFile: (fhirData: any, options?: VirtualFileInput) => Promise<VirtualFileResult>;
+
   // Reset function
   reset: () => void;
 }

@@ -229,14 +229,14 @@ export class VersionControlService {
     }
 
     const recordData = recordSnap.data();
-    const owners = recordData.owners || [recordData.uploadedBy];
+    const owners: string[] = recordData.owners || [recordData.uploadedBy];
+    const administrators: string[] = recordData.administrators || [];
 
-    if (!owners.includes(this.userId)) {
+    const isOwner = owners.includes(this.userId);
+    const isAdmin = administrators.includes(this.userId);
+
+    if (!isOwner && !isAdmin) {
       throw new Error("You do not have permission to view this record's history");
-    }
-
-    if (!recordSnap.exists()) {
-      throw new Error('Record not found');
     }
 
     try {
@@ -393,10 +393,14 @@ export class VersionControlService {
       }
 
       const recordData = recordSnap.data();
-      const owners = recordData.owners || [recordData.uploadedBy];
+      const owners: string[] = recordData.owners || [recordData.uploadedBy];
+      const administrators: string[] = recordData.administrators || [];
 
-      if (!owners.includes(this.userId)) {
-        throw new Error('You do not have permission to restore this record');
+      const isOwner = owners.includes(this.userId);
+      const isAdmin = administrators.includes(this.userId);
+
+      if (!isOwner && !isAdmin) {
+        throw new Error("You do not have permission to rollback this record's history");
       }
 
       // Create a new version before restoring (so we can undo the restore)

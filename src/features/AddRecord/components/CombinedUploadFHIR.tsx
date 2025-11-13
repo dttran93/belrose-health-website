@@ -7,8 +7,8 @@ import {
   AlertCircle,
   CheckCircle,
   ExternalLink,
-  RefreshCw,
   X,
+  SquarePen,
 } from 'lucide-react';
 import FileUploadZone from './ui/FileUploadZone';
 import { FileListItem } from './FileListItem';
@@ -20,7 +20,6 @@ import { Button } from '@/components/ui/Button';
 // Import the fixed types
 import type { CombinedUploadFHIRProps, FHIRValidation, TabType } from './CombinedUploadFHIR.type';
 import type { FHIRWithValidation } from '../services/fhirConversionService.type';
-import { UploadResult } from '../services/shared.types';
 
 const TABS = [
   {
@@ -38,7 +37,19 @@ const TABS = [
     label: 'FHIR Data',
     icon: Code,
   },
+  {
+    id: 'manual',
+    label: 'Manual Record',
+    icon: SquarePen,
+  },
 ];
+
+// Helper to format file size
+const formatFileSize = (bytes: number) => {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+};
 
 const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   // File management props
@@ -50,13 +61,12 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   getStats,
   updateFileStatus,
   onReview,
+  processFile,
+  uploadFiles,
 
   // Direct upload functions
   addFhirAsVirtualFile,
-  uploadFiles,
   convertTextToFHIR,
-  shouldAutoUpload,
-  savingToFirestore,
 
   // Configuration props
   acceptedTypes = ['.pdf', '.docx', '.doc', '.txt', '.jpg', '.jpeg', '.png'] as string[],
@@ -64,9 +74,6 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   maxSizeBytes = 10 * 1024 * 1024, // 10MB
   className = '',
 }) => {
-  // Add a ref to track files currently being uploaded
-  const uploadingFiles = useRef<Set<string>>(new Set());
-
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('upload');
   const handleTabChange = (tabId: string) => {
@@ -78,14 +85,21 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   const [fhirValidation, setFhirValidation] = useState<FHIRValidation | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
+  // Plain text input state (context)
+  const [contextText, setContextText] = useState<string>('');
+
   // Plain text input state
   const [plainText, setPlainText] = useState<string>('');
   const [submittingText, setSubmittingText] = useState<boolean>(false);
 
+  //Track files while processing
+  const [processing, setProcessing] = useState<boolean>(false);
+
   // Determine which section to show. Input section if no files. FileList if yes files
   const stats = getStats();
-  const hasFiles = files.length > 0;
-  const allFilesCompleted = hasFiles && stats.completed === stats.total && stats.errors === 0;
+  const hasProcessingFiles = files.length > 0;
+  const allFilesCompleted =
+    hasProcessingFiles && stats.completed === stats.total && stats.errors === 0;
   const hasErrors = stats.errors > 0;
 
   // Handle file selection
@@ -98,9 +112,107 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
     }
   };
 
+  // Get pending (attached but not yet processed) files
+  const pendingFiles = files.filter(f => f.status === 'pending');
+  const hasAttachedFiles = pendingFiles.length > 0;
+
+  // Handle removing an attached file before processing
+  const handleRemoveAttached = (fileId: string) => {
+    removeFileFromLocal(fileId);
+    toast.info('File removed');
+  };
+
+  // Handle "Process & Upload" button click
+  const handleProcessAndUpload = async () => {
+    if (!hasAttachedFiles) {
+      toast.error('No files attached');
+      return;
+    }
+
+    setProcessing(true);
+
+    try {
+      console.log('🚀 Starting to process attached files...');
+      console.log(
+        '📋 Pending files:',
+        pendingFiles.map(f => ({
+          id: f.id,
+          name: f.fileName,
+          hasFile: !!f.file,
+          status: f.status,
+        }))
+      );
+
+      const processedFiles: FileObject[] = []; // ✅ Collect processed files here
+
+      // Step 1: Process each pending file
+      for (const fileObj of pendingFiles) {
+        console.log(`📋 Processing file: ${fileObj.fileName}`);
+        console.log('🔍 File object BEFORE processing:', {
+          id: fileObj.id,
+          hasFile: !!fileObj.file,
+          hasEncryptedData: !!fileObj.encryptedData,
+          status: fileObj.status,
+        });
+
+        // Add context if provided
+        if (contextText.trim()) {
+          updateFileStatus(fileObj.id, 'pending', {
+            originalText: contextText.trim(),
+          });
+        }
+
+        // Make sure fileObj still has the File reference
+        if (!fileObj.file) {
+          throw new Error(`File object missing for ${fileObj.fileName}`);
+        }
+
+        // ✅ GET THE RETURN VALUE - don't look at state!
+        const processedFile = await processFile(fileObj);
+        processedFiles.push(processedFile); // ✅ Save it!
+
+        // 🔍 Check the RETURNED file object
+        console.log('🔍 File object AFTER processing (from return):', {
+          id: processedFile.id,
+          hasEncryptedData: !!processedFile.encryptedData,
+          encryptedDataKeys: processedFile.encryptedData
+            ? Object.keys(processedFile.encryptedData)
+            : [],
+          status: processedFile.status,
+        });
+      }
+
+      console.log('✅ All files processed, now uploading...');
+
+      // 🔍 Check processed files RIGHT before upload
+      console.log(
+        '🔍 Processed files array RIGHT BEFORE upload:',
+        processedFiles.map(f => ({
+          id: f.id,
+          name: f.fileName,
+          hasEncryptedData: !!f.encryptedData,
+          encryptedDataKeys: f.encryptedData ? Object.keys(f.encryptedData) : [],
+          status: f.status,
+        }))
+      );
+
+      // ✅ Upload using the IDs from the processed files
+      await uploadFiles(processedFiles);
+
+      setContextText('');
+      toast.success('✅ Files processed and uploaded successfully!');
+    } catch (error) {
+      console.error('❌ Error:', error);
+      toast.error('Failed to process files');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   // Keeps files, starts uploading things all over again
-  const handleStartOver = () => {
-    // Remove all files
+  const handleCancelDeleteReset = () => {
+    // Remove all files from Firebase and Local
+    files.forEach(file => removeFile(file.id));
     files.forEach(file => removeFileFromLocal(file.id));
 
     // Reset form states
@@ -112,12 +224,6 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
 
     // Reset to upload tab
     setActiveTab('upload');
-  };
-
-  //Cancels uploads and deletes any files from session.
-  const handleCancelandDelete = () => {
-    // Remove all files
-    files.forEach(file => removeFile(file.id));
   };
 
   const handleConfirm = useCallback(
@@ -174,97 +280,6 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
       setFhirValidation(validation);
     } else {
       setFhirValidation(null);
-    }
-  };
-
-  // Submit FHIR data and immediately upload to Firestore
-  const handleFileComplete = async (fileItem: FileObject): Promise<void> => {
-    console.log('🚨 handleFileComplete called for:', fileItem.fileName, 'status:', fileItem.status);
-
-    // 🔧 GET LATEST FILE STATE
-    const latestFile = files.find(f => f.id === fileItem.id);
-    if (!latestFile) {
-      console.error('❌ Could not find latest file state for:', fileItem.id);
-      return;
-    }
-
-    // 🚨 REF-BASED DEDUPLICATION - Check this FIRST
-    if (uploadingFiles.current.has(latestFile.id)) {
-      console.log('⏭️ Skipping - upload already in progress (ref check):', latestFile.fileName);
-      return;
-    }
-
-    // Use shouldAutoUpload with latest file state
-    if (!shouldAutoUpload(latestFile)) {
-      console.log(`⏭️ File not ready for upload: ${latestFile.fileName}`);
-      return;
-    }
-
-    // Check if already uploaded to Firestore
-    if (latestFile.firestoreId || latestFile.uploadInProgress === true) {
-      console.log('⏭️ Skipping upload - already uploaded:', {
-        firestoreId: latestFile.firestoreId, // ← Fixed the log
-        uploadInProgress: latestFile.uploadInProgress,
-      });
-      return;
-    }
-
-    // Check global state
-    if (savingToFirestore.has(latestFile.id)) {
-      console.log('⏳ Upload already in progress (global check):', latestFile.fileName);
-      return;
-    }
-
-    // Only upload if file has extracted text
-    if (latestFile.extractedText) {
-      try {
-        // 🔒 ADD TO REF SET IMMEDIATELY
-        uploadingFiles.current.add(latestFile.id);
-
-        // Mark as upload in progress
-        updateFileStatus(latestFile.id, 'uploading', { uploadInProgress: true });
-
-        console.log('🚀 Auto-uploading completed file with ALL data:', latestFile.fileName);
-
-        // Upload with LATEST file state
-        const uploadResults: UploadResult[] = await uploadFiles([latestFile.id]);
-
-        if (uploadResults && uploadResults[0]?.success) {
-          console.log('✅ File with ALL data uploaded successfully!', latestFile.fileName);
-
-          updateFileStatus(latestFile.id, 'completed', {
-            firestoreId: uploadResults[0].documentId,
-            uploadInProgress: false,
-          });
-
-          const aiInfo = latestFile.belroseFields?.visitType
-            ? `Classified as: ${latestFile.belroseFields.visitType}`
-            : 'Processing completed';
-
-          toast.success(`🎯 ${latestFile.fileName} uploaded successfully!`, {
-            description: aiInfo,
-            duration: 4000,
-          });
-
-          console.log('🎯 Complete pipeline: File → Text → FHIR → AI → Firebase ✅');
-        } else {
-          throw new Error('Upload failed - no success result');
-        }
-      } catch (error) {
-        console.error('🔍 Error in handleFileComplete:', error);
-        updateFileStatus(latestFile.id, 'completed', {
-          error: `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          uploadInProgress: false,
-        });
-
-        toast.error(`Failed to upload ${latestFile.fileName}`, {
-          description: error instanceof Error ? error.message : 'Upload failed',
-          duration: 5000,
-        });
-      } finally {
-        // 🔓 ALWAYS REMOVE FROM REF SET
-        uploadingFiles.current.delete(latestFile.id);
-      }
     }
   };
 
@@ -391,39 +406,19 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
             <div>
               <h2 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
                 <FileText className="w-5 h-5 text-blue-600" />
-                <span>Add Health Records</span>
+                <span>Add Health Record</span>
               </h2>
-              <p className="text-sm text-gray-600 mt-1">
-                {hasFiles
-                  ? 'Processing your files...'
-                  : 'Upload documents, type medical notes, or input FHIR data - everything gets saved automatically'}
+              <p className="text-sm text-left text-gray-600 m-3">
+                Add your health record in any format you like. Upload images, PDFs, word docs; type
+                medical notes; input FHIR data, or manually write a record - everything will be
+                processed and uploaded automatically.
               </p>
             </div>
-
-            {/* Add More Files Button - only show when files are present - resets to the main page */}
-            {hasFiles && (
-              <div className="flex items-center space-x-2 px-4 py-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    handleCancelandDelete();
-                    handleStartOver();
-                  }}
-                >
-                  <X className="w-4 h-4" />
-                  <span>Cancel Upload</span>
-                </Button>
-                <Button variant="default" onClick={handleStartOver}>
-                  <RefreshCw className="w-4 h-4" />
-                  <span>Add More Files</span>
-                </Button>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* 🔥 CONDITIONAL CONTENT: Files OR Input Interface */}
-        {hasFiles ? (
+        {/* Processing Files View OR Input Interface */}
+        {hasProcessingFiles && !hasAttachedFiles ? (
           /* FILE PROCESSING VIEW */
           <>
             <div className="p-4 border-b bg-blue-50">
@@ -465,9 +460,8 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
                     fileItem={fileItem}
                     fhirResult={fhirResult}
                     onConfirm={handleConfirm}
-                    onRemove={removeFile}
+                    onRemove={handleCancelDeleteReset}
                     onRetry={handleRetryFile}
-                    onComplete={handleFileComplete}
                     showFHIRResults={true}
                     onReview={onReview}
                   />
@@ -501,18 +495,94 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
               <TabNavigation tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
             </div>
 
+            {/* Context Input (shows for upload and fhir tabs) */}
+            {(activeTab === 'upload' || activeTab === 'fhir') && (
+              <div className="px-6 pt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Record Context (Optional)
+                </label>
+                <textarea
+                  value={contextText}
+                  onChange={e => setContextText(e.target.value)}
+                  placeholder={`Add any relevant context. For example:
+
+• "This file is from Dr. Smith and contains my X-ray after my right leg injury"
+• "This is my vaccination record from childhood"`}
+                  className="w-full bg-background min-h-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+              </div>
+            )}
+
             <div className="p-6">
               {/* File Upload Tab */}
               {activeTab === 'upload' && (
-                <div>
+                <div className="space-y-4">
                   <FileUploadZone
                     onFilesSelected={handleFilesSelected}
                     acceptedTypes={acceptedTypes}
                     maxFiles={maxFiles}
                     maxSizeBytes={maxSizeBytes}
                     title="Drop medical documents here or click to upload"
-                    subtitle="Files will be processed and automatically saved to your cloud storage"
+                    subtitle="Attach files to process and upload"
                   />
+
+                  {/* Attached Files Display */}
+                  {hasAttachedFiles && (
+                    <div className="space-y-3">
+                      <div className="text-sm font-medium text-gray-700">
+                        Attached Files ({pendingFiles.length})
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {pendingFiles.map(file => {
+                          return (
+                            <div
+                              key={file.id}
+                              className="flex items-center space-x-2 px-3 py-2 bg-gray-100 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium text-gray-900 truncate">
+                                  {file.fileName}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {formatFileSize(file.fileSize)}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleRemoveAttached(file.id)}
+                                className="flex-shrink-0 p-1 hover:bg-gray-200 rounded transition-colors"
+                                aria-label="Remove file"
+                              >
+                                <X className="w-4 h-4 text-gray-500 hover:text-red-600" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* ✅ NEW: Process & Upload Button */}
+                      <div className="pt-2">
+                        <Button
+                          onClick={handleProcessAndUpload}
+                          disabled={processing}
+                          className={`w-full flex items-center justify-center space-x-2 px-6 py-3 rounded-lg font-medium transition-colors ${
+                            processing ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : ''
+                          }`}
+                        >
+                          {processing ? (
+                            <>
+                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              <span>Processing Files...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-5 h-5" />
+                              <span>Process & Upload Files</span>
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -543,12 +613,12 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
                       Your text will be automatically converted to medical FHIR format and saved.
                     </div>
 
-                    <button
+                    <Button
                       onClick={handleTextSubmit}
                       disabled={!plainText.trim() || submittingText}
                       className={`px-6 py-2 rounded-lg font-medium ${
                         plainText.trim() && !submittingText
-                          ? 'bg-blue-600 text-white hover:bg-blue-700'
+                          ? ''
                           : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       }`}
                     >
@@ -560,7 +630,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
                       ) : (
                         'Save Medical Note'
                       )}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -636,12 +706,12 @@ Example:
                   )}
 
                   <div className="flex justify-end">
-                    <button
+                    <Button
                       onClick={handleFhirSubmit}
                       disabled={!fhirValidation?.valid || submitting}
                       className={`px-6 py-2 rounded-lg font-medium ${
                         fhirValidation?.valid && !submitting
-                          ? 'bg-blue-600 text-white hover:bg-blue-700'
+                          ? ''
                           : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       }`}
                     >
@@ -653,7 +723,7 @@ Example:
                       ) : (
                         'Upload FHIR Data'
                       )}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}

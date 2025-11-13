@@ -14,12 +14,10 @@ export const FileListItem: React.FC<FileListItemProps> = ({
   onRemove,
   onConfirm,
   onRetry,
-  onComplete,
   showFHIRResults = true,
   onReview,
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
-  const onCompleteCalledRef = useRef<boolean>(false);
 
   //utility functions
 
@@ -42,36 +40,6 @@ export const FileListItem: React.FC<FileListItemProps> = ({
   const handleConfirm = () => onConfirm(fileItem.id);
   const handleRetry = () => onRetry(fileItem);
   const handleToggleExpanded = () => setIsExpanded(!isExpanded);
-
-  // Modified effect to prevent duplicate calls
-  useEffect(() => {
-    if (
-      onComplete &&
-      fileItem.status === 'completed' &&
-      fileItem.extractedText &&
-      !onCompleteCalledRef.current &&
-      !fileItem.firestoreId && // 🧠 Skip if already uploaded
-      !fileItem.uploadInProgress // 🧠 Skip if upload still in progress
-    ) {
-      console.log('📞 FileListItem calling onComplete for:', fileItem.fileName);
-      onCompleteCalledRef.current = true;
-      onComplete(fileItem);
-    }
-  }, [
-    fileItem.status,
-    fileItem.extractedText,
-    fileItem.firestoreId,
-    fileItem.uploadInProgress,
-    onComplete,
-    fileItem,
-  ]);
-
-  // ✅ OPTIONAL: Reset the ref if file goes back to processing (for retry scenarios)
-  useEffect(() => {
-    if (fileItem.status !== 'completed') {
-      onCompleteCalledRef.current = false;
-    }
-  }, [fileItem.status]);
 
   //Function to show expanded text in originalText/extractedText preview
   function ExpandableText({ text, maxLength = 500 }: { text: string; maxLength?: number }) {
