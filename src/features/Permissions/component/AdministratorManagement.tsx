@@ -12,7 +12,7 @@ import UserCard from '@/features/Users/components/ui/UserCard';
 
 interface AdminManagementProps {
   record: FileObject;
-  currentOwners: string[];
+  currentAdmins: string[];
   onSuccess?: () => void;
   onBack?: () => void;
   onAddMode?: () => void;
@@ -21,7 +21,7 @@ interface AdminManagementProps {
 
 export const AdminManagement: React.FC<AdminManagementProps> = ({
   record,
-  currentOwners,
+  currentAdmins,
   onSuccess,
   onBack,
   onAddMode,
@@ -32,7 +32,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
   const [refreshOwnersTrigger, setRefreshOWnersTrigger] = useState(0);
 
-  const { addOwner, removeOwner, isLoading } = usePermissions({
+  const { addAdmin, removeAdmin, isLoading } = usePermissions({
     onSuccess: msg => {
       setSelectedUser(null);
       setRefreshOWnersTrigger(prev => prev + 1);
@@ -44,13 +44,13 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
     setSelectedUser(user);
   };
 
-  const handleAddOwner = async () => {
+  const handleAddAdmin = async () => {
     if (!selectedUser) return;
-    await addOwner(record.id, selectedUser.uid);
+    await addAdmin(record.id, selectedUser.uid);
   };
 
-  const handleDeleteOwner = async (userIdToRemove: string) => {
-    await removeOwner(record.id, userIdToRemove);
+  const handleDeleteAdmin = async (userIdToRemove: string) => {
+    await removeAdmin(record.id, userIdToRemove);
   };
 
   // Fetch access permissions for this record
@@ -69,16 +69,11 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
           return;
         }
 
-        // Fetch user profiles for all owners and receivers
+        // Fetch user profiles for all owners and administrators
         const userIds = new Set<string>();
 
         // Add owners
-        record.owners?.forEach(ownerId => userIds.add(ownerId));
-
-        // Add subject if exists
-        if (record.subjectId) {
-          userIds.add(record.subjectId);
-        }
+        record.administrators?.forEach(adminId => userIds.add(adminId));
 
         // Fetch all user profiles at once
         const profiles = await getUserProfiles(Array.from(userIds));
@@ -140,8 +135,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
             <Users className="w-5 h-5 text-gray-700" />
             <span className="font-semibold text-gray-900">Administrators</span>
             <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-              {record.owners!.length}{' '}
-              {/* Revise this eventually when you split up the FileObject */}
+              {record.administrators.length}{' '}
             </span>
           </div>
           {!isAddMode && (
@@ -193,17 +187,17 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
             <div className="flex justify-center items-center py-8">
               <p className="text-gray-500">Loading owners...</p>
             </div>
-          ) : record.owners && record.owners.length > 0 ? (
+          ) : record.administrators && record.administrators.length > 0 ? (
             // Existing logic for displaying owners
             <div className="space-y-3 mt-4">
-              {record.owners.map((owner, idx) => {
-                const ownerProfile = userProfiles.get(owner);
+              {record.administrators.map(admin => {
+                const adminProfile = userProfiles.get(admin);
                 return (
                   <UserCard
-                    key={owner}
-                    user={ownerProfile}
-                    onView={handleAddOwner}
-                    onDelete={() => handleDeleteOwner(owner)}
+                    key={admin}
+                    user={adminProfile}
+                    onView={handleAddAdmin}
+                    onDelete={() => handleDeleteAdmin(admin)}
                     variant="default"
                     color="green"
                   />
@@ -224,7 +218,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
           {/* User Search Component */}
           <UserSearch
             onUserSelect={handleUserSelect}
-            excludeUserIds={currentOwners}
+            excludeUserIds={currentAdmins}
             placeholder="Search by name, email, or ID..."
           />
 
@@ -244,7 +238,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
                   onCancel={() => setSelectedUser(null)}
                 />
               </div>
-              <Button onClick={handleAddOwner} disabled={isLoading} className="w-full">
+              <Button onClick={handleAddAdmin} disabled={isLoading} className="w-full">
                 {isLoading ? 'Adding Owner...' : 'Confirm & Add Owner'}
               </Button>
             </div>

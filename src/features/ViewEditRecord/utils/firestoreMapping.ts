@@ -59,8 +59,7 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
     uploadedBy: data.uploadedBy,
     uploadedByName: data.uploadedByName,
     owners: data.owners || [],
-    subjectId: data.subjectId,
-    subjectName: data.subjectName,
+    administrators: data.administrators,
   } as FileObject;
 };
 

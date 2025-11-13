@@ -44,16 +44,56 @@ export class PermissionsService {
     // Add the user to the owners array
     await updateDoc(recordRef, {
       owners: arrayUnion(userId),
+      administrators: arrayUnion(userId), //add it to administrators as well
     });
   }
 
   /**
-   * Remove an owner from a record
+   * Add an administrator to a record
+   * @param recordId - The record ID
+   * @param userId - The user ID to add as owner
+   * @throws Error if operation fails or user doesn't have permission
+   */
+  static async addAdmin(recordId: string, userId: string): Promise<void> {
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    const db = getFirestore();
+    const recordRef = doc(db, 'records', recordId);
+
+    // First, check if the current user is an admin
+    const recordDoc = await getDoc(recordRef);
+    if (!recordDoc.exists()) {
+      throw new Error('Record not found');
+    }
+
+    const recordData = recordDoc.data();
+    if (!recordData.administrators.includes(currentUser.uid)) {
+      throw new Error('Only administrators can add other administrators');
+    }
+
+    // Check if user is already an administrator
+    if (recordData.administrators.includes(userId)) {
+      throw new Error('User is already an administrator');
+    }
+
+    // Add the user to the owners array
+    await updateDoc(recordRef, {
+      administrators: arrayUnion(userId),
+    });
+  }
+
+  /**
+   * Remove an admin from a record
    * @param recordId - The record ID
    * @param userId - The user ID to remove as owner
    * @throws Error if operation fails or user doesn't have permission
    */
-  static async removeOwner(recordId: string, userId: string): Promise<void> {
+  static async removeAdmin(recordId: string, userId: string): Promise<void> {
     const auth = getAuth();
     const currentUser = auth.currentUser;
 
@@ -64,85 +104,44 @@ export class PermissionsService {
     const db = getFirestore();
     const recordRef = doc(db, 'records', recordId);
 
-    // Check if the current user is an owner
+    // Check if the current user is an admin
     const recordDoc = await getDoc(recordRef);
     if (!recordDoc.exists()) {
       throw new Error('Record not found');
     }
 
     const recordData = recordDoc.data();
-    if (!recordData.owners?.includes(currentUser.uid)) {
-      throw new Error('Only owners can remove other owners');
+    if (!recordData.administrators?.includes(currentUser.uid)) {
+      throw new Error('Only administrators can remove other administrators');
     }
 
-    // Prevent removing the subject if they're an owner
-    if (recordData.subjectId && recordData.subjectId === userId) {
-      throw new Error('Cannot remove the record subject as an owner');
+    // Prevent removing the administrator if they're an owner
+    if (recordData.owners && recordData.owners === userId) {
+      throw new Error('Cannot remove the record owner as an administrator');
     }
 
-    // Prevent removing yourself if you're the last owner
-    if (recordData.owners?.length === 1 && recordData.owners[0] === userId) {
-      throw new Error('Cannot remove the last owner from a record');
+    // Prevent removing yourself if you're the last administrator
+    if (recordData.administrator?.length === 1 && recordData.administrator[0] === userId) {
+      throw new Error('Cannot remove the last administrator from a record');
     }
 
-    // Check if user is actually an owner
-    if (!recordData.owners?.includes(userId)) {
-      throw new Error('User is not an owner of this record');
+    // Check if user is actually an administrator
+    if (!recordData.administrators?.includes(userId)) {
+      throw new Error('User is not an administrator of this record');
     }
 
     // Remove the user from the owners array
     await updateDoc(recordRef, {
-      owners: arrayRemove(userId),
+      administrators: arrayRemove(userId),
     });
   }
 
   /**
-   * Set the subject ID for a record (can only be done once)
-   * The subject is automatically added as an owner
+   * Check if current user can manage administrators for a record
    * @param recordId - The record ID
-   * @param subjectId - The user ID to set as subject
-   * @throws Error if operation fails or subject is already set
+   * @returns true if user is an admin, false otherwise
    */
-  static async setSubject(recordId: string, subjectId: string): Promise<void> {
-    const auth = getAuth();
-    const currentUser = auth.currentUser;
-
-    if (!currentUser) {
-      throw new Error('User not authenticated');
-    }
-
-    const db = getFirestore();
-    const recordRef = doc(db, 'records', recordId);
-
-    // Check if the current user is an owner
-    const recordDoc = await getDoc(recordRef);
-    if (!recordDoc.exists()) {
-      throw new Error('Record not found');
-    }
-
-    const recordData = recordDoc.data();
-    if (!recordData.owners?.includes(currentUser.uid)) {
-      throw new Error('Only owners can set the record subject');
-    }
-
-    // Check if subject is already set
-    if (recordData.subjectId) {
-      throw new Error('Record subject is already set and cannot be changed');
-    }
-
-    // Set the subject and ensure they're added to owners
-    await updateDoc(recordRef, {
-      subjectId: subjectId,
-      owners: arrayUnion(subjectId), // Subject is automatically an owner
-    });
-  }
-
-  /**
-   * Check if current user can manage owners for a record
-   * @param recordId - The record ID
-   * @returns true if user is an owner, false otherwise
-   */
-  static async canManageOwners(recordId: string): Promise<boolean> {
+  static async canManageAdmins(recordId: string): Promise<boolean> {
     try {
       const auth = getAuth();
       const currentUser = auth.currentUser;
@@ -156,7 +155,7 @@ export class PermissionsService {
       if (!recordDoc.exists()) return false;
 
       const recordData = recordDoc.data();
-      return recordData.owners?.includes(currentUser.uid) || false;
+      return recordData.administrators.includes(currentUser.uid) || false;
     } catch (err) {
       console.error('Error checking permissions:', err);
       return false;
@@ -164,12 +163,12 @@ export class PermissionsService {
   }
 
   /**
-   * Check if a specific user can be removed as an owner
+   * Check if a specific user can be removed as an admin
    * @param recordId - The record ID
    * @param userId - The user ID to check
    * @returns true if user can be removed, false otherwise
    */
-  static async canRemoveOwner(recordId: string, userId: string): Promise<boolean> {
+  static async canRemoveAdmins(recordId: string, userId: string): Promise<boolean> {
     try {
       const db = getFirestore();
       const recordRef = doc(db, 'records', recordId);
@@ -179,11 +178,12 @@ export class PermissionsService {
 
       const recordData = recordDoc.data();
 
-      // Cannot remove if they're the subject
-      if (recordData.subjectId === userId) return false;
+      // Cannot remove if they're the owner
+      if (recordData.owners === userId) return false;
 
-      // Cannot remove if they're the last owner
-      if (recordData.owners?.length === 1 && recordData.owners[0] === userId) return false;
+      // Cannot remove if they're the last administrator
+      if (recordData.administrators.length === 1 && recordData.administrators[0] === userId)
+        return false;
 
       return true;
     } catch (err) {
@@ -195,11 +195,11 @@ export class PermissionsService {
   /**
    * Get record ownership information
    * @param recordId - The record ID
-   * @returns Object with owners, subject, and permission info
+   * @returns Object with owners, administrators, and permission info
    */
   static async getRecordOwnership(recordId: string): Promise<{
     owners: string[];
-    subjectId: string | null;
+    administrators: string[];
     canManage: boolean;
   } | null> {
     try {
@@ -210,11 +210,11 @@ export class PermissionsService {
       if (!recordDoc.exists()) return null;
 
       const recordData = recordDoc.data();
-      const canManage = await this.canManageOwners(recordId);
+      const canManage = await this.canManageAdmins(recordId);
 
       return {
         owners: recordData.owners || [],
-        subjectId: recordData.subjectId || null,
+        administrators: recordData.administrators || [],
         canManage,
       };
     } catch (err) {

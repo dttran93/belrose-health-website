@@ -57,7 +57,6 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ record, 
       {(viewMode === 'manager' || viewMode === 'add-subject') && (
         <OwnerManagement
           record={record}
-          subject={record.subjectId}
           onSuccess={() => {}}
           onBack={handleManagerScreen}
           onAddMode={handleAddSubject}
@@ -69,7 +68,7 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ record, 
       {(viewMode === 'manager' || viewMode === 'add-owner') && (
         <AdminManagement
           record={record}
-          currentOwners={record.owners!}
+          currentAdmins={record.administrators}
           onBack={handleManagerScreen}
           onAddMode={handleAddOwner}
           isAddMode={viewMode === 'add-owner'}

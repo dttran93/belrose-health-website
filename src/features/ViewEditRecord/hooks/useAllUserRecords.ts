@@ -31,7 +31,7 @@ interface UseAllUserRecordsReturn {
  * This includes:
  * - Records uploaded by the user (uploadedBy === userId)
  * - Records where the user is in the owners array
- * - Records where the user is the subject (subjectId === userId)
+ * - Records where the user is the administrators array
  *
  * Now queries from the GLOBAL 'records' collection instead of user-specific subcollections
  * Also handles decryption of encrypted records
@@ -67,7 +67,7 @@ export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
       or(
         where('uploadedBy', '==', userId),
         where('owners', 'array-contains', userId),
-        where('subjectId', '==', userId)
+        where('administrators', 'array-contains', userId)
       ),
       orderBy('uploadedAt', 'desc')
     );
@@ -89,10 +89,10 @@ export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
               fileName: data.fileName || data.encryptedFileName ? '[ENCRYPTED]' : '[NO NAME]',
               uploadedBy: data.uploadedBy,
               owners: data.owners,
-              subjectId: data.subjectId,
+              administrators: data.administrators,
               isEncrypted: !!data.isEncrypted,
               userIsOwner: data.owners?.includes(userId),
-              userIsSubject: data.subjectId === userId,
+              userIsAdmin: data.administrators.includes(userId),
               userIsUploader: data.uploadedBy === userId,
             });
 
@@ -116,7 +116,7 @@ export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
             const hasAccess =
               record.uploadedBy === userId ||
               record.owners?.includes(userId) ||
-              (record.subjectId && record.subjectId === userId);
+              record.administrators.includes(userId);
 
             if (!hasAccess) {
               console.warn('⚠️ Record slipped through query filter:', record.id);

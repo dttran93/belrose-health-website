@@ -1,6 +1,6 @@
 // Updated FileListItem.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { FileText, X, Eye, EyeOff, Check, HardDriveUpload } from 'lucide-react';
 import { EnhancedFHIRResults } from '@/features/AddRecord/components/FHIRValidation';
 import { ProgressChips, createFileProcessingSteps } from './ui/ProgressChips';
@@ -19,6 +19,7 @@ export const FileListItem: React.FC<FileListItemProps> = ({
   onReview,
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const onCompleteCalledRef = useRef<boolean>(false);
 
   //utility functions
 
@@ -42,12 +43,35 @@ export const FileListItem: React.FC<FileListItemProps> = ({
   const handleRetry = () => onRetry(fileItem);
   const handleToggleExpanded = () => setIsExpanded(!isExpanded);
 
-  // Effects
-  React.useEffect(() => {
-    if (onComplete && fileItem.status === 'completed' && fileItem.extractedText) {
+  // Modified effect to prevent duplicate calls
+  useEffect(() => {
+    if (
+      onComplete &&
+      fileItem.status === 'completed' &&
+      fileItem.extractedText &&
+      !onCompleteCalledRef.current &&
+      !fileItem.firestoreId && // 🧠 Skip if already uploaded
+      !fileItem.uploadInProgress // 🧠 Skip if upload still in progress
+    ) {
+      console.log('📞 FileListItem calling onComplete for:', fileItem.fileName);
+      onCompleteCalledRef.current = true;
       onComplete(fileItem);
     }
-  }, [fileItem.status, fileItem.extractedText, onComplete]);
+  }, [
+    fileItem.status,
+    fileItem.extractedText,
+    fileItem.firestoreId,
+    fileItem.uploadInProgress,
+    onComplete,
+    fileItem,
+  ]);
+
+  // ✅ OPTIONAL: Reset the ref if file goes back to processing (for retry scenarios)
+  useEffect(() => {
+    if (fileItem.status !== 'completed') {
+      onCompleteCalledRef.current = false;
+    }
+  }, [fileItem.status]);
 
   //Function to show expanded text in originalText/extractedText preview
   function ExpandableText({ text, maxLength = 500 }: { text: string; maxLength?: number }) {

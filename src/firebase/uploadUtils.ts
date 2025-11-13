@@ -397,10 +397,11 @@ async function deleteFromFirestore(documentId: string): Promise<void> {
 
     // Verify user is an owner or the subject
     const owners = docData.owners || [docData.uploadedBy];
+    const administrators = docData.administrators || [];
     const isOwner = owners.includes(user.uid);
-    const isSubject = docData.subjectId === user.uid;
+    const isAdmin = administrators.includes(user.uid);
 
-    if (!isOwner && !isSubject) {
+    if (!isOwner && !isAdmin) {
       throw new Error('You do not have permission to delete this record');
     }
 

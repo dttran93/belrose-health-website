@@ -39,19 +39,41 @@ export function usePermissions(options?: UsePermissionsOptions) {
   };
 
   /**
-   * Remove an owner from a record
+   * Add an admin to a record
    */
-  const removeOwner = async (recordId: string, userId: string): Promise<boolean> => {
+  const addAdmin = async (recordId: string, userId: string): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
 
     try {
-      await PermissionsService.removeOwner(recordId, userId);
-      const successMessage = 'Owner removed successfully';
+      await PermissionsService.addAdmin(recordId, userId);
+      const successMessage = 'Admin added successfully';
       options?.onSuccess?.(successMessage);
       return true;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to remove owner';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add admin';
+      setError(errorMessage);
+      options?.onError?.(errorMessage);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Remove an admin from a record
+   */
+  const removeAdmin = async (recordId: string, userId: string): Promise<boolean> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await PermissionsService.removeAdmin(recordId, userId);
+      const successMessage = 'Admin removed successfully';
+      options?.onSuccess?.(successMessage);
+      return true;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to remove admin';
       setError(errorMessage);
       options?.onError?.(errorMessage);
       return false;
@@ -83,51 +105,29 @@ export function usePermissions(options?: UsePermissionsOptions) {
   };
 
   /**
-   * Set the subject ID for a record
-   */
-  const setSubject = async (recordId: string, subjectId: string): Promise<boolean> => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      await PermissionsService.setSubject(recordId, subjectId);
-      const successMessage = 'Record subject set successfully';
-      options?.onSuccess?.(successMessage);
-      return true;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to set subject';
-      setError(errorMessage);
-      options?.onError?.(errorMessage);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  /**
    * Check if current user can perform owner operations
    */
-  const canManageOwners = async (recordId: string): Promise<boolean> => {
-    return PermissionsService.canManageOwners(recordId);
+  const canManageAdmins = async (recordId: string): Promise<boolean> => {
+    return PermissionsService.canManageAdmins(recordId);
   };
 
   /**
    * Check if a user can be removed as an owner
    */
-  const canRemoveOwner = async (recordId: string, userId: string): Promise<boolean> => {
-    return PermissionsService.canRemoveOwner(recordId, userId);
+  const canRemoveAdmins = async (recordId: string, userId: string): Promise<boolean> => {
+    return PermissionsService.canRemoveAdmins(recordId, userId);
   };
 
   return {
     // Actions
     addOwner,
-    removeOwner,
     revokeAccess,
-    setSubject,
+    addAdmin,
+    removeAdmin,
 
     // Permission checks
-    canManageOwners,
-    canRemoveOwner,
+    canManageAdmins,
+    canRemoveAdmins,
 
     // State
     isLoading,

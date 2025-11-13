@@ -30,14 +30,13 @@ export function useFileManager(): UseFileManagerTypes {
 
   const { user } = useAuthContext(); // user.uid is usually the unique ID
   const [files, setFiles] = useState<FileObject[]>(() => {
-    // Try to restore from sessionStorage on mount
     if (typeof window !== 'undefined' && window.sessionStorage) {
       try {
         const saved = sessionStorage.getItem('fileUpload_files');
         if (saved) {
           const parsed = JSON.parse(saved);
           console.log('🔄 Restored files from sessionStorage:', parsed.length);
-          return parsed;
+          return parsed; // restored as-is
         }
       } catch (error) {
         console.warn('Failed to restore files from sessionStorage:', error);
@@ -228,6 +227,8 @@ export function useFileManager(): UseFileManagerTypes {
 
   // Also add this helper function to prevent auto-upload during processing
   const shouldAutoUpload = useCallback((file: FileObject): boolean => {
+    //skip already uploaded files
+    if (file.firestoreId) return false;
     const fileCompleted = file.status === 'completed';
     const aiStatus = file.aiProcessingStatus || 'not_needed';
     const needsAI = !!file.fhirData;
@@ -487,7 +488,7 @@ export function useFileManager(): UseFileManagerTypes {
     async (fileIds?: string[]): Promise<UploadResult[]> => {
       const filesToUpload = fileIds
         ? files.filter(f => fileIds.includes(f.id))
-        : files.filter(f => f.status === 'completed');
+        : files.filter(f => f.status === 'completed' && !f.firestoreId);
 
       if (filesToUpload.length === 0) {
         console.log('📤 No files ready for upload');
@@ -517,6 +518,24 @@ export function useFileManager(): UseFileManagerTypes {
             uploadedAt: result.uploadedAt || Timestamp.now(),
             owners: [fileObj.uploadedBy!],
           });
+
+          // 🔄 Sync sessionStorage right after updating status
+          if (typeof window !== 'undefined' && window.sessionStorage) {
+            try {
+              const updatedFiles = files.map(f =>
+                f.id === fileObj.id
+                  ? {
+                      ...f,
+                      firestoreId: result.documentId,
+                      uploadedAt: result.uploadedAt || Timestamp.now(),
+                    }
+                  : f
+              );
+              sessionStorage.setItem('fileUpload_files', JSON.stringify(updatedFiles));
+            } catch (err) {
+              console.warn('Failed to update sessionStorage after upload:', err);
+            }
+          }
 
           // 🎉 SUCCESS TOAST HERE
           toast.success(`📁 ${fileObj.fileName} uploaded successfully!`, {
@@ -586,7 +605,6 @@ export function useFileManager(): UseFileManagerTypes {
         status: 'completed',
         uploadedAt: Timestamp.now(),
         uploadedBy: user?.uid,
-        subjectId: virtualData.subjectId || null,
         originalText: virtualData.originalText,
         wordCount: virtualData.wordCount || 0,
         sourceType: virtualData.sourceType,
@@ -654,7 +672,6 @@ export function useFileManager(): UseFileManagerTypes {
             firestoreId: uploadResult.documentId,
             uploadedAt: uploadResult.uploadedAt || Timestamp.now(),
             owners: [virtualFile.uploadedBy || 'unknown_user'],
-            subjectId: virtualFile.subjectId || null,
           });
 
           toast.success(`📁 ${virtualFile.fileName} uploaded successfully!`, {

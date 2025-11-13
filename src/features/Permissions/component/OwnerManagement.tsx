@@ -1,26 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Users,
-  ArrowLeft,
-  HelpCircle,
-  Plus,
-  CircleUser,
-  Sparkle,
-  TriangleAlert,
-} from 'lucide-react';
+import { ArrowLeft, HelpCircle, Plus, CircleUser, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { usePermissions } from '@/features/Permissions/hooks/usePermissions';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import UserSearch from '@/features/Users/components/UserSearch';
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import UserCard from '@/features/Users/components/ui/UserCard';
 
 interface OwnerManagementProps {
   record: FileObject;
-  subject: string | null | undefined;
+  currentOwners: string[] | undefined;
   onSuccess?: () => void;
   onBack?: () => void;
   onAddMode?: () => void;
@@ -29,7 +20,7 @@ interface OwnerManagementProps {
 
 export const OwnerManagement: React.FC<OwnerManagementProps> = ({
   record,
-  subject,
+  currentOwners,
   onSuccess,
   onBack,
   onAddMode,
@@ -39,7 +30,7 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
   const [loadingOwners, setLoadingOwners] = useState(true);
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
 
-  const { setSubject, isLoading } = usePermissions({
+  const { addOwner, isLoading } = usePermissions({
     onSuccess: msg => {
       setSelectedUser(null);
       onSuccess?.();
@@ -50,9 +41,9 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
     setSelectedUser(user);
   };
 
-  const handleSetSubject = async () => {
+  const handleAddOwner = async () => {
     if (!selectedUser) return;
-    await setSubject(record.id, selectedUser.uid);
+    await addOwner(record.id, selectedUser.uid);
   };
 
   // Fetch access permissions for this record
@@ -62,7 +53,6 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
 
       setLoadingOwners(true);
       try {
-        const db = getFirestore();
         const auth = getAuth();
         const currentUser = auth.currentUser;
 
@@ -76,11 +66,6 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
 
         // Add owners
         record.owners?.forEach(ownerId => userIds.add(ownerId));
-
-        // Add subject if exists
-        if (record.subjectId) {
-          userIds.add(record.subjectId);
-        }
 
         // Fetch all user profiles at once
         const profiles = await getUserProfiles(Array.from(userIds));
@@ -145,9 +130,9 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
           <div className="flex items-center gap-2">
             <CircleUser className="w-5 h-5 text-gray-700" />
             <span className="font-semibold text-gray-900">Owners</span>
-            {record.subjectId ? (
+            {record.owners ? (
               <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">
-                {record.subjectId}
+                {record.owners.length}
               </span>
             ) : null}
           </div>
@@ -198,34 +183,26 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
             <div className="flex justify-center items-center py-8">
               <p className="text-gray-500">Loading owners...</p>
             </div>
+          ) : record.owners && record.owners.length > 0 ? (
+            <div className="space-y-3 mt-4">
+              {record.owners.map((owner, idx) => {
+                const adminProfile = userProfiles.get(owner);
+                return (
+                  <UserCard
+                    key={owner}
+                    user={adminProfile}
+                    onView={handleAddOwner}
+                    variant="default"
+                    color="primary"
+                  />
+                );
+              })}
+            </div>
           ) : (
-            <>
-              {record.subjectId ? (
-                <div className="flex items-center justify-between p-4 bg-red-200 rounded-lg border border-red-700 hover:shadow-sm transition-shadow">
-                  <div className="text-xl font-bold text-gray-900">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-red-300 rounded-full flex items-center justify-center">
-                        <Sparkle className="w-5 h-5 text-red-700" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-base font-semibold text-gray-900">
-                          {userProfiles.get(record.subjectId)?.displayName || record.subjectId}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {userProfiles.get(record.subjectId)?.email || record.subjectId}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">{record.subjectId}</p>
-                </div>
-              ) : (
-                <div className="flex justify-between">
-                  <p>No record subject</p>
-                  {!isAddMode && <Button onClick={onAddMode}>Set Record Owner</Button>}
-                </div>
-              )}
-            </>
+            <div className="flex justify-between">
+              <p>No record subject</p>
+              {!isAddMode && <Button onClick={onAddMode}>Set Record Owner</Button>}
+            </div>
           )}
         </div>
       </div>
@@ -235,7 +212,7 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
           {/* User Search Component */}
           <UserSearch
             onUserSelect={handleUserSelect}
-            excludeUserIds={subject ? [subject] : []}
+            excludeUserIds={currentOwners ? currentOwners : []}
             placeholder="Search by name, email, or ID..."
           />
 
@@ -255,7 +232,7 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
                   onCancel={() => setSelectedUser(null)}
                 />
               </div>
-              <Button onClick={handleSetSubject} disabled={isLoading} className="w-full">
+              <Button onClick={handleAddOwner} disabled={isLoading} className="w-full">
                 {isLoading ? 'Adding Owner...' : 'Confirm & Add Record Subject'}
               </Button>
             </div>
