@@ -7,6 +7,7 @@ import { FileObject, BelroseFields } from '@/types/core';
 import { TabNavigation } from '@/features/AddRecord/components/ui/TabNavigation';
 import FHIRRecord from '@/features/ViewEditRecord/components/ui/FHIRRecord';
 import BelroseRecord from './BelroseRecord';
+import { DecryptedFileViewer } from '@/features/Encryption/components/DecryptedFileViewer';
 
 export type TabType = 'record' | 'fhir' | 'data' | 'original';
 
@@ -164,7 +165,7 @@ export const RecordView: React.FC<RecordViewProps> = ({
 
             {record.contextText && (
               <div className="flex flex-col">
-                <h2 className="text-xl font-semibold text-gray-900">Record Context Submitted</h2>
+                <h2 className="text-xl font-semibold text-gray-900">Record Context Submission</h2>
                 <div className="bg-gray-50 rounded-lg p-4">
                   <p className="text-gray-600">{record.contextText}</p>
                 </div>
@@ -183,107 +184,31 @@ export const RecordView: React.FC<RecordViewProps> = ({
 
             {/* Original File Download Section with Embedded Viewer */}
             {record.downloadURL && (
-              <div className="flex flex-col space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-gray-900">Original File</h2>
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => window.open(record.downloadURL, '_blank')}
-                      className="flex items-center space-x-2"
-                    >
-                      <Share2 className="w-4 h-4" />
-                      <span>Open</span>
-                    </Button>
-                    <Button
-                      variant="default"
-                      onClick={async () => {
-                        if (!record.downloadURL) {
-                          console.error('No download URL available');
-                          return;
-                        }
-
-                        try {
-                          const response = await fetch(record.downloadURL);
-                          const blob = await response.blob();
-
-                          const link = document.createElement('a');
-                          link.href = URL.createObjectURL(blob);
-                          link.download = record.fileName || 'document';
-                          link.click();
-
-                          URL.revokeObjectURL(link.href);
-                        } catch (error) {
-                          console.error('Download failed:', error);
-                          window.open(record.downloadURL, '_blank');
-                        }
-                      }}
-                      className="flex items-center space-x-2"
-                    >
-                      <FileInput className="w-4 h-4" />
-                      <span>Download</span>
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <FileInput className="w-6 h-6 text-gray-500" />
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {record.fileName || 'Original Document'}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {record.fileType} •{' '}
-                        {record.fileSize
-                          ? `${(record.fileSize / 1024).toFixed(1)} KB`
-                          : 'Unknown size'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Embedded Document Viewer */}
-                  <div className="border rounded-lg overflow-hidden bg-white">
-                    {record.fileType?.includes('image') ? (
-                      // Image preview
-                      <img
-                        src={record.downloadURL}
-                        alt={record.fileName || 'Document preview'}
-                        className="w-full max-h-96 object-contain"
-                      />
-                    ) : record.fileType === 'application/pdf' ? (
-                      // PDF embed
-                      <iframe
-                        src={`${record.downloadURL}#toolbar=0&navpanes=0&scrollbar=1`}
-                        className="w-full h-96"
-                        title={record.fileName || 'PDF preview'}
-                      />
-                    ) : (
-                      // Fallback for other file types
-                      <div className="p-8 text-center">
-                        <FileInput className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-600 mb-2">
-                          Preview not available for this file type
-                        </p>
-                        <p className="text-sm text-gray-500">Click "Open" to view in a new tab</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <DecryptedFileViewer
+                downloadURL={record.downloadURL}
+                fileName={record.fileName}
+                fileType={record.fileType}
+                fileSize={record.fileSize}
+                isEncrypted={record.isEncrypted || false}
+                encryptedKey={record.encryptedKey}
+                encryptedFileIV={record.encryptedFileIV}
+              />
             )}
 
             {/* Show message if no original data */}
-            {!record.originalText && !record.extractedText && !record.downloadURL && (
-              <div className="text-center py-12">
-                <FileInput className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No Original Data</h3>
-                <p className="text-gray-600">
-                  This record doesn't have any original text submissions, extracted text, or file
-                  attachments.
-                </p>
-              </div>
-            )}
+            {!record.contextText &&
+              !record.originalText &&
+              !record.extractedText &&
+              !record.downloadURL && (
+                <div className="text-center py-12">
+                  <FileInput className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Original Data</h3>
+                  <p className="text-gray-600">
+                    This record doesn't have any context submissions, original text submissions,
+                    extracted text, or file attachments.
+                  </p>
+                </div>
+              )}
           </div>
         )}
       </div>
