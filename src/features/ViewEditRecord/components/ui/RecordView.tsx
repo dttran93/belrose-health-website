@@ -162,6 +162,15 @@ export const RecordView: React.FC<RecordViewProps> = ({
               </div>
             )}
 
+            {record.contextText && (
+              <div className="flex flex-col">
+                <h2 className="text-xl font-semibold text-gray-900">Record Context Submitted</h2>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-gray-600">{record.contextText}</p>
+                </div>
+              </div>
+            )}
+
             {/* Extracted Text from File */}
             {record.extractedText && (
               <div className="flex flex-col">

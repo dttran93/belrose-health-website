@@ -28,7 +28,7 @@ exports.createDetailedNarrative = (0, https_1.onRequest)({
     try {
         console.log('📖 Detailed narrative generation request received');
         // Extract and validate request body
-        const { fhirData, belroseFields, fileName, extractedText, originalText } = req.body;
+        const { fhirData, belroseFields, fileName, extractedText, originalText, contextText } = req.body;
         if (!fhirData) {
             res.status(400).json({ error: 'fhirData is required' });
             return;
@@ -45,9 +45,10 @@ exports.createDetailedNarrative = (0, https_1.onRequest)({
             hasBelroseFields: !!belroseFields,
             hasExtractedText: !!extractedText,
             hasOriginalText: !!originalText,
+            hasContextText: !!contextText,
         });
         // Generate the narrative
-        const result = await generateNarrativeWithAI(fhirData, apiKey, belroseFields, fileName, extractedText, originalText);
+        const result = await generateNarrativeWithAI(fhirData, apiKey, belroseFields, fileName, extractedText, originalText, contextText);
         console.log('✅ Narrative generation successful');
         res.json(result);
     }
@@ -63,10 +64,10 @@ exports.createDetailedNarrative = (0, https_1.onRequest)({
 /**
  * Generate narrative using AI
  */
-async function generateNarrativeWithAI(fhirData, apiKey, belroseFields, fileName, extractedText, originalText) {
+async function generateNarrativeWithAI(fhirData, apiKey, belroseFields, fileName, extractedText, originalText, contextText) {
     const anthropicService = new anthropicService_1.AnthropicService(apiKey);
     // Build the prompt with all context
-    const prompt = (0, prompts_1.getDetailedNarrativePrompt)(fhirData, belroseFields, fileName, extractedText, originalText);
+    const prompt = (0, prompts_1.getDetailedNarrativePrompt)(fhirData, belroseFields, fileName, extractedText, originalText, contextText);
     try {
         // Use Sonnet model - better reasoning and narrative generation
         const responseText = await anthropicService.sendTextMessage(prompt, {

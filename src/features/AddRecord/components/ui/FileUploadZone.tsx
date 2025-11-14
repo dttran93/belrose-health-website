@@ -18,7 +18,7 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
   maxSizeBytes,
   title,
   subtitle,
-  compact = false
+  compact = false,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -35,14 +35,17 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
     e.stopPropagation();
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      onFilesSelected(e.dataTransfer.files);
-    }
-  }, [onFilesSelected]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        onFilesSelected(e.dataTransfer.files);
+      }
+    },
+    [onFilesSelected]
+  );
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -52,7 +55,7 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
 
   return (
     <div
-      className={`border-2 border-dashed border-gray-300 rounded-lg text-center hover:border-gray-400 transition-colors cursor-pointer ${
+      className={`border-2 border-dashed border-gray-300 rounded-lg text-center hover:border-chart-1 transition-colors cursor-pointer ${
         compact ? 'p-4' : 'p-8'
       }`}
       onDragEnter={handleDrag}
@@ -69,19 +72,18 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
         onChange={handleFileInputChange}
         className="hidden"
       />
-      
+
       <Upload className={`mx-auto text-gray-400 mb-4 ${compact ? 'h-8 w-8' : 'h-12 w-12'}`} />
-      
+
       <h3 className={`font-medium text-gray-900 mb-2 ${compact ? 'text-base' : 'text-lg'}`}>
         {title}
       </h3>
-      
-      <p className={`text-gray-600 mb-4 ${compact ? 'text-xs' : 'text-sm'}`}>
-        {subtitle}
-      </p>
-      
+
+      <p className={`text-gray-600 mb-4 ${compact ? 'text-xs' : 'text-sm'}`}>{subtitle}</p>
+
       <p className="text-xs text-gray-500">
-        Accepted: {acceptedTypes.join(', ')} • Max {maxFiles} files • {formatFileSize(maxSizeBytes)} each
+        Accepted: {acceptedTypes.join(', ')} • Max {maxFiles} files • {formatFileSize(maxSizeBytes)}{' '}
+        each
       </p>
     </div>
   );

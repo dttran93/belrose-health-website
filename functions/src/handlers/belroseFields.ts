@@ -17,8 +17,9 @@ const anthropicKey = defineSecret('ANTHROPIC_KEY');
  * - fhirData: The FHIR Bundle (required)
  * - fileName: Original file name (optional, for context)
  * - analysis: Previous image analysis (optional, for context)
- *  * - extractedText: Text from OCR/image processing (optional, helps catch missed info)
+ * - extractedText: Text from OCR/image processing (optional, helps catch missed info)
  * - originalText: Raw text from document (optional, helps catch missed info)
+ * - contextText: context provided by the user along with the record
  *
  * Returns:
  * - visitType: e.g., "Lab Results", "Doctor Visit"
@@ -45,7 +46,7 @@ export const createBelroseFields = onRequest(
       console.log('🏥 FHIR processing request received');
 
       // Extract and validate request body
-      const { fhirData, fileName, analysis, extractedText, originalText } =
+      const { fhirData, fileName, analysis, extractedText, originalText, contextText } =
         req.body as FHIRProcessingRequest;
 
       if (!fhirData) {
@@ -61,12 +62,16 @@ export const createBelroseFields = onRequest(
         return;
       }
 
-      console.log('🤖 Processing FHIR data with AI...', {
-        fileName,
-        hasAnalysis: !!analysis,
-        hasExtractedText: !!extractedText,
-        hasOriginalText: !!originalText,
-      });
+      console.log(
+        '🤖 Processing FHIR data with AI... ' +
+          JSON.stringify({
+            fileName,
+            analysis,
+            extractedText,
+            originalText,
+            contextText,
+          })
+      );
 
       // Process FHIR data to extract display-friendly info
       const result = await processDataForBelroseFields(
@@ -75,7 +80,8 @@ export const createBelroseFields = onRequest(
         fileName,
         analysis,
         extractedText,
-        originalText
+        originalText,
+        contextText
       );
 
       console.log('✅ FHIR processing successful');
@@ -101,12 +107,20 @@ async function processDataForBelroseFields(
   fileName?: string,
   analysis?: FHIRAnalysis,
   extractedText?: string,
-  originalText?: string
+  originalText?: string,
+  contextText?: string
 ): Promise<FHIRProcessingResponse> {
   const anthropicService = new AnthropicService(apiKey);
 
   // Build the prompt with all context
-  const prompt = getBelroseFieldsPrompt(fhirData, fileName, analysis, extractedText, originalText);
+  const prompt = getBelroseFieldsPrompt(
+    fhirData,
+    fileName,
+    analysis,
+    extractedText,
+    originalText,
+    contextText
+  );
 
   try {
     // Use Haiku model - it's faster and cheaper for this task

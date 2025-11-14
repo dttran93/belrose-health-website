@@ -17,7 +17,7 @@ export interface VersionControlRecord {
   };
 }
 
-// 🆕 Encrypted snapshot structure
+// Encrypted snapshot structure
 export interface EncryptedSnapshot {
   // Encrypted data (these are objects with {encrypted: string, iv: string})
   encryptedFileName?: {
@@ -29,6 +29,10 @@ export interface EncryptedSnapshot {
     iv: string;
   };
   encryptedOriginalText?: {
+    encrypted: string;
+    iv: string;
+  };
+  encryptedContextText?: {
     encrypted: string;
     iv: string;
   };
@@ -72,7 +76,9 @@ export interface RecordVersion {
   editedAt: Timestamp; // Firestore timestamp
 
   // What changed
-  changes: Change[];
+  changes?: Change[];
+  encryptedChanges?: string;
+  hasEncryptedChanges?: boolean;
   commitMessage?: string;
 
   // Integrity

@@ -64,7 +64,7 @@ export const BelroseRecord: React.FC<BelroseRecordProps> = ({
                 type="text"
                 value={editedData.visitType || ''}
                 onChange={e => updateField('visitType', e.target.value)}
-                className="text-base bg-background font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 w-full focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                className="text-base bg-background font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 w-full focus:outline-none focus:border-none focus:ring-1 focus:ring-chart-1"
                 placeholder="Visit Type..."
               />
             ) : (
@@ -78,7 +78,7 @@ export const BelroseRecord: React.FC<BelroseRecordProps> = ({
               type="text"
               value={editedData.title || ''}
               onChange={e => updateField('title', e.target.value)}
-              className="text-base bg-background font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 w-full focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              className="text-base bg-background font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 w-full focus:outline-none focus:border-none focus:ring-1 focus:ring-chart-1"
               placeholder="Enter record title..."
             />
           ) : (
@@ -100,7 +100,7 @@ export const BelroseRecord: React.FC<BelroseRecordProps> = ({
               type="date"
               value={editedData.completedDate?.split('T')[0] || ''}
               onChange={e => updateField('completedDate', e.target.value)}
-              className="text-base bg-background font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 w-full focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              className="text-base bg-background font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 w-full focus:outline-none focus:border-none focus:ring-1 focus:ring-chart-1"
             />
           ) : (
             <p className="text-base font-semibold text-gray-900">
@@ -120,7 +120,7 @@ export const BelroseRecord: React.FC<BelroseRecordProps> = ({
               type="text"
               value={editedData.patient || ''}
               onChange={e => updateField('patient', e.target.value)}
-              className="text-base bg-background font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 w-full focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              className="text-base bg-background font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 w-full focus:outline-none focus:border-none focus:ring-1 focus:ring-chart-1"
               placeholder="Patient name..."
             />
           ) : (
@@ -139,7 +139,7 @@ export const BelroseRecord: React.FC<BelroseRecordProps> = ({
               type="text"
               value={editedData.provider || ''}
               onChange={e => updateField('provider', e.target.value)}
-              className="text-base bg-background font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 w-full focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              className="text-base bg-background font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 w-full focus:outline-none focus:border-none focus:ring-1 focus:ring-chart-1"
               placeholder="Provider name..."
             />
           ) : (
@@ -158,7 +158,7 @@ export const BelroseRecord: React.FC<BelroseRecordProps> = ({
               type="text"
               value={editedData.institution || ''}
               onChange={e => updateField('institution', e.target.value)}
-              className="text-base bg-background font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 w-full focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              className="text-base bg-background font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 w-full focus:outline-none focus:border-none focus:ring-1 focus:ring-chart-1"
               placeholder="Institution name..."
             />
           ) : (
@@ -178,7 +178,7 @@ export const BelroseRecord: React.FC<BelroseRecordProps> = ({
             value={editedData.summary || ''}
             onChange={e => updateField('summary', e.target.value)}
             rows={5}
-            className="text-base bg-background text-gray-900 border border-gray-300 rounded px-2 py-1 w-full focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+            className="text-base bg-background text-gray-900 border border-gray-300 rounded px-2 py-1 w-full focus:outline-none focus:border-none focus:ring-1 focus:ring-chart-1"
             placeholder="Enter a brief summary..."
           />
         ) : (
@@ -187,34 +187,32 @@ export const BelroseRecord: React.FC<BelroseRecordProps> = ({
       </div>
 
       {/* Detailed Narrative Section */}
-      {Data.detailedNarrative && (
-        <div className="bg-chart-4/10 rounded-xl border border-gray-200 p-6">
-          {/* Header */}
-          <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-            <FileText className="w-5 h-5" />
-            Detailed Clinical Record
-          </h2>
+      <div className="bg-chart-4/10 rounded-xl border border-gray-200 p-6">
+        {/* Header */}
+        <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+          <FileText className="w-5 h-5" />
+          Detailed Clinical Record
+        </h2>
 
-          {/* Content */}
-          <div>
-            {editable ? (
-              <textarea
-                value={editedData.detailedNarrative || ''}
-                onChange={e => updateField('detailedNarrative', e.target.value)}
-                rows={16}
-                className="text-base bg-background text-gray-900 border border-gray-300 rounded px-2 py-1 w-full focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-                placeholder="Enter detailed narrative..."
-              />
-            ) : (
-              <div className="prose prose-sm max-w-none">
-                <p className="text-gray-800 text-left leading-relaxed whitespace-pre-wrap">
-                  {Data.detailedNarrative}
-                </p>
-              </div>
-            )}
-          </div>
+        {/* Content */}
+        <div>
+          {editable ? (
+            <textarea
+              value={editedData.detailedNarrative || ''}
+              onChange={e => updateField('detailedNarrative', e.target.value)}
+              rows={16}
+              className="text-base bg-background text-gray-900 border border-gray-300 rounded px-2 py-1 w-full focus:outline-none focus:border-none focus:ring-1 focus:ring-chart-1"
+              placeholder="Enter detailed narrative..."
+            />
+          ) : (
+            <div className="prose prose-sm max-w-none">
+              <p className="text-gray-800 text-left leading-relaxed whitespace-pre-wrap">
+                {Data.detailedNarrative}
+              </p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

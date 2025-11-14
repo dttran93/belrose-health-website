@@ -2,7 +2,7 @@
 import { toast } from 'sonner';
 import DocumentProcessorService from './documentProcessorService';
 import { convertToFHIR } from './fhirConversionService';
-import { processRecordWithAI } from './belroseFieldsService';
+import { createBelroseFields } from './belroseFieldsService';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import {
   isEncryptionEnabled,
@@ -16,7 +16,6 @@ import {
   HashableFileContent,
 } from '@/features/ViewEditRecord/services/generateRecordHash';
 import { generateDetailedNarrative } from './belroseNarrativeService';
-import { Timestamp } from 'firebase/firestore';
 
 export interface ProcessedRecord {
   extractedText?: string | null;
@@ -26,6 +25,7 @@ export interface ProcessedRecord {
   recordHash?: string;
   encryptedData?: any;
   aiProcessingStatus?: 'completed' | 'failed' | 'not_needed';
+  contextText?: string;
 }
 
 export interface ProcessingCallbacks {
@@ -93,9 +93,10 @@ export class CombinedRecordProcessingService {
             fhirData: result.fhirData,
             fileName: fileObj.fileName,
             extractedText: result.extractedText || undefined,
+            contextText: fileObj.contextText || undefined,
           };
 
-          const aiResult = await processRecordWithAI(BelroseFieldInputs);
+          const aiResult = await createBelroseFields(BelroseFieldInputs);
 
           result.belroseFields = {
             visitType: aiResult.visitType,
@@ -135,6 +136,7 @@ export class CombinedRecordProcessingService {
             belroseFields: result.belroseFields,
             fileName: fileObj.fileName,
             extractedText: result.extractedText || undefined,
+            contextText: fileObj.contextText || undefined,
           };
           const narrativeResult = await generateDetailedNarrative(detailedNarrativeInput);
 
@@ -163,6 +165,7 @@ export class CombinedRecordProcessingService {
           extractedText: result.extractedText,
           originalText: fileObj.originalText,
           originalFileHash: fileObj.originalFileHash,
+          contextText: fileObj.contextText,
           fhirData: result.fhirData,
           belroseFields: result.belroseFields,
           customData: fileObj.customData,
@@ -209,6 +212,7 @@ export class CombinedRecordProcessingService {
                 fileObj.file,
                 result.extractedText,
                 fileObj.originalText,
+                fileObj.contextText,
                 result.fhirData,
                 result.belroseFields,
                 null,
@@ -276,9 +280,10 @@ export class CombinedRecordProcessingService {
           fhirData: virtualData.fhirData,
           fileName: fileName,
           originalText: virtualData.originalText,
+          contextText: virtualData.contextText,
         };
 
-        const aiResult = await processRecordWithAI(virtualBelroseFieldInputs);
+        const aiResult = await createBelroseFields(virtualBelroseFieldInputs);
 
         result.belroseFields = {
           visitType: aiResult.visitType,
@@ -383,6 +388,7 @@ export class CombinedRecordProcessingService {
           undefined,
           null,
           virtualData.originalText,
+          virtualData.contextText,
           virtualData.fhirData,
           result.belroseFields,
           null,

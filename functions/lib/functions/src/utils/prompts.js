@@ -116,7 +116,7 @@ Only return the JSON, no additional text.
 /**
  * Prompt for processing BelroseFields
  */
-function getBelroseFieldsPrompt(fhirData, fileName, analysis, extractedText, originalText) {
+function getBelroseFieldsPrompt(fhirData, fileName, analysis, extractedText, originalText, contextText) {
     const today = new Date().toISOString().split('T')[0];
     //extracted is extracted from file, original is submitted as plaintext or JSON
     const extractedOrOriginalText = extractedText || originalText;
@@ -132,9 +132,13 @@ ${extractedOrOriginalText
         ? `The FHIR conversion above was created from extracted or original Text. 
 Use both the FHIR data AND this extracted or original text to ensure you don't miss any important details: 
 ${extractedOrOriginalText} 
-
 If there's information in the extracted or original text that isn't in the FHIR data, 
 make sure to include it in your summary and extracted fields`
+        : ''}
+${contextText
+        ? `The following context was included with the files the user uploaded. 
+Use this along with any fhir data, original text, and extracted text to ensure you don't miss any important details: 
+${contextText}`
         : ''}
 
 Extract and return ONLY a JSON object with this exact structure:
@@ -184,7 +188,7 @@ function truncateText(text, maxLength = 50000) {
 /**
  * Prompt for generating detailed narrative from FHIR data
  */
-function getDetailedNarrativePrompt(fhirData, belroseFields, fileName, extractedText, originalText) {
+function getDetailedNarrativePrompt(fhirData, belroseFields, fileName, extractedText, originalText, contextText) {
     const extractedOrOriginalText = extractedText || originalText;
     return `
 Your task is to create a detailed, human-readable narrative of this health record.
@@ -208,10 +212,16 @@ ${belroseFields
 ${fileName ? `Document Name: ${fileName}` : ''}
 
 ${extractedOrOriginalText
-        ? `Additional Context (Original/Extracted Text):
+        ? `(Original/Extracted Text):
 ${extractedOrOriginalText}
 
 Use BOTH the FHIR data AND this text to ensure completeness. If there's information in this text that isn't in the FHIR data, make sure to include it in your narrative.`
+        : ''}
+
+${contextText
+        ? `Additional Context, the following context was included with the files the user uploaded. 
+Use this along with any fhir data, original text, and extracted text to ensure you don't miss any important details: 
+${contextText}`
         : ''}
 
 GUIDELINES:

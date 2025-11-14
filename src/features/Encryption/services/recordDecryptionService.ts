@@ -11,6 +11,7 @@ export interface EncryptedRecord {
   encryptedFileName?: { encrypted: string; iv: string };
   encryptedExtractedText?: { encrypted: string; iv: string };
   encryptedOriginalText?: { encrypted: string; iv: string };
+  encryptedContextText?: { encrypted: string; iv: string };
   encryptedFhirData?: { encrypted: string; iv: string };
   encryptedBelroseFields?: { encrypted: string; iv: string };
   // ... plus all the regular fields
@@ -89,6 +90,16 @@ export class RecordDecryptionService {
           base64ToArrayBuffer(encryptedRecord.encryptedOriginalText.iv)
         );
         console.log('✓ Original text decrypted');
+      }
+
+      // Decrypt context text
+      if (encryptedRecord.encryptedContextText) {
+        decryptedData.contextText = await EncryptionService.decryptText(
+          base64ToArrayBuffer(encryptedRecord.encryptedContextText.encrypted),
+          fileKey,
+          base64ToArrayBuffer(encryptedRecord.encryptedContextText.iv)
+        );
+        console.log('✓ Context text decrypted');
       }
 
       // Decrypt FHIR data

@@ -7,6 +7,7 @@ export type HashableFileContent = Pick<
   | 'extractedText'
   | 'originalText'
   | 'originalFileHash'
+  | 'contextText'
   | 'fhirData'
   | 'belroseFields'
   | 'customData'

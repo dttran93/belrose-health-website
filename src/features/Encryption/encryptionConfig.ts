@@ -30,6 +30,7 @@ export const ENCRYPTION_CONFIG = {
     file: true, // Encrypt original uploaded file
     extractedText: true, // Encrypt extracted text
     originalText: true, // Encrypt original text
+    contextText: true, //Encrypt context text
     fhirData: true, // Encrypt FHIR data
     belroseFields: true, // Encrypt Belrose fields
     customData: true, //encrypt custom data

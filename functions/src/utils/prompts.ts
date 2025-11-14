@@ -122,7 +122,8 @@ export function getBelroseFieldsPrompt(
   fileName?: string,
   analysis?: any,
   extractedText?: string,
-  originalText?: string
+  originalText?: string,
+  contextText?: string
 ): string {
   const today = new Date().toISOString().split('T')[0];
 
@@ -142,9 +143,15 @@ ${
     ? `The FHIR conversion above was created from extracted or original Text. 
 Use both the FHIR data AND this extracted or original text to ensure you don't miss any important details: 
 ${extractedOrOriginalText} 
-
 If there's information in the extracted or original text that isn't in the FHIR data, 
 make sure to include it in your summary and extracted fields`
+    : ''
+}
+${
+  contextText
+    ? `The following context was included with the files the user uploaded. 
+Use this along with any fhir data, original text, and extracted text to ensure you don't miss any important details: 
+${contextText}`
     : ''
 }
 
@@ -216,7 +223,8 @@ export function getDetailedNarrativePrompt(
   },
   fileName?: string,
   extractedText?: string,
-  originalText?: string
+  originalText?: string,
+  contextText?: string
 ): string {
   const extractedOrOriginalText = extractedText || originalText;
 
@@ -245,10 +253,18 @@ ${fileName ? `Document Name: ${fileName}` : ''}
 
 ${
   extractedOrOriginalText
-    ? `Additional Context (Original/Extracted Text):
+    ? `(Original/Extracted Text):
 ${extractedOrOriginalText}
 
 Use BOTH the FHIR data AND this text to ensure completeness. If there's information in this text that isn't in the FHIR data, make sure to include it in your narrative.`
+    : ''
+}
+
+${
+  contextText
+    ? `Additional Context, the following context was included with the files the user uploaded. 
+Use this along with any fhir data, original text, and extracted text to ensure you don't miss any important details: 
+${contextText}`
     : ''
 }
 

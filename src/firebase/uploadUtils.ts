@@ -200,6 +200,13 @@ export async function createFirestoreRecord({
         }
       : undefined,
 
+    encryptedContextText: fileObj.encryptedData.contextText
+      ? {
+          encrypted: fileObj.encryptedData.contextText.encrypted,
+          iv: fileObj.encryptedData.contextText.iv,
+        }
+      : undefined,
+
     encryptedFhirData: fileObj.encryptedData.fhirData
       ? {
           encrypted: fileObj.encryptedData.fhirData.encrypted,

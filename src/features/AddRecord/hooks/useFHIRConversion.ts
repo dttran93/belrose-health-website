@@ -47,9 +47,27 @@ export const useFHIRConversion = (
 
       try {
         console.log('Converting extracted text to FHIR...');
-        console.log('Extracted text preview:', targetFile.extractedText.substring(0, 100) + '...');
 
-        const fhirResult = await convertToFHIR(targetFile.extractedText);
+        let contentForConversion = targetFile.extractedText;
+
+        //If there was context text, add that to the extractedText
+        if (targetFile.contextText && targetFile.contextText.trim()) {
+          console.log('Including user context in FHIR conversion');
+          contentForConversion = `USER PROVIDED CONTEXT:
+${targetFile.contextText.trim()}
+
+DOCUMENT CONTENT:
+${targetFile.extractedText}`;
+
+          console.log('Context preview:', targetFile.contextText.substring(0, 100) + '...');
+        }
+
+        console.log(
+          'Content for conversion preview:',
+          contentForConversion.substring(0, 100) + '...'
+        );
+
+        const fhirResult = await convertToFHIR(contentForConversion);
 
         console.log('FHIR conversion successful:', fhirResult);
 
@@ -81,7 +99,9 @@ export const useFHIRConversion = (
         console.log('FHIR data stored in state for fileId:', fileId);
 
         toast.success(`FHIR conversion completed for ${targetFile.fileName}`, {
-          description: 'Medical data has been converted to FHIR format',
+          description: targetFile.contextText
+            ? 'Medical data with your context converted to FHIR format'
+            : 'Medical data has been converted to FHIR format',
           duration: 4000,
         });
       } catch (error) {

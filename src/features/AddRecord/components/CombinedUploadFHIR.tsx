@@ -14,12 +14,16 @@ import FileUploadZone from './ui/FileUploadZone';
 import { FileListItem } from './FileListItem';
 import { TabNavigation } from './ui/TabNavigation';
 import { toast } from 'sonner';
-import { FileObject } from '@/types/core';
+import { BelroseFields, FileObject } from '@/types/core';
 import { Button } from '@/components/ui/Button';
 
 // Import the fixed types
-import type { CombinedUploadFHIRProps, FHIRValidation, TabType } from './CombinedUploadFHIR.type';
+import type { CombinedUploadFHIRProps, FHIRValidation } from './CombinedUploadFHIR.type';
 import type { FHIRWithValidation } from '../services/fhirConversionService.type';
+import RecordView from '@/features/ViewEditRecord/components/ui/RecordView';
+import BelroseRecord from '@/features/ViewEditRecord/components/ui/BelroseRecord';
+
+export type TabType = 'upload' | 'text' | 'fhir' | 'manual';
 
 const TABS = [
   {
@@ -147,29 +151,27 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
 
       // Step 1: Process each pending file
       for (const fileObj of pendingFiles) {
-        console.log(`📋 Processing file: ${fileObj.fileName}`);
+        const fileObjWithContext: FileObject = {
+          ...fileObj,
+          contextText: contextText.trim() || undefined,
+        };
+
+        console.log(`📋 Processing file: ${fileObjWithContext.fileName}`);
         console.log('🔍 File object BEFORE processing:', {
-          id: fileObj.id,
-          hasFile: !!fileObj.file,
-          hasEncryptedData: !!fileObj.encryptedData,
-          status: fileObj.status,
+          id: fileObjWithContext.id,
+          hasFile: !!fileObjWithContext.file,
+          hasEncryptedData: !!fileObjWithContext.encryptedData,
+          status: fileObjWithContext.status,
+          contextText: fileObjWithContext.contextText,
         });
 
-        // Add context if provided
-        if (contextText.trim()) {
-          updateFileStatus(fileObj.id, 'pending', {
-            originalText: contextText.trim(),
-          });
-        }
-
         // Make sure fileObj still has the File reference
-        if (!fileObj.file) {
-          throw new Error(`File object missing for ${fileObj.fileName}`);
+        if (!fileObjWithContext.file) {
+          throw new Error(`File object missing for ${fileObjWithContext.fileName}`);
         }
 
-        // ✅ GET THE RETURN VALUE - don't look at state!
-        const processedFile = await processFile(fileObj);
-        processedFiles.push(processedFile); // ✅ Save it!
+        const processedFile = await processFile(fileObjWithContext);
+        processedFiles.push(processedFile);
 
         // 🔍 Check the RETURNED file object
         console.log('🔍 File object AFTER processing (from return):', {
@@ -179,6 +181,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
             ? Object.keys(processedFile.encryptedData)
             : [],
           status: processedFile.status,
+          contextText: fileObj.contextText,
         });
       }
 
@@ -193,6 +196,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
           hasEncryptedData: !!f.encryptedData,
           encryptedDataKeys: f.encryptedData ? Object.keys(f.encryptedData) : [],
           status: f.status,
+          contextText: f.contextText,
         }))
       );
 
@@ -397,6 +401,17 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
     retryFile(fileItem.id);
   };
 
+  const blankRecord: BelroseFields = {
+    visitType: '',
+    title: '',
+    summary: '',
+    completedDate: '',
+    provider: '',
+    institution: '',
+    patient: '',
+    detailedNarrative: '',
+  };
+
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Main Container */}
@@ -508,7 +523,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
 
 • "This file is from Dr. Smith and contains my X-ray after my right leg injury"
 • "This is my vaccination record from childhood"`}
-                  className="w-full bg-background min-h-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full bg-background min-h-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-none focus:ring-1 focus:ring-chart-1 resize-none"
                 />
               </div>
             )}
@@ -603,7 +618,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   • "Visited urgent care for sore throat. Prescribed amoxicillin 500mg, take twice daily for 10 days."
   • "Follow-up appointment for diabetes. HbA1c improved to 7.2%. Continue current medication."
   • "Annual physical exam completed. All vitals within normal range. Recommended yearly mammogram."`}
-                      className="w-full bg-background min-h-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      className="w-full bg-background min-h-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-none focus:ring-1 focus:ring-chart-1 resize-none"
                       disabled={submittingText}
                     />
                   </div>
@@ -661,7 +676,7 @@ Example:
   }
 ]
 }`}
-                      className="w-full h-64 px-3 py-2 bg-background border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                      className="w-full h-64 px-3 py-2 bg-background border border-gray-300 rounded-md focus:outline-none focus:border-none focus:ring-1 focus:ring-chart-1 font-mono text-sm"
                       disabled={submitting}
                     />
                   </div>
@@ -725,6 +740,12 @@ Example:
                       )}
                     </Button>
                   </div>
+                </div>
+              )}
+              {/* Manual Record Input Tab */}
+              {activeTab === 'manual' && (
+                <div className="">
+                  <BelroseRecord Data={blankRecord} editable={true} />
                 </div>
               )}
             </div>

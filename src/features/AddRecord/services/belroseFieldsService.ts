@@ -18,7 +18,7 @@ const AI_ENDPOINT = 'https://us-central1-belrose-757fe.cloudfunctions.net/create
 /**
  * Process a FHIR record with AI to generate Belrose fields
  */
-export async function processRecordWithAI(input: FHIRProcessingRequest): Promise<BelroseFields> {
+export async function createBelroseFields(input: FHIRProcessingRequest): Promise<BelroseFields> {
   console.log('🤖 Starting AI processing for record...');
 
   // Validate input
@@ -38,6 +38,13 @@ export async function processRecordWithAI(input: FHIRProcessingRequest): Promise
   console.log('🧠 Calling AI service...');
 
   try {
+    console.log('Client sending JSON:', {
+      fhirData: input.fhirData,
+      fileName: input.fileName,
+      extractedText: input.extractedText,
+      contextText: input.contextText,
+    });
+
     const response = await fetch(AI_ENDPOINT, {
       method: 'POST',
       headers: {
@@ -47,6 +54,7 @@ export async function processRecordWithAI(input: FHIRProcessingRequest): Promise
         fhirData: input.fhirData,
         fileName: input.fileName,
         extractedText: input.extractedText,
+        contextText: input.contextText,
       }),
     });
 
@@ -87,4 +95,4 @@ function isValidBelroseFields(result: any): result is BelroseFields {
   );
 }
 
-export default processRecordWithAI;
+export default createBelroseFields;

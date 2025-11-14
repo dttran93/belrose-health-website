@@ -65,6 +65,7 @@ export async function generateDetailedNarrative(
         fileName: input.fileName,
         extractedText: input.extractedText,
         originalText: input.originalText,
+        contextText: input.contextText,
       }),
     });
 

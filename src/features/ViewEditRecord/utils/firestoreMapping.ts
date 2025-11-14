@@ -25,6 +25,7 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
     encryptedFileName: data.encryptedFileName,
     encryptedExtractedText: data.encryptedExtractedText,
     encryptedOriginalText: data.encryptedOriginalText,
+    encryptedContextText: data.encryptedContextText,
     encryptedFhirData: data.encryptedFhirData,
     encryptedBelroseFields: data.encryptedBelroseFields,
 

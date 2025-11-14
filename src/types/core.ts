@@ -120,6 +120,7 @@ export type AIProcessingStatus =
   | 'not_needed'; // This record type doesn't need AI processing
 
 export type FileStatus =
+  | 'open' //waiting to upload
   | 'pending' // File uploaded, waiting to process
   | 'processing' // Currently being processed
   | 'uploading' // Currently uploading, use for making sure there aren't multiple uploads
@@ -165,10 +166,8 @@ export interface FileObject {
   // === OWNERSHIP AND PERMISSIONS ===
   uploadedBy?: string; // User ID of who created/uploaded the record (for audit trail)
   uploadedByName?: string; //Display name of subject (for UI)
-  subjectId?: string | null; // User ID of who the record is About (ultimate owner)
-  subjectName?: string; //Display name of subject (for UI)
   owners?: string[]; // Array of user IDs with ultimate ownership access to record (read, update, delete, share)
-  administrators?: string[]; //Array of userIDs with administrative access to records, can't remove others
+  administrators: string[]; //Array of userIDs with administrative access to records, can't remove others
 
   // === PROCESSING STATUS ===
   status: FileStatus; //Processing property. Initially set as pending. Then pending/processing... see below
@@ -199,6 +198,7 @@ export interface FileObject {
   file?: File; //actual file object from file input. Real life upload not virtual. Generated in createFileObject in useFileManager.ts
   extractedText?: string | null; //text extracted from image/pdf
   originalText?: string | null; //text typed into app by user
+  contextText?: string | null; //context provided along with either the file upload or fhir upload
   fhirData?: any;
   belroseFields?: BelroseFields; //AI enriched fields for easy labeling within the Belrose App
   customData?: any; //for non-medical data that may come in different formats, but not be particularly suited to FHIR format
@@ -207,6 +207,7 @@ export interface FileObject {
   encryptedFileName?: { encrypted: string; iv: string };
   encryptedExtractedText?: { encrypted: string; iv: string };
   encryptedOriginalText?: { encrypted: string; iv: string };
+  encryptedContextText?: { encrypted: string; iv: string };
   encryptedFhirData?: { encrypted: string; iv: string };
   encryptedBelroseFields?: { encrypted: string; iv: string };
   encryptedCustomData?: { encrypted: string; iv: string };
@@ -250,6 +251,12 @@ export interface FileObject {
 
     // Encrypted original text (if exists)
     originalText?: {
+      encrypted: ArrayBuffer; // Only exists during upload process
+      iv: string; // Base64
+    };
+
+    // Encrypted context text (if exists)
+    contextText?: {
       encrypted: ArrayBuffer; // Only exists during upload process
       iv: string; // Base64
     };

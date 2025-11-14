@@ -76,6 +76,7 @@ export interface FHIRProcessingRequest {
   originalText?: string;
   fileName?: string;
   analysis?: FHIRAnalysis;
+  contextText?: string;
 }
 
 export interface FHIRAnalysis {

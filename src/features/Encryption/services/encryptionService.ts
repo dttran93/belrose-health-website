@@ -154,6 +154,7 @@ export class EncryptionService {
     file: File | undefined,
     extractedText: string | undefined | null,
     originalText: string | undefined | null,
+    contextText: string | undefined | null,
     fhirData: any | null,
     belroseFields: any | null,
     customData: any | null,
@@ -172,6 +173,10 @@ export class EncryptionService {
       iv: string;
     };
     originalText?: {
+      encrypted: ArrayBuffer;
+      iv: string;
+    };
+    contextText?: {
       encrypted: ArrayBuffer;
       iv: string;
     };
@@ -194,6 +199,7 @@ export class EncryptionService {
     console.log('  - File:', file ? 'Yes' : 'No');
     console.log('  - ExtractedText:', extractedText ? 'Yes' : 'No');
     console.log('  - OriginalText:', originalText ? 'Yes' : 'No');
+    console.log('  - contextText:', contextText ? 'Yes' : 'No');
     console.log('  - FHIR:', fhirData ? 'Yes' : 'No');
     console.log('  - BelroseFields:', belroseFields ? 'Yes' : 'No');
     console.log('  - CustomData:', customData ? 'Yes' : 'No');
@@ -246,6 +252,17 @@ export class EncryptionService {
       console.log(
         `    ✓ Original text encrypted (${originalTextResult.encrypted.byteLength} bytes)`
       );
+    }
+
+    // Encrypt context text if it exists
+    if (contextText && contextText.trim().length > 0) {
+      console.log('  🔒 Encrypting context text...');
+      const contextTextResult = await this.encryptText(contextText, fileKey);
+      result.contextText = {
+        encrypted: arrayBufferToBase64(contextTextResult.encrypted),
+        iv: arrayBufferToBase64(contextTextResult.iv),
+      };
+      console.log(`    ✓ Context text encrypted (${contextTextResult.encrypted.byteLength} bytes)`);
     }
 
     // Encrypt FHIR data if it exists
@@ -301,6 +318,7 @@ export class EncryptionService {
       file?: { encrypted: ArrayBuffer; iv: string };
       extractedText?: { encrypted: ArrayBuffer; iv: string };
       originalText?: { encrypted: ArrayBuffer; iv: string };
+      contextText?: { encrypted: ArrayBuffer; iv: string };
       fhirData?: { encrypted: ArrayBuffer; iv: string };
       belroseFields?: { encrypted: ArrayBuffer; iv: string };
       customData?: { encrypted: ArrayBuffer; iv: string };
@@ -311,6 +329,7 @@ export class EncryptionService {
     file?: ArrayBuffer;
     extractedText?: string;
     originalText?: string;
+    contextText?: string;
     fhirData?: any;
     belroseFields?: any;
     customData?: any;
@@ -364,6 +383,17 @@ export class EncryptionService {
         base64ToArrayBuffer(encryptedData.originalText.iv)
       );
       console.log(`    ✓ Original text decrypted (${result.originalText.length} chars)`);
+    }
+
+    // Decrypt context text if it exists
+    if (encryptedData.contextText) {
+      console.log('  🔓 Decrypting original text...');
+      result.contextText = await this.decryptText(
+        encryptedData.contextText.encrypted,
+        fileKey,
+        base64ToArrayBuffer(encryptedData.contextText.iv)
+      );
+      console.log(`    ✓ Context text decrypted (${result.contextText.length} chars)`);
     }
 
     // Decrypt FHIR data if it exists

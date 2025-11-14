@@ -18,6 +18,7 @@ export interface DetailedNarrativeInput {
   fileName?: string;
   extractedText?: string;
   originalText?: string;
+  contextText?: string;
 }
 
 export interface DetailedNarrative {
@@ -49,7 +50,7 @@ export const createDetailedNarrative = onRequest(
       console.log('📖 Detailed narrative generation request received');
 
       // Extract and validate request body
-      const { fhirData, belroseFields, fileName, extractedText, originalText } =
+      const { fhirData, belroseFields, fileName, extractedText, originalText, contextText } =
         req.body as DetailedNarrativeInput;
 
       if (!fhirData) {
@@ -70,6 +71,7 @@ export const createDetailedNarrative = onRequest(
         hasBelroseFields: !!belroseFields,
         hasExtractedText: !!extractedText,
         hasOriginalText: !!originalText,
+        hasContextText: !!contextText,
       });
 
       // Generate the narrative
@@ -79,7 +81,8 @@ export const createDetailedNarrative = onRequest(
         belroseFields,
         fileName,
         extractedText,
-        originalText
+        originalText,
+        contextText
       );
 
       console.log('✅ Narrative generation successful');
@@ -105,7 +108,8 @@ async function generateNarrativeWithAI(
   belroseFields?: DetailedNarrativeInput['belroseFields'],
   fileName?: string,
   extractedText?: string,
-  originalText?: string
+  originalText?: string,
+  contextText?: string
 ): Promise<DetailedNarrative> {
   const anthropicService = new AnthropicService(apiKey);
 
@@ -115,7 +119,8 @@ async function generateNarrativeWithAI(
     belroseFields,
     fileName,
     extractedText,
-    originalText
+    originalText,
+    contextText
   );
 
   try {

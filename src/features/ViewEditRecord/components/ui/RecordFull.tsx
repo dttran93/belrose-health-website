@@ -93,6 +93,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       encryptedFileName: version.recordSnapshot.encryptedFileName,
       encryptedExtractedText: version.recordSnapshot.encryptedExtractedText,
       encryptedOriginalText: version.recordSnapshot.encryptedOriginalText,
+      encryptedContextText: version.recordSnapshot.encryptedContextText,
       encryptedFhirData: version.recordSnapshot.encryptedFhirData,
       encryptedBelroseFields: version.recordSnapshot.encryptedBelroseFields,
       encryptedKey: version.recordSnapshot.encryptedKey,

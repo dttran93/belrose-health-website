@@ -210,6 +210,7 @@ export function useFileManager(): UseFileManagerTypes {
           recordHash: result.recordHash,
           encryptedData: result.encryptedData,
           aiProcessingStatus: result.aiProcessingStatus,
+          contextText: result.contextText,
         });
 
         // Create the updated file object
@@ -224,6 +225,7 @@ export function useFileManager(): UseFileManagerTypes {
           recordHash: result.recordHash,
           encryptedData: result.encryptedData,
           aiProcessingStatus: result.aiProcessingStatus,
+          contextText: result.contextText,
         };
 
         console.log(`🎉 Complete processing pipeline finished for: ${fileObj.fileName}`);
