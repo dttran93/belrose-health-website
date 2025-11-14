@@ -1,8 +1,21 @@
-// services/combinedRecordProcessingService.ts
+//src/features/AddRecord/hooks/useRecordProcessing.ts
+
+/**
+ * This hook orchestrates the full processing flow for a file.
+ * It handles: extracting text, FHIR conversion, AI processing, hashing, encryption and metadata
+ * generation. It also reports stages for the UI progress.
+ *
+ * This hook does NOT create fileobjects or upload them. That's in 'useFileManager', which calls this hook
+ * to process each file after creating the initial FileObject.
+ *
+ * Flow:
+ * CombinedUploadFHIR --> useFileManager --> useRecordProcessing --> documentProcessorService
+ */
+
 import { toast } from 'sonner';
-import DocumentProcessorService from './documentProcessorService';
-import { convertToFHIR } from './fhirConversionService';
-import { createBelroseFields } from './belroseFieldsService';
+import DocumentProcessorService from '../services/documentProcessorService';
+import { convertToFHIR } from '../services/fhirConversionService';
+import { createBelroseFields } from '../services/belroseFieldsService';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import {
   isEncryptionEnabled,
@@ -15,7 +28,7 @@ import {
   RecordHashService,
   HashableFileContent,
 } from '@/features/ViewEditRecord/services/generateRecordHash';
-import { generateDetailedNarrative } from './belroseNarrativeService';
+import { generateDetailedNarrative } from '../services/belroseNarrativeService';
 
 export interface ProcessedRecord {
   extractedText?: string | null;
@@ -327,6 +340,7 @@ export class CombinedRecordProcessingService {
           fhirData: virtualData.fhirData,
           belroseFields: result.belroseFields,
           originalText: virtualData.originalText || undefined,
+          contextText: virtualData.contextText || undefined,
         };
         const narrativeResult = await generateDetailedNarrative(virtualDetailedNarrativeInput);
 
@@ -347,6 +361,7 @@ export class CombinedRecordProcessingService {
     const virtualFileForHash: HashableFileContent = {
       fileName: fileName,
       originalText: virtualData.originalText,
+      contextText: virtualData.contextText,
       fhirData: virtualData.fhirData,
       belroseFields: result.belroseFields,
       customData: virtualData.customData,

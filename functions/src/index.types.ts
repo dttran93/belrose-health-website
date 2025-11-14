@@ -31,18 +31,6 @@ export interface FHIRConversionResponse {
 
 // ==================== IMAGE ANALYSIS TYPES ====================
 
-export interface ImageData {
-  base64: string;
-  mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
-}
-
-export interface ImageAnalysisRequest {
-  image: ImageData;
-  fileName?: string;
-  fileType?: string;
-  analysisType?: 'detection' | 'extraction' | 'full';
-}
-
 export interface ImageAnalysisResponse {
   isMedical?: boolean;
   confidence?: number;

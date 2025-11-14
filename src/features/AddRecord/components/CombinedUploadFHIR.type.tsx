@@ -1,19 +1,6 @@
 import type { FHIRWithValidation } from '../services/fhirConversionService.type';
-import { FileObject, FileStatus, VirtualFileInput } from '@/types/core';
+import { FileObject, VirtualFileInput } from '@/types/core';
 import { UploadResult } from '../services/shared.types';
-
-// ============================================================================
-// FHIR VALIDATION TYPES
-// ============================================================================
-
-export interface FHIRValidation {
-  valid: boolean;
-  error?: string;
-  resourceType?: string;
-  entryCount?: number;
-  resourceTypes?: string[];
-  isSingleResource?: boolean;
-}
 
 // ============================================================================
 // FILE MANAGEMENT TYPES - UPDATED TO MATCH HOOK
@@ -42,12 +29,6 @@ export interface VirtualFileResult {
 }
 
 // ============================================================================
-// TAB TYPES
-// ============================================================================
-
-export type TabType = 'upload' | 'text' | 'fhir';
-
-// ============================================================================
 // COMPONENT PROPS - UPDATED TO MATCH HOOK INTERFACE
 // ============================================================================
 
@@ -64,26 +45,18 @@ export interface CombinedUploadFHIRProps {
   // Updated: Hook provides the full FileStats interface
   getStats: () => FileStats;
 
-  updateFileStatus: (
-    fileId: string,
-    status: FileStatus,
-    additionalData?: Partial<FileObject>
-  ) => void;
   onReview: (fileItem: FileObject) => void;
   processFile: (fileObj: FileObject) => Promise<FileObject>;
 
-  // Direct upload functions - UPDATED to match hook
+  // Direct upload functions
   addFhirAsVirtualFile: (
     fhirData: FHIRWithValidation,
     options?: VirtualFileInput & { autoUpload?: boolean }
   ) => Promise<VirtualFileResult>;
-
-  // Updated: Hook takes fileIds array, returns Promise<void>
-  // Component should extract IDs from files and rely on state updates
   uploadFiles: (filesToUpload: FileObject[]) => Promise<UploadResult[]>;
   savingToFirestore: Set<string>;
 
-  // 🔥 ADD FHIR PROPS
+  // FHIR PRops
   fhirData?: Map<string, FHIRWithValidation>;
   onFHIRConverted?: (fileId: string, uploadResult: any, fileObj?: FileObject) => Promise<void>;
 
@@ -94,40 +67,4 @@ export interface CombinedUploadFHIRProps {
   className?: string;
 
   convertTextToFHIR?: (text: string, patientName?: string) => Promise<FHIRWithValidation>;
-}
-
-// ============================================================================
-// FILE LIST ITEM PROPS - UPDATED FOR CONSISTENCY
-// ============================================================================
-
-export interface FileListItemProps {
-  fileItem: FileObject;
-  fhirResult?: {
-    success: boolean;
-    fhirData?: FHIRWithValidation;
-    error?: string;
-  };
-  onRemove: (fileId: string) => void;
-  onConfirm: (fileId: string) => void;
-
-  // Updated: FileListItem should pass FileItem, but retryFile expects fileId
-  // We'll handle the conversion in the component
-  onRetry: (fileItem: FileObject) => void;
-  onForceConvert?: (fileItem: FileObject) => void;
-  showFHIRResults?: boolean;
-  onReview: (fileItem: FileObject) => void;
-}
-
-// ============================================================================
-// FILE UPLOAD ZONE PROPS
-// ============================================================================
-
-export interface FileUploadZoneProps {
-  onFilesSelected: (fileList: FileList) => void;
-  acceptedTypes: string[];
-  maxFiles: number;
-  maxSizeBytes: number;
-  title: string;
-  subtitle: string;
-  compact?: boolean;
 }

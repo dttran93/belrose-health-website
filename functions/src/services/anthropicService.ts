@@ -1,4 +1,5 @@
 // functions/src/services/anthropicService.ts
+import { SupportedImageType } from '../../../src/types/sharedApi';
 
 /**
  * Service for interacting with the Anthropic Claude API
@@ -16,7 +17,7 @@ export interface MessageContent {
   text?: string;
   source?: {
     type: 'base64';
-    media_type: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+    media_type: 'image/jpeg' | 'image/jpg' | 'image/png' | 'image/gif' | 'image/webp';
     data: string;
   };
 }
@@ -87,7 +88,7 @@ export class AnthropicService {
    */
   async sendImageMessage(
     imageBase64: string,
-    mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+    mediaType: SupportedImageType,
     prompt: string,
     options: AnthropicRequestOptions = {}
   ): Promise<string> {

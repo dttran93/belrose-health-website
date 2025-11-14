@@ -1,14 +1,65 @@
 import { createFirestoreRecord, uploadFileComplete } from '@/firebase/uploadUtils';
 import { FileObject } from '@/types/core';
-import {
-  UploadResult,
-  UploadProgress,
-  FHIRUpdateData,
-  IFileUploadService,
-  FileUploadError,
-  UploadErrorCode,
-} from './fileUploadService.types';
 import { Timestamp } from 'firebase/firestore';
+
+// ==================== UPLOAD TYPES ====================
+export interface UploadResult {
+  documentId?: string; // For new uploads
+  firestoreId?: string; // Legacy field name for compatibility
+  downloadURL?: string | null;
+  filePath?: string | null;
+  uploadedAt?: Timestamp;
+  fileSize?: number;
+  savedAt?: string; // Legacy field for compatibility
+  originalFileHash?: string | null; // Legacy field for compatibility
+  success: boolean;
+  fileId?: string;
+  error?: string;
+}
+
+export interface UploadProgress {
+  fileId: string;
+  bytesTransferred: number;
+  totalBytes: number;
+  percentComplete: number;
+  estimatedTimeRemaining?: number;
+}
+
+// ==================== FIRESTORE TYPES ====================
+export interface FHIRUpdateData {
+  fhirData: any;
+  fhirConvertedAt: string;
+  processingStatus: 'fhir_converted';
+}
+
+// ==================== SERVICE INTERFACE ====================
+export interface IFileUploadService {
+  uploadFile(fileObj: FileObject): Promise<UploadResult>;
+  updateRecord(fileId: string, data: Record<string, any>): Promise<void>;
+  deleteFile(fileId: string): Promise<void>;
+
+  // FHIR specific methods
+  updateWithFHIR(documentId: string, fhirData: any): Promise<void>;
+}
+
+// ==================== ERROR TYPES ====================
+export class FileUploadError extends Error {
+  constructor(message: string, public code: UploadErrorCode, public fileId?: string) {
+    super(message);
+    this.name = 'FileUploadError';
+  }
+}
+
+export type UploadErrorCode =
+  | 'FILE_TOO_LARGE'
+  | 'INVALID_FILE_TYPE'
+  | 'NETWORK_ERROR'
+  | 'STORAGE_QUOTA_EXCEEDED'
+  | 'PERMISSION_DENIED'
+  | 'UPLOAD_CANCELLED'
+  | 'UPDATE_FAILED'
+  | 'DELETE_FAILED'
+  | 'UNKNOWN_ERROR';
 
 /**
  * Service for handling file uploads to Firebase Storage and Firestore

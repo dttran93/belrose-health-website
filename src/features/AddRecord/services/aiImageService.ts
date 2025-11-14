@@ -1,41 +1,10 @@
-export interface ImageData {
-  base64: string;
-  mediaType: string;
-}
-
-export interface AnalysisRequest {
-  image: ImageData;
-  fileName: string;
-  fileType: string;
-  analysisType: AnalysisType;
-}
-
-export type AnalysisType = 'detection' | 'extraction' | 'full';
+import { ImageData, ImageAnalysisRequest, SUPPORTED_IMAGE_TYPES } from '@/types/sharedApi';
 
 export interface ApiErrorResponse {
   error: string;
 }
 
-//Medical file extensions and MIME types
-export const MEDICAL_FILE_EXTENSIONS = [
-  '.dcm',
-  '.dicom',
-  '.nii',
-  '.nii.gz',
-  '.mha',
-  '.mhd',
-] as const;
-
-export const SUPPORTED_IMAGE_TYPES = [
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-] as const;
-
 export type SupportedImageType = (typeof SUPPORTED_IMAGE_TYPES)[number];
-export type MedicalFileExtension = (typeof MEDICAL_FILE_EXTENSIONS)[number];
 
 import type { TextExtractionResult } from './shared.types';
 
@@ -72,8 +41,8 @@ export class AiImageService {
   }
 
   //Get media type for API
-  getMediaType(fileType: string): string {
-    const mimeTypeMap: Record<string, string> = {
+  getMediaType(fileType: string): SupportedImageType {
+    const mimeTypeMap: Record<string, SupportedImageType> = {
       'image/jpeg': 'image/jpeg',
       'image/jpg': 'image/jpeg',
       'image/png': 'image/png',
@@ -106,7 +75,7 @@ export class AiImageService {
       const mediaType = this.getMediaType(file.type);
       console.log('🔧 Media type:', mediaType);
 
-      const requestBody: AnalysisRequest = {
+      const requestBody: ImageAnalysisRequest = {
         image: { base64: base64Image, mediaType: mediaType },
         fileName: file.name,
         fileType: file.type,

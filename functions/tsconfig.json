@@ -13,11 +13,17 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@types/*": ["src/types/*"]
+    }
   },
   "compileOnSave": true,
   "include": [
     "src/**/*.ts"
+    
   ],
   "exclude": [
     "node_modules",

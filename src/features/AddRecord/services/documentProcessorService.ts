@@ -1,23 +1,55 @@
 import TextExtractionService from './textExtractionService';
 import VisionExtractionService from './visionExtractionService';
-import { 
-  FileValidationResult, 
-  ProcessingOptions, 
-  SupportedFileType,
-  ProcessingStep,
-  IDocumentProcessorService,
-  isValidFileType
-} from './documentProcessorService.types';
-
-// Import service type definitions
 import { TextExtractionResult, ProcessingResult } from './shared.types';
+
+// ==================== VALIDATION TYPES ====================
+export interface FileValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+// ==================== PROCESSING OPTIONS ====================
+export interface ProcessingOptions {
+  enableVisionAI?: boolean;
+  compressionThreshold?: number;
+  signal?: AbortSignal; // For cancellation
+}
+
+// ==================== SERVICE INTERFACE ====================
+export interface IDocumentProcessorService {
+  validateFile(file: File): FileValidationResult;
+  processDocument(file: File, options?: ProcessingOptions): Promise<ProcessingResult>;
+}
+
+// ==================== UTILITY TYPES ====================
+export type SupportedFileType =
+  | 'application/pdf'
+  | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  | 'application/msword'
+  | 'text/plain'
+  | 'image/jpeg'
+  | 'image/png'
+  | 'image/jpg';
+
+// ==================== TYPE GUARDS ====================
+export function isValidFileType(type: string): type is SupportedFileType {
+  const supportedTypes: SupportedFileType[] = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/msword',
+    'text/plain',
+    'image/jpeg',
+    'image/png',
+    'image/jpg',
+  ];
+  return supportedTypes.includes(type as SupportedFileType);
+}
 
 /**
  * Simplified service for processing documents through text extraction only
  * Handles both regular documents (PDF, Word) and images (JPG, PNG) with OCR
  */
 class DocumentProcessorService implements IDocumentProcessorService {
-  
   /**
    * Process a document file through the simplified pipeline
    */
@@ -25,7 +57,7 @@ class DocumentProcessorService implements IDocumentProcessorService {
     const {
       enableVisionAI = true,
       compressionThreshold = 2 * 1024 * 1024, // 2MB
-      signal
+      signal,
     } = options;
 
     console.log(`Processing document: ${file.name} (${file.type})`);
@@ -41,7 +73,7 @@ class DocumentProcessorService implements IDocumentProcessorService {
         processingMethod: null,
         success: false,
         error: null,
-        processingTime: Date.now()
+        processingTime: Date.now(),
       };
 
       // Check for cancellation
@@ -51,9 +83,15 @@ class DocumentProcessorService implements IDocumentProcessorService {
 
       // Text Extraction
       result.processingSteps.push('text_extraction_started');
-      
+
       if (file.type.startsWith('image/')) {
-        result = await this.processImageFile(file, result, enableVisionAI, compressionThreshold, signal);
+        result = await this.processImageFile(
+          file,
+          result,
+          enableVisionAI,
+          compressionThreshold,
+          signal
+        );
       } else {
         result = await this.processDocumentFile(file, result, signal);
       }
@@ -64,18 +102,16 @@ class DocumentProcessorService implements IDocumentProcessorService {
       }
 
       // Calculate final metrics
-      result.wordCount = result.extractedText ? 
-        result.extractedText.split(/\s+/).length : 0;
+      result.wordCount = result.extractedText ? result.extractedText.split(/\s+/).length : 0;
       result.processingTime = Date.now() - result.processingTime;
       result.success = true;
       result.processingSteps.push('processing_completed');
 
       console.log(`Document processing completed in ${result.processingTime}ms`);
       return result;
-
     } catch (error: any) {
       console.error(`Document processing failed for ${file.name}:`, error);
-      
+
       return {
         fileName: file.name,
         fileType: file.type,
@@ -86,7 +122,7 @@ class DocumentProcessorService implements IDocumentProcessorService {
         processingMethod: null,
         success: false,
         error: error.message,
-        processingTime: Date.now() - (Date.now()) // Fallback timing
+        processingTime: Date.now() - Date.now(), // Fallback timing
       };
     }
   }
@@ -102,25 +138,26 @@ class DocumentProcessorService implements IDocumentProcessorService {
       'application/msword',
       'text/plain',
       'image/jpeg',
-      'image/png'
+      'image/png',
     ];
 
     if (file.size > maxSize) {
       return {
         valid: false,
-        error: `File size exceeds 10MB limit (${Math.round(file.size / 1024 / 1024)}MB)`
+        error: `File size exceeds 10MB limit (${Math.round(file.size / 1024 / 1024)}MB)`,
       };
     }
 
-    const isSupported = supportedTypes.includes(file.type as SupportedFileType) || 
-                       file.type.startsWith('text/') || 
-                       file.type.startsWith('image/') ||
-                       isValidFileType(file.type);
+    const isSupported =
+      supportedTypes.includes(file.type as SupportedFileType) ||
+      file.type.startsWith('text/') ||
+      file.type.startsWith('image/') ||
+      isValidFileType(file.type);
 
     if (!isSupported) {
       return {
         valid: false,
-        error: `File type '${file.type}' is not supported`
+        error: `File type '${file.type}' is not supported`,
       };
     }
 
@@ -133,23 +170,23 @@ class DocumentProcessorService implements IDocumentProcessorService {
   getProcessingRecommendations(file: File): ProcessingRecommendation {
     const validation = this.validateFile(file);
     if (!validation.valid) {
-      return { 
-        canProcess: false, 
-        error: validation.error 
+      return {
+        canProcess: false,
+        error: validation.error,
       };
     }
 
     if (file.type.startsWith('image/')) {
       const imageRec = VisionExtractionService.getProcessingRecommendation?.(file) || {
         estimatedTime: '5-15 seconds',
-        recommendation: 'Use AI Vision for best results'
+        recommendation: 'Use AI Vision for best results',
       };
-      
+
       return {
         canProcess: true,
         ...imageRec,
         enableVisionAI: true,
-        approach: 'ai_vision_extraction'
+        approach: 'ai_vision_extraction',
       };
     }
 
@@ -158,41 +195,48 @@ class DocumentProcessorService implements IDocumentProcessorService {
       approach: 'standard_extraction',
       recommendation: 'Standard text extraction',
       estimatedTime: '1-5 seconds',
-      enableVisionAI: false
+      enableVisionAI: false,
     };
   }
 
   /**
    * Batch process multiple files
    */
-  async processMultipleDocuments(files: File[], options: BatchProcessingOptions = {}): Promise<ProcessingResult[]> {
+  async processMultipleDocuments(
+    files: File[],
+    options: BatchProcessingOptions = {}
+  ): Promise<ProcessingResult[]> {
     const { maxConcurrent = 3, ...processingOptions } = options;
-    
+
     console.log(`Processing ${files.length} files with max ${maxConcurrent} concurrent`);
 
     const results: ProcessingResult[] = [];
-    
+
     // Process files in batches to avoid overwhelming the system
     for (let i = 0; i < files.length; i += maxConcurrent) {
       const batch = files.slice(i, i + maxConcurrent);
       const batchPromises = batch.map(file => this.processDocument(file, processingOptions));
-      
+
       try {
         const batchResults = await Promise.allSettled(batchPromises);
-        results.push(...batchResults.map((result, index) => 
-          result.status === 'fulfilled' ? result.value : {
-            fileName: batch[index]?.name || 'unknown',
-            fileType: batch[index]?.type || 'unknown',
-            fileSize: batch[index]?.size || 0,
-            processingSteps: ['processing_failed'],
-            extractedText: null,
-            wordCount: 0,
-            processingMethod: null,
-            success: false,
-            error: result.reason?.message || 'Unknown error',
-            processingTime: 0
-          }
-        ));
+        results.push(
+          ...batchResults.map((result, index) =>
+            result.status === 'fulfilled'
+              ? result.value
+              : {
+                  fileName: batch[index]?.name || 'unknown',
+                  fileType: batch[index]?.type || 'unknown',
+                  fileSize: batch[index]?.size || 0,
+                  processingSteps: ['processing_failed'],
+                  extractedText: null,
+                  wordCount: 0,
+                  processingMethod: null,
+                  success: false,
+                  error: result.reason?.message || 'Unknown error',
+                  processingTime: 0,
+                }
+          )
+        );
       } catch (error: any) {
         console.error('Batch processing error:', error);
         // Add error results for failed batch
@@ -207,7 +251,7 @@ class DocumentProcessorService implements IDocumentProcessorService {
             processingMethod: null,
             success: false,
             error: 'Batch processing failed',
-            processingTime: 0
+            processingTime: 0,
           });
         });
       }
@@ -222,13 +266,12 @@ class DocumentProcessorService implements IDocumentProcessorService {
    * Process image files using Vision AI or OCR
    */
   private async processImageFile(
-    file: File, 
-    result: ProcessingResult, 
-    enableVisionAI: boolean, 
+    file: File,
+    result: ProcessingResult,
+    enableVisionAI: boolean,
     compressionThreshold: number,
     signal?: AbortSignal
   ): Promise<ProcessingResult> {
-    
     if (enableVisionAI) {
       try {
         // Check for cancellation
@@ -238,12 +281,14 @@ class DocumentProcessorService implements IDocumentProcessorService {
 
         // Try AI Vision text extraction
         result.processingSteps.push('ai_vision_analysis');
-        const visionResult: TextExtractionResult = await VisionExtractionService.extractImageText(file);
-        
+        const visionResult: TextExtractionResult = await VisionExtractionService.extractImageText(
+          file
+        );
+
         result.extractedText = visionResult.text;
         result.processingMethod = 'ai_vision_text_only';
         result.processingSteps.push('ai_vision_completed');
-        
+
         return result;
       } catch (visionError: any) {
         console.warn('AI Vision analysis failed, falling back to text extraction:', visionError);
@@ -253,23 +298,27 @@ class DocumentProcessorService implements IDocumentProcessorService {
 
     // Fallback to basic text extraction
     result.processingSteps.push('image_text_extraction');
-    
+
     // Compress if needed
     let fileToProcess = file;
     if (file.size > compressionThreshold) {
       result.processingSteps.push('image_compression');
-      fileToProcess = await VisionExtractionService.compressImageIfNeeded(file, compressionThreshold);
+      fileToProcess = await VisionExtractionService.compressImageIfNeeded(
+        file,
+        compressionThreshold
+      );
     }
 
-    const textResult: TextExtractionResult = await VisionExtractionService.extractImageText(fileToProcess) as TextExtractionResult;
-    
+    const textResult: TextExtractionResult = (await VisionExtractionService.extractImageText(
+      fileToProcess
+    )) as TextExtractionResult;
+
     console.log('🔍 DocProcessor: Text result received:', {
-    text: textResult.text?.substring(0, 50) + '...',
-    wordCount: textResult.text?.split(/\s+/).length || 0,
-    success: textResult.success
+      text: textResult.text?.substring(0, 50) + '...',
+      wordCount: textResult.text?.split(/\s+/).length || 0,
+      success: textResult.success,
     });
 
-    
     result.extractedText = textResult.text;
     result.processingMethod = textResult.method;
     result.processingSteps.push('image_text_completed');
@@ -281,11 +330,10 @@ class DocumentProcessorService implements IDocumentProcessorService {
    * Process non-image document files
    */
   private async processDocumentFile(
-    file: File, 
+    file: File,
     result: ProcessingResult,
     signal?: AbortSignal
   ): Promise<ProcessingResult> {
-    
     // Check for cancellation
     if (signal?.aborted) {
       throw new Error('Processing cancelled');
@@ -295,7 +343,7 @@ class DocumentProcessorService implements IDocumentProcessorService {
     result.extractedText = await TextExtractionService.extractText(file);
     result.processingMethod = this.getExtractionMethodName(file.type);
     result.processingSteps.push('document_text_completed');
-    
+
     return result;
   }
 
@@ -347,5 +395,5 @@ export const {
   validateFile,
   getProcessingRecommendations,
   processMultipleDocuments,
-  processDocument
+  processDocument,
 } = documentProcessorService;

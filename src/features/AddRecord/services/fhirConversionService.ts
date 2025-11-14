@@ -2,7 +2,6 @@ import fhirpath from 'fhirpath';
 import fhirpathR4Model from 'fhirpath/fhir-context/r4';
 
 import type {
-  FHIRConversionRequest,
   ValidationResult,
   ValidationIssue,
   ValidationCheck,
@@ -19,6 +18,7 @@ import type {
 
 import { VALID_OBSERVATION_STATUSES } from './fhirConversionService.type';
 import { PractitionerName } from './fhirConversionService.type';
+import { FHIRConversionRequest } from '@/types/sharedApi';
 
 /**
  * Convert document text to FHIR format using AI

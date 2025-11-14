@@ -14,7 +14,6 @@ const anthropicKey = (0, params_1.defineSecret)('ANTHROPIC_KEY');
  * Takes:
  * - fhirData: The FHIR Bundle (required)
  * - fileName: Original file name (optional, for context)
- * - analysis: Previous image analysis (optional, for context)
  * - extractedText: Text from OCR/image processing (optional, helps catch missed info)
  * - originalText: Raw text from document (optional, helps catch missed info)
  * - contextText: context provided by the user along with the record
@@ -40,7 +39,7 @@ exports.createBelroseFields = (0, https_1.onRequest)({
     try {
         console.log('🏥 FHIR processing request received');
         // Extract and validate request body
-        const { fhirData, fileName, analysis, extractedText, originalText, contextText } = req.body;
+        const { fhirData, fileName, extractedText, originalText, contextText } = req.body;
         if (!fhirData) {
             res.status(400).json({ error: 'fhirData is required' });
             return;
@@ -55,13 +54,12 @@ exports.createBelroseFields = (0, https_1.onRequest)({
         console.log('🤖 Processing FHIR data with AI... ' +
             JSON.stringify({
                 fileName,
-                analysis,
                 extractedText,
                 originalText,
                 contextText,
             }));
         // Process FHIR data to extract display-friendly info
-        const result = await processDataForBelroseFields(fhirData, apiKey, fileName, analysis, extractedText, originalText, contextText);
+        const result = await processDataForBelroseFields(fhirData, apiKey, fileName, extractedText, originalText, contextText);
         console.log('✅ FHIR processing successful');
         res.json(result);
     }
@@ -69,17 +67,17 @@ exports.createBelroseFields = (0, https_1.onRequest)({
         console.error('❌ FHIR processing error:', error);
         // Return a fallback response instead of failing completely
         // This ensures the user still gets something useful
-        const fallback = createFallbackResponse(req.body.fileName, req.body.analysis);
+        const fallback = createFallbackResponse(req.body.fileName);
         res.json(fallback);
     }
 });
 /**
  * Process FHIR data with AI to extract key information
  */
-async function processDataForBelroseFields(fhirData, apiKey, fileName, analysis, extractedText, originalText, contextText) {
+async function processDataForBelroseFields(fhirData, apiKey, fileName, extractedText, originalText, contextText) {
     const anthropicService = new anthropicService_1.AnthropicService(apiKey);
     // Build the prompt with all context
-    const prompt = (0, prompts_1.getBelroseFieldsPrompt)(fhirData, fileName, analysis, extractedText, originalText, contextText);
+    const prompt = (0, prompts_1.getBelroseFieldsPrompt)(fhirData, fileName, extractedText, originalText, contextText);
     try {
         // Use Haiku model - it's faster and cheaper for this task
         const responseText = await anthropicService.sendTextMessage(prompt, {
@@ -91,14 +89,14 @@ async function processDataForBelroseFields(fhirData, apiKey, fileName, analysis,
         const jsonMatch = responseText.match(/\{[\s\S]*?\}/);
         if (!jsonMatch) {
             console.warn('⚠️ No JSON found in AI response, using fallback');
-            return createFallbackResponse(fileName, analysis);
+            return createFallbackResponse(fileName);
         }
         const result = JSON.parse(jsonMatch[0]);
         return validateAndCleanResult(result, fileName);
     }
     catch (error) {
         console.error('❌ FHIR processing with AI failed:', error);
-        return createFallbackResponse(fileName, analysis);
+        return createFallbackResponse(fileName);
     }
 }
 /**
@@ -119,9 +117,9 @@ function validateAndCleanResult(result, fileName) {
 }
 /**
  * Create a fallback response when AI processing fails
- * Uses any available context (fileName, analysis) to make it useful
+ * Uses any available context (fileName) to make it useful
  */
-function createFallbackResponse(fileName, analysis) {
+function createFallbackResponse(fileName) {
     const today = new Date().toISOString().split('T')[0];
     return {
         visitType: 'Medical Record',

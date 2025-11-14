@@ -6,14 +6,48 @@ import type { Request, Response } from 'express';
 import { defineSecret } from 'firebase-functions/params';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import * as crypto from 'crypto';
-import type {
-  PersonaInquiryResponse,
-  VerifiedData,
-  CreateSessionResponse,
-  CheckStatusRequest,
-  CheckStatusResponse,
-  CreateVerificationSessionRequest,
-} from '../index.types';
+
+export interface PersonaInquiryResponse {
+  data: {
+    id: string;
+    attributes: {
+      session_token: string;
+      status: 'created' | 'pending' | 'approved' | 'declined' | 'needs_review';
+      name_first?: string;
+      name_last?: string;
+      birthdate?: string;
+      address_street_1?: string;
+      address_postal_code?: string;
+    };
+  };
+}
+
+export interface VerifiedData {
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  address: string;
+  postcode: string;
+}
+
+export interface CreateSessionResponse {
+  sessionToken: string;
+  inquiryId: string;
+}
+
+export interface CheckStatusRequest {
+  inquiryId: string;
+}
+
+export interface CheckStatusResponse {
+  verified: boolean;
+  data?: VerifiedData;
+  reason?: string;
+}
+
+export interface CreateVerificationSessionRequest {
+  templateId: string;
+}
 
 /**
  * Verification Handler

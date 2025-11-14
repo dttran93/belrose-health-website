@@ -1,3 +1,5 @@
+import { Timestamp } from 'firebase/firestore';
+
 export interface TextExtractionResult {
   text: string;
   method: string;
@@ -57,7 +59,7 @@ export interface UploadResult {
   documentId?: string;
   downloadURL?: string | null;
   filePath?: string | null;
-  uploadedAt?: Date;
+  uploadedAt?: Timestamp;
   fileSize?: number;
 
   // Legacy compatibility fields (keep for backward compatibility)

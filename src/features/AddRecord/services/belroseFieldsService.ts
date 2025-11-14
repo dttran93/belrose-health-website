@@ -1,5 +1,5 @@
 import { BelroseFields } from '@/types/core';
-import { FHIRProcessingRequest } from 'functions/src/index.types';
+import { BelroseFieldProcessingRequest } from '@/types/sharedApi';
 
 /**
  * Error class for AI processing failures
@@ -18,7 +18,9 @@ const AI_ENDPOINT = 'https://us-central1-belrose-757fe.cloudfunctions.net/create
 /**
  * Process a FHIR record with AI to generate Belrose fields
  */
-export async function createBelroseFields(input: FHIRProcessingRequest): Promise<BelroseFields> {
+export async function createBelroseFields(
+  input: BelroseFieldProcessingRequest
+): Promise<BelroseFields> {
   console.log('🤖 Starting AI processing for record...');
 
   // Validate input

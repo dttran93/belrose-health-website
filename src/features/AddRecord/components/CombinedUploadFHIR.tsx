@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   FileText,
   Upload,
@@ -16,14 +16,14 @@ import { TabNavigation } from './ui/TabNavigation';
 import { toast } from 'sonner';
 import { BelroseFields, FileObject } from '@/types/core';
 import { Button } from '@/components/ui/Button';
+import { validateBasicFhirStructure, getValidationSummary } from '../utils/fhirValidationUtils';
+import { SimpleFHIRValidation } from '../utils/fhirValidationUtils';
 
 // Import the fixed types
-import type { CombinedUploadFHIRProps, FHIRValidation } from './CombinedUploadFHIR.type';
+import type { CombinedUploadFHIRProps } from './CombinedUploadFHIR.type';
 import type { FHIRWithValidation } from '../services/fhirConversionService.type';
-import RecordView from '@/features/ViewEditRecord/components/ui/RecordView';
-import BelroseRecord from '@/features/ViewEditRecord/components/ui/BelroseRecord';
 
-export type TabType = 'upload' | 'text' | 'fhir' | 'manual';
+export type TabType = 'upload' | 'text' | 'fhir';
 
 const TABS = [
   {
@@ -40,11 +40,6 @@ const TABS = [
     id: 'fhir',
     label: 'FHIR Data',
     icon: Code,
-  },
-  {
-    id: 'manual',
-    label: 'Manual Record',
-    icon: SquarePen,
   },
 ];
 
@@ -63,7 +58,6 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   removeFileFromLocal,
   retryFile,
   getStats,
-  updateFileStatus,
   onReview,
   processFile,
   uploadFiles,
@@ -86,7 +80,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
 
   // FHIR input state
   const [fhirText, setFhirText] = useState<string>('');
-  const [fhirValidation, setFhirValidation] = useState<FHIRValidation | null>(null);
+  const [fhirValidation, setFhirValidation] = useState<SimpleFHIRValidation | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   // Plain text input state (context)
@@ -239,48 +233,12 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
     [removeFileFromLocal]
   );
 
-  // Validate FHIR JSON
-  const validateFhirJson = (jsonString: string): FHIRValidation => {
-    try {
-      const parsed = JSON.parse(jsonString);
-
-      if (!parsed.resourceType) {
-        return { valid: false, error: 'Missing resourceType field' };
-      }
-
-      if (parsed.resourceType === 'Bundle') {
-        if (!parsed.entry || !Array.isArray(parsed.entry)) {
-          return { valid: false, error: 'Bundle must have an entry array' };
-        }
-        const resourceTypes = parsed.entry
-          .map((e: any) => e.resource?.resourceType)
-          .filter((type: any): type is string => typeof type === 'string') as string[];
-
-        return {
-          valid: true,
-          resourceType: 'Bundle',
-          entryCount: parsed.entry.length,
-          resourceTypes: [...new Set(resourceTypes)],
-        };
-      } else {
-        return {
-          valid: true,
-          resourceType: parsed.resourceType,
-          isSingleResource: true,
-        };
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return { valid: false, error: `Invalid JSON: ${errorMessage}` };
-    }
-  };
-
   // Handle FHIR text changes
   const handleFhirTextChange = (value: string): void => {
     setFhirText(value);
 
     if (value.trim()) {
-      const validation = validateFhirJson(value);
+      const validation = validateBasicFhirStructure(value);
       setFhirValidation(validation);
     } else {
       setFhirValidation(null);
@@ -373,6 +331,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
         sourceType: 'Manual FHIR JSON Submission',
         originalText: fhirText.trim(),
         autoUpload: true,
+        contextText: contextText.trim(),
       });
 
       console.log('✅ FHIR data uploaded successfully');
@@ -401,17 +360,6 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
     retryFile(fileItem.id);
   };
 
-  const blankRecord: BelroseFields = {
-    visitType: '',
-    title: '',
-    summary: '',
-    completedDate: '',
-    provider: '',
-    institution: '',
-    patient: '',
-    detailedNarrative: '',
-  };
-
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Main Container */}
@@ -425,8 +373,8 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
               </h2>
               <p className="text-sm text-left text-gray-600 m-3">
                 Add your health record in any format you like. Upload images, PDFs, word docs; type
-                medical notes; input FHIR data, or manually write a record - everything will be
-                processed and uploaded automatically.
+                medical notes; or input a FHIR JSON directly - everything will be processed and
+                uploaded automatically.
               </p>
             </div>
           </div>
@@ -701,7 +649,8 @@ Example:
                             fhirValidation.valid ? 'text-green-800' : 'text-red-800'
                           }`}
                         >
-                          {fhirValidation.valid ? 'Valid FHIR Data' : 'Invalid FHIR Data'}
+                          {/* Use the centralized validation summary */}
+                          {getValidationSummary(fhirValidation)}
                         </span>
                       </div>
 
@@ -715,6 +664,12 @@ Example:
                           {fhirValidation.entryCount && (
                             <span> • {fhirValidation.entryCount} entries</span>
                           )}
+                          {fhirValidation.resourceTypes &&
+                            fhirValidation.resourceTypes.length > 0 && (
+                              <div className="mt-1">
+                                Contains: {fhirValidation.resourceTypes.join(', ')}
+                              </div>
+                            )}
                         </div>
                       )}
                     </div>
@@ -740,12 +695,6 @@ Example:
                       )}
                     </Button>
                   </div>
-                </div>
-              )}
-              {/* Manual Record Input Tab */}
-              {activeTab === 'manual' && (
-                <div className="">
-                  <BelroseRecord Data={blankRecord} editable={true} />
                 </div>
               )}
             </div>

@@ -5,7 +5,8 @@ import type { Request, Response } from 'express';
 import { defineSecret } from 'firebase-functions/params';
 import { AnthropicService, MODELS } from '../services/anthropicService';
 import { getBelroseFieldsPrompt } from '../utils/prompts';
-import type { FHIRProcessingRequest, FHIRProcessingResponse, FHIRAnalysis } from '../index.types';
+import type { BelroseFieldProcessingRequest } from '../../../src/types/sharedApi';
+import { BelroseFields } from '../../../src/types/core';
 
 // Define the secret
 const anthropicKey = defineSecret('ANTHROPIC_KEY');
@@ -16,7 +17,6 @@ const anthropicKey = defineSecret('ANTHROPIC_KEY');
  * Takes:
  * - fhirData: The FHIR Bundle (required)
  * - fileName: Original file name (optional, for context)
- * - analysis: Previous image analysis (optional, for context)
  * - extractedText: Text from OCR/image processing (optional, helps catch missed info)
  * - originalText: Raw text from document (optional, helps catch missed info)
  * - contextText: context provided by the user along with the record
@@ -46,8 +46,8 @@ export const createBelroseFields = onRequest(
       console.log('🏥 FHIR processing request received');
 
       // Extract and validate request body
-      const { fhirData, fileName, analysis, extractedText, originalText, contextText } =
-        req.body as FHIRProcessingRequest;
+      const { fhirData, fileName, extractedText, originalText, contextText } =
+        req.body as BelroseFieldProcessingRequest;
 
       if (!fhirData) {
         res.status(400).json({ error: 'fhirData is required' });
@@ -66,7 +66,6 @@ export const createBelroseFields = onRequest(
         '🤖 Processing FHIR data with AI... ' +
           JSON.stringify({
             fileName,
-            analysis,
             extractedText,
             originalText,
             contextText,
@@ -78,7 +77,6 @@ export const createBelroseFields = onRequest(
         fhirData,
         apiKey,
         fileName,
-        analysis,
         extractedText,
         originalText,
         contextText
@@ -91,7 +89,7 @@ export const createBelroseFields = onRequest(
 
       // Return a fallback response instead of failing completely
       // This ensures the user still gets something useful
-      const fallback = createFallbackResponse(req.body.fileName, req.body.analysis);
+      const fallback = createFallbackResponse(req.body.fileName);
 
       res.json(fallback);
     }
@@ -105,18 +103,16 @@ async function processDataForBelroseFields(
   fhirData: any,
   apiKey: string,
   fileName?: string,
-  analysis?: FHIRAnalysis,
   extractedText?: string,
   originalText?: string,
   contextText?: string
-): Promise<FHIRProcessingResponse> {
+): Promise<BelroseFields> {
   const anthropicService = new AnthropicService(apiKey);
 
   // Build the prompt with all context
   const prompt = getBelroseFieldsPrompt(
     fhirData,
     fileName,
-    analysis,
     extractedText,
     originalText,
     contextText
@@ -134,14 +130,14 @@ async function processDataForBelroseFields(
     const jsonMatch = responseText.match(/\{[\s\S]*?\}/);
     if (!jsonMatch) {
       console.warn('⚠️ No JSON found in AI response, using fallback');
-      return createFallbackResponse(fileName, analysis);
+      return createFallbackResponse(fileName);
     }
 
-    const result = JSON.parse(jsonMatch[0]) as Partial<FHIRProcessingResponse>;
+    const result = JSON.parse(jsonMatch[0]) as Partial<BelroseFields>;
     return validateAndCleanResult(result, fileName);
   } catch (error) {
     console.error('❌ FHIR processing with AI failed:', error);
-    return createFallbackResponse(fileName, analysis);
+    return createFallbackResponse(fileName);
   }
 }
 
@@ -149,10 +145,7 @@ async function processDataForBelroseFields(
  * Validate and clean the AI result
  * Ensures all required fields have sensible defaults
  */
-function validateAndCleanResult(
-  result: Partial<FHIRProcessingResponse>,
-  fileName?: string
-): FHIRProcessingResponse {
+function validateAndCleanResult(result: Partial<BelroseFields>, fileName?: string): BelroseFields {
   const today = new Date().toISOString().split('T')[0];
 
   return {
@@ -168,12 +161,9 @@ function validateAndCleanResult(
 
 /**
  * Create a fallback response when AI processing fails
- * Uses any available context (fileName, analysis) to make it useful
+ * Uses any available context (fileName) to make it useful
  */
-function createFallbackResponse(
-  fileName?: string,
-  analysis?: FHIRAnalysis
-): FHIRProcessingResponse {
+function createFallbackResponse(fileName?: string): BelroseFields {
   const today = new Date().toISOString().split('T')[0];
 
   return {

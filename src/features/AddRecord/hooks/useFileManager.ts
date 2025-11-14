@@ -1,3 +1,12 @@
+// src/features/AddRecord/hooks/useFileManager.ts
+
+/**
+ * Central hook for managing file uploads and virtual files.
+ * Handles creation, local state, processing via useRecordProcessing,
+ * Firestore/cloud storage uploads, deletions, and progress tracking.
+ * Supports virtual FHIR files and auto-upload.
+ */
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { FileUploadService } from '@/features/AddRecord/services/fileUploadService';
@@ -12,19 +21,10 @@ import {
 } from './useFileManager.type';
 import { VirtualFileResult } from '../components/CombinedUploadFHIR.type';
 import { UploadResult } from '../services/shared.types';
-import { CombinedRecordProcessingService } from '../services/combinedRecordProcessingService';
+import { CombinedRecordProcessingService } from './useRecordProcessing';
 import { useAuthContext } from '@/components/auth/AuthContext';
 import { Timestamp } from 'firebase/firestore';
 
-/**
- * A comprehensive file upload hook that handles:
- * - File selection and validation
- * - Document processing and text extraction
- * - Medical content detection
- * - Firestore uploads
- * - FHIR data integration
- * - Virtual file support
- */
 export function useFileManager(): UseFileManagerTypes {
   // ==================== STATE MANAGEMENT ====================
 
@@ -591,6 +591,7 @@ export function useFileManager(): UseFileManagerTypes {
         uploadedAt: Timestamp.now(),
         uploadedBy: user?.uid,
         originalText: virtualData.originalText,
+        contextText: virtualData.contextText,
         wordCount: virtualData.wordCount || 0,
         sourceType: virtualData.sourceType,
         isVirtual: true,
@@ -626,6 +627,7 @@ export function useFileManager(): UseFileManagerTypes {
         fileSize: JSON.stringify(fhirData).length,
         fileType: 'application/fhir+json',
         originalText: options.originalText,
+        contextText: options.contextText,
         wordCount: JSON.stringify(fhirData).split(/\s+/).length,
         sourceType: options.sourceType,
         fhirData,
@@ -633,11 +635,7 @@ export function useFileManager(): UseFileManagerTypes {
       };
 
       // Get the processed virtual file directly from the return value
-      const {
-        fileId: generatedFileId,
-        recordHash,
-        virtualFile,
-      } = await addVirtualFile(virtualFileInput);
+      const { fileId: generatedFileId, virtualFile } = await addVirtualFile(virtualFileInput);
 
       console.log('🧩 virtualFile AFTER addVirtualFile:', {
         hasEncryptedData: !!virtualFile.encryptedData,
@@ -646,59 +644,52 @@ export function useFileManager(): UseFileManagerTypes {
           : Object.keys(virtualFile || {}),
       });
 
-      // 🔥 AUTO-UPLOAD if requested
-      if (options.autoUpload) {
-        console.log('🚀 Auto-uploading virtual file:', virtualFile.fileName);
-
-        try {
-          if (savingToFirestore.has(generatedFileId)) {
-            throw new Error('File already uploading');
-          }
-
-          setSavingToFirestore(prev => new Set([...prev, generatedFileId]));
-
-          const uploadResult = await fileUploadService.current.uploadFile(virtualFile);
-          console.log(`✅ Auto-upload successful for ${virtualFile.fileName}:`, uploadResult);
-
-          updateFileStatus(generatedFileId, 'completed', {
-            firestoreId: uploadResult.documentId,
-            uploadedAt: uploadResult.uploadedAt || Timestamp.now(),
-            owners: [virtualFile.uploadedBy || 'unknown_user'],
-          });
-
-          toast.success(`📁 ${virtualFile.fileName} uploaded successfully!`, {
-            description: 'Your file has been saved to cloud storage',
-            duration: 4000,
-          });
-
-          return {
-            fileId: generatedFileId,
-            virtualFile,
-            uploadResult: {
-              success: true,
-              documentId: uploadResult.documentId,
-              fileId: generatedFileId,
-              uploadedAt: uploadResult.uploadedAt,
-              filePath: uploadResult.filePath,
-              downloadURL: uploadResult.downloadURL,
-            },
-          };
-        } catch (error) {
-          console.error(`❌ Auto-upload failed for ${virtualFile.fileName}:`, error);
-          updateFileStatus(generatedFileId, 'error', {
-            error: error instanceof Error ? error.message : 'Upload failed',
-          });
-          throw error;
-        } finally {
-          setSavingToFirestore(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(generatedFileId);
-            return newSet;
-          });
+      try {
+        if (savingToFirestore.has(generatedFileId)) {
+          throw new Error('File already uploading');
         }
-      }
 
-      return { fileId: generatedFileId, virtualFile };
+        setSavingToFirestore(prev => new Set([...prev, generatedFileId]));
+
+        const uploadResult = await fileUploadService.current.uploadFile(virtualFile);
+        console.log(`✅ Auto-upload successful for ${virtualFile.fileName}:`, uploadResult);
+
+        updateFileStatus(generatedFileId, 'completed', {
+          firestoreId: uploadResult.documentId,
+          uploadedAt: uploadResult.uploadedAt || Timestamp.now(),
+          owners: [virtualFile.uploadedBy || 'unknown_user'],
+        });
+
+        toast.success(`📁 ${virtualFile.fileName} uploaded successfully!`, {
+          description: 'Your file has been saved to cloud storage',
+          duration: 4000,
+        });
+
+        return {
+          fileId: generatedFileId,
+          virtualFile,
+          uploadResult: {
+            success: true,
+            documentId: uploadResult.documentId,
+            fileId: generatedFileId,
+            uploadedAt: uploadResult.uploadedAt,
+            filePath: uploadResult.filePath,
+            downloadURL: uploadResult.downloadURL,
+          },
+        };
+      } catch (error) {
+        console.error(`❌ Auto-upload failed for ${virtualFile.fileName}:`, error);
+        updateFileStatus(generatedFileId, 'error', {
+          error: error instanceof Error ? error.message : 'Upload failed',
+        });
+        throw error;
+      } finally {
+        setSavingToFirestore(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(generatedFileId);
+          return newSet;
+        });
+      }
     },
     [addVirtualFile, fileUploadService, savingToFirestore, updateFileStatus]
   );

@@ -18,12 +18,23 @@ export class RecordHashService {
    * Generate a hash of the medical record content
    */
   static async generateRecordHash(fileObject: HashableFileContent): Promise<string> {
+    console.log('🔐 Starting complete record encryption...');
+    console.log('  - FileName:', fileObject.fileName ? 'Yes' : 'No');
+    console.log('  - Original File Hash:', fileObject.originalFileHash ? 'Yes' : 'No');
+    console.log('  - ExtractedText:', fileObject.extractedText ? 'Yes' : 'No');
+    console.log('  - OriginalText:', fileObject.originalText ? 'Yes' : 'No');
+    console.log('  - contextText:', fileObject.contextText ? 'Yes' : 'No');
+    console.log('  - FHIR:', fileObject.fhirData ? 'Yes' : 'No');
+    console.log('  - BelroseFields:', fileObject.belroseFields ? 'Yes' : 'No');
+    console.log('  - CustomData:', fileObject.customData ? 'Yes' : 'No');
+
     const hashableContent = {
       // Only Core content that affects record integrity
       fileName: fileObject.fileName || null,
       extractedText: fileObject.extractedText || null,
       originalText: fileObject.originalText || null,
       originalFileHash: fileObject.originalFileHash || null,
+      contextText: fileObject.contextText || null,
       fhirData: fileObject.fhirData || null,
       belroseFields: fileObject.belroseFields || null,
       customData: fileObject.customData || null,
@@ -34,6 +45,8 @@ export class RecordHashService {
     // Sort keys to ensure consistent hashing
     const sortedContent = this.sortObjectKeys(hashableContent);
     const contentString = JSON.stringify(sortedContent);
+
+    console.log('🧩 Hashing keys:', Object.keys(sortedContent));
 
     // Use Web Crypto API for proper cryptographic hashing
     const encoder = new TextEncoder();

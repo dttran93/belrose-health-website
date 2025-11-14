@@ -2,22 +2,83 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import Tesseract from 'tesseract.js';
 import mammoth from 'mammoth';
-import {TextExtractionResult} from './shared.types'
-import {
-  ExtractionOptions,
-  DocumentMetadata,
-  PDFExtractionResult,
-  PageText,
-  ITextExtractionService,
-  TextExtractionError,
-  TextExtractionErrorCode,
-  PDFMetadata,
-  PDFMetadataInfo,
-  PDFTextItem,
-  PDFTextContent,
-  PDFPageProxy,
-  PDFDocumentProxy,
-} from './textExtractionService.types';
+import { TextExtractionResult } from './shared.types';
+
+// ==================== TEXT EXTRACTION OPTIONS ====================
+
+/**
+ * Options for customizing text extraction behavior
+ * Preserve linebreaks, metadata (author dates etc) and language code
+ */
+export interface ExtractionOptions {
+  preserveFormatting?: boolean;
+  includeMetadata?: boolean;
+  language?: string;
+}
+
+//Metadata extracted from documents
+export interface DocumentMetadata {
+  title?: string;
+  author?: string;
+  createdDate?: Date;
+  modifiedDate?: Date;
+  pageCount?: number;
+  fileSize: number;
+}
+//Text from a single page (for multi-page documents)
+export interface PageText {
+  pageNumber: number;
+  text: string;
+  confidence?: number; // 0-1, how confident we are in the extraction
+}
+
+//Extended result for PDF extraction with additional PDF-specific data
+export interface PDFExtractionResult extends TextExtractionResult {
+  pageCount: number;
+  metadata?: DocumentMetadata;
+  pages?: PageText[]; // Individual page texts (only if includeMetadata is true)
+}
+
+// ==================== PDF.JS TYPE HELPERS ====================
+
+/**
+ * Simplified PDF metadata structure
+ * Full type available from pdfjs-dist library
+ */
+export interface PDFMetadata {
+  info?: {
+    Title?: string;
+    Author?: string;
+    CreationDate?: string;
+    ModDate?: string;
+  };
+  metadata?: any;
+}
+
+// ==================== SERVICE INTERFACE ====================
+export interface ITextExtractionService {
+  extractText(file: File, options?: ExtractionOptions): Promise<string>;
+  extractFromPDF(file: File, options?: ExtractionOptions): Promise<PDFExtractionResult>;
+  extractFromWord(file: File, options?: ExtractionOptions): Promise<TextExtractionResult>;
+  extractFromPlainText(file: File): Promise<string>;
+  getEstimatedProcessingTime?(file: File): string;
+}
+
+// ==================== ERROR HANDLING ====================
+export class TextExtractionError extends Error {
+  constructor(message: string, public code: TextExtractionErrorCode, public fileName?: string) {
+    super(message);
+    this.name = 'TextExtractionError';
+  }
+}
+
+export type TextExtractionErrorCode =
+  | 'UNSUPPORTED_FORMAT' // File type not supported
+  | 'CORRUPTED_FILE' // File appears to be corrupted
+  | 'EMPTY_DOCUMENT' // No text content found
+  | 'PROCESSING_FAILED' // Generic processing error
+  | 'MEMORY_LIMIT_EXCEEDED' // File too large to process
+  | 'UNKNOWN_ERROR'; // Unexpected error
 
 // Set up PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
@@ -27,7 +88,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
  * Supports PDF, Word documents, plain text, and OCR for images
  */
 class TextExtractionService implements ITextExtractionService {
-
   /**
    * Main text extraction method that routes to appropriate extraction function
    */
@@ -40,7 +100,8 @@ class TextExtractionService implements ITextExtractionService {
           const pdfResult = await this.extractFromPDF(file, options);
           return pdfResult.text;
 
-        case file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+        case file.type ===
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
         case file.type === 'application/msword':
           const wordResult = await this.extractFromWord(file, options);
           return wordResult.text;
@@ -60,11 +121,11 @@ class TextExtractionService implements ITextExtractionService {
       }
     } catch (error: any) {
       console.error(`Error extracting text from ${file.name}:`, error);
-      
+
       if (error instanceof TextExtractionError) {
         throw error; // Re-throw our custom errors as-is
       }
-      
+
       // Wrap other errors in our custom error type
       throw new TextExtractionError(
         `Text extraction failed: ${error.message}`,
@@ -80,13 +141,13 @@ class TextExtractionService implements ITextExtractionService {
   async extractFromPDF(file: File, options: ExtractionOptions = {}): Promise<PDFExtractionResult> {
     try {
       console.log(`Extracting PDF text from ${file.name}`);
-      
+
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
       let fullText = '';
       const pages: PageText[] = [];
-      
+
       // Extract text from each page
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
@@ -94,27 +155,29 @@ class TextExtractionService implements ITextExtractionService {
         const pageText = textContent.items
           .map((item: any) => item.str)
           .join(options.preserveFormatting ? '\n' : ' ');
-        
+
         pages.push({
           pageNumber: i,
           text: pageText,
-          confidence: 1.0 // PDF text extraction has high confidence
+          confidence: 1.0, // PDF text extraction has high confidence
         });
-        
+
         fullText += pageText + (options.preserveFormatting ? '\n\n' : ' ');
       }
 
       // Extract metadata if requested
       let metadata: DocumentMetadata | undefined;
       if (options.includeMetadata) {
-        const pdfMetadata = await pdf.getMetadata() as PDFMetadata;
+        const pdfMetadata = (await pdf.getMetadata()) as PDFMetadata;
         metadata = {
           title: pdfMetadata.info?.Title,
           author: pdfMetadata.info?.Author,
-          createdDate: pdfMetadata.info?.CreationDate ? new Date(pdfMetadata.info.CreationDate) : undefined,
+          createdDate: pdfMetadata.info?.CreationDate
+            ? new Date(pdfMetadata.info.CreationDate)
+            : undefined,
           modifiedDate: pdfMetadata.info?.ModDate ? new Date(pdfMetadata.info.ModDate) : undefined,
           pageCount: pdf.numPages,
-          fileSize: file.size
+          fileSize: file.size,
         };
       }
 
@@ -125,7 +188,7 @@ class TextExtractionService implements ITextExtractionService {
         confidence: 1.0,
         pageCount: pdf.numPages,
         metadata,
-        pages: options.includeMetadata ? pages : undefined
+        pages: options.includeMetadata ? pages : undefined,
       };
     } catch (error: any) {
       console.error('PDF text extraction failed:', error);
@@ -140,13 +203,16 @@ class TextExtractionService implements ITextExtractionService {
   /**
    * Extract text from Word documents using mammoth
    */
-  async extractFromWord(file: File, options: ExtractionOptions = {}): Promise<TextExtractionResult> {
+  async extractFromWord(
+    file: File,
+    options: ExtractionOptions = {}
+  ): Promise<TextExtractionResult> {
     try {
       console.log(`Extracting Word document text from ${file.name}`);
-      
+
       const arrayBuffer = await file.arrayBuffer();
       const result = await mammoth.extractRawText({ arrayBuffer });
-      
+
       if (!result.value || result.value.trim().length === 0) {
         throw new TextExtractionError(
           'No text content found in Word document',
@@ -164,15 +230,15 @@ class TextExtractionService implements ITextExtractionService {
         text: result.value,
         method: 'word_extraction',
         wordCount: result.value.split(/\s+/).length,
-        confidence: 0.95 // Word extraction is very reliable
+        confidence: 0.95, // Word extraction is very reliable
       };
     } catch (error: any) {
       console.error('Word document text extraction failed:', error);
-      
+
       if (error instanceof TextExtractionError) {
         throw error;
       }
-      
+
       throw new TextExtractionError(
         `Failed to extract text from Word document: ${error.message}`,
         'PROCESSING_FAILED',
@@ -187,37 +253,39 @@ class TextExtractionService implements ITextExtractionService {
   async extractFromPlainText(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      
-      reader.onload = (e) => {
+
+      reader.onload = e => {
         const result = e.target?.result;
         if (typeof result === 'string') {
           if (result.trim().length === 0) {
-            reject(new TextExtractionError(
-              'Text file appears to be empty',
-              'EMPTY_DOCUMENT',
-              file.name
-            ));
+            reject(
+              new TextExtractionError('Text file appears to be empty', 'EMPTY_DOCUMENT', file.name)
+            );
           } else {
             resolve(result);
           }
         } else {
-          reject(new TextExtractionError(
-            'Failed to read text file as string',
-            'PROCESSING_FAILED',
-            file.name
-          ));
+          reject(
+            new TextExtractionError(
+              'Failed to read text file as string',
+              'PROCESSING_FAILED',
+              file.name
+            )
+          );
         }
       };
-      
-      reader.onerror = (error) => {
+
+      reader.onerror = error => {
         console.error('Plain text extraction failed:', error);
-        reject(new TextExtractionError(
-          `Failed to read text file: ${error}`,
-          'PROCESSING_FAILED',
-          file.name
-        ));
+        reject(
+          new TextExtractionError(
+            `Failed to read text file: ${error}`,
+            'PROCESSING_FAILED',
+            file.name
+          )
+        );
       };
-      
+
       reader.readAsText(file);
     });
   }
@@ -228,48 +296,42 @@ class TextExtractionService implements ITextExtractionService {
   async extractFromImage(file: File, options: ExtractionOptions = {}): Promise<string> {
     try {
       console.log(`Using Tesseract OCR for image text extraction: ${file.name}`);
-      
+
       // Validate image file
       if (!file.type.startsWith('image/')) {
-        throw new TextExtractionError(
-          'File is not an image',
-          'UNSUPPORTED_FORMAT',
-          file.name
-        );
+        throw new TextExtractionError('File is not an image', 'UNSUPPORTED_FORMAT', file.name);
       }
 
       // Check file size (OCR can be memory intensive)
       const maxSize = 50 * 1024 * 1024; // 50MB limit for OCR
       if (file.size > maxSize) {
         throw new TextExtractionError(
-          `Image file too large for OCR processing (${Math.round(file.size / 1024 / 1024)}MB > 50MB)`,
+          `Image file too large for OCR processing (${Math.round(
+            file.size / 1024 / 1024
+          )}MB > 50MB)`,
           'MEMORY_LIMIT_EXCEEDED',
           file.name
         );
       }
 
       const tesseractResult = await Tesseract.recognize(file, options.language || 'eng', {
-        logger: (m: any) => console.log('Tesseract:', m)
+        logger: (m: any) => console.log('Tesseract:', m),
       });
-      
+
       const extractedText = tesseractResult.data.text;
-      
+
       if (!extractedText || extractedText.trim().length === 0) {
-        throw new TextExtractionError(
-          'No text detected in image',
-          'EMPTY_DOCUMENT',
-          file.name
-        );
+        throw new TextExtractionError('No text detected in image', 'EMPTY_DOCUMENT', file.name);
       }
 
       return extractedText;
     } catch (error: any) {
       console.error('Tesseract OCR failed:', error);
-      
+
       if (error instanceof TextExtractionError) {
         throw error;
       }
-      
+
       throw new TextExtractionError(
         `OCR text extraction failed: ${error.message}`,
         'PROCESSING_FAILED',
@@ -288,12 +350,14 @@ class TextExtractionService implements ITextExtractionService {
       'application/msword',
       'text/plain',
       'text/csv',
-      'text/tab-separated-values'
+      'text/tab-separated-values',
     ];
 
-    return supportedTypes.includes(fileType) || 
-           fileType.startsWith('text/') || 
-           fileType.startsWith('image/');
+    return (
+      supportedTypes.includes(fileType) ||
+      fileType.startsWith('text/') ||
+      fileType.startsWith('image/')
+    );
   }
 
   /**
@@ -318,7 +382,7 @@ class TextExtractionService implements ITextExtractionService {
     if (file.size > maxSize) {
       return {
         valid: false,
-        error: `File size exceeds ${maxSize / 1024 / 1024}MB limit`
+        error: `File size exceeds ${maxSize / 1024 / 1024}MB limit`,
       };
     }
 
@@ -326,7 +390,7 @@ class TextExtractionService implements ITextExtractionService {
     if (!this.isSupported(file.type)) {
       return {
         valid: false,
-        error: `File type '${file.type}' is not supported for text extraction`
+        error: `File type '${file.type}' is not supported for text extraction`,
       };
     }
 
@@ -334,7 +398,7 @@ class TextExtractionService implements ITextExtractionService {
     if (file.size === 0) {
       return {
         valid: false,
-        error: 'File appears to be empty'
+        error: 'File appears to be empty',
       };
     }
 
@@ -344,7 +408,11 @@ class TextExtractionService implements ITextExtractionService {
   /**
    * Extract text with automatic retry on failure
    */
-  async extractTextWithRetry(file: File, maxRetries: number = 2, options: ExtractionOptions = {}): Promise<string> {
+  async extractTextWithRetry(
+    file: File,
+    maxRetries: number = 2,
+    options: ExtractionOptions = {}
+  ): Promise<string> {
     let lastError: Error;
 
     for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
@@ -354,7 +422,7 @@ class TextExtractionService implements ITextExtractionService {
       } catch (error: any) {
         lastError = error;
         console.warn(`Text extraction attempt ${attempt} failed:`, error.message);
-        
+
         if (attempt <= maxRetries) {
           // Wait before retry (exponential backoff)
           const delay = Math.pow(2, attempt - 1) * 1000;
@@ -369,9 +437,12 @@ class TextExtractionService implements ITextExtractionService {
   /**
    * Batch extract text from multiple files
    */
-  async extractTextBatch(files: File[], options: ExtractionOptions = {}): Promise<TextExtractionResult[]> {
+  async extractTextBatch(
+    files: File[],
+    options: ExtractionOptions = {}
+  ): Promise<TextExtractionResult[]> {
     const results: TextExtractionResult[] = [];
-    
+
     for (const file of files) {
       try {
         const text = await this.extractText(file, options);
@@ -379,18 +450,18 @@ class TextExtractionService implements ITextExtractionService {
           text,
           method: this.getExtractionMethod(file.type),
           wordCount: text.split(/\s+/).length,
-          confidence: this.getExtractionConfidence(file.type)
+          confidence: this.getExtractionConfidence(file.type),
         });
       } catch (error: any) {
         results.push({
           text: '',
           method: 'failed',
           wordCount: 0,
-          confidence: 0
+          confidence: 0,
         });
       }
     }
-    
+
     return results;
   }
 
@@ -452,5 +523,5 @@ export const {
   extractFromPlainText: extractPlainText,
   extractFromImage: extractImageTextOCR,
   isSupported,
-  getEstimatedProcessingTime
+  getEstimatedProcessingTime,
 } = textExtractionService;

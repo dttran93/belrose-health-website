@@ -5,7 +5,7 @@ import type { Request, Response } from 'express';
 import { defineSecret } from 'firebase-functions/params';
 import { AnthropicService, MODELS } from '../services/anthropicService';
 import { getImageAnalysisPrompt } from '../utils/prompts';
-import type { ImageAnalysisRequest, ImageAnalysisResponse } from '../index.types';
+import { ImageAnalysisRequest, ImageAnalysisResponse } from '../../../src/types/sharedApi';
 
 // Define the secret
 const anthropicKey = defineSecret('ANTHROPIC_KEY');
