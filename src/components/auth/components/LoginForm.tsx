@@ -1,7 +1,7 @@
 // /features/Auth/components/LoginForm.tsx
 
 import React, { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, User, CheckCircle, X } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, User, CheckCircle, X, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import { authService } from '@/components/auth/services/authServices';
@@ -23,9 +23,10 @@ interface FirebaseError extends Error {
 interface LoginFormProps {
   onSwitchToRegister: () => void;
   onForgotPassword: () => void;
+  onBack: () => void;
 }
 
-const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onForgotPassword }) => {
+const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onForgotPassword, onBack }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -189,6 +190,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onForgotPassw
           <p className="text-foreground">Sign in to your account</p>
         </div>
 
+        {/* Back to Login Button */}
+        <button
+          onClick={onBack}
+          className="flex items-center space-x-2 text-foreground hover:text-primary mb-2 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Homepage</span>
+        </button>
+
         {/* Form */}
         <div className="bg-background rounded-2xl shadow-xl p-8 border border-gray-100">
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -206,7 +216,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onForgotPassw
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={`w-full pl-10 pr-12 py-3 bg-background border focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent rounded-xl ${
+                  className={`w-full pl-10 pr-12 py-3 bg-background border focus:outline-none focus:ring-1 focus:ring-chart-1 focus:border-none rounded-xl ${
                     errors.email ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder="Enter your email"
@@ -227,7 +237,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onForgotPassw
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={`w-full pl-10 pr-12 py-3 bg-background border focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent rounded-xl ${
+                  className={`w-full pl-10 pr-12 py-3 bg-background border focus:outline-none focus:ring-1 focus:ring-chart-1 focus:border-none rounded-xl ${
                     errors.password ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder="Enter your password"

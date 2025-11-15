@@ -44,7 +44,7 @@ export const InputField: React.FC<InputFieldProps> = ({
           name={name}
           type={type}
           className={cn(
-            'w-full py-3 border bg-background rounded-xl focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all placeholder-gray-400',
+            'w-full py-3 border bg-background rounded-xl focus:border-none focus:outline-none focus:ring-1 focus:ring-chart-1 focus:border-transparent transition-all placeholder-gray-400',
             icon ? 'pl-10 pr-4' : 'px-4',
             error ? 'border-red-500' : 'border-gray-300',
             className

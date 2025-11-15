@@ -5,7 +5,6 @@ import {
   doc,
   getDoc,
   setDoc,
-  deleteDoc,
   updateDoc,
   collection,
   query,
@@ -13,13 +12,12 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { SharingKeyManagementService } from './sharingKeyManagementService';
 import { ethers } from 'ethers';
 import { SharingContractService } from '@/features/BlockchainVerification/service/sharingContractService';
 import { EmailInvitationService } from './emailInvitationService';
-import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
+import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 
 export interface ShareRecordRequest {
   recordId: string;
@@ -29,7 +27,7 @@ export interface ShareRecordRequest {
 
 export interface SharedRecord {
   recordId: string;
-  ownerId: string;
+  sharerId: string;
   receiverId: string;
   receiverWalletAddress: string;
   wrappedKeyId: string;
@@ -53,6 +51,8 @@ export class SharingService {
     }
 
     // Validate that at least one identifier is provided
+    // These are user-facing identifiers. We'll look up the receiver's uid in Firestore
+    // uid will be used for internal operations
     if (!request.receiverEmail && !request.receiverWalletAddress) {
       throw new Error('Either receiver email or wallet address must be provided');
     }
@@ -76,8 +76,8 @@ export class SharingService {
     const recordData = recordDoc.data();
 
     // Verify the user owns this record
-    if (!recordData.owners || !recordData.owners.includes(user.uid)) {
-      throw new Error('You do not own this record');
+    if (!recordData.administrators || !recordData.administrators.includes(user.uid)) {
+      throw new Error('You are neither an administrator nor owner of this record');
     }
 
     console.log('✅ Record found and ownership verified');
@@ -188,6 +188,27 @@ export class SharingService {
 
     console.log('✅ Receiver found:', receiverId);
 
+    //Check if they already have access
+    const wrappedKeyId = `${request.recordId}_${receiverId}`;
+    const existingWrappedKeyRef = doc(db, 'wrappedKeys', wrappedKeyId);
+    const existingWrappedKey = await getDoc(existingWrappedKeyRef);
+
+    if (existingWrappedKey.exists()) {
+      const existingData = existingWrappedKey.data();
+
+      // Check if it's active
+      if (existingData.isActive) {
+        // Check if they're an admin
+        const isAdmin = recordData.administrators?.includes(receiverId);
+        const role = isAdmin ? 'administrator' : 'viewer';
+
+        throw new Error(`This user already has ${role} priviledges. No need to share again.`);
+      } else {
+        // They had access before but it was revoked - we can re-share
+        console.log('ℹ️  User previously had access (now revoked), re-sharing...');
+      }
+    }
+
     console.log('🔍 Checking record data:', {
       hasEncryptedKey: !!recordData.encryptedKey,
       encryptedKeyType: typeof recordData.encryptedKey,
@@ -195,9 +216,10 @@ export class SharingService {
     });
 
     // 3. Decrypt the record's AES key using owner's master key
-    const encryptedKeyData = base64ToArrayBuffer(recordData.encryptedKey);
-    const recordKey = await EncryptionService.importKey(
-      await EncryptionService.decryptKeyWithMasterKey(encryptedKeyData, masterKey)
+    const recordKey = await RecordDecryptionService.getRecordKey(
+      request.recordId,
+      recordData,
+      masterKey
     );
 
     console.log('✅ Record key decrypted');
@@ -220,87 +242,138 @@ export class SharingService {
     console.log('✅ Key wrapped for receiver');
 
     // 5. Create permission hash for blockchain
+    // 5.1: Get sharer's wallet address:
+    const sharerRef = doc(db, 'users', user.uid);
+    const sharerDoc = await getDoc(sharerRef);
+
+    if (!sharerDoc.exists()) {
+      throw new Error('User profile not found');
+    }
+
+    const sharerData = sharerDoc.data();
+    const sharerWalletAddress =
+      sharerData.connectedWallet?.address || sharerData.generatedWallet?.address || '';
+
+    if (!sharerWalletAddress) {
+      throw new Error('User wallet address not found. Please connect or generate a wallet.');
+    }
+
+    //5.2 get receiver wallet address
+    const receiverWalletAddress =
+      receiverData.connectedWallet?.address || receiverData.generatedWallet?.address || '';
+
+    if (!receiverWalletAddress) {
+      throw new Error(
+        'Receiver wallet address not found. They need to connect or generate a wallet.'
+      );
+    }
+
+    // 5.3 create permission hash using Ethereum's Keccak-256 (ethers.id())
     const permissionData = {
       recordId: request.recordId,
-      ownerAddress: user.uid,
-      receiverAddress: receiverData.connectedWallet?.address,
+      sharerAddress: sharerWalletAddress,
+      receiverAddress: receiverWalletAddress,
       timestamp: Date.now(),
     };
     const permissionHash = ethers.id(JSON.stringify(permissionData));
 
     console.log('✅ Permission hash created:', permissionHash);
+    console.log('✅ Permission data (off-chain):', permissionData);
 
-    // 6. Store wrapped key in Firestore
-    const wrappedKeyId = `${request.recordId}_${receiverId}`;
-    const wrappedKeyRef = doc(db, 'wrappedKeys', wrappedKeyId);
-
-    console.log('📝 About to create wrapped key:', {
-      wrappedKeyId,
-      recordId: request.recordId,
-      userId: receiverId,
-      currentUser: user.uid,
-    });
-
-    await setDoc(wrappedKeyRef, {
-      recordId: request.recordId,
-      userId: receiverId,
-      wrappedKey: wrappedKeyForReceiver,
-      permissionHash: permissionHash,
-      createdAt: new Date(),
-      isActive: true,
-    });
-
-    console.log('✅ Wrapped key stored');
-
-    // 7. Store access permission record
-    const accessPermissionRef = doc(db, 'accessPermissions', permissionHash);
-
-    const receiverWalletAddress =
-      receiverData.connectedWallet?.address || receiverData.generatedWallet?.address || '';
-
-    console.log('📝 About to create access permission:', {
-      permissionHash,
-      recordId: request.recordId,
-      ownerId: user.uid,
-      receiverId,
-    });
-
-    await setDoc(accessPermissionRef, {
-      recordId: request.recordId,
-      ownerId: user.uid,
-      receiverId: receiverId,
-      receiverWalletAddress: receiverWalletAddress,
-      isActive: true,
-      grantedAt: new Date(),
-      revokedAt: null,
-    });
-
-    console.log('✅ Access permission stored');
-
-    // 8. Store permission hash on blockchain
+    // 6. Store permission hash on blockchain
+    let txHash;
     try {
       console.log('🔗 Storing permission on blockchain...');
-      const txHash = await SharingContractService.grantAccessOnChain(
+      txHash = await SharingContractService.grantAccessOnChain(
         permissionHash,
         request.recordId,
-        receiverWalletAddress // ✅ Use the same wallet address variable
+        receiverWalletAddress
       );
       console.log('✅ Blockchain transaction:', txHash);
+    } catch (error) {
+      console.error('❌ Blockchain transaction failed:', error);
+      throw new Error(
+        'Failed to store permission on blockchain, canceling share: ' + (error as Error).message
+      );
+    }
 
-      // Optionally store the transaction hash in Firestore
-      await updateDoc(accessPermissionRef, {
+    // 7. Store everything in Firestore
+    // 7.1 create reference in Firestore
+    const wrappedKeyRef = doc(db, 'wrappedKeys', wrappedKeyId);
+    const accessPermissionRef = doc(db, 'accessPermissions', permissionHash);
+
+    //7.2 function to actually write stuff to firestore
+    const writeToFirestore = async () => {
+      await setDoc(wrappedKeyRef, {
+        recordId: request.recordId,
+        userId: receiverId,
+        wrappedKey: wrappedKeyForReceiver,
+        permissionHash: permissionHash,
+        createdAt: new Date(),
+        isActive: true,
+      });
+
+      await setDoc(accessPermissionRef, {
+        recordId: request.recordId,
+        sharerId: user.uid,
+        receiverId: receiverId,
+        receiverWalletAddress: receiverWalletAddress,
+        isActive: true,
+        grantedAt: new Date(),
+        revokedAt: null,
         blockchainTxHash: txHash,
         onChain: true,
       });
-    } catch (error) {
-      console.error('❌ Blockchain transaction failed:', error);
-      // Clean up Firestore if blockchain fails
-      await deleteDoc(wrappedKeyRef);
-      await deleteDoc(accessPermissionRef);
-      throw new Error('Failed to store permission on blockchain: ' + (error as Error).message);
-    }
+    };
 
-    console.log('✅ Record shared successfully!');
+    //7.3 Handle Firestore write failures with retry queue
+    //If firestore fails after blockchain succeeds, save to pending queue for background sync
+    try {
+      await writeToFirestore();
+      console.log('✅ Wrapped key stored', {
+        wrappedKeyId,
+        recordId: request.recordId,
+        receiverId: receiverId,
+        currentUser: user.uid,
+      });
+      console.log('✅ Record shared successfully!:', {
+        permissionHash,
+        recordId: request.recordId,
+        sharerId: user.uid,
+        receiverId,
+      });
+    } catch (error) {
+      console.error('❌ Firestore write failed:', error);
+
+      // Save to pending queue for background processing
+      try {
+        await setDoc(doc(db, 'pendingPermissions', permissionHash), {
+          txHash,
+          permissionHash,
+          recordId: request.recordId,
+          receiverId,
+          wrappedKey: wrappedKeyForReceiver,
+          receiverWalletAddress,
+          createdAt: new Date(),
+        });
+
+        //TO-DO: Someone needs to process pendingPermissions queue and retry write to wrappedKey/accessPermissions
+
+        throw new Error(
+          'Permission saved on blockchain (tx: ' +
+            txHash +
+            ') but local save failed. ' +
+            'Your permission is valid and will sync shortly.'
+        );
+      } catch (queueError) {
+        throw new Error(
+          'Permission saved on blockchain (tx: ' +
+            txHash +
+            ') but local save failed. ' +
+            'Please contact support with this transaction hash.'
+        );
+      }
+    }
   }
 
   /**
@@ -379,7 +452,7 @@ export class SharingService {
     }
 
     const accessPermissionsRef = collection(db, 'accessPermissions');
-    const q = query(accessPermissionsRef, where('ownerId', '==', user.uid));
+    const q = query(accessPermissionsRef, where('sharerId', '==', user.uid));
 
     const querySnapshot = await getDocs(q);
 
@@ -387,7 +460,7 @@ export class SharingService {
       const data = doc.data();
       return {
         recordId: data.recordId,
-        ownerId: data.ownerId,
+        sharerId: data.sharerId,
         receiverId: data.receiverId,
         receiverWalletAddress: data.receiverWalletAddress,
         wrappedKeyId: `${data.recordId}_${data.receiverId}`,
@@ -424,7 +497,7 @@ export class SharingService {
       const data = doc.data();
       return {
         recordId: data.recordId,
-        ownerId: data.ownerId,
+        sharerId: data.sharerId,
         receiverId: data.receiverId,
         receiverWalletAddress: data.receiverWalletAddress,
         wrappedKeyId: `${data.recordId}_${data.receiverId}`,

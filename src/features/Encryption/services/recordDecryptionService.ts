@@ -3,8 +3,12 @@
 import { EncryptionService } from './encryptionService';
 import { EncryptionKeyManager } from './encryptionKeyManager';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
+import { getAuth } from 'firebase/auth';
+import { doc, getDoc, getFirestore } from 'firebase/firestore';
+import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
 
 export interface EncryptedRecord {
+  id: string;
   isEncrypted: boolean;
   encryptedKey?: string;
   fileName?: string;
@@ -48,13 +52,10 @@ export class RecordDecryptionService {
     }
 
     try {
-      // 1. Decrypt the file's AES key using the master key
-      const encryptedKeyData = base64ToArrayBuffer(encryptedRecord.encryptedKey);
-      const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(
-        encryptedKeyData,
-        masterKey
-      );
-      const fileKey = await EncryptionService.importKey(fileKeyData);
+      // Use getRecordKey to handle either original uploader key (EncryptedKey in FileObject)
+      // or Admin/Viewer key (wrapped key in database)
+      const fileKey = await this.getRecordKey(encryptedRecord.id, encryptedRecord, masterKey);
+
       console.log('✓ File key decrypted');
 
       // 2. Decrypt all the fields
@@ -144,5 +145,95 @@ export class RecordDecryptionService {
 
     console.log(`✅ Decrypted ${decryptedRecords.length} records`);
     return decryptedRecords;
+  }
+
+  /**
+   * Get the decryption key for a record
+   * Handles both original uploader (uses encryptedKey) and shared/admin access (uses wrappedKey)
+   * @param recordId - The record ID
+   * @param recordData - The record data from Firestore to pull the encryption key if you're an owner
+   * @param masterKey - The current user's master key from session
+   * @returns The decrypted record AES key
+   */
+  static async getRecordKey(
+    recordId: string,
+    recordData: any,
+    masterKey: CryptoKey
+  ): Promise<CryptoKey> {
+    const auth = getAuth();
+    const db = getFirestore();
+    const user = auth.currentUser;
+
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    console.log('🔍 Determining decryption method for record:', recordId);
+
+    // Check if we have a wrapped key (meaning we're an admin/viewer, not original uploader)
+    const wrappedKeyId = `${recordId}_${user.uid}`;
+    const wrappedKeyRef = doc(db, 'wrappedKeys', wrappedKeyId);
+    const wrappedKeyDoc = await getDoc(wrappedKeyRef);
+
+    if (wrappedKeyDoc.exists() && wrappedKeyDoc.data().isActive) {
+      // We're an admin/viewer who was added later - use our wrapped key
+      console.log('ℹ️  Using wrapped key (shared/admin access)');
+
+      const wrappedKeyData = wrappedKeyDoc.data();
+
+      // Get our encrypted RSA private key from our user profile
+      const userRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userRef);
+
+      if (!userDoc.exists()) {
+        throw new Error('User profile not found');
+      }
+
+      const userData = userDoc.data();
+
+      if (!userData.encryption?.encryptedPrivateKey) {
+        throw new Error('Private key not found. Please contact support.');
+      }
+
+      // Decrypt our RSA private key using our master key (remember master key is in session memory, decrypted when you login. KEK structure)
+      const encryptedPrivateKeyData = base64ToArrayBuffer(userData.encryption.encryptedPrivateKey);
+      const privateKeyIv = base64ToArrayBuffer(userData.encryption.encryptedPrivateKeyIV);
+
+      const privateKeyBytes = await EncryptionService.decryptFile(
+        encryptedPrivateKeyData,
+        masterKey,
+        privateKeyIv
+      );
+
+      // Import the RSA private key
+      const rsaPrivateKey = await SharingKeyManagementService.importPrivateKey(
+        arrayBufferToBase64(privateKeyBytes)
+      );
+
+      // Unwrap the record key using our RSA private key
+      const recordKey = await SharingKeyManagementService.unwrapKey(
+        wrappedKeyData.wrappedKey,
+        rsaPrivateKey
+      );
+
+      console.log('✅ Record key unwrapped from wrapped key');
+      return recordKey;
+    } else {
+      // We're the original uploader (or an owner with the original master key)
+      console.log('ℹ️  Using original encrypted key (original uploader/owner)');
+
+      if (!recordData.encryptedKey) {
+        throw new Error('Record encryption key not found');
+      }
+
+      // Decrypt using the record's encryptedKey
+      const encryptedKeyData = base64ToArrayBuffer(recordData.encryptedKey);
+      const recordKey = await EncryptionService.importKey(
+        await EncryptionService.decryptKeyWithMasterKey(encryptedKeyData, masterKey)
+      );
+
+      console.log('✅ Record key decrypted from original encrypted key');
+      return recordKey;
+    }
   }
 }

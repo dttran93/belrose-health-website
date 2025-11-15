@@ -1,4 +1,9 @@
 // src/services/encryptionService.ts
+
+/**
+ * encryptionService. Does the actual AES math for what needs to be encrypted and decrypted
+ * different functions for different types of files (Type Safety and some differences here and there)
+ */
 import { ENCRYPTION_CONFIG } from '../encryptionConfig';
 import * as bip39 from 'bip39';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';

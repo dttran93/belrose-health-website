@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { PermissionsService } from '@/features/Permissions/services/permissionsService';
 import { SharingService } from '@/features/Sharing/services/sharingService';
+import { toast } from 'sonner';
 
 interface UsePermissionsOptions {
   onSuccess?: (message: string) => void;
@@ -69,8 +70,29 @@ export function usePermissions(options?: UsePermissionsOptions) {
 
     try {
       await PermissionsService.removeAdmin(recordId, userId);
-      const successMessage = 'Admin removed successfully';
-      options?.onSuccess?.(successMessage);
+
+      // Show toast with option to also revoke viewer access
+      toast.info('Administrator Removed', {
+        description: 'Do you also want to revoke their viewer access as well?',
+        duration: 8000,
+        action: {
+          label: 'Yes, Revoke Access',
+          onClick: async () => {
+            const success = await revokeAccess(recordId, userId);
+            if (success) {
+              toast.success('All access revoked successfully');
+            }
+          },
+        },
+        cancel: {
+          label: 'No, Keep Viewer Access',
+          onClick: () => {
+            toast.success('User can still view as a shared viewer');
+          },
+        },
+      });
+
+      options?.onSuccess?.('Admin status removed successfully');
       return true;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to remove admin';
@@ -84,12 +106,24 @@ export function usePermissions(options?: UsePermissionsOptions) {
 
   /**
    * Revoke shared access (remove a viewer)
+   * Also removes them as an administrator if they are one
    */
   const revokeAccess = async (recordId: string, receiverId: string): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
 
     try {
+      // First, check if they're an admin and remove admin privileges
+      // We'll do this silently - if they're not an admin, the removeAdmin will throw but we'll catch it
+      try {
+        await PermissionsService.removeAdmin(recordId, receiverId);
+        console.log('✅ Admin privileges removed before revoking access');
+      } catch (adminError) {
+        // They're not an admin, that's fine - continue with revoking viewer access
+        console.log('ℹ️  User is not an admin, proceeding to revoke viewer access');
+      }
+
+      // Revoke viewer access
       await SharingService.revokeAccess(recordId, receiverId);
       const successMessage = 'Access revoked successfully';
       options?.onSuccess?.(successMessage);
