@@ -9,22 +9,25 @@ interface UseBlockchainVerificationReturn {
   isGeneratingHash: boolean;
   isVerifying: boolean;
   verificationError: string | null;
-  
+
   // Actions
-  generateBlockchainVerification: (fileObject: FileObject, options?: {
-    providerSignature?: string;
-    signerId?: string;
-    network?: string;
-  }) => Promise<BlockchainVerification | null>;
-  
+  generateBlockchainVerification: (
+    fileObject: FileObject,
+    options?: {
+      providerSignature?: string;
+      signerId?: string;
+      network?: string;
+    }
+  ) => Promise<BlockchainVerification | null>;
+
   verifyRecordIntegrity: (fileObject: FileObject) => Promise<boolean>;
-  
+
   getVerificationStatus: (fileObject: FileObject) => {
     status: 'verified' | 'unverified' | 'failed' | 'pending';
     message: string;
     icon: string;
   };
-  
+
   // Utility
   canUseBlockchainVerification: (fileObject: FileObject) => boolean;
 }
@@ -34,48 +37,51 @@ export const useBlockchainVerification = (): UseBlockchainVerificationReturn => 
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
 
-  const generateBlockchainVerification = useCallback(async (
-    fileObject: FileObject,
-    options: {
-      providerSignature?: string;
-      signerId?: string;
-      network?: string;
-    } = {}
-  ): Promise<BlockchainVerification | null> => {
-    try {
-      setIsGeneratingHash(true);
-      setVerificationError(null);
-      
-      const verification = await BlockchainService.createBlockchainVerification(
-        fileObject,
-        options
-      );
-      
-      console.log('Generated blockchain verification:', verification);
-      return verification;
-      
-    } catch (error) {
-      console.error('Failed to generate blockchain verification:', error);
-      setVerificationError(error instanceof Error ? error.message : 'Unknown error');
-      return null;
-    } finally {
-      setIsGeneratingHash(false);
-    }
-  }, []);
+  const generateBlockchainVerification = useCallback(
+    async (
+      fileObject: FileObject,
+      options: {
+        providerSignature?: string;
+        signerId?: string;
+        network?: string;
+      } = {}
+    ): Promise<BlockchainVerification | null> => {
+      try {
+        setIsGeneratingHash(true);
+        setVerificationError(null);
+
+        const verification = await BlockchainService.createBlockchainVerification(
+          fileObject,
+          options
+        );
+
+        console.log('Generated blockchain verification:', verification);
+        return verification;
+      } catch (error) {
+        console.error('Failed to generate blockchain verification:', error);
+        setVerificationError(error instanceof Error ? error.message : 'Unknown error');
+        return null;
+      } finally {
+        setIsGeneratingHash(false);
+      }
+    },
+    []
+  );
 
   const verifyRecordIntegrity = useCallback(async (fileObject: FileObject): Promise<boolean> => {
     try {
       setIsVerifying(true);
       setVerificationError(null);
-      
+
       const isValid = await BlockchainService.verifyRecordIntegrity(fileObject);
-      
+
       if (!isValid) {
-        setVerificationError('Record integrity verification failed - content may have been tampered with');
+        setVerificationError(
+          'Record integrity verification failed - content may have been tampered with'
+        );
       }
-      
+
       return isValid;
-      
     } catch (error) {
       console.error('Failed to verify record integrity:', error);
       setVerificationError(error instanceof Error ? error.message : 'Verification error');
@@ -91,7 +97,7 @@ export const useBlockchainVerification = (): UseBlockchainVerificationReturn => 
 
   const canUseBlockchainVerification = useCallback((fileObject: FileObject): boolean => {
     // Show badge for provider records or any record with blockchain verification
-    return fileObject.isProviderRecord || !!fileObject.blockchainVerification;
+    return !!fileObject.blockchainVerification;
   }, []);
 
   return {
@@ -99,13 +105,13 @@ export const useBlockchainVerification = (): UseBlockchainVerificationReturn => 
     isGeneratingHash,
     isVerifying,
     verificationError,
-    
+
     // Actions
     generateBlockchainVerification,
     verifyRecordIntegrity,
     getVerificationStatus,
-    
+
     // Utility
-    canUseBlockchainVerification
+    canUseBlockchainVerification,
   };
 };

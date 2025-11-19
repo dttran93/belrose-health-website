@@ -189,9 +189,11 @@ export class SharingService {
     console.log('✅ Receiver found:', receiverId);
 
     //Check if they already have access
+    console.log('📝 About to check for existing wrapped key...');
     const wrappedKeyId = `${request.recordId}_${receiverId}`;
     const existingWrappedKeyRef = doc(db, 'wrappedKeys', wrappedKeyId);
     const existingWrappedKey = await getDoc(existingWrappedKeyRef);
+    console.log('✅ Existing wrapped key check complete');
 
     if (existingWrappedKey.exists()) {
       const existingData = existingWrappedKey.data();
@@ -231,9 +233,13 @@ export class SharingService {
     });
 
     // 4. Wrap the record key with receiver's RSA public key
+    console.log('📝 About to import receiver public key...');
     const receiverPublicKey = await SharingKeyManagementService.importPublicKey(
       receiverData.publicKey
     );
+    console.log('✅ Receiver public key imported');
+
+    console.log('📝 About to wrap key for receiver...');
     const wrappedKeyForReceiver = await SharingKeyManagementService.wrapKey(
       recordKey,
       receiverPublicKey
@@ -243,8 +249,10 @@ export class SharingService {
 
     // 5. Create permission hash for blockchain
     // 5.1: Get sharer's wallet address:
+    console.log('📝 About to get sharer wallet address...');
     const sharerRef = doc(db, 'users', user.uid);
     const sharerDoc = await getDoc(sharerRef);
+    console.log('✅ Sharer doc retrieved');
 
     if (!sharerDoc.exists()) {
       throw new Error('User profile not found');
@@ -357,7 +365,7 @@ export class SharingService {
           createdAt: new Date(),
         });
 
-        //TO-DO: Someone needs to process pendingPermissions queue and retry write to wrappedKey/accessPermissions
+        //Manual TO-DO: Someone needs to process pendingPermissions queue and retry write to wrappedKey/accessPermissions
 
         throw new Error(
           'Permission saved on blockchain (tx: ' +
@@ -427,7 +435,7 @@ export class SharingService {
       );
       console.log('✅ Blockchain transaction:', txHash);
 
-      // Optionally store the revocation tx hash
+      // Store revocation Tx Hash for audit trail
       await updateDoc(accessPermissionRef, {
         revocationTxHash: txHash,
       });

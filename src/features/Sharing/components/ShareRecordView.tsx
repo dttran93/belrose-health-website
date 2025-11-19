@@ -11,6 +11,7 @@ import { getAuth } from 'firebase/auth';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import UserCard from '@/features/Users/components/ui/UserCard';
+import { SharingContractService } from '@/features/BlockchainVerification/service/sharingContractService';
 
 interface ShareRecordViewProps {
   record: FileObject;
@@ -23,7 +24,7 @@ interface ShareRecordViewProps {
 interface AccessPermissionData {
   id: string; // The document ID (permissionHash)
   recordId: string;
-  ownerId: string;
+  sharerId: string;
   receiverId: string;
   receiverWalletAddress: string;
   isActive: boolean;
@@ -48,6 +49,22 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({
 
   const { shareRecord, revokeAccess, getSharedRecords, isSharing, isRevoking } = useSharing();
 
+  // In ShareRecordView.tsx
+  useEffect(() => {
+    const testCheck = async () => {
+      try {
+        const result = await SharingContractService.checkAccessOnChain(
+          '0x84aa7bf2ba50a7637df2b5e943de8bf0d73b960506dbf5969957e94a064f35e8'
+        );
+        console.log('✅ checkAccess result:', result);
+      } catch (error) {
+        console.error('❌ checkAccess failed:', error);
+      }
+    };
+
+    testCheck();
+  }, []); // Empty dependency array means run once on mount
+
   // Fetch access permissions for this record
   useEffect(() => {
     fetchAccessPermissions();
@@ -69,11 +86,11 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({
 
       const accessPermissionsRef = collection(db, 'accessPermissions');
 
-      // Query by ownerId (current user) instead of recordId
+      // Query by sharerId (current user) instead of recordId
       // Then filter client-side for this specific record
       const q = query(
         accessPermissionsRef,
-        where('ownerId', '==', currentUser.uid),
+        where('sharerId', '==', currentUser.uid),
         where('isActive', '==', true)
       );
 

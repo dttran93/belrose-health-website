@@ -27,7 +27,7 @@ contract HealthRecordVerification {
 
     event AccessGranted(
         string indexed permissionHash,
-        address indexed owner,
+        address indexed sharer,
         address indexed receiver,
         string recordId,
         uint256 timestamp
@@ -35,7 +35,7 @@ contract HealthRecordVerification {
 
     event AccessRevoked(
         string indexed permissionHash,
-        address indexed owner,
+        address indexed sharer,
         address indexed receiver,
         string recordId,
         uint256 timestamp
@@ -56,7 +56,7 @@ contract HealthRecordVerification {
     // Sharing Structure
     struct AccessPermission {
         string permissionHash;
-        address owner;
+        address sharer;
         address receiver;
         string recordId;
         uint256 grantedAt;
@@ -74,7 +74,7 @@ contract HealthRecordVerification {
 
     // Storage for Sharing
     mapping(string => AccessPermission) public accessPermissions;
-    mapping(address => string[]) public permissionsByOwner;
+    mapping(address => string[]) public permissionsBySharer;
     mapping(address => string[]) public permissionsByReceiver;
     uint256 public totalPermissions;
     
@@ -262,7 +262,7 @@ contract HealthRecordVerification {
         
         accessPermissions[permissionHash] = AccessPermission({
             permissionHash: permissionHash,
-            owner: msg.sender,
+            sharer: msg.sender,
             receiver: receiver,
             recordId: recordId,
             grantedAt: block.timestamp,
@@ -271,7 +271,7 @@ contract HealthRecordVerification {
             exists: true
         });
         
-        permissionsByOwner[msg.sender].push(permissionHash);
+        permissionsBySharer[msg.sender].push(permissionHash);
         permissionsByReceiver[receiver].push(permissionHash);
         totalPermissions++;
         
@@ -284,7 +284,6 @@ contract HealthRecordVerification {
      */
     function revokeAccess(string memory permissionHash) external {
         require(accessPermissions[permissionHash].exists, "Permission does not exist");
-        require(accessPermissions[permissionHash].owner == msg.sender, "Only owner can revoke");
         require(accessPermissions[permissionHash].isActive, "Already revoked");
         
         accessPermissions[permissionHash].isActive = false;
@@ -308,7 +307,7 @@ contract HealthRecordVerification {
         view 
         returns (
             bool isActive,
-            address owner,
+            address sharer,
             address receiver,
             string memory recordId,
             uint256 grantedAt,
@@ -318,7 +317,7 @@ contract HealthRecordVerification {
         AccessPermission memory permission = accessPermissions[permissionHash];
         return (
             permission.isActive,
-            permission.owner,
+            permission.sharer,
             permission.receiver,
             permission.recordId,
             permission.grantedAt,
@@ -327,14 +326,14 @@ contract HealthRecordVerification {
     }
     
     /**
-     * Get all permissions granted by an owner
+     * Get all permissions granted by an sharer
      */
-    function getPermissionsByOwner(address owner) 
+    function getPermissionsBySharer(address sharer) 
         external 
         view 
         returns (string[] memory) 
     {
-        return permissionsByOwner[owner];
+        return permissionsBySharer[sharer];
     }
     
     /**
@@ -356,22 +355,22 @@ contract HealthRecordVerification {
     }
     
     /**
-     * Get permission statistics for an owner
-     * @param owner The owner's address
+     * Get permission statistics for an sharer
+     * @param sharer The sharer's address
      * @return total Total permissions granted
      * @return active How many are still active
      */
-    function getOwnerStats(address owner) 
+    function getSharerStats(address sharer) 
         external 
         view 
         returns (uint256 total, uint256 active) 
     {
-        string[] memory ownerPermissions = permissionsByOwner[owner];
-        total = ownerPermissions.length;
+        string[] memory sharerPermissions = permissionsBySharer[sharer];
+        total = sharerPermissions.length;
         active = 0;
         
-        for (uint256 i = 0; i < ownerPermissions.length; i++) {
-            if (accessPermissions[ownerPermissions[i]].isActive) {
+        for (uint256 i = 0; i < sharerPermissions.length; i++) {
+            if (accessPermissions[sharerPermissions[i]].isActive) {
                 active++;
             }
         }

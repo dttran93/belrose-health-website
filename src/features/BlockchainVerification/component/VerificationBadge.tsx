@@ -87,11 +87,6 @@ export const VerificationDetails: React.FC<VerificationDetailsProps> = ({ fileOb
     return (
       <div className="p-4 bg-gray-50 rounded-lg">
         <h4 className="font-medium text-gray-900 mb-2">No Blockchain Verification</h4>
-        <p className="text-sm text-gray-600">
-          {fileObject.isProviderRecord
-            ? 'This provider record should have blockchain verification but none was found.'
-            : 'This self-reported record does not require blockchain verification.'}
-        </p>
       </div>
     );
   }
@@ -137,15 +132,6 @@ export const VerificationDetails: React.FC<VerificationDetailsProps> = ({ fileOb
           <p className="text-gray-600 mt-1 font-mono text-xs break-all">{fileObject.recordHash}</p>
         </div>
       </div>
-
-      {fileObject.isProviderRecord && (
-        <div className="pt-2 border-t border-gray-200">
-          <p className="text-xs text-gray-500">
-            This provider record is cryptographically verified and cannot be tampered with. Any
-            changes would invalidate the blockchain verification.
-          </p>
-        </div>
-      )}
     </div>
   );
 };

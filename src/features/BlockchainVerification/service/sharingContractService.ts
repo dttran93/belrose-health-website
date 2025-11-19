@@ -2,8 +2,8 @@
 
 import { ethers, Contract, ContractTransactionResponse } from 'ethers';
 
-// Your deployed contract address (update after deployment!)
-const CONTRACT_ADDRESS = '0xDB920644612CfaEd5240a9665c5Cb9aa12A75c71';
+// Your deployed contract address
+const CONTRACT_ADDRESS = '0xA9f388D92032E5e84E1264e72129A30d57cBfE66';
 
 // Contract ABI (just the sharing functions)
 const CONTRACT_ABI = [
@@ -38,6 +38,22 @@ const CONTRACT_ABI = [
       { internalType: 'string', name: 'recordId', type: 'string' },
       { internalType: 'uint256', name: 'grantedAt', type: 'uint256' },
       { internalType: 'uint256', name: 'revokedAt', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ internalType: 'string', name: '', type: 'string' }],
+    name: 'accessPermissions',
+    outputs: [
+      { internalType: 'string', name: 'permissionHash', type: 'string' },
+      { internalType: 'address', name: 'sharer', type: 'address' },
+      { internalType: 'address', name: 'receiver', type: 'address' },
+      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'uint256', name: 'grantedAt', type: 'uint256' },
+      { internalType: 'uint256', name: 'revokedAt', type: 'uint256' },
+      { internalType: 'bool', name: 'isActive', type: 'bool' },
+      { internalType: 'bool', name: 'exists', type: 'bool' },
     ],
     stateMutability: 'view',
     type: 'function',
@@ -174,5 +190,21 @@ export class SharingContractService {
       grantedAt: Number(result[4]),
       revokedAt: Number(result[5]),
     };
+  }
+
+  /**
+   * Get permission details from blockchain (for testing)
+   */
+  static async getPermissionDetails(permissionHash: string): Promise<any> {
+    console.log('🔍 Getting permission details for:', permissionHash);
+
+    const contract = await this.getContract();
+
+    // Use getFunction to be type-safe
+    const accessPermissionsFunction = contract.getFunction('accessPermissions');
+    const permission = await accessPermissionsFunction(permissionHash);
+
+    console.log('📋 Permission details:', permission);
+    return permission;
   }
 }
