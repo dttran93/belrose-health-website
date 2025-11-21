@@ -33,7 +33,7 @@ const CONTRACT_ABI = [
     name: 'checkAccess',
     outputs: [
       { internalType: 'bool', name: 'isActive', type: 'bool' },
-      { internalType: 'address', name: 'owner', type: 'address' },
+      { internalType: 'address', name: 'sharer', type: 'address' },
       { internalType: 'address', name: 'receiver', type: 'address' },
       { internalType: 'string', name: 'recordId', type: 'string' },
       { internalType: 'uint256', name: 'grantedAt', type: 'uint256' },
@@ -63,7 +63,7 @@ const CONTRACT_ABI = [
     anonymous: false,
     inputs: [
       { indexed: true, internalType: 'string', name: 'permissionHash', type: 'string' },
-      { indexed: true, internalType: 'address', name: 'owner', type: 'address' },
+      { indexed: true, internalType: 'address', name: 'sharer', type: 'address' },
       { indexed: true, internalType: 'address', name: 'receiver', type: 'address' },
       { indexed: false, internalType: 'string', name: 'recordId', type: 'string' },
       { indexed: false, internalType: 'uint256', name: 'timestamp', type: 'uint256' },
@@ -75,7 +75,7 @@ const CONTRACT_ABI = [
     anonymous: false,
     inputs: [
       { indexed: true, internalType: 'string', name: 'permissionHash', type: 'string' },
-      { indexed: true, internalType: 'address', name: 'owner', type: 'address' },
+      { indexed: true, internalType: 'address', name: 'sharer', type: 'address' },
       { indexed: true, internalType: 'address', name: 'receiver', type: 'address' },
       { indexed: false, internalType: 'string', name: 'recordId', type: 'string' },
       { indexed: false, internalType: 'uint256', name: 'timestamp', type: 'uint256' },
@@ -164,7 +164,7 @@ export class SharingContractService {
    */
   static async checkAccessOnChain(permissionHash: string): Promise<{
     isActive: boolean;
-    owner: string;
+    sharer: string;
     receiver: string;
     recordId: string;
     grantedAt: number;
@@ -184,7 +184,7 @@ export class SharingContractService {
 
     return {
       isActive: result[0],
-      owner: result[1],
+      sharer: result[1],
       receiver: result[2],
       recordId: result[3],
       grantedAt: Number(result[4]),

@@ -1,7 +1,7 @@
 //src/features/Users/components/ui/UserMenu.tsx
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MoreHorizontal, Share2, Eye, Trash2, LucideIcon } from 'lucide-react';
+import { MoreHorizontal, Share2, Eye, Trash2, LucideIcon, Blocks, User } from 'lucide-react';
 import { BelroseUserProfile } from '@/types/core';
 
 // Types for the menu system
@@ -31,6 +31,7 @@ interface UserMenuProps {
   onView?: (record: any) => void;
   onShare?: (record: any) => void;
   onDelete?: (record: any) => void;
+  onVerifyBlockchain?: (record: any) => void;
 
   // Customization props
   triggerIcon?: LucideIcon;
@@ -41,6 +42,7 @@ interface UserMenuProps {
   showView?: boolean;
   showShare?: boolean;
   showDelete?: boolean;
+  showBlockchain?: boolean;
 
   // Additional menu items from parent
   additionalItems?: MenuItem[];
@@ -49,6 +51,7 @@ interface UserMenuProps {
 /**
  * View User Details
  * Share Record with User
+ * Blockchain Verification
  * ---------------
  * Delete/Remove
  */
@@ -58,12 +61,14 @@ const UserMenu: React.FC<UserMenuProps> = ({
   onView,
   onShare,
   onDelete,
+  onVerifyBlockchain,
   triggerIcon: TriggerIcon = MoreHorizontal,
   triggerClassName = 'p-2 text-primary hover:text-primary hover:bg-gray-100 rounded-lg transition-colors',
-  menuClassName = 'absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[160px]',
+  menuClassName = 'absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[210px]',
   showShare = true,
   showView = true,
   showDelete = true,
+  showBlockchain = true,
   additionalItems = [],
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -106,9 +111,9 @@ const UserMenu: React.FC<UserMenuProps> = ({
     // View action
     if (showView && onView) {
       items.push({
-        key: 'view',
-        label: 'View User Details',
-        icon: Eye,
+        key: 'user',
+        label: 'User Profile',
+        icon: User,
         onClick: createHandler(onView),
       });
     }
@@ -120,6 +125,16 @@ const UserMenu: React.FC<UserMenuProps> = ({
         label: 'Share Records with User',
         icon: Share2,
         onClick: createHandler(onShare),
+      });
+    }
+
+    // Verify Blockchain
+    if (showBlockchain && onVerifyBlockchain) {
+      items.push({
+        key: 'blockchain',
+        label: 'Blockchain Verification',
+        icon: Blocks,
+        onClick: createHandler(onVerifyBlockchain),
       });
     }
 

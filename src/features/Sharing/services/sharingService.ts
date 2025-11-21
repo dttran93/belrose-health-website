@@ -25,9 +25,10 @@ export interface ShareRecordRequest {
   receiverEmail?: string;
 }
 
-export interface SharedRecord {
+export interface AccessPermissionData {
   recordId: string;
   sharerId: string;
+  sharerWalletAddress: string;
   receiverId: string;
   receiverWalletAddress: string;
   wrappedKeyId: string;
@@ -35,6 +36,8 @@ export interface SharedRecord {
   isActive: boolean;
   grantedAt: Date;
   revokedAt?: Date;
+  blockchainTxHash: string;
+  onChain: boolean;
 }
 
 export class SharingService {
@@ -324,6 +327,7 @@ export class SharingService {
       await setDoc(accessPermissionRef, {
         recordId: request.recordId,
         sharerId: user.uid,
+        sharerWalletAddress: sharerWalletAddress,
         receiverId: receiverId,
         receiverWalletAddress: receiverWalletAddress,
         isActive: true,
@@ -450,7 +454,7 @@ export class SharingService {
   /**
    * Get all records shared by the current user (as owner)
    */
-  static async getSharedRecords(): Promise<SharedRecord[]> {
+  static async getSharedRecords(): Promise<AccessPermissionData[]> {
     const auth = getAuth();
     const db = getFirestore();
     const user = auth.currentUser;
@@ -469,6 +473,7 @@ export class SharingService {
       return {
         recordId: data.recordId,
         sharerId: data.sharerId,
+        sharerWalletAddress: data.sharerWalletAddress,
         receiverId: data.receiverId,
         receiverWalletAddress: data.receiverWalletAddress,
         wrappedKeyId: `${data.recordId}_${data.receiverId}`,
@@ -476,6 +481,8 @@ export class SharingService {
         isActive: data.isActive,
         grantedAt: data.grantedAt.toDate(),
         revokedAt: data.revokedAt?.toDate(),
+        blockchainTxHash: data.blockchainTxHash,
+        onChain: data.onChain,
       };
     });
   }
@@ -483,7 +490,7 @@ export class SharingService {
   /**
    * Get all records shared with the current user (as receiver)
    */
-  static async getRecordsSharedWithMe(): Promise<SharedRecord[]> {
+  static async getRecordsSharedWithMe(): Promise<AccessPermissionData[]> {
     const auth = getAuth();
     const db = getFirestore();
     const user = auth.currentUser;
@@ -506,6 +513,7 @@ export class SharingService {
       return {
         recordId: data.recordId,
         sharerId: data.sharerId,
+        sharerWalletAddress: data.sharerWalletAddress,
         receiverId: data.receiverId,
         receiverWalletAddress: data.receiverWalletAddress,
         wrappedKeyId: `${data.recordId}_${data.receiverId}`,
@@ -513,6 +521,8 @@ export class SharingService {
         isActive: data.isActive,
         grantedAt: data.grantedAt.toDate(),
         revokedAt: data.revokedAt?.toDate(),
+        blockchainTxHash: data.blockchainTxHash,
+        onChain: data.onChain,
       };
     });
   }

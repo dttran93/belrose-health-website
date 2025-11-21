@@ -35,6 +35,7 @@ interface UserCardProps {
   onDelete?: () => void;
   onCancel?: () => void;
   onAccept?: () => void;
+  onVerifyBlockchain?: () => void;
   actions?: {
     label: string;
     icon?: React.ReactNode;
@@ -106,6 +107,7 @@ export const UserCard: React.FC<UserCardProps> = ({
   onCardClick,
   onCancel,
   onAccept,
+  onVerifyBlockchain,
   menuType = 'default',
   showEmail = true,
   showUserId = true,
@@ -160,7 +162,13 @@ export const UserCard: React.FC<UserCardProps> = ({
         )}
         {/* Actions Menu - Full Menu */}
         {menuType === 'default' && (
-          <UserMenu user={user} onView={onView} onShare={onShare} onDelete={onDelete} />
+          <UserMenu
+            user={user}
+            onView={onView}
+            onShare={onShare}
+            onDelete={onDelete}
+            onVerifyBlockchain={onVerifyBlockchain}
+          />
         )}
 
         {/* Actions Menu - Cancel / AcceptOrCancel Menu */}
@@ -296,7 +304,13 @@ export const UserCard: React.FC<UserCardProps> = ({
           </div>
           {/* Actions Menu - Full Menu */}
           {menuType === 'default' && (
-            <UserMenu user={user} onView={onView} onShare={onShare} onDelete={onDelete} />
+            <UserMenu
+              user={user}
+              onView={onView}
+              onShare={onShare}
+              onDelete={onDelete}
+              onVerifyBlockchain={onVerifyBlockchain}
+            />
           )}
 
           {/* Actions Menu - Cancel / AcceptOrCancel Menu */}
@@ -469,7 +483,13 @@ export const UserCard: React.FC<UserCardProps> = ({
         </div>
         {/* Actions Menu - Full Menu */}
         {menuType === 'default' && (
-          <UserMenu user={user} onView={onView} onShare={onShare} onDelete={onDelete} />
+          <UserMenu
+            user={user}
+            onView={onView}
+            onShare={onShare}
+            onDelete={onDelete}
+            onVerifyBlockchain={onVerifyBlockchain}
+          />
         )}
 
         {/* Actions Menu - Cancel / AcceptOrCancel Menu */}

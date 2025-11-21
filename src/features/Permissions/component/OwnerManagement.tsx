@@ -110,14 +110,16 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
               <TriangleAlert />
             </div>
             <p className="font-semibold mb-2 text-sm">
-              A Record Owner is the person a record is about; they have special permissions:
+              A Record Owner is the person a record is about; once an Owner is set, they have
+              special permissions:
             </p>
             <ol className="list-decimal list-inside space-y-1 text-xs">
               <li>
                 Owners are automatically Administrators of a record and can do anything with the
                 record
               </li>
-              <li>If an Owner has been set, only an Owner can add another Owner</li>
+              <li>Only an Owner can add another Owner</li>
+              <li>Only an Owner can remove other Administrators</li>
               <li>Owners are the ONLY users allowed a delete the record</li>
             </ol>
           </div>
@@ -155,15 +157,16 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
                       sideOffset={5}
                     >
                       <p className="font-semibold mb-2 text-sm">
-                        A Record Owner is the person a record is about; they have special
-                        permissions:
+                        A Record Owner is the person a record is about; once an Owner is set, they
+                        have special permissions:
                       </p>
                       <ol className="list-decimal list-inside space-y-1 text-xs">
                         <li>
                           Owners are automatically Administrators of a record and can do anything
                           with the record
                         </li>
-                        <li>If an Owner has been set, only an Owner can add another Owner</li>
+                        <li>Only an Owner can add another Owner</li>
+                        <li>Only an Owner can remove other Administrators</li>
                         <li>Owners are the ONLY users allowed a delete the record</li>
                       </ol>
                       <Tooltip.Arrow className="fill-gray-900" />

@@ -12,26 +12,14 @@ import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { SharingContractService } from '@/features/BlockchainVerification/service/sharingContractService';
+import { SharingBlockchainVerification } from './SharingBlockchainVerification';
+import { AccessPermissionData } from '../services/sharingService';
 
 interface ShareRecordViewProps {
   record: FileObject;
   onBack: () => void;
   onAddMode?: () => void;
   isAddMode: boolean;
-}
-
-// Type for access permission data from Firestore
-interface AccessPermissionData {
-  id: string; // The document ID (permissionHash)
-  recordId: string;
-  sharerId: string;
-  receiverId: string;
-  receiverWalletAddress: string;
-  isActive: boolean;
-  grantedAt: any; // Firestore Timestamp
-  revokedAt?: any;
-  blockchainTxHash?: string;
-  onChain?: boolean;
 }
 
 export const ShareRecordView: React.FC<ShareRecordViewProps> = ({
@@ -48,6 +36,8 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
 
   const { shareRecord, revokeAccess, getSharedRecords, isSharing, isRevoking } = useSharing();
+  const [permissionBlockchainVerification, setPermissionBlockchainVerification] =
+    useState<AccessPermissionData | null>(null);
 
   // In ShareRecordView.tsx
   useEffect(() => {
@@ -101,8 +91,10 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({
         .map(
           doc =>
             ({
-              id: doc.id,
+              permissionHash: doc.id,
               ...doc.data(),
+              grantedAt: doc.data().grantedAt.toDate(), // ← Convert to Date from Firestore timestamp
+              revokedAt: doc.data().revokedAt?.toDate() || null, // ← Convert to Date or null from Firestore timestamp
             } as AccessPermissionData)
         )
         .filter(permission => permission.recordId === record.id);
@@ -369,6 +361,7 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({
                       key={permission.receiverId}
                       user={receiverProfile}
                       onView={() => {}}
+                      onVerifyBlockchain={() => setPermissionBlockchainVerification(permission)}
                       onDelete={() => handleRevoke(receiverProfile!.uid)}
                       variant="default"
                       color="amber"
@@ -385,6 +378,29 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Modal that shows Blockchain Verification Detail */}
+      {permissionBlockchainVerification && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white px-6 py-4 flex items-center justify-end">
+              <button
+                onClick={() => setPermissionBlockchainVerification(null)}
+                className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full p-2 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <SharingBlockchainVerification
+                permissionHash={permissionBlockchainVerification.permissionHash}
+                firestoreData={permissionBlockchainVerification}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

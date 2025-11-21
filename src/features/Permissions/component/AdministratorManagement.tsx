@@ -112,16 +112,16 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
 
           {/* Info */}
           <div className="bg-chart-4/20 border border-chart-4 rounded-lg p-4 mb-6">
-            <p className="text-sm text-primary font-medium mb-2">
+            <p className="font-semibold mb-2 text-sm">
               Administrators have full access to view, edit, share, verify, and dispute records
             </p>
-            <ol className="list-decimal list-inside text-xs text-foreground space-y-1">
-              <li>Record Owners are automatically Administrators</li>
+            <ol className="list-decimal list-inside space-y-1 text-xs">
+              <li>If there is no Owner, Administrators may appoint an Owner</li>
+              <li>If there is no Owner, Administrators can add and remove other Administrators</li>
               <li>
-                If there is no Owner, Administrators may appoint an owner, but can not remove Owners
+                If there is an Owner, Administrators can add other Administrators but may not remove
+                other Administrators
               </li>
-              <li>Administrators can add and remove other Administrators</li>
-              <li>Administrators can add new Viewers</li>
               <li>There must be at least one Administrator in every record</li>
             </ol>
           </div>
@@ -160,13 +160,15 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
                         records
                       </p>
                       <ol className="list-decimal list-inside space-y-1 text-xs">
-                        <li>Record Owners are automatically Administrators</li>
+                        <li>If there is no Owner, Administrators may appoint an Owner</li>
                         <li>
-                          If there is no Owner, Administrators may appoint an owner, but can not
-                          remove Owners
+                          If there is no Owner, Administrators can add and remove other
+                          Administrators
                         </li>
-                        <li>Administrators can add and remove other Administrators</li>
-                        <li>Administrators can add new Viewers</li>
+                        <li>
+                          If there is an Owner, Administrators can add other Administrators but may
+                          not remove other Administrators
+                        </li>
                         <li>There must be at least one Administrator in every record</li>
                       </ol>
                       <Tooltip.Arrow className="fill-gray-900" />
