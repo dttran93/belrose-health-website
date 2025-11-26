@@ -134,7 +134,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-gray-700" />
             <span className="font-semibold text-gray-900">Administrators</span>
-            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+            <span className="text-xs border border-green-700 bg-green-100 text-green-800 px-2 py-1 rounded-full">
               {record.administrators.length}{' '}
             </span>
           </div>
@@ -144,7 +144,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
                 <Tooltip.Root>
                   <Tooltip.Trigger asChild>
                     <button className="inline-flex items-center ml-1 text-blue-700 hover:text-red-800">
-                      <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full flex items-center">
+                      <span className="text-xs border border-green-700 bg-green-200 text-green-800 px-2 py-1 rounded-full flex items-center">
                         Administrative Access
                         <HelpCircle className="w-4 h-4 ml-1" />
                       </span>

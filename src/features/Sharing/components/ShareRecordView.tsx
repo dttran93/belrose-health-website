@@ -304,7 +304,7 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({
             <div className="flex items-center gap-2">
               <Share2 className="w-5 h-5 text-gray-700" />
               <span className="font-semibold text-gray-900">Viewers</span>
-              <span className="text-xs bg-chart-4/20 text-chart-4 px-2 py-1 rounded-full">
+              <span className="text-xs border border-yellow-700 bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full">
                 {accessPermissions.length}
               </span>
             </div>
@@ -314,7 +314,7 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({
                   <Tooltip.Root>
                     <Tooltip.Trigger asChild>
                       <button className="inline-flex items-center ml-1">
-                        <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full flex items-center">
+                        <span className="text-xs border border-yellow-700 bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full flex items-center">
                           View Access
                           <HelpCircle className="w-4 h-4 ml-1" />
                         </span>

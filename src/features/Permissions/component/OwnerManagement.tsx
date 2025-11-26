@@ -133,7 +133,7 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
             <CircleUser className="w-5 h-5 text-gray-700" />
             <span className="font-semibold text-gray-900">Owners</span>
             {record.owners ? (
-              <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">
+              <span className="text-xs border border-red-800 bg-red-100 text-red-800 px-2 py-1 rounded-full">
                 {record.owners.length}
               </span>
             ) : null}
@@ -145,7 +145,7 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
                 <Tooltip.Root>
                   <Tooltip.Trigger asChild>
                     <button className="inline-flex items-center ml-1">
-                      <span className="text-xs bg-red-200 text-red-800 px-2 py-1 rounded-full flex items-center">
+                      <span className="text-xs border border-red-800 bg-red-200 text-red-800 px-2 py-1 rounded-full flex items-center">
                         Ultimate Access
                         <HelpCircle className="w-4 h-4 ml-1" />
                       </span>
