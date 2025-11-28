@@ -8,19 +8,19 @@ pragma solidity ^0.8.19;
  * Part 1: Role Management
  * Part 2: Access Permission
  * Part 3: Record Verification
- * Part 4: Credibility System
+ * Part 4: Record Dispute
  */
 contract HealthRecordVerification {
   // ===============================================================
   // ROLE MANAGEMENT
   // ===============================================================
 
-  // ROLE MANAGEMENT - EVENTS
+  // =================== ROLE MANAGEMENT - EVENTS ===================
   event RoleGranted(
     string indexed recordId, // Which record
     address indexed user, // Who received the role
     string role, // What role they got
-    address indexed grantedBy, // Who gave it to them
+    address indexed grantedBy, //Who granted this role
     uint256 timestamp
   );
 
@@ -41,18 +41,21 @@ contract HealthRecordVerification {
     uint256 timestamp
   );
 
-  // ROLE MANAGEMENT - STRUCTURE Represents a user's role for a specific record
+  event OwnerVoluntarilyLeft(string indexed recordId, address indexed owner, uint256 timestamp);
+
+  // =================== ROLE MANAGEMENT - STRUCTURE ===================
+  // The shape of a user's role for a specific record
   struct RecordRole {
     string recordId; // Which record this role is for
     address user; // Who has this role
     string role; // "owner", "administrator", "viewer"
-    uint256 grantedAt; // When the role was first granted
+    uint256 grantedAt; // When the access was first granted
     uint256 lastModified; // When it was last changed
     address grantedBy; // Who granted this role
     bool isActive; // Is this role currently active?
   }
 
-  //ROLE MANAGEMENT - STORAGE/MAPPING
+  // =================== ROLE MANAGEMENT - STORAGE/MAPPING ===================
   // Primary storage: hash(recordId + user) -> role details
   mapping(bytes32 => RecordRole) public recordRoles;
 
@@ -67,12 +70,12 @@ contract HealthRecordVerification {
   // Counter
   uint256 public totalRoles;
 
-  // ROLE MANAGEMENT - FUNCTIONS
-
-  // ========== INTERNAL ROLE HELPERS ==========
+  // =================== ROLE MANAGEMENT - FUNCTIONS ===================
+  // ========== ROLE MANAGEMENT FUNCTIONS - INTERNAL ROLE MANAGEMENT HELPERS ==========
 
   /**
-   * @dev Internal function to grant a role - called by other functions
+   * @dev Internal function to grant a role - called by other functions.
+   * Exclusively for someone NEW to the record. If it's an upgrade/downgrade, we will use changeRole below
    * @param recordId The record this role is for
    * @param user Who is receiving the role
    * @param role The role to grant ("owner", "administrator", "viewer")
@@ -127,6 +130,38 @@ contract HealthRecordVerification {
   }
 
   /**
+   * @dev Remove user from the appropriate role array
+   * Uses removeFromAddressArray function below
+   */
+  function _removeFromRoleArray(string memory recordId, address user, string memory role) internal {
+    bytes32 roleHash = keccak256(bytes(role));
+
+    if (roleHash == keccak256(bytes('owner'))) {
+      _removeFromAddressArray(ownersByRecord[recordId], user);
+    } else if (roleHash == keccak256(bytes('administrator'))) {
+      _removeFromAddressArray(adminsByRecord[recordId], user);
+    } else if (roleHash == keccak256(bytes('viewer'))) {
+      _removeFromAddressArray(viewersByRecord[recordId], user);
+    }
+  }
+
+  /**
+   * @dev Remove an address from an array using swap-and-pop
+   * This is O(n) but more gas efficient than shifting all elements
+   */
+  function _removeFromAddressArray(address[] storage array, address toRemove) internal {
+    for (uint256 i = 0; i < array.length; i++) {
+      if (array[i] == toRemove) {
+        // Swap with last element
+        array[i] = array[array.length - 1];
+        // Remove last element
+        array.pop();
+        break;
+      }
+    }
+  }
+
+  /**
    * @dev Check if a user has a specific role
    */
   function _hasRole(
@@ -147,10 +182,11 @@ contract HealthRecordVerification {
     return _hasRole(recordId, user, 'owner') || _hasRole(recordId, user, 'administrator');
   }
 
-  // ========== PUBLIC ROLE FUNCTIONS ==========
+  // ========== ROLE MANAGEMENT FUNCTIONS - EXTERNAL ROLE MANAGEMENT FUNCTIONS ==========
 
   /**
-   * @notice Grant a role to a user for a specific record
+   * @notice Grant a role to a user for a specific record for the first time
+   * Not used for changing a role, only used if the user has not had a role in this record before
    * @param recordId The record ID
    * @param user The address to grant the role to
    * @param role The role to grant ("owner", "administrator", "viewer")
@@ -170,24 +206,34 @@ contract HealthRecordVerification {
       'Invalid role. Must be: owner, administrator, or viewer'
     );
 
-    // ======== ACCESS CONTROL ========
-    // This is the critical security part!
-
+    // Check if the caller has a role, if not throw error
     bytes32 callerRoleKey = keccak256(abi.encodePacked(recordId, msg.sender));
     RecordRole memory callerRole = recordRoles[callerRoleKey];
-
     require(callerRole.isActive, 'You have no role for this record');
 
-    // Enforce hierarchy:
-    // - Only owners can grant owner or administrator roles
-    // - Owners and admins can grant viewer roles
+    // Check to see if there's an owner. Check to see if caller is owner or admin
+    bool ownerExists = ownersByRecord[recordId].length > 0;
+    bool callerIsOwner = _hasRole(recordId, msg.sender, 'owner');
+    bool callerIsAdmin = _hasRole(recordId, msg.sender, 'administrator');
+
+    // Enforce access permissions hierarchy
     if (roleHash == keccak256(bytes('owner'))) {
-      require(_hasRole(recordId, msg.sender, 'owner'), 'Only owners can grant owner role');
+      // Owner role: If there's an owner set (ownerExists), then only owner can grant, otherwise admins can gran the first owner
+      if (ownerExists) {
+        require(callerIsOwner, 'Only owners can grant owner role');
+      } else {
+        require(callerIsAdmin, 'Only administrators can grant first owner');
+      }
     } else if (roleHash == keccak256(bytes('administrator'))) {
-      require(_hasRole(recordId, msg.sender, 'owner'), 'Only owners can grant administrator role');
-    } else if (roleHash == keccak256(bytes('viewer'))) {
+      // Admin role: owner OR admin can grant
       require(
-        _isOwnerOrAdmin(recordId, msg.sender),
+        callerIsOwner || callerIsAdmin,
+        'Only owners and administrators can grant administrator role'
+      );
+    } else if (roleHash == keccak256(bytes('viewer'))) {
+      // Viewer role: owner OR admin can grant
+      require(
+        callerIsOwner || callerIsAdmin,
         'Only owners and administrators can grant viewer role'
       );
     }
@@ -223,39 +269,110 @@ contract HealthRecordVerification {
       'Invalid role. Must be: owner, administrator, or viewer'
     );
 
-    // ======== ACCESS CONTROL ========
-    // Only owners can change roles
-    require(_hasRole(recordId, msg.sender, 'owner'), 'Only owners can change roles');
-
     // Get the user's current role
     bytes32 targetRoleKey = keccak256(abi.encodePacked(recordId, user));
     RecordRole memory currentRole = recordRoles[targetRoleKey];
-
     require(currentRole.isActive, 'User does not have an active role');
 
     string memory oldRole = currentRole.role;
+    bytes32 oldRoleHash = keccak256(bytes(oldRole));
 
     // Can't change to the same role
-    require(keccak256(bytes(oldRole)) != newRoleHash, 'User already has this role');
+    require(oldRoleHash != newRoleHash, 'User already has this role');
 
-    // ======== SAFETY CHECK ========
-    // Prevent removing the last owner
-    if (keccak256(bytes(oldRole)) == keccak256(bytes('owner'))) {
-      require(ownersByRecord[recordId].length > 1, 'Cannot change role of the last owner');
+    // Cannot demote owner
+    require(
+      oldRoleHash != keccak256(bytes('owner')),
+      'Owners cannot be demoted. Owner must voluntarily remove themselves.'
+    );
+
+    // Access Control Heirarchy, governs what roles can change what roles
+
+    bool ownerExists = ownersByRecord[recordId].length > 0;
+    bool callerIsOwner = _hasRole(recordId, msg.sender, 'owner');
+    bool callerIsAdmin = _hasRole(recordId, msg.sender, 'administrator');
+    bool callerIsTarget = msg.sender == user;
+
+    // Promoting TO owner
+    if (newRoleHash == keccak256(bytes('owner'))) {
+      if (ownerExists) {
+        require(callerIsOwner, 'Only owners can promote to owner');
+      } else {
+        require(callerIsAdmin, 'Only administrators can promote first owner');
+      }
+    }
+    // Promoting TO admin (from viewer)
+    else if (newRoleHash == keccak256(bytes('administrator'))) {
+      require(
+        callerIsOwner || callerIsAdmin,
+        'Only owners and administrators can promote to administrator'
+      );
+    }
+    // Demoting TO viewer (from admin)
+    else if (newRoleHash == keccak256(bytes('viewer'))) {
+      if (ownerExists) {
+        // Owner can demote anyone, admin can only demote themselves
+        require(
+          callerIsOwner || (callerIsAdmin && callerIsTarget),
+          'Only owners can demote others. Administrators can only demote themselves.'
+        );
+      } else {
+        // No owner - admin can demote anyone
+        require(callerIsAdmin, 'Only administrators can demote to viewer');
+      }
     }
 
-    // ======== UPDATE STORAGE ========
-    // Remove from old role array
-    _removeFromRoleArray(recordId, user, oldRole);
+    // Prevent removing the last admin when no owner exists. Must always be an owner or an admin
+    if (
+      oldRoleHash == keccak256(bytes('administrator')) && newRoleHash == keccak256(bytes('viewer'))
+    ) {
+      if (!ownerExists) {
+        require(
+          adminsByRecord[recordId].length > 1,
+          'Cannot demote the last administrator when no owner exists'
+        );
+      }
+    }
 
-    // Add to new role array
+    // Storage update
+    _removeFromRoleArray(recordId, user, oldRole);
     _addToRoleArray(recordId, user, newRole);
 
-    // Update the role record
     recordRoles[targetRoleKey].role = newRole;
     recordRoles[targetRoleKey].lastModified = block.timestamp;
 
     emit RoleChanged(recordId, user, oldRole, newRole, msg.sender, block.timestamp);
+  }
+
+  /**
+   * @notice Allows an owner to voluntarily give up their ownership
+   * @param recordId The record ID
+   * @dev Owners can never be removed by others, only by themselves
+   */
+  function voluntarilyRemoveOwnOwnership(string memory recordId) external {
+    require(bytes(recordId).length > 0, 'Record ID cannot be empty');
+
+    // Must be an owner
+    require(_hasRole(recordId, msg.sender, 'owner'), 'You are not an owner of this record');
+
+    // Can't remove if you're the last owner AND there are no admins
+    bool hasOtherOwners = ownersByRecord[recordId].length > 1;
+    bool hasAdmins = adminsByRecord[recordId].length > 0;
+
+    require(
+      hasOtherOwners || hasAdmins,
+      'Cannot remove yourself as last owner with no administrators'
+    );
+
+    // Update Storage
+    bytes32 roleKey = keccak256(abi.encodePacked(recordId, msg.sender));
+
+    _removeFromRoleArray(recordId, msg.sender, 'owner');
+
+    recordRoles[roleKey].isActive = false;
+    recordRoles[roleKey].lastModified = block.timestamp;
+
+    emit OwnerVoluntarilyLeft(recordId, msg.sender, block.timestamp);
   }
 
   /**
@@ -268,75 +385,200 @@ contract HealthRecordVerification {
     require(bytes(recordId).length > 0, 'Record ID cannot be empty');
     require(user != address(0), 'User address cannot be zero');
 
-    // ======== ACCESS CONTROL ========
-    // Only owners can revoke roles
-    require(_hasRole(recordId, msg.sender, 'owner'), 'Only owners can revoke roles');
-
-    // Can't revoke your own role (use changeRole or have another owner do it)
-    require(user != msg.sender, 'Cannot revoke your own role');
-
-    // Get the user's current role
+    // Get the user's current role first
     bytes32 targetRoleKey = keccak256(abi.encodePacked(recordId, user));
     RecordRole memory currentRole = recordRoles[targetRoleKey];
-
     require(currentRole.isActive, 'User does not have an active role');
 
     string memory role = currentRole.role;
+    bytes32 roleHash = keccak256(bytes(role));
 
-    // ======== SAFETY CHECK ========
-    // Prevent revoking the last owner
-    if (keccak256(bytes(role)) == keccak256(bytes('owner'))) {
-      require(ownersByRecord[recordId].length > 1, 'Cannot revoke the last owner');
+    // Owner can't be revoked
+    require(
+      roleHash != keccak256(bytes('owner')),
+      'Owners cannot be revoked. Owner must use voluntarilyRemoveOwnOwnership().'
+    );
+
+    // Check for Self-Revocation, if yes, then that's ok!
+    bool isSelfRevoke = msg.sender == user;
+
+    // If not self-revocation, check if permissions are ok
+    if (!isSelfRevoke) {
+      // First check: Must be owner or admin to revoke anyone
+      require(
+        _isOwnerOrAdmin(recordId, msg.sender),
+        'Only owners and administrators can revoke roles'
+      );
+
+      // Second check: Differentiate if caller is Owner or Admin
+      bool callerIsOwner = _hasRole(recordId, msg.sender, 'owner');
+
+      if (!callerIsOwner) {
+        // Caller is admin (we know because they passed _isOwnerOrAdmin)
+        // Now we must check if they're targeting another admin.
+        // If yes, need to make sure theres no owner because only owners can remove other admins
+        // If they're self-targetting, we already pass above
+        bool targetIsAdmin = roleHash == keccak256(bytes('administrator'));
+
+        if (targetIsAdmin) {
+          // Admin revoking another admin - only allowed if no owner exists
+          bool ownerExists = ownersByRecord[recordId].length > 0;
+          require(!ownerExists, 'Only owners can revoke administrators');
+        }
+        // If target is viewer, admin can revoke - no extra check needed
+      }
+      // If caller is owner, they can revoke anyone - no extra check needed
     }
 
-    // ======== UPDATE STORAGE ========
-    // Remove from role array
+    // Safety check, make sure there's at leat 1 admin or owner
+    if (roleHash == keccak256(bytes('administrator'))) {
+      bool hasOtherAdmins = adminsByRecord[recordId].length > 1;
+      bool ownerExists = ownersByRecord[recordId].length > 0;
+
+      require(
+        hasOtherAdmins || ownerExists,
+        'Cannot revoke last administrator without an owner present'
+      );
+    }
+
+    // Update storage
     _removeFromRoleArray(recordId, user, role);
 
-    // Mark as inactive (we keep the record for history)
     recordRoles[targetRoleKey].isActive = false;
     recordRoles[targetRoleKey].lastModified = block.timestamp;
 
     emit RoleRevoked(recordId, user, role, msg.sender, block.timestamp);
   }
 
-  /**
-   * @dev Remove user from the appropriate role array
-   * Uses swap-and-pop pattern for gas efficiency
-   */
-  function _removeFromRoleArray(string memory recordId, address user, string memory role) internal {
-    bytes32 roleHash = keccak256(bytes(role));
+  // ========== ROLE MANAGEMENT FUNCTIONS - VIEW FUNCTIONS ==========
 
-    if (roleHash == keccak256(bytes('owner'))) {
-      _removeFromAddressArray(ownersByRecord[recordId], user);
-    } else if (roleHash == keccak256(bytes('administrator'))) {
-      _removeFromAddressArray(adminsByRecord[recordId], user);
-    } else if (roleHash == keccak256(bytes('viewer'))) {
-      _removeFromAddressArray(viewersByRecord[recordId], user);
-    }
+  /**
+   * @notice Get full role details (for audit/verification UI)
+   * @param recordId The record ID
+   * @param user The address to check
+   * @return role The role string
+   * @return grantedAt When the access was first granted
+   * @return lastModified When the role was last modified
+   * @return grantedBy Who granted the role
+   * @return isActive Whether the role is currently active
+   */
+  function getRoleDetails(
+    string memory recordId,
+    address user
+  )
+    external
+    view
+    returns (
+      string memory role,
+      uint256 grantedAt,
+      uint256 lastModified,
+      address grantedBy,
+      bool isActive
+    )
+  {
+    bytes32 roleKey = keccak256(abi.encodePacked(recordId, user));
+    RecordRole memory userRole = recordRoles[roleKey];
+
+    return (
+      userRole.role,
+      userRole.grantedAt,
+      userRole.lastModified,
+      userRole.grantedBy,
+      userRole.isActive
+    );
   }
 
   /**
-   * @dev Remove an address from an array using swap-and-pop
-   * This is O(n) but more gas efficient than shifting all elements
+   * @notice Get all owners of a record
+   * @param recordId The record ID
+   * @return Array of owner addresses
    */
-  function _removeFromAddressArray(address[] storage array, address toRemove) internal {
-    for (uint256 i = 0; i < array.length; i++) {
-      if (array[i] == toRemove) {
-        // Swap with last element
-        array[i] = array[array.length - 1];
-        // Remove last element
-        array.pop();
-        break;
-      }
-    }
+  function getRecordOwners(string memory recordId) external view returns (address[] memory) {
+    return ownersByRecord[recordId];
+  }
+
+  /**
+   * @notice Get all administrators of a record
+   * @param recordId The record ID
+   * @return Array of administrator addresses
+   */
+  function getRecordAdmins(string memory recordId) external view returns (address[] memory) {
+    return adminsByRecord[recordId];
+  }
+
+  /**
+   * @notice Get all viewers of a record
+   * @param recordId The record ID
+   * @return Array of viewer addresses
+   */
+  function getRecordViewers(string memory recordId) external view returns (address[] memory) {
+    return viewersByRecord[recordId];
+  }
+
+  /**
+   * @notice Get all records where a user has any role
+   * @param user The user's address
+   * @return Array of record IDs
+   */
+  function getRecordsByUser(address user) external view returns (string[] memory) {
+    return recordsByUser[user];
+  }
+
+  /**
+   * @notice Check if a user has a specific role (convenience function)
+   * @param recordId The record ID
+   * @param user The address to check
+   * @param role The role to check for
+   * @return hasRole True if user has this exact role and it's active
+   */
+  function hasRole(
+    string memory recordId,
+    address user,
+    string memory role
+  ) external view returns (bool) {
+    return _hasRole(recordId, user, role);
+  }
+
+  /**
+   * @notice Check if user is owner or administrator (can manage record)
+   * @param recordId The record ID
+   * @param user The address to check
+   * @return canManage True if user can manage this record
+   */
+  function isOwnerOrAdmin(string memory recordId, address user) external view returns (bool) {
+    return _isOwnerOrAdmin(recordId, user);
+  }
+
+  /**
+   * @notice Get role statistics for a record
+   * @param recordId The record ID
+   * @return ownerCount Number of owners
+   * @return adminCount Number of administrators
+   * @return viewerCount Number of viewers
+   */
+  function getRecordRoleStats(
+    string memory recordId
+  ) external view returns (uint256 ownerCount, uint256 adminCount, uint256 viewerCount) {
+    return (
+      ownersByRecord[recordId].length,
+      adminsByRecord[recordId].length,
+      viewersByRecord[recordId].length
+    );
+  }
+
+  /**
+   * @notice Get total number of roles across all records
+   * @return Total role count
+   */
+  function getTotalRoles() external view returns (uint256) {
+    return totalRoles;
   }
 
   // ===============================================================
   // ACCESS PERMISSIONS
   // ===============================================================
 
-  // ACCESS PERMISSIONS - EVENTS
+  // ========== ACCESS PERMISSIONS - EVENTS ==========
   event AccessGranted(
     string indexed permissionHash,
     address indexed sharer,
@@ -353,7 +595,7 @@ contract HealthRecordVerification {
     uint256 timestamp
   );
 
-  // ACCESS PERMISSION - SHARING STRUCTURE
+  // ========== ACCESS PERMISSION - STRUCTURE ==========
   struct AccessPermission {
     string permissionHash;
     address sharer;
@@ -365,13 +607,13 @@ contract HealthRecordVerification {
     bool exists;
   }
 
-  // ACCESS PERMISSION STORAGE/MAPPING
+  // ========== ACCESS PERMISSION - STORAGE/MAPPING ==========
   mapping(string => AccessPermission) public accessPermissions;
   mapping(address => string[]) public permissionsBySharer;
   mapping(address => string[]) public permissionsByReceiver;
   uint256 public totalPermissions;
 
-  // ACCESS PERMISSION FUNCTIONS
+  // ========== ACCESS PERMISSION - FUNCTIONS ==========
 
   /**
    * Grant access to a record
@@ -502,7 +744,7 @@ contract HealthRecordVerification {
   // RECORD VERIFICATION
   // ===============================================================
 
-  // RECORD VERIFICATION - EVENTS
+  // ========== RECORD VERIFICATION - EVENTS ==========
   event RecordStored(
     string indexed recordHash,
     address indexed patient,
@@ -512,32 +754,28 @@ contract HealthRecordVerification {
   );
 
   // Event when a record gets medical verification
-  event MedicalVerification(
-    string indexed recordHash,
-    address indexed medicalVerifier,
-    uint256 timestamp
-  );
+  event Verification(string indexed recordHash, address indexed verifier, uint256 timestamp);
 
-  // RECORD VERIFICATION - STRUCTURE
+  /// ========== RECORD VERIFICATION - STRUCTURE ==========
   struct RecordVerification {
     string recordHash; // SHA-256 hash of medical data
     address patient; // Patient this record belongs to
     address submitter; // Who actually submitted it (could be patient, provider, etc.)
-    address medicalVerifier; // Healthcare provider who attests to this record
+    address verifier; // person who attests to this record
     uint256 timestamp; // When it was submitted
     string recordId; // Your app's internal record ID
     bool exists; // Whether this record exists
-    bool isVerified; // Whether a medical verifier has attested to it
+    bool isVerified; // Whether a verifier has attested to it
   }
 
-  // RECORD VERIFICATION - STORAGE/MAPPING
+  // ========== RECORD VERIFICATION - STORAGE/MAPPING ==========
   mapping(string => RecordVerification) public recordVerifications;
   string[] public allRecordHashes; // Array of all hashes (for counting/listing)
   uint256 public totalRecords; // Total count
   mapping(address => string[]) public recordsByPatient; // Records by patient address
   mapping(address => string[]) public recordsByVerifier; // Records by medical verifier
 
-  //RECORD VERIFICATION - FUNCTIONS
+  // ========== RECORD VERIFICATION - FUNCTIONS ==========
   /**
    * Store a medical record hash on the blockchain
    * @param recordHash SHA-256 hash of the medical record
@@ -560,7 +798,7 @@ contract HealthRecordVerification {
       recordHash: recordHash,
       patient: patientAddress,
       submitter: msg.sender, // Who called this function
-      medicalVerifier: address(0), // No verifier yet
+      verifier: address(0), // No verifier yet
       timestamp: block.timestamp,
       recordId: recordId,
       exists: true,
@@ -586,14 +824,14 @@ contract HealthRecordVerification {
     require(msg.sender != address(0), 'Invalid verifier address');
 
     // Update the record
-    recordVerifications[recordHash].medicalVerifier = msg.sender;
+    recordVerifications[recordHash].verifier = msg.sender;
     recordVerifications[recordHash].isVerified = true;
 
     // Add to verifier's list
     recordsByVerifier[msg.sender].push(recordHash);
 
     // Emit event
-    emit MedicalVerification(recordHash, msg.sender, block.timestamp);
+    emit Verification(recordHash, msg.sender, block.timestamp);
   }
 
   /**
@@ -627,7 +865,7 @@ contract HealthRecordVerification {
       record.exists,
       record.patient,
       record.submitter,
-      record.medicalVerifier,
+      record.verifier,
       record.timestamp,
       record.recordId,
       record.isVerified
@@ -688,4 +926,8 @@ contract HealthRecordVerification {
 
     return (total, verified);
   }
+
+  // ===============================================================
+  // RECORD DISPUTE
+  // ===============================================================
 }
