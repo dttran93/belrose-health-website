@@ -26,7 +26,3 @@ export interface VerificationAdapterProps {
 }
 
 export type VerificationAdapter = React.ComponentType<VerificationAdapterProps>;
-
-export interface CreateVerificationSessionRequest {
-  templateId: string;
-}

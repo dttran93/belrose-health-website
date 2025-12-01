@@ -1,7 +1,7 @@
 // src/services/userService.ts
 import { doc, setDoc, getDoc, updateDoc, getFirestore, serverTimestamp } from 'firebase/firestore';
 import { User as FirebaseUser } from 'firebase/auth';
-import { UserProfile } from '@/types/core';
+import { BelroseUserProfile } from '@/types/core';
 
 export class UserService {
   /**
@@ -29,7 +29,7 @@ export class UserService {
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
 
-    const userData: Partial<UserProfile> = {
+    const userData: Partial<BelroseUserProfile> = {
       uid: user.uid,
       email: user.email || '',
       emailVerified: user.emailVerified,
@@ -76,14 +76,14 @@ export class UserService {
   /**
    * Get user profile from Firestore
    */
-  static async getUserProfile(uid: string): Promise<UserProfile | null> {
+  static async getUserProfile(uid: string): Promise<BelroseUserProfile | null> {
     const db = getFirestore();
     const userRef = doc(db, 'users', uid);
 
     try {
       const userDoc = await getDoc(userRef);
       if (userDoc.exists()) {
-        return userDoc.data() as UserProfile;
+        return userDoc.data() as BelroseUserProfile;
       }
       return null;
     } catch (error) {
@@ -95,7 +95,7 @@ export class UserService {
   /**
    * Update user profile
    */
-  static async updateUserProfile(uid: string, updates: Partial<UserProfile>): Promise<void> {
+  static async updateUserProfile(uid: string, updates: Partial<BelroseUserProfile>): Promise<void> {
     const db = getFirestore();
     const userRef = doc(db, 'users', uid);
 

@@ -1,19 +1,8 @@
-/**
- * FHIR Validation Utilities
- *
- * This module consolidates FHIR validation logic that was previously duplicated
- * across CombinedUploadFHIR.tsx and FHIRValidation.tsx.
- *
- * KEY CONCEPT: Instead of having two separate validation systems, we now have
- * one source of truth that can be used anywhere in the app.
- */
+//src/features/AddRecord/utils/fhirValidationUtils.ts
+//Centralized util for fhir validation
 
 import type { FHIRWithValidation } from '@/features/AddRecord/services/fhirConversionService.type';
 
-/**
- * Simple validation result for UI display
- * This is what CombinedUploadFHIR was using - simpler than full FHIRWithValidation
- */
 export interface SimpleFHIRValidation {
   valid: boolean;
   error?: string;

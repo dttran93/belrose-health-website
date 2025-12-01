@@ -4,31 +4,170 @@ pragma solidity ^0.8.19;
 /**
  * @title HealthRecordVerification
  * @dev Store and verify medical record hashes on blockchain with medical attestation
- * Has 3 parts at the moment:
- * Part 1: Role Management
- * Part 2: Access Permission
- * Part 3: Record Verification
- * Part 4: Record Dispute
+ * Part 1: Member Registry
+ * Part 2: Role Management
+ * Part 3: Access Permission
+ * Part 4: Record Initiatlization - Commitment and Anchoring
+ * Part 5: Record Reviews - Verification and Disputes
  */
 contract HealthRecordVerification {
+  // ===============================================================
+  // MEMBER REGISTRY
+  // ===============================================================
+
+  // =================== ADMIN MANAGEMENT ===================
+  address public admin;
+
+  event AdminTransferred(address indexed oldAdmin, address indexed newAdmin, uint256 timestamp);
+
+  modifier onlyAdmin() {
+    require(msg.sender == admin, 'Only admin');
+    _;
+  }
+
+  modifier onlyActiveMember() {
+    //Note this only checks for NOT inactive so it captures both verified and active members
+    require(members[msg.sender].status != MemberStatus.Inactive, 'Not an active member');
+    _;
+  }
+
+  modifier onlyVerifiedMember() {
+    require(members[msg.sender].status == MemberStatus.Verified, 'Not a verified member');
+    _;
+  }
+
+  constructor() {
+    admin = msg.sender;
+  }
+
+  function transferAdmin(address newAdmin) external onlyAdmin {
+    require(newAdmin != address(0), 'Invalid address');
+    emit AdminTransferred(admin, newAdmin, block.timestamp);
+    admin = newAdmin;
+  }
+
+  // =================== MEMBER REGISTRY - ENUMS ===================
+
+  enum MemberStatus {
+    Inactive, // 0 - Cannot transact (banned/removed)
+    Active, // 1 - Default Status
+    Verified // 2 - User has verified their identity and email
+  }
+
+  // =================== MEMBER REGISTRY - EVENTS ===================
+
+  event MemberRegistered(
+    address indexed userWalletAddress,
+    bytes32 indexed userIdHash,
+    uint256 timestamp
+  );
+
+  event MemberStatusChanged(
+    address indexed userAddress,
+    MemberStatus oldStatus,
+    MemberStatus newStatus,
+    address indexed changedBy,
+    uint256 timestamp
+  );
+
+  // =================== MEMBER REGISTRY - STRUCTURE ===================
+
+  struct Member {
+    address userWalletAddress;
+    bytes32 userIdhash;
+    MemberStatus status;
+    uint256 joinedAt;
+  }
+
+  // =================== MEMBER REGISTRY - STORAGE ===================
+
+  mapping(address => Member) public members;
+  mapping(bytes32 => address) public userIdHashToAddress;
+  uint256 public totalMembers;
+
+  // =================== MEMBER REGISTRY - FUNCTIONS ===================
+
+  /**
+   * @notice Register a new member (called by Belrose backend)
+   * @param userWallet The user's wallet address
+   * @param userIdHash Hash of their off-chain user ID
+   */
+  function addMember(address userWallet, bytes32 userIdHash) external onlyAdmin {
+    require(userWallet != address(0), 'Invalid wallet address');
+    require(members[userWallet].joinedAt == 0, 'Already a member');
+    require(userIdHashToAddress[userIdHash] == address(0), 'User ID already registered');
+
+    members[userWallet] = Member({
+      userWalletAddress: userWallet,
+      userIdhash: userIdHash,
+      status: MemberStatus.Active,
+      joinedAt: block.timestamp
+    });
+
+    userIdHashToAddress[userIdHash] = userWallet;
+    totalMembers++;
+
+    emit MemberRegistered(userWallet, userIdHash, block.timestamp);
+  }
+
+  /**
+   * @notice Change a member's status
+   * @param userWallet The member's wallet
+   * @param newStatus The new status
+   */
+  function setMemberStatus(address userWallet, MemberStatus newStatus) external onlyAdmin {
+    require(members[userWallet].joinedAt != 0, 'Not a member');
+
+    MemberStatus oldStatus = members[userWallet].status;
+    require(oldStatus != newStatus, 'Already this status');
+
+    members[userWallet].status = newStatus;
+
+    emit MemberStatusChanged(userWallet, oldStatus, newStatus, msg.sender, block.timestamp);
+  }
+
+  /**
+   * @notice Check if address is active member
+   */
+  function isActiveMember(address user) public view returns (bool) {
+    return members[user].status == MemberStatus.Active;
+  }
+
+  /**
+   * @notice Get member details
+   */
+  function getMember(
+    address user
+  ) external view returns (bytes32 userIdHash, MemberStatus status, uint256 joinedAt) {
+    Member memory m = members[user];
+    return (m.userIdhash, m.status, m.joinedAt);
+  }
+
+  /**
+   * @notice Lookup wallet by user ID hash
+   */
+  function getWalletByUserIdHash(bytes32 userIdHash) external view returns (address) {
+    return userIdHashToAddress[userIdHash];
+  }
+
   // ===============================================================
   // ROLE MANAGEMENT
   // ===============================================================
 
   // =================== ROLE MANAGEMENT - EVENTS ===================
   event RoleGranted(
-    string indexed recordId, // Which record
-    address indexed user, // Who received the role
-    string role, // What role they got
-    address indexed grantedBy, //Who granted this role
+    string indexed recordId,
+    address indexed user,
+    string role,
+    address indexed grantedBy,
     uint256 timestamp
   );
 
   event RoleChanged(
     string indexed recordId,
     address indexed user,
-    string oldRole, // What they had before
-    string newRole, //What they have now
+    string oldRole,
+    string newRole,
     address indexed changedBy,
     uint256 timestamp
   );
@@ -36,7 +175,7 @@ contract HealthRecordVerification {
   event RoleRevoked(
     string indexed recordId,
     address indexed user,
-    string role, // What role was removed
+    string role,
     address indexed revokedBy,
     uint256 timestamp
   );
@@ -185,17 +324,40 @@ contract HealthRecordVerification {
   // ========== ROLE MANAGEMENT FUNCTIONS - EXTERNAL ROLE MANAGEMENT FUNCTIONS ==========
 
   /**
+   * @notice Admin establishes first administrator on a new record
+   * @dev Must be called before anyone can use grantRole on this record
+   * @param recordId The record ID
+   * @param firstAdmin The address to make first administrator
+   */
+  function initializeRecordRole(string memory recordId, address firstAdmin) external onlyAdmin {
+    require(bytes(recordId).length > 0, 'Record ID cannot be empty');
+    require(firstAdmin != address(0), 'Invalid address');
+    require(isActiveMember(firstAdmin), 'Must be an active member');
+
+    // Ensure record hasn't been initialized yet
+    require(
+      ownersByRecord[recordId].length == 0 && adminsByRecord[recordId].length == 0,
+      'Record already initialized'
+    );
+
+    _grantRoleInternal(recordId, firstAdmin, 'administrator', msg.sender);
+  }
+
+  /**
    * @notice Grant a role to a user for a specific record for the first time
    * Not used for changing a role, only used if the user has not had a role in this record before
    * @param recordId The record ID
    * @param user The address to grant the role to
    * @param role The role to grant ("owner", "administrator", "viewer")
    */
-  function grantRole(string memory recordId, address user, string memory role) external {
+  function grantRole(
+    string memory recordId,
+    address user,
+    string memory role
+  ) external onlyActiveMember {
     // Validation
     require(bytes(recordId).length > 0, 'Record ID cannot be empty');
     require(user != address(0), 'User address cannot be zero');
-    require(user != msg.sender, 'Cannot grant role to yourself');
 
     // Validate role string
     bytes32 roleHash = keccak256(bytes(role));
@@ -255,7 +417,11 @@ contract HealthRecordVerification {
    * @param user The address whose role is being changed
    * @param newRole The new role ("owner", "administrator", "viewer")
    */
-  function changeRole(string memory recordId, address user, string memory newRole) external {
+  function changeRole(
+    string memory recordId,
+    address user,
+    string memory newRole
+  ) external onlyActiveMember {
     // Validation
     require(bytes(recordId).length > 0, 'Record ID cannot be empty');
     require(user != address(0), 'User address cannot be zero');
@@ -741,193 +907,579 @@ contract HealthRecordVerification {
   }
 
   // ===============================================================
-  // RECORD VERIFICATION
+  // RECORD INITIALIZATION
   // ===============================================================
 
-  // ========== RECORD VERIFICATION - EVENTS ==========
-  event RecordStored(
+  // =================== RECORD INITIALIZATION - EVENTS ===================
+  event RecordAnchored(
+    string indexed recordId,
     string indexed recordHash,
-    address indexed patient,
-    address indexed submitter,
-    uint256 timestamp,
-    string recordId
+    address indexed subject,
+    address createdBy,
+    uint256 timestamp
   );
 
-  // Event when a record gets medical verification
-  event Verification(string indexed recordHash, address indexed verifier, uint256 timestamp);
+  // =================== RECORD INITIALIZATION - ENUMS ===================
 
-  /// ========== RECORD VERIFICATION - STRUCTURE ==========
-  struct RecordVerification {
-    string recordHash; // SHA-256 hash of medical data
-    address patient; // Patient this record belongs to
-    address submitter; // Who actually submitted it (could be patient, provider, etc.)
-    address verifier; // person who attests to this record
-    uint256 timestamp; // When it was submitted
-    string recordId; // Your app's internal record ID
-    bool exists; // Whether this record exists
-    bool isVerified; // Whether a verifier has attested to it
+  enum RecordStatus {
+    Pending,
+    Accepted,
+    Unacknowledged,
+    Rejected
   }
 
-  // ========== RECORD VERIFICATION - STORAGE/MAPPING ==========
-  mapping(string => RecordVerification) public recordVerifications;
-  string[] public allRecordHashes; // Array of all hashes (for counting/listing)
-  uint256 public totalRecords; // Total count
-  mapping(address => string[]) public recordsByPatient; // Records by patient address
-  mapping(address => string[]) public recordsByVerifier; // Records by medical verifier
+  // =================== RECORD INITIALIZATION - STRUCTURES ===================
+  struct AnchoredRecord {
+    string recordHash;
+    string recordId;
+    address subject; // Who this record is ABOUT (the patient)
+    uint256 createdAt;
+    address createdBy;
+    bool exists;
+  }
 
-  // ========== RECORD VERIFICATION - FUNCTIONS ==========
+  // =================== RECORD INITIALIZATION - STORAGE/MAPPING ===================
+
+  // Record metadata: recordId -> metadata
+  mapping(string => AnchoredRecord) public anchoredRecords;
+
+  // Reverse lookup: subject address -> array of recordIds about them
+  mapping(address => string[]) public recordsAboutSubject;
+  mapping(string => string[]) public recordHashesByRecordId;
+
+  // Counters
+  uint256 public totalAnchoredRecords;
+
+  // ========== RECORD INITIALIZATION FUNCTIONS ==========
+
   /**
-   * Store a medical record hash on the blockchain
-   * @param recordHash SHA-256 hash of the medical record
-   * @param recordId Your internal record ID (like "patient-123-visit-456")
-   * @param patientAddress The patient this record belongs to
+   * @notice Healthcare provider proposes a record
+   * @dev This must happen before anchoring to give the patient an opportunity to accept or reject
+   * @param subject The patient/person this record is about
+   * @param commitmentId unique ID for proposal
+   * @param recordHashCommitment //keccak256(recordHash + recordId + salt)
    */
-  function storeRecordHash(
+
+  /**
+   * @notice Anchor a record hash with its metadata
+   * @dev This must happen before any reviews
+   * @param recordHash SHA-256 hash of the record contents
+   * @param recordId Your internal record ID
+   * @param subject The patient/person this record is about
+   */
+  function anchorRecord(
     string memory recordHash,
     string memory recordId,
-    address patientAddress
+    address subject
   ) external {
-    // Validation
     require(bytes(recordHash).length > 0, 'Hash cannot be empty');
     require(bytes(recordId).length > 0, 'Record ID cannot be empty');
-    require(patientAddress != address(0), 'Patient address cannot be zero');
-    require(!recordVerifications[recordHash].exists, 'Hash already exists');
+    require(subject != address(0), 'Subject cannot be zero address');
+    require(!anchoredRecords[recordHash].exists, 'Hash already anchored');
 
-    // Store the record
-    recordVerifications[recordHash] = RecordVerification({
+    // Must have a role on this record to anchor it
+    bytes32 roleKey = keccak256(abi.encodePacked(recordId, msg.sender));
+    require(recordRoles[roleKey].isActive, 'No access to this record');
+
+    anchoredRecords[recordHash] = AnchoredRecord({
       recordHash: recordHash,
-      patient: patientAddress,
-      submitter: msg.sender, // Who called this function
-      verifier: address(0), // No verifier yet
-      timestamp: block.timestamp,
       recordId: recordId,
-      exists: true,
-      isVerified: false // Not verified yet
+      subject: subject,
+      createdAt: block.timestamp,
+      createdBy: msg.sender,
+      exists: true
     });
 
-    // Add to our lists
-    allRecordHashes.push(recordHash);
-    recordsByPatient[patientAddress].push(recordHash);
-    totalRecords++;
+    recordsAboutSubject[subject].push(recordHash);
+    recordHashesByRecordId[recordId].push(recordHash);
+    totalAnchoredRecords++;
 
-    // Emit event
-    emit RecordStored(recordHash, patientAddress, msg.sender, block.timestamp, recordId);
+    emit RecordAnchored(recordHash, recordId, subject, msg.sender, block.timestamp);
   }
 
   /**
-   * Allow a medical verifier to attest to a record
-   * @param recordHash The hash of the record to verify
+   * @notice Get record metadata
    */
-  function verifyMedicalRecord(string memory recordHash) external {
-    require(recordVerifications[recordHash].exists, 'Record does not exist');
-    require(!recordVerifications[recordHash].isVerified, 'Already verified');
-    require(msg.sender != address(0), 'Invalid verifier address');
-
-    // Update the record
-    recordVerifications[recordHash].verifier = msg.sender;
-    recordVerifications[recordHash].isVerified = true;
-
-    // Add to verifier's list
-    recordsByVerifier[msg.sender].push(recordHash);
-
-    // Emit event
-    emit Verification(recordHash, msg.sender, block.timestamp);
-  }
-
-  /**
-   * Check if a record hash exists and get its info
-   * @param recordHash The hash to look up
-   * @return exists Whether it exists
-   * @return patient Who the record belongs to
-   * @return submitter Who submitted it
-   * @return medicalVerifier Who verified it (address(0) if not verified)
-   * @return timestamp When it was submitted
-   * @return recordId The internal record ID
-   * @return isVerified Whether it's been medically verified
-   */
-  function verifyRecordExists(
+  function getAnchoredRecord(
     string memory recordHash
   )
     external
     view
     returns (
-      bool exists,
-      address patient,
-      address submitter,
-      address medicalVerifier,
-      uint256 timestamp,
       string memory recordId,
-      bool isVerified
+      address subject,
+      uint256 createdAt,
+      address createdBy,
+      bool exists
     )
   {
-    RecordVerification memory record = recordVerifications[recordHash];
-    return (
-      record.exists,
-      record.patient,
-      record.submitter,
-      record.verifier,
-      record.timestamp,
-      record.recordId,
-      record.isVerified
+    AnchoredRecord memory record = anchoredRecords[recordHash];
+    return (record.recordId, record.subject, record.createdAt, record.createdBy, record.exists);
+  }
+
+  /**
+   * @notice Get the subject (patient) of a record
+   */
+  function getRecordSubject(string memory recordHash) external view returns (address) {
+    require(anchoredRecords[recordHash].exists, 'Record does not exist');
+    return anchoredRecords[recordHash].subject;
+  }
+
+  /**
+   * @notice Get all records where an address is the subject
+   */
+  function getRecordsAboutSubject(address subject) external view returns (string[] memory) {
+    return recordsAboutSubject[subject];
+  }
+
+  /**
+   * @notice Get all versions of a record
+   */
+  function getHashesByRecordId(string memory recordId) external view returns (string[] memory) {
+    return recordHashesByRecordId[recordId];
+  }
+
+  /**
+   * @notice Check if an address is the subject of a record
+   */
+  function isSubject(string memory recordHash, address user) external view returns (bool) {
+    return anchoredRecords[recordHash].subject == user;
+  }
+
+  // ===============================================================
+  // RECORD REVIEW - VERIFICATION AND DISPUTES
+  // ===============================================================
+
+  // =================== RECORD REVIEW - EVENTS ===================
+  event RecordReviewed(
+    string indexed recordId,
+    string indexed recordHash,
+    address indexed reviewer,
+    ReviewType reviewType,
+    DisputeSeverity severity,
+    DisputeCulpability culpability,
+    uint256 timestamp
+  );
+
+  event ReviewRetracted(
+    string indexed recordHash,
+    address indexed reviewer,
+    ReviewType reviewType,
+    uint256 timestamp
+  );
+
+  event DisputeReaction(
+    string indexed recordHash,
+    address indexed reactor,
+    address indexed reviewer,
+    bool supportsDispute,
+    uint256 timestamp
+  );
+
+  event DisputeModification(
+    string indexed recordHash,
+    address indexed reviewer,
+    DisputeSeverity oldSeverity,
+    DisputeSeverity newSeverity,
+    DisputeCulpability oldCulpability,
+    DisputeCulpability newCulpability,
+    uint256 timestamp
+  );
+
+  // =================== RECORD REVIEW - ENUMS ===================
+  enum ReviewType {
+    Verification,
+    Dispute
+  }
+
+  enum DisputeSeverity {
+    None,
+    Negligible,
+    Moderate,
+    Major
+  }
+
+  enum DisputeCulpability {
+    None,
+    NoFault,
+    Systemic,
+    Preventable,
+    Reckless,
+    Intentional
+  }
+
+  // =================== RECORD REVIEW - STRUCTURES ===================
+
+  struct Review {
+    address reviewer;
+    ReviewType reviewType;
+    DisputeSeverity severity;
+    DisputeCulpability culpability;
+    uint256 timestamp;
+    string notes; // Hash of detailed reasoning (stored off-chain)
+    bool isActive;
+  }
+
+  struct Reaction {
+    address reactor;
+    bool supportsDispute; // true = thumbs up, false = thumbs down
+    uint256 timestamp;
+  }
+
+  // =================== RECORD REVIEW - STORAGE/MAPPING ===================
+
+  // Reviews: recordHash -> array of record Reviews
+  mapping(string => Review[]) public recordReviews;
+
+  // Has user reviewed to this hash: recordHash -> user -> hasReviewed
+  mapping(string => mapping(address => bool)) public hasReviewed;
+
+  // User's review index: recordHash -> user -> index in array. Needed for finding review quickly,
+  //otherwise you'll have to loop through the entire thing when retracting
+  mapping(string => mapping(address => uint256)) public userReviewIndex;
+
+  // Review reactions: recordHash -> reviewer address -> array of reactions
+  mapping(string => mapping(address => Reaction[])) public disputeReactions;
+
+  // Has user reacted to this dispute: recordHash -> disputer -> reactor -> hasReacted
+  // For enforcing one reaction per user per dispute
+  mapping(string => mapping(address => mapping(address => bool))) public hasReactedToDispute;
+
+  // Reverse lookups for credibility scoring
+  mapping(address => string[]) public verificationsByUser;
+  mapping(address => string[]) public disputesByUser;
+
+  // Counters
+  uint256 public totalReviews;
+
+  // ========== REVIEW REVIEW FUNCTIONS ==========
+
+  /**
+   * @notice Verify a record (attest that it's accurate)
+   * @param recordHash The hash being verified
+   * @param notes Optional hash of detailed notes (stored off-chain)
+   */
+  function verifyRecord(string memory recordHash, string memory notes) external {
+    _reviewRecord(
+      recordHash,
+      notes,
+      ReviewType.Verification,
+      DisputeSeverity.None,
+      DisputeCulpability.None
+    );
+    verificationsByUser[msg.sender].push(recordHash);
+  }
+
+  /**
+   * @notice Dispute a record (claim it's inaccurate/tampered)
+   * @param recordHash The hash being disputed
+   * @param severity Measures the potential impact of the mistake 1=Neglibile 2= Moderate 3=Major
+   * @param culpability Measures reasons for failure 1=NoFault, 2=Systemic 3=Preventable 4=Reckless 5=Intentional
+   * @param notes Optional hash of detailed reasoning (stored off-chain)
+   */
+  function disputeRecord(
+    string memory recordHash,
+    uint8 severity,
+    uint8 culpability,
+    string memory notes
+  ) external {
+    require(severity >= 1 && severity <= 5, 'Severity must be 1-5');
+    _reviewRecord(
+      recordHash,
+      notes,
+      ReviewType.Dispute,
+      DisputeSeverity(severity),
+      DisputeCulpability(culpability)
+    );
+    disputesByUser[msg.sender].push(recordHash);
+  }
+
+  /**
+   * @dev Internal function to handle both verifications and disputes
+   */
+  function _reviewRecord(
+    string memory recordHash,
+    string memory notes,
+    ReviewType reviewType,
+    DisputeSeverity severity,
+    DisputeCulpability culpability
+  ) internal {
+    require(anchoredRecords[recordHash].exists, 'Record not anchored');
+    string memory recordId = anchoredRecords[recordHash].recordId;
+
+    // Must have a role on this record
+    bytes32 roleKey = keccak256(abi.encodePacked(recordId, msg.sender));
+    require(recordRoles[roleKey].isActive, 'No access to this record');
+
+    // One attestation per user per hash
+    require(!hasReviewed[recordHash][msg.sender], 'Already reviewed this record');
+
+    // Store attestation
+    uint256 newIndex = recordReviews[recordHash].length;
+
+    recordReviews[recordHash].push(
+      Review({
+        reviewer: msg.sender,
+        reviewType: reviewType,
+        severity: severity,
+        culpability: culpability,
+        timestamp: block.timestamp,
+        notes: notes,
+        isActive: true
+      })
+    );
+
+    hasReviewed[recordHash][msg.sender] = true;
+    userReviewIndex[recordHash][msg.sender] = newIndex;
+    totalReviews++;
+
+    emit RecordReviewed(
+      recordHash,
+      recordId,
+      msg.sender,
+      reviewType,
+      severity,
+      culpability,
+      block.timestamp
     );
   }
 
   /**
-   * Get all records for a specific patient
-   * @param patientAddress The patient's address
-   * @return Array of record hashes
+   * @notice Retract your attestation (verification or dispute)
+   * @dev Once retracted, you cannot re-attest
+   * @param recordHash The hash you attested to
    */
-  function getPatientRecords(address patientAddress) external view returns (string[] memory) {
-    return recordsByPatient[patientAddress];
+  function retractReview(string memory recordHash) external {
+    require(hasReviewed[recordHash][msg.sender], 'No review to retract');
+
+    uint256 index = userReviewIndex[recordHash][msg.sender];
+    Review storage review = recordReviews[recordHash][index];
+
+    require(review.isActive, 'Already retracted');
+
+    review.isActive = false;
+
+    //Allow them to review again
+    hasReviewed[recordHash][msg.sender] = false;
+
+    emit ReviewRetracted(recordHash, msg.sender, review.reviewType, block.timestamp);
   }
 
   /**
-   * Get all records verified by a specific medical provider
-   * @param verifierAddress The verifier's address
-   * @return Array of record hashes
+   * @notice Allows a user to change the severity and/or culpability scores on their active dispute.
+   * @param recordHash The hash of the record with the dispute.
+   * @param newSeverity The new severity score (1-5).
+   * @param newCulpability The new culpability score (1-5).
    */
-  function getVerifierRecords(address verifierAddress) external view returns (string[] memory) {
-    return recordsByVerifier[verifierAddress];
+  function modifyDispute(
+    string memory recordHash,
+    uint8 newSeverity,
+    uint8 newCulpability
+  ) external {
+    // 1. Basic Checks
+    require(anchoredRecords[recordHash].exists, 'Record not anchored');
+    require(hasReviewed[recordHash][msg.sender], 'User has no review on this record');
+    // Severity: 1(Negligible) to 5(Catastrophic). 0 is None.
+    require(newSeverity >= 1 && newSeverity <= 3, 'Severity must be 1-3');
+    // Culpability: 1(NoFault) to 5(Intentional). 0 is None.
+    require(newCulpability >= 1 && newCulpability <= 5, 'Culpability must be 1-5');
+
+    // 2. Locate Review
+    uint256 index = userReviewIndex[recordHash][msg.sender];
+    Review storage review = recordReviews[recordHash][index];
+
+    // 3. Verify it's an active dispute
+    require(review.isActive, 'Dispute has been retracted');
+    require(review.reviewType == ReviewType.Dispute, 'Review is not a dispute');
+
+    // Store old values for the event
+    DisputeSeverity oldSeverity = review.severity;
+    DisputeCulpability oldCulpability = review.culpability;
+
+    // 4. Update the scores
+    review.severity = DisputeSeverity(newSeverity);
+    review.culpability = DisputeCulpability(newCulpability);
+
+    // 5. Emit Event for Transparency
+    emit DisputeModification(
+      recordHash,
+      msg.sender,
+      oldSeverity,
+      review.severity,
+      oldCulpability,
+      review.culpability,
+      block.timestamp
+    );
+  }
+
+  // ========== RECORD REVIEW - DISPUTE REACTION FUNCTIONS ==========
+
+  /**
+   * @notice React to a dispute (thumbs up or thumbs down)
+   * @param recordHash The record hash with the dispute
+   * @param disputer The address who created the dispute
+   * @param supportsDispute True = agree with dispute, False = disagree
+   */
+  function reactToDispute(
+    string memory recordHash,
+    address disputer,
+    bool supportsDispute
+  ) external {
+    require(anchoredRecords[recordHash].exists, 'Record not anchored');
+    require(hasReviewed[recordHash][disputer], 'No dispute from this address');
+
+    // Verify it's actually a dispute
+    uint256 disputeIndex = userReviewIndex[recordHash][disputer];
+    Review memory review = recordReviews[recordHash][disputeIndex];
+    require(review.reviewType == ReviewType.Dispute, 'Not a dispute');
+    require(review.isActive, 'Dispute has been retracted');
+
+    // Must have access to the record
+    string memory recordId = anchoredRecords[recordHash].recordId;
+    bytes32 roleKey = keccak256(abi.encodePacked(recordId, msg.sender));
+    require(recordRoles[roleKey].isActive, 'No access to this record');
+
+    // Can't react to your own dispute
+    require(msg.sender != disputer, 'Cannot react to your own dispute');
+
+    // One reaction per user per dispute
+    require(
+      !hasReactedToDispute[recordHash][disputer][msg.sender],
+      'Already reacted to this dispute'
+    );
+
+    disputeReactions[recordHash][disputer].push(
+      Reaction({
+        reactor: msg.sender,
+        supportsDispute: supportsDispute,
+        timestamp: block.timestamp
+      })
+    );
+
+    hasReactedToDispute[recordHash][disputer][msg.sender] = true;
+
+    emit DisputeReaction(recordHash, msg.sender, disputer, supportsDispute, block.timestamp);
+  }
+
+  // ========== RECORD REVIEW VIEW FUNCTIONS ==========
+  /**
+   * @notice Get all Reviews for a record hash
+   */
+  function getReviews(string memory recordHash) external view returns (Review[] memory) {
+    return recordReviews[recordHash];
   }
 
   /**
-   * Get total number of records
+   * @notice Get attestation counts for a record hash
    */
-  function getTotalRecords() external view returns (uint256) {
-    return totalRecords;
-  }
+  function getReviewStats(
+    string memory recordHash
+  )
+    external
+    view
+    returns (uint256 activeVerifications, uint256 activeDisputes, uint256 retractedCount)
+  {
+    Review[] memory review = recordReviews[recordHash];
 
-  /**
-   * Get a record hash by its index in the array
-   */
-  function getRecordByIndex(uint256 index) external view returns (string memory) {
-    require(index < allRecordHashes.length, 'Index out of bounds');
-    return allRecordHashes[index];
-  }
-
-  /**
-   * Get verification statistics for a patient
-   * @param patientAddress The patient's address
-   * @return total Total records for this patient
-   * @return verified How many are medically verified
-   */
-  function getPatientStats(
-    address patientAddress
-  ) external view returns (uint256 total, uint256 verified) {
-    string[] memory patientRecords = recordsByPatient[patientAddress];
-    total = patientRecords.length;
-    verified = 0;
-
-    for (uint256 i = 0; i < patientRecords.length; i++) {
-      if (recordVerifications[patientRecords[i]].isVerified) {
-        verified++;
+    for (uint256 i = 0; i < review.length; i++) {
+      if (review[i].isActive) {
+        if (review[i].reviewType == ReviewType.Verification) {
+          activeVerifications++;
+        } else {
+          activeDisputes++;
+        }
+      } else {
+        retractedCount++;
       }
     }
 
-    return (total, verified);
+    return (activeVerifications, activeDisputes, retractedCount);
   }
 
-  // ===============================================================
-  // RECORD DISPUTE
-  // ===============================================================
+  /**
+   * @notice Get a user's attestation on a record hash
+   */
+  function getUserReview(
+    string memory recordHash,
+    address user
+  )
+    external
+    view
+    returns (
+      bool exists,
+      ReviewType reviewType,
+      uint256 timestamp,
+      string memory notes,
+      bool isActive
+    )
+  {
+    if (!hasReviewed[recordHash][user]) {
+      return (false, ReviewType.Verification, 0, '', false);
+    }
+
+    uint256 index = userReviewIndex[recordHash][user];
+    Review memory review = recordReviews[recordHash][index];
+
+    return (true, review.reviewType, review.timestamp, review.notes, review.isActive);
+  }
+
+  /**
+   * @notice Get reactions to a specific dispute
+   */
+  function getDisputeReactions(
+    string memory recordHash,
+    address disputer
+  ) external view returns (Reaction[] memory) {
+    return disputeReactions[recordHash][disputer];
+  }
+
+  /**
+   * @notice Get reaction counts for a dispute
+   */
+  function getDisputeReactionStats(
+    string memory recordHash,
+    address disputer
+  ) external view returns (uint256 supportsCount, uint256 opposesCount) {
+    Reaction[] memory reactions = disputeReactions[recordHash][disputer];
+
+    for (uint256 i = 0; i < reactions.length; i++) {
+      if (reactions[i].supportsDispute) {
+        supportsCount++;
+      } else {
+        opposesCount++;
+      }
+    }
+
+    return (supportsCount, opposesCount);
+  }
+
+  /**
+   * @notice Get user's attestation history (for credibility scoring)
+   */
+  function getUserAttestationHistory(
+    address user
+  ) external view returns (uint256 totalVerifications, uint256 totalDisputes) {
+    return (verificationsByUser[user].length, disputesByUser[user].length);
+  }
+
+  /**
+   * @notice Get all record hashes a user has verified
+   */
+  function getUserVerifications(address user) external view returns (string[] memory) {
+    return verificationsByUser[user];
+  }
+
+  /**
+   * @notice Get all record hashes a user has disputed
+   */
+  function getUserDisputes(address user) external view returns (string[] memory) {
+    return disputesByUser[user];
+  }
+
+  /**
+   * @notice Get total counts
+   */
+  function getTotalStats() external view returns (uint256 totalAnchored, uint256 totalReviewCount) {
+    return (totalAnchoredRecords, totalReviews);
+  }
 }

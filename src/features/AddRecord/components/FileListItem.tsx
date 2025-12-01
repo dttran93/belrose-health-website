@@ -6,7 +6,26 @@ import { EnhancedFHIRResults } from '@/features/AddRecord/components/FHIRValidat
 import { ProgressChips, createFileProcessingSteps } from './ui/ProgressChips';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { Button } from '@/components/ui/Button';
-import type { FileListItemProps } from './CombinedUploadFHIR.type';
+import { FileObject } from '@/types/core';
+import { FHIRWithValidation } from '../services/fhirConversionService.type';
+
+export interface FileListItemProps {
+  fileItem: FileObject;
+  fhirResult?: {
+    success: boolean;
+    fhirData?: FHIRWithValidation;
+    error?: string;
+  };
+  onRemove: (fileId: string) => void;
+  onConfirm: (fileId: string) => void;
+
+  // Updated: FileListItem should pass FileItem, but retryFile expects fileId
+  // We'll handle the conversion in the component
+  onRetry: (fileItem: FileObject) => void;
+  onForceConvert?: (fileItem: FileObject) => void;
+  showFHIRResults?: boolean;
+  onReview: (fileItem: FileObject) => void;
+}
 
 export const FileListItem: React.FC<FileListItemProps> = ({
   fileItem,

@@ -1,10 +1,11 @@
 import React from 'react';
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation, Location } from "react-router-dom";
 import { useAuthContext } from "./AuthContext";
+import { ProtectedRouteProps, LocationState } from '@/types/core'; // Import from core types
 
-const ProtectedRoute = ({ children }) => {
-  const { user, loading } = useAuthContext(); // Use context instead
-  const location = useLocation();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const { user, loading } = useAuthContext();
+  const location = useLocation() as Location<LocationState>;
 
   if (loading) {
     return (
@@ -21,7 +22,7 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
-  return children; 
+  return <>{children}</>;
 };
 
 export default ProtectedRoute;

@@ -5,7 +5,7 @@
  * It handles: extracting text, FHIR conversion, AI processing, hashing, encryption and metadata
  * generation. It also reports stages for the UI progress.
  *
- * This hook does NOT create fileobjects or upload them. That's in 'useFileManager', which calls this hook
+ * This hook does NOT create file objects or upload them. That's in 'useFileManager', which calls this hook
  * to process each file after creating the initial FileObject.
  *
  * Flow:

@@ -1,8 +1,3 @@
-export interface FHIRConversionRequest {
-  documentText: string;
-  documentType?: string;
-}
-
 export interface ValidationIssue {
   message: string;
   severity: 'error' | 'warning' | 'info';

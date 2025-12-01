@@ -39,7 +39,7 @@ export interface FHIRResourceCardProps {
 }
 
 // Props for the main FHIR cards display component
-export interface HealthRecordProps {
+export interface FHIRRecordProps {
   fhirData: FHIRBundle | null | undefined;
   className?: string;
   //Edit mode props

@@ -1,5 +1,5 @@
 import React from 'react';
-import ValuesCard from './ui/ValuesCard.jsx';
+import ValuesCard from './ui/ValuesCard';
 import { Shield, Users, Handshake } from 'lucide-react';
 
 interface ValueItem {

@@ -1,4 +1,4 @@
-// functions/src/functions/sharing/sendShareInvitationEmail.ts
+// functions/src/functions/handlers/sendShareInvitationEmail.ts
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';

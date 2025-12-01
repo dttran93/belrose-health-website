@@ -78,5 +78,5 @@ export const LayoutSlot: React.FC<LayoutSlotProps> = ({ children, slot }) => {
     };
   }, [children, slot, setHeader, setFooter]);
 
-  return null; // This component doesn't render anything itself
+  return null;
 };

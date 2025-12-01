@@ -5,7 +5,7 @@ import DesktopSidebar from '@/components/app/DesktopSidebar';
 import MobileSidebar from '@/components/app/MobileSidebar';
 import MobileHeader from '@/components/app/MobileHeader';
 import ResizeHandle from '@/components/ui/ResizeHandle';
-import AIChatPanel from '@/features/ai/AIChatPanel';
+import AIChatPanel from '@/features/Ai/AIChatPanel';
 import useMediaQuery from '@/hooks/useMediaQuery';
 import { healthRecords, healthCategories } from '@/components/app/navigation';
 import { useAuthContext } from '@/components/auth/AuthContext';
