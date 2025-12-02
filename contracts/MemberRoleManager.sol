@@ -99,6 +99,7 @@ contract MemberRoleManager is MemberRoleManagerInterface {
 
   mapping(address => Member) public members;
   mapping(bytes32 => address) public userIdHashToAddress;
+  address[] public memberList; //For enumeration and migrations
   uint256 public totalMembers;
 
   // =================== MEMBER REGISTRY - FUNCTIONS ===================
@@ -121,6 +122,7 @@ contract MemberRoleManager is MemberRoleManagerInterface {
     });
 
     userIdHashToAddress[userIdHash] = userWallet;
+    memberList.push(userWallet);
     totalMembers++;
 
     emit MemberRegistered(userWallet, userIdHash, block.timestamp);
@@ -171,6 +173,13 @@ contract MemberRoleManager is MemberRoleManagerInterface {
    */
   function getWalletByUserIdHash(bytes32 userIdHash) external view returns (address) {
     return userIdHashToAddress[userIdHash];
+  }
+
+  /**
+   * @notice Get all member addresses. Could be very useful for future migration.
+   */
+  function getAllMembers() external view returns (address[] memory) {
+    return memberList;
   }
 
   // ===============================================================

@@ -1,43 +1,8 @@
 {
   "_format": "hh-sol-cache-2",
   "files": {
-    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\contracts\\HealthRecordVerification.sol": {
-      "lastModificationDate": 1764599453096,
-      "contentHash": "b940105731081552a22aa975864ef903",
-      "sourceName": "contracts/HealthRecordVerification.sol",
-      "solcConfig": {
-        "version": "0.8.19",
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 200
-          },
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [],
-      "versionPragmas": [
-        "^0.8.19"
-      ],
-      "artifacts": [
-        "HealthRecordVerification"
-      ]
-    },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\contracts\\HealthRecordCore.sol": {
-      "lastModificationDate": 1764609424777,
+      "lastModificationDate": 1764612088429,
       "contentHash": "af76c5b431eae5d8b7f344821f1460d2",
       "sourceName": "contracts/HealthRecordCore.sol",
       "solcConfig": {
@@ -74,8 +39,8 @@
       ]
     },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\contracts\\MemberRoleManager.sol": {
-      "lastModificationDate": 1764609990987,
-      "contentHash": "662eb74c87753ec463203cebca052c31",
+      "lastModificationDate": 1764670713492,
+      "contentHash": "82e35267ed332b1e7dfcc546fd49a8bf",
       "sourceName": "contracts/MemberRoleManager.sol",
       "solcConfig": {
         "version": "0.8.19",
