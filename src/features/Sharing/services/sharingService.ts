@@ -171,7 +171,7 @@ export class SharingService {
       }
 
       // ✅ CASE 4: No encryption keys set up
-      if (!data.publicKey) {
+      if (!data.encryption?.publicKey) {
         throw new Error(
           'Receiver has not completed their account setup (encryption keys missing). Please ask them to complete their registration.'
         );
@@ -188,7 +188,7 @@ export class SharingService {
     const receiverId = receiver.id;
     const receiverData = receiver.data;
 
-    if (!receiverData.publicKey) {
+    if (!receiverData.encryption?.publicKey) {
       throw new Error('Receiver has not set up encryption keys');
     }
 
@@ -224,24 +224,20 @@ export class SharingService {
     });
 
     // 3. Decrypt the record's AES key using owner's master key
-    const recordKey = await RecordDecryptionService.getRecordKey(
-      request.recordId,
-      recordData,
-      masterKey
-    );
+    const recordKey = await RecordDecryptionService.getRecordKey(request.recordId, masterKey);
 
     console.log('✅ Record key decrypted');
 
     console.log('🔍 Checking receiver public key:', {
-      hasPublicKey: !!receiverData.publicKey,
-      publicKeyType: typeof receiverData.publicKey,
-      publicKeyPreview: receiverData.publicKey?.substring?.(0, 100),
+      hasPublicKey: !!receiverData.encryption.publicKey,
+      publicKeyType: typeof receiverData.encryption.publicKey,
+      publicKeyPreview: receiverData.encryption.publicKey?.substring?.(0, 100),
     });
 
     // 4. Wrap the record key with receiver's RSA public key
     console.log('📝 About to import receiver public key...');
     const receiverPublicKey = await SharingKeyManagementService.importPublicKey(
-      receiverData.publicKey
+      receiverData.encryption.publicKey
     );
     console.log('✅ Receiver public key imported');
 

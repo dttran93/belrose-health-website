@@ -6,7 +6,6 @@ import {
   doc,
   addDoc,
   getDoc,
-  updateDoc,
   getDocs,
   deleteDoc,
   query,
@@ -39,6 +38,49 @@ export class VersionControlService {
     return this.currentUser.uid;
   }
 
+  // ==================== ENCRYPTION KEY HELPER ====================
+
+  /**
+   * Helper to fetch the user's wrapped DEK for a given record.
+   * This key is stored in the `wrappedKeys` collection and is encrypted
+   * by the current user's master key.
+   */
+  private async fetchEncryptedRecordKey(recordId: string): Promise<string> {
+    if (!this.userId) throw new Error('User not authenticated');
+
+    console.log(`🔑 Fetching wrapped key for record ${recordId}...`);
+
+    const q = query(
+      collection(this.db, 'wrappedKeys'),
+      where('recordId', '==', recordId),
+      where('userId', '==', this.userId),
+      limit(1)
+    );
+
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      throw new Error(
+        `Wrapped key not found for record ${recordId} and user ${this.userId}. Cannot perform versioning operations.`
+      );
+    }
+
+    const firstDoc = snapshot.docs[0];
+    if (!firstDoc) {
+      throw new Error('Internal error: Document was expected but not found in snapshot.');
+    }
+
+    const docData = firstDoc.data();
+
+    //Safely access the encrypted key and check its type
+    const encryptedKey = docData.encryptedKey as string | undefined;
+    if (!encryptedKey || typeof encryptedKey !== 'string') {
+      throw new Error('Wrapped key data is corrupt or missing the "encryptedKey" field.');
+    }
+
+    return encryptedKey;
+  }
+
   // ==================== CORE VERSION METHODS ====================
 
   /**
@@ -56,10 +98,6 @@ export class VersionControlService {
       throw new Error(
         'Cannot create version: Record must be encrypted. Plaintext storage is not supported.'
       );
-    }
-
-    if (!updatedRecord.encryptedKey) {
-      throw new Error('Cannot create version: Missing encryption key.');
     }
 
     // Step 1: Get the CURRENT record from Firestore (the original, pre-edit state)
@@ -98,7 +136,6 @@ export class VersionControlService {
       encryptedContextText: originalRecord.encryptedContextText ?? null,
       encryptedFhirData: originalRecord.encryptedFhirData ?? null,
       encryptedBelroseFields: originalRecord.encryptedBelroseFields ?? null,
-      encryptedKey: originalRecord.encryptedKey ?? null,
       isEncrypted: true,
       fileType: originalRecord.fileType ?? null,
       fileSize: originalRecord.fileSize ?? null,
@@ -134,26 +171,26 @@ export class VersionControlService {
       );
     }
 
-    if (!updatedRecord.encryptedKey) {
-      throw new Error('Cannot create version: Missing encryption key.');
-    }
-
     try {
       const versionHistory = await this.getVersionHistory(recordId);
 
-      // 🆕 If no versions exist, delegate to initialization. InitializeVersioning returns to here after creating v0
+      //If no versions exist, delegate to initialization. InitializeVersioning returns to here after creating v0
       if (versionHistory.length === 0) {
         console.log('📦 First edit detected — initializing versioning...');
         return await this.initializeVersioning(recordId, updatedRecord, commitMessage);
       }
 
       // Versions already exist - create next version normally
-      const latestVersion = versionHistory[0] as RecordVersion; // array is descending so newest version is Index [0] latest would be Index[length]
+      // Array is descending by versionNumber, so index [0] is the newest version
+      const latestVersion = versionHistory[0] as RecordVersion;
       const versionNumber = latestVersion.versionNumber + 1;
 
       console.log(
         `📝 Creating version ${versionNumber} (previous: ${latestVersion.versionNumber})`
       );
+
+      // Fetch the encrypted key before calculating changes and encrypting changes
+      const encryptedRecordKey = await this.fetchEncryptedRecordKey(recordId); // Use fetched key
 
       // Calculate changes from previous version
       const previousSnapshot = await this.decryptVersionSnapshot(latestVersion);
@@ -161,6 +198,7 @@ export class VersionControlService {
         fileName: updatedRecord.fileName,
         fhirData: updatedRecord.fhirData ?? null,
         belroseFields: updatedRecord.belroseFields ?? null,
+        contextText: updatedRecord.contextText ?? null,
         extractedText: updatedRecord.extractedText ?? null,
         originalText: updatedRecord.originalText ?? null,
       };
@@ -180,7 +218,7 @@ export class VersionControlService {
       // Always Encrypt Changes - Zero Knowledge Architecture
       if (changes.length > 0) {
         console.log('  🔐 Encrypting changes array...');
-        version.encryptedChanges = await this.encryptChanges(changes, updatedRecord.encryptedKey);
+        version.encryptedChanges = await this.encryptChanges(changes, encryptedRecordKey);
         version.hasEncryptedChanges = true;
         version.commitMessage = commitMessage || this.generateAutoCommitMessage(changes);
         console.log('  ✅ Changes encrypted');
@@ -198,7 +236,6 @@ export class VersionControlService {
         encryptedContextText: updatedRecord.encryptedContextText,
         encryptedFhirData: updatedRecord.encryptedFhirData,
         encryptedBelroseFields: updatedRecord.encryptedBelroseFields,
-        encryptedKey: updatedRecord.encryptedKey,
         isEncrypted: true,
       };
 
@@ -260,7 +297,7 @@ export class VersionControlService {
           ({
             id: doc.id,
             ...doc.data(),
-          } as RecordVersion)
+          }) as RecordVersion
       );
 
       console.log(`📚 Found ${versions.length} versions for record ${recordId}`);
@@ -308,11 +345,10 @@ export class VersionControlService {
         throw new Error('Cannot decrypt changes: Missing encryption key');
       }
 
+      const encryptedRecordKey = await this.fetchEncryptedRecordKey(version.recordId);
+
       // ✅ TypeScript now knows this is an EncryptedSnapshot
-      return await this.decryptChanges(
-        version.encryptedChanges,
-        version.recordSnapshot.encryptedKey
-      );
+      return await this.decryptChanges(version.encryptedChanges, encryptedRecordKey);
     }
 
     return [];
@@ -322,13 +358,19 @@ export class VersionControlService {
    * Decrypt a version's snapshot for viewing or comparison
    * Returns plaintext data whether version is encrypted or not
    */
-  private async decryptVersionSnapshot(version: RecordVersion): Promise<any> {
-    // If the version isn't encrypted, return the plain data
+  private async decryptVersionSnapshot(
+    version: RecordVersion,
+    encryptedKey?: string
+  ): Promise<any> {
+    // If the version isn't encrypted, throw error
     if (!version.recordSnapshot.isEncrypted) {
       throw new Error('Invalid version: Snapshot must be encrypted');
     }
 
     console.log(`🔓 Decrypting version ${version.versionNumber}...`);
+
+    //Get the key from caller or fetch
+    const keyToUse = encryptedKey || (await this.fetchEncryptedRecordKey(version.recordId));
 
     // Check if encryption session is active
     const masterKey = EncryptionKeyManager.getSessionKey();
@@ -341,17 +383,17 @@ export class VersionControlService {
     try {
       // Build an encrypted record object from the version snapshot
       const encryptedRecord = {
+        id: version.recordId,
         encryptedFileName: version.recordSnapshot.encryptedFileName,
         encryptedExtractedText: version.recordSnapshot.encryptedExtractedText,
         encryptedOriginalText: version.recordSnapshot.encryptedOriginalText,
         encryptedContextText: version.recordSnapshot.encryptedContextText,
         encryptedFhirData: version.recordSnapshot.encryptedFhirData,
         encryptedBelroseFields: version.recordSnapshot.encryptedBelroseFields,
-        encryptedKey: version.recordSnapshot.encryptedKey,
         isEncrypted: true,
       };
 
-      const decryptedData = await RecordDecryptionService.decryptRecord(encryptedRecord);
+      const decryptedData = await RecordDecryptionService.decryptRecord(encryptedRecord, keyToUse);
       console.log(`✅ Version ${version.versionNumber} decrypted successfully`);
 
       // Return in the format expected by diff/display
@@ -361,6 +403,7 @@ export class VersionControlService {
         belroseFields: decryptedData.belroseFields ?? null,
         extractedText: decryptedData.extractedText ?? null,
         originalText: decryptedData.originalText ?? null,
+        contextText: decryptedData.contextText ?? null,
       };
     } catch (error: any) {
       console.error(`❌ Failed to decrypt version ${version.versionNumber}:`, error);
@@ -484,9 +527,12 @@ export class VersionControlService {
       v2Encrypted: version2.recordSnapshot?.isEncrypted,
     });
 
+    // Fetch the key once and pass it to avoid redundant lookups
+    const encryptedRecordKey = await this.fetchEncryptedRecordKey(recordId);
+
     // Decrypt both versions before comparing
-    const decryptedSnapshot1 = await this.decryptVersionSnapshot(version1);
-    const decryptedSnapshot2 = await this.decryptVersionSnapshot(version2);
+    const decryptedSnapshot1 = await this.decryptVersionSnapshot(version1, encryptedRecordKey);
+    const decryptedSnapshot2 = await this.decryptVersionSnapshot(version2, encryptedRecordKey);
 
     console.log('VersionJSON comparison:', {
       v1: decryptedSnapshot1,
@@ -653,10 +699,13 @@ ENCRYPTION/DECRYPTION HELPERS
     if (changes.length === 0) return 'No changes';
     if (changes.length === 1) return changes[0]?.description || 'Updated record';
 
-    const operationCounts = changes.reduce((acc, change) => {
-      acc[change.operation] = (acc[change.operation] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const operationCounts = changes.reduce(
+      (acc, change) => {
+        acc[change.operation] = (acc[change.operation] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
     const parts: string[] = [];
     if (operationCounts.create) parts.push(`${operationCounts.create} added`);

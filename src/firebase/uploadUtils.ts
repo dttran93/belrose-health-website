@@ -1,13 +1,6 @@
 // src/firebase/uploadUtils.ts
 
-import {
-  getStorage,
-  ref,
-  uploadBytes,
-  getDownloadURL,
-  deleteObject,
-  getMetadata,
-} from 'firebase/storage';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import {
   collection,
   addDoc,
@@ -16,9 +9,9 @@ import {
   deleteDoc,
   getDoc,
   getDocs,
-  DocumentReference,
   query,
   where,
+  setDoc,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
@@ -33,6 +26,7 @@ import {
   arrayBufferToBase64,
   base64ToArrayBuffer,
 } from '@/utils/dataFormattingUtils';
+import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
 
 // ==================== TYPE DEFINITIONS ====================
 
@@ -176,7 +170,6 @@ export async function createFirestoreRecord({
     administrators: administrators,
 
     isEncrypted: true,
-    encryptedKey: fileObj.encryptedData.encryptedKey,
     isVirtual: fileObj.isVirtual,
 
     encryptedFileName: fileObj.encryptedData.fileName
@@ -246,6 +239,19 @@ export async function createFirestoreRecord({
   // Save to GLOBAL records collection
   console.log('📄 Saving documentData:', documentData);
   const docRef = await addDoc(collection(db, 'records'), removeUndefinedValues(documentData));
+
+  // Create wrappedKey entry for the creator
+  const wrappedKeyId = `${docRef.id}_${user.uid}`;
+  await setDoc(doc(db, 'wrappedKeys', wrappedKeyId), {
+    recordId: docRef.id,
+    userId: user.uid,
+    wrappedKey: fileObj.encryptedData.encryptedKey, // Store the AES key encrypted with creator's master key
+    isCreator: true, // Flag to indicate this is the original creator (uses master key, not RSA)
+    createdAt: new Date(),
+    isActive: true,
+  });
+  console.log('✅ Creator wrappedKey entry created:', wrappedKeyId);
+
   return docRef.id;
 }
 
@@ -274,14 +280,6 @@ export const updateFirestoreRecord = async (
     if (!currentDoc.exists()) throw new Error('Document not found');
     const currentData = currentDoc.data();
 
-    // DEBUG
-    console.log('👑 Ownership check:', {
-      owners: currentData.owners,
-      administrators: currentData.administrators,
-      uploadedBy: currentData.uploadedBy,
-      user: user.uid,
-    });
-
     // Verify user is an owner or administrator
     const owners: string[] = currentData.owners || [currentData.uploadedBy];
     const administrators: string[] = currentData.administrators || [];
@@ -304,13 +302,57 @@ export const updateFirestoreRecord = async (
       throw new Error('Please unlock your encryption to save changes.');
     }
 
-    // Get the record's encrypted file key and decrypt it
-    const encryptedKeyData = base64ToArrayBuffer(currentData.encryptedKey);
-    const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(
-      encryptedKeyData,
-      masterKey
-    );
-    const fileKey = await EncryptionService.importKey(fileKeyData);
+    // Get encryption key from wrappedKeys collection
+    const wrappedKeyId = `${documentId}_${user.uid}`;
+    const wrappedKeyRef = doc(db, 'wrappedKeys', wrappedKeyId);
+    const wrappedKeyDoc = await getDoc(wrappedKeyRef);
+
+    if (!wrappedKeyDoc.exists() || !wrappedKeyDoc.data().isActive) {
+      throw new Error('You do not have access to this record');
+    }
+
+    const wrappedKeyData = wrappedKeyDoc.data();
+    const isCreator = wrappedKeyData.isCreator === true;
+
+    let fileKey: CryptoKey;
+
+    if (isCreator) {
+      // Creator: key is encrypted with their master key (AES)
+      const encryptedKeyData = base64ToArrayBuffer(wrappedKeyData.wrappedKey);
+      const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(
+        encryptedKeyData,
+        masterKey
+      );
+      fileKey = await EncryptionService.importKey(fileKeyData);
+    } else {
+      // Shared user: key is wrapped with their RSA public key
+      // Get user's RSA private key
+      const userRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userRef);
+      const userData = userDoc.data();
+
+      if (!userData) {
+        throw new Error('RSA private key not found');
+      }
+
+      const encryptedPrivateKeyData = base64ToArrayBuffer(userData.encryption.encryptedPrivateKey);
+      const privateKeyIv = base64ToArrayBuffer(userData.encryption.encryptedPrivateKeyIV);
+
+      const privateKeyBytes = await EncryptionService.decryptFile(
+        encryptedPrivateKeyData,
+        masterKey,
+        privateKeyIv
+      );
+
+      const rsaPrivateKey = await SharingKeyManagementService.importPrivateKey(
+        arrayBufferToBase64(privateKeyBytes)
+      );
+
+      fileKey = await SharingKeyManagementService.unwrapKey(
+        wrappedKeyData.wrappedKey,
+        rsaPrivateKey
+      );
+    }
     console.log('✓ File key decrypted');
 
     // Encrypt updated Fields
@@ -343,8 +385,16 @@ export const updateFirestoreRecord = async (
     try {
       const newRecordHash = await RecordHashService.generateRecordHash(updatedFileObject);
       filteredData.recordHash = newRecordHash;
-      filteredData.previousRecordHash = currentData.recordHash;
-      console.log('🔗 Record hash updated');
+      const currentHash = currentData.recordHash; //Hash of the record before this update
+      //Get existing previousRecordHash array from current document data
+      let previousHashes: string[] = currentData.previousRecordHash || [];
+      if (currentHash) {
+        previousHashes.push(currentHash);
+      }
+
+      filteredData.previousRecordHash = previousHashes;
+
+      console.log('🔗 Record hash updated. New history length:', previousHashes.length);
     } catch (hashError) {
       console.warn('⚠️ Failed to generate record hash:', hashError);
     }

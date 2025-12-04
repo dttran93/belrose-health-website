@@ -1,15 +1,7 @@
 // /features/Auth/components/RegistrationForm.tsx
 
 import React, { useState } from 'react';
-import {
-  Check,
-  Lock,
-  Wallet,
-  ShieldCheck,
-  ArrowRight,
-  ArrowLeft,
-  RotateCcwKey,
-} from 'lucide-react';
+import { Check, Wallet, ShieldCheck, ArrowRight, ArrowLeft, RotateCcwKey } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
@@ -81,7 +73,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
   const isStepCompleted = (stepNumber: number): boolean => {
     switch (stepNumber) {
       case 1:
-        //Step 1 is done if we have a userId and email and email verification
+        //Step 1 is done if we have a userId and email
         return !!(registrationData.userId && registrationData.email);
       case 2:
         // Step 2 is complete if wallet address and type are set
@@ -190,13 +182,14 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         email: registrationData.email,
         firstName: registrationData.firstName,
         lastName: registrationData.lastName,
-        publicKey: registrationData.publicKey,
+
         encryption: {
           enabled: true,
           encryptedMasterKey: registrationData.encryptedMasterKey,
           masterKeyIV: registrationData.masterKeyIV,
           encryptedPrivateKey: registrationData.encryptedPrivateKey,
           encryptedPrivateKeyIV: registrationData.encryptedPrivateKeyIV,
+          publicKey: registrationData.publicKey,
           recoveryKeyHash: registrationData.recoveryKeyHash,
           setupAt: new Date().toISOString(),
         },
@@ -275,8 +268,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
                         isCompleted
                           ? `text-chart-3`
                           : isCurrent
-                          ? 'text-chart-4 text-lg'
-                          : 'text-secondary text-base'
+                            ? 'text-chart-4 text-lg'
+                            : 'text-secondary text-base'
                       }`}
                     >
                       {step.title}

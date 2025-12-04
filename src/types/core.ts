@@ -13,13 +13,18 @@ export interface User {
   lastName: string | null;
   photoURL?: string | null;
 
-  encryption?: {
+  encryption: {
     enabled: boolean;
     encryptedMasterKey: string;
     masterKeyIV: string;
     recoveryKeyHash: string; // for recovery key verification
     setupAt: string;
     lastUnlockedAt?: string; // track usage
+
+    // RSA Sharing Keys (used for sharing and unwrapping shared file keys)
+    encryptedPrivateKey: string; // The encrypted RSA Private Key (encrypted by Master Key)
+    encryptedPrivateKeyIV: string; // The IV for the encrypted RSA Private Key
+    publicKey: string; // The RSA Public Key
   };
 }
 
@@ -179,7 +184,7 @@ export interface FileObject {
   // === VERIFICATION AND SECURITY ===
   originalFileHash?: string | null; //hash of the original file that was uploaded
   recordHash?: string | null; //has of the record content
-  previousRecordHash?: string | null; //to establish chain of records in case they are edited
+  previousRecordHash?: string[] | null; //to establish chain of records in case they are edited
   blockchainVerification?: BlockchainVerification;
 
   // === METADATA ===
@@ -214,7 +219,6 @@ export interface FileObject {
 
   // Encryption fields at ROOT level (as stored in Firestore)
   isEncrypted?: boolean;
-  encryptedKey?: string; // The wrapped AES key (needed for decryption & sharing!)
   encryptedFileIV?: string; // IV for the file stored in Firebase Storage
 
   //For versioning purposes
