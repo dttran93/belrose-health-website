@@ -10,6 +10,8 @@ import {
   query,
   where,
   getDocs,
+  addDoc,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
@@ -18,6 +20,7 @@ import { ethers } from 'ethers';
 import { SharingContractService } from '@/features/BlockchainVerification/service/sharingContractService';
 import { EmailInvitationService } from './emailInvitationService';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
+import { MemberRoleManagerService } from '@/features/Permissions/services/memberRoleManagerService';
 
 export interface ShareRecordRequest {
   recordId: string;
@@ -308,6 +311,22 @@ export class SharingService {
       );
     }
 
+    // 6.5 Grant viewer role on MemberRoleManager
+    try {
+      console.log('🔗 Granting viewer role on blockchain...');
+      await MemberRoleManagerService.grantRole(request.recordId, receiverWalletAddress, 'viewer');
+      console.log('✅ Blockchain: Viewer role granted');
+    } catch (blockchainError) {
+      console.error('⚠️ Failed to grant viewer role on blockchain:', blockchainError);
+      // Log to sync queue for retry - don't fail the share since access permission succeeded
+      await this.logBlockchainSyncFailure(
+        request.recordId,
+        'grantRole',
+        { walletAddress: receiverWalletAddress, role: 'viewer', userId: receiverId },
+        blockchainError as Error
+      );
+    }
+
     // 7. Store everything in Firestore
     // 7.1 create reference in Firestore
     const wrappedKeyRef = doc(db, 'wrappedKeys', wrappedKeyId);
@@ -431,7 +450,7 @@ export class SharingService {
 
     console.log('✅ Access permission revoked');
 
-    // 4. Revoke permission on blockchain
+    // 4. Revoke permission on Access Permissions smart contract
     try {
       console.log('🔗 Revoking permission on blockchain...');
       const txHash = await SharingContractService.revokeAccessOnChain(
@@ -446,6 +465,30 @@ export class SharingService {
     } catch (error) {
       console.error('❌ Blockchain transaction failed:', error);
       throw new Error('Failed to revoke on blockchain: ' + (error as Error).message);
+    }
+
+    // 5. Revoke role on MemberRoleManager Smart Contract
+    const receiverDoc = await getDoc(doc(db, 'users', receiverId));
+    const receiverData = receiverDoc.data();
+    const receiverWalletAddress =
+      receiverData?.connectedWallet?.address || receiverData?.generatedWallet?.address;
+
+    if (receiverWalletAddress) {
+      try {
+        console.log('🔗 Revoking role on blockchain...');
+        await MemberRoleManagerService.revokeRole(recordId, receiverWalletAddress);
+        console.log('✅ Blockchain: Role revoked');
+      } catch (blockchainError) {
+        console.error('⚠️ Failed to revoke role on blockchain:', blockchainError);
+        await this.logBlockchainSyncFailure(
+          recordId,
+          'revokeRole',
+          { walletAddress: receiverWalletAddress, userId: receiverId },
+          blockchainError as Error
+        );
+      }
+    } else {
+      console.warn('⚠️ No wallet address found for receiver, skipping blockchain revoke');
     }
 
     console.log('✅ Access revoked successfully!');
@@ -543,5 +586,36 @@ export class SharingService {
 
     const data = wrappedKeyDoc.data();
     return data.isActive === true;
+  }
+
+  // Add this helper method to the class
+  private static async logBlockchainSyncFailure(
+    recordId: string,
+    action: 'grantRole' | 'changeRole' | 'revokeRole',
+    params: {
+      walletAddress: string;
+      role?: 'owner' | 'administrator' | 'viewer';
+      userId: string;
+    },
+    error: Error
+  ): Promise<void> {
+    try {
+      const db = getFirestore();
+      await addDoc(collection(db, 'blockchainSyncQueue'), {
+        recordId,
+        action,
+        walletAddress: params.walletAddress,
+        role: params.role || null,
+        userId: params.userId,
+        error: error.message,
+        status: 'pending',
+        retryCount: 0,
+        createdAt: serverTimestamp(),
+        lastAttemptAt: serverTimestamp(),
+      });
+      console.log('📝 Blockchain sync failure logged for retry');
+    } catch (logError) {
+      console.error('❌ Failed to log blockchain sync failure:', logError);
+    }
   }
 }

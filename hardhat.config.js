@@ -10,6 +10,7 @@ export default {
         enabled: true,
         runs: 200,
       },
+      evmVersion: 'paris',
     },
   },
   networks: {
@@ -24,7 +25,7 @@ export default {
     sepolia: {
       url: 'https://1rpc.io/sepolia',
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: 20000000000,
+      gasPrice: 10000000000,
     },
   },
   etherscan: {

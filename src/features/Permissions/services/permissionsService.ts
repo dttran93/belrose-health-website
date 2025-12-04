@@ -1,8 +1,19 @@
 //src/features/Permissions/service/permissionsService.ts
 
-import { getFirestore, doc, updateDoc, arrayRemove, arrayUnion, getDoc } from 'firebase/firestore';
+import {
+  getFirestore,
+  doc,
+  updateDoc,
+  arrayRemove,
+  arrayUnion,
+  getDoc,
+  collection,
+  addDoc,
+  serverTimestamp,
+} from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { SharingService } from '@/features/Sharing/services/sharingService';
+import { MemberRoleManagerService } from './memberRoleManagerService';
 
 /**
  * Service for managing record permissions
@@ -10,11 +21,69 @@ import { SharingService } from '@/features/Sharing/services/sharingService';
  */
 export class PermissionsService {
   /**
+   * Helper: Get a user's wallet address from Firestore
+   * Throws if user has no wallet
+   */
+  private static async getUserWalletAddress(userId: string): Promise<string> {
+    const db = getFirestore();
+    const userDoc = await getDoc(doc(db, 'users', userId));
+
+    if (!userDoc.exists()) {
+      throw new Error('User not found');
+    }
+
+    const userData = userDoc.data();
+    const walletAddress = userData.connectedWallet?.address || userData.generatedWallet?.address;
+
+    if (!walletAddress) {
+      throw new Error(
+        'User has no wallet address. They must set up a wallet before managing permissions.'
+      );
+    }
+
+    return walletAddress;
+  }
+
+  /**
+   * Helper: Log a failed blockchain sync for later retry
+   */
+  private static async logBlockchainSyncFailure(
+    recordId: string,
+    action: 'grantRole' | 'changeRole' | 'revokeRole',
+    params: {
+      walletAddress: string;
+      role?: 'owner' | 'administrator' | 'viewer';
+      userId: string;
+    },
+    error: Error
+  ): Promise<void> {
+    try {
+      const db = getFirestore();
+      await addDoc(collection(db, 'blockchainSyncQueue'), {
+        recordId,
+        action,
+        walletAddress: params.walletAddress,
+        role: params.role || null,
+        userId: params.userId,
+        error: error.message,
+        status: 'pending',
+        retryCount: 0,
+        createdAt: serverTimestamp(),
+        lastAttemptAt: serverTimestamp(),
+      });
+      console.log('📝 Blockchain sync failure logged for retry');
+    } catch (logError) {
+      console.error('❌ Failed to log blockchain sync failure:', logError);
+    }
+  }
+
+  /**
    * Add an owner to a record
    * @param recordId - The record ID
    * @param userId - The user ID to add as owner
    * @throws Error if operation fails or user doesn't have permission
    * Also adds owner as administrator if they aren't one already
+   * Mirrors to blockchain as well. Creates list if blockchain mirroring fails
    */
   static async addOwner(recordId: string, userId: string): Promise<void> {
     const auth = getAuth();
@@ -23,6 +92,9 @@ export class PermissionsService {
     if (!currentUser) {
       throw new Error('User not authenticated');
     }
+
+    //Get wallet address upfrot - throws if missing
+    const userWalletAddress = await this.getUserWalletAddress(userId);
 
     const db = getFirestore();
     const recordRef = doc(db, 'records', recordId);
@@ -57,14 +129,27 @@ export class PermissionsService {
       console.log('📝 User is not yet an admin, adding admin privileges...');
       await this.addAdmin(recordId, userId);
       console.log('✅ User added as administrator with encryption access');
-    } else {
-      console.log('ℹ️  User is already an administrator, skipping admin addition');
     }
 
     //Step 2: Add them to the owners array
     await updateDoc(recordRef, {
       owners: arrayUnion(userId),
     });
+
+    // Step 3: Mirror to blockchain
+    try {
+      console.log('🔗 Updating role to owner on blockchain...');
+      await MemberRoleManagerService.changeRole(recordId, userWalletAddress, 'owner');
+      console.log('✅ Blockchain: Owner role granted');
+    } catch (blockchainError) {
+      console.error('⚠️ Blockchain update failed:', blockchainError);
+      await this.logBlockchainSyncFailure(
+        recordId,
+        'changeRole',
+        { walletAddress: userWalletAddress, role: 'owner', userId },
+        blockchainError as Error
+      );
+    }
 
     console.log('✅ Owner added successfully with full access');
   }
@@ -82,6 +167,9 @@ export class PermissionsService {
     if (!currentUser) {
       throw new Error('User not authenticated');
     }
+
+    // Get wallet address upfront - throws if missing
+    const userWalletAddress = await this.getUserWalletAddress(userId);
 
     const db = getFirestore();
     const recordRef = doc(db, 'records', recordId);
@@ -120,6 +208,7 @@ export class PermissionsService {
     // Step 1: Share the record with them (creates wrapped key for encryption access)
     // This validates they have encryption keys, verified email, etc.
     // If they already have viewer access, shareRecord will throw an error,
+    let isExistingViewer = false;
     try {
       await SharingService.shareRecord({
         recordId: recordId,
@@ -132,6 +221,7 @@ export class PermissionsService {
       // If they already have access as a viewer, that's fine - they'll keep that key
       if (errorMsg.includes('This user already has')) {
         console.log('ℹ️  User already has viewer access, will keep existing wrapped key');
+        isExistingViewer = true;
       } else {
         // Some other error - re-throw it
         throw shareError;
@@ -142,6 +232,27 @@ export class PermissionsService {
     await updateDoc(recordRef, {
       administrators: arrayUnion(userId),
     });
+
+    //Step 3: Mirror to Blockchain
+    try {
+      console.log('🔗 Granting administrator role on blockchain...');
+
+      if (isExistingViewer) {
+        await MemberRoleManagerService.changeRole(recordId, userWalletAddress, 'administrator');
+        console.log('✅ Blockchain: Upgraded to administrator');
+      } else {
+        await MemberRoleManagerService.grantRole(recordId, userWalletAddress, 'administrator');
+        console.log('✅ Blockchain: Administrator role granted');
+      }
+    } catch (blockchainError) {
+      console.error('⚠️ Blockchain update failed:', blockchainError);
+      await this.logBlockchainSyncFailure(
+        recordId,
+        isExistingViewer ? 'changeRole' : 'grantRole',
+        { walletAddress: userWalletAddress, role: 'administrator', userId },
+        blockchainError as Error
+      );
+    }
 
     console.log('✅ Administrator added successfully with full access');
   }
@@ -159,6 +270,9 @@ export class PermissionsService {
     if (!currentUser) {
       throw new Error('User not authenticated');
     }
+
+    // Get wallet address upfront - throws if missing
+    const userWalletAddress = await this.getUserWalletAddress(userId);
 
     const db = getFirestore();
     const recordRef = doc(db, 'records', recordId);
@@ -178,7 +292,7 @@ export class PermissionsService {
       throw new Error('Only the record owner can remove other administrators');
     }
 
-    // Rule 2: Check if you are an admin of this record
+    // Rule 2: Check if caller is an admin of this record
     if (userId === currentUser.uid && !isAdmin) {
       throw new Error('You are not an administrator of this record');
     }
@@ -200,10 +314,25 @@ export class PermissionsService {
 
     console.log('🔄 Removing administrator:', userId);
 
-    // Remove the user from the owners array
+    // Step 1: Remove the user from the owners array
     await updateDoc(recordRef, {
       administrators: arrayRemove(userId),
     });
+
+    // Step 2: Mirror to blockchain - demote to viewer
+    try {
+      console.log('🔗 Demoting to viewer on blockchain...');
+      await MemberRoleManagerService.changeRole(recordId, userWalletAddress, 'viewer');
+      console.log('✅ Blockchain: Demoted to viewer');
+    } catch (blockchainError) {
+      console.error('⚠️ Blockchain update failed:', blockchainError);
+      await this.logBlockchainSyncFailure(
+        recordId,
+        'changeRole',
+        { walletAddress: userWalletAddress, role: 'viewer', userId },
+        blockchainError as Error
+      );
+    }
 
     console.log('✅ User admin priviledges removed successfully', userId);
     console.log(
