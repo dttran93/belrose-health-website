@@ -11,7 +11,7 @@ import {
   Blocks,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { SharingContractService } from '@/features/BlockchainVerification/service/sharingContractService';
+import { SharingBlockchainService } from '@/features/Sharing/services/sharingBlockchainService';
 import { AccessPermissionData } from '../services/sharingService';
 
 interface SharingBlockchainVerificationProps {
@@ -42,7 +42,7 @@ export const SharingBlockchainVerification: React.FC<SharingBlockchainVerificati
     setError(null);
 
     try {
-      const data = await SharingContractService.checkAccessOnChain(permissionHash);
+      const data = await SharingBlockchainService.checkAccessOnChain(permissionHash);
       setBlockchainData(data);
     } catch (err) {
       console.error('Failed to fetch blockchain data:', err);

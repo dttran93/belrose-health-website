@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.healthDetailed = exports.health = exports.sendShareInvitationEmail = exports.personaWebhook = exports.checkVerificationStatus = exports.createVerificationSession = exports.getEncryptedWallet = exports.createWallet = exports.createDetailedNarrative = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = void 0;
+exports.initializeRecordOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.sendShareInvitationEmail = exports.personaWebhook = exports.checkVerificationStatus = exports.createVerificationSession = exports.getEncryptedWallet = exports.createWallet = exports.createDetailedNarrative = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = void 0;
 // functions/src/index.ts
 const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin
@@ -66,4 +66,9 @@ Object.defineProperty(exports, "sendShareInvitationEmail", { enumerable: true, g
 var healthCheck_1 = require("./handlers/healthCheck");
 Object.defineProperty(exports, "health", { enumerable: true, get: function () { return healthCheck_1.health; } });
 Object.defineProperty(exports, "healthDetailed", { enumerable: true, get: function () { return healthCheck_1.healthDetailed; } });
+// ==================== MEMBER REGISTRY ====================
+var memberRegistry_1 = require("./handlers/memberRegistry");
+Object.defineProperty(exports, "registerMemberOnChain", { enumerable: true, get: function () { return memberRegistry_1.registerMemberOnChain; } });
+Object.defineProperty(exports, "updateMemberStatus", { enumerable: true, get: function () { return memberRegistry_1.updateMemberStatus; } });
+Object.defineProperty(exports, "initializeRecordOnChain", { enumerable: true, get: function () { return memberRegistry_1.initializeRecordOnChain; } });
 //# sourceMappingURL=index.js.map

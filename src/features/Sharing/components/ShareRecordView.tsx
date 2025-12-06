@@ -11,7 +11,7 @@ import { getAuth } from 'firebase/auth';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import UserCard from '@/features/Users/components/ui/UserCard';
-import { SharingContractService } from '@/features/BlockchainVerification/service/sharingContractService';
+import { SharingBlockchainService } from '@/features/Sharing/services/sharingBlockchainService';
 import { SharingBlockchainVerification } from './SharingBlockchainVerification';
 import { AccessPermissionData } from '../services/sharingService';
 
@@ -43,7 +43,7 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({
   useEffect(() => {
     const testCheck = async () => {
       try {
-        const result = await SharingContractService.checkAccessOnChain(
+        const result = await SharingBlockchainService.checkAccessOnChain(
           '0x84aa7bf2ba50a7637df2b5e943de8bf0d73b960506dbf5969957e94a064f35e8'
         );
         console.log('✅ checkAccess result:', result);
@@ -95,7 +95,7 @@ export const ShareRecordView: React.FC<ShareRecordViewProps> = ({
               ...doc.data(),
               grantedAt: doc.data().grantedAt.toDate(), // ← Convert to Date from Firestore timestamp
               revokedAt: doc.data().revokedAt?.toDate() || null, // ← Convert to Date or null from Firestore timestamp
-            } as AccessPermissionData)
+            }) as AccessPermissionData
         )
         .filter(permission => permission.recordId === record.id);
 

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Bell, CircleUserRound, CreditCard, GlobeLock, Link, Settings2 } from 'lucide-react';
-import { WalletConnection } from '@/features/BlockchainVerification/component/WalletConnection';
 
 const SettingsPage = () => {
   const [activeSection, setActiveSection] = useState('profile');
@@ -11,7 +10,7 @@ const SettingsPage = () => {
     { id: 'preferences', name: 'Preferences', icon: Settings2 },
     { id: 'privacy', name: 'Privacy & Security', icon: GlobeLock },
     { id: 'notifications', name: 'Notifications', icon: Bell },
-    { id: 'billing', name: 'Billing & Plans', icon: CreditCard }
+    { id: 'billing', name: 'Billing & Plans', icon: CreditCard },
   ];
 
   //Replace these with more comprehensive Settings pages later.
@@ -35,20 +34,22 @@ const SettingsPage = () => {
                     Edit Profile
                   </button>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                    <input 
-                      type="text" 
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Full Name
+                    </label>
+                    <input
+                      type="text"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       defaultValue="John Doe"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <input 
-                      type="email" 
+                    <input
+                      type="email"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       defaultValue="john.doe@email.com"
                     />
@@ -59,29 +60,17 @@ const SettingsPage = () => {
           </div>
         );
 
-        case 'wallet':
+      case 'wallet':
         return (
-            <div className="space-y-6">
+          <div className="space-y-6">
             <div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Blockchain Wallet</h2>
-                <p className="text-gray-600 mb-6">
-                Connect a wallet to enable blockchain verification for your medical records. 
-                Your wallet will be permanently linked to your account for future use.
-                </p>
-                
-                <WalletConnection 
-                onConnectionChange={(connected, address) => {
-                    console.log('Wallet connection changed:', connected, address);
-                    if (connected) {
-                    console.log('Wallet connected:', address);
-                    } else {
-                    console.log('Wallet disconnected');
-                    }
-                }}
-                showBalance={true}
-                />
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Blockchain Wallet</h2>
+              <p className="text-gray-600 mb-6">
+                Connect a wallet to enable blockchain verification for your medical records. Your
+                wallet will be permanently linked to your account for future use.
+              </p>
             </div>
-            </div>
+          </div>
         );
 
       case 'preferences':
@@ -90,11 +79,12 @@ const SettingsPage = () => {
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Preferences</h2>
               <div className="bg-white rounded-lg border p-6 space-y-6">
-                
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium text-gray-900">Blockchain Verification</h3>
-                    <p className="text-sm text-gray-600">Automatically verify new records on blockchain</p>
+                    <p className="text-sm text-gray-600">
+                      Automatically verify new records on blockchain
+                    </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" className="sr-only peer" defaultChecked />
@@ -105,7 +95,9 @@ const SettingsPage = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium text-gray-900">Auto-connect Wallet</h3>
-                    <p className="text-sm text-gray-600">Automatically connect wallet when you sign in</p>
+                    <p className="text-sm text-gray-600">
+                      Automatically connect wallet when you sign in
+                    </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" className="sr-only peer" />
@@ -116,7 +108,9 @@ const SettingsPage = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-medium text-gray-900">Email Notifications</h3>
-                    <p className="text-sm text-gray-600">Receive updates about your records and verifications</p>
+                    <p className="text-sm text-gray-600">
+                      Receive updates about your records and verifications
+                    </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" className="sr-only peer" defaultChecked />
@@ -138,12 +132,21 @@ const SettingsPage = () => {
                   <h3 className="font-medium text-gray-900 mb-3">Data Sharing</h3>
                   <div className="space-y-3">
                     <label className="flex items-center">
-                      <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                      <input
+                        type="checkbox"
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
                       <span className="ml-2 text-sm text-gray-700">Allow anonymous analytics</span>
                     </label>
                     <label className="flex items-center">
-                      <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" defaultChecked />
-                      <span className="ml-2 text-sm text-gray-700">Share verification status with providers</span>
+                      <input
+                        type="checkbox"
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        defaultChecked
+                      />
+                      <span className="ml-2 text-sm text-gray-700">
+                        Share verification status with providers
+                      </span>
                     </label>
                   </div>
                 </div>
@@ -188,9 +191,9 @@ const SettingsPage = () => {
           <div className="p-6">
             <h1 className="text-xl font-semibold text-primary">Settings</h1>
           </div>
-          
+
           <nav className="px-3">
-            {settingsSections.map((section) => (
+            {settingsSections.map(section => (
               <button
                 key={section.id}
                 onClick={() => setActiveSection(section.id)}
@@ -200,7 +203,7 @@ const SettingsPage = () => {
                     : 'text-foreground hover:bg-chart-1/5'
                 }`}
               >
-                <section.icon className="mr-4 w-5 h-5"/>
+                <section.icon className="mr-4 w-5 h-5" />
                 <span>{section.name}</span>
               </button>
             ))}
@@ -209,9 +212,7 @@ const SettingsPage = () => {
 
         {/* Main Content */}
         <div className="flex-1">
-          <div className="p-8">
-            {renderContent()}
-          </div>
+          <div className="p-8">{renderContent()}</div>
         </div>
       </div>
     </div>

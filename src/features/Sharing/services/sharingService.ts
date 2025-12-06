@@ -17,7 +17,7 @@ import { getAuth } from 'firebase/auth';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { SharingKeyManagementService } from './sharingKeyManagementService';
 import { ethers } from 'ethers';
-import { SharingContractService } from '@/features/BlockchainVerification/service/sharingContractService';
+import { SharingBlockchainService } from '@/features/Sharing/services/sharingBlockchainService';
 import { EmailInvitationService } from './emailInvitationService';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 import { MemberRoleManagerService } from '@/features/Permissions/services/memberRoleManagerService';
@@ -294,7 +294,7 @@ export class SharingService {
     let txHash;
     try {
       console.log('🔗 Storing permission on blockchain...');
-      txHash = await SharingContractService.grantAccessOnChain(
+      txHash = await SharingBlockchainService.grantAccessOnChain(
         permissionHash,
         request.recordId,
         receiverWalletAddress
@@ -449,7 +449,7 @@ export class SharingService {
     // 4. Revoke permission on Access Permissions smart contract
     try {
       console.log('🔗 Revoking permission on blockchain...');
-      const txHash = await SharingContractService.revokeAccessOnChain(
+      const txHash = await SharingBlockchainService.revokeAccessOnChain(
         wrappedKeyData.permissionHash
       );
       console.log('✅ Blockchain transaction:', txHash);

@@ -29,3 +29,10 @@ export { sendShareInvitationEmail } from './handlers/sendShareInvitationEmail';
 
 // ==================== HEALTH CHECK ====================
 export { health, healthDetailed } from './handlers/healthCheck';
+
+// ==================== MEMBER REGISTRY ====================
+export {
+  registerMemberOnChain,
+  updateMemberStatus,
+  initializeRecordOnChain,
+} from './handlers/memberRegistry';
