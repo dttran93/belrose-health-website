@@ -1,22 +1,22 @@
 // src/features/Auth/components/WalletSetup.tsx
 
 import React, { useState } from 'react';
-import { Wallet, Zap, CheckCircle, AlertCircle, Check, Loader2 } from 'lucide-react';
+import {
+  Wallet,
+  CheckCircle,
+  AlertCircle,
+  Check,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  Shield,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import { WalletService } from '@/features/BlockchainWallet/services/walletService';
 import { auth } from '@/firebase/config';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
-import {
-  getFirestore,
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-  updateDoc,
-  serverTimestamp,
-} from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
 
 // ==================== TYPES ====================
 
@@ -28,30 +28,8 @@ interface WalletSetupProps {
   isActivated: boolean;
 }
 
-type WalletChoice = 'generated' | 'metamask' | null;
-
-// Unified wallet structure to be saved in Firestore
-interface WalletData {
-  address: string;
-  origin: 'generated' | 'metamask' | 'walletconnect' | 'hardware';
-  createdAt: string;
-  lastUsed: string;
-  // Only present for generated wallets
-  encryptedPrivateKey?: string;
-  keyIv?: string;
-  keyAuthTag?: string;
-  keySalt?: string;
-  encryptedMnemonic?: string;
-  mnemonicIv?: string;
-  mnemonicAuthTag?: string;
-  mnemonicSalt?: string;
-}
-
 // ==================== WALLET VALIDATION ====================
 
-/**
- * Check if a wallet address is already registered to another user
- */
 async function checkWalletAvailability(
   walletAddress: string,
   currentUserId: string
@@ -60,13 +38,11 @@ async function checkWalletAvailability(
     const db = getFirestore();
     const normalizedAddress = walletAddress.toLowerCase();
 
-    // Query the unified wallet.address field
     const walletQuery = query(
       collection(db, 'users'),
       where('wallet.address', '==', normalizedAddress)
     );
 
-    // Also check with checksum address (some may be stored with original case)
     const walletQueryChecksum = query(
       collection(db, 'users'),
       where('wallet.address', '==', walletAddress)
@@ -77,25 +53,24 @@ async function checkWalletAvailability(
       getDocs(walletQueryChecksum),
     ]);
 
-    // Combine results and check if any belong to a different user
     const allDocs = [...results.docs, ...resultsChecksum.docs];
     const otherUserHasWallet = allDocs.some(doc => doc.id !== currentUserId);
 
     if (otherUserHasWallet) {
       return {
         available: false,
-        error:
-          'This wallet address is already registered to another account. Please use a different wallet.',
+        error: 'This wallet address is already registered to another account.',
       };
     }
 
     return { available: true };
   } catch (error) {
     console.error('Error checking wallet availability:', error);
-    // Allow to proceed - blockchain will be the final check
     return { available: true };
   }
 }
+
+// ==================== COMPONENT ====================
 
 export const WalletSetup: React.FC<WalletSetupProps> = ({
   userId,
@@ -104,16 +79,15 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
   isCompleted = false,
   isActivated = false,
 }) => {
-  const [walletChoice, setWalletChoice] = useState<WalletChoice>(
-    initialWalletData?.walletType || null
-  );
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [metaMaskConnected, setMetaMaskConnected] = useState(false);
-  const [connectedAddress, setConnectedAddress] = useState<string>(
-    initialWalletData?.walletAddress || ''
-  );
+  const [connectedAddress, setConnectedAddress] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isValidatingWallet, setIsValidatingWallet] = useState(false);
+  const [useMetaMask, setUseMetaMask] = useState(false);
   const [error, setError] = useState('');
+
+  // ==================== HANDLERS ====================
 
   const handleConnectMetaMask = async () => {
     setError('');
@@ -121,28 +95,27 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
     setIsValidatingWallet(true);
 
     try {
-      //Step 1: Connect to MetaMask
       const connection = await WalletService.connectMetaMask();
 
-      // Step 2: Check if wallet is already registered
       console.log('🔍 Checking wallet availability...');
       const availability = await checkWalletAvailability(connection.address, userId);
 
       if (!availability.available) {
         setError(availability.error || 'Wallet already in use');
         toast.error('Wallet already registered', {
-          description:
-            'This wallet is connected to another account. Please use a different wallet.',
+          description: 'This wallet is connected to another account.',
         });
         return;
       }
 
-      //Wallet is available
       console.log('✅ Wallet is available');
-
       setMetaMaskConnected(true);
       setConnectedAddress(connection.address);
-      setWalletChoice('metamask');
+      setUseMetaMask(true);
+
+      toast.success('MetaMask connected!', {
+        description: `${connection.address.slice(0, 6)}...${connection.address.slice(-4)}`,
+      });
     } catch (err: any) {
       setError(err.message || 'Failed to connect MetaMask');
     } finally {
@@ -151,83 +124,102 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
     }
   };
 
-  const handleSubmit = async () => {
+  const handleCreateGeneratedWallet = async () => {
     setError('');
-
-    if (!walletChoice) {
-      setError('Please choose a wallet option');
-      return;
-    }
-
     setIsProcessing(true);
 
     try {
-      // Generated Wallet Flow
-      if (walletChoice === 'generated') {
-        const user = auth.currentUser;
-        if (!user) {
-          throw new Error('Not authenticated');
-        }
-
-        const token = await user.getIdToken();
-
-        // ✅ Get the master key from the session (set during registration)
-        const masterKey = EncryptionKeyManager.getSessionKey();
-        if (!masterKey) {
-          throw new Error('Encryption key not available. Please restart registration.');
-        }
-
-        // Convert master key to hex string for transmission
-        const masterKeyBytes = await window.crypto.subtle.exportKey('raw', masterKey);
-        const masterKeyArray = new Uint8Array(masterKeyBytes);
-        const masterKeyHex = Array.from(masterKeyArray)
-          .map(b => b.toString(16).padStart(2, '0'))
-          .join('');
-
-        console.log('🔑 Sending wallet creation request with master key...');
-
-        const response = await fetch(
-          import.meta.env.DEV
-            ? 'http://127.0.0.1:5001/belrose-757fe/us-central1/createWallet'
-            : 'https://us-central1-belrose-757fe.cloudfunctions.net/createWallet',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              userId,
-              masterKeyHex, // ✅ Send the master key for encryption
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to create wallet');
-        }
-
-        const data = await response.json();
-        console.log('✅ Wallet created successfully');
-        toast.success('Wallet created successfully!');
-
-        onComplete({
-          walletAddress: data.walletAddress,
-          walletType: 'generated',
-        });
-      } else if (walletChoice === 'metamask') {
-        await WalletService.saveExternalWallet(userId, connectedAddress);
-        toast.success('MetaMask wallet linked successfully!');
-
-        onComplete({
-          walletAddress: connectedAddress,
-          walletType: 'metamask',
-        });
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('Not authenticated');
       }
+
+      const token = await user.getIdToken();
+
+      const masterKey = EncryptionKeyManager.getSessionKey();
+      if (!masterKey) {
+        throw new Error('Encryption key not available. Please restart registration.');
+      }
+
+      const masterKeyBytes = await window.crypto.subtle.exportKey('raw', masterKey);
+      const masterKeyArray = new Uint8Array(masterKeyBytes);
+      const masterKeyHex = Array.from(masterKeyArray)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      console.log('🔑 Creating wallet...');
+
+      const response = await fetch(
+        import.meta.env.DEV
+          ? 'http://127.0.0.1:5001/belrose-757fe/us-central1/createWallet'
+          : 'https://us-central1-belrose-757fe.cloudfunctions.net/createWallet',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            userId,
+            masterKeyHex,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create wallet');
+      }
+
+      const data = await response.json();
+      console.log('✅ Wallet created:', data.walletAddress);
+
+      /* Top up gas so user can transact
+      console.log('⛽ Requesting initial gas...');
+      try {
+        await GasService.requestTopUp(data.walletAddress);
+        console.log('✅ Gas topped up');
+      } catch (gasError) {
+        // Don't fail registration if gas top-up fails
+        console.warn('⚠️ Gas top-up failed, user can request later:', gasError);
+      }
+      */
+
+      toast.success('Wallet created successfully!');
+
+      onComplete({
+        walletAddress: data.walletAddress,
+        walletType: 'generated',
+      });
     } catch (err: any) {
-      console.error('❌ Wallet setup error:', err);
-      setError(err.message || 'Failed to setup wallet');
+      console.error('❌ Wallet creation error:', err);
+      setError(err.message || 'Failed to create wallet');
+      toast.error('Wallet creation failed', { description: err.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleConnectMetaMaskWallet = async () => {
+    if (!connectedAddress) {
+      setError('Please connect MetaMask first');
+      return;
+    }
+
+    setError('');
+    setIsProcessing(true);
+
+    try {
+      await WalletService.saveExternalWallet(userId, connectedAddress);
+      toast.success('MetaMask wallet linked!');
+
+      onComplete({
+        walletAddress: connectedAddress,
+        walletType: 'metamask',
+      });
+    } catch (err: any) {
+      console.error('❌ MetaMask link error:', err);
+      setError(err.message || 'Failed to link wallet');
     } finally {
       setIsProcessing(false);
     }
@@ -235,163 +227,213 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
 
   // ==================== RENDER ====================
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="text-center mb-6">
-        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Wallet className="w-8 h-8 text-blue-600" />
+  // Completed State
+  if (initialWalletData?.walletAddress && initialWalletData?.walletType) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Check className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900">Wallet Ready</h2>
         </div>
-        <h2 className="text-2xl font-bold text-gray-900">Blockchain Wallet</h2>
-        <p className="text-gray-600 mt-2">
-          Your wallet enables secure, verifiable health record management
-        </p>
-      </div>
 
-      {/* Wallet Options - Only show if not completed */}
-      {!isCompleted && isActivated && (
-        <div className="space-y-4">
-          {/* Auto-Generate Option */}
-          <button
-            type="button"
-            onClick={() => setWalletChoice('generated')}
-            disabled={isProcessing}
-            className={`w-full p-6 border-2 rounded-lg text-left transition-all ${
-              walletChoice === 'generated'
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-200 hover:border-blue-300'
-            }`}
-          >
-            <div className="flex items-start space-x-4">
-              <div
-                className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                  walletChoice === 'generated' ? 'bg-blue-500' : 'bg-gray-200'
-                }`}
-              >
-                <Zap
-                  className={`w-6 h-6 ${
-                    walletChoice === 'generated' ? 'text-white' : 'text-gray-600'
-                  }`}
-                />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center space-x-2 mb-1">
-                  <h4 className="font-semibold text-gray-900">Auto-Generate</h4>
-                </div>
-                <p className="text-sm text-gray-600">Easy secure setup, works immediately</p>
-              </div>
-            </div>
-          </button>
-
-          {/* MetaMask Option */}
-          <button
-            type="button"
-            onClick={() => !metaMaskConnected && handleConnectMetaMask()}
-            disabled={isProcessing}
-            className={`w-full p-6 border-2 rounded-lg text-left transition-all ${
-              walletChoice === 'metamask'
-                ? 'border-orange-500 bg-orange-50'
-                : 'border-gray-200 hover:border-orange-300'
-            }`}
-          >
-            <div className="flex items-start space-x-4">
-              <div
-                className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                  walletChoice === 'metamask' ? 'bg-orange-500' : 'bg-gray-200'
-                }`}
-              >
-                <span className="text-2xl">🦊</span>
-              </div>
-              <div className="flex-1">
-                <h4 className="font-semibold text-gray-900 mb-1">Connect MetaMask</h4>
-                {isValidatingWallet ? (
-                  <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Checking wallet availability...</span>
-                  </div>
-                ) : metaMaskConnected ? (
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                    <span className="text-sm text-green-700">
-                      {connectedAddress.slice(0, 6)}...{connectedAddress.slice(-4)}
-                    </span>
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-600">Use your existing wallet, more control</p>
-                )}
-              </div>
-            </div>
-          </button>
-        </div>
-      )}
-
-      {/* Connected Wallet Display (when completed) */}
-      {initialWalletData?.walletAddress && initialWalletData?.walletType && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <div className="flex items-start space-x-3">
             <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
               <Check className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1">
-              <div className="flex items-center space-x-2 mb-1">
-                <h4 className="font-semibold text-green-900">
-                  {initialWalletData.walletType === 'generated'
-                    ? 'Wallet Generated'
-                    : 'MetaMask Connected'}
-                </h4>
-              </div>
-              <p className="text-sm text-green-800 font-mono break-all">
+              <h4 className="font-semibold text-green-900">
+                {initialWalletData.walletType === 'generated'
+                  ? 'Secure Wallet Created'
+                  : 'MetaMask Connected'}
+              </h4>
+              <p className="text-sm text-green-800 font-mono break-all mt-1">
                 {initialWalletData.walletAddress}
               </p>
               <p className="text-xs text-green-700 mt-2">
                 {initialWalletData.walletType === 'generated'
-                  ? 'Your wallet has been securely generated and encrypted'
-                  : 'Your MetaMask wallet is ready to use'}
+                  ? 'Protected by your Recovery Key'
+                  : 'Managed by MetaMask'}
               </p>
             </div>
           </div>
         </div>
-      )}
+      </div>
+    );
+  }
+
+  // Not Activated State
+  if (!isActivated) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+            <Wallet className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-2xl font-bold text-primary">Blockchain Wallet</h2>
+        </div>
+
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-yellow-900">Complete Step 1 to set up your wallet.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Active Setup State
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="text-center mb-6">
+        <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+          <Wallet className="w-8 h-8 text-white" />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900">Blockchain Wallet</h2>
+        <p className="text-gray-600 mt-2">
+          Your wallet signs health record permissions on the blockchain.
+        </p>
+      </div>
+
+      {/* Recommended Option - Generated Wallet */}
+      <div className="border-2 border-chart-2 bg-chart-2/10 rounded-xl p-6">
+        <div className="flex items-center space-x-2 mb-3">
+          <span className="bg-chart-2 text-white text-xs font-semibold px-2 py-1 rounded">
+            RECOMMENDED
+          </span>
+        </div>
+
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Generate Secure Wallet</h3>
+
+        <p className="text-gray-600 text-sm mb-4">We recommend this because:</p>
+
+        {/* Benefits */}
+        <div className="space-y-2 mb-5 text-left">
+          <div className="flex items-center space-x-2 text-sm text-gray-700">
+            <CheckCircle className="w-4 h-4 mr-2 text-chart-2 flex-shrink-0" />
+            <span>No crypto to buy or manage - we handle transaction fees</span>
+          </div>
+          <div className="flex items-center space-x-2 text-sm text-gray-700">
+            <CheckCircle className="w-4 h-4 mr-2 text-chart-2 flex-shrink-0" />
+            <span>Protected by your Recovery Key - one key for everything (Step 3)</span>
+          </div>
+          <div className="flex items-center space-x-2 text-sm text-gray-700">
+            <CheckCircle className="w-4 h-4 mr-2 text-chart-2 flex-shrink-0" />
+            <span>Works instantly - no browser extensions or apps to install</span>
+          </div>
+          <div className="flex items-center space-x-2 text-sm text-gray-700">
+            <CheckCircle className="w-4 h-4 mr-2 text-chart-2 flex-shrink-0" />
+            <span>
+              Non-custodial - you have complete control and can move it to other services as desired
+            </span>
+          </div>
+        </div>
+
+        <Button
+          onClick={handleCreateGeneratedWallet}
+          disabled={isProcessing || useMetaMask}
+          className="w-full"
+        >
+          {isProcessing && !useMetaMask ? (
+            <>
+              <Loader2 className="animate-spin h-5 w-5 mr-2" />
+              Creating Wallet...
+            </>
+          ) : (
+            <>
+              <Shield className="w-5 h-5 mr-2" />
+              Create Secure Wallet
+            </>
+          )}
+        </Button>
+      </div>
+
+      {/* Advanced Options Toggle */}
+      <div className="border-t border-gray-200 pt-4">
+        <button
+          type="button"
+          onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+          className="flex items-center justify-center w-full text-sm text-gray-500 hover:text-gray-700 transition-colors"
+        >
+          {showAdvancedOptions ? (
+            <>
+              <ChevronUp className="w-4 h-4 mr-1" />
+              Hide advanced options
+            </>
+          ) : (
+            <>
+              <ChevronDown className="w-4 h-4 mr-1" />I already have a crypto wallet
+            </>
+          )}
+        </button>
+
+        {/* MetaMask Option */}
+        {showAdvancedOptions && (
+          <div className="mt-4 border border-gray-200 rounded-lg p-4 bg-gray-50">
+            <div className="flex items-center space-x-3 mb-3">
+              <div>
+                <h4 className="font-medium text-gray-900">Connect Your Own Wallet</h4>
+              </div>
+            </div>
+
+            {metaMaskConnected ? (
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2 bg-green-100 text-green-800 rounded-lg px-3 py-2">
+                  <CheckCircle className="w-4 h-4" />
+                  <span className="text-sm font-mono">
+                    {connectedAddress.slice(0, 6)}...{connectedAddress.slice(-4)}
+                  </span>
+                </div>
+                <Button
+                  onClick={handleConnectMetaMaskWallet}
+                  disabled={isProcessing}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {isProcessing && useMetaMask ? (
+                    <>
+                      <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                      Linking...
+                    </>
+                  ) : (
+                    'Use This Wallet'
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={handleConnectMetaMask}
+                disabled={isProcessing}
+                variant="outline"
+                className="w-full"
+              >
+                {isValidatingWallet ? (
+                  <>
+                    <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                    Connecting...
+                  </>
+                ) : (
+                  '🦊 Connect MetaMask'
+                )}
+              </Button>
+            )}
+
+            <p className="text-xs text-gray-500 mt-3">
+              You'll need ETH for transaction fees if you use your own wallet.
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Error Display */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start space-x-2">
           <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm text-red-800 font-medium">Wallet Error</p>
-            <p className="text-sm text-red-700">{error}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Submit Button */}
-      {!isCompleted && isActivated && (
-        <div className="flex space-x-3">
-          <Button
-            onClick={handleSubmit}
-            disabled={isProcessing || !walletChoice}
-            className="w-full"
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="animate-spin h-5 w-5 mr-2" />
-                {walletChoice === 'generated' ? 'Creating wallet...' : 'Connecting...'}
-              </>
-            ) : (
-              'Connect Wallet'
-            )}
-          </Button>
-        </div>
-      )}
-
-      {/* Info Box */}
-      {!isCompleted && isActivated && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <p className="text-xs text-blue-800">
-            <strong>Why a wallet?</strong> Your blockchain wallet creates an immutable record of
-            your health data permissions. Each wallet can only be linked to one Belrose account to
-            ensure secure, verifiable identity.
-          </p>
+          <p className="text-sm text-red-700">{error}</p>
         </div>
       )}
     </div>

@@ -49,6 +49,7 @@ export async function getUserProfile(
       photoURL: userData.photoURL,
       affiliations: userData.affiliations || [],
       createdAt: userData.createdAt,
+      encryption: userData.encryption,
     };
 
     // Store in cache

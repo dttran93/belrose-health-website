@@ -20,7 +20,7 @@ import { ethers } from 'ethers';
 import { SharingBlockchainService } from '@/features/Sharing/services/sharingBlockchainService';
 import { EmailInvitationService } from './emailInvitationService';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
-import { MemberRoleManagerService } from '@/features/Permissions/services/memberRoleManagerService';
+import { BlockchainRoleManagerService } from '@/features/Permissions/services/blockchainRoleManagerService';
 
 export interface ShareRecordRequest {
   recordId: string;
@@ -261,16 +261,14 @@ export class SharingService {
     }
 
     const sharerData = sharerDoc.data();
-    const sharerWalletAddress =
-      sharerData.connectedWallet?.address || sharerData.generatedWallet?.address || '';
+    const sharerWalletAddress = sharerData.wallet?.address || '';
 
     if (!sharerWalletAddress) {
       throw new Error('User wallet address not found. Please connect or generate a wallet.');
     }
 
     //5.2 get receiver wallet address
-    const receiverWalletAddress =
-      receiverData.connectedWallet?.address || receiverData.generatedWallet?.address || '';
+    const receiverWalletAddress = receiverData.wallet?.address || '';
 
     if (!receiverWalletAddress) {
       throw new Error(
@@ -310,7 +308,11 @@ export class SharingService {
     // 6.5 Grant viewer role on MemberRoleManager
     try {
       console.log('🔗 Granting viewer role on blockchain...');
-      await MemberRoleManagerService.grantRole(request.recordId, receiverWalletAddress, 'viewer');
+      await BlockchainRoleManagerService.grantRole(
+        request.recordId,
+        receiverWalletAddress,
+        'viewer'
+      );
       console.log('✅ Blockchain: Viewer role granted');
     } catch (blockchainError) {
       console.error('⚠️ Failed to grant viewer role on blockchain:', blockchainError);
@@ -466,13 +468,12 @@ export class SharingService {
     // 5. Revoke role on MemberRoleManager Smart Contract
     const receiverDoc = await getDoc(doc(db, 'users', receiverId));
     const receiverData = receiverDoc.data();
-    const receiverWalletAddress =
-      receiverData?.connectedWallet?.address || receiverData?.generatedWallet?.address;
+    const receiverWalletAddress = receiverData?.wallet?.address;
 
     if (receiverWalletAddress) {
       try {
         console.log('🔗 Revoking role on blockchain...');
-        await MemberRoleManagerService.revokeRole(recordId, receiverWalletAddress);
+        await BlockchainRoleManagerService.revokeRole(recordId, receiverWalletAddress);
         console.log('✅ Blockchain: Role revoked');
       } catch (blockchainError) {
         console.error('⚠️ Failed to revoke role on blockchain:', blockchainError);

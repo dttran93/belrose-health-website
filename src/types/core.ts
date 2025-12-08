@@ -58,37 +58,7 @@ export interface BelroseUserProfile extends User {
   emailVerifiedAt?: any;
   encryptedMasterKey?: string; // Encrypted with password-derived KEK
   masterKeyIV?: string; // IV for the encrypted master key
-
-  generatedWallet?: {
-    address: string;
-    encryptedPrivateKey: string;
-    keyIv: string;
-    keyAuthTag: string;
-    keySalt: string;
-    encryptedMnemonic: string; // Backup recovery phrase
-    mnemonicIv: string;
-    mnemonicAuthTag: string;
-    mnemonicSalt: string;
-    walletType: 'generated';
-    createdAt: string;
-  };
-
-  connectedWallet?: {
-    address: string;
-    authMethod: 'web3auth' | 'metamask';
-    connectedAt: string;
-    lastUsed: string;
-    userInfo?: {
-      email?: string;
-      name?: string;
-      profileImage?: string;
-      typeOfLogin?: string;
-    };
-  };
-  preferences?: {
-    blockchainVerificationEnabled: boolean;
-    autoConnectWallet: boolean;
-  };
+  wallet?: UserWallet;
 
   //Other Info
   affiliations?: [string] | [];
@@ -100,16 +70,9 @@ export interface BelroseUserProfile extends User {
  */
 export type WalletOrigin = 'generated' | 'metamask' | 'walletconnect' | 'hardware';
 
-/**
- * Unified wallet structure
- * Replaces the old separate 'generatedWallet' and 'connectedWallet' fields
- */
 export interface UserWallet {
   address: string;
   origin: WalletOrigin;
-  createdAt: string;
-  lastUsed: string;
-  balance?: string;
 
   // Only present for generated wallets (Belrose stores encrypted keys)
   encryptedPrivateKey?: string;
@@ -211,7 +174,7 @@ export interface FileObject {
 
   // === VERIFICATION AND SECURITY ===
   originalFileHash?: string | null; //hash of the original file that was uploaded
-  recordHash?: string | null; //has of the record content
+  recordHash?: string | null; //hash of the record content
   previousRecordHash?: string[] | null; //to establish chain of records in case they are edited
   blockchainVerification?: BlockchainVerification;
 

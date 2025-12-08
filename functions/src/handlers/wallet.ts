@@ -33,6 +33,21 @@ interface GetWalletResponse {
   walletType: string;
 }
 
+type WalletOrigin = 'generated' | 'metamask' | 'walletconnect' | 'hardware';
+
+interface UserWallet {
+  address: string;
+  origin: WalletOrigin;
+  encryptedPrivateKey?: string;
+  keyIv?: string;
+  keyAuthTag?: string;
+  keySalt?: string;
+  encryptedMnemonic?: string;
+  mnemonicIv?: string;
+  mnemonicAuthTag?: string;
+  mnemonicSalt?: string;
+}
+
 // ==================== CREATE WALLET HANDLER ====================
 
 /**
@@ -87,10 +102,19 @@ export const createWallet = onRequest({ cors: true }, async (req: Request, res: 
     }
 
     const userData = userDoc.data();
-    if (userData?.generatedWallet) {
+    if (userData?.wallet?.address) {
       res.status(400).json({
         error: 'Wallet already exists',
-        details: 'User already has a generated wallet',
+        details: 'User already has a wallet linked to their account',
+      });
+      return;
+    }
+
+    // Validate master key
+    if (!masterKeyHex) {
+      res.status(400).json({
+        error: 'Missing encryption key',
+        details: 'Master key is required to encrypt wallet',
       });
       return;
     }
@@ -100,57 +124,33 @@ export const createWallet = onRequest({ cors: true }, async (req: Request, res: 
     const wallet = generateWallet();
     console.log('✅ Generated wallet address:', wallet.address);
 
-    // ✅ Use the master key if provided, otherwise this should not happen
-    if (!masterKeyHex) {
-      res.status(400).json({
-        error: 'Missing encryption key',
-        details: 'Master key is required to encrypt wallet',
-      });
-      return;
-    }
-
     console.log('🔑 Using master key for wallet encryption...');
 
-    // Use the master key as the encryption password
-    const encryptionPassword = masterKeyHex;
-
     // Encrypt the private key and mnemonic
-    const encryptedData = encryptPrivateKey(wallet.privateKey, encryptionPassword);
-    const encryptedMnemonic = encryptPrivateKey(wallet.mnemonic || '', encryptionPassword);
+    const encryptedData = encryptPrivateKey(wallet.privateKey, masterKeyHex);
+    const encryptedMnemonic = encryptPrivateKey(wallet.mnemonic || '', masterKeyHex);
+
+    const walletData: UserWallet = {
+      address: wallet.address.toLowerCase(),
+      origin: 'generated',
+      //Encrypted private key data
+      encryptedPrivateKey: encryptedData.encryptedKey,
+      keyIv: encryptedData.iv,
+      keyAuthTag: encryptedData.authTag,
+      keySalt: encryptedData.salt,
+      //Encrypted Mnemonic Data
+      encryptedMnemonic: encryptedMnemonic.encryptedKey,
+      mnemonicIv: encryptedMnemonic.iv,
+      mnemonicAuthTag: encryptedMnemonic.authTag,
+      mnemonicSalt: encryptedMnemonic.salt,
+    };
 
     // Save encrypted wallet to database
     await userRef.update({
-      generatedWallet: {
-        address: wallet.address,
-        encryptedPrivateKey: encryptedData.encryptedKey,
-        keyIv: encryptedData.iv,
-        keyAuthTag: encryptedData.authTag,
-        keySalt: encryptedData.salt,
-        encryptedMnemonic: encryptedMnemonic.encryptedKey,
-        mnemonicIv: encryptedMnemonic.iv,
-        mnemonicAuthTag: encryptedMnemonic.authTag,
-        mnemonicSalt: encryptedMnemonic.salt,
-        walletType: 'generated',
-        createdAt: new Date().toISOString(),
-      },
-      updatedAt: new Date().toISOString(),
+      wallet: walletData,
     });
 
     console.log('✅ Wallet saved for user:', userId);
-
-    // ✅ Explicitly clear the master key from memory
-    // This is extra security to ensure the key doesn't linger
-    // (Though it will be garbage collected anyway)
-    const clearKey = () => {
-      try {
-        // Overwrite the variable (JavaScript doesn't have true memory zeroing)
-        // but this prevents accidental reuse
-        encryptionPassword.split('').forEach(() => {});
-      } catch (e) {
-        // Ignore errors in cleanup
-      }
-    };
-    clearKey();
 
     // Return success response
     const response: CreateWalletResponse = {
@@ -199,12 +199,31 @@ export const getEncryptedWallet = onRequest({ cors: true }, async (req: Request,
     }
 
     const userData = userDoc.data();
-    const wallet = userData?.generatedWallet;
+    const wallet = userData?.wallet as UserWallet | undefined;
 
     if (!wallet) {
       res.status(404).json({
         error: 'Wallet not found',
         details: 'No generated wallet found for this user',
+      });
+      return;
+    }
+
+    // Only return encrypted data if this is a generated wallet
+    if (wallet.origin !== 'generated' || !wallet.encryptedPrivateKey) {
+      res.status(400).json({
+        error: 'Not a generated wallet',
+        details: 'This wallet was connected externally. Private key is not stored.',
+      });
+      return;
+    }
+
+    // Validate all required fields exist
+    if (!wallet.encryptedPrivateKey || !wallet.keyIv || !wallet.keyAuthTag || !wallet.keySalt) {
+      console.error('❌ Generated wallet missing encryption fields:', userId);
+      res.status(500).json({
+        error: 'Wallet data corrupted',
+        details: 'Generated wallet is missing encryption data. Please contact support.',
       });
       return;
     }
@@ -218,7 +237,7 @@ export const getEncryptedWallet = onRequest({ cors: true }, async (req: Request,
       iv: wallet.keyIv,
       authTag: wallet.keyAuthTag,
       salt: wallet.keySalt,
-      walletType: wallet.walletType,
+      walletType: wallet.origin,
     };
 
     res.json(response);

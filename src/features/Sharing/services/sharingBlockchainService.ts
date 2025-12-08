@@ -1,4 +1,4 @@
-// src/features/BlockchainVerification/services/sharingContractService.ts
+// src/features/Sharing/services/sharingBlockchainService.ts
 
 import { ethers, Contract, ContractTransactionResponse } from 'ethers';
 
@@ -85,7 +85,7 @@ const CONTRACT_ABI = [
   },
 ] as const;
 
-export class SharingContractService {
+export class SharingBlockchainService {
   /**
    * Get contract instance with signer
    */
@@ -179,7 +179,7 @@ export class SharingContractService {
       string,
       string,
       bigint,
-      bigint
+      bigint,
     ];
 
     return {

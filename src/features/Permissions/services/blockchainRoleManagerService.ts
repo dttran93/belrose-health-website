@@ -1,13 +1,23 @@
-// src/features/Permissions/services/memberRoleManagerService.ts
+// src/features/Permissions/services/blockchainRoleManagerService.ts
+//
+// Frontend service for blockchain role management.
+// Uses WalletService for signing (supports both MetaMask and generated wallets).
+//
+// Read operations: No wallet needed (uses public RPC)
+// Write operations: Uses user's wallet via WalletService
 
 import { ethers, Contract } from 'ethers';
+import { WalletService } from '@/features/BlockchainWallet/services/walletService';
 
-// Contract addresses - UPDATE THESE after deployment
+// Contract address
 const MEMBER_ROLE_MANAGER_ADDRESS = '0xD671B0cB1cB10330d9Ed05dC1D1F6E63802Cf4A9';
 
-// ABI - only the functions we need to call from frontend
+// RPC for read-only operations
+const RPC_URL = 'https://1rpc.io/sepolia';
+
+// ABI - only the functions we need
 const MEMBER_ROLE_MANAGER_ABI = [
-  // View functions (no gas needed - anyone can call)
+  // ==================== VIEW FUNCTIONS (no gas needed) ====================
   {
     inputs: [{ internalType: 'address', name: 'user', type: 'address' }],
     name: 'isActiveMember',
@@ -40,7 +50,6 @@ const MEMBER_ROLE_MANAGER_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
-  // Role view functions
   {
     inputs: [
       { internalType: 'string', name: 'recordId', type: 'string' },
@@ -93,7 +102,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
-  // Write functions (require user's wallet to sign)
+  // ==================== WRITE FUNCTIONS (require user signature) ====================
   {
     inputs: [
       { internalType: 'string', name: 'recordId', type: 'string' },
@@ -135,36 +144,56 @@ const MEMBER_ROLE_MANAGER_ABI = [
   },
 ];
 
-// Member status enum matching the contract
+// ==================== TYPES ====================
+
 export enum MemberStatus {
   Inactive = 0,
   Active = 1,
   Verified = 2,
 }
 
-export class MemberRoleManagerService {
+export interface MemberInfo {
+  userIdHash: string;
+  status: MemberStatus;
+  joinedAt: Date | null;
+}
+
+export interface TransactionResult {
+  txHash: string;
+  blockNumber: number;
+}
+
+// ==================== SERVICE ====================
+
+export class BlockchainRoleManagerService {
   /**
    * Get a read-only contract instance (no wallet needed)
    */
   private static getReadOnlyContract(): Contract {
-    const provider = new ethers.JsonRpcProvider('https://1rpc.io/sepolia');
+    const provider = new ethers.JsonRpcProvider(RPC_URL);
     return new ethers.Contract(MEMBER_ROLE_MANAGER_ADDRESS, MEMBER_ROLE_MANAGER_ABI, provider);
   }
 
   /**
-   * Get contract instance with signer (requires MetaMask)
+   * Get contract instance with user's signer
+   * Works for both MetaMask and generated wallets
    */
-  private static async getSignerContract(): Promise<Contract> {
-    if (!window.ethereum) {
-      throw new Error('MetaMask not installed');
-    }
-
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const signer = await provider.getSigner();
-    return new ethers.Contract(MEMBER_ROLE_MANAGER_ADDRESS, MEMBER_ROLE_MANAGER_ABI, signer);
+  private static async getSignerContract(): Promise<{
+    contract: Contract;
+    walletOrigin: string;
+  }> {
+    const { signer, origin } = await WalletService.getSigner();
+    const contract = new ethers.Contract(
+      MEMBER_ROLE_MANAGER_ADDRESS,
+      MEMBER_ROLE_MANAGER_ABI,
+      signer
+    );
+    return { contract, walletOrigin: origin };
   }
 
-  // ==================== MEMBER VIEW FUNCTIONS ====================
+  // ============================================================================
+  // MEMBER VIEW FUNCTIONS (Read-only, no gas)
+  // ============================================================================
 
   /**
    * Check if an address is an active member
@@ -172,8 +201,8 @@ export class MemberRoleManagerService {
   static async isActiveMember(userAddress: string): Promise<boolean> {
     try {
       const contract = this.getReadOnlyContract();
-      const isActiveFunction = contract.getFunction('isActiveMember');
-      return await isActiveFunction(userAddress);
+      const fn = contract.getFunction('isActiveMember');
+      return await fn(userAddress);
     } catch (error) {
       console.error('Error checking active member status:', error);
       return false;
@@ -186,8 +215,8 @@ export class MemberRoleManagerService {
   static async isVerifiedMember(userAddress: string): Promise<boolean> {
     try {
       const contract = this.getReadOnlyContract();
-      const isVerifiedFunction = contract.getFunction('isVerifiedMember');
-      return await isVerifiedFunction(userAddress);
+      const fn = contract.getFunction('isVerifiedMember');
+      return await fn(userAddress);
     } catch (error) {
       console.error('Error checking verified member status:', error);
       return false;
@@ -197,15 +226,11 @@ export class MemberRoleManagerService {
   /**
    * Get member details
    */
-  static async getMember(userAddress: string): Promise<{
-    userIdHash: string;
-    status: MemberStatus;
-    joinedAt: Date | null;
-  } | null> {
+  static async getMember(userAddress: string): Promise<MemberInfo | null> {
     try {
       const contract = this.getReadOnlyContract();
-      const isMemberFunction = contract.getFunction('getMember');
-      const result = await isMemberFunction(userAddress);
+      const fn = contract.getFunction('getMember');
+      const result = await fn(userAddress);
 
       // If joinedAt is 0, member doesn't exist
       if (Number(result[2]) === 0) {
@@ -229,8 +254,8 @@ export class MemberRoleManagerService {
   static async getTotalMembers(): Promise<number> {
     try {
       const contract = this.getReadOnlyContract();
-      const isGetTotalFunction = contract.getFunction('getTotalMembers');
-      const total = await isGetTotalFunction();
+      const fn = contract.getFunction('totalMembers');
+      const total = await fn();
       return Number(total);
     } catch (error) {
       console.error('Error getting total members:', error);
@@ -238,7 +263,9 @@ export class MemberRoleManagerService {
     }
   }
 
-  // ==================== ROLE VIEW FUNCTIONS ====================
+  // ============================================================================
+  // ROLE VIEW FUNCTIONS (Read-only, no gas)
+  // ============================================================================
 
   /**
    * Check if user has any active role on a record
@@ -246,8 +273,8 @@ export class MemberRoleManagerService {
   static async hasActiveRole(recordId: string, userAddress: string): Promise<boolean> {
     try {
       const contract = this.getReadOnlyContract();
-      const isActiveFunction = contract.getFunction('hasActiveRole');
-      return await isActiveFunction(recordId, userAddress);
+      const fn = contract.getFunction('hasActiveRole');
+      return await fn(recordId, userAddress);
     } catch (error) {
       console.error('Error checking active role:', error);
       return false;
@@ -264,8 +291,8 @@ export class MemberRoleManagerService {
   ): Promise<boolean> {
     try {
       const contract = this.getReadOnlyContract();
-      const hasRoleFunction = contract.getFunction('hasRole');
-      return await hasRoleFunction(recordId, userAddress, role);
+      const fn = contract.getFunction('hasRole');
+      return await fn(recordId, userAddress, role);
     } catch (error) {
       console.error('Error checking role:', error);
       return false;
@@ -278,8 +305,8 @@ export class MemberRoleManagerService {
   static async isOwnerOrAdmin(recordId: string, userAddress: string): Promise<boolean> {
     try {
       const contract = this.getReadOnlyContract();
-      const OwnerOrAdminFunction = contract.getFunction('isOwnerOrAdmin');
-      return await OwnerOrAdminFunction(recordId, userAddress);
+      const fn = contract.getFunction('isOwnerOrAdmin');
+      return await fn(recordId, userAddress);
     } catch (error) {
       console.error('Error checking owner/admin status:', error);
       return false;
@@ -292,8 +319,8 @@ export class MemberRoleManagerService {
   static async getRecordOwners(recordId: string): Promise<string[]> {
     try {
       const contract = this.getReadOnlyContract();
-      const getRecordOwnersFunction = contract.getFunction('getRecordOwners');
-      return await getRecordOwnersFunction(recordId);
+      const fn = contract.getFunction('getRecordOwners');
+      return await fn(recordId);
     } catch (error) {
       console.error('Error getting record owners:', error);
       return [];
@@ -306,8 +333,8 @@ export class MemberRoleManagerService {
   static async getRecordAdmins(recordId: string): Promise<string[]> {
     try {
       const contract = this.getReadOnlyContract();
-      const getRecordAdminsFunction = contract.getFunction('getRecordAdmins');
-      return await getRecordAdminsFunction(recordId);
+      const fn = contract.getFunction('getRecordAdmins');
+      return await fn(recordId);
     } catch (error) {
       console.error('Error getting record admins:', error);
       return [];
@@ -320,16 +347,17 @@ export class MemberRoleManagerService {
   static async getRecordsByUser(userAddress: string): Promise<string[]> {
     try {
       const contract = this.getReadOnlyContract();
-      const getRecordsByUserFunction = contract.getFunction('getRecordsByUser');
-      return await getRecordsByUserFunction(userAddress);
+      const fn = contract.getFunction('getRecordsByUser');
+      return await fn(userAddress);
     } catch (error) {
       console.error('Error getting records by user:', error);
       return [];
     }
   }
 
-  // ==================== ROLE WRITE FUNCTIONS ====================
-  // These require the user to sign with their wallet
+  // ============================================================================
+  // ROLE WRITE FUNCTIONS (Require user signature)
+  // ============================================================================
 
   /**
    * Grant a role to another user (must be owner/admin)
@@ -338,18 +366,23 @@ export class MemberRoleManagerService {
     recordId: string,
     userAddress: string,
     role: 'owner' | 'administrator' | 'viewer'
-  ): Promise<string> {
-    console.log('🔗 Calling grantRole on MemberRoleManager...');
+  ): Promise<TransactionResult> {
+    console.log('🔗 Granting role on blockchain...', { recordId, userAddress, role });
 
-    const contract = await this.getSignerContract();
-    const grantRoleFunction = contract.getFunction('grantRole');
-    const tx = await grantRoleFunction(recordId, userAddress, role);
+    const { contract, walletOrigin } = await this.getSignerContract();
+    console.log(`📝 Signing with ${walletOrigin} wallet...`);
 
-    console.log('📝 Transaction sent:', tx.hash);
+    const fn = contract.getFunction('grantRole');
+    const tx = await fn(recordId, userAddress, role);
+    console.log('📤 Transaction sent:', tx.hash);
+
     const receipt = await tx.wait();
     console.log('✅ Role granted, block:', receipt?.blockNumber);
 
-    return tx.hash;
+    return {
+      txHash: tx.hash,
+      blockNumber: receipt?.blockNumber || 0,
+    };
   }
 
   /**
@@ -359,51 +392,77 @@ export class MemberRoleManagerService {
     recordId: string,
     userAddress: string,
     newRole: 'owner' | 'administrator' | 'viewer'
-  ): Promise<string> {
-    console.log('🔗 Calling changeRole on MemberRoleManager...');
+  ): Promise<TransactionResult> {
+    console.log('🔗 Changing role on blockchain...', { recordId, userAddress, newRole });
 
-    const contract = await this.getSignerContract();
-    const changeRoleFunction = contract.getFunction('changeRole');
-    const tx = await changeRoleFunction(recordId, userAddress, newRole);
+    const { contract, walletOrigin } = await this.getSignerContract();
+    console.log(`📝 Signing with ${walletOrigin} wallet...`);
 
-    console.log('📝 Transaction sent:', tx.hash);
+    const fn = contract.getFunction('changeRole');
+    const tx = await fn(recordId, userAddress, newRole);
+    console.log('📤 Transaction sent:', tx.hash);
+
     const receipt = await tx.wait();
     console.log('✅ Role changed, block:', receipt?.blockNumber);
 
-    return tx.hash;
+    return {
+      txHash: tx.hash,
+      blockNumber: receipt?.blockNumber || 0,
+    };
   }
 
   /**
    * Revoke a user's role (must be owner/admin, or self-revoke)
    */
-  static async revokeRole(recordId: string, userAddress: string): Promise<string> {
-    console.log('🔗 Calling revokeRole on MemberRoleManager...');
+  static async revokeRole(recordId: string, userAddress: string): Promise<TransactionResult> {
+    console.log('🔗 Revoking role on blockchain...', { recordId, userAddress });
 
-    const contract = await this.getSignerContract();
-    const revokeRoleFunction = contract.getFunction('revokeRole');
-    const tx = await revokeRoleFunction(recordId, userAddress);
+    const { contract, walletOrigin } = await this.getSignerContract();
+    console.log(`📝 Signing with ${walletOrigin} wallet...`);
 
-    console.log('📝 Transaction sent:', tx.hash);
+    const fn = contract.getFunction('revokeRole');
+    const tx = await fn(recordId, userAddress);
+    console.log('📤 Transaction sent:', tx.hash);
+
     const receipt = await tx.wait();
     console.log('✅ Role revoked, block:', receipt?.blockNumber);
 
-    return tx.hash;
+    return {
+      txHash: tx.hash,
+      blockNumber: receipt?.blockNumber || 0,
+    };
   }
 
   /**
    * Owner voluntarily removes their own ownership
    */
-  static async voluntarilyRemoveOwnOwnership(recordId: string): Promise<string> {
-    console.log('🔗 Calling voluntarilyRemoveOwnOwnership...');
+  static async voluntarilyRemoveOwnOwnership(recordId: string): Promise<TransactionResult> {
+    console.log('🔗 Removing own ownership on blockchain...', { recordId });
 
-    const contract = await this.getSignerContract();
-    const voluntarilyRemoveFunction = contract.getFunction('voluntarilyRemoveOwnOwnership');
-    const tx = await voluntarilyRemoveFunction(recordId);
+    const { contract, walletOrigin } = await this.getSignerContract();
+    console.log(`📝 Signing with ${walletOrigin} wallet...`);
 
-    console.log('📝 Transaction sent:', tx.hash);
+    const fn = contract.getFunction('voluntarilyRemoveOwnOwnership');
+    const tx = await fn(recordId);
+    console.log('📤 Transaction sent:', tx.hash);
+
     const receipt = await tx.wait();
     console.log('✅ Ownership removed, block:', receipt?.blockNumber);
 
-    return tx.hash;
+    return {
+      txHash: tx.hash,
+      blockNumber: receipt?.blockNumber || 0,
+    };
+  }
+
+  // ============================================================================
+  // UTILITY FUNCTIONS
+  // ============================================================================
+
+  /**
+   * Check if user can sign transactions
+   */
+  static async canSign(): Promise<{ canSign: boolean; reason?: string }> {
+    return WalletService.canSign();
   }
 }

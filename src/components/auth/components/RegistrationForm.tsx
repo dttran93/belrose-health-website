@@ -12,6 +12,7 @@ import { getFirestore, doc, updateDoc } from 'firebase/firestore';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
+import { MemberRegistryBlockchain } from '../services/memberRegistryBlockchain';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 
 interface StepConfig {
@@ -28,7 +29,7 @@ interface RegistrationFormProps {
 const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<number>(1);
-  const [acknowledgeRecoveryKey, setAcknowledgeRecoveryKey] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Store data from all steps
   const [registrationData, setRegistrationData] = useState({
@@ -167,14 +168,49 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     }
   };
 
+  /**
+   * Register member on blockchain
+   * Non-blocking - logs failure for retry but doesn't fail registration
+   */
+  const registerMemberOnBlockchain = async (walletAddress: string): Promise<void> => {
+    try {
+      console.log('🔗 Registering member on blockchain...');
+      const result = await MemberRegistryBlockchain.registerMember(walletAddress);
+
+      if (result.txHash) {
+        console.log('✅ Blockchain registration complete:', result.txHash);
+      } else {
+        console.log('ℹ️ Member already registered or registration skipped');
+      }
+    } catch (error: any) {
+      console.error('⚠️ Blockchain registration failed (non-blocking):', error);
+
+      // Log to Firestore for retry later
+      try {
+        const db = getFirestore();
+        await updateDoc(doc(db, 'users', registrationData.userId), {
+          'blockchainMember.pendingRegistration': true,
+          'blockchainMember.registrationError': error.message,
+          'blockchainMember.lastAttempt': new Date().toISOString(),
+        });
+      } catch (logError) {
+        console.error('Failed to log blockchain error:', logError);
+      }
+    }
+  };
+
   const handleCompleteRegistration = async () => {
     if (!canCompleteRegistration()) {
       toast.error('Please complete all steps before continuing');
       return;
     }
 
+    // Prevent double-clicks
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     try {
-      // Save core account data to Firestore
+      // 1. Save core account data to Firestore
       const db = getFirestore();
       const userDocRef = doc(db, 'users', registrationData.userId);
 
@@ -197,12 +233,16 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         emailVerified: false,
         isIdentityVerified: false,
         createdAt: new Date(),
+        updatedAt: new Date(),
       });
 
       toast.success('Account created successfully!', {
         description: "Now let's verify your account",
         duration: 3000,
       });
+
+      //2. Register member on blockchain (non-blocking, can run in background)
+      registerMemberOnBlockchain(registrationData.walletAddress);
 
       // Navigate to verification hub instead of dashboard
       navigate('/verification', {
@@ -219,6 +259,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         description: 'Please try again or contact support',
         duration: 5000,
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

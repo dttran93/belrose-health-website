@@ -38,10 +38,6 @@ export class UserService {
       lastName: lastName || '',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      preferences: {
-        blockchainVerificationEnabled: true,
-        autoConnectWallet: false,
-      },
     };
 
     try {

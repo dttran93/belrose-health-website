@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { SharingService } from '@/features/Sharing/services/sharingService';
-import { MemberRoleManagerService } from './memberRoleManagerService';
+import { BlockchainRoleManagerService } from './blockchainRoleManagerService';
 
 /**
  * Service for managing record permissions
@@ -33,7 +33,7 @@ export class PermissionsService {
     }
 
     const userData = userDoc.data();
-    const walletAddress = userData.connectedWallet?.address || userData.generatedWallet?.address;
+    const walletAddress = userData.wallet?.address;
 
     if (!walletAddress) {
       throw new Error(
@@ -139,7 +139,7 @@ export class PermissionsService {
     // Step 3: Mirror to blockchain
     try {
       console.log('🔗 Updating role to owner on blockchain...');
-      await MemberRoleManagerService.changeRole(recordId, userWalletAddress, 'owner');
+      await BlockchainRoleManagerService.changeRole(recordId, userWalletAddress, 'owner');
       console.log('✅ Blockchain: Owner role granted');
     } catch (blockchainError) {
       console.error('⚠️ Blockchain update failed:', blockchainError);
@@ -238,10 +238,10 @@ export class PermissionsService {
       console.log('🔗 Granting administrator role on blockchain...');
 
       if (isExistingViewer) {
-        await MemberRoleManagerService.changeRole(recordId, userWalletAddress, 'administrator');
+        await BlockchainRoleManagerService.changeRole(recordId, userWalletAddress, 'administrator');
         console.log('✅ Blockchain: Upgraded to administrator');
       } else {
-        await MemberRoleManagerService.grantRole(recordId, userWalletAddress, 'administrator');
+        await BlockchainRoleManagerService.grantRole(recordId, userWalletAddress, 'administrator');
         console.log('✅ Blockchain: Administrator role granted');
       }
     } catch (blockchainError) {
@@ -322,7 +322,7 @@ export class PermissionsService {
     // Step 2: Mirror to blockchain - demote to viewer
     try {
       console.log('🔗 Demoting to viewer on blockchain...');
-      await MemberRoleManagerService.changeRole(recordId, userWalletAddress, 'viewer');
+      await BlockchainRoleManagerService.changeRole(recordId, userWalletAddress, 'viewer');
       console.log('✅ Blockchain: Demoted to viewer');
     } catch (blockchainError) {
       console.error('⚠️ Blockchain update failed:', blockchainError);
