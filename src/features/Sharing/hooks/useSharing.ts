@@ -1,7 +1,11 @@
 // src/features/Sharing/hooks/useSharing.ts
 
 import { useState } from 'react';
-import { SharingService, ShareRecordRequest, SharedRecord } from '../services/sharingService';
+import {
+  SharingService,
+  ShareRecordRequest,
+  AccessPermissionData,
+} from '../services/sharingService';
 import { toast } from 'sonner';
 
 export const useSharing = () => {
@@ -51,7 +55,7 @@ export const useSharing = () => {
     }
   };
 
-  const getSharedRecords = async (): Promise<SharedRecord[]> => {
+  const getSharedRecords = async (): Promise<AccessPermissionData[]> => {
     setIsLoading(true);
     try {
       console.log('🔄 useSharing: Fetching shared records');
@@ -69,7 +73,7 @@ export const useSharing = () => {
     }
   };
 
-  const getRecordsSharedWithMe = async (): Promise<SharedRecord[]> => {
+  const getRecordsSharedWithMe = async (): Promise<AccessPermissionData[]> => {
     setIsLoading(true);
     try {
       console.log('🔄 useSharing: Fetching records shared with me');

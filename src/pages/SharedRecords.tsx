@@ -3,14 +3,14 @@
 import React, { useEffect, useState } from 'react';
 import { Share2, Users, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { useSharing } from '@/features/Sharing/hooks/useSharing';
-import { SharedRecord } from '@/features/Sharing/services/sharingService';
+import { AccessPermissionData, SharingService } from '@/features/Sharing/services/sharingService';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 
 export const SharedRecords: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'shared-by-me' | 'shared-with-me'>('shared-by-me');
-  const [sharedByMe, setSharedByMe] = useState<SharedRecord[]>([]);
-  const [sharedWithMe, setSharedWithMe] = useState<SharedRecord[]>([]);
+  const [sharedByMe, setSharedByMe] = useState<AccessPermissionData[]>([]);
+  const [sharedWithMe, setSharedWithMe] = useState<AccessPermissionData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const { getSharedRecords, getRecordsSharedWithMe, revokeAccess, isRevoking } = useSharing();
@@ -117,7 +117,7 @@ export const SharedRecords: React.FC = () => {
 
 // Component for records shared by current user
 const SharedByMeList: React.FC<{
-  records: SharedRecord[];
+  records: AccessPermissionData[];
   onRevoke: (recordId: string, receiverId: string) => void;
   isRevoking: boolean;
 }> = ({ records, onRevoke, isRevoking }) => {
@@ -134,15 +134,18 @@ const SharedByMeList: React.FC<{
   }
 
   // Group records by recordId
-  const groupedRecords = records.reduce((acc, record) => {
-    const existing = acc[record.recordId];
-    if (existing) {
-      existing.push(record);
-    } else {
-      acc[record.recordId] = [record];
-    }
-    return acc;
-  }, {} as Record<string, SharedRecord[]>);
+  const groupedRecords = records.reduce(
+    (acc, record) => {
+      const existing = acc[record.recordId];
+      if (existing) {
+        existing.push(record);
+      } else {
+        acc[record.recordId] = [record];
+      }
+      return acc;
+    },
+    {} as Record<string, AccessPermissionData[]>
+  );
 
   return (
     <div className="space-y-4">
@@ -219,7 +222,7 @@ const SharedByMeList: React.FC<{
 
 // Component for records shared with current user
 const SharedWithMeList: React.FC<{
-  records: SharedRecord[];
+  records: AccessPermissionData[];
 }> = ({ records }) => {
   if (records.length === 0) {
     return (
@@ -237,7 +240,7 @@ const SharedWithMeList: React.FC<{
     <div className="space-y-4">
       {records.map(record => (
         <div
-          key={`${record.recordId}-${record.ownerId}`}
+          key={`${record.recordId}-${record.sharerId}`}
           className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
         >
           <div className="flex items-start justify-between">
@@ -245,11 +248,11 @@ const SharedWithMeList: React.FC<{
               {/* Owner Info */}
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-lg">
-                  {record.ownerId.slice(0, 2).toUpperCase()}
+                  {record.sharerId.slice(0, 2).toUpperCase()}
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Shared by</p>
-                  <p className="font-medium text-gray-900">Owner ID: {record.ownerId}</p>
+                  <p className="font-medium text-gray-900">Owner ID: {record.sharerId}</p>
                 </div>
               </div>
 
