@@ -1,6 +1,6 @@
 import React from 'react';
-import { Navigate, useLocation, Location } from "react-router-dom";
-import { useAuthContext } from "./AuthContext";
+import { Navigate, useLocation, Location } from 'react-router-dom';
+import { useAuthContext } from './AuthContext';
 import { ProtectedRouteProps, LocationState } from '@/types/core'; // Import from core types
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
@@ -20,6 +20,22 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   if (!user) {
     return <Navigate to="/auth" state={{ from: location }} replace />;
+  }
+
+  // Logged in but email not verified → send to verification hub
+  // (except if they're already on the verification page)
+  if (!user.emailVerified && location.pathname !== '/verification') {
+    return (
+      <Navigate
+        to="/verification"
+        state={{
+          userId: user.uid,
+          email: user.email,
+          from: location,
+        }}
+        replace
+      />
+    );
   }
 
   return <>{children}</>;

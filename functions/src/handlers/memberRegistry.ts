@@ -119,6 +119,7 @@ export const registerMemberOnChain = onCall(async request => {
           txHash: tx.hash,
           blockNumber: receipt?.blockNumber,
           registeredAt: new Date().toISOString(),
+          status: 'Active',
         },
       });
 

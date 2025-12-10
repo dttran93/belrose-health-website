@@ -7,6 +7,7 @@ export interface User {
   uid: string;
   email: string | null;
   emailVerified?: boolean;
+  emailVerifiedAt?: any;
   isIdentityVerified?: boolean;
   displayName: string | null;
   firstName: string | null;
@@ -26,6 +27,46 @@ export interface User {
     encryptedPrivateKeyIV: string; // The IV for the encrypted RSA Private Key
     publicKey: string; // The RSA Public Key
   };
+}
+
+export interface BelroseUserProfile extends User {
+  createdAt: any;
+  updatedAt: any;
+  wallet: UserWallet;
+
+  // Blockchain membership status
+  blockchainMember?: {
+    registered: boolean;
+    walletAddress: string;
+    userIdHash: string;
+    txHash: string;
+    blockNumber: number;
+    registeredAt: string;
+    status: 'Inactive' | 'Active' | 'Verified';
+    statusUpdatedAt?: string;
+    statusTxHash?: string;
+  };
+
+  //Other Info
+  affiliations?: [string] | [];
+}
+
+// ==================== WALLET TYPES ====================
+export type WalletOrigin = 'generated' | 'metamask' | 'walletconnect' | 'hardware';
+
+export interface UserWallet {
+  address: string;
+  origin: WalletOrigin;
+
+  // Only present for generated wallets (Belrose stores encrypted keys)
+  encryptedPrivateKey?: string;
+  keyIv?: string;
+  keyAuthTag?: string;
+  keySalt?: string;
+  encryptedMnemonic?: string;
+  mnemonicIv?: string;
+  mnemonicAuthTag?: string;
+  mnemonicSalt?: string;
 }
 
 // Authentication context data structure
@@ -50,39 +91,6 @@ export interface LocationState {
   from: {
     pathname: string;
   };
-}
-
-export interface BelroseUserProfile extends User {
-  createdAt: any;
-  updatedAt: any;
-  emailVerifiedAt?: any;
-  encryptedMasterKey?: string; // Encrypted with password-derived KEK
-  masterKeyIV?: string; // IV for the encrypted master key
-  wallet?: UserWallet;
-
-  //Other Info
-  affiliations?: [string] | [];
-}
-
-// ==================== WALLET TYPES ====================
-/**
- * How the wallet was created/connected
- */
-export type WalletOrigin = 'generated' | 'metamask' | 'walletconnect' | 'hardware';
-
-export interface UserWallet {
-  address: string;
-  origin: WalletOrigin;
-
-  // Only present for generated wallets (Belrose stores encrypted keys)
-  encryptedPrivateKey?: string;
-  keyIv?: string;
-  keyAuthTag?: string;
-  keySalt?: string;
-  encryptedMnemonic?: string;
-  mnemonicIv?: string;
-  mnemonicAuthTag?: string;
-  mnemonicSalt?: string;
 }
 
 // ==================== HEALTH RECORDS FILE ====================

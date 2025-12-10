@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
-import { EmailVerificationBanner } from '../components/auth/components/EmailVerificationBanner';
 import IdentityVerificationForm from '../components/auth/components/IdentityVerificationForm';
 import { VerificationResult, VerifiedData } from '@/types/identity';
 import { getAuth, sendEmailVerification } from 'firebase/auth';
@@ -44,6 +43,18 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
   const userId = propUserId || location.state?.user || auth.currentUser?.uid;
   const email = propEmail || location.state?.email || auth.currentUser?.email;
   const fromRegistration = location.state?.fromRegistration || false;
+
+  // If no user is logged in, redirect to auth
+  useEffect(() => {
+    if (!auth.currentUser) {
+      navigate('/auth', { replace: true });
+    }
+  }, [auth.currentUser, navigate]);
+
+  // Don't render anything while redirecting
+  if (!auth.currentUser) {
+    return null;
+  }
 
   // Verification states
   const [emailVerified, setEmailVerified] = useState(false);
@@ -79,9 +90,7 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
       const currentUser = auth.currentUser;
 
       if (currentUser?.emailVerified) {
-        toast.success('Email verified!', {
-          description: 'Your email has been successfully verified',
-        });
+        setEmailVerified(true);
 
         // Update Firestore
         if (userId) {
@@ -89,6 +98,11 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
           await updateDoc(userDocRef, {
             emailVerified: true,
             emailVerifiedAt: new Date().toISOString(),
+          });
+
+          await writeVerificationToBlockchain(true, identityVerified);
+          toast.success('Email verified!', {
+            description: 'Your email has been successfully verified',
           });
         }
       } else {
@@ -160,32 +174,7 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
       });
     }
 
-    // Update blockchain status to Verified (2) - only if email is also verified
-    if (emailVerified) {
-      try {
-        const userDoc = await getDoc(doc(db, 'users', userId));
-        const userData = userDoc.data();
-        const walletAddress =
-          userData?.connectedWallet?.address || userData?.generatedWallet?.address;
-
-        if (walletAddress) {
-          const functions = getFunctions();
-          const updateStatus = httpsCallable(functions, 'updateMemberStatus');
-          await updateStatus({ walletAddress, status: 2 }); // 2 = Verified
-
-          console.log('✅ Blockchain status updated to Verified');
-        } else {
-          console.warn('⚠️ No wallet address found, skipping blockchain update');
-        }
-      } catch (blockchainError) {
-        console.error('⚠️ Blockchain update failed:', blockchainError);
-        // Don't fail the whole flow - verification still succeeded
-      }
-    } else {
-      console.log(
-        'ℹ️ Email not verified yet, blockchain status will update after email verification'
-      );
-    }
+    await writeVerificationToBlockchain(emailVerified, true);
 
     toast.success('Identity verified!', {
       description: emailVerified
@@ -232,6 +221,37 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
       });
     }
     navigate('/dashboard', { replace: true });
+  };
+
+  const writeVerificationToBlockchain = async (
+    isEmailVerified: boolean,
+    isIdentityVerified: boolean
+  ) => {
+    // Only update Verification status if both email AND identity are verified
+    if (!isEmailVerified || !isIdentityVerified) {
+      console.log('ℹ️ Both verifications required for blockchain update', {
+        emailVerified: isEmailVerified,
+        identityVerified: isIdentityVerified,
+      });
+      return;
+    }
+
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      const userData = userDoc.data();
+      const walletAddress = userData?.wallet?.address;
+
+      if (walletAddress) {
+        const functions = getFunctions();
+        const updateStatus = httpsCallable(functions, 'updateMemberStatus');
+        await updateStatus({ walletAddress, status: 2 }); // 2 = Verified
+        console.log('✅ Blockchain status updated to Verified');
+      } else {
+        console.warn('⚠️ No wallet address found, skipping blockchain update');
+      }
+    } catch (error) {
+      console.error('⚠️ Blockchain update failed:', error);
+    }
   };
 
   // Calculate if user can proceed (email verified = minimum requirement)

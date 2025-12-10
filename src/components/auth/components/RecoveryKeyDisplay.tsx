@@ -84,9 +84,9 @@ export const RecoveryKeyDisplay: React.FC<RecoveryKeyDisplayProps> = ({
           <div className="flex items-start space-x-3">
             <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-yellow-900 flex-1">
-              <p className="font-semibold mb-2">
-                Create your Belrose Account and connect your Blockchain Wallet (Steps 1-2) to
-                receive your Recovery Key.
+              <p className="mb-2">
+                Create your Belrose Account and Blockchain Wallet (Steps 1-2) to receive your
+                Recovery Key.
               </p>
             </div>
           </div>
