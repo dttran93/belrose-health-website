@@ -1,8 +1,44 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Bell, CircleUserRound, CreditCard, GlobeLock, Link, Settings2 } from 'lucide-react';
+import UserSettings from '@/features/Settings/components/UserSettings';
+import { getAuth } from 'firebase/auth';
+import { useNavigate } from 'react-router-dom';
+import { UserService } from '@/components/auth/services/userService';
+import { BelroseUserProfile } from '@/types/core';
 
 const SettingsPage = () => {
+  const auth = getAuth();
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('profile');
+  const [userProfile, setUserProfile] = useState<BelroseUserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // If no user is logged in, redirect to auth
+  useEffect(() => {
+    if (!auth.currentUser) {
+      navigate('/auth');
+    }
+  }, [auth.currentUser, navigate]);
+
+  // Fetch user profile and blockchain member data
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!auth.currentUser) return;
+
+      setIsLoading(true);
+      try {
+        // Fetch user profile from Firestore
+        const profile = await UserService.getUserProfile(auth.currentUser.uid);
+        setUserProfile(profile);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [auth.currentUser]);
 
   const settingsSections = [
     { id: 'profile', name: 'Profile', icon: CircleUserRound },
@@ -13,51 +49,45 @@ const SettingsPage = () => {
     { id: 'billing', name: 'Billing & Plans', icon: CreditCard },
   ];
 
-  //Replace these with more comprehensive Settings pages later.
   const renderContent = () => {
     switch (activeSection) {
       case 'profile':
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Profile Information</h2>
-              <div className="bg-white rounded-lg border p-6 space-y-4">
-                <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
-                    <span className="text-2xl">👤</span>
-                  </div>
-                  <div>
-                    <h3 className="font-medium">John Doe</h3>
-                    <p className="text-gray-600">john.doe@email.com</p>
-                  </div>
-                  <button className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                    Edit Profile
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Full Name
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      defaultValue="John Doe"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <input
-                      type="email"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      defaultValue="john.doe@email.com"
-                    />
-                  </div>
-                </div>
-              </div>
+        if (isLoading) {
+          return (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          </div>
+          );
+        }
+
+        if (!userProfile) {
+          return (
+            <div className="bg-white rounded-lg border p-8 text-center">
+              <p className="text-gray-600">Unable to load profile data</p>
+            </div>
+          );
+        }
+
+        return (
+          <UserSettings
+            user={userProfile}
+            onChangeName={() => {
+              // TODO: Open change name modal
+              console.log('Change name clicked');
+            }}
+            onChangeEmail={() => {
+              // TODO: Open change email modal
+              console.log('Change email clicked');
+            }}
+            onChangePhoto={() => {
+              // TODO: Open change photo modal
+              console.log('Change photo clicked');
+            }}
+            onStartVerification={() => {
+              // Navigate to verification page
+              navigate('/verification');
+            }}
+          />
         );
 
       case 'wallet':

@@ -6,9 +6,6 @@ import { ReactNode } from 'react';
 export interface User {
   uid: string;
   email: string | null;
-  emailVerified?: boolean;
-  emailVerifiedAt?: any;
-  isIdentityVerified?: boolean;
   displayName: string | null;
   firstName: string | null;
   lastName: string | null;
@@ -33,6 +30,10 @@ export interface BelroseUserProfile extends User {
   createdAt: any;
   updatedAt: any;
   wallet: UserWallet;
+  emailVerified: boolean;
+  emailVerifiedAt?: any;
+  identityVerified: boolean;
+  identityVerifiedAt?: any;
 
   // Blockchain membership status
   blockchainMember?: {
@@ -71,7 +72,7 @@ export interface UserWallet {
 
 // Authentication context data structure
 export interface AuthContextData {
-  user: User | null;
+  user: BelroseUserProfile | null;
   loading: boolean;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;

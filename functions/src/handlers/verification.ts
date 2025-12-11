@@ -221,26 +221,18 @@ export const checkVerificationStatus = onCall<CheckStatusRequest, Promise<CheckS
 
       const verified = status === 'approved';
 
-      // If approved, extract and save verified data
-      if (verified) {
-        const verifiedData: VerifiedData = {
-          firstName: inquiry.data.attributes.name_first || '',
-          lastName: inquiry.data.attributes.name_last || '',
-          dateOfBirth: inquiry.data.attributes.birthdate || '',
-          address: inquiry.data.attributes.address_street_1 || '',
-          postcode: inquiry.data.attributes.address_postal_code || '',
-        };
+      const db = getFirestore();
 
+      if (verified) {
         console.log('✅ User verified successfully:', userId);
 
-        // Update both users and verifications collections
-        const db = getFirestore();
+        // Update user and verification records - minimal data storage
         const batch = db.batch();
 
         batch.update(db.collection('users').doc(userId), {
           identityVerified: true,
-          verifiedData: verifiedData,
-          verifiedAt: FieldValue.serverTimestamp(),
+          identityVerifiedAt: FieldValue.serverTimestamp(),
+          identityVerificationInquiryId: inquiryId,
         });
 
         batch.update(db.collection('verifications').doc(userId), {
@@ -250,12 +242,20 @@ export const checkVerificationStatus = onCall<CheckStatusRequest, Promise<CheckS
 
         await batch.commit();
 
-        return { verified: true, data: verifiedData };
+        // Return verified data for immediate UI display (not persisted)
+        return {
+          verified: true,
+          data: {
+            firstName: inquiry.data.attributes.name_first || '',
+            lastName: inquiry.data.attributes.name_last || '',
+            dateOfBirth: inquiry.data.attributes.birthdate || '',
+            address: inquiry.data.attributes.address_street_1 || '',
+            postcode: inquiry.data.attributes.address_postal_code || '',
+          },
+        };
       } else {
-        // Not approved - update status
         console.log('❌ Verification not approved:', status);
 
-        const db = getFirestore();
         await db.collection('verifications').doc(userId).update({
           status: status,
           completedAt: FieldValue.serverTimestamp(),
@@ -341,14 +341,19 @@ export const personaWebhook = onRequest(
       switch (status) {
         case 'approved':
           console.log('✅ Webhook: User verified', userId);
+          const inquiryId = inquiry?.id;
           await db.collection('verifications').doc(userId).update({
             status: 'approved',
             completedAt: FieldValue.serverTimestamp(),
           });
-          await db.collection('users').doc(userId).update({
-            identityVerified: true,
-            verifiedAt: FieldValue.serverTimestamp(),
-          });
+          await db
+            .collection('users')
+            .doc(userId)
+            .update({
+              identityVerified: true,
+              identityVerifiedAt: FieldValue.serverTimestamp(),
+              identityVerificationInquiryId: inquiryId || null,
+            });
           break;
 
         case 'declined':

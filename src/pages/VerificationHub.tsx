@@ -168,7 +168,7 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
     if (userId) {
       const userDocRef = doc(db, 'users', userId);
       await updateDoc(userDocRef, {
-        isIdentityVerified: true,
+        identityVerified: true,
         verifiedData: result.data,
         identityVerifiedAt: new Date().toISOString(),
       });

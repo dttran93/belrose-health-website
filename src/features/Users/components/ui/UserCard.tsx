@@ -133,7 +133,7 @@ export const UserCard: React.FC<UserCardProps> = ({
       >
         <span className="text-sm font-medium text-gray-900 truncate">{displayName}</span>
         {/*Verified Badge*/}
-        {user?.emailVerified && user?.isIdentityVerified && (
+        {user?.emailVerified && user?.identityVerified && (
           <Tooltip.Provider>
             <Tooltip.Root>
               <Tooltip.Trigger asChild>
@@ -219,7 +219,7 @@ export const UserCard: React.FC<UserCardProps> = ({
             <div className="flex items-center gap-1">
               <p className="text-base font-semibold text-gray-900 truncate">{displayName}</p>{' '}
               {/*Verified Badge*/}
-              {user?.emailVerified && user?.isIdentityVerified && (
+              {user?.emailVerified && user?.identityVerified && (
                 <Tooltip.Provider>
                   <Tooltip.Root>
                     <Tooltip.Trigger asChild>
@@ -373,7 +373,7 @@ export const UserCard: React.FC<UserCardProps> = ({
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-bold text-gray-900 truncate">{displayName}</h3>
             {/*Verified Badge*/}
-            {user?.emailVerified && user?.isIdentityVerified && (
+            {user?.emailVerified && user?.identityVerified && (
               <Tooltip.Provider>
                 <Tooltip.Root>
                   <Tooltip.Trigger asChild>
