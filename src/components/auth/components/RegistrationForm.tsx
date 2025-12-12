@@ -60,7 +60,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     {
       number: 2,
       title: 'Blockchain Connection',
-      subtitle: 'Connect your blockchain wallet',
+      subtitle: 'Connect to the blockchain',
       icon: Wallet,
     },
     {
@@ -231,7 +231,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         },
         // Verification fields will be updated later in the verification flow
         emailVerified: false,
-        isIdentityVerified: false,
+        identityVerified: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       });

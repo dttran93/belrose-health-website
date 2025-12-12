@@ -81,8 +81,8 @@ export const AccountRecovery: React.FC<AccountRecoveryProps> = ({ onBackToLogin 
                               <p className="font-semibold mb-2 text-sm">Why this happens:</p>
                               <ol className="list-decimal list-inside space-y-1 text-xs">
                                 <li>
-                                  Your Password protects your Encryption Key. Belrose does not know
-                                  either Password nor your Encryption Key
+                                  Your Password protects your Encryption Key. Belrose knows neither
+                                  your Password nor your Encryption Key
                                 </li>
                                 <li>A new password can't decrypt the old Encryption Key</li>
                                 <li>
@@ -105,42 +105,30 @@ export const AccountRecovery: React.FC<AccountRecoveryProps> = ({ onBackToLogin 
                 <h2 className="text-lg font-bold text-gray-900 mb-4">Choose Your Situation:</h2>
 
                 {/* Option 1: Have Recovery Key - RECOMMENDED */}
-                <div className="text-foreground border-2 border-primary bg-background hover:border-green-400 hover:bg-green-50 hover:text-green-600 rounded-lg p-6 transition-colors shadow-lg">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
+                <button
+                  onClick={() => {
+                    setCurrentView('recoveryKey');
+                  }}
+                  className="w-full"
+                >
+                  <div className="text-foreground border-2 border-primary bg-background hover:border-green-400 hover:bg-green-50 hover:text-green-600 rounded-lg p-6 transition-colors shadow-lg">
+                    <div className="flex items-start justify-between">
                       <div className="flex items-center space-x-2 mb-2">
                         <span className="text-3xl">✅</span>
-                        <h3 className="font-bold text-lg">I Have My 24-Word Recovery Key</h3>
+                        <h3 className="font-bold text-lg">
+                          I Have My 24-Word Recovery Key (Recommended)
+                        </h3>
                       </div>
-                      <div className="bg-transparent rounded p-3 mb-3">
-                        <p className="text-sm font-semibold mb-1">✨ BEST - Full Recovery</p>
-                        <p className="text-xs">
-                          This will restore complete access to your encrypted data AND let you set a
-                          new password. This is the safest option.
-                        </p>
-                      </div>
-
-                      <Button
-                        onClick={() => {
-                          setCurrentView('recoveryKey');
-                        }}
-                        variant="default"
-                        size="lg"
-                        className="w-full"
-                      >
-                        <KeyRound className="w-5 h-5 mr-2" />
-                        Use My Recovery Key (Recommended)
-                      </Button>
                     </div>
                   </div>
-                </div>
+                </button>
 
                 {/* Option 2: No Recovery Key - DATA LOSS */}
                 <div className="bg-background border-2 border-primary hover:border-red-400 hover:bg-red-50 rounded-lg p-6">
                   <div className="flex items-start space-x-4">
                     <div className="flex-1 hover:text-red-600">
                       <h3 className="text-left font-bold mb-2 text-lg">
-                        ❌ I Don't Have My Recovery Key
+                        ❌ I Don't Have My 24-Word Recovery Key
                       </h3>
 
                       <div className="bg-transparent rounded p-4 mb-2">

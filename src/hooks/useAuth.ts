@@ -33,18 +33,13 @@ export const useAuth = (): AuthContextData => {
         // 1. user (FirebaseAuthUser) - For uid, email, displayName, photoURL, emailVerified
         // 2. profile (Firestore document) - For all custom Belrose fields
         mergedUser = {
-          // --- 1. Base User Fields (from Firebase Auth / baseAuthUser) ---
           uid: user.uid,
           email: user.email,
           displayName: user.displayName,
           firstName: profile.firstName || null, // From Firestore Profile
           lastName: profile.lastName || null, // From Firestore Profile
           photoURL: user.photoURL,
-
-          // --- 2. Encryption Fields (REQUIRED for BelroseUserProfile)
           encryption: profile.encryption,
-
-          // --- 3. BelroseUserProfile Specific Fields (REQUIRED by the interface) ---
           createdAt: profile.createdAt || null,
           updatedAt: profile.updatedAt || null,
           wallet: profile.wallet,
@@ -52,8 +47,6 @@ export const useAuth = (): AuthContextData => {
           emailVerifiedAt: profile.emailVerifiedAt || null,
           identityVerified: profile.identityVerified || false, // Use false if missing
           identityVerifiedAt: profile.identityVerifiedAt || null,
-
-          // Optional Fields
           blockchainMember: profile.blockchainMember || undefined,
           affiliations: profile.affiliations || [],
         } as BelroseUserProfile;

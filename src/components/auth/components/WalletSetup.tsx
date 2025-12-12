@@ -272,7 +272,10 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
           <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
             <Wallet className="w-8 h-8 text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-primary">Blockchain Wallet</h2>
+          <h2 className="text-2xl font-bold text-primary">Blockchain Connection</h2>
+          <p className="text-gray-600 mt-2">
+            A blockchain connection ensures record reliability and Belrose platform's auditability.
+          </p>
         </div>
 
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -293,9 +296,9 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
         <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
           <Wallet className="w-8 h-8 text-white" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900">Blockchain Wallet</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Blockchain Connection</h2>
         <p className="text-gray-600 mt-2">
-          Your wallet signs health record permissions on the blockchain.
+          A blockchain connection ensures record reliability and Belrose platform's auditability.
         </p>
       </div>
 
@@ -307,7 +310,9 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
           </span>
         </div>
 
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Generate Secure Wallet</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Generate Secure Wallet for Blockchain Connection
+        </h3>
 
         <p className="text-gray-600 text-sm mb-4">We recommend this because:</p>
 
