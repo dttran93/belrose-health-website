@@ -8,6 +8,7 @@ import { BelroseUserProfile } from '@/types/core';
 import { useUserSettings } from '@/features/Settings/hooks/useUserSettings';
 import ChangeNameModal from '@/features/Settings/components/ChangeNameModal';
 import ChangeEmailModal from '@/features/Settings/components/ChangeEmailModal';
+import ChangePhotoModal from '@/features/Settings/components/ChangePhotoModal';
 
 const SettingsPage = () => {
   const auth = getAuth();
@@ -19,18 +20,26 @@ const SettingsPage = () => {
   //Modal states
   const [isChangeNameModalOpen, setIsChangeNameModalOpen] = useState(false);
   const [isChangeEmailModalOpen, setIsChangeEmailModalOpen] = useState(false);
+  const [isChangePhotoModalOpen, setIsChangePhotoModalOpen] = useState(false);
 
   //User settings hook
-  const { isUpdatingName, isUpdatingEmail, updateName, updateEmail, refreshUserProfile } =
-    useUserSettings({
-      onSuccess: async () => {
-        //Refresh user profile after successful update
-        const updated = await refreshUserProfile();
-        if (updated) {
-          setUserProfile(updated);
-        }
-      },
-    });
+  const {
+    isUpdatingName,
+    isUpdatingEmail,
+    isUpdatingPhoto,
+    updateName,
+    updateEmail,
+    updatePhoto,
+    refreshUserProfile,
+  } = useUserSettings({
+    onSuccess: async () => {
+      //Refresh user profile after successful update
+      const updated = await refreshUserProfile();
+      if (updated) {
+        setUserProfile(updated);
+      }
+    },
+  });
 
   // If no user is logged in, redirect to auth
   useEffect(() => {
@@ -92,12 +101,8 @@ const SettingsPage = () => {
             user={userProfile}
             onChangeName={() => setIsChangeNameModalOpen(true)}
             onChangeEmail={() => setIsChangeEmailModalOpen(true)}
-            onChangePhoto={() => {
-              // TODO: Open change photo modal
-              console.log('Change photo clicked');
-            }}
+            onChangePhoto={() => setIsChangePhotoModalOpen(true)}
             onStartVerification={() => {
-              // Navigate to verification page
               navigate('/verification');
             }}
           />
@@ -276,6 +281,14 @@ const SettingsPage = () => {
             onSubmit={updateEmail}
             isLoading={isUpdatingEmail}
             currentEmail={userProfile.email || ''}
+          />
+          <ChangePhotoModal
+            isOpen={isChangePhotoModalOpen}
+            onClose={() => setIsChangePhotoModalOpen(false)}
+            onSubmit={updatePhoto}
+            isLoading={isUpdatingPhoto}
+            currentPhotoURL={userProfile.photoURL || null}
+            userInitials={`${userProfile.firstName?.[0] || ''}${userProfile.lastName?.[0] || ''}`.toUpperCase()}
           />
         </>
       )}

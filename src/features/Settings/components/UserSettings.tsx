@@ -117,16 +117,16 @@ const UserSettings: React.FC<UserSettingsProps> = ({
             'w-24 h-24 rounded-full flex items-center justify-center text-3xl font-semibold text-white mb-3 bg-gradient-to-br from-chart-1 to-chart-5'
           }
           style={
-            user.profilePicture
+            user.photoURL
               ? {
-                  backgroundImage: `url(${user.profilePicture})`,
+                  backgroundImage: `url(${user.photoURL})`,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
                 }
               : undefined
           }
         >
-          {!user.profilePicture && initials}
+          {!user.photoURL && initials}
         </div>
         <div className="text-xl font-semibold text-foreground">{user.displayName}</div>
         <Button

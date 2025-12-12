@@ -100,7 +100,9 @@ export function useUserSettings(options: UseUserSettingsOptions = {}): UseUserSe
       setIsUpdatingEmail(true);
       try {
         await UserSettingsService.updateEmail(user.uid, newEmail, currentPassword);
-        handleSuccess('Email updated. Please check your inbox to verify your new email address.');
+        handleSuccess(
+          'Verification email sent to your new address. Your email will update after you click the verification link.'
+        );
         return true;
       } catch (error: any) {
         handleError(error.message || 'Failed to update email');

@@ -95,8 +95,8 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({
           <div className="text-sm">
             <p className="font-medium text-chart-4">Email verification required</p>
             <p className="text-muted-foreground mt-1">
-              After changing your email, you'll need to verify the new address before you can use it
-              to sign in.
+              We'll send a verification link to your new email address. Your email will only change
+              ater you click that link.
             </p>
           </div>
         </div>

@@ -9,7 +9,7 @@ export interface User {
   displayName: string | null;
   firstName: string | null;
   lastName: string | null;
-  photoURL?: string | null;
+  profilePicture?: string | null;
 
   encryption: {
     enabled: boolean;
