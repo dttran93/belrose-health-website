@@ -1,9 +1,15 @@
-import React from 'react';
-import { AlertTriangle } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AlertTriangle, CheckCircle, RefreshCw, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import { SectionHeader, SettingsRow } from './ui/SettingsRow';
 import { BelroseUserProfile } from '@/types/core';
+import {
+  BlockchainRoleManagerService,
+  MemberStatus,
+  MemberInfo,
+} from '@/features/Permissions/services/blockchainRoleManagerService';
+import { ethers } from 'ethers';
 
 interface UserSettingsProps {
   user: BelroseUserProfile;
@@ -50,6 +56,57 @@ const UserSettings: React.FC<UserSettingsProps> = ({
   className,
 }) => {
   const initials = `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || 'U';
+
+  //Blockchain query state
+  const [onChainData, setOnChainData] = useState<MemberInfo | null>(null);
+  const [isLoadingOnChain, setIsLoadingOnChain] = useState(false);
+  const [onChainError, setOnChainError] = useState<string | null>(null);
+
+  //Fetch on-chain data
+  const fetchOnChainData = async () => {
+    if (!user.wallet?.address) {
+      setOnChainError('No wallet address');
+      return;
+    }
+
+    setIsLoadingOnChain(true);
+    setOnChainError(null);
+
+    try {
+      const memberData = await BlockchainRoleManagerService.getMember(user.wallet.address);
+      setOnChainData(memberData);
+    } catch (error) {
+      console.error('Error fetching on-chain data:', error);
+      setOnChainError('Failed to query blockchain');
+    } finally {
+      setIsLoadingOnChain(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user.wallet?.address) {
+      fetchOnChainData();
+    }
+  }, [user.wallet?.address]);
+
+  const formatOnChainStatus = (status: MemberStatus) => {
+    switch (status) {
+      case MemberStatus.Verified:
+        return { label: 'Verified', color: 'text-chart-3', bg: 'bg-chart-3' };
+      case MemberStatus.Active:
+        return { label: 'Active', color: 'text-chart-1', bg: 'bg-chart-1' };
+      case MemberStatus.Inactive:
+        return { label: 'Inactive', color: 'text-chart-4', bg: 'bg-chart-4' };
+      default:
+        return { label: 'Unknown', color: 'text-muted-foreground', bg: 'bg-foreground' };
+    }
+  };
+
+  const computedUserIdHash = user.uid ? ethers.keccak256(ethers.toUtf8Bytes(user.uid)) : null;
+  const hashesMatch =
+    computedUserIdHash && onChainData?.userIdHash
+      ? computedUserIdHash.toLowerCase() === onChainData.userIdHash.toLowerCase()
+      : false;
 
   return (
     <div className={`max-w-2xl mx-auto py-8 px-6 ${className || ''}`}>
@@ -138,7 +195,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({
 
       <SettingsRow
         label="Wallet Activity"
-        value={truncateHash(user.wallet.address)}
+        value={user.wallet.address}
         isLink
         linkHref={`https://etherscan.io/address/${user.wallet.address}`}
         mono
@@ -154,68 +211,68 @@ const UserSettings: React.FC<UserSettingsProps> = ({
       />
 
       <SettingsRow
-        label="Date Registered"
-        value={
-          user.blockchainMember?.registeredAt
-            ? formatDate(user.blockchainMember.registeredAt)
-            : 'N/A'
-        }
-      />
-
-      <SettingsRow
-        label="Verification Status"
-        value={(() => {
-          const status = user.blockchainMember?.status;
-          if (status === 'Verified') {
-            return (
-              <span className="inline-flex items-center gap-2 text-chart-3">
-                <span className="w-2 h-2 rounded-full bg-chart-3" />
-                Verified
-              </span>
-            );
-          } else if (status === 'Active') {
-            return (
-              <span className="inline-flex items-center gap-2 text-chart-1">
-                <span className="w-2 h-2 rounded-full bg-chart-1" />
-                Active
-              </span>
-            );
-          } else if (status === 'Inactive') {
-            return (
-              <span className="inline-flex items-center gap-2 text-foreground">
-                <span className="w-2 h-2 rounded-full bg-foreground" />
-                Inactive
-              </span>
-            );
-          } else {
-            return (
-              <span className="inline-flex items-center gap-2 text-chart-4">
-                <span className="w-2 h-2 rounded-full bg-chart-4" />
-                Not Verified
-              </span>
-            );
-          }
-        })()}
-      />
-
-      <SettingsRow
         label="Transaction Hash"
-        value={
-          user.blockchainMember?.txHash
-            ? truncateHash(user.blockchainMember.txHash)
-            : 'Not registered'
-        }
+        value={user.blockchainMember?.txHash ? user.blockchainMember.txHash : 'Not registered'}
         isLink={!!user.blockchainMember?.txHash}
         linkHref={`https://etherscan.io/tx/${user.blockchainMember?.txHash}`}
         mono
-        buttonText={user.blockchainMember?.txHash ? 'Copy' : undefined}
-        onButtonClick={() =>
-          copyToClipboard(
-            user.blockchainMember?.txHash ? 'user.blockchainMember?.txHash' : 'N/A',
-            'Transaction hash'
-          )
-        }
       />
+
+      {!user.wallet?.address ? (
+        <div className="text-sm text-muted-foreground py-3">
+          No wallet connected. Connect a wallet to view on-chain data.
+        </div>
+      ) : isLoadingOnChain ? (
+        <div className="text-sm text-muted-foreground py-3 flex items-center gap-2">
+          <RefreshCw className="w-4 h-4 animate-spin" />
+          Querying blockchain...
+        </div>
+      ) : onChainError ? (
+        <div className="text-sm text-destructive py-3">{onChainError}</div>
+      ) : onChainData ? (
+        <>
+          <SettingsRow
+            label="On-Chain Status"
+            value={(() => {
+              const { label, color, bg } = formatOnChainStatus(onChainData.status);
+              return (
+                <span className={`inline-flex items-center gap-1 ${color}`}>
+                  <span className={`w-2 h-2 rounded-full ${bg}`} />
+                  {label}
+                </span>
+              );
+            })()}
+          />
+
+          <SettingsRow
+            label="User ID Hash (on-chain)"
+            value={
+              <div className="flex items-center gap -2">
+                <span className="font-mono text-sm break-all">{onChainData.userIdHash}</span>
+                {hashesMatch ? (
+                  <span className="inline-flex items-center text-chart-3 gap-1">
+                    <span className="w-2 h-2 rounded-full bg-chart-3 ml-2" /> <span>Verified</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-destructive">
+                    <span className="w-2 h-2 rounded-full bg-foreground mx-1" />{' '}
+                    <span className="text-xs">Mismatch</span>
+                  </span>
+                )}
+              </div>
+            }
+          />
+
+          <SettingsRow
+            label="Joined At (on-chain)"
+            value={onChainData.joinedAt ? onChainData.joinedAt.toLocaleString() : 'Not registered'}
+          />
+        </>
+      ) : (
+        <div className="text-sm text-muted-foreground py-3">
+          No on-chain member data found for this wallet address.
+        </div>
+      )}
     </div>
   );
 };

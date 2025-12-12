@@ -5,6 +5,9 @@ import { getAuth } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { UserService } from '@/components/auth/services/userService';
 import { BelroseUserProfile } from '@/types/core';
+import { useUserSettings } from '@/features/Settings/hooks/useUserSettings';
+import ChangeNameModal from '@/features/Settings/components/ChangeNameModal';
+import ChangeEmailModal from '@/features/Settings/components/ChangeEmailModal';
 
 const SettingsPage = () => {
   const auth = getAuth();
@@ -12,6 +15,22 @@ const SettingsPage = () => {
   const [activeSection, setActiveSection] = useState('profile');
   const [userProfile, setUserProfile] = useState<BelroseUserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  //Modal states
+  const [isChangeNameModalOpen, setIsChangeNameModalOpen] = useState(false);
+  const [isChangeEmailModalOpen, setIsChangeEmailModalOpen] = useState(false);
+
+  //User settings hook
+  const { isUpdatingName, isUpdatingEmail, updateName, updateEmail, refreshUserProfile } =
+    useUserSettings({
+      onSuccess: async () => {
+        //Refresh user profile after successful update
+        const updated = await refreshUserProfile();
+        if (updated) {
+          setUserProfile(updated);
+        }
+      },
+    });
 
   // If no user is logged in, redirect to auth
   useEffect(() => {
@@ -71,14 +90,8 @@ const SettingsPage = () => {
         return (
           <UserSettings
             user={userProfile}
-            onChangeName={() => {
-              // TODO: Open change name modal
-              console.log('Change name clicked');
-            }}
-            onChangeEmail={() => {
-              // TODO: Open change email modal
-              console.log('Change email clicked');
-            }}
+            onChangeName={() => setIsChangeNameModalOpen(true)}
+            onChangeEmail={() => setIsChangeEmailModalOpen(true)}
             onChangePhoto={() => {
               // TODO: Open change photo modal
               console.log('Change photo clicked');
@@ -245,6 +258,27 @@ const SettingsPage = () => {
           <div className="p-8">{renderContent()}</div>
         </div>
       </div>
+
+      {/* Modals */}
+      {userProfile && (
+        <>
+          <ChangeNameModal
+            isOpen={isChangeNameModalOpen}
+            onClose={() => setIsChangeNameModalOpen(false)}
+            onSubmit={updateName}
+            isLoading={isUpdatingName}
+            currentFirstName={userProfile.firstName || ''}
+            currentLastName={userProfile.lastName || ''}
+          />
+          <ChangeEmailModal
+            isOpen={isChangeEmailModalOpen}
+            onClose={() => setIsChangeEmailModalOpen(false)}
+            onSubmit={updateEmail}
+            isLoading={isUpdatingEmail}
+            currentEmail={userProfile.email || ''}
+          />
+        </>
+      )}
     </div>
   );
 };
