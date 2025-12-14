@@ -15,6 +15,7 @@ import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionK
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 import { toISOString, formatTimestamp } from '@/utils/dataFormattingUtils';
 import PermissionsManager from '@/features/Permissions/component/PermissionManager';
+import SubjectManager from '@/features/Subject/components/SubjectManager';
 
 type ViewMode =
   | 'record'
@@ -23,7 +24,8 @@ type ViewMode =
   | 'version-detail'
   | 'verification'
   | 'share'
-  | 'permissions';
+  | 'permissions'
+  | 'subject';
 
 interface RecordFullProps {
   record: FileObject;
@@ -38,7 +40,14 @@ interface RecordFullProps {
 
   //Navigation Props
   onBack: (record: FileObject) => void; //for returning to the previous screen, could be different so need a prop
-  initialViewMode?: 'record' | 'edit' | 'versions' | 'verification' | 'permissions' | 'share'; //version-detail can never be the initial view, since it only comes from versions
+  initialViewMode?:
+    | 'record'
+    | 'edit'
+    | 'versions'
+    | 'verification'
+    | 'permissions'
+    | 'share'
+    | 'subject'; //version-detail can never be the initial view, since it only comes from versions
   comingFromAddRecord?: boolean; //so the Save button is activated when coming from the AddRecord screen, otherwise it'd be disabled and the user is stuck
 }
 
@@ -90,13 +99,13 @@ export const RecordFull: React.FC<RecordFullProps> = ({
 
     // Decrypt the version
     const encryptedRecord = {
+      id: record.id,
       encryptedFileName: version.recordSnapshot.encryptedFileName,
       encryptedExtractedText: version.recordSnapshot.encryptedExtractedText,
       encryptedOriginalText: version.recordSnapshot.encryptedOriginalText,
       encryptedContextText: version.recordSnapshot.encryptedContextText,
       encryptedFhirData: version.recordSnapshot.encryptedFhirData,
       encryptedBelroseFields: version.recordSnapshot.encryptedBelroseFields,
-      encryptedKey: version.recordSnapshot.encryptedKey,
       isEncrypted: true,
     };
 
@@ -127,7 +136,9 @@ export const RecordFull: React.FC<RecordFullProps> = ({
 
       // Get Hashes from Version Metadata
       recordHash: version.recordHash ?? null,
-      previousRecordHash: originalRecord.recordHash ?? null,
+      previousRecordHash: originalRecord.recordHash
+        ? [...(originalRecord.previousRecordHash ?? []), originalRecord.recordHash]
+        : (originalRecord.previousRecordHash ?? null),
       originalFileHash: originalRecord.originalFileHash ?? null,
 
       versionInfo: {
@@ -167,6 +178,10 @@ export const RecordFull: React.FC<RecordFullProps> = ({
 
   const handlePermissionManager = () => {
     setViewMode('permissions');
+  };
+
+  const handleSubjectPage = () => {
+    setViewMode('subject');
   };
 
   const handleViewVersion = async (version: RecordVersion) => {
@@ -314,6 +329,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
                 showView={false} //Don't need view because we're already on view full record
                 onEdit={viewMode !== 'edit' ? handleEnterEditMode : undefined}
                 onVersion={viewMode !== 'versions' ? handleViewVersionHistory : undefined}
+                onSubject={viewMode !== 'subject' ? handleSubjectPage : undefined}
                 onShare={viewMode !== 'share' ? handleSharePage : undefined}
                 onViewVerification={
                   viewMode !== 'verification' ? handleViewVerification : undefined
@@ -404,6 +420,12 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       {viewMode === 'permissions' && (
         <div className="px-4 py-2">
           <PermissionsManager record={displayRecord} onBack={handleBackToRecord} />
+        </div>
+      )}
+
+      {viewMode === 'subject' && (
+        <div className="px-4 py-2">
+          <SubjectManager record={displayRecord} onBack={handleBackToRecord} />
         </div>
       )}
 

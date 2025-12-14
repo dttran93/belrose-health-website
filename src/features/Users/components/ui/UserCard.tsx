@@ -63,10 +63,10 @@ const colorClasses: Record<
     border: 'border-gray-200',
   },
   primary: {
-    bg: 'bg-primary/10',
-    iconBg: 'bg-primary/20',
+    bg: 'bg-primary/20',
+    iconBg: 'bg-primary/50',
     icon: 'text-primary',
-    border: 'border-primary/30',
+    border: 'border-primary',
   },
   green: {
     bg: 'bg-chart-3/20',
@@ -81,10 +81,10 @@ const colorClasses: Record<
     border: 'border-red-200',
   },
   purple: {
-    bg: 'bg-purple-50',
-    iconBg: 'bg-purple-200',
-    icon: 'text-purple-700',
-    border: 'border-purple-200',
+    bg: 'bg-chart-1/20',
+    iconBg: 'bg-chart-1/50',
+    icon: 'text-chart-1',
+    border: 'border-chart-1',
   },
   amber: {
     bg: 'bg-chart-4/20',

@@ -73,12 +73,12 @@ export class VersionControlService {
     const docData = firstDoc.data();
 
     //Safely access the encrypted key and check its type
-    const encryptedKey = docData.encryptedKey as string | undefined;
-    if (!encryptedKey || typeof encryptedKey !== 'string') {
-      throw new Error('Wrapped key data is corrupt or missing the "encryptedKey" field.');
+    const wrappedKey = docData.wrappedKey as string | undefined;
+    if (!wrappedKey || typeof wrappedKey !== 'string') {
+      throw new Error('Wrapped key data is corrupt or missing the "wrappedKey" field.');
     }
 
-    return encryptedKey;
+    return wrappedKey;
   }
 
   // ==================== CORE VERSION METHODS ====================

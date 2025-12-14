@@ -18,7 +18,6 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
 
     // ✨ ENCRYPTION FLAGS - Must be preserved!
     isEncrypted: data.isEncrypted || false,
-    encryptedKey: data.encryptedKey,
     encryptedFileIV: data.encryptedFileIV,
 
     // ✨ ENCRYPTED FIELDS - Pass through for decryption service
@@ -61,6 +60,8 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
     uploadedByName: data.uploadedByName,
     owners: data.owners || [],
     administrators: data.administrators,
+    subject: data.subject || [],
+    pendingSubjectRequests: data.pendingSubjectRequests,
   } as FileObject;
 };
 

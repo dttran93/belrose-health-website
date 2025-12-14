@@ -21,11 +21,13 @@ import { SharingBlockchainService } from '@/features/Sharing/services/sharingBlo
 import { EmailInvitationService } from './emailInvitationService';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 import { BlockchainRoleManagerService } from '@/features/Permissions/services/blockchainRoleManagerService';
+import { BelroseUserProfile } from '@/types/core';
 
 export interface ShareRecordRequest {
   recordId: string;
   receiverWalletAddress?: string;
   receiverEmail?: string;
+  receiverUserId?: string;
 }
 
 export interface AccessPermissionData {
@@ -59,8 +61,8 @@ export class SharingService {
     // Validate that at least one identifier is provided
     // These are user-facing identifiers. We'll look up the receiver's uid in Firestore
     // uid will be used for internal operations
-    if (!request.receiverEmail && !request.receiverWalletAddress) {
-      throw new Error('Either receiver email or wallet address must be provided');
+    if (!request.receiverEmail && !request.receiverWalletAddress && !request.receiverUserId) {
+      throw new Error('Either receiver email, wallet address, or user ID must be provided');
     }
 
     // Get the master key from session
@@ -89,6 +91,32 @@ export class SharingService {
     console.log('✅ Record found and ownership verified');
 
     const getReceiver = async () => {
+      //Direct userId lookup
+      if (request.receiverUserId) {
+        console.log('🔍 Looking up receiver by userId:', request.receiverUserId);
+        const userDoc = await getDoc(doc(db, 'users', request.receiverUserId));
+
+        if (!userDoc.exists()) {
+          throw new Error('Receiver not found. The user may have been deleted.');
+        }
+
+        const data = userDoc.data() as BelroseUserProfile;
+
+        // Still need to validate encryption keys
+        if (!data.encryption?.publicKey) {
+          throw new Error(
+            'Receiver has not completed their account setup (encryption keys missing). Please ask them to complete their registration.'
+          );
+        }
+
+        console.log('✅ Receiver found by userId');
+        return {
+          id: userDoc.id,
+          data: data,
+        };
+      }
+
+      //Look up logic for email/wallet
       const usersRef = collection(db, 'users');
       let q;
 
@@ -137,8 +165,8 @@ export class SharingService {
         }
       }
 
-      const doc = querySnapshot.docs[0];
-      const data = doc.data();
+      const receiverDoc = querySnapshot.docs[0];
+      const data = receiverDoc.data();
 
       // ✅ CASE 2: Email not verified
       if (request.receiverEmail && data.emailVerified === false) {
@@ -179,7 +207,7 @@ export class SharingService {
 
       // ✅ ALL CHECKS PASSED!
       return {
-        id: doc.id,
+        id: receiverDoc.id,
         data: data,
       };
     };

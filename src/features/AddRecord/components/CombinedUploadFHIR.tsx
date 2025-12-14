@@ -8,13 +8,12 @@ import {
   CheckCircle,
   ExternalLink,
   X,
-  SquarePen,
 } from 'lucide-react';
 import FileUploadZone from './ui/FileUploadZone';
 import { FileListItem } from './FileListItem';
 import { TabNavigation } from './ui/TabNavigation';
 import { toast } from 'sonner';
-import { BelroseFields, FileObject } from '@/types/core';
+import { FileObject } from '@/types/core';
 import { Button } from '@/components/ui/Button';
 import { validateBasicFhirStructure, getValidationSummary } from '../utils/fhirValidationUtils';
 import { SimpleFHIRValidation } from '../utils/fhirValidationUtils';

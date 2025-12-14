@@ -6,13 +6,12 @@ import {
   Download,
   Copy,
   Eye,
-  Archive,
   Trash2,
   LucideIcon,
   GitBranch,
   Shield,
-  FileLock,
   UserLock,
+  FileUser,
 } from 'lucide-react';
 
 // Types for the menu system
@@ -45,6 +44,7 @@ interface RecordMenuProps {
   onShare?: (record: any) => void;
   onViewVerification?: (record: any) => void;
   onPermissions?: (record: any) => void;
+  onSubject?: (record: any) => void;
 
   //File Management Props
   onDownload?: (record: any) => void;
@@ -67,6 +67,7 @@ interface RecordMenuProps {
   showVersions?: boolean;
   showVerification?: boolean;
   showPermissions?: boolean;
+  showSubject?: boolean;
 
   // Additional menu items from parent
   additionalItems?: MenuItem[];
@@ -94,6 +95,7 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
   onShare,
   onViewVerification,
   onPermissions,
+  onSubject,
   onDownload,
   onCopy,
   onDelete,
@@ -109,6 +111,7 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
   showVersions = true,
   showVerification = true,
   showPermissions = true,
+  showSubject = true,
   additionalItems = [],
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -158,7 +161,6 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
       });
     }
 
-    // Edit action
     if (showEdit && onEdit) {
       items.push({
         key: 'edit',
@@ -168,13 +170,21 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
       });
     }
 
-    // Versions action
     if (showVersions && onVersion) {
       items.push({
         key: 'versions',
         label: 'Version History',
         icon: GitBranch,
         onClick: createHandler(onVersion),
+      });
+    }
+
+    if (showSubject && onSubject) {
+      items.push({
+        key: 'subject',
+        label: 'Record Subject',
+        icon: FileUser,
+        onClick: createHandler(onSubject),
       });
     }
 
@@ -188,21 +198,21 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
       });
     }
 
-    if (showVerification && onViewVerification) {
-      items.push({
-        key: 'verification',
-        label: 'Verify Record',
-        icon: Shield,
-        onClick: createHandler(onViewVerification),
-      });
-    }
-
     if (showPermissions && onPermissions) {
       items.push({
         key: 'permissions',
         label: 'Permissions',
         icon: UserLock,
         onClick: createHandler(onPermissions),
+      });
+    }
+
+    if (showVerification && onViewVerification) {
+      items.push({
+        key: 'verification',
+        label: 'Verify Record',
+        icon: Shield,
+        onClick: createHandler(onViewVerification),
       });
     }
 

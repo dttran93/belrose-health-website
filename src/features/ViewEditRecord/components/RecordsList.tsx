@@ -46,7 +46,7 @@ export const RecordsList: React.FC<RecordsListProps> = ({
   const [editMode, setEditMode] = useState(false);
   // Track what view RecordFull should open in ('record', 'versions', 'verification', 'share')
   const [initialRecordView, setInitialRecordView] = useState<
-    'record' | 'edit' | 'versions' | 'verification' | 'permissions' | 'share'
+    'record' | 'edit' | 'versions' | 'verification' | 'permissions' | 'share' | 'subject'
   >('record');
   const [comingFromAddRecord, setComingFromAddRecord] = useState(false);
 
@@ -107,6 +107,17 @@ export const RecordsList: React.FC<RecordsListProps> = ({
     setEditMode(false);
     setInitialRecordView('versions'); // Open in versions view
     console.log('View versions for:', record);
+  };
+
+  /**
+   * Opens subject page for a record
+   */
+  const handleSubjectPage = (record: FileObject) => {
+    setSelectedRecord(record);
+    setViewMode('detailed');
+    setEditMode(false);
+    setInitialRecordView('subject'); // Open in share view
+    console.log('View subject page for:', record);
   };
 
   /**
@@ -415,6 +426,7 @@ export const RecordsList: React.FC<RecordsListProps> = ({
                 onView={handleViewRecord}
                 onEdit={handleEditRecord}
                 onVersions={handleViewVersions}
+                onSubject={handleSubjectPage}
                 onShare={handleSharePage}
                 onViewVerification={handleViewVerification}
                 onPermissions={handlePermissionManager}

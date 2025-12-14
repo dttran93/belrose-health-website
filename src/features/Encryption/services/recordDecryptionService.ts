@@ -38,7 +38,7 @@ export class RecordDecryptionService {
    */
   static async decryptRecord(
     encryptedRecord: EncryptedRecord,
-    encryptedRecordKey?: string
+    encryptedRecordKey?: string //For the cases where the key IS provided within the component, optimized so there aren't multiple firebase reads, see VersionControlService
   ): Promise<DecryptedRecord> {
     // If not encrypted, return as-is
     if (!encryptedRecord.isEncrypted) {
@@ -55,6 +55,7 @@ export class RecordDecryptionService {
     }
 
     let fileKey: CryptoKey;
+
     try {
       if (encryptedRecordKey) {
         // PATH 1: Key is provided (e.g., from VersionControlService for efficiency)

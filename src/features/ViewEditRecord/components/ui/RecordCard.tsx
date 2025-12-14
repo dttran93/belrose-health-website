@@ -11,6 +11,7 @@ interface HealthRecordCardProps {
   onView?: (record: FileObject) => void;
   onEdit?: (record: FileObject) => void;
   onVersions?: (record: FileObject) => void;
+  onSubject?: (record: FileObject) => void;
   onShare?: (record: FileObject) => void;
   onViewVerification?: (record: FileObject) => void;
   onPermissions?: (record: FileObject) => void;
@@ -35,6 +36,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
   record,
   onView,
   onEdit,
+  onSubject,
   onShare,
   onVersions,
   onViewVerification,
@@ -73,6 +75,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
               onView={onView}
               onEdit={onEdit}
               onVersion={onVersions}
+              onSubject={onSubject}
               onShare={onShare}
               onViewVerification={onViewVerification}
               onPermissions={onPermissions}

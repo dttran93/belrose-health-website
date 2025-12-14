@@ -36,3 +36,6 @@ export {
   updateMemberStatus,
   initializeRecordOnChain,
 } from './handlers/memberRegistry';
+
+// ==================== NOTIFICATIONS ====================
+export { onRecordSubjectChange } from './notifications';

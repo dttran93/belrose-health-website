@@ -109,10 +109,7 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
               </p>
               <TriangleAlert />
             </div>
-            <p className="font-semibold mb-2 text-sm">
-              A Record Owner is the person a record is about; once an Owner is set, they have
-              special permissions:
-            </p>
+            <p className="font-semibold mb-2 text-sm">Record Owners have special permissions:</p>
             <ol className="list-decimal list-inside space-y-1 text-xs">
               <li>
                 Owners are automatically Administrators of a record and can do anything with the
@@ -157,8 +154,7 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
                       sideOffset={5}
                     >
                       <p className="font-semibold mb-2 text-sm">
-                        A Record Owner is the person a record is about; once an Owner is set, they
-                        have special permissions:
+                        Record Owners have special permissions:
                       </p>
                       <ol className="list-decimal list-inside space-y-1 text-xs">
                         <li>

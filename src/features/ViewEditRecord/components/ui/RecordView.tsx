@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { Share2, ClipboardPlus, Code, FileInput, Computer, Info } from 'lucide-react';
+import { ClipboardPlus, Code, FileInput, Computer, Info } from 'lucide-react';
 import { FileObject, BelroseFields } from '@/types/core';
 import { TabNavigation } from '@/features/AddRecord/components/ui/TabNavigation';
 import FHIRRecord from '@/features/ViewEditRecord/components/ui/FHIRRecord';
@@ -190,8 +190,6 @@ export const RecordView: React.FC<RecordViewProps> = ({
                 fileType={record.fileType}
                 fileSize={record.fileSize}
                 isEncrypted={record.isEncrypted || false}
-                encryptedKey={record.encryptedKey}
-                encryptedFileIV={record.encryptedFileIV}
               />
             )}
 

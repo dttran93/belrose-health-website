@@ -9,7 +9,7 @@ export interface User {
   displayName: string | null;
   firstName: string | null;
   lastName: string | null;
-  profilePicture?: string | null;
+  photoURL?: string | null;
 
   encryption: {
     enabled: boolean;
@@ -173,6 +173,13 @@ export interface FileObject {
   uploadedByName?: string; //Display name of subject (for UI)
   owners?: string[]; // Array of user IDs with ultimate ownership access to record (read, update, delete, share)
   administrators: string[]; //Array of userIDs with administrative access to records, can't remove others
+  subject?: string[]; //The subject of this record. Made it an array for edge cases where there are multiple subjects (couples therapy, mother/newborn, family history, genetic testing)
+  pendingSubjectRequests?: {
+    userId: string;
+    requestedBy: string;
+    requestedAt: Timestamp;
+    status: 'pending' | 'accepted' | 'rejected';
+  }[];
 
   // === PROCESSING STATUS ===
   status: FileStatus; //Processing property. Initially set as pending. Then pending/processing... see below

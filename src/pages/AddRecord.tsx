@@ -98,7 +98,6 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
           removeFileFromLocal={removeFileFromLocal}
           retryFile={retryFile}
           getStats={getStats}
-          updateFileStatus={updateFileStatus}
           addFhirAsVirtualFile={addFhirAsVirtualFile}
           uploadFiles={uploadFiles}
           fhirData={fhirData}
