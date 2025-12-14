@@ -67,7 +67,9 @@ export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
       or(
         where('uploadedBy', '==', userId),
         where('owners', 'array-contains', userId),
-        where('administrators', 'array-contains', userId)
+        where('administrators', 'array-contains', userId),
+        where('viewers', 'array-contains', userId),
+        where('subjects', 'array-contains', userId)
       ),
       orderBy('uploadedAt', 'desc')
     );
@@ -84,29 +86,8 @@ export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
           const accessibleRecords: FileObject[] = snapshot.docs.map(doc => {
             const data = doc.data();
 
-            // Log ownership info for debugging
-            console.log(`📄 Record ${doc.id}:`, {
-              fileName: data.fileName || data.encryptedFileName ? '[ENCRYPTED]' : '[NO NAME]',
-              uploadedBy: data.uploadedBy,
-              owners: data.owners,
-              administrators: data.administrators,
-              isEncrypted: !!data.isEncrypted,
-              userIsOwner: data.owners?.includes(userId),
-              userIsAdmin: data.administrators.includes(userId),
-              userIsUploader: data.uploadedBy === userId,
-            });
-
             // Use shared mapping function
             const mapped = mapFirestoreToFileObject(doc.id, data);
-
-            // 🔍 DEBUG: Check if mapping preserves uploadedBy
-            console.log(`🔍 Mapped record ${doc.id}:`, {
-              hasUploadedBy: !!mapped.uploadedBy,
-              uploadedByValue: mapped.uploadedBy,
-              hasOwners: !!mapped.owners,
-              ownersValue: mapped.owners,
-              isEncrypted: !!(data as any).isEncrypted,
-            });
 
             return mapped;
           });
@@ -116,7 +97,9 @@ export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
             const hasAccess =
               record.uploadedBy === userId ||
               record.owners?.includes(userId) ||
-              record.administrators.includes(userId);
+              record.administrators.includes(userId) ||
+              record.viewers?.includes(userId) ||
+              record.subjects?.includes(userId);
 
             if (!hasAccess) {
               console.warn('⚠️ Record slipped through query filter:', record.id);

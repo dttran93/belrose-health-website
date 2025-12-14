@@ -174,7 +174,8 @@ export interface FileObject {
   uploadedByName?: string; //Display name of subject (for UI)
   owners?: string[]; // Array of user IDs with ultimate ownership access to record (read, update, delete, share)
   administrators: string[]; //Array of userIDs with administrative access to records, can't remove others
-  subject?: string[]; //The subject of this record. Made it an array for edge cases where there are multiple subjects (couples therapy, mother/newborn, family history, genetic testing)
+  viewers?: string[]; // Array of user IDs with view access to record
+  subjects?: string[]; //The subject of this record. Made it an array for edge cases where there are multiple subjects (couples therapy, mother/newborn, family history, genetic testing)
   pendingSubjectRequests?: {
     userId: string;
     requestedBy: string;

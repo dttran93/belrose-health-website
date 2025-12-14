@@ -33,7 +33,7 @@ import { getAuth } from 'firebase/auth';
 // ============================================================================
 
 export type SubjectRequestStatus = 'pending' | 'accepted' | 'rejected';
-export type SubjectRejectionType = 'request_rejected' | 'removed_after_acceptance';
+export type SubjectRejectionType = 'request_rejected' | 'removed_after_acceptance' | 'self_removal';
 export type SubjectRejectionStatus =
   | 'pending_creator_decision'
   | 'acknowledged'
@@ -352,8 +352,9 @@ export class SubjectService {
    * Unified function that handles both:
    * - Rejecting a pending subject request (never accepted)
    * - Removing oneself as subject (previously accepted)
+   * - Self-removal by owner/admin (added themselves, no consent flow)
    *
-   * In both cases:
+   * In consent flow cases:
    * 1. Subject is immediately unlinked from the record
    * 2. A SubjectRejection record is created with status 'pending_creator_decision'
    * 3. Creator is notified and must decide whether to publicly list the rejection
@@ -389,9 +390,8 @@ export class SubjectService {
       const recordData = recordDoc.data();
       const subjects: string[] = recordData.subjects || [];
       const pendingRequests: PendingSubjectRequest[] = recordData.pendingSubjectRequests || [];
-      const existingRejections: SubjectRejection[] = recordData.subjectRejections || [];
 
-      // Determine rejection type based on current state
+      //Determine if user is currently a subject or pending subject
       const isCurrentSubject = subjects.includes(user.uid);
       const pendingRequestIndex = pendingRequests.findIndex(
         req => req.subjectId === user.uid && req.status === 'pending'
@@ -402,20 +402,39 @@ export class SubjectService {
         throw new Error('You are not a subject or pending subject of this record');
       }
 
+      //Check if there was a consent flow (i.e. the user accepted a request previously)
+      const acceptedRequest = pendingRequests.find(
+        req => req.subjectId === user.uid && req.status === 'accepted'
+      );
+
+      // FLOW 1: SELF REMOVAL. There's no accepted or pending request, so the user
+      // added themselves/there's no "rejection" or anyone to respond. Clean Removal
+      if (isCurrentSubject && !acceptedRequest && !hasPendingRequest) {
+        await updateDoc(recordRef, {
+          subjects: arrayRemove(user.uid),
+          lastModified: serverTimestamp(),
+        });
+
+        console.log('✅ Self-removal complete (no consent flow existed)');
+
+        return {
+          success: true,
+          recordId,
+          rejectionType: 'self_removal',
+          pendingCreatorDecision: false,
+        };
+      }
+
+      //FLOW 2: REJECTION FLOW: Either rejecting pending request or removing after consent
       const rejectionType: SubjectRejectionType = isCurrentSubject
         ? 'removed_after_acceptance'
         : 'request_rejected';
 
       // Get original consent signature if removing after acceptance
-      let originalConsentSignature: string | undefined;
-      if (isCurrentSubject) {
-        const acceptedRequest = pendingRequests.find(
-          req => req.subjectId === user.uid && req.status === 'accepted'
-        );
-        originalConsentSignature = acceptedRequest?.consentSignature;
-      }
+      const originalConsentSignature = acceptedRequest?.consentSignature;
 
       // Create the rejection record
+      const existingRejections: SubjectRejection[] = recordData.subjectRejections || [];
       const rejection: SubjectRejection = {
         subjectId: user.uid,
         rejectionType,

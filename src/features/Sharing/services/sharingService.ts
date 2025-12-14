@@ -12,6 +12,8 @@ import {
   getDocs,
   addDoc,
   serverTimestamp,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
@@ -360,6 +362,10 @@ export class SharingService {
 
     //7.2 function to actually write stuff to firestore
     const writeToFirestore = async () => {
+      await updateDoc(recordRef, {
+        viewers: arrayUnion(receiverId),
+      });
+
       await setDoc(wrappedKeyRef, {
         recordId: request.recordId,
         userId: receiverId,
@@ -465,6 +471,12 @@ export class SharingService {
     });
 
     console.log('✅ Wrapped key deactivated');
+
+    await updateDoc(doc(db, 'records', recordId), {
+      viewers: arrayRemove(receiverId),
+    });
+
+    console.log('✅ Removed from viewers array');
 
     // 3. Update access permission
     const accessPermissionRef = doc(db, 'accessPermissions', wrappedKeyData.permissionHash);
