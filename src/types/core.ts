@@ -15,6 +15,7 @@ export interface User {
     enabled: boolean;
     encryptedMasterKey: string;
     masterKeyIV: string;
+    masterKeySalt: string;
     recoveryKeyHash: string; // for recovery key verification
     setupAt: string;
     lastUnlockedAt?: string; // track usage
@@ -179,7 +180,7 @@ export interface FileObject {
     requestedBy: string;
     requestedAt: Timestamp;
     status: 'pending' | 'accepted' | 'rejected';
-  }[];
+  }[]; //If you set a subject in a record as someone else, that person must accept it for it to show up in their record.
 
   // === PROCESSING STATUS ===
   status: FileStatus; //Processing property. Initially set as pending. Then pending/processing... see below

@@ -452,18 +452,13 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
                             {emailVerified && (
                               <>
                                 <div className="space-y-2 mb-4">
-                                  <p className="text-sm font-medium text-primary mb-2">
-                                    Unlock these features:
-                                  </p>
                                   <div className="flex items-center text-sm text-muted-foreground">
                                     <FileText className="w-4 h-4 mr-2 text-chart-4" />
                                     <span>Request medical records on your behalf</span>
                                   </div>
                                   <div className="flex items-center text-sm text-muted-foreground">
                                     <Sparkles className="w-4 h-4 mr-2 text-chart-4" />
-                                    <span>
-                                      <strong>Verified</strong> blockchain trust status
-                                    </span>
+                                    <span>Verified trust status</span>
                                   </div>
                                   <div className="flex items-center text-sm text-muted-foreground">
                                     <Shield className="w-4 h-4 mr-2 text-chart-4" />

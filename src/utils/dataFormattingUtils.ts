@@ -256,7 +256,7 @@ Process is usually:
  * Converts an ArrayBuffer to a base64 string.
  * Useful for storing/transmitting binary data (like encryption keys or ciphertext) as text.
  */
-export const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+export const arrayBufferToBase64 = (buffer: ArrayBufferLike): string => {
   const bytes = new Uint8Array(buffer);
   const binary = Array.from(bytes)
     .map(byte => String.fromCharCode(byte))

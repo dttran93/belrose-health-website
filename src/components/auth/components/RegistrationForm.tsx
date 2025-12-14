@@ -45,6 +45,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     acknowledgedRecoveryKey: false,
     encryptedMasterKey: '',
     masterKeyIV: '',
+    masterKeySalt: '',
     publicKey: '',
     encryptedPrivateKey: '',
     encryptedPrivateKeyIV: '',
@@ -102,10 +103,9 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         console.log('✓ Master key generated');
 
         // 2. Wrap it with password
-        const { encryptedKey, iv } = await EncryptionKeyManager.wrapMasterKeyWithPassword(
+        const { encryptedKey, iv, salt } = await EncryptionKeyManager.wrapMasterKeyWithPassword(
           masterKey,
-          data.password,
-          data.userId
+          data.password
         );
         console.log('✓ Master key encrypted');
 
@@ -135,6 +135,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
           ...data,
           encryptedMasterKey: encryptedKey,
           masterKeyIV: iv,
+          masterKeySalt: salt,
           recoveryKey: recoveryKey,
           recoveryKeyHash: recoveryKeyHash,
           publicKey: publicKey,
@@ -223,6 +224,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
           enabled: true,
           encryptedMasterKey: registrationData.encryptedMasterKey,
           masterKeyIV: registrationData.masterKeyIV,
+          masterKeySalt: registrationData.masterKeySalt,
           encryptedPrivateKey: registrationData.encryptedPrivateKey,
           encryptedPrivateKeyIV: registrationData.encryptedPrivateKeyIV,
           publicKey: registrationData.publicKey,

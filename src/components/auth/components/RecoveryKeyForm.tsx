@@ -154,10 +154,9 @@ export const RecoveryKeyForm: React.FC<RecoveryKeyFormProps> = ({ onBackToLogin 
 
       // Wrap the Master Key with the new password
       // This creates a new KEK from the new password and encrypts the Master Key with it
-      const { encryptedKey, iv } = await EncryptionKeyManager.wrapMasterKeyWithPassword(
+      const { encryptedKey, iv, salt } = await EncryptionKeyManager.wrapMasterKeyWithPassword(
         masterKey,
-        newPassword,
-        user.uid
+        newPassword
       );
 
       // Update Firestore with new wrapped key and password hash
@@ -165,6 +164,7 @@ export const RecoveryKeyForm: React.FC<RecoveryKeyFormProps> = ({ onBackToLogin 
       await updateDoc(userRef, {
         'encryption.encryptedMasterKey': encryptedKey,
         'encryption.masterKeyIV': iv,
+        'encryption.masterKeySalt': salt,
         'encryption.lastPasswordUpdate': new Date().toISOString(),
       });
 

@@ -1,5 +1,4 @@
 // features/Encryption/services/encryptionKeyManager.ts
-import { EncryptionService } from './encryptionService';
 import * as bip39 from 'bip39';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 
@@ -12,7 +11,29 @@ export class EncryptionKeyManager {
   private static lastActivityTime: number = Date.now();
   private static SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
-  // =================== NEW: MASTER KEY GENERATION ===================
+  // =================== SALT GENERATION ===================
+  /**
+   * Generate and store salt along side encryptedKey and IV
+   */
+  static generateSalt(): Uint8Array {
+    return crypto.getRandomValues(new Uint8Array(16));
+  }
+
+  /**
+   * Convert salt to string for storage
+   */
+  static saltToString(salt: Uint8Array): string {
+    return arrayBufferToBase64(salt.buffer);
+  }
+
+  /**
+   * Convert stored base64 string back to Uint8Array
+   */
+  static stringToSalt(saltString: string): Uint8Array {
+    return new Uint8Array(base64ToArrayBuffer(saltString));
+  }
+
+  // =================== MASTER KEY GENERATION ===================
 
   /**
    * Generate a new master encryption key during registration
@@ -33,13 +54,9 @@ export class EncryptionKeyManager {
    * Derive a Key Encryption Key (KEK) from user's login password
    * This is the "big safe" that protects the master key
    */
-  static async deriveKEKFromPassword(
-    password: string,
-    userId: string // Use userId as salt
-  ): Promise<CryptoKey> {
+  static async deriveKEKFromPassword(password: string, salt: Uint8Array): Promise<CryptoKey> {
     const encoder = new TextEncoder();
     const passwordBuffer = encoder.encode(password);
-    const saltBuffer = encoder.encode(userId);
 
     // Import password as key material
     const keyMaterial = await crypto.subtle.importKey('raw', passwordBuffer, 'PBKDF2', false, [
@@ -51,7 +68,7 @@ export class EncryptionKeyManager {
     return await crypto.subtle.deriveKey(
       {
         name: 'PBKDF2',
-        salt: saltBuffer,
+        salt: salt as BufferSource,
         iterations: 100000,
         hash: 'SHA-256',
       },
@@ -69,10 +86,13 @@ export class EncryptionKeyManager {
   static async wrapMasterKeyWithPassword(
     masterKey: CryptoKey,
     password: string,
-    userId: string
-  ): Promise<{ encryptedKey: string; iv: string }> {
+    salt?: Uint8Array //Optional - will generate if not provided
+  ): Promise<{ encryptedKey: string; iv: string; salt: string }> {
+    //Generate salt if not provided during registration
+    const actualSalt = salt ?? this.generateSalt();
+
     // Derive KEK from password
-    const kek = await this.deriveKEKFromPassword(password, userId);
+    const kek = await this.deriveKEKFromPassword(password, actualSalt);
 
     // Export master key to raw format
     const keyData = await crypto.subtle.exportKey('raw', masterKey);
@@ -93,6 +113,7 @@ export class EncryptionKeyManager {
     return {
       encryptedKey: arrayBufferToBase64(encryptedData),
       iv: arrayBufferToBase64(iv.buffer),
+      salt: this.saltToString(actualSalt),
     };
   }
 
@@ -104,10 +125,13 @@ export class EncryptionKeyManager {
     encryptedKeyData: string,
     ivData: string,
     password: string,
-    userId: string
+    saltData: string
   ): Promise<CryptoKey> {
+    // Convert salt from stored string back to Uint8Array
+    const salt = this.stringToSalt(saltData);
+
     // Derive KEK from password
-    const kek = await this.deriveKEKFromPassword(password, userId);
+    const kek = await this.deriveKEKFromPassword(password, salt);
 
     const encryptedKey = base64ToArrayBuffer(encryptedKeyData);
     const iv = base64ToArrayBuffer(ivData);
@@ -132,7 +156,7 @@ export class EncryptionKeyManager {
     );
   }
 
-  // =================== NEW: RECOVERY KEY METHODS ===================
+  // =================== RECOVERY KEY METHODS ===================
 
   /**
    * Generate a 24-word recovery key from the master key
@@ -194,13 +218,13 @@ export class EncryptionKeyManager {
     encryptedKeyData: string,
     ivData: string,
     password: string,
-    userId: string
+    saltData: string
   ): Promise<void> {
     this.sessionKey = await this.unwrapMasterKeyWithPassword(
       encryptedKeyData,
       ivData,
       password,
-      userId
+      saltData
     );
     this.lastActivityTime = Date.now();
 
