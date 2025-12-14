@@ -45,6 +45,10 @@ function AppLayout({ children }: AppLayoutProps) {
     navigate('/dashboard/settings');
   };
 
+  const handleNotifications = () => {
+    navigate('/dashboard/notifications');
+  };
+
   const handleHelp = () => {
     window.open('https://help.example.com', '_blank');
   };
@@ -77,6 +81,7 @@ function AppLayout({ children }: AppLayoutProps) {
             healthRecords={healthRecords}
             healthCategories={healthCategories}
             onSettings={handleSettings}
+            onNotifications={handleNotifications}
             onHelp={handleHelp}
             onCloseAI={() => setIsMobileOpen(false)}
             onToggleAI={() => setIsAIOpen(!isAIOpen)}

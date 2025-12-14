@@ -46,7 +46,7 @@ export const getUserRoleForRecord = (userId: string, record: FileObject): Subjec
   // Check if user has viewer access (shared with them)
   // This would need to check the sharedWith array or similar
   // For now, we'll check if they're the uploader
-  if (record.uploadedBy === userId) return 'owner'; // Uploader is effectively an owner
+  if (record.uploadedBy === userId) return 'administrator';
   return null;
 };
 
@@ -109,7 +109,7 @@ export const useSetSubject = (options: UseSetSubjectOptions = {}): UseSetSubject
   const addSubject = async (recordId: string, userId: string): Promise<void> => {
     const recordRef = doc(db, 'records', recordId);
     await updateDoc(recordRef, {
-      subject: arrayUnion(userId),
+      subjects: arrayUnion(userId),
     });
   };
 

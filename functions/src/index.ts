@@ -38,4 +38,4 @@ export {
 } from './handlers/memberRegistry';
 
 // ==================== NOTIFICATIONS ====================
-export { onRecordSubjectChange } from './notifications';
+export { onRecordSubjectChange } from './notifications/triggers/subjectNotificationTrigger';

@@ -43,7 +43,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
 
       setLoadingSubjects(true);
       try {
-        const subjects = record.subject || [];
+        const subjects = record.subjects || [];
 
         if (subjects.length > 0) {
           const profiles = await getUserProfiles(subjects);
@@ -57,7 +57,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
     };
 
     fetchSubjectProfiles();
-  }, [record.id, record.subject]);
+  }, [record.id, record.subjects]);
 
   const handleOpenModal = () => {
     setShowSetSubjectModal(true);
@@ -80,7 +80,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
     await removeSubjectAsOwner(record, subjectId);
   };
 
-  const currentSubjects = record.subject || [];
+  const currentSubjects = record.subjects || [];
 
   return (
     <div className="w-full mx-auto p-6 space-y-6">

@@ -11,7 +11,7 @@ interface VerificationBadgeProps {
 
 export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
   fileObject,
-  size = 'md',
+  size = 'sm',
   showDetails = false,
   onClick,
 }) => {
@@ -20,7 +20,7 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
   //if can't use blockchain verification, it's self-reported
   if (!canUseBlockchainVerification(fileObject)) {
     return (
-      <div className="bg-red-100 text-red-800 border-red-200 rounded-full text-xs px-2 py-1 m-1">
+      <div className="bg-red-100 text-red-800 border border-red-800 rounded-full text-xs px-2 py-0.5">
         Self-Reported
       </div>
     );

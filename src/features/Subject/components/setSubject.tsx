@@ -101,7 +101,7 @@ export const SetSubject: React.FC<SetSubjectProps> = ({
 
       setLoadingSubjects(true);
       try {
-        const subjects = record.subject || [];
+        const subjects = record.subjects || [];
         setCurrentSubjects(subjects);
 
         if (subjects.length > 0) {
@@ -118,7 +118,7 @@ export const SetSubject: React.FC<SetSubjectProps> = ({
     if (asModal ? isOpen : true) {
       loadCurrentSubjects();
     }
-  }, [isOpen, record.id, record.subject, asModal]);
+  }, [isOpen, record.id, record.subjects, asModal]);
 
   // Reset state when modal closes
   useEffect(() => {

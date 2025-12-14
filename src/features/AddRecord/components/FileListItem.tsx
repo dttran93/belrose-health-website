@@ -8,6 +8,7 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import { Button } from '@/components/ui/Button';
 import { FileObject } from '@/types/core';
 import { FHIRWithValidation } from '../services/fhirConversionService.type';
+import SubjectBadge from '@/features/Subject/components/SubjectBadge';
 
 export interface FileListItemProps {
   fileItem: FileObject;
@@ -37,6 +38,7 @@ export const FileListItem: React.FC<FileListItemProps> = ({
   onReview,
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [hideSubjectBadge, setHideSubjectBadge] = useState(false);
 
   //utility functions
 
@@ -100,7 +102,17 @@ export const FileListItem: React.FC<FileListItemProps> = ({
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
                 <p className="font-semibold text-gray-900 truncate">{fileItem.fileName}</p>
-                <div className="text-right ml-4">
+
+                <div className="flex items-center">
+                  {isFullyProcessed && !hideSubjectBadge && (
+                    <div className="mr-2">
+                      <SubjectBadge
+                        record={fileItem}
+                        onOpenManager={() => onReview?.(fileItem)}
+                        onSuccess={() => setHideSubjectBadge(true)}
+                      />
+                    </div>
+                  )}
                   {hasExpandableContent && (
                     <Tooltip.Root>
                       <Tooltip.Trigger asChild>

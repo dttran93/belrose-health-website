@@ -499,9 +499,10 @@ export function useFileManager(): UseFileManagerTypes {
           console.log(`✅ Upload successful for ${fileObj.fileName}:`, result);
 
           updateFileStatus(fileObj.id, 'completed', {
+            id: result.documentId,
             firestoreId: result.documentId,
             uploadedAt: result.uploadedAt || Timestamp.now(),
-            owners: [fileObj.uploadedBy!],
+            administrators: fileObj.administrators || [fileObj.uploadedBy!],
           });
 
           // 🔄 Sync sessionStorage right after updating status
@@ -655,9 +656,10 @@ export function useFileManager(): UseFileManagerTypes {
         console.log(`✅ Auto-upload successful for ${virtualFile.fileName}:`, uploadResult);
 
         updateFileStatus(generatedFileId, 'completed', {
+          id: uploadResult.documentId,
           firestoreId: uploadResult.documentId,
           uploadedAt: uploadResult.uploadedAt || Timestamp.now(),
-          owners: [virtualFile.uploadedBy || 'unknown_user'],
+          administrators: virtualFile.administrators || [virtualFile.uploadedBy!],
         });
 
         toast.success(`📁 ${virtualFile.fileName} uploaded successfully!`, {

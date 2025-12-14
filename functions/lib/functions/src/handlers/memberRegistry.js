@@ -107,6 +107,7 @@ exports.registerMemberOnChain = (0, https_1.onCall)(async (request) => {
                 txHash: tx.hash,
                 blockNumber: receipt === null || receipt === void 0 ? void 0 : receipt.blockNumber,
                 registeredAt: new Date().toISOString(),
+                status: 'Active',
             },
         });
         return {

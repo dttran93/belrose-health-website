@@ -185,11 +185,13 @@ export const RecordView: React.FC<RecordViewProps> = ({
             {/* Original File Download Section with Embedded Viewer */}
             {record.downloadURL && (
               <DecryptedFileViewer
+                recordId={record.id}
                 downloadURL={record.downloadURL}
                 fileName={record.fileName}
                 fileType={record.fileType}
                 fileSize={record.fileSize}
                 isEncrypted={record.isEncrypted || false}
+                encryptedFileIV={record.encryptedFileIV}
               />
             )}
 

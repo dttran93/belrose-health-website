@@ -5,6 +5,7 @@ import { FileObject } from '@/types/core';
 import HealthRecordMenu from '@/features/ViewEditRecord/components/ui/RecordMenu';
 import { VerificationBadge } from '@/features/BlockchainVerification/component/VerificationBadge';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
+import SubjectBadge from '@/features/Subject/components/SubjectBadge';
 
 interface HealthRecordCardProps {
   record: FileObject;
@@ -64,14 +65,19 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
               {record.sourceType}
             </span>
           </div>
-          <div className="flex">
+          <div className="flex items-center gap-1">
+            <SubjectBadge
+              record={record}
+              onOpenManager={() => onSubject?.(record)}
+              onSuccess={() => {}}
+            />
             <div className="flex items-center">
               <VerificationBadge fileObject={record} />
             </div>
             <HealthRecordMenu
               record={record}
               triggerIcon={Ellipsis}
-              triggerClassName="mx-1 p-2 rounded-3xl hover:bg-gray-100"
+              triggerClassName="p-2 rounded-3xl hover:bg-gray-100"
               onView={onView}
               onEdit={onEdit}
               onVersion={onVersions}

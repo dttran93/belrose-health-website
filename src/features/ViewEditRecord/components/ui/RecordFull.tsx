@@ -16,6 +16,7 @@ import { RecordDecryptionService } from '@/features/Encryption/services/recordDe
 import { toISOString, formatTimestamp } from '@/utils/dataFormattingUtils';
 import PermissionsManager from '@/features/Permissions/component/PermissionManager';
 import SubjectManager from '@/features/Subject/components/SubjectManager';
+import SubjectBadge from '@/features/Subject/components/SubjectBadge';
 
 type ViewMode =
   | 'record'
@@ -320,7 +321,12 @@ export const RecordFull: React.FC<RecordFullProps> = ({
               )}
             </div>
 
-            <div className="flex items-center">
+            <div className="flex items-center gap-1">
+              <SubjectBadge
+                record={record}
+                onOpenManager={handleSubjectPage}
+                onSuccess={() => {}}
+              />
               <VerificationBadge fileObject={record} />
               <HealthRecordMenu
                 record={record}

@@ -28,6 +28,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "D": "^1.0.0",
+    "date-fns": "^4.1.0",
     "fhirpath": "^4.5.0",
     "firebase": "^11.9.1",
     "json-diff-ts": "^4.8.2",

@@ -173,35 +173,35 @@ exports.checkVerificationStatus = (0, https_1.onCall)({ secrets: [personaKey] },
         const status = inquiry.data.attributes.status;
         console.log('📊 Inquiry status from Persona:', status);
         const verified = status === 'approved';
-        // If approved, extract and save verified data
+        const db = (0, firestore_1.getFirestore)();
         if (verified) {
-            const verifiedData = {
-                firstName: inquiry.data.attributes.name_first || '',
-                lastName: inquiry.data.attributes.name_last || '',
-                dateOfBirth: inquiry.data.attributes.birthdate || '',
-                address: inquiry.data.attributes.address_street_1 || '',
-                postcode: inquiry.data.attributes.address_postal_code || '',
-            };
             console.log('✅ User verified successfully:', userId);
-            // Update both users and verifications collections
-            const db = (0, firestore_1.getFirestore)();
+            // Update user and verification records - minimal data storage
             const batch = db.batch();
             batch.update(db.collection('users').doc(userId), {
                 identityVerified: true,
-                verifiedData: verifiedData,
-                verifiedAt: firestore_1.FieldValue.serverTimestamp(),
+                identityVerifiedAt: firestore_1.FieldValue.serverTimestamp(),
+                identityVerificationInquiryId: inquiryId,
             });
             batch.update(db.collection('verifications').doc(userId), {
                 status: 'approved',
                 completedAt: firestore_1.FieldValue.serverTimestamp(),
             });
             await batch.commit();
-            return { verified: true, data: verifiedData };
+            // Return verified data for immediate UI display (not persisted)
+            return {
+                verified: true,
+                data: {
+                    firstName: inquiry.data.attributes.name_first || '',
+                    lastName: inquiry.data.attributes.name_last || '',
+                    dateOfBirth: inquiry.data.attributes.birthdate || '',
+                    address: inquiry.data.attributes.address_street_1 || '',
+                    postcode: inquiry.data.attributes.address_postal_code || '',
+                },
+            };
         }
         else {
-            // Not approved - update status
             console.log('❌ Verification not approved:', status);
-            const db = (0, firestore_1.getFirestore)();
             await db.collection('verifications').doc(userId).update({
                 status: status,
                 completedAt: firestore_1.FieldValue.serverTimestamp(),
@@ -271,13 +271,18 @@ exports.personaWebhook = (0, https_1.onRequest)({
         switch (status) {
             case 'approved':
                 console.log('✅ Webhook: User verified', userId);
+                const inquiryId = inquiry === null || inquiry === void 0 ? void 0 : inquiry.id;
                 await db.collection('verifications').doc(userId).update({
                     status: 'approved',
                     completedAt: firestore_1.FieldValue.serverTimestamp(),
                 });
-                await db.collection('users').doc(userId).update({
+                await db
+                    .collection('users')
+                    .doc(userId)
+                    .update({
                     identityVerified: true,
-                    verifiedAt: firestore_1.FieldValue.serverTimestamp(),
+                    identityVerifiedAt: firestore_1.FieldValue.serverTimestamp(),
+                    identityVerificationInquiryId: inquiryId || null,
                 });
                 break;
             case 'declined':

@@ -5,24 +5,25 @@ import { Share2, FileInput } from 'lucide-react';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
+import { RecordDecryptionService } from '../services/recordDecryptionService';
 
 interface DecryptedFileViewerProps {
+  recordId: string;
   downloadURL: string;
   fileName?: string;
   fileType?: string;
   fileSize?: number;
   isEncrypted: boolean;
-  encryptedKey?: string;
-  encryptedFileIV?: string; // IV is stored separately in Firestore
+  encryptedFileIV: string | undefined; // IV is stored separately in Firestore
 }
 
 export function DecryptedFileViewer({
+  recordId,
   downloadURL,
   fileName,
   fileType,
   fileSize,
   isEncrypted,
-  encryptedKey,
   encryptedFileIV,
 }: DecryptedFileViewerProps) {
   const [decryptedFileUrl, setDecryptedFileUrl] = useState<string | null>(null);
@@ -32,7 +33,7 @@ export function DecryptedFileViewer({
   useEffect(() => {
     async function decryptAndDisplayFile() {
       // If not encrypted, use the URL directly
-      if (!isEncrypted || !encryptedKey) {
+      if (!isEncrypted) {
         setDecryptedFileUrl(downloadURL);
         return;
       }
@@ -50,12 +51,7 @@ export function DecryptedFileViewer({
         }
 
         // 2. Decrypt the file's AES key using the master key
-        const encryptedKeyData = base64ToArrayBuffer(encryptedKey);
-        const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(
-          encryptedKeyData,
-          masterKey
-        );
-        const fileKey = await EncryptionService.importKey(fileKeyData);
+        const fileKey = await RecordDecryptionService.getRecordKey(recordId, masterKey);
 
         // 3. Fetch the encrypted file from Storage
         const response = await fetch(downloadURL);
@@ -102,7 +98,7 @@ export function DecryptedFileViewer({
         URL.revokeObjectURL(decryptedFileUrl);
       }
     };
-  }, [downloadURL, isEncrypted, encryptedKey]);
+  }, [downloadURL, isEncrypted]);
 
   const handleDownload = async () => {
     if (!decryptedFileUrl) return;

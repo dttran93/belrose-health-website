@@ -12,6 +12,7 @@ interface DesktopSidebarProps {
   healthRecords: NavigationItem[];
   healthCategories: NavigationItem[];
   onSettings: () => void;
+  onNotifications: () => void;
   onHelp: () => void;
   onToggleAI: () => void;
   onCloseAI: () => void;
@@ -26,6 +27,7 @@ function DesktopSidebar({
   healthRecords,
   healthCategories,
   onSettings,
+  onNotifications,
   onHelp,
   onToggleAI,
   onCloseAI,
@@ -137,6 +139,7 @@ function DesktopSidebar({
           isCollapsed={isCollapsed}
           onLogout={onLogout}
           onSettings={onSettings}
+          onNotifications={onNotifications}
           onHelp={onHelp}
         />
       </div>

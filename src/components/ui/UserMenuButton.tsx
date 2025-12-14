@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, Settings, LogOut, HelpCircle, ChevronUp } from 'lucide-react';
+import { User, Settings, LogOut, HelpCircle, ChevronUp, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { User as UserType } from '@/types/core';
 
 // Menu action types
-type MenuAction = 'logout' | 'settings' | 'help';
+type MenuAction = 'logout' | 'settings' | 'notifications' | 'help';
 
 // Props interface
 interface UserMenuButtonProps {
@@ -12,6 +12,7 @@ interface UserMenuButtonProps {
   isCollapsed: boolean;
   onLogout?: () => void;
   onSettings?: () => void;
+  onNotifications?: () => void;
   onHelp?: () => void;
 }
 
@@ -20,16 +21,13 @@ const UserMenuButton: React.FC<UserMenuButtonProps> = ({
   isCollapsed,
   onLogout,
   onSettings,
+  onNotifications,
   onHelp,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const initials = `${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}`.toUpperCase() || 'U';
-
-  console.log('User Object:', user);
-  console.log(`firstName: ${user?.firstName}`, `lastName: ${user?.lastName}`);
-  console.log(`Calculated Initials: ${initials}`);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -58,6 +56,9 @@ const UserMenuButton: React.FC<UserMenuButtonProps> = ({
         break;
       case 'settings':
         onSettings?.();
+        break;
+      case 'notifications':
+        onNotifications?.();
         break;
       case 'help':
         onHelp?.();
@@ -114,6 +115,13 @@ const UserMenuButton: React.FC<UserMenuButtonProps> = ({
           ref={menuRef}
           className={`${getDropdownClasses()} bg-gray-800 border border-gray-700 rounded-lg shadow-lg py-2 z-50`}
         >
+          <button
+            onClick={() => handleMenuItemClick('notifications')}
+            className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-3 text-gray-300 hover:text-white transition-colors"
+          >
+            <Bell className="w-4 h-4" />
+            <span className="text-sm">Notifications</span>
+          </button>
           <button
             onClick={() => handleMenuItemClick('settings')}
             className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-3 text-gray-300 hover:text-white transition-colors"
