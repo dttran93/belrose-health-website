@@ -1,18 +1,24 @@
 "use strict";
 // functions/src/notifications/triggers/subjectNotificationTrigger.ts
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onRecordSubjectChange = void 0;
+exports.onRecordSubjectChange = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = void 0;
 /**
- * Subject Notification Trigger
+ * Subject Notification Triggers
  *
- * Firestore trigger that watches for subject-related changes on records
- * and automatically creates notifications.
+ * Firestore triggers that watch for subject-related changes and
+ * automatically create notifications.
  *
- * Handles:
- * - New subject requests (notifies proposed subject)
- * - Accepted requests (notifies requester)
- * - Rejections (notifies record owners)
- * - Creator responses to rejections (notifies subject)
+ * Two triggers:
+ * 1. onSubjectConsentRequestCreated - watches subjectConsentRequests collection
+ *    - New consent requests (notifies proposed subject)
+ *
+ * 2. onSubjectConsentRequestUpdated - watches subjectConsentRequests collection
+ *    - Accepted requests (notifies requester)
+ *    - Rejected requests (notifies requester)
+ *
+ * 3. onRecordSubjectChange - watches records collection
+ *    - Subject rejections/removals (notifies record owners)
+ *    - Creator responses to rejections (notifies subject)
  */
 const firestore_1 = require("firebase-functions/v2/firestore");
 const notificationUtils_1 = require("../notificationUtils");
@@ -21,37 +27,117 @@ const notificationUtils_1 = require("../notificationUtils");
 // ============================================================================
 const SOURCE = 'Subject';
 // ============================================================================
-// DIFF DETECTION HELPERS
+// HELPER FUNCTIONS
 // ============================================================================
 /**
- * Find pending requests that are new (didn't exist before as pending)
+ * Get all users who should be notified about record changes
+ * (uploader + owners, deduplicated)
  */
-function findNewPendingRequests(before, after) {
-    const beforeRequests = before.pendingSubjectRequests || [];
-    const afterRequests = after.pendingSubjectRequests || [];
-    return afterRequests.filter(afterReq => {
-        if (afterReq.status !== 'pending')
-            return false;
-        const existedBefore = beforeRequests.some(b => b.subjectId === afterReq.subjectId &&
-            b.requestedBy === afterReq.requestedBy &&
-            b.status === 'pending');
-        return !existedBefore;
-    });
+function getRecordNotificationTargets(recordData) {
+    const targets = [recordData.uploadedBy];
+    if (recordData.owners) {
+        targets.push(...recordData.owners);
+    }
+    // Deduplicate
+    return [...new Set(targets)];
 }
+// ============================================================================
+// TRIGGER 1: NEW CONSENT REQUEST CREATED
+// ============================================================================
 /**
- * Find requests that changed from 'pending' to 'accepted'
+ * Triggered when a new consent request document is created.
+ * Notifies the proposed subject that someone wants them to be a subject.
  */
-function findNewlyAcceptedRequests(before, after) {
-    const beforeRequests = before.pendingSubjectRequests || [];
-    const afterRequests = after.pendingSubjectRequests || [];
-    return afterRequests.filter(afterReq => {
-        if (afterReq.status !== 'accepted')
-            return false;
-        const beforeReq = beforeRequests.find(b => b.subjectId === afterReq.subjectId && b.requestedBy === afterReq.requestedBy);
-        // Newly accepted if it didn't exist before OR was pending before
-        return !beforeReq || beforeReq.status === 'pending';
+exports.onSubjectConsentRequestCreated = (0, firestore_1.onDocumentCreated)('subjectConsentRequests/{requestId}', async (event) => {
+    var _a;
+    const requestId = event.params.requestId;
+    const data = (_a = event.data) === null || _a === void 0 ? void 0 : _a.data();
+    if (!data) {
+        console.log('⚠️ No data in created document, skipping');
+        return;
+    }
+    console.log(`📬 New consent request created: ${requestId}`);
+    // Only notify for pending requests (should always be pending on create)
+    if (data.status !== 'pending') {
+        console.log(`⚠️ Request status is ${data.status}, not pending. Skipping notification.`);
+        return;
+    }
+    const requesterName = await (0, notificationUtils_1.getUserDisplayName)(data.requestedBy);
+    const recordName = data.recordTitle || (await (0, notificationUtils_1.getRecordDisplayName)(data.recordId));
+    await (0, notificationUtils_1.createNotification)(data.subjectId, {
+        type: 'SUBJECT_REQUEST_RECEIVED',
+        sourceService: SOURCE,
+        message: `${requesterName} has requested you as the subject of record: ${recordName}. Please review and respond.`,
+        link: `/records/${data.recordId}`,
+        payload: {
+            recordId: data.recordId,
+            requestId,
+            subjectId: data.subjectId,
+            requestedBy: data.requestedBy,
+            requestedSubjectRole: data.requestedSubjectRole,
+        },
     });
-}
+    console.log(`✅ Notification sent to subject: ${data.subjectId}`);
+});
+// ============================================================================
+// TRIGGER 2: CONSENT REQUEST UPDATED (ACCEPTED/REJECTED)
+// ============================================================================
+/**
+ * Triggered when a consent request document is updated.
+ * Handles status changes from 'pending' to 'accepted' or 'rejected'.
+ */
+exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)('subjectConsentRequests/{requestId}', async (event) => {
+    var _a, _b;
+    const requestId = event.params.requestId;
+    const beforeData = (_a = event.data) === null || _a === void 0 ? void 0 : _a.before.data();
+    const afterData = (_b = event.data) === null || _b === void 0 ? void 0 : _b.after.data();
+    if (!beforeData || !afterData) {
+        console.log('⚠️ No data to compare, skipping');
+        return;
+    }
+    // Only process if status changed
+    if (beforeData.status === afterData.status) {
+        console.log('📭 Status unchanged, skipping');
+        return;
+    }
+    console.log(`🔄 Consent request ${requestId} status changed: ${beforeData.status} → ${afterData.status}`);
+    const recordName = afterData.recordTitle || (await (0, notificationUtils_1.getRecordDisplayName)(afterData.recordId));
+    // Handle acceptance
+    if (beforeData.status === 'pending' && afterData.status === 'accepted') {
+        const subjectName = await (0, notificationUtils_1.getUserDisplayName)(afterData.subjectId);
+        await (0, notificationUtils_1.createNotification)(afterData.requestedBy, {
+            type: 'SUBJECT_ACCEPTED',
+            sourceService: SOURCE,
+            message: `${subjectName} has accepted your subject request for the record: ${recordName}.`,
+            link: `/records/${afterData.recordId}`,
+            payload: {
+                recordId: afterData.recordId,
+                requestId,
+                subjectId: afterData.subjectId,
+            },
+        });
+        console.log(`✅ Acceptance notification sent to requester: ${afterData.requestedBy}`);
+    }
+    // Handle rejection
+    if (beforeData.status === 'pending' && afterData.status === 'rejected') {
+        const subjectName = await (0, notificationUtils_1.getUserDisplayName)(afterData.subjectId);
+        await (0, notificationUtils_1.createNotification)(afterData.requestedBy, {
+            type: 'REJECTION_PENDING_CREATOR_DECISION',
+            sourceService: SOURCE,
+            message: `${subjectName} has declined to be set as the subject of record: ${recordName}.`,
+            link: `/records/${afterData.recordId}`,
+            payload: {
+                recordId: afterData.recordId,
+                requestId,
+                subjectId: afterData.subjectId,
+            },
+        });
+        console.log(`✅ Rejection notification sent to requester: ${afterData.requestedBy}`);
+    }
+});
+// ============================================================================
+// TRIGGER 3: RECORD SUBJECT CHANGES (REJECTIONS/REMOVALS)
+// ============================================================================
 /**
  * Find rejections that are newly in 'pending_creator_decision' status
  */
@@ -80,51 +166,8 @@ function findNewlyRespondedRejections(before, after) {
     });
 }
 /**
- * Get all users who should be notified about record changes
- * (uploader + owners, deduplicated)
+ * Handle new rejections - notify record owners
  */
-function getRecordNotificationTargets(recordData) {
-    const targets = [recordData.uploadedBy];
-    if (recordData.owners) {
-        targets.push(...recordData.owners);
-    }
-    // Deduplicate
-    return [...new Set(targets)];
-}
-// ============================================================================
-// NOTIFICATION HANDLERS
-// ============================================================================
-async function handleNewPendingRequests(requests, recordId, recordName) {
-    for (const request of requests) {
-        const requesterName = await (0, notificationUtils_1.getUserDisplayName)(request.requestedBy);
-        await (0, notificationUtils_1.createNotification)(request.subjectId, {
-            type: 'SUBJECT_REQUEST_RECEIVED',
-            sourceService: SOURCE,
-            message: `${requesterName} has requested you as the subject of record: ${recordName}. Please review and respond.`,
-            link: `/records/${recordId}`,
-            payload: {
-                recordId,
-                subjectId: request.subjectId,
-                requestedBy: request.requestedBy,
-            },
-        });
-    }
-}
-async function handleAcceptedRequests(requests, recordId, recordName) {
-    for (const request of requests) {
-        const subjectName = await (0, notificationUtils_1.getUserDisplayName)(request.subjectId);
-        await (0, notificationUtils_1.createNotification)(request.requestedBy, {
-            type: 'SUBJECT_ACCEPTED',
-            sourceService: SOURCE,
-            message: `${subjectName} has accepted your subject request for the record: ${recordName}.`,
-            link: `/records/${recordId}`,
-            payload: {
-                recordId,
-                subjectId: request.subjectId,
-            },
-        });
-    }
-}
 async function handleNewRejections(rejections, recordId, recordName, recordData) {
     const targets = getRecordNotificationTargets(recordData);
     for (const rejection of rejections) {
@@ -141,6 +184,9 @@ async function handleNewRejections(rejections, recordId, recordName, recordData)
         });
     }
 }
+/**
+ * Handle responded rejections - notify the subject of the creator's decision
+ */
 async function handleRespondedRejections(rejections, recordId, recordName) {
     for (const rejection of rejections) {
         const notificationType = rejection.status === 'publicly_listed'
@@ -161,13 +207,9 @@ async function handleRespondedRejections(rejections, recordId, recordName) {
         });
     }
 }
-// ============================================================================
-// MAIN TRIGGER
-// ============================================================================
-/*
- *Basically everything hinges on "onDocumentUpdated" because of that, everytime something changes in records/{recordId}
- * an Event Object is passed by Firestore into this function. This event object has the state of the collection before
- * and after the update. Thus, it can figure out what changed, and then we can run a notification based on the changes
+/**
+ * Triggered when a record document is updated.
+ * Handles subject rejection flows (which still live on the record document).
  */
 exports.onRecordSubjectChange = (0, firestore_1.onDocumentUpdated)('records/{recordId}', async (event) => {
     var _a, _b;
@@ -178,28 +220,20 @@ exports.onRecordSubjectChange = (0, firestore_1.onDocumentUpdated)('records/{rec
         console.log('⚠️ No data to compare, skipping');
         return;
     }
-    console.log(`🔍 Checking subject changes for record: ${recordId}`);
-    const recordName = await (0, notificationUtils_1.getRecordDisplayName)(recordId);
-    // Detect all changes
-    const newPendingRequests = findNewPendingRequests(beforeData, afterData);
-    const acceptedRequests = findNewlyAcceptedRequests(beforeData, afterData);
+    console.log(`🔍 Checking subject rejection changes for record: ${recordId}`);
+    // Detect rejection-related changes only
     const newRejections = findNewPendingRejections(beforeData, afterData);
     const respondedRejections = findNewlyRespondedRejections(beforeData, afterData);
-    // Log what we found
-    const totalChanges = newPendingRequests.length +
-        acceptedRequests.length +
-        newRejections.length +
-        respondedRejections.length;
+    const totalChanges = newRejections.length + respondedRejections.length;
     if (totalChanges === 0) {
-        console.log('📭 No subject-related changes detected');
+        console.log('📭 No subject rejection changes detected');
         return;
     }
-    console.log(`📬 Found ${totalChanges} subject change(s) to process`);
-    // Process each type
-    await handleNewPendingRequests(newPendingRequests, recordId, recordName);
-    await handleAcceptedRequests(acceptedRequests, recordId, recordName);
+    console.log(`📬 Found ${totalChanges} subject rejection change(s) to process`);
+    const recordName = await (0, notificationUtils_1.getRecordDisplayName)(recordId);
+    // Process rejection changes
     await handleNewRejections(newRejections, recordId, recordName, afterData);
     await handleRespondedRejections(respondedRejections, recordId, recordName);
-    console.log(`✅ Finished processing subject changes for record: ${recordId}`);
+    console.log(`✅ Finished processing subject rejection changes for record: ${recordId}`);
 });
 //# sourceMappingURL=subjectNotificationTrigger.js.map

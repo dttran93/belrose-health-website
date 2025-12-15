@@ -31,13 +31,6 @@ export const SubjectBadge: React.FC<SubjectBadgeProps> = ({
   const subjects = record.subjects || [];
   const hasSubject = subjects.length > 0;
 
-  console.log('🔍 Record in SubjectBadge:', {
-    id: record.id,
-    owners: record.owners,
-    administrators: record.administrators,
-    uploadedBy: record.uploadedBy,
-  });
-
   // Fetch the first subject's name for display
   useEffect(() => {
     const fetchFirstSubjectName = async () => {

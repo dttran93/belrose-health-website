@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { getAuth } from 'firebase/auth';
-import { doc, getDoc, updateDoc, arrayUnion, getFirestore } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { FileObject } from '@/types/core';
 import { usePermissions } from '@/features/Permissions/hooks/usePermissions';
@@ -20,7 +19,7 @@ interface UseSetSubjectReturn {
   setSubjectAsSelf: (record: FileObject, role: SubjectRole) => Promise<void>;
   requestSubjectConsent: (
     record: FileObject,
-    targetUserId: string,
+    subjectId: string,
     role: SubjectRole
   ) => Promise<void>;
   removeSubjectAsSelf: (record: FileObject, reason?: string) => Promise<void>;
@@ -72,13 +71,16 @@ export const getMinimumAllowedRole = (userId: string, record: FileObject): Subje
 
 /**
  * Hook for setting record subjects with integrated permission management
+ *
+ * This hook provides a UI-friendly interface for subject management,
+ * handling loading states, error messages, and toast notifications.
+ * All Firestore operations are delegated to SubjectService.
  */
 export const useSetSubject = (options: UseSetSubjectOptions = {}): UseSetSubjectReturn => {
   const { onSuccess, onError } = options;
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const db = getFirestore();
   const auth = getAuth();
 
   // Use the permissions hook for role management
@@ -101,16 +103,6 @@ export const useSetSubject = (options: UseSetSubjectOptions = {}): UseSetSubject
         await SharingService.shareRecord({ recordId, receiverUserId: userId });
         break;
     }
-  };
-
-  /**
-   * Add user to the subject array
-   */
-  const addSubject = async (recordId: string, userId: string): Promise<void> => {
-    const recordRef = doc(db, 'records', recordId);
-    await updateDoc(recordRef, {
-      subjects: arrayUnion(userId),
-    });
   };
 
   /**
@@ -139,9 +131,9 @@ export const useSetSubject = (options: UseSetSubjectOptions = {}): UseSetSubject
     setError(null);
 
     try {
-      // Step 1: Add user as subject
+      // Step 1: Add user as subject via SubjectService
       console.log('📝 Adding self as subject...');
-      await addSubject(record.id, currentUser.uid);
+      await SubjectService.setSubjectAsSelf(record.id);
 
       // Step 2: Grant role (if upgrading or same level)
       // Only grant if the role is higher than current
@@ -176,7 +168,7 @@ export const useSetSubject = (options: UseSetSubjectOptions = {}): UseSetSubject
    */
   const requestSubjectConsent = async (
     record: FileObject,
-    targetUserId: string,
+    subjectId: string,
     role: SubjectRole
   ): Promise<void> => {
     const currentUser = auth.currentUser;
@@ -198,37 +190,17 @@ export const useSetSubject = (options: UseSetSubjectOptions = {}): UseSetSubject
     setError(null);
 
     try {
-      // Step 1: Create consent request
+      // Step 1: Create consent request via SubjectService
       console.log('📨 Creating subject consent request...');
-
-      // Store the consent request in Firestore
-      const consentRequestRef = doc(db, 'subjectConsentRequests', `${record.id}_${targetUserId}`);
-
-      // Check if request already exists
-      const existingRequest = await getDoc(consentRequestRef);
-      if (existingRequest.exists()) {
-        const data = existingRequest.data();
-        if (data.status === 'pending') {
-          throw new Error('A consent request is already pending for this user');
-        }
-      }
-
-      // Create the consent request
-      const { setDoc, Timestamp } = await import('firebase/firestore');
-      await setDoc(consentRequestRef, {
-        recordId: record.id,
-        targetUserId: targetUserId,
-        requestedBy: currentUser.uid,
-        requestedByName: currentUser.displayName || currentUser.email || 'Unknown User',
-        requestedRole: role,
-        status: 'pending',
-        createdAt: Timestamp.now(),
-        recordTitle: record.belroseFields?.title || record.fileName || 'Untitled Record',
+      await SubjectService.requestSubjectConsent(record.id, subjectId, {
+        role,
+        recordTitle: record.belroseFields?.title || record.fileName,
       });
 
       // Note: Notification is created automatically via Cloud Function (onDocumentCreated trigger)
 
       // Step 2: Blockchain verification will happen when consent is accepted
+      // TODO: Blockchain attestation will be recorded in acceptSubjectRequest flow
       console.log('⛓️ Blockchain attestation will occur upon consent acceptance');
 
       console.log('✅ Consent request sent successfully');
@@ -266,6 +238,10 @@ export const useSetSubject = (options: UseSetSubjectOptions = {}): UseSetSubject
     try {
       console.log('🚫 Removing self as subject...');
       await SubjectService.rejectSubjectStatus(record.id, { reason });
+
+      // TODO: Blockchain attestation for subject removal
+      // await BlockchainService.recordSubjectRemoval(record.id, currentUser.uid);
+      console.log('⛓️ Blockchain removal attestation (TODO)');
 
       console.log('✅ Successfully removed self as subject');
       toast.success('You have been removed as the subject of this record');
@@ -306,6 +282,10 @@ export const useSetSubject = (options: UseSetSubjectOptions = {}): UseSetSubject
     try {
       console.log('🗑️ Removing subject as owner/admin...');
       await SubjectService.removeSubjectByOwner(record.id, subjectId);
+
+      // TODO: Blockchain attestation for administrative subject removal
+      // await BlockchainService.recordAdminSubjectRemoval(record.id, subjectId, currentUser.uid);
+      console.log('⛓️ Blockchain admin removal attestation (TODO)');
 
       console.log('✅ Successfully removed subject');
       toast.success('Subject has been removed from this record');

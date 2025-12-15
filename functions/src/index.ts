@@ -38,4 +38,8 @@ export {
 } from './handlers/memberRegistry';
 
 // ==================== NOTIFICATIONS ====================
-export { onRecordSubjectChange } from './notifications/triggers/subjectNotificationTrigger';
+export {
+  onSubjectConsentRequestCreated,
+  onSubjectConsentRequestUpdated,
+  onRecordSubjectChange,
+} from './notifications/triggers/subjectNotificationTrigger';

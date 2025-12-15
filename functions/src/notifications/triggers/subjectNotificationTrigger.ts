@@ -1,19 +1,25 @@
 // functions/src/notifications/triggers/subjectNotificationTrigger.ts
 
 /**
- * Subject Notification Trigger
+ * Subject Notification Triggers
  *
- * Firestore trigger that watches for subject-related changes on records
- * and automatically creates notifications.
+ * Firestore triggers that watch for subject-related changes and
+ * automatically create notifications.
  *
- * Handles:
- * - New subject requests (notifies proposed subject)
- * - Accepted requests (notifies requester)
- * - Rejections (notifies record owners)
- * - Creator responses to rejections (notifies subject)
+ * Two triggers:
+ * 1. onSubjectConsentRequestCreated - watches subjectConsentRequests collection
+ *    - New consent requests (notifies proposed subject)
+ *
+ * 2. onSubjectConsentRequestUpdated - watches subjectConsentRequests collection
+ *    - Accepted requests (notifies requester)
+ *    - Rejected requests (notifies requester)
+ *
+ * 3. onRecordSubjectChange - watches records collection
+ *    - Subject rejections/removals (notifies record owners)
+ *    - Creator responses to rejections (notifies subject)
  */
 
-import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
+import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { Timestamp } from 'firebase-admin/firestore';
 import {
   createNotification,
@@ -25,21 +31,26 @@ import {
 } from '../notificationUtils';
 
 // ============================================================================
-// TYPES (Subject-specific, matching subjectService.ts)
+// TYPES
 // ============================================================================
 
-interface PendingSubjectRequest {
+/**
+ * Document structure for subjectConsentRequests collection
+ */
+interface SubjectConsentRequest {
+  recordId: string;
   subjectId: string;
   requestedBy: string;
-  requestedAt: Timestamp;
+  requestedSubjectRole: 'viewer' | 'administrator' | 'owner';
   status: 'pending' | 'accepted' | 'rejected';
-  consentSignature?: string;
-  consentSignedAt?: Timestamp;
+  createdAt: Timestamp;
+  respondedAt?: Timestamp;
+  recordTitle?: string;
 }
 
 interface SubjectRejection {
   subjectId: string;
-  rejectionType: 'request_rejected' | 'removed_after_acceptance';
+  rejectionType: 'request_rejected' | 'removed_after_acceptance' | 'self_removal';
   rejectedAt: Timestamp;
   reason?: string;
   status: 'pending_creator_decision' | 'acknowledged' | 'publicly_listed';
@@ -55,7 +66,6 @@ interface RecordData {
   owners?: string[];
   administrators?: string[];
   subjects?: string[];
-  pendingSubjectRequests?: PendingSubjectRequest[];
   subjectRejections?: SubjectRejection[];
 }
 
@@ -66,48 +76,147 @@ interface RecordData {
 const SOURCE: SourceService = 'Subject';
 
 // ============================================================================
-// DIFF DETECTION HELPERS
+// HELPER FUNCTIONS
 // ============================================================================
 
 /**
- * Find pending requests that are new (didn't exist before as pending)
+ * Get all users who should be notified about record changes
+ * (uploader + owners, deduplicated)
  */
-function findNewPendingRequests(before: RecordData, after: RecordData): PendingSubjectRequest[] {
-  const beforeRequests = before.pendingSubjectRequests || [];
-  const afterRequests = after.pendingSubjectRequests || [];
+function getRecordNotificationTargets(recordData: RecordData): string[] {
+  const targets = [recordData.uploadedBy];
 
-  return afterRequests.filter(afterReq => {
-    if (afterReq.status !== 'pending') return false;
+  if (recordData.owners) {
+    targets.push(...recordData.owners);
+  }
 
-    const existedBefore = beforeRequests.some(
-      b =>
-        b.subjectId === afterReq.subjectId &&
-        b.requestedBy === afterReq.requestedBy &&
-        b.status === 'pending'
-    );
-
-    return !existedBefore;
-  });
+  // Deduplicate
+  return [...new Set(targets)];
 }
+
+// ============================================================================
+// TRIGGER 1: NEW CONSENT REQUEST CREATED
+// ============================================================================
 
 /**
- * Find requests that changed from 'pending' to 'accepted'
+ * Triggered when a new consent request document is created.
+ * Notifies the proposed subject that someone wants them to be a subject.
  */
-function findNewlyAcceptedRequests(before: RecordData, after: RecordData): PendingSubjectRequest[] {
-  const beforeRequests = before.pendingSubjectRequests || [];
-  const afterRequests = after.pendingSubjectRequests || [];
+export const onSubjectConsentRequestCreated = onDocumentCreated(
+  'subjectConsentRequests/{requestId}',
+  async event => {
+    const requestId = event.params.requestId;
+    const data = event.data?.data() as SubjectConsentRequest | undefined;
 
-  return afterRequests.filter(afterReq => {
-    if (afterReq.status !== 'accepted') return false;
+    if (!data) {
+      console.log('⚠️ No data in created document, skipping');
+      return;
+    }
 
-    const beforeReq = beforeRequests.find(
-      b => b.subjectId === afterReq.subjectId && b.requestedBy === afterReq.requestedBy
+    console.log(`📬 New consent request created: ${requestId}`);
+
+    // Only notify for pending requests (should always be pending on create)
+    if (data.status !== 'pending') {
+      console.log(`⚠️ Request status is ${data.status}, not pending. Skipping notification.`);
+      return;
+    }
+
+    const requesterName = await getUserDisplayName(data.requestedBy);
+    const recordName = data.recordTitle || (await getRecordDisplayName(data.recordId));
+
+    await createNotification(data.subjectId, {
+      type: 'SUBJECT_REQUEST_RECEIVED',
+      sourceService: SOURCE,
+      message: `${requesterName} has requested you as the subject of record: ${recordName}. Please review and respond.`,
+      link: `/records/${data.recordId}`,
+      payload: {
+        recordId: data.recordId,
+        requestId,
+        subjectId: data.subjectId,
+        requestedBy: data.requestedBy,
+        requestedSubjectRole: data.requestedSubjectRole,
+      },
+    });
+
+    console.log(`✅ Notification sent to subject: ${data.subjectId}`);
+  }
+);
+
+// ============================================================================
+// TRIGGER 2: CONSENT REQUEST UPDATED (ACCEPTED/REJECTED)
+// ============================================================================
+
+/**
+ * Triggered when a consent request document is updated.
+ * Handles status changes from 'pending' to 'accepted' or 'rejected'.
+ */
+export const onSubjectConsentRequestUpdated = onDocumentUpdated(
+  'subjectConsentRequests/{requestId}',
+  async event => {
+    const requestId = event.params.requestId;
+    const beforeData = event.data?.before.data() as SubjectConsentRequest | undefined;
+    const afterData = event.data?.after.data() as SubjectConsentRequest | undefined;
+
+    if (!beforeData || !afterData) {
+      console.log('⚠️ No data to compare, skipping');
+      return;
+    }
+
+    // Only process if status changed
+    if (beforeData.status === afterData.status) {
+      console.log('📭 Status unchanged, skipping');
+      return;
+    }
+
+    console.log(
+      `🔄 Consent request ${requestId} status changed: ${beforeData.status} → ${afterData.status}`
     );
 
-    // Newly accepted if it didn't exist before OR was pending before
-    return !beforeReq || beforeReq.status === 'pending';
-  });
-}
+    const recordName = afterData.recordTitle || (await getRecordDisplayName(afterData.recordId));
+
+    // Handle acceptance
+    if (beforeData.status === 'pending' && afterData.status === 'accepted') {
+      const subjectName = await getUserDisplayName(afterData.subjectId);
+
+      await createNotification(afterData.requestedBy, {
+        type: 'SUBJECT_ACCEPTED',
+        sourceService: SOURCE,
+        message: `${subjectName} has accepted your subject request for the record: ${recordName}.`,
+        link: `/records/${afterData.recordId}`,
+        payload: {
+          recordId: afterData.recordId,
+          requestId,
+          subjectId: afterData.subjectId,
+        },
+      });
+
+      console.log(`✅ Acceptance notification sent to requester: ${afterData.requestedBy}`);
+    }
+
+    // Handle rejection
+    if (beforeData.status === 'pending' && afterData.status === 'rejected') {
+      const subjectName = await getUserDisplayName(afterData.subjectId);
+
+      await createNotification(afterData.requestedBy, {
+        type: 'REJECTION_PENDING_CREATOR_DECISION',
+        sourceService: SOURCE,
+        message: `${subjectName} has declined to be set as the subject of record: ${recordName}.`,
+        link: `/records/${afterData.recordId}`,
+        payload: {
+          recordId: afterData.recordId,
+          requestId,
+          subjectId: afterData.subjectId,
+        },
+      });
+
+      console.log(`✅ Rejection notification sent to requester: ${afterData.requestedBy}`);
+    }
+  }
+);
+
+// ============================================================================
+// TRIGGER 3: RECORD SUBJECT CHANGES (REJECTIONS/REMOVALS)
+// ============================================================================
 
 /**
  * Find rejections that are newly in 'pending_creator_decision' status
@@ -146,67 +255,8 @@ function findNewlyRespondedRejections(before: RecordData, after: RecordData): Su
 }
 
 /**
- * Get all users who should be notified about record changes
- * (uploader + owners, deduplicated)
+ * Handle new rejections - notify record owners
  */
-function getRecordNotificationTargets(recordData: RecordData): string[] {
-  const targets = [recordData.uploadedBy];
-
-  if (recordData.owners) {
-    targets.push(...recordData.owners);
-  }
-
-  // Deduplicate
-  return [...new Set(targets)];
-}
-
-// ============================================================================
-// NOTIFICATION HANDLERS
-// ============================================================================
-
-async function handleNewPendingRequests(
-  requests: PendingSubjectRequest[],
-  recordId: string,
-  recordName: string
-): Promise<void> {
-  for (const request of requests) {
-    const requesterName = await getUserDisplayName(request.requestedBy);
-
-    await createNotification(request.subjectId, {
-      type: 'SUBJECT_REQUEST_RECEIVED',
-      sourceService: SOURCE,
-      message: `${requesterName} has requested you as the subject of record: ${recordName}. Please review and respond.`,
-      link: `/records/${recordId}`,
-      payload: {
-        recordId,
-        subjectId: request.subjectId,
-        requestedBy: request.requestedBy,
-      },
-    });
-  }
-}
-
-async function handleAcceptedRequests(
-  requests: PendingSubjectRequest[],
-  recordId: string,
-  recordName: string
-): Promise<void> {
-  for (const request of requests) {
-    const subjectName = await getUserDisplayName(request.subjectId);
-
-    await createNotification(request.requestedBy, {
-      type: 'SUBJECT_ACCEPTED',
-      sourceService: SOURCE,
-      message: `${subjectName} has accepted your subject request for the record: ${recordName}.`,
-      link: `/records/${recordId}`,
-      payload: {
-        recordId,
-        subjectId: request.subjectId,
-      },
-    });
-  }
-}
-
 async function handleNewRejections(
   rejections: SubjectRejection[],
   recordId: string,
@@ -231,6 +281,9 @@ async function handleNewRejections(
   }
 }
 
+/**
+ * Handle responded rejections - notify the subject of the creator's decision
+ */
 async function handleRespondedRejections(
   rejections: SubjectRejection[],
   recordId: string,
@@ -260,16 +313,10 @@ async function handleRespondedRejections(
   }
 }
 
-// ============================================================================
-// MAIN TRIGGER
-// ============================================================================
-
-/*
- *Basically everything hinges on "onDocumentUpdated" because of that, everytime something changes in records/{recordId}
- * an Event Object is passed by Firestore into this function. This event object has the state of the collection before
- * and after the update. Thus, it can figure out what changed, and then we can run a notification based on the changes
+/**
+ * Triggered when a record document is updated.
+ * Handles subject rejection flows (which still live on the record document).
  */
-
 export const onRecordSubjectChange = onDocumentUpdated('records/{recordId}', async event => {
   const recordId = event.params.recordId;
   const beforeData = event.data?.before.data() as RecordData | undefined;
@@ -280,35 +327,26 @@ export const onRecordSubjectChange = onDocumentUpdated('records/{recordId}', asy
     return;
   }
 
-  console.log(`🔍 Checking subject changes for record: ${recordId}`);
+  console.log(`🔍 Checking subject rejection changes for record: ${recordId}`);
 
-  const recordName = await getRecordDisplayName(recordId);
-
-  // Detect all changes
-  const newPendingRequests = findNewPendingRequests(beforeData, afterData);
-  const acceptedRequests = findNewlyAcceptedRequests(beforeData, afterData);
+  // Detect rejection-related changes only
   const newRejections = findNewPendingRejections(beforeData, afterData);
   const respondedRejections = findNewlyRespondedRejections(beforeData, afterData);
 
-  // Log what we found
-  const totalChanges =
-    newPendingRequests.length +
-    acceptedRequests.length +
-    newRejections.length +
-    respondedRejections.length;
+  const totalChanges = newRejections.length + respondedRejections.length;
 
   if (totalChanges === 0) {
-    console.log('📭 No subject-related changes detected');
+    console.log('📭 No subject rejection changes detected');
     return;
   }
 
-  console.log(`📬 Found ${totalChanges} subject change(s) to process`);
+  console.log(`📬 Found ${totalChanges} subject rejection change(s) to process`);
 
-  // Process each type
-  await handleNewPendingRequests(newPendingRequests, recordId, recordName);
-  await handleAcceptedRequests(acceptedRequests, recordId, recordName);
+  const recordName = await getRecordDisplayName(recordId);
+
+  // Process rejection changes
   await handleNewRejections(newRejections, recordId, recordName, afterData);
   await handleRespondedRejections(respondedRejections, recordId, recordName);
 
-  console.log(`✅ Finished processing subject changes for record: ${recordId}`);
+  console.log(`✅ Finished processing subject rejection changes for record: ${recordId}`);
 });

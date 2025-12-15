@@ -25,6 +25,11 @@ import {
   serverTimestamp,
   getDoc,
   Timestamp,
+  setDoc,
+  collection,
+  query,
+  where,
+  getDocs,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
@@ -39,13 +44,19 @@ export type SubjectRejectionStatus =
   | 'acknowledged'
   | 'publicly_listed';
 
-export interface PendingSubjectRequest {
+/**
+ * Document structure for subjectConsentRequests collection
+ * Document ID format: {recordId}_{targetUserId}
+ */
+export interface SubjectConsentRequest {
+  recordId: string;
   subjectId: string;
   requestedBy: string;
-  requestedAt: Timestamp;
+  requestedSubjectRole: 'viewer' | 'administrator' | 'owner';
   status: SubjectRequestStatus;
-  consentSignature?: string;
-  consentSignedAt?: Timestamp;
+  createdAt: Timestamp;
+  respondedAt?: Timestamp;
+  recordTitle?: string;
 }
 
 export interface SubjectRejection {
@@ -99,14 +110,22 @@ export interface RespondToRejectionResult {
 }
 
 export interface IncomingSubjectRequest {
+  id: string;
   recordId: string;
-  firestoreId: string;
-  fileName: string;
+  recordTitle?: string;
   requestedBy: string;
-  requestedByName?: string;
+  requestedSubjectRole: 'viewer' | 'administrator' | 'owner';
   requestedAt: Timestamp;
   status: SubjectRequestStatus;
 }
+
+/**
+ * Generate the document ID for a consent request
+ * Format: {recordId}_{targetUserId}
+ */
+const getConsentRequestId = (recordId: string, subjectId: string): string => {
+  return `${recordId}_${subjectId}`;
+};
 
 export class SubjectService {
   /**
@@ -184,7 +203,11 @@ export class SubjectService {
    */
   static async requestSubjectConsent(
     recordId: string,
-    subjectId: string
+    subjectId: string,
+    options?: {
+      role?: 'viewer' | 'administrator' | 'owner';
+      recordTitle?: string;
+    }
   ): Promise<RequestSubjectConsentResult> {
     const auth = getAuth();
     const db = getFirestore();
@@ -200,6 +223,7 @@ export class SubjectService {
         success: result.success,
         recordId,
         subjectId,
+        requestId: getConsentRequestId(recordId, subjectId),
       };
     }
 
@@ -227,33 +251,42 @@ export class SubjectService {
         throw new Error('This user is already a subject of this record');
       }
 
-      const existingRequests = recordData.pendingSubjectRequests || [];
-      const existingRequest = existingRequests.find(
-        (req: PendingSubjectRequest) => req.subjectId === subjectId && req.status === 'pending'
-      );
+      //Check if a pending request already exists
+      const requestId = getConsentRequestId(recordId, subjectId);
+      const requestRef = doc(db, 'subjectConsentRequests', requestId);
+      const existingRequest = await getDoc(requestRef);
 
-      if (existingRequest) {
-        throw new Error('A pending request already exists for this user');
+      if (existingRequest.exists()) {
+        const data = existingRequest.data();
+        if (data.status === 'pending') {
+          throw new Error('A pending request already exists for this user');
+        }
       }
 
-      const newRequest: PendingSubjectRequest = {
-        subjectId: subjectId,
+      //Create new consent request document
+      const consentRequest: SubjectConsentRequest = {
+        recordId,
+        subjectId,
         requestedBy: user.uid,
-        requestedAt: Timestamp.now(),
+        requestedSubjectRole: options?.role || 'viewer',
         status: 'pending',
+        createdAt: Timestamp.now(),
+        recordTitle:
+          options?.recordTitle ||
+          recordData.belroseFields?.title ||
+          recordData.fileName ||
+          'Untitled Record',
       };
 
-      await updateDoc(recordRef, {
-        pendingSubjectRequests: arrayUnion(newRequest),
-        lastModified: serverTimestamp(),
-      });
+      await setDoc(requestRef, consentRequest);
 
-      console.log('✅ Subject consent request created');
+      console.log('✅ Subject consent request created:', requestId);
 
       return {
         success: true,
         recordId,
-        subjectId,
+        subjectId: subjectId,
+        requestId,
       };
     } catch (error) {
       console.error('❌ Error requesting subject consent:', error);
@@ -285,54 +318,41 @@ export class SubjectService {
     console.log('✅ Accepting subject request for record:', recordId);
 
     try {
-      const recordRef = doc(db, 'records', recordId);
-      const recordDoc = await getDoc(recordRef);
+      //Step 1: Find and update the consent request
+      const requestId = getConsentRequestId(recordId, user.uid);
+      const requestRef = doc(db, 'subjectConsentRequests', requestId);
+      const requestDoc = await getDoc(requestRef);
 
-      if (!recordDoc.exists()) {
-        throw new Error('Record not found');
-      }
-
-      const recordData = recordDoc.data();
-      const pendingRequests: PendingSubjectRequest[] = recordData.pendingSubjectRequests || [];
-
-      const requestIndex = pendingRequests.findIndex(
-        req => req.subjectId === user.uid && req.status === 'pending'
-      );
-
-      if (requestIndex === -1) {
+      if (!requestDoc.exists()) {
         throw new Error('No pending subject request found for you');
       }
 
-      const existingRequest = pendingRequests[requestIndex];
+      const requestData = requestDoc.data() as SubjectConsentRequest;
 
-      if (
-        !existingRequest ||
-        !existingRequest.subjectId ||
-        !existingRequest.requestedBy ||
-        !existingRequest.requestedAt
-      ) {
-        throw new Error('Invalid pending request data: missing required fields');
+      if (requestData.status !== 'pending') {
+        throw new Error(`Request has already been ${requestData.status}`);
       }
 
-      const updatedRequest: PendingSubjectRequest = {
-        subjectId: existingRequest.subjectId,
-        requestedBy: existingRequest.requestedBy,
-        requestedAt: existingRequest.requestedAt,
+      if (requestData.subjectId !== user.uid) {
+        throw new Error('This request is not for you');
+      }
+
+      // Step 2: Update the consent request status
+      await updateDoc(requestRef, {
         status: 'accepted',
-        consentSignature: signature,
-        consentSignedAt: signature ? Timestamp.now() : undefined,
-      };
+        respondedAt: Timestamp.now(),
+      });
 
-      const updatedRequests = [...pendingRequests];
-      updatedRequests[requestIndex] = updatedRequest;
+      console.log('✅ Consent request updated to accepted');
 
+      // Step 3: Add user to record's subjects array
+      const recordRef = doc(db, 'records', recordId);
       await updateDoc(recordRef, {
         subjects: arrayUnion(user.uid),
-        pendingSubjectRequests: updatedRequests,
         lastModified: serverTimestamp(),
       });
 
-      console.log('✅ Subject request accepted, user added to subjects');
+      console.log('✅ User added to record subjects');
 
       return {
         success: true,
@@ -347,12 +367,70 @@ export class SubjectService {
   }
 
   /**
-   * Reject or remove subject status
+   * Reject a pending subject request
    *
-   * Unified function that handles both:
-   * - Rejecting a pending subject request (never accepted)
-   * - Removing oneself as subject (previously accepted)
+   * Called by the proposed subject to decline being set as subject.
+   *
+   * @param recordId - The Firestore document ID of the record
+   * @param reason - Optional reason for rejection
+   */
+  static async rejectSubjectRequest(
+    recordId: string,
+    reason?: string
+  ): Promise<{ success: boolean; recordId: string }> {
+    const auth = getAuth();
+    const db = getFirestore();
+    const user = auth.currentUser;
+
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    console.log('❌ Rejecting subject request for record:', recordId);
+
+    try {
+      const requestId = getConsentRequestId(recordId, user.uid);
+      const requestRef = doc(db, 'subjectConsentRequests', requestId);
+      const requestDoc = await getDoc(requestRef);
+
+      if (!requestDoc.exists()) {
+        throw new Error('No pending subject request found for you');
+      }
+
+      const requestData = requestDoc.data() as SubjectConsentRequest;
+
+      if (requestData.status !== 'pending') {
+        throw new Error(`Request has already been ${requestData.status}`);
+      }
+
+      if (requestData.subjectId !== user.uid) {
+        throw new Error('This request is not for you');
+      }
+
+      // Update the consent request status
+      await updateDoc(requestRef, {
+        status: 'rejected',
+        respondedAt: Timestamp.now(),
+      });
+
+      console.log('✅ Subject request rejected');
+
+      return {
+        success: true,
+        recordId,
+      };
+    } catch (error) {
+      console.error('❌ Error rejecting subject request:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Reject or remove subject status (self-removal flow)
+   *
+   * Unified function that handles:
    * - Self-removal by owner/admin (added themselves, no consent flow)
+   * - Removing oneself as subject (previously accepted via consent)
    *
    * In consent flow cases:
    * 1. Subject is immediately unlinked from the record
@@ -389,27 +467,23 @@ export class SubjectService {
 
       const recordData = recordDoc.data();
       const subjects: string[] = recordData.subjects || [];
-      const pendingRequests: PendingSubjectRequest[] = recordData.pendingSubjectRequests || [];
 
-      //Determine if user is currently a subject or pending subject
+      // Check if user is currently a subject
       const isCurrentSubject = subjects.includes(user.uid);
-      const pendingRequestIndex = pendingRequests.findIndex(
-        req => req.subjectId === user.uid && req.status === 'pending'
-      );
-      const hasPendingRequest = pendingRequestIndex !== -1;
 
-      if (!isCurrentSubject && !hasPendingRequest) {
-        throw new Error('You are not a subject or pending subject of this record');
+      if (!isCurrentSubject) {
+        throw new Error('You are not a subject of this record');
       }
 
-      //Check if there was a consent flow (i.e. the user accepted a request previously)
-      const acceptedRequest = pendingRequests.find(
-        req => req.subjectId === user.uid && req.status === 'accepted'
-      );
+      // Check if there was a consent flow by looking up the consent request
+      const requestId = getConsentRequestId(recordId, user.uid);
+      const requestRef = doc(db, 'subjectConsentRequests', requestId);
+      const requestDoc = await getDoc(requestRef);
 
-      // FLOW 1: SELF REMOVAL. There's no accepted or pending request, so the user
-      // added themselves/there's no "rejection" or anyone to respond. Clean Removal
-      if (isCurrentSubject && !acceptedRequest && !hasPendingRequest) {
+      const hadConsentFlow = requestDoc.exists() && requestDoc.data()?.status === 'accepted';
+
+      // FLOW 1: SELF REMOVAL - No consent flow existed
+      if (!hadConsentFlow) {
         await updateDoc(recordRef, {
           subjects: arrayRemove(user.uid),
           lastModified: serverTimestamp(),
@@ -425,15 +499,10 @@ export class SubjectService {
         };
       }
 
-      //FLOW 2: REJECTION FLOW: Either rejecting pending request or removing after consent
-      const rejectionType: SubjectRejectionType = isCurrentSubject
-        ? 'removed_after_acceptance'
-        : 'request_rejected';
+      // FLOW 2: REJECTION FLOW - Removing after consent was given
+      const rejectionType: SubjectRejectionType = 'removed_after_acceptance';
 
-      // Get original consent signature if removing after acceptance
-      const originalConsentSignature = acceptedRequest?.consentSignature;
-
-      // Create the rejection record
+      // Create the rejection record on the record document
       const existingRejections: SubjectRejection[] = recordData.subjectRejections || [];
       const rejection: SubjectRejection = {
         subjectId: user.uid,
@@ -442,47 +511,15 @@ export class SubjectService {
         reason: options?.reason,
         status: 'pending_creator_decision',
         publiclyListed: false,
-        originalConsentSignature,
         rejectionSignature: options?.signature,
       };
 
-      // Build the update object
-      const updateData: Record<string, any> = {
+      // Update record: remove from subjects, add rejection
+      await updateDoc(recordRef, {
+        subjects: arrayRemove(user.uid),
         subjectRejections: [...existingRejections, rejection],
         lastModified: serverTimestamp(),
-      };
-
-      // Remove from subjects if currently a subject
-      if (isCurrentSubject) {
-        updateData.subjects = arrayRemove(user.uid);
-      }
-
-      // Update pending request status if rejecting a pending request
-      if (hasPendingRequest) {
-        const existingRequest = pendingRequests[pendingRequestIndex];
-
-        if (
-          !existingRequest ||
-          !existingRequest.subjectId ||
-          !existingRequest.requestedBy ||
-          !existingRequest.requestedAt
-        ) {
-          throw new Error('Invalid pending request data: missing required fields');
-        }
-
-        const updatedRequest: PendingSubjectRequest = {
-          subjectId: existingRequest.subjectId,
-          requestedBy: existingRequest.requestedBy,
-          requestedAt: existingRequest.requestedAt,
-          status: 'rejected',
-        };
-
-        const updatedRequests = [...pendingRequests];
-        updatedRequests[pendingRequestIndex] = updatedRequest;
-        updateData.pendingSubjectRequests = updatedRequests;
-      }
-
-      await updateDoc(recordRef, updateData);
+      });
 
       console.log(`✅ Subject status rejected (type: ${rejectionType})`);
 
@@ -688,27 +725,73 @@ export class SubjectService {
   }
 
   /**
-   * Get pending subject requests for a record
+   * Get pending consent requests for a record
+   *
+   * Queries the subjectConsentRequests collection for pending requests
+   * associated with this record.
    *
    * @param recordId - The Firestore document ID of the record
-   * @returns Array of pending requests
+   * @returns Array of pending consent requests
    */
-  static async getPendingRequests(recordId: string): Promise<PendingSubjectRequest[]> {
+  static async getPendingRequestsForRecord(recordId: string): Promise<SubjectConsentRequest[]> {
     const db = getFirestore();
 
     try {
-      const recordRef = doc(db, 'records', recordId);
-      const recordDoc = await getDoc(recordRef);
+      const requestsRef = collection(db, 'subjectConsentRequests');
+      const q = query(
+        requestsRef,
+        where('recordId', '==', recordId),
+        where('status', '==', 'pending')
+      );
 
-      if (!recordDoc.exists()) {
-        throw new Error('Record not found');
-      }
-
-      const requests: PendingSubjectRequest[] = recordDoc.data().pendingSubjectRequests || [];
-
-      return requests.filter(req => req.status === 'pending');
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => doc.data() as SubjectConsentRequest);
     } catch (error) {
-      console.error('❌ Error getting pending requests:', error);
+      console.error('❌ Error getting pending requests for record:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get incoming consent requests for the current user
+   *
+   * Queries the subjectConsentRequests collection for pending requests
+   * where the current user is the target.
+   *
+   * @returns Array of incoming consent requests
+   */
+  static async getIncomingRequests(): Promise<IncomingSubjectRequest[]> {
+    const auth = getAuth();
+    const db = getFirestore();
+    const user = auth.currentUser;
+
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    try {
+      const requestsRef = collection(db, 'subjectConsentRequests');
+      const q = query(
+        requestsRef,
+        where('subjectId', '==', user.uid),
+        where('status', '==', 'pending')
+      );
+
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => {
+        const data = doc.data() as SubjectConsentRequest;
+        return {
+          id: doc.id,
+          recordId: data.recordId,
+          recordTitle: data.recordTitle,
+          requestedBy: data.requestedBy,
+          requestedSubjectRole: data.requestedSubjectRole,
+          requestedAt: data.createdAt,
+          status: data.status,
+        };
+      });
+    } catch (error) {
+      console.error('❌ Error getting incoming requests:', error);
       throw error;
     }
   }

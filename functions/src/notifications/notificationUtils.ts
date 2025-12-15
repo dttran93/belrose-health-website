@@ -56,9 +56,11 @@ export interface NotificationDoc {
  */
 export interface NotificationPayload {
   // Subject-related
-  recordId?: string;
-  subjectId?: string;
+  recordId: string;
+  subjectId: string;
+  requestId?: string;
   requestedBy?: string;
+  requestedSubjectRole?: string;
   // Messaging (future)
   conversationId?: string;
   senderId?: string;
