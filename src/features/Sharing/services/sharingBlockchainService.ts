@@ -1,6 +1,7 @@
 // src/features/Sharing/services/sharingBlockchainService.ts
 
 import { ethers, Contract, ContractTransactionResponse } from 'ethers';
+import { WalletService } from '@/features/BlockchainWallet/services/walletService';
 
 // Your deployed contract address
 const CONTRACT_ADDRESS = '0xA9f388D92032E5e84E1264e72129A30d57cBfE66';
@@ -87,22 +88,30 @@ const CONTRACT_ABI = [
 
 export class SharingBlockchainService {
   /**
-   * Get contract instance with signer
+   * Get contract instance with signer from WalletService
+   * Now supports both MetaMask AND generated wallets automatically
    */
   private static async getContract(): Promise<Contract> {
-    // Check if MetaMask is available
-    if (!window.ethereum) {
-      throw new Error('MetaMask not installed');
-    }
+    // Use WalletService to get the appropriate signer
+    // This handles MetaMask, WalletConnect, hardware wallets, AND generated wallets
+    const { signer, origin } = await WalletService.getSigner();
 
-    // Create provider
-    const provider = new ethers.BrowserProvider(window.ethereum);
+    console.log(`🔐 Using ${origin} wallet for contract interaction`);
 
-    // Get signer (current user's wallet)
-    const signer = await provider.getSigner();
-
-    // Create contract instance
+    // Create contract instance with the signer
     return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+  }
+
+  /**
+   * Check if user can sign transactions before attempting
+   * Useful for showing appropriate UI feedback
+   */
+  static async canSignTransactions(): Promise<{
+    canSign: boolean;
+    reason?: string;
+    walletOrigin?: string;
+  }> {
+    return WalletService.canSign();
   }
 
   /**
@@ -113,7 +122,14 @@ export class SharingBlockchainService {
     recordId: string,
     receiverWalletAddress: string
   ): Promise<string> {
+    // Pre-flight check
+    const signCheck = await WalletService.canSign();
+    if (!signCheck.canSign) {
+      throw new Error(signCheck.reason || 'Cannot sign transactions');
+    }
+
     console.log('🔗 Calling smart contract grantAccess()...');
+    console.log(`   Wallet type: ${signCheck.walletOrigin}`);
 
     const contract = await this.getContract();
 
@@ -140,7 +156,14 @@ export class SharingBlockchainService {
    * Revoke access on blockchain
    */
   static async revokeAccessOnChain(permissionHash: string): Promise<string> {
+    // Pre-flight check
+    const signCheck = await WalletService.canSign();
+    if (!signCheck.canSign) {
+      throw new Error(signCheck.reason || 'Cannot sign transactions');
+    }
+
     console.log('🔗 Calling smart contract revokeAccess()...');
+    console.log(`   Wallet type: ${signCheck.walletOrigin}`);
 
     const contract = await this.getContract();
 
@@ -161,6 +184,7 @@ export class SharingBlockchainService {
 
   /**
    * Check access status on blockchain
+   * Note: This is a read-only call, so it doesn't require signing
    */
   static async checkAccessOnChain(permissionHash: string): Promise<{
     isActive: boolean;

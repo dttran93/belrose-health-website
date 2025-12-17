@@ -7,7 +7,7 @@ import { FileObject, BelroseUserProfile } from '@/types/core';
 import UserSearch from '@/features/Users/components/UserSearch';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
-import { useAuthContext } from '@/components/auth/AuthContext';
+import { useAuthContext } from '@/features/Auth/AuthContext';
 import {
   useSetSubject,
   SubjectRole,

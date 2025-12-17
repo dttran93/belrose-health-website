@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { getAuth } from 'firebase/auth';
 import { toast } from 'sonner';
 import { UserSettingsService } from '../services/userSettingsService';
-import { UserService } from '@/components/auth/services/userService';
+import { UserService } from '@/features/Auth/services/userService';
 import { BelroseUserProfile } from '@/types/core';
 
 interface UseUserSettingsOptions {

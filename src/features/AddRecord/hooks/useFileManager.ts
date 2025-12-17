@@ -22,7 +22,7 @@ import {
 import { VirtualFileResult } from '../components/CombinedUploadFHIR.type';
 import { UploadResult } from '../services/shared.types';
 import { CombinedRecordProcessingService } from './useRecordProcessing';
-import { useAuthContext } from '@/components/auth/AuthContext';
+import { useAuthContext } from '@/features/Auth/AuthContext';
 import { Timestamp } from 'firebase/firestore';
 
 export function useFileManager(): UseFileManagerTypes {

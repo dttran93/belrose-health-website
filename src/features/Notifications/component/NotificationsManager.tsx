@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { Bell, BellOff, CheckCheck, Filter, Loader2, AlertCircle, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { useAuthContext } from '@/components/auth/AuthContext';
+import { useAuthContext } from '@/features/Auth/AuthContext';
 import { useNotifications, SourceService } from '../hooks/useNotifications';
 import NotificationItem from './ui/NotificationItem';
 import { toast } from 'sonner';

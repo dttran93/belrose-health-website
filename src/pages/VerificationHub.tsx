@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
-import IdentityVerificationForm from '../components/auth/components/IdentityVerificationForm';
+import IdentityVerificationForm from '../features/Auth/components/IdentityVerificationForm';
 import { VerificationResult, VerifiedData } from '@/types/identity';
 import { getAuth, sendEmailVerification } from 'firebase/auth';
 import { getFirestore, doc, updateDoc, getDoc } from 'firebase/firestore';

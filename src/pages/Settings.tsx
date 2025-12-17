@@ -3,7 +3,7 @@ import { Bell, CircleUserRound, CreditCard, GlobeLock, Link, Settings2 } from 'l
 import UserSettings from '@/features/Settings/components/UserSettings';
 import { getAuth } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
-import { UserService } from '@/components/auth/services/userService';
+import { UserService } from '@/features/Auth/services/userService';
 import { BelroseUserProfile } from '@/types/core';
 import { useUserSettings } from '@/features/Settings/hooks/useUserSettings';
 import ChangeNameModal from '@/features/Settings/components/ChangeNameModal';

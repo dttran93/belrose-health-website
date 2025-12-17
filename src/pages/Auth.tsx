@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import LoginForm from '@/components/auth/components/LoginForm';
-import RegistrationForm from '@/components/auth/components/RegistrationForm';
-import AccountRecovery from '@/components/auth/components/AccountRecovery';
+import LoginForm from '@/features/Auth/components/LoginForm';
+import RegistrationForm from '@/features/Auth/components/RegistrationForm';
+import AccountRecovery from '@/features/Auth/components/AccountRecovery';
 import { useNavigate } from 'react-router-dom';
 
 type AuthPageState = 'login' | 'registration' | 'accountRecovery';

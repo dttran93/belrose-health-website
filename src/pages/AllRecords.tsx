@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuthContext } from '@/components/auth/AuthContext';
+import { useAuthContext } from '@/features/Auth/AuthContext';
 import { useRecordFileActions } from '@/features/ViewEditRecord/hooks/useRecordFileActions';
 import { RecordsList } from '@/features/ViewEditRecord/components/RecordsList';
 import { useAllUserRecords } from '@/features/ViewEditRecord/hooks/useAllUserRecords';

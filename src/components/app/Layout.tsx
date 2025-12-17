@@ -8,8 +8,8 @@ import ResizeHandle from '@/components/ui/ResizeHandle';
 import AIChatPanel from '@/features/Ai/AIChatPanel';
 import useMediaQuery from '@/hooks/useMediaQuery';
 import { healthRecords, healthCategories } from '@/components/app/navigation';
-import { useAuthContext } from '@/components/auth/AuthContext';
-import { authService } from '@/components/auth/services/authServices';
+import { useAuthContext } from '@/features/Auth/AuthContext';
+import { authService } from '@/features/Auth/services/authServices';
 import { useLayout } from '@/components/app/LayoutProvider';
 
 interface AppLayoutProps {

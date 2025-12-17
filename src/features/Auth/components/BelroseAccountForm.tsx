@@ -14,14 +14,14 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
-import { authService } from '@/components/auth/services/authServices';
+import { authService } from '@/features/Auth/services/authServices';
 import { useAuthForm } from '../hooks/useAuthForm';
 import { SocialAuthButtons } from './ui/SocialAuthButtons';
-import { PasswordStrengthIndicator } from '@/components/auth/components/ui/PasswordStrengthIndicator';
+import { PasswordStrengthIndicator } from '@/features/Auth/components/ui/PasswordStrengthIndicator';
 import {
   validatePassword,
   validatePasswordConfirmation,
-} from '@/components/auth/utils/PasswordStrength';
+} from '@/features/Auth/utils/PasswordStrength';
 import InputField from './ui/InputField';
 
 interface BelroseAccountFormData {

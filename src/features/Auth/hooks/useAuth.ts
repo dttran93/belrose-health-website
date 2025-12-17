@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 // Assuming these are all correctly imported/typed services
-import { authService } from '@/components/auth/services/authServices';
-import { UserService } from '@/components/auth/services/userService';
+import { authService } from '@/features/Auth/services/authServices';
+import { UserService } from '../services/userService';
 import { UserSettingsService } from '@/features/Settings/services/userSettingsService';
 // Import your core types
 import { AuthContextData, BelroseUserProfile } from '@/types/core';

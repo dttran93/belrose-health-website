@@ -6,7 +6,7 @@ import {
   getPasswordStrength,
   getPasswordStrengthColors,
   getPasswordRequirements,
-} from '@/components/auth/utils/PasswordStrength';
+} from '@/features/Auth/utils/PasswordStrength';
 
 interface PasswordStrengthIndicatorProps {
   password: string;

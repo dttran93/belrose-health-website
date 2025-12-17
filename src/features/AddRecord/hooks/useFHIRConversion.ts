@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useAuthContext } from '@/components/auth/AuthContext';
+import { useAuthContext } from '@/features/Auth/AuthContext';
 import { toast } from 'sonner';
 import { FileObject } from '@/types/core';
 import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';

@@ -1,7 +1,7 @@
 // /features/Auth/hooks/useSocialAuth.ts
 
 import { useState } from 'react';
-import { authService } from '@/components/auth/services/authServices';
+import { authService } from '@/features/Auth/services/authServices';
 import { toast } from 'sonner';
 import { useNavigate, useLocation } from 'react-router-dom';
 

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Mail, ArrowLeft, AlertCircle, KeyRound, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { authService } from '@/components/auth/services/authServices';
+import { authService } from '@/features/Auth/services/authServices';
 import { toast } from 'sonner';
 
 interface ResetPasswordFormProps {

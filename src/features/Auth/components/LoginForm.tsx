@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, User, CheckCircle, X, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
-import { authService } from '@/components/auth/services/authServices';
+import { authService } from '@/features/Auth/services/authServices';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthForm } from '../hooks/useAuthForm';
 import { SocialAuthButtons } from './ui/SocialAuthButtons';
