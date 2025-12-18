@@ -43,3 +43,6 @@ export {
   onSubjectConsentRequestUpdated,
   onRecordSubjectChange,
 } from './notifications/triggers/subjectNotificationTrigger';
+
+// ==================== PAYMASTER ====================
+export { signSponsorship, getSponsorshipStatus } from './handlers/paymaster';

@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "-": "^0.0.1",
+    "@account-abstraction/contracts": "^0.7.0",
+    "@openzeppelin/contracts": "^5.0.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-navigation-menu": "^1.2.13",
@@ -36,6 +38,7 @@
     "mammoth": "^1.9.1",
     "pdf-parse": "^1.1.1",
     "pdfjs-dist": "^5.3.31",
+    "permissionless": "^0.3.2",
     "prop-types": "^15.8.1",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
@@ -44,7 +47,8 @@
     "sonner": "^2.0.4",
     "tailwind-merge": "^3.3.0",
     "tailwindcss-animate": "^1.0.7",
-    "tesseract.js": "^6.0.1"
+    "tesseract.js": "^6.0.1",
+    "viem": "^2.43.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
