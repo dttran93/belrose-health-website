@@ -11,17 +11,16 @@ const params_1 = require("firebase-functions/params");
 const paymasterSignerKey = (0, params_1.defineSecret)('PAYMASTER_SIGNER_PRIVATE_KEY');
 // ==================== CONFIG ====================
 // Your deployed paymaster contract address (update after deployment)
-const PAYMASTER_CONTRACT_ADDRESS = process.env.PAYMASTER_CONTRACT_ADDRESS || '';
+const PAYMASTER_CONTRACT_ADDRESS = process.env.PAYMASTER_CONTRACT_ADDRESS;
 // Sepolia chain ID
 const CHAIN_ID = 11155111;
 // Rate limiting config
-const DAILY_SPONSORED_LIMIT = 10; // Max sponsored txs per user per day
-const SIGNATURE_VALIDITY_SECONDS = 300; // 5 minutes
+const DAILY_SPONSORED_LIMIT = 100; // Max sponsored txs per user per day. Set high so we can test in dev. Change in future
 // ==================== HELPER FUNCTIONS ====================
 /**
  * Check and update rate limit for a user
  */
-async function checkRateLimit(db, userId) {
+async function checkRateLimit(db, userId, userOpHash) {
     const rateLimitRef = db.collection('paymasterRateLimits').doc(userId);
     return db.runTransaction(async (transaction) => {
         const doc = await transaction.get(rateLimitRef);
@@ -32,6 +31,7 @@ async function checkRateLimit(db, userId) {
             transaction.set(rateLimitRef, {
                 count: 1,
                 resetAt: resetAt,
+                lastUserOpHash: userOpHash,
             });
             return { allowed: true };
         }
@@ -43,45 +43,72 @@ async function checkRateLimit(db, userId) {
             transaction.update(rateLimitRef, {
                 count: 1,
                 resetAt: newResetAt,
+                lastUserOpHash: userOpHash,
             });
             return { allowed: true };
         }
+        //Check if its a repeated clal for the same UserOp (Simulation and then actual)
+        if (data.lastUserOpHash === userOpHash) {
+            console.log(`♻️ Repeat request for hash ${userOpHash.slice(0, 10)}... allowing without charge.`);
+            return { allowed: true };
+        }
+        //3. Check hard limit
         if (data.count >= DAILY_SPONSORED_LIMIT) {
             return {
                 allowed: false,
                 reason: `Daily limit reached (${DAILY_SPONSORED_LIMIT} transactions). Resets at ${resetAt.toISOString()}`,
             };
         }
-        // Increment counter
+        // 4. Unique transaction - Increment counter
         transaction.update(rateLimitRef, {
             count: data.count + 1,
+            lastUserOpHash: userOpHash,
         });
         return { allowed: true };
     });
 }
 /**
- * Build the paymasterAndData field for the UserOperation
+ * Build the signature for the paymaster
  * Format: [paymaster(20)][validUntil(6)][validAfter(6)][signature(65)]
  */
-async function buildPaymasterAndData(userOpHash, signerPrivateKey) {
-    const now = Math.floor(Date.now() / 1000);
-    const validAfter = now;
-    const validUntil = now + SIGNATURE_VALIDITY_SECONDS;
+async function buildSignature(userOpHash, validUntil, //client provided to ensure hashes match
+validAfter, //client provided to ensure hashes match
+signerPrivateKey) {
     // Create signer
-    const signer = new ethers_1.ethers.Wallet(signerPrivateKey);
-    // Build hash that matches what the paymaster contract expects
-    const hash = ethers_1.ethers.solidityPackedKeccak256(['bytes32', 'uint256', 'address', 'uint48', 'uint48'], [userOpHash, CHAIN_ID, PAYMASTER_CONTRACT_ADDRESS, validUntil, validAfter]);
-    // Sign with EIP-191 prefix (what toEthSignedMessageHash does in Solidity)
-    const signature = await signer.signMessage(ethers_1.ethers.getBytes(hash));
-    // Pack paymasterAndData
-    // Format: [paymaster(20)][validUntil(6)][validAfter(6)][signature(65)]
-    const paymasterAndData = ethers_1.ethers.concat([
-        PAYMASTER_CONTRACT_ADDRESS,
-        ethers_1.ethers.zeroPadValue(ethers_1.ethers.toBeHex(validUntil), 6),
-        ethers_1.ethers.zeroPadValue(ethers_1.ethers.toBeHex(validAfter), 6),
-        signature,
+    const signingKey = new ethers_1.ethers.SigningKey(signerPrivateKey);
+    const abiCoder = new ethers_1.ethers.AbiCoder();
+    //Check for contract Address
+    if (!PAYMASTER_CONTRACT_ADDRESS) {
+        throw new Error('Contract Address Missing');
+    }
+    // Matches Solidity: abi.encode(innerHash, chainId, address, until, after)
+    const encodedData = abiCoder.encode(['bytes32', 'uint256', 'address', 'uint48', 'uint48'], [
+        userOpHash,
+        BigInt(CHAIN_ID),
+        ethers_1.ethers.getAddress(PAYMASTER_CONTRACT_ADDRESS),
+        BigInt(validUntil),
+        BigInt(validAfter),
     ]);
-    return ethers_1.ethers.hexlify(paymasterAndData);
+    const hashToSign = ethers_1.ethers.keccak256(encodedData);
+    // --- DEBUGGING ---
+    console.log('--- DEBUG SPONSORSHIP ---');
+    console.log('UserOpHash:', userOpHash);
+    console.log('ChainId:', CHAIN_ID);
+    console.log('PaymasterAddr:', PAYMASTER_CONTRACT_ADDRESS);
+    console.log('ValidUntil:', validUntil);
+    console.log('ValidAfter:', validAfter);
+    console.log('Final Hash to Sign:', hashToSign);
+    console.log('RAW ENCODED DATA:', encodedData);
+    const eip191Hash = ethers_1.ethers.hashMessage(ethers_1.ethers.getBytes(hashToSign));
+    // 2. Sign the raw hash
+    const signatureObj = signingKey.sign(eip191Hash);
+    // Use the built-in serialized property to ensure
+    // the hex string is perfectly formatted for Solidity
+    const signature = signatureObj.serialized;
+    console.log('--- SIGNATURE CHECK ---');
+    console.log('Signature Length (chars):', signature.length); // Should be 132 (0x + 130)
+    console.log('Full Signature Hex:', signature);
+    return signature;
 }
 // ==================== MAIN HANDLER ====================
 /**
@@ -106,7 +133,7 @@ exports.signSponsorship = (0, https_1.onCall)({
         throw new https_1.HttpsError('unauthenticated', 'Must be logged in to request sponsorship');
     }
     const userId = request.auth.uid;
-    const { userOpHash, sender } = request.data;
+    const { userOpHash, sender, validUntil, validAfter } = request.data;
     // 2. Validate input
     if (!userOpHash || !sender) {
         throw new https_1.HttpsError('invalid-argument', 'Missing userOpHash or sender');
@@ -136,28 +163,30 @@ exports.signSponsorship = (0, https_1.onCall)({
         }
         const userData = userDoc.data();
         // Check email verification (adjust based on your user model)
-        if (!(userData === null || userData === void 0 ? void 0 : userData.emailVerified) && !(userData === null || userData === void 0 ? void 0 : userData.verified)) {
+        if (!userData?.emailVerified && !userData?.verified) {
             return { sponsored: false, reason: 'Email not verified' };
         }
         // 5. Check rate limits
-        const rateLimitCheck = await checkRateLimit(db, userId);
+        const rateLimitCheck = await checkRateLimit(db, userId, userOpHash);
         if (!rateLimitCheck.allowed) {
             return { sponsored: false, reason: rateLimitCheck.reason };
         }
-        // 6. Build and sign paymasterAndData
-        const paymasterAndData = await buildPaymasterAndData(userOpHash, signerKey);
+        // 6. Build signature
+        const signature = await buildSignature(userOpHash, validUntil, validAfter, signerKey);
         // 7. Log for analytics (optional)
         await db.collection('paymasterLogs').add({
             userId,
             sender,
             userOpHash,
+            validUntil,
+            validAfter,
             timestamp: new Date(),
             sponsored: true,
         });
         console.log(`✅ Sponsored transaction for user ${userId}, sender ${sender}`);
         return {
             sponsored: true,
-            paymasterAndData,
+            signature,
         };
     }
     catch (error) {
@@ -166,9 +195,7 @@ exports.signSponsorship = (0, https_1.onCall)({
     }
 });
 /**
- * Get Sponsorship Status
- *
- * Returns user's current rate limit status
+ * Get Sponsorship Status - Returns user's current rate limit status
  */
 exports.getSponsorshipStatus = (0, https_1.onCall)({
     cors: true,

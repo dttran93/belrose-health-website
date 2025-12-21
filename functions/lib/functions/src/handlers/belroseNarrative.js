@@ -95,11 +95,11 @@ async function generateNarrativeWithAI(fhirData, apiKey, belroseFields, fileName
  * Create a fallback narrative when AI generation fails
  */
 function createFallbackNarrative(belroseFields, fileName) {
-    const title = (belroseFields === null || belroseFields === void 0 ? void 0 : belroseFields.title) || fileName || 'Health Record';
-    const date = (belroseFields === null || belroseFields === void 0 ? void 0 : belroseFields.completedDate) || new Date().toISOString().split('T')[0];
-    const provider = (belroseFields === null || belroseFields === void 0 ? void 0 : belroseFields.provider) || 'Healthcare Provider';
-    const institution = (belroseFields === null || belroseFields === void 0 ? void 0 : belroseFields.institution) || 'Medical Center';
-    const fallbackNarrative = `This is a medical record titled "${title}" dated ${date}. The record was created at ${institution} with ${provider}. ${(belroseFields === null || belroseFields === void 0 ? void 0 : belroseFields.summary) || 'Additional details are available in the structured FHIR data.'}`;
+    const title = belroseFields?.title || fileName || 'Health Record';
+    const date = belroseFields?.completedDate || new Date().toISOString().split('T')[0];
+    const provider = belroseFields?.provider || 'Healthcare Provider';
+    const institution = belroseFields?.institution || 'Medical Center';
+    const fallbackNarrative = `This is a medical record titled "${title}" dated ${date}. The record was created at ${institution} with ${provider}. ${belroseFields?.summary || 'Additional details are available in the structured FHIR data.'}`;
     return {
         detailedNarrative: fallbackNarrative,
     };

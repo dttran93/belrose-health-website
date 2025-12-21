@@ -74,20 +74,19 @@ exports.convertToFHIR = (0, https_1.onRequest)({
  * Handle FHIR conversion errors
  */
 function handleConversionError(res, error) {
-    var _a, _b, _c, _d;
-    if (((_a = error.message) === null || _a === void 0 ? void 0 : _a.includes('JSON')) || ((_b = error.message) === null || _b === void 0 ? void 0 : _b.includes('parse'))) {
+    if (error.message?.includes('JSON') || error.message?.includes('parse')) {
         res.status(500).json({
             error: 'Failed to parse FHIR response from AI',
             details: 'The AI returned invalid JSON format',
         });
     }
-    else if (((_c = error.message) === null || _c === void 0 ? void 0 : _c.includes('Anthropic')) || error.name === 'AnthropicAPIError') {
+    else if (error.message?.includes('Anthropic') || error.name === 'AnthropicAPIError') {
         res.status(502).json({
             error: 'External AI service error',
             details: 'Unable to connect to AI service',
         });
     }
-    else if ((_d = error.message) === null || _d === void 0 ? void 0 : _d.includes('Bundle')) {
+    else if (error.message?.includes('Bundle')) {
         res.status(500).json({
             error: 'Invalid FHIR format',
             details: 'The response is not a valid FHIR Bundle',

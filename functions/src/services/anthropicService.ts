@@ -150,7 +150,7 @@ export class AnthropicService {
         await this.handleAPIError(response);
       }
 
-      const data: ClaudeResponse = await response.json();
+      const data = (await response.json()) as ClaudeResponse;
 
       console.log('✅ Received response from Anthropic API', {
         inputTokens: data.usage.input_tokens,
@@ -254,7 +254,11 @@ export class AnthropicService {
  * Custom error class for Anthropic API errors
  */
 export class AnthropicAPIError extends Error {
-  constructor(message: string, public statusCode: number, public details?: any) {
+  constructor(
+    message: string,
+    public statusCode: number,
+    public details?: any
+  ) {
     super(message);
     this.name = 'AnthropicAPIError';
   }

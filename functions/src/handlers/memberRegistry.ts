@@ -7,6 +7,10 @@ import { ethers } from 'ethers';
 
 const MEMBER_ROLE_MANAGER_ADDRESS = '0xD671B0cB1cB10330d9Ed05dC1D1F6E63802Cf4A9';
 
+const functionOptions = {
+  secrets: ['ADMIN_WALLET_PRIVATE_KEY', 'RPC_URL'],
+};
+
 // ABI - only admin functions
 const MEMBER_ROLE_MANAGER_ABI = [
   {
@@ -53,12 +57,13 @@ enum MemberStatus {
  */
 function getAdminWallet(): ethers.Wallet {
   const privateKey = process.env.ADMIN_WALLET_PRIVATE_KEY;
+  const rpcUrl = process.env.RPC_URL || 'https://1rpc.io/sepolia';
+
   if (!privateKey) {
-    throw new Error('Admin wallet private key not configured');
+    throw new Error('Admin wallet private key not found in environment secrets');
   }
 
-  const provider = new ethers.JsonRpcProvider(process.env.RPC_URL || 'https://1rpc.io/sepolia');
-
+  const provider = new ethers.JsonRpcProvider(rpcUrl);
   return new ethers.Wallet(privateKey, provider);
 }
 

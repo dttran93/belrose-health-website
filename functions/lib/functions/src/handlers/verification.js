@@ -106,7 +106,7 @@ exports.createVerificationSession = (0, https_1.onCall)({ secrets: [personaKey] 
             throw new https_1.HttpsError('internal', `Persona API error: ${response.status}`);
         }
         // Parse response
-        const personaData = await response.json();
+        const personaData = (await response.json());
         const inquiryId = personaData.data.id;
         console.log('✅ Inquiry created:', inquiryId);
         // Save verification record to database
@@ -169,7 +169,7 @@ exports.checkVerificationStatus = (0, https_1.onCall)({ secrets: [personaKey] },
             throw new https_1.HttpsError('internal', 'Failed to fetch verification status');
         }
         // Parse inquiry data
-        const inquiry = await response.json();
+        const inquiry = (await response.json());
         const status = inquiry.data.attributes.status;
         console.log('📊 Inquiry status from Persona:', status);
         const verified = status === 'approved';
@@ -229,7 +229,6 @@ exports.personaWebhook = (0, https_1.onRequest)({
     secrets: [personaKey, personaWebhookSecret],
     cors: true,
 }, async (req, res) => {
-    var _a, _b, _c, _d, _e, _f, _g;
     // Only accept POST requests
     if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method Not Allowed' });
@@ -255,10 +254,10 @@ exports.personaWebhook = (0, https_1.onRequest)({
         console.log('✅ Webhook signature verified - legitimate request from Persona');
         // Extract event data
         const event = req.body;
-        const eventName = (_b = (_a = event.data) === null || _a === void 0 ? void 0 : _a.attributes) === null || _b === void 0 ? void 0 : _b.name;
-        const inquiry = (_e = (_d = (_c = event.data) === null || _c === void 0 ? void 0 : _c.attributes) === null || _d === void 0 ? void 0 : _d.payload) === null || _e === void 0 ? void 0 : _e.data;
-        const status = (_f = inquiry === null || inquiry === void 0 ? void 0 : inquiry.attributes) === null || _f === void 0 ? void 0 : _f.status;
-        const userId = (_g = inquiry === null || inquiry === void 0 ? void 0 : inquiry.attributes) === null || _g === void 0 ? void 0 : _g['reference-id'];
+        const eventName = event.data?.attributes?.name;
+        const inquiry = event.data?.attributes?.payload?.data;
+        const status = inquiry?.attributes?.status;
+        const userId = inquiry?.attributes?.['reference-id'];
         console.log('📬 Processing verified webhook:', { eventName, status, userId });
         // Validate we have a userId
         if (!userId) {
@@ -271,7 +270,7 @@ exports.personaWebhook = (0, https_1.onRequest)({
         switch (status) {
             case 'approved':
                 console.log('✅ Webhook: User verified', userId);
-                const inquiryId = inquiry === null || inquiry === void 0 ? void 0 : inquiry.id;
+                const inquiryId = inquiry?.id;
                 await db.collection('verifications').doc(userId).update({
                     status: 'approved',
                     completedAt: firestore_1.FieldValue.serverTimestamp(),

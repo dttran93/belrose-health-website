@@ -7,6 +7,9 @@ const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const ethers_1 = require("ethers");
 const MEMBER_ROLE_MANAGER_ADDRESS = '0xD671B0cB1cB10330d9Ed05dC1D1F6E63802Cf4A9';
+const functionOptions = {
+    secrets: ['ADMIN_WALLET_PRIVATE_KEY', 'RPC_URL'],
+};
 // ABI - only admin functions
 const MEMBER_ROLE_MANAGER_ABI = [
     {
@@ -52,10 +55,11 @@ var MemberStatus;
  */
 function getAdminWallet() {
     const privateKey = process.env.ADMIN_WALLET_PRIVATE_KEY;
+    const rpcUrl = process.env.RPC_URL || 'https://1rpc.io/sepolia';
     if (!privateKey) {
-        throw new Error('Admin wallet private key not configured');
+        throw new Error('Admin wallet private key not found in environment secrets');
     }
-    const provider = new ethers_1.ethers.JsonRpcProvider(process.env.RPC_URL || 'https://1rpc.io/sepolia');
+    const provider = new ethers_1.ethers.JsonRpcProvider(rpcUrl);
     return new ethers_1.ethers.Wallet(privateKey, provider);
 }
 /**
@@ -70,7 +74,6 @@ function getAdminContract() {
  * Called after user completes registration
  */
 exports.registerMemberOnChain = (0, https_1.onCall)(async (request) => {
-    var _a, _b;
     // Verify user is authenticated
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'User must be authenticated');
@@ -93,7 +96,7 @@ exports.registerMemberOnChain = (0, https_1.onCall)(async (request) => {
         console.log('⏳ Transaction sent:', tx.hash);
         // Wait for confirmation
         const receipt = await tx.wait();
-        console.log('✅ Member registered on blockchain, block:', receipt === null || receipt === void 0 ? void 0 : receipt.blockNumber);
+        console.log('✅ Member registered on blockchain, block:', receipt?.blockNumber);
         // Update Firestore with blockchain registration info
         const db = (0, firestore_1.getFirestore)();
         await db
@@ -105,7 +108,7 @@ exports.registerMemberOnChain = (0, https_1.onCall)(async (request) => {
                 walletAddress: walletAddress,
                 userIdHash: userIdHash,
                 txHash: tx.hash,
-                blockNumber: receipt === null || receipt === void 0 ? void 0 : receipt.blockNumber,
+                blockNumber: receipt?.blockNumber,
                 registeredAt: new Date().toISOString(),
                 status: 'Active',
             },
@@ -113,16 +116,16 @@ exports.registerMemberOnChain = (0, https_1.onCall)(async (request) => {
         return {
             success: true,
             txHash: tx.hash,
-            blockNumber: receipt === null || receipt === void 0 ? void 0 : receipt.blockNumber,
+            blockNumber: receipt?.blockNumber,
         };
     }
     catch (error) {
         console.error('❌ Failed to register member on blockchain:', error);
         // Handle specific errors
-        if ((_a = error.message) === null || _a === void 0 ? void 0 : _a.includes('Already a member')) {
+        if (error.message?.includes('Already a member')) {
             throw new https_1.HttpsError('already-exists', 'User is already registered on blockchain');
         }
-        if ((_b = error.message) === null || _b === void 0 ? void 0 : _b.includes('User ID already registered')) {
+        if (error.message?.includes('User ID already registered')) {
             throw new https_1.HttpsError('already-exists', 'User ID is already registered');
         }
         throw new https_1.HttpsError('internal', `Blockchain registration failed: ${error.message}`);
@@ -152,11 +155,11 @@ exports.updateMemberStatus = (0, https_1.onCall)(async (request) => {
         const tx = await contract.setMemberStatus(walletAddress, status);
         console.log('⏳ Transaction sent:', tx.hash);
         const receipt = await tx.wait();
-        console.log('✅ Member status updated, block:', receipt === null || receipt === void 0 ? void 0 : receipt.blockNumber);
+        console.log('✅ Member status updated, block:', receipt?.blockNumber);
         return {
             success: true,
             txHash: tx.hash,
-            blockNumber: receipt === null || receipt === void 0 ? void 0 : receipt.blockNumber,
+            blockNumber: receipt?.blockNumber,
         };
     }
     catch (error) {
@@ -169,7 +172,6 @@ exports.updateMemberStatus = (0, https_1.onCall)(async (request) => {
  * Called when a new record is created
  */
 exports.initializeRecordOnChain = (0, https_1.onCall)(async (request) => {
-    var _a;
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'User must be authenticated');
     }
@@ -187,16 +189,16 @@ exports.initializeRecordOnChain = (0, https_1.onCall)(async (request) => {
         const tx = await contract.initializeRecordRole(recordId, adminWalletAddress);
         console.log('⏳ Transaction sent:', tx.hash);
         const receipt = await tx.wait();
-        console.log('✅ Record role initialized, block:', receipt === null || receipt === void 0 ? void 0 : receipt.blockNumber);
+        console.log('✅ Record role initialized, block:', receipt?.blockNumber);
         return {
             success: true,
             txHash: tx.hash,
-            blockNumber: receipt === null || receipt === void 0 ? void 0 : receipt.blockNumber,
+            blockNumber: receipt?.blockNumber,
         };
     }
     catch (error) {
         console.error('❌ Failed to initialize record role:', error);
-        if ((_a = error.message) === null || _a === void 0 ? void 0 : _a.includes('Record already initialized')) {
+        if (error.message?.includes('Record already initialized')) {
             throw new https_1.HttpsError('already-exists', 'Record already has roles assigned');
         }
         throw new https_1.HttpsError('internal', `Record initialization failed: ${error.message}`);

@@ -94,15 +94,14 @@ function enrichAnalysisResult(result, fileName, fileType, analysisType) {
  * Handle image analysis errors with appropriate fallback response
  */
 function handleImageAnalysisError(res, error) {
-    var _a, _b, _c;
     console.error('❌ Image analysis failed:', error);
     // Determine error type and response
     let statusCode = 500;
     let errorMessage = 'Failed to process image';
-    if (((_a = error.message) === null || _a === void 0 ? void 0 : _a.includes('JSON')) || ((_b = error.message) === null || _b === void 0 ? void 0 : _b.includes('parse'))) {
+    if (error.message?.includes('JSON') || error.message?.includes('parse')) {
         errorMessage = 'Failed to parse AI response';
     }
-    else if (((_c = error.message) === null || _c === void 0 ? void 0 : _c.includes('Anthropic')) || error.name === 'AnthropicAPIError') {
+    else if (error.message?.includes('Anthropic') || error.name === 'AnthropicAPIError') {
         statusCode = 502;
         errorMessage = 'External AI service error';
     }

@@ -67,7 +67,7 @@ async function getUserDisplayName(userId) {
         const userDoc = await getFirestore().collection('users').doc(userId).get();
         if (userDoc.exists) {
             const data = userDoc.data();
-            return (data === null || data === void 0 ? void 0 : data.displayName) || (data === null || data === void 0 ? void 0 : data.email) || formatUserIdFallback(userId);
+            return data?.displayName || data?.email || formatUserIdFallback(userId);
         }
     }
     catch (error) {
@@ -92,7 +92,7 @@ async function getRecordDisplayName(recordId) {
         const recordDoc = await getFirestore().collection('records').doc(recordId).get();
         if (recordDoc.exists) {
             const data = recordDoc.data();
-            return (data === null || data === void 0 ? void 0 : data.fileName) || formatRecordIdFallback(recordId);
+            return data?.fileName || formatRecordIdFallback(recordId);
         }
     }
     catch (error) {
@@ -124,7 +124,11 @@ async function createNotification(targetUserId, notification) {
         .collection('users')
         .doc(targetUserId)
         .collection('notifications');
-    const docRef = await notificationRef.add(Object.assign(Object.assign({}, notification), { read: false, createdAt: admin.firestore.Timestamp.now() }));
+    const docRef = await notificationRef.add({
+        ...notification,
+        read: false,
+        createdAt: admin.firestore.Timestamp.now(),
+    });
     console.log(`✅ Notification created for user ${targetUserId}: ${notification.type} (${docRef.id})`);
     return docRef.id;
 }

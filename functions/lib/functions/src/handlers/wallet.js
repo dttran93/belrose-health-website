@@ -45,7 +45,6 @@ const backendWalletService_1 = require("../services/backendWalletService");
  * Creates a new blockchain wallet for a user
  */
 exports.createWallet = (0, https_1.onRequest)({ cors: true }, async (req, res) => {
-    var _a;
     // Validate HTTP method
     if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method Not Allowed' });
@@ -85,7 +84,7 @@ exports.createWallet = (0, https_1.onRequest)({ cors: true }, async (req, res) =
             return;
         }
         const userData = userDoc.data();
-        if ((_a = userData === null || userData === void 0 ? void 0 : userData.wallet) === null || _a === void 0 ? void 0 : _a.address) {
+        if (userData?.wallet?.address) {
             res.status(400).json({
                 error: 'Wallet already exists',
                 details: 'User already has a wallet linked to their account',
@@ -167,7 +166,7 @@ exports.getEncryptedWallet = (0, https_1.onRequest)({ cors: true }, async (req, 
             return;
         }
         const userData = userDoc.data();
-        const wallet = userData === null || userData === void 0 ? void 0 : userData.wallet;
+        const wallet = userData?.wallet;
         if (!wallet) {
             res.status(404).json({
                 error: 'Wallet not found',
@@ -218,7 +217,7 @@ async function authenticateUser(req, expectedUserId) {
     try {
         // Check for Authorization header
         const authHeader = req.headers.authorization;
-        if (!(authHeader === null || authHeader === void 0 ? void 0 : authHeader.startsWith('Bearer '))) {
+        if (!authHeader?.startsWith('Bearer ')) {
             console.error('❌ Missing or invalid Authorization header');
             return null;
         }
@@ -238,7 +237,6 @@ async function authenticateUser(req, expectedUserId) {
  * Handle wallet-related errors with appropriate responses
  */
 function handleWalletError(res, error, operation) {
-    var _a, _b, _c, _d;
     const operationText = operation === 'create' ? 'create' : 'fetch';
     // Handle specific error types
     if (error.code === 'permission-denied') {
@@ -256,7 +254,7 @@ function handleWalletError(res, error, operation) {
         return;
     }
     // Handle crypto/encryption errors
-    if (((_a = error.message) === null || _a === void 0 ? void 0 : _a.includes('encrypt')) || ((_b = error.message) === null || _b === void 0 ? void 0 : _b.includes('crypto'))) {
+    if (error.message?.includes('encrypt') || error.message?.includes('crypto')) {
         res.status(500).json({
             error: 'Encryption error',
             details: `Failed to ${operationText} wallet due to encryption error`,
@@ -264,7 +262,7 @@ function handleWalletError(res, error, operation) {
         return;
     }
     // Handle database errors
-    if (((_c = error.message) === null || _c === void 0 ? void 0 : _c.includes('Firestore')) || ((_d = error.message) === null || _d === void 0 ? void 0 : _d.includes('database'))) {
+    if (error.message?.includes('Firestore') || error.message?.includes('database')) {
         res.status(500).json({
             error: 'Database error',
             details: `Failed to ${operationText} wallet in database`,

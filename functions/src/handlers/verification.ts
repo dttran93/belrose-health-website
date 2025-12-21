@@ -135,7 +135,7 @@ export const createVerificationSession = onCall<
       }
 
       // Parse response
-      const personaData: PersonaInquiryResponse = await response.json();
+      const personaData = (await response.json()) as PersonaInquiryResponse;
       const inquiryId = personaData.data.id;
 
       console.log('✅ Inquiry created:', inquiryId);
@@ -214,7 +214,7 @@ export const checkVerificationStatus = onCall<CheckStatusRequest, Promise<CheckS
       }
 
       // Parse inquiry data
-      const inquiry: PersonaInquiryResponse = await response.json();
+      const inquiry = (await response.json()) as PersonaInquiryResponse;
       const status = inquiry.data.attributes.status;
 
       console.log('📊 Inquiry status from Persona:', status);

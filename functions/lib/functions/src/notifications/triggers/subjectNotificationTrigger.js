@@ -49,9 +49,8 @@ function getRecordNotificationTargets(recordData) {
  * Notifies the proposed subject that someone wants them to be a subject.
  */
 exports.onSubjectConsentRequestCreated = (0, firestore_1.onDocumentCreated)('subjectConsentRequests/{requestId}', async (event) => {
-    var _a;
     const requestId = event.params.requestId;
-    const data = (_a = event.data) === null || _a === void 0 ? void 0 : _a.data();
+    const data = event.data?.data();
     if (!data) {
         console.log('⚠️ No data in created document, skipping');
         return;
@@ -87,10 +86,9 @@ exports.onSubjectConsentRequestCreated = (0, firestore_1.onDocumentCreated)('sub
  * Handles status changes from 'pending' to 'accepted' or 'rejected'.
  */
 exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)('subjectConsentRequests/{requestId}', async (event) => {
-    var _a, _b;
     const requestId = event.params.requestId;
-    const beforeData = (_a = event.data) === null || _a === void 0 ? void 0 : _a.before.data();
-    const afterData = (_b = event.data) === null || _b === void 0 ? void 0 : _b.after.data();
+    const beforeData = event.data?.before.data();
+    const afterData = event.data?.after.data();
     if (!beforeData || !afterData) {
         console.log('⚠️ No data to compare, skipping');
         return;
@@ -162,7 +160,7 @@ function findNewlyRespondedRejections(before, after) {
             return false;
         }
         const beforeRej = beforeRejections.find(b => b.subjectId === afterRej.subjectId);
-        return (beforeRej === null || beforeRej === void 0 ? void 0 : beforeRej.status) === 'pending_creator_decision';
+        return beforeRej?.status === 'pending_creator_decision';
     });
 }
 /**
@@ -212,10 +210,9 @@ async function handleRespondedRejections(rejections, recordId, recordName) {
  * Handles subject rejection flows (which still live on the record document).
  */
 exports.onRecordSubjectChange = (0, firestore_1.onDocumentUpdated)('records/{recordId}', async (event) => {
-    var _a, _b;
     const recordId = event.params.recordId;
-    const beforeData = (_a = event.data) === null || _a === void 0 ? void 0 : _a.before.data();
-    const afterData = (_b = event.data) === null || _b === void 0 ? void 0 : _b.after.data();
+    const beforeData = event.data?.before.data();
+    const afterData = event.data?.after.data();
     if (!beforeData || !afterData) {
         console.log('⚠️ No data to compare, skipping');
         return;

@@ -62,11 +62,10 @@ class AnthropicService {
      * Core method to send messages to the Anthropic API
      */
     async sendMessage(messages, options = {}) {
-        var _a;
         const requestBody = {
             model: options.model || exports.MODELS.SONNET,
             max_tokens: options.maxTokens || DEFAULT_OPTIONS.maxTokens,
-            temperature: (_a = options.temperature) !== null && _a !== void 0 ? _a : DEFAULT_OPTIONS.temperature,
+            temperature: options.temperature ?? DEFAULT_OPTIONS.temperature,
             messages,
         };
         console.log('🤖 Sending request to Anthropic API...', {
@@ -86,7 +85,7 @@ class AnthropicService {
             if (!response.ok) {
                 await this.handleAPIError(response);
             }
-            const data = await response.json();
+            const data = (await response.json());
             console.log('✅ Received response from Anthropic API', {
                 inputTokens: data.usage.input_tokens,
                 outputTokens: data.usage.output_tokens,
@@ -116,15 +115,14 @@ class AnthropicService {
      * Handle API errors with detailed information
      */
     async handleAPIError(response) {
-        var _a;
         let errorData;
         try {
             errorData = await response.json();
         }
-        catch (_b) {
+        catch {
             errorData = { message: 'Unknown error' };
         }
-        const errorMessage = ((_a = errorData.error) === null || _a === void 0 ? void 0 : _a.message) || errorData.message || 'Unknown error';
+        const errorMessage = errorData.error?.message || errorData.message || 'Unknown error';
         console.error('❌ Anthropic API error:', {
             status: response.status,
             statusText: response.statusText,
