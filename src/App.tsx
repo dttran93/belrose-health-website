@@ -20,6 +20,7 @@ import SharedRecords from './pages/SharedRecords';
 import VerificationHub from './pages/VerificationHub';
 import EmailVerifiedPage from './pages/EmailVerified';
 import NotificationsManager from './features/Notifications/component/NotificationsManager';
+import BlockchainAdminDashboard from './pages/BlockchainAdminDashboard';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
@@ -56,6 +57,7 @@ const App: React.FC = (): React.JSX.Element => {
                             <Route path="settings" element={<SettingsPage />} />
                             <Route path="notifications" element={<NotificationsManager />} />
                             <Route path="share-records" element={<SharedRecords />} />
+                            <Route path="blockchain-admin" element={<BlockchainAdminDashboard />} />
                           </Routes>
                         </Layout>
                       </LayoutProvider>

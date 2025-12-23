@@ -4,17 +4,7 @@
  * This service handles the blockchain portion of sharing records
  * Combines signing service from wallet and paymaster to abstract gas transactions
  */
-import {
-  encodeFunctionData,
-  createPublicClient,
-  http,
-  type Hex,
-  concat,
-  pad,
-  toHex,
-  parseAbiParameters,
-  encodeAbiParameters,
-} from 'viem';
+import { encodeFunctionData, createPublicClient, http, type Hex, concat, pad, toHex } from 'viem';
 import { sepolia } from 'viem/chains';
 import { createSmartAccountClient } from 'permissionless';
 import { toSimpleSmartAccount } from 'permissionless/accounts';
@@ -23,7 +13,6 @@ import { entryPoint07Address, getUserOperationHash } from 'viem/account-abstract
 import { privateKeyToAccount } from 'viem/accounts';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { WalletService } from '@/features/BlockchainWallet/services/walletService';
-import { ethers, keccak256 } from 'ethers';
 
 // ==================== CONFIG ====================
 
@@ -31,7 +20,7 @@ import { ethers, keccak256 } from 'ethers';
 const HEALTH_RECORD_CONTRACT = '0xA9f388D92032E5e84E1264e72129A30d57cBfE66';
 
 // Your deployed paymaster
-const PAYMASTER_ADDRESS = '0x2a6e5391ADf5654772F9C155BACDdDc4B6eebC05';
+const PAYMASTER_ADDRESS = '0x967e757609E1118E7164e51A204772a14804E253';
 
 // Pimlico bundler URL (get from dashboard.pimlico.io)
 const BUNDLER_URL = import.meta.env.VITE_PIMLICO_BUNDLER_URL;

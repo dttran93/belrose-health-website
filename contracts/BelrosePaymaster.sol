@@ -32,17 +32,6 @@ contract BelrosePaymaster is BasePaymaster {
 
   error InvalidSignerAddress();
 
-  // ============ Debug Errors ============
-  // Use these to see why the signature is failing
-  error DebugValidate(
-    bytes32 calculatedHash,
-    address recoveredSigner,
-    address expectedSigner,
-    uint256 contractChainId
-  );
-
-  error DebugSlicing(uint256 totalLen, uint48 until, uint48 afterwards, bytes sigPrefix);
-
   // ============ Constructor ============
 
   constructor(
@@ -90,18 +79,8 @@ contract BelrosePaymaster is BasePaymaster {
     // toEthSignedMessageHash adds "\x19Ethereum Signed Message:\n32" prefix
     address recovered = hashToSign.toEthSignedMessageHash().recover(signature);
 
-    // FOR DEBUGGING If signature starts with 0x00 (your stub) or 0xff (standard viem dummy), bypass
-    if (signature[0] == 0x00 || signature[0] == 0xff) {
-      return ('', _packValidationData(false, validUntil, validAfter));
-    }
-
-    // --- TRIGGER DEBUG REVERT ---
-    // This will force the transaction to fail and show us the data in the logs
-    revert DebugValidate(hashToSign, recovered, verifyingSigner, block.chainid);
-
-    //revert DebugSlicing(userOp.paymasterAndData.length, validUntil, validAfter, signature[0:4]);
-    //bool signatureFailed = (recovered != verifyingSigner);
-    //return ('', _packValidationData(signatureFailed, validUntil, validAfter));
+    bool signatureFailed = (recovered != verifyingSigner);
+    return ('', _packValidationData(signatureFailed, validUntil, validAfter));
   }
 
   /**
