@@ -30,6 +30,7 @@ import {
   query,
   where,
   getDocs,
+  deleteDoc,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
@@ -696,6 +697,76 @@ export class SubjectService {
       return { success: true };
     } catch (error) {
       console.error('❌ Error removing subject:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel a pending subject consent request
+   *
+   * Called by the record owner/admin to cancel a request they sent.
+   * Simply deletes the pending request document.
+   *
+   * @param recordId - The Firestore document ID of the record
+   * @param subjectId - The userId of the proposed subject
+   */
+  static async cancelPendingRequest(
+    recordId: string,
+    subjectId: string
+  ): Promise<{ success: boolean }> {
+    const auth = getAuth();
+    const db = getFirestore();
+    const user = auth.currentUser;
+
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    console.log('🚫 Canceling pending subject request:', { recordId, subjectId });
+
+    try {
+      const requestId = getConsentRequestId(recordId, subjectId);
+      const requestRef = doc(db, 'subjectConsentRequests', requestId);
+      const requestDoc = await getDoc(requestRef);
+
+      if (!requestDoc.exists()) {
+        throw new Error('No pending request found');
+      }
+
+      const requestData = requestDoc.data() as SubjectConsentRequest;
+
+      // Verify it's still pending
+      if (requestData.status !== 'pending') {
+        throw new Error(`Request has already been ${requestData.status}`);
+      }
+
+      // Verify user has permission (must be the one who requested, or an owner/admin)
+      const recordRef = doc(db, 'records', recordId);
+      const recordDoc = await getDoc(recordRef);
+
+      if (!recordDoc.exists()) {
+        throw new Error('Record not found');
+      }
+
+      const recordData = recordDoc.data();
+      const canCancel =
+        requestData.requestedBy === user.uid ||
+        recordData.uploadedBy === user.uid ||
+        recordData.owners?.includes(user.uid) ||
+        recordData.administrators?.includes(user.uid);
+
+      if (!canCancel) {
+        throw new Error('You do not have permission to cancel this request');
+      }
+
+      // Delete the request document
+      await deleteDoc(requestRef);
+
+      console.log('✅ Pending request canceled');
+
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error canceling pending request:', error);
       throw error;
     }
   }
