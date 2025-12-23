@@ -1,84 +1,9 @@
 {
   "_format": "hh-sol-cache-2",
   "files": {
-    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\contracts\\HealthRecordCore.sol": {
-      "lastModificationDate": 1764612088429,
-      "contentHash": "af76c5b431eae5d8b7f344821f1460d2",
-      "sourceName": "contracts/HealthRecordCore.sol",
-      "solcConfig": {
-        "version": "0.8.23",
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 200
-          },
-          "evmVersion": "paris",
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [
-        "./MemberRoleManager.sol"
-      ],
-      "versionPragmas": [
-        "^0.8.19"
-      ],
-      "artifacts": [
-        "HealthRecordCore"
-      ]
-    },
-    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\contracts\\MemberRoleManager.sol": {
-      "lastModificationDate": 1765152289664,
-      "contentHash": "82e35267ed332b1e7dfcc546fd49a8bf",
-      "sourceName": "contracts/MemberRoleManager.sol",
-      "solcConfig": {
-        "version": "0.8.23",
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 200
-          },
-          "evmVersion": "paris",
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [],
-      "versionPragmas": [
-        "^0.8.19"
-      ],
-      "artifacts": [
-        "MemberRoleManager",
-        "MemberRoleManagerInterface"
-      ]
-    },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\contracts\\BelrosePaymaster.sol": {
-      "lastModificationDate": 1766095467283,
-      "contentHash": "95c6880402ddc5feea7d457489b39cb2",
+      "lastModificationDate": 1766339914835,
+      "contentHash": "9ad59f68e4d29983676c8957a8a1ec96",
       "sourceName": "contracts/BelrosePaymaster.sol",
       "solcConfig": {
         "version": "0.8.23",
@@ -87,6 +12,7 @@
             "enabled": true,
             "runs": 200
           },
+          "viaIR": true,
           "evmVersion": "paris",
           "outputSelection": {
             "*": {
@@ -118,40 +44,6 @@
         "BelrosePaymaster"
       ]
     },
-    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\core\\Helpers.sol": {
-      "lastModificationDate": 1766093261320,
-      "contentHash": "d9a3c7fc04ae5f3fc8011d8792e8cb18",
-      "sourceName": "@account-abstraction/contracts/core/Helpers.sol",
-      "solcConfig": {
-        "version": "0.8.23",
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 200
-          },
-          "evmVersion": "paris",
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [],
-      "versionPragmas": [
-        "^0.8.23"
-      ],
-      "artifacts": []
-    },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\core\\BasePaymaster.sol": {
       "lastModificationDate": 1766093261284,
       "contentHash": "b8fa794daa7d572b1e715bca109533f9",
@@ -163,6 +55,7 @@
             "enabled": true,
             "runs": 200
           },
+          "viaIR": true,
           "evmVersion": "paris",
           "outputSelection": {
             "*": {
@@ -194,10 +87,10 @@
         "BasePaymaster"
       ]
     },
-    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@openzeppelin\\contracts\\utils\\cryptography\\MessageHashUtils.sol": {
-      "lastModificationDate": 1766093261711,
-      "contentHash": "9e5eec59eaffa554d6cca561dcb914eb",
-      "sourceName": "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol",
+    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\core\\Helpers.sol": {
+      "lastModificationDate": 1766093261320,
+      "contentHash": "d9a3c7fc04ae5f3fc8011d8792e8cb18",
+      "sourceName": "@account-abstraction/contracts/core/Helpers.sol",
       "solcConfig": {
         "version": "0.8.23",
         "settings": {
@@ -205,6 +98,7 @@
             "enabled": true,
             "runs": 200
           },
+          "viaIR": true,
           "evmVersion": "paris",
           "outputSelection": {
             "*": {
@@ -222,15 +116,11 @@
           }
         }
       },
-      "imports": [
-        "../Strings.sol"
-      ],
+      "imports": [],
       "versionPragmas": [
-        "^0.8.20"
+        "^0.8.23"
       ],
-      "artifacts": [
-        "MessageHashUtils"
-      ]
+      "artifacts": []
     },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\core\\UserOperationLib.sol": {
       "lastModificationDate": 1766093261410,
@@ -243,6 +133,7 @@
             "enabled": true,
             "runs": 200
           },
+          "viaIR": true,
           "evmVersion": "paris",
           "outputSelection": {
             "*": {
@@ -282,6 +173,7 @@
             "enabled": true,
             "runs": 200
           },
+          "viaIR": true,
           "evmVersion": "paris",
           "outputSelection": {
             "*": {
@@ -307,10 +199,10 @@
         "ECDSA"
       ]
     },
-    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\interfaces\\IPaymaster.sol": {
-      "lastModificationDate": 1766093261353,
-      "contentHash": "0edfe2232b7eb455a17ebaacd0d09243",
-      "sourceName": "@account-abstraction/contracts/interfaces/IPaymaster.sol",
+    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@openzeppelin\\contracts\\utils\\cryptography\\MessageHashUtils.sol": {
+      "lastModificationDate": 1766093261711,
+      "contentHash": "9e5eec59eaffa554d6cca561dcb914eb",
+      "sourceName": "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol",
       "solcConfig": {
         "version": "0.8.23",
         "settings": {
@@ -318,6 +210,7 @@
             "enabled": true,
             "runs": 200
           },
+          "viaIR": true,
           "evmVersion": "paris",
           "outputSelection": {
             "*": {
@@ -336,13 +229,13 @@
         }
       },
       "imports": [
-        "./PackedUserOperation.sol"
+        "../Strings.sol"
       ],
       "versionPragmas": [
-        ">=0.7.5"
+        "^0.8.20"
       ],
       "artifacts": [
-        "IPaymaster"
+        "MessageHashUtils"
       ]
     },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\interfaces\\IEntryPoint.sol": {
@@ -356,6 +249,7 @@
             "enabled": true,
             "runs": 200
           },
+          "viaIR": true,
           "evmVersion": "paris",
           "outputSelection": {
             "*": {
@@ -386,6 +280,45 @@
         "IEntryPoint"
       ]
     },
+    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\interfaces\\IPaymaster.sol": {
+      "lastModificationDate": 1766093261353,
+      "contentHash": "0edfe2232b7eb455a17ebaacd0d09243",
+      "sourceName": "@account-abstraction/contracts/interfaces/IPaymaster.sol",
+      "solcConfig": {
+        "version": "0.8.23",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "viaIR": true,
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./PackedUserOperation.sol"
+      ],
+      "versionPragmas": [
+        ">=0.7.5"
+      ],
+      "artifacts": [
+        "IPaymaster"
+      ]
+    },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@openzeppelin\\contracts\\access\\Ownable.sol": {
       "lastModificationDate": 1766093261713,
       "contentHash": "d3c790edc9ccf808a17c5a6cd13614fd",
@@ -397,6 +330,7 @@
             "enabled": true,
             "runs": 200
           },
+          "viaIR": true,
           "evmVersion": "paris",
           "outputSelection": {
             "*": {
@@ -435,6 +369,7 @@
             "enabled": true,
             "runs": 200
           },
+          "viaIR": true,
           "evmVersion": "paris",
           "outputSelection": {
             "*": {
@@ -471,6 +406,7 @@
             "enabled": true,
             "runs": 200
           },
+          "viaIR": true,
           "evmVersion": "paris",
           "outputSelection": {
             "*": {
@@ -494,10 +430,10 @@
       ],
       "artifacts": []
     },
-    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\interfaces\\IStakeManager.sol": {
+    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\interfaces\\INonceManager.sol": {
       "lastModificationDate": 1766093261353,
-      "contentHash": "8a37b39cb2b2d53efcd76e8d6af616ff",
-      "sourceName": "@account-abstraction/contracts/interfaces/IStakeManager.sol",
+      "contentHash": "2865a605d4aece6b0d511f573003d167",
+      "sourceName": "@account-abstraction/contracts/interfaces/INonceManager.sol",
       "solcConfig": {
         "version": "0.8.23",
         "settings": {
@@ -505,6 +441,7 @@
             "enabled": true,
             "runs": 200
           },
+          "viaIR": true,
           "evmVersion": "paris",
           "outputSelection": {
             "*": {
@@ -527,7 +464,7 @@
         ">=0.7.5"
       ],
       "artifacts": [
-        "IStakeManager"
+        "INonceManager"
       ]
     },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\interfaces\\IAggregator.sol": {
@@ -541,6 +478,7 @@
             "enabled": true,
             "runs": 200
           },
+          "viaIR": true,
           "evmVersion": "paris",
           "outputSelection": {
             "*": {
@@ -568,10 +506,10 @@
         "IAggregator"
       ]
     },
-    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\interfaces\\INonceManager.sol": {
+    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\interfaces\\IStakeManager.sol": {
       "lastModificationDate": 1766093261353,
-      "contentHash": "2865a605d4aece6b0d511f573003d167",
-      "sourceName": "@account-abstraction/contracts/interfaces/INonceManager.sol",
+      "contentHash": "8a37b39cb2b2d53efcd76e8d6af616ff",
+      "sourceName": "@account-abstraction/contracts/interfaces/IStakeManager.sol",
       "solcConfig": {
         "version": "0.8.23",
         "settings": {
@@ -579,6 +517,7 @@
             "enabled": true,
             "runs": 200
           },
+          "viaIR": true,
           "evmVersion": "paris",
           "outputSelection": {
             "*": {
@@ -601,7 +540,7 @@
         ">=0.7.5"
       ],
       "artifacts": [
-        "INonceManager"
+        "IStakeManager"
       ]
     },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@openzeppelin\\contracts\\utils\\Context.sol": {
@@ -615,6 +554,7 @@
             "enabled": true,
             "runs": 200
           },
+          "viaIR": true,
           "evmVersion": "paris",
           "outputSelection": {
             "*": {
@@ -651,6 +591,7 @@
             "enabled": true,
             "runs": 200
           },
+          "viaIR": true,
           "evmVersion": "paris",
           "outputSelection": {
             "*": {
@@ -690,6 +631,7 @@
             "enabled": true,
             "runs": 200
           },
+          "viaIR": true,
           "evmVersion": "paris",
           "outputSelection": {
             "*": {
@@ -726,6 +668,7 @@
             "enabled": true,
             "runs": 200
           },
+          "viaIR": true,
           "evmVersion": "paris",
           "outputSelection": {
             "*": {
@@ -749,6 +692,83 @@
       ],
       "artifacts": [
         "SignedMath"
+      ]
+    },
+    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\contracts\\HealthRecordCore.sol": {
+      "lastModificationDate": 1764612088429,
+      "contentHash": "af76c5b431eae5d8b7f344821f1460d2",
+      "sourceName": "contracts/HealthRecordCore.sol",
+      "solcConfig": {
+        "version": "0.8.23",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "viaIR": true,
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./MemberRoleManager.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.19"
+      ],
+      "artifacts": [
+        "HealthRecordCore"
+      ]
+    },
+    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\contracts\\MemberRoleManager.sol": {
+      "lastModificationDate": 1765152289664,
+      "contentHash": "82e35267ed332b1e7dfcc546fd49a8bf",
+      "sourceName": "contracts/MemberRoleManager.sol",
+      "solcConfig": {
+        "version": "0.8.23",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "viaIR": true,
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.19"
+      ],
+      "artifacts": [
+        "MemberRoleManager",
+        "MemberRoleManagerInterface"
       ]
     }
   }

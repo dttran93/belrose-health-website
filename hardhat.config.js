@@ -10,6 +10,7 @@ export default {
         enabled: true,
         runs: 200,
       },
+      viaIR: true,
       evmVersion: 'paris',
     },
   },
@@ -20,18 +21,17 @@ export default {
     mumbai: {
       url: 'https://polygon-mumbai-bor.publicnode.com',
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: 20000000000,
     },
     sepolia: {
       url: 'https://1rpc.io/sepolia',
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: 10000000000,
     },
   },
   etherscan: {
-    apiKey: {
-      polygonMumbai: process.env.POLYGONSCAN_API_KEY,
-      sepolia: process.env.ETHERSCAN_API_KEY,
-    },
+    apiKey: process.env.ETHERSCAN_API_KEY,
+  },
+
+  sourcify: {
+    enabled: false,
   },
 };

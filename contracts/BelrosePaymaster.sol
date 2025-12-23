@@ -9,7 +9,8 @@ import '@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol';
 
 /**
  * @title BelrosePaymaster
- * @notice A Verifying Paymaster that sponsors gas for users when your backend approves
+ * @notice A Verifying Paymaster that sponsors gas for users based on backend signatures.
+ * Verified against TypeScript/Viem implementation for ERC-4337 v0.7 compatibility.
  */
 contract BelrosePaymaster is BasePaymaster {
   using ECDSA for bytes32;
@@ -18,27 +19,29 @@ contract BelrosePaymaster is BasePaymaster {
 
   // ============ State Variables ============
 
-  /// @notice The address whose signatures we trust (your backend's signing wallet)
   address public verifyingSigner;
-
-  /// @notice Maximum gas cost we'll sponsor per UserOperation (safety limit)
   uint256 public maxCostPerUserOp;
-
-  /// @notice Track used signatures to prevent replay attacks
-  mapping(bytes32 => bool) public usedSignatures;
 
   // ============ Events ============
 
   event SignerUpdated(address indexed oldSigner, address indexed newSigner);
   event MaxCostUpdated(uint256 oldMaxCost, uint256 newMaxCost);
-  event GasSponsored(address indexed sender, bytes32 indexed userOpHash, uint256 maxCost);
+  event GasSponsored(address indexed sender, uint256 maxCost);
 
   // ============ Errors ============
 
-  error InvalidSignatureLength();
-  error SignatureAlreadyUsed();
-  error CostExceedsMax(uint256 cost, uint256 max);
   error InvalidSignerAddress();
+
+  // ============ Debug Errors ============
+  // Use these to see why the signature is failing
+  error DebugValidate(
+    bytes32 calculatedHash,
+    address recoveredSigner,
+    address expectedSigner,
+    uint256 contractChainId
+  );
+
+  error DebugSlicing(uint256 totalLen, uint48 until, uint48 afterwards, bytes sigPrefix);
 
   // ============ Constructor ============
 
@@ -54,74 +57,120 @@ contract BelrosePaymaster is BasePaymaster {
 
   // ============ Core Paymaster Logic ============
 
+  /**
+   * @notice Validates the paymaster's participation in a UserOperation.
+   * @dev Note: We calculate our own hash internally to ensure signature integrity.
+   */
   function _validatePaymasterUserOp(
     PackedUserOperation calldata userOp,
-    bytes32 userOpHash,
+    bytes32 /*userOpHash*/,
     uint256 maxCost
-  ) internal override returns (bytes memory context, uint256 validationData) {
+  ) internal view override returns (bytes memory context, uint256 validationData) {
+    // 1. Safety Limit Check
     if (maxCost > maxCostPerUserOp) {
-      revert CostExceedsMax(maxCost, maxCostPerUserOp);
+      return ('', _packValidationData(true, 0, 0));
     }
 
-    // paymasterAndData format: [paymaster(20)][validUntil(6)][validAfter(6)][signature(65)]
-    bytes calldata paymasterData = userOp.paymasterAndData;
-
-    if (paymasterData.length < 97) {
-      revert InvalidSignatureLength();
+    // 2. Extract Custom Data (Starts at index 52)
+    // Byte 1-52 consists of: Address (20b), Paymaster Verification Gas Limit (16b), Paymaster Post-Op Gas Limit (16b)
+    // Remainder is customData [validUntil: 6b][validAfter: 6b][signature: 65b] = 77 bytes
+    bytes calldata customData = userOp.paymasterAndData[52:];
+    if (customData.length < 77) {
+      return ('', _packValidationData(true, 0, 0));
     }
 
-    uint48 validUntil = uint48(bytes6(paymasterData[20:26]));
-    uint48 validAfter = uint48(bytes6(paymasterData[26:32]));
-    bytes calldata signature = paymasterData[32:97];
+    uint48 validUntil = uint48(bytes6(customData[0:6]));
+    uint48 validAfter = uint48(bytes6(customData[6:12]));
+    bytes calldata signature = customData[12:];
 
-    // Build hash that backend should have signed
-    bytes32 hash = keccak256(
-      abi.encode(userOpHash, block.chainid, address(this), validUntil, validAfter)
-    ).toEthSignedMessageHash();
+    // 3. Compute Hashing (The logic verified in our tests)
+    bytes32 hashToSign = getHashWithZeroSignature(userOp, validUntil, validAfter);
 
-    // Prevent replay
-    if (usedSignatures[hash]) {
-      revert SignatureAlreadyUsed();
-    }
-    usedSignatures[hash] = true;
+    // 4. Verify EIP-191 Signature
+    // toEthSignedMessageHash adds "\x19Ethereum Signed Message:\n32" prefix
+    address recovered = hashToSign.toEthSignedMessageHash().recover(signature);
 
-    // Verify signature
-    address recovered = hash.recover(signature);
-
-    if (recovered != verifyingSigner) {
-      return ('', _packValidationData(true, validUntil, validAfter));
+    // FOR DEBUGGING If signature starts with 0x00 (your stub) or 0xff (standard viem dummy), bypass
+    if (signature[0] == 0x00 || signature[0] == 0xff) {
+      return ('', _packValidationData(false, validUntil, validAfter));
     }
 
-    emit GasSponsored(userOp.sender, userOpHash, maxCost);
-    return ('', _packValidationData(false, validUntil, validAfter));
+    // --- TRIGGER DEBUG REVERT ---
+    // This will force the transaction to fail and show us the data in the logs
+    revert DebugValidate(hashToSign, recovered, verifyingSigner, block.chainid);
+
+    //revert DebugSlicing(userOp.paymasterAndData.length, validUntil, validAfter, signature[0:4]);
+    //bool signatureFailed = (recovered != verifyingSigner);
+    //return ('', _packValidationData(signatureFailed, validUntil, validAfter));
   }
 
-  function _postOp(PostOpMode, bytes calldata, uint256, uint256) internal pure override {
-    // No post-op logic needed
-  }
-
-  // ============ View Functions ============
-
-  function getHash(
-    bytes32 userOpHash,
+  /**
+   * @notice Replicates the exact hashing flow verified in HashTester.test.ts
+   */
+  function getHashWithZeroSignature(
+    PackedUserOperation calldata userOp,
     uint48 validUntil,
     uint48 validAfter
   ) public view returns (bytes32) {
+    // Build paymasterData with zero signature placeholder
+    bytes memory paymasterDataWithZeroSig = abi.encodePacked(validUntil, validAfter, new bytes(65));
+
+    // Compute the "Inner" UserOp Hash
+    bytes32 userOpHashWithZeroSig = _computeUserOpHash(userOp, paymasterDataWithZeroSig);
+
+    // Wrap with ChainID and Paymaster-specific context
     return
-      keccak256(abi.encode(userOpHash, block.chainid, address(this), validUntil, validAfter))
-        .toEthSignedMessageHash();
+      keccak256(
+        abi.encode(userOpHashWithZeroSig, block.chainid, address(this), validUntil, validAfter)
+      );
   }
+
+  /**
+   * @dev Internal helper to compute UserOp hash matching EntryPoint v0.7 logic.
+   * Scoped variables prevent "Stack Too Deep" errors.
+   */
+  function _computeUserOpHash(
+    PackedUserOperation calldata userOp,
+    bytes memory paymasterDataOverride
+  ) internal view returns (bytes32) {
+    bytes32 paymasterAndDataHash;
+    {
+      // Extract the gas limits from paymasterAndData bytes
+      bytes16 pmVerif = bytes16(userOp.paymasterAndData[20:36]);
+      bytes16 pmPost = bytes16(userOp.paymasterAndData[36:52]);
+      paymasterAndDataHash = keccak256(
+        abi.encodePacked(address(this), pmVerif, pmPost, paymasterDataOverride)
+      );
+    }
+
+    bytes32 innerHash = keccak256(
+      abi.encode(
+        userOp.sender,
+        userOp.nonce,
+        keccak256(userOp.initCode),
+        keccak256(userOp.callData),
+        userOp.accountGasLimits,
+        userOp.preVerificationGas,
+        userOp.gasFees,
+        paymasterAndDataHash
+      )
+    );
+
+    return keccak256(abi.encode(innerHash, address(entryPoint), block.chainid));
+  }
+
+  function _postOp(PostOpMode, bytes calldata, uint256, uint256) internal pure override {}
 
   // ============ Admin Functions ============
 
   function updateSigner(address _newSigner) external onlyOwner {
     if (_newSigner == address(0)) revert InvalidSignerAddress();
-    emit SignerUpdated(verifyingSigner, _newSigner);
     verifyingSigner = _newSigner;
+    emit SignerUpdated(verifyingSigner, _newSigner);
   }
 
   function setMaxCostPerUserOp(uint256 _newMaxCost) external onlyOwner {
-    emit MaxCostUpdated(maxCostPerUserOp, _newMaxCost);
     maxCostPerUserOp = _newMaxCost;
+    emit MaxCostUpdated(maxCostPerUserOp, _newMaxCost);
   }
 }

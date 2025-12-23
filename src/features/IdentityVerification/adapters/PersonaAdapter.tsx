@@ -94,7 +94,7 @@ const PersonaAdapter: React.FC<VerificationAdapterProps> = ({
           inquiryId,
           hasToken: !!sessionToken,
           tokenLength: sessionToken?.length,
-          templateIdUsed: templateId, // Make sure this matches what you expect
+          templateIdUsed: templateId, // Make sure this matches what you expecton
         });
 
         // Check if Persona SDK is loaded

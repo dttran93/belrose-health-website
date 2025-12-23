@@ -51,7 +51,7 @@ export async function getUserProfile(
       identityVerifiedAt: userData.identityVerifiedAt,
       displayName: userData.displayName || 'Unknown User',
       email: userData.email,
-      profilePicture: userData.profilePicture,
+      photoURL: userData.photoURL,
       affiliations: userData.affiliations || [],
       createdAt: userData.createdAt,
       encryption: userData.encryption,
