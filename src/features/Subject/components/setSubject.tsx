@@ -372,7 +372,7 @@ export const SetSubject: React.FC<SetSubjectProps> = ({
                 <UserCard
                   user={selectedUser}
                   variant="default"
-                  color="amber"
+                  color="yellow"
                   menuType="cancel"
                   onView={() => {}}
                   onCancel={() => setSelectedUser(null)}

@@ -5,8 +5,16 @@ import UserMenu from './UserMenu';
 import { BelroseUserProfile } from '@/types/core';
 import { copyToClipboard } from '@/utils/browserUtils';
 
-export type UserCardVariant = 'compact' | 'default' | 'detailed';
-export type UserCardColor = 'default' | 'primary' | 'green' | 'red' | 'purple' | 'amber';
+export type UserCardVariant = 'compact' | 'default';
+export type UserCardColor = 'primary' | 'green' | 'red' | 'blue' | 'purple' | 'yellow';
+export type BadgeColor = 'primary' | 'pink' | 'green' | 'red' | 'blue' | 'purple' | 'yellow';
+
+export interface BadgeConfig {
+  text: string;
+  color: BadgeColor;
+  icon?: React.ReactNode;
+  tooltip?: string;
+}
 
 interface UserCardProps {
   user: BelroseUserProfile | null | undefined;
@@ -15,11 +23,7 @@ interface UserCardProps {
   color?: UserCardColor;
 
   // Optional badges/indicators
-  badge?: {
-    text: string;
-    color: 'primary' | 'green' | 'red' | 'yellow' | 'purple';
-    icon?: React.ReactNode;
-  };
+  badges?: BadgeConfig[];
 
   // Optional metadata to display
   metadata?: {
@@ -44,7 +48,7 @@ interface UserCardProps {
   }[];
 
   // Display options
-  menuType?: 'default' | 'cancel' | 'acceptOrCancel';
+  menuType?: 'default' | 'cancel' | 'acceptOrCancel' | 'none';
   showEmail?: boolean;
   showUserId?: boolean;
   showAffiliations?: boolean;
@@ -56,12 +60,6 @@ const colorClasses: Record<
   UserCardColor,
   { bg: string; iconBg: string; icon: string; border: string }
 > = {
-  default: {
-    bg: 'bg-gray-50',
-    iconBg: 'bg-gray-200',
-    icon: 'text-gray-700',
-    border: 'border-gray-200',
-  },
   primary: {
     bg: 'bg-primary/20',
     iconBg: 'bg-primary/50',
@@ -80,13 +78,19 @@ const colorClasses: Record<
     icon: 'text-red-700',
     border: 'border-red-200',
   },
-  purple: {
-    bg: 'bg-chart-1/20',
-    iconBg: 'bg-chart-1/50',
-    icon: 'text-chart-1',
-    border: 'border-chart-1',
+  blue: {
+    bg: 'bg-chart-2/20',
+    iconBg: 'bg-chart-2/50',
+    icon: 'text-chart-2',
+    border: 'border-chart-2',
   },
-  amber: {
+  purple: {
+    bg: 'bg-chart-5/20',
+    iconBg: 'bg-chart-5/50',
+    icon: 'text-chart-5',
+    border: 'border-chart-5',
+  },
+  yellow: {
     bg: 'bg-chart-4/20',
     iconBg: 'bg-chart-4/50',
     icon: 'text-chart-4',
@@ -94,13 +98,22 @@ const colorClasses: Record<
   },
 };
 
+const badgeColorClasses: Record<BadgeColor, { bg: string; text: string; border: string }> = {
+  primary: { bg: 'bg-primary/20', text: 'text-primary', border: 'border-primary' },
+  pink: { bg: 'bg-secondary', text: 'text-destructive', border: 'border-destructive' },
+  green: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-700' },
+  red: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-700' },
+  blue: { bg: 'bg-chart-2/30', text: 'text-chart-2', border: 'border-chart-2' },
+  purple: { bg: 'bg-chart-5/20', text: 'text-chart-5', border: 'border-chart-5' },
+  yellow: { bg: 'bg-yellow-200', text: 'text-yellow-800', border: 'border-chart-4' },
+};
+
 export const UserCard: React.FC<UserCardProps> = ({
   user,
   userId,
   variant = 'default',
-  color = 'default',
-  badge,
-  metadata,
+  color = 'primary',
+  badges,
   onView,
   onShare,
   onDelete,
@@ -119,10 +132,133 @@ export const UserCard: React.FC<UserCardProps> = ({
   const displayName = user?.displayName || 'Unknown User';
   const email = user?.email || '';
   const uid = user?.uid || userId || '';
-
   const isClickable = clickable || !!onCardClick;
 
-  // Compact variant - just name and icon
+  //==============================================================
+  // HELPER FUNCITONS
+  //==============================================================
+
+  const renderBadge = (badgeItem: BadgeConfig, index: number) => {
+    const badgeColors = badgeColorClasses[badgeItem.color];
+
+    const badgeElement = (
+      <span
+        className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full 
+          ${badgeColors.bg} ${badgeColors.text} border ${badgeColors.border}
+          ${badgeItem.tooltip ? 'cursor-help' : ''}`}
+      >
+        {badgeItem.icon}
+        {badgeItem.text}
+      </span>
+    );
+
+    if (badgeItem.tooltip) {
+      return (
+        <Tooltip.Provider key={index}>
+          <Tooltip.Root>
+            <Tooltip.Trigger asChild>{badgeElement}</Tooltip.Trigger>
+            <Tooltip.Portal>
+              <Tooltip.Content
+                className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 z-50 max-w-xs"
+                sideOffset={5}
+              >
+                {badgeItem.tooltip}
+                <Tooltip.Arrow className="fill-gray-900" />
+              </Tooltip.Content>
+            </Tooltip.Portal>
+          </Tooltip.Root>
+        </Tooltip.Provider>
+      );
+    }
+
+    return <React.Fragment key={index}>{badgeElement}</React.Fragment>;
+  };
+
+  // Helper function to render the verified badge
+  const renderVerifiedBadge = () => {
+    if (!user?.emailVerified || !user?.identityVerified) return null;
+
+    return (
+      <Tooltip.Provider>
+        <Tooltip.Root>
+          <Tooltip.Trigger asChild>
+            <div>
+              <CircleCheck className="text-blue-500 w-4 h-4" />
+            </div>
+          </Tooltip.Trigger>
+          <Tooltip.Portal>
+            <Tooltip.Content
+              className="bg-gray-900 text-white text-xs rounded px-2 py-1 z-50"
+              sideOffset={5}
+            >
+              User identity and email have been verified!
+              <Tooltip.Arrow className="fill-gray-900" />
+            </Tooltip.Content>
+          </Tooltip.Portal>
+        </Tooltip.Root>
+      </Tooltip.Provider>
+    );
+  };
+
+  const renderActionButtons = () => {
+    if (menuType !== 'cancel' && menuType !== 'acceptOrCancel') return null;
+
+    return (
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <button
+          onClick={e => {
+            e.stopPropagation();
+            onCancel?.();
+          }}
+          className="flex items-center bg-red-200 rounded-full p-2 hover:bg-red-300"
+        >
+          <X className="text-red-700 w-4 h-4" />
+        </button>
+        {menuType === 'acceptOrCancel' && (
+          <button
+            onClick={e => {
+              e.stopPropagation();
+              onAccept?.();
+            }}
+            className="flex items-center bg-green-200 rounded-full p-2 hover:bg-green-400"
+          >
+            <Check className="text-green-900 w-4 h-4" />
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  // Helper function to render the menu
+  const renderMenu = () => {
+    if (menuType !== 'default') return null;
+
+    return (
+      <UserMenu
+        user={user}
+        onView={onView}
+        onShare={onShare}
+        onDelete={onDelete}
+        onVerifyBlockchain={onVerifyBlockchain}
+      />
+    );
+  };
+
+  //Helper function to pull cycle through array of badges
+  const renderBadges = () => {
+    if (!badges || badges.length === 0) return null;
+
+    return (
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {badges.map((b, i) => renderBadge(b, i))}
+      </div>
+    );
+  };
+
+  //==============================================================
+  // COMPACT USER CARD
+  //==============================================================
+
   if (variant === 'compact') {
     return (
       <div
@@ -131,74 +267,21 @@ export const UserCard: React.FC<UserCardProps> = ({
           colors.border
         } ${isClickable ? 'cursor-pointer hover:opacity-80' : ''} ${className}`}
       >
-        <span className="text-sm font-medium text-gray-900 truncate">{displayName}</span>
-        {/*Verified Badge*/}
-        {user?.emailVerified && user?.identityVerified && (
-          <Tooltip.Provider>
-            <Tooltip.Root>
-              <Tooltip.Trigger asChild>
-                <div>
-                  <CircleCheck className="text-blue-500 w-4 h-4" />
-                </div>
-              </Tooltip.Trigger>
-              <Tooltip.Portal>
-                <Tooltip.Content
-                  className="bg-gray-900 text-white text-xs rounded px-2 py-1 z-50"
-                  sideOffset={5}
-                >
-                  User identity and email have been verified!
-                  <Tooltip.Arrow className="fill-gray-900" />
-                </Tooltip.Content>
-              </Tooltip.Portal>
-            </Tooltip.Root>
-          </Tooltip.Provider>
-        )}
-        {badge && (
-          <span
-            className={`text-xs px-2 py-0.5 rounded-full bg-${badge.color}-100 text-${badge.color}-800`}
-          >
-            {badge.text}
-          </span>
-        )}
-        {/* Actions Menu - Full Menu */}
-        {menuType === 'default' && (
-          <UserMenu
-            user={user}
-            onView={onView}
-            onShare={onShare}
-            onDelete={onDelete}
-            onVerifyBlockchain={onVerifyBlockchain}
-          />
-        )}
-
-        {/* Actions Menu - Cancel / AcceptOrCancel Menu */}
-        <div className="flex justify-between z-50">
-          {(menuType === 'acceptOrCancel' || menuType === 'cancel') && (
-            <div className="mx-1">
-              <button
-                onClick={onCancel}
-                className="flex items-center bg-red-200 rounded-full p-2 hover:bg-red-300"
-              >
-                <X className="text-red-700 w-4 h-4 " />
-              </button>
-            </div>
-          )}
-          {menuType === 'acceptOrCancel' && (
-            <div className="mx-1">
-              <button
-                onClick={onAccept}
-                className="flex items-center bg-green-200 rounded-full p-2 hover:bg-green-400"
-              >
-                <Check className="text-green-900 w-4 h-4" />
-              </button>
-            </div>
-          )}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span className="text-sm font-medium text-gray-900 truncate">{displayName}</span>
+          {renderVerifiedBadge()}
         </div>
+
+        {renderBadges()}
+        {renderMenu()}
+        {renderActionButtons()}
       </div>
     );
   }
 
-  // Default variant - standard card
+  //==============================================================
+  // DEFAULT USER CARD
+  //==============================================================
   if (variant === 'default') {
     return (
       <div
@@ -210,52 +293,30 @@ export const UserCard: React.FC<UserCardProps> = ({
         `}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
+          {/* Avatar */}
           <div
             className={`w-10 h-10 ${colors.iconBg} rounded-full flex items-center justify-center flex-shrink-0`}
           >
             <User className={`w-5 h-5 ${colors.icon}`} />
           </div>
+
+          {/* User Info */}
           <div className="flex-1 min-w-0 text-left">
             <div className="flex items-center gap-1">
-              <p className="text-base font-semibold text-gray-900 truncate">{displayName}</p>{' '}
-              {/*Verified Badge*/}
-              {user?.emailVerified && user?.identityVerified && (
-                <Tooltip.Provider>
-                  <Tooltip.Root>
-                    <Tooltip.Trigger asChild>
-                      <div>
-                        <CircleCheck className="text-blue-500 w-4 h-4" />
-                      </div>
-                    </Tooltip.Trigger>
-                    <Tooltip.Portal>
-                      <Tooltip.Content
-                        className="bg-gray-900 text-white text-xs rounded px-2 py-1 z-50"
-                        sideOffset={5}
-                      >
-                        User identity and email have been verified!
-                        <Tooltip.Arrow className="fill-gray-900" />
-                      </Tooltip.Content>
-                    </Tooltip.Portal>
-                  </Tooltip.Root>
-                </Tooltip.Provider>
-              )}
-              {badge && (
-                <span
-                  className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-${badge.color}-100 text-${badge.color}-800 flex-shrink-0`}
-                >
-                  {badge.icon}
-                  {badge.text}
-                </span>
-              )}
+              <p className="text-base font-semibold text-gray-900 truncate">{displayName}</p>
+              {renderVerifiedBadge()}
             </div>
-            {/* Email with tooltip */}
+
             {showEmail && email && (
               <Tooltip.Provider>
                 <Tooltip.Root>
                   <Tooltip.Trigger asChild>
                     <div
-                      onClick={() => copyToClipboard(email)}
-                      className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 cursor-help mb-1"
+                      onClick={e => {
+                        e.stopPropagation();
+                        copyToClipboard(email);
+                      }}
+                      className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 cursor-pointer mb-1"
                     >
                       <Mail className="w-4 h-4" />
                       <span className="truncate">{email}</span>
@@ -273,14 +334,17 @@ export const UserCard: React.FC<UserCardProps> = ({
                 </Tooltip.Root>
               </Tooltip.Provider>
             )}
-            {/* User ID with tooltip */}
+
             {showUserId && uid && (
               <Tooltip.Provider>
                 <Tooltip.Root>
                   <Tooltip.Trigger asChild>
                     <div
-                      onClick={() => copyToClipboard(uid)}
-                      className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 cursor-help"
+                      onClick={e => {
+                        e.stopPropagation();
+                        copyToClipboard(uid);
+                      }}
+                      className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 cursor-pointer"
                     >
                       <Hash className="w-3 h-3" />
                       <span className="truncate font-mono">{uid}</span>
@@ -298,226 +362,26 @@ export const UserCard: React.FC<UserCardProps> = ({
                 </Tooltip.Root>
               </Tooltip.Provider>
             )}
+
             {showAffiliations && user?.affiliations && user.affiliations.length > 0 && (
               <p className="text-xs text-gray-500 truncate mt-1">{user.affiliations.join(', ')}</p>
             )}
           </div>
-          {/* Actions Menu - Full Menu */}
-          {menuType === 'default' && (
-            <UserMenu
-              user={user}
-              onView={onView}
-              onShare={onShare}
-              onDelete={onDelete}
-              onVerifyBlockchain={onVerifyBlockchain}
-            />
-          )}
 
-          {/* Actions Menu - Cancel / AcceptOrCancel Menu */}
-          <div className="flex justify-between z-50">
-            {(menuType === 'acceptOrCancel' || menuType === 'cancel') && (
-              <div className="mx-1">
-                <button
-                  onClick={onCancel}
-                  className="flex items-center bg-red-200 rounded-full p-2 hover:bg-red-300"
-                >
-                  <X className="text-red-700 w-4 h-4 " />
-                </button>
-              </div>
-            )}
-            {menuType === 'acceptOrCancel' && (
-              <div className="mx-1">
-                <button
-                  onClick={onAccept}
-                  className="flex items-center bg-green-200 rounded-full p-2 hover:bg-green-400"
-                >
-                  <Check className="text-green-900 w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </div>
+          {/* Badges */}
+          {renderBadges()}
+
+          {/* Menu */}
+          {renderMenu()}
+
+          {/* Action Buttons */}
+          {renderActionButtons()}
         </div>
       </div>
     );
   }
 
-  // Detailed variant - full profile card
-  return (
-    <div
-      onClick={onCardClick}
-      className={`
-        ${colors.bg} rounded-lg border ${colors.border} p-4
-        ${isClickable ? 'cursor-pointer hover:shadow-lg' : ''}
-        transition-shadow ${className}
-      `}
-    >
-      <div className="flex items-start gap-4">
-        {/* Avatar */}
-        <div
-          className={`w-16 h-16 ${colors.iconBg} rounded-full flex items-center justify-center flex-shrink-0`}
-        >
-          {user?.photoURL ? (
-            <img
-              src={user.photoURL}
-              alt={displayName}
-              className="w-full h-full rounded-full object-cover"
-            />
-          ) : (
-            <User className={`w-8 h-8 ${colors.icon}`} />
-          )}
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          {/* Name and Badge */}
-          <div className="flex items-center gap-2">
-            <h3 className="text-lg font-bold text-gray-900 truncate">{displayName}</h3>
-            {/*Verified Badge*/}
-            {user?.emailVerified && user?.identityVerified && (
-              <Tooltip.Provider>
-                <Tooltip.Root>
-                  <Tooltip.Trigger asChild>
-                    <div>
-                      <CircleCheck className="text-blue-500 w-4 h-4" />
-                    </div>
-                  </Tooltip.Trigger>
-                  <Tooltip.Portal>
-                    <Tooltip.Content
-                      className="bg-gray-900 text-white text-xs rounded px-2 py-1 z-50"
-                      sideOffset={5}
-                    >
-                      User identity and email have been verified!
-                      <Tooltip.Arrow className="fill-gray-900" />
-                    </Tooltip.Content>
-                  </Tooltip.Portal>
-                </Tooltip.Root>
-              </Tooltip.Provider>
-            )}
-            {badge && (
-              <span
-                className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-${badge.color}-100 text-${badge.color}-800 flex-shrink-0`}
-              >
-                {badge.icon}
-                {badge.text}
-              </span>
-            )}
-          </div>
-
-          {/* Email with tooltip */}
-          {showEmail && email && (
-            <Tooltip.Provider>
-              <Tooltip.Root>
-                <Tooltip.Trigger asChild>
-                  <div
-                    onClick={() => copyToClipboard(email)}
-                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 cursor-help mb-1"
-                  >
-                    <Mail className="w-4 h-4" />
-                    <span className="truncate">{email}</span>
-                  </div>
-                </Tooltip.Trigger>
-                <Tooltip.Portal>
-                  <Tooltip.Content
-                    className="bg-gray-900 text-white text-xs rounded px-2 py-1 z-50"
-                    sideOffset={5}
-                  >
-                    Click to copy email
-                    <Tooltip.Arrow className="fill-gray-900" />
-                  </Tooltip.Content>
-                </Tooltip.Portal>
-              </Tooltip.Root>
-            </Tooltip.Provider>
-          )}
-
-          {/* User ID with tooltip */}
-          {showUserId && uid && (
-            <Tooltip.Provider>
-              <Tooltip.Root>
-                <Tooltip.Trigger asChild>
-                  <div
-                    onClick={() => copyToClipboard(uid)}
-                    className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 cursor-help mb-2"
-                  >
-                    <Hash className="w-3 h-3" />
-                    <span className="truncate font-mono">{uid}</span>
-                  </div>
-                </Tooltip.Trigger>
-                <Tooltip.Portal>
-                  <Tooltip.Content
-                    className="bg-gray-900 text-white text-xs rounded px-2 py-1 z-50"
-                    sideOffset={5}
-                  >
-                    User ID - Click to copy
-                    <Tooltip.Arrow className="fill-gray-900" />
-                  </Tooltip.Content>
-                </Tooltip.Portal>
-              </Tooltip.Root>
-            </Tooltip.Provider>
-          )}
-
-          {/* Affiliations */}
-          {showAffiliations && user?.affiliations && user.affiliations.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-2">
-              {user.affiliations.map((affiliation, idx) => (
-                <span key={idx} className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
-                  {affiliation}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Metadata */}
-          {metadata && metadata.length > 0 && (
-            <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-gray-200">
-              {metadata.map((item, idx) => (
-                <div key={idx} className="flex items-center gap-1">
-                  {item.icon && <span className="text-gray-500">{item.icon}</span>}
-                  <div className="flex flex-col">
-                    <span className="text-xs text-gray-500">{item.label}</span>
-                    <span className="text-sm font-medium text-gray-900">{item.value}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        {/* Actions Menu - Full Menu */}
-        {menuType === 'default' && (
-          <UserMenu
-            user={user}
-            onView={onView}
-            onShare={onShare}
-            onDelete={onDelete}
-            onVerifyBlockchain={onVerifyBlockchain}
-          />
-        )}
-
-        {/* Actions Menu - Cancel / AcceptOrCancel Menu */}
-        <div className="flex justify-between z-50">
-          {(menuType === 'acceptOrCancel' || menuType === 'cancel') && (
-            <div className="mx-1">
-              <button
-                onClick={onCancel}
-                className="flex items-center bg-red-200 rounded-full p-2 hover:bg-red-300"
-              >
-                <X className="text-red-700 w-4 h-4 " />
-              </button>
-            </div>
-          )}
-          {menuType === 'acceptOrCancel' && (
-            <div className="mx-1">
-              <button
-                onClick={onAccept}
-                className="flex items-center bg-green-200 rounded-full p-2 hover:bg-green-400"
-              >
-                <Check className="text-green-900 w-4 h-4" />
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  return null;
 };
 
 export default UserCard;

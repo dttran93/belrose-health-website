@@ -196,7 +196,7 @@ export const UserSearch: React.FC<UserSearchProps> = ({
               onDelete={() => {}}
               onCardClick={() => {}}
               variant="default"
-              color="amber"
+              color="yellow"
               menuType="acceptOrCancel"
               onAccept={() => handleSelectUser(user)}
               onCancel={handleClear}

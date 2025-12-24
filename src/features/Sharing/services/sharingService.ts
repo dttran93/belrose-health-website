@@ -1,4 +1,9 @@
 // src/features/Sharing/services/sharingService.ts
+/**
+ * Service for managing encryption keys. Called primarily by permissionsService
+ * Calls SharingKeyManagementService which has the RSA public/private key logic
+ * Does not handle array updates or blockchain updates, those are handled by PermissionService
+ */
 
 import {
   getFirestore,
@@ -10,48 +15,34 @@ import {
   query,
   where,
   getDocs,
-  addDoc,
-  serverTimestamp,
-  arrayUnion,
-  arrayRemove,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { SharingKeyManagementService } from './sharingKeyManagementService';
-import { ethers } from 'ethers';
-import { SharingBlockchainService } from '@/features/Sharing/services/sharingBlockchainService';
 import { EmailInvitationService } from './emailInvitationService';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
-import { BlockchainRoleManagerService } from '@/features/Permissions/services/blockchainRoleManagerService';
 import { BelroseUserProfile } from '@/types/core';
 
-export interface ShareRecordRequest {
-  recordId: string;
+export interface ReceiverLookupRequest {
   receiverWalletAddress?: string;
   receiverEmail?: string;
   receiverUserId?: string;
 }
 
-export interface AccessPermissionData {
-  recordId: string;
-  sharerId: string;
-  sharerWalletAddress: string;
-  receiverId: string;
-  receiverWalletAddress: string;
-  wrappedKeyId: string;
-  permissionHash: string;
-  isActive: boolean;
-  grantedAt: Date;
-  revokedAt?: Date;
-  blockchainTxHash: string;
-  onChain: boolean;
-}
-
 export class SharingService {
   /**
-   * Share a record with another user (family, provider, researcher, etc.)
+   * Grant encryption access (create/reactivate wrappedKeys)
+   * Role arrays in firebase and blockchain are handled in PermissionService
+   * called by PermissionService.grantViewer/grantAdmin/grantOwner
+   * @param recordID - The record ID
+   * @param userID - The user getting the access
+   * @param grantorID - the user granting the access
    */
-  static async shareRecord(request: ShareRecordRequest): Promise<void> {
+  static async grantEncryptionAccess(
+    recordId: string,
+    userId: string,
+    grantorId: string
+  ): Promise<void> {
     const auth = getAuth();
     const db = getFirestore();
     const user = auth.currentUser;
@@ -60,389 +51,85 @@ export class SharingService {
       throw new Error('User not authenticated');
     }
 
-    // Validate that at least one identifier is provided
-    // These are user-facing identifiers. We'll look up the receiver's uid in Firestore
-    // uid will be used for internal operations
-    if (!request.receiverEmail && !request.receiverWalletAddress && !request.receiverUserId) {
-      throw new Error('Either receiver email, wallet address, or user ID must be provided');
-    }
-
-    // Get the master key from session
     const masterKey = EncryptionKeyManager.getSessionKey();
     if (!masterKey) {
       throw new Error('Encryption session not active. Please unlock your encryption.');
     }
 
-    console.log('🔄 Starting share process for record:', request.recordId);
+    console.log('🔐 Granting encryption access for record:', recordId, 'to user:', userId);
 
-    // 1. Get the record
-    const recordRef = doc(db, 'records', request.recordId);
-    const recordDoc = await getDoc(recordRef);
+    // Step 1. Check for existing active wrapped key
+    const wrappedKeyId = `${recordId}_${userId}`;
+    const wrappedKeyRef = doc(db, 'wrappedKeys', wrappedKeyId);
+    const existingWrappedKey = await getDoc(wrappedKeyRef);
 
-    if (!recordDoc.exists()) {
-      throw new Error('Record not found');
+    if (existingWrappedKey.exists() && existingWrappedKey.data()?.isActive) {
+      console.log('ℹ️  User already has active encryption access');
+      return;
     }
 
-    const recordData = recordDoc.data();
+    // Step 2. Get receiver's public key
+    const receiverRef = doc(db, 'users', userId);
+    const receiverDoc = await getDoc(receiverRef);
 
-    // Verify the user owns this record
-    if (!recordData.administrators || !recordData.administrators.includes(user.uid)) {
-      throw new Error('You are neither an administrator nor owner of this record');
+    if (!receiverDoc.exists()) {
+      throw new Error('User not found');
     }
 
-    console.log('✅ Record found and ownership verified');
-
-    const getReceiver = async () => {
-      //Direct userId lookup
-      if (request.receiverUserId) {
-        console.log('🔍 Looking up receiver by userId:', request.receiverUserId);
-        const userDoc = await getDoc(doc(db, 'users', request.receiverUserId));
-
-        if (!userDoc.exists()) {
-          throw new Error('Receiver not found. The user may have been deleted.');
-        }
-
-        const data = userDoc.data() as BelroseUserProfile;
-
-        // Still need to validate encryption keys
-        if (!data.encryption?.publicKey) {
-          throw new Error(
-            'Receiver has not completed their account setup (encryption keys missing). Please ask them to complete their registration.'
-          );
-        }
-
-        console.log('✅ Receiver found by userId');
-        return {
-          id: userDoc.id,
-          data: data,
-        };
-      }
-
-      //Look up logic for email/wallet
-      const usersRef = collection(db, 'users');
-      let q;
-
-      console.log('🔍 Looking up receiver with:', {
-        email: request.receiverEmail,
-        wallet: request.receiverWalletAddress,
-      });
-
-      if (request.receiverEmail) {
-        q = query(usersRef, where('email', '==', request.receiverEmail));
-      } else {
-        q = query(usersRef, where('walletAddress', '==', request.receiverWalletAddress));
-      }
-
-      console.log('🔍 Executing query...');
-      const querySnapshot = await getDocs(q);
-      console.log('✅ Query completed. Results:', querySnapshot.size);
-
-      // ✅ CASE 1: Receiver doesn't exist at all
-      if (querySnapshot.empty || !querySnapshot.docs[0]) {
-        if (request.receiverEmail) {
-          // Send signup invitation
-          console.log('📧 Receiver not found. Sending signup invitation...');
-
-          try {
-            const result = await EmailInvitationService.sendShareInvitation({
-              senderName: user.displayName || user.email || 'A Belrose user',
-              senderEmail: user.email || '',
-              receiverEmail: request.receiverEmail,
-              recordName: recordData.fileName || 'a health record',
-            });
-
-            throw new Error(
-              `We sent an invitation to ${request.receiverEmail}! They'll need to create a Belrose account and verify their email before you can share with them.`
-            );
-          } catch (inviteError) {
-            // If invitation sending fails, still throw a helpful error
-            throw new Error(
-              'Receiver not found. They need a Belrose account to receive shared records. Please ask them to sign up at belrosehealth.com'
-            );
-          }
-        } else {
-          throw new Error(
-            'Receiver not found. They need a Belrose account to receive shared records.'
-          );
-        }
-      }
-
-      const receiverDoc = querySnapshot.docs[0];
-      const data = receiverDoc.data();
-
-      // ✅ CASE 2: Email not verified
-      if (request.receiverEmail && data.emailVerified === false) {
-        console.log('📧 Email not verified. Sending verification reminder...');
-
-        try {
-          const result = await EmailInvitationService.sendShareInvitation({
-            senderName: user.displayName || user.email || 'A Belrose user',
-            senderEmail: user.email || '',
-            receiverEmail: request.receiverEmail,
-            recordName: recordData.fileName || 'a health record',
-          });
-
-          throw new Error(
-            `We sent a reminder to ${request.receiverEmail}! They'll need to verify their email before you can share with them. We've asked them to check their inbox.`
-          );
-        } catch (inviteError) {
-          throw new Error(
-            `${request.receiverEmail} hasn't verified their email yet. We tried to send them a reminder, but you may want to contact them directly.`
-          );
-        }
-      }
-
-      // ✅ CASE 3: Email verification status unknown (for safety)
-      if (request.receiverEmail && data.emailVerified === undefined) {
-        console.warn('⚠️ Email verification status unknown for user');
-        throw new Error(
-          `Unable to confirm if ${request.receiverEmail} has verified their email. Please ask them to verify and try again.`
-        );
-      }
-
-      // ✅ CASE 4: No encryption keys set up
-      if (!data.encryption?.publicKey) {
-        throw new Error(
-          'Receiver has not completed their account setup (encryption keys missing). Please ask them to complete their registration.'
-        );
-      }
-
-      // ✅ ALL CHECKS PASSED!
-      return {
-        id: receiverDoc.id,
-        data: data,
-      };
-    };
-
-    const receiver = await getReceiver();
-    const receiverId = receiver.id;
-    const receiverData = receiver.data;
+    const receiverData = receiverDoc.data();
 
     if (!receiverData.encryption?.publicKey) {
-      throw new Error('Receiver has not set up encryption keys');
+      throw new Error('User has not completed their account setup (encryption keys missing).');
     }
 
-    console.log('✅ Receiver found:', receiverId);
+    // Step 3. Decrypt record key and wrap for receiver
+    const recordKey = await RecordDecryptionService.getRecordKey(recordId, masterKey);
 
-    //Check if they already have access
-    console.log('📝 About to check for existing wrapped key...');
-    const wrappedKeyId = `${request.recordId}_${receiverId}`;
-    const existingWrappedKeyRef = doc(db, 'wrappedKeys', wrappedKeyId);
-    const existingWrappedKey = await getDoc(existingWrappedKeyRef);
-    console.log('✅ Existing wrapped key check complete');
-
-    if (existingWrappedKey.exists()) {
-      const existingData = existingWrappedKey.data();
-
-      // Check if it's active
-      if (existingData.isActive) {
-        // Check if they're an admin
-        const isAdmin = recordData.administrators?.includes(receiverId);
-        const role = isAdmin ? 'administrator' : 'viewer';
-
-        throw new Error(`This user already has ${role} priviledges. No need to share again.`);
-      } else {
-        // They had access before but it was revoked - we can re-share
-        console.log('ℹ️  User previously had access (now revoked), re-sharing...');
-      }
-    }
-
-    console.log('🔍 Checking record data:', {
-      hasEncryptedKey: !!recordData.encryptedKey,
-      encryptedKeyType: typeof recordData.encryptedKey,
-      encryptedKeyPreview: recordData.encryptedKey?.substring?.(0, 100),
-    });
-
-    // 3. Decrypt the record's AES key using owner's master key
-    const recordKey = await RecordDecryptionService.getRecordKey(request.recordId, masterKey);
-
-    console.log('✅ Record key decrypted');
-
-    console.log('🔍 Checking receiver public key:', {
-      hasPublicKey: !!receiverData.encryption.publicKey,
-      publicKeyType: typeof receiverData.encryption.publicKey,
-      publicKeyPreview: receiverData.encryption.publicKey?.substring?.(0, 100),
-    });
-
-    // 4. Wrap the record key with receiver's RSA public key
-    console.log('📝 About to import receiver public key...');
     const receiverPublicKey = await SharingKeyManagementService.importPublicKey(
       receiverData.encryption.publicKey
     );
-    console.log('✅ Receiver public key imported');
 
-    console.log('📝 About to wrap key for receiver...');
     const wrappedKeyForReceiver = await SharingKeyManagementService.wrapKey(
       recordKey,
       receiverPublicKey
     );
-
     console.log('✅ Key wrapped for receiver');
 
-    // 5. Create permission hash for blockchain
-    // 5.1: Get sharer's wallet address:
-    console.log('📝 About to get sharer wallet address...');
-    const sharerRef = doc(db, 'users', user.uid);
-    const sharerDoc = await getDoc(sharerRef);
-    console.log('✅ Sharer doc retrieved');
+    // Step 4. Store wrapped key
+    const isReactivation = existingWrappedKey.exists();
 
-    if (!sharerDoc.exists()) {
-      throw new Error('User profile not found');
-    }
-
-    const sharerData = sharerDoc.data();
-    const sharerWalletAddress = sharerData.wallet?.address || '';
-
-    if (!sharerWalletAddress) {
-      throw new Error('User wallet address not found. Please connect or generate a wallet.');
-    }
-
-    //5.2 get receiver wallet address
-    const receiverWalletAddress = receiverData.wallet?.address || '';
-
-    if (!receiverWalletAddress) {
-      throw new Error(
-        'Receiver wallet address not found. They need to connect or generate a wallet.'
-      );
-    }
-
-    // 5.3 create permission hash using Ethereum's Keccak-256 (ethers.id())
-    const permissionData = {
-      recordId: request.recordId,
-      sharerAddress: sharerWalletAddress,
-      receiverAddress: receiverWalletAddress,
-      timestamp: Date.now(),
-    };
-    const permissionHash = ethers.id(JSON.stringify(permissionData));
-
-    console.log('✅ Permission hash created:', permissionHash);
-    console.log('✅ Permission data (off-chain):', permissionData);
-
-    // 6. Store permission hash on blockchain
-    let txHash;
-    try {
-      console.log('🔗 Storing permission on blockchain...');
-      txHash = await SharingBlockchainService.grantAccessOnChain(
-        permissionHash,
-        request.recordId,
-        receiverWalletAddress
-      );
-      console.log('✅ Blockchain transaction:', txHash);
-    } catch (error) {
-      console.error('❌ Blockchain transaction failed:', error);
-      throw new Error(
-        'Failed to store permission on blockchain, canceling share: ' + (error as Error).message
-      );
-    }
-
-    // 6.5 Grant viewer role on MemberRoleManager
-    try {
-      console.log('🔗 Granting viewer role on blockchain...');
-      await BlockchainRoleManagerService.grantRole(
-        request.recordId,
-        receiverWalletAddress,
-        'viewer'
-      );
-      console.log('✅ Blockchain: Viewer role granted');
-    } catch (blockchainError) {
-      console.error('⚠️ Failed to grant viewer role on blockchain:', blockchainError);
-      // Log to sync queue for retry - don't fail the share since access permission succeeded
-      await this.logBlockchainSyncFailure(
-        request.recordId,
-        'grantRole',
-        { walletAddress: receiverWalletAddress, role: 'viewer', userId: receiverId },
-        blockchainError as Error
-      );
-    }
-
-    // 7. Store everything in Firestore
-    // 7.1 create reference in Firestore
-    const wrappedKeyRef = doc(db, 'wrappedKeys', wrappedKeyId);
-    const accessPermissionRef = doc(db, 'accessPermissions', permissionHash);
-
-    //7.2 function to actually write stuff to firestore
-    const writeToFirestore = async () => {
-      await updateDoc(recordRef, {
-        viewers: arrayUnion(receiverId),
-      });
-
-      await setDoc(wrappedKeyRef, {
-        recordId: request.recordId,
-        userId: receiverId,
+    if (isReactivation) {
+      await updateDoc(wrappedKeyRef, {
         wrappedKey: wrappedKeyForReceiver,
-        permissionHash: permissionHash,
+        isActive: true,
+        reactivatedAt: new Date(),
+        reactivatedBy: grantorId,
+      });
+      console.log('✅ Wrapped key reactivated');
+    } else {
+      await setDoc(wrappedKeyRef, {
+        recordId,
+        userId,
+        wrappedKey: wrappedKeyForReceiver,
         createdAt: new Date(),
         isActive: true,
+        isCreator: false,
+        grantedBy: grantorId,
       });
-
-      await setDoc(accessPermissionRef, {
-        recordId: request.recordId,
-        sharerId: user.uid,
-        sharerWalletAddress: sharerWalletAddress,
-        receiverId: receiverId,
-        receiverWalletAddress: receiverWalletAddress,
-        isActive: true,
-        grantedAt: new Date(),
-        revokedAt: null,
-        blockchainTxHash: txHash,
-        onChain: true,
-      });
-    };
-
-    //7.3 Handle Firestore write failures with retry queue
-    //If firestore fails after blockchain succeeds, save to pending queue for background sync
-    try {
-      await writeToFirestore();
-      console.log('✅ Wrapped key stored', {
-        wrappedKeyId,
-        recordId: request.recordId,
-        receiverId: receiverId,
-        currentUser: user.uid,
-      });
-      console.log('✅ Record shared successfully!:', {
-        permissionHash,
-        recordId: request.recordId,
-        sharerId: user.uid,
-        receiverId,
-      });
-    } catch (error) {
-      console.error('❌ Firestore write failed:', error);
-
-      // Save to pending queue for background processing
-      try {
-        await setDoc(doc(db, 'pendingPermissions', permissionHash), {
-          txHash,
-          permissionHash,
-          recordId: request.recordId,
-          receiverId,
-          wrappedKey: wrappedKeyForReceiver,
-          receiverWalletAddress,
-          createdAt: new Date(),
-        });
-
-        //Manual TO-DO: Someone needs to process pendingPermissions queue and retry write to wrappedKey/accessPermissions
-
-        throw new Error(
-          'Permission saved on blockchain (tx: ' +
-            txHash +
-            ') but local save failed. ' +
-            'Your permission is valid and will sync shortly.'
-        );
-      } catch (queueError) {
-        throw new Error(
-          'Permission saved on blockchain (tx: ' +
-            txHash +
-            ') but local save failed. ' +
-            'Please contact support with this transaction hash.'
-        );
-      }
+      console.log('✅ Wrapped key created');
     }
   }
 
   /**
-   * Revoke access to a record
+   * Revoke encryption access (deactivates wrapped key).
+   * Does NOT remove from role arrays or update blockchain.
+   * Called by PermissionsService.removeViewer/removeAdmin/removeOwner
    */
-  static async revokeAccess(recordId: string, receiverId: string): Promise<void> {
+  static async revokeEncryptionAccess(
+    recordId: string,
+    userId: string,
+    revokerId: string
+  ): Promise<void> {
     const auth = getAuth();
     const db = getFirestore();
     const user = auth.currentUser;
@@ -451,169 +138,38 @@ export class SharingService {
       throw new Error('User not authenticated');
     }
 
-    console.log('🔄 Revoking access for record:', recordId);
+    console.log('🔐 Revoking encryption access for record:', recordId, 'from user:', userId);
 
-    // 1. Get the wrapped key
-    const wrappedKeyId = `${recordId}_${receiverId}`;
+    const wrappedKeyId = `${recordId}_${userId}`;
     const wrappedKeyRef = doc(db, 'wrappedKeys', wrappedKeyId);
     const wrappedKeyDoc = await getDoc(wrappedKeyRef);
 
     if (!wrappedKeyDoc.exists()) {
-      throw new Error('Access permission not found');
+      console.log('ℹ️  No wrapped key found - user may never have had access');
+      return;
     }
 
-    const wrappedKeyData = wrappedKeyDoc.data();
+    if (!wrappedKeyDoc.data()?.isActive) {
+      console.log('ℹ️  Wrapped key already inactive');
+      return;
+    }
 
-    // 2. Update wrapped key status
     await updateDoc(wrappedKeyRef, {
       isActive: false,
       revokedAt: new Date(),
+      revokedBy: revokerId,
     });
 
     console.log('✅ Wrapped key deactivated');
-
-    await updateDoc(doc(db, 'records', recordId), {
-      viewers: arrayRemove(receiverId),
-    });
-
-    console.log('✅ Removed from viewers array');
-
-    // 3. Update access permission
-    const accessPermissionRef = doc(db, 'accessPermissions', wrappedKeyData.permissionHash);
-
-    await updateDoc(accessPermissionRef, {
-      isActive: false,
-      revokedAt: new Date(),
-    });
-
-    console.log('✅ Access permission revoked');
-
-    // 4. Revoke permission on Access Permissions smart contract
-    try {
-      console.log('🔗 Revoking permission on blockchain...');
-      const txHash = await SharingBlockchainService.revokeAccessOnChain(
-        wrappedKeyData.permissionHash
-      );
-      console.log('✅ Blockchain transaction:', txHash);
-
-      // Store revocation Tx Hash for audit trail
-      await updateDoc(accessPermissionRef, {
-        revocationTxHash: txHash,
-      });
-    } catch (error) {
-      console.error('❌ Blockchain transaction failed:', error);
-      throw new Error('Failed to revoke on blockchain: ' + (error as Error).message);
-    }
-
-    // 5. Revoke role on MemberRoleManager Smart Contract
-    const receiverDoc = await getDoc(doc(db, 'users', receiverId));
-    const receiverData = receiverDoc.data();
-    const receiverWalletAddress = receiverData?.wallet?.address;
-
-    if (receiverWalletAddress) {
-      try {
-        console.log('🔗 Revoking role on blockchain...');
-        await BlockchainRoleManagerService.revokeRole(recordId, receiverWalletAddress);
-        console.log('✅ Blockchain: Role revoked');
-      } catch (blockchainError) {
-        console.error('⚠️ Failed to revoke role on blockchain:', blockchainError);
-        await this.logBlockchainSyncFailure(
-          recordId,
-          'revokeRole',
-          { walletAddress: receiverWalletAddress, userId: receiverId },
-          blockchainError as Error
-        );
-      }
-    } else {
-      console.warn('⚠️ No wallet address found for receiver, skipping blockchain revoke');
-    }
-
-    console.log('✅ Access revoked successfully!');
   }
 
   /**
-   * Get all records shared by the current user (as owner)
+   * Check if a user has active encryption access to a record
    */
-  static async getSharedRecords(): Promise<AccessPermissionData[]> {
-    const auth = getAuth();
-    const db = getFirestore();
-    const user = auth.currentUser;
-
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
-    const accessPermissionsRef = collection(db, 'accessPermissions');
-    const q = query(accessPermissionsRef, where('sharerId', '==', user.uid));
-
-    const querySnapshot = await getDocs(q);
-
-    return querySnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        recordId: data.recordId,
-        sharerId: data.sharerId,
-        sharerWalletAddress: data.sharerWalletAddress,
-        receiverId: data.receiverId,
-        receiverWalletAddress: data.receiverWalletAddress,
-        wrappedKeyId: `${data.recordId}_${data.receiverId}`,
-        permissionHash: doc.id,
-        isActive: data.isActive,
-        grantedAt: data.grantedAt.toDate(),
-        revokedAt: data.revokedAt?.toDate(),
-        blockchainTxHash: data.blockchainTxHash,
-        onChain: data.onChain,
-      };
-    });
-  }
-
-  /**
-   * Get all records shared with the current user (as receiver)
-   */
-  static async getRecordsSharedWithMe(): Promise<AccessPermissionData[]> {
-    const auth = getAuth();
-    const db = getFirestore();
-    const user = auth.currentUser;
-
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
-    const accessPermissionsRef = collection(db, 'accessPermissions');
-    const q = query(
-      accessPermissionsRef,
-      where('receiverId', '==', user.uid),
-      where('isActive', '==', true)
-    );
-
-    const querySnapshot = await getDocs(q);
-
-    return querySnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        recordId: data.recordId,
-        sharerId: data.sharerId,
-        sharerWalletAddress: data.sharerWalletAddress,
-        receiverId: data.receiverId,
-        receiverWalletAddress: data.receiverWalletAddress,
-        wrappedKeyId: `${data.recordId}_${data.receiverId}`,
-        permissionHash: doc.id,
-        isActive: data.isActive,
-        grantedAt: data.grantedAt.toDate(),
-        revokedAt: data.revokedAt?.toDate(),
-        blockchainTxHash: data.blockchainTxHash,
-        onChain: data.onChain,
-      };
-    });
-  }
-
-  /**
-   * Check if a receiver has access to a specific record
-   */
-  static async checkAccess(recordId: string, receiverId: string): Promise<boolean> {
+  static async hasEncryptionAccess(recordId: string, userId: string): Promise<boolean> {
     const db = getFirestore();
 
-    const wrappedKeyId = `${recordId}_${receiverId}`;
+    const wrappedKeyId = `${recordId}_${userId}`;
     const wrappedKeyRef = doc(db, 'wrappedKeys', wrappedKeyId);
     const wrappedKeyDoc = await getDoc(wrappedKeyRef);
 
@@ -621,38 +177,124 @@ export class SharingService {
       return false;
     }
 
-    const data = wrappedKeyDoc.data();
-    return data.isActive === true;
+    return wrappedKeyDoc.data()?.isActive === true;
   }
 
-  // Add this helper method to the class
-  private static async logBlockchainSyncFailure(
-    recordId: string,
-    action: 'grantRole' | 'changeRole' | 'revokeRole',
-    params: {
-      walletAddress: string;
-      role?: 'owner' | 'administrator' | 'viewer';
-      userId: string;
-    },
-    error: Error
+  /**
+   * Find and validate a receiver by email, wallet address, or user ID.
+   * Handles invitation emails for non-existent or unverified users.
+   * Called by PermissionsService before granting any role.
+   */
+  static async getReceiver(
+    request: ReceiverLookupRequest,
+    recordData?: { fileName?: string }
+  ): Promise<{ id: string; data: BelroseUserProfile }> {
+    const auth = getAuth();
+    const db = getFirestore();
+    const user = auth.currentUser;
+
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    if (!request.receiverEmail && !request.receiverWalletAddress && !request.receiverUserId) {
+      throw new Error('Either receiver email, wallet address, or user ID must be provided');
+    }
+
+    // Direct userId lookup
+    if (request.receiverUserId) {
+      console.log('🔍 Looking up receiver by userId:', request.receiverUserId);
+      const userDoc = await getDoc(doc(db, 'users', request.receiverUserId));
+
+      if (!userDoc.exists()) {
+        throw new Error('Receiver not found. The user may have been deleted.');
+      }
+
+      const data = userDoc.data() as BelroseUserProfile;
+
+      if (!data.encryption?.publicKey) {
+        throw new Error(
+          'Receiver has not completed their account setup (encryption keys missing).'
+        );
+      }
+
+      return { id: userDoc.id, data };
+    }
+
+    // Email or wallet lookup
+    const usersRef = collection(db, 'users');
+    let q;
+
+    if (request.receiverEmail) {
+      q = query(usersRef, where('email', '==', request.receiverEmail));
+    } else {
+      q = query(usersRef, where('wallet.address', '==', request.receiverWalletAddress));
+    }
+
+    const querySnapshot = await getDocs(q);
+
+    // Case 1: Receiver doesn't exist
+    if (querySnapshot.empty || !querySnapshot.docs[0]) {
+      if (request.receiverEmail) {
+        await this.sendInvitationEmail(user, request.receiverEmail, recordData?.fileName);
+        throw new Error(
+          `We sent an invitation to ${request.receiverEmail}! They'll need to create a Belrose account before you can share with them.`
+        );
+      }
+      throw new Error('Receiver not found. They need a Belrose account to receive shared records.');
+    }
+
+    const receiverDoc = querySnapshot.docs[0];
+    const data = receiverDoc.data() as BelroseUserProfile;
+
+    // Case 2: Email not verified
+    if (request.receiverEmail && data.emailVerified === false) {
+      await this.sendInvitationEmail(user, request.receiverEmail, recordData?.fileName);
+      throw new Error(
+        `${request.receiverEmail} hasn't verified their email yet. We've sent them a reminder.`
+      );
+    }
+
+    // Case 3: Email verification status unknown
+    if (request.receiverEmail && data.emailVerified === undefined) {
+      throw new Error(
+        `Unable to confirm if ${request.receiverEmail} has verified their email. Please ask them to verify.`
+      );
+    }
+
+    // Case 4: No encryption keys
+    if (!data.encryption?.publicKey) {
+      throw new Error('Receiver has not completed their account setup (encryption keys missing).');
+    }
+
+    // Case 5: No wallet (needed for blockchain roles)
+    if (!data.wallet?.address) {
+      throw new Error(
+        'Receiver has not set up a wallet. They need to connect or generate a wallet first.'
+      );
+    }
+
+    return { id: receiverDoc.id, data };
+  }
+
+  /**
+   * Helper: Send invitation/reminder email
+   */
+  private static async sendInvitationEmail(
+    sender: { displayName: string | null; email: string | null },
+    receiverEmail: string,
+    recordName?: string
   ): Promise<void> {
     try {
-      const db = getFirestore();
-      await addDoc(collection(db, 'blockchainSyncQueue'), {
-        recordId,
-        action,
-        walletAddress: params.walletAddress,
-        role: params.role || null,
-        userId: params.userId,
-        error: error.message,
-        status: 'pending',
-        retryCount: 0,
-        createdAt: serverTimestamp(),
-        lastAttemptAt: serverTimestamp(),
+      await EmailInvitationService.sendShareInvitation({
+        senderName: sender.displayName || sender.email || 'A Belrose user',
+        senderEmail: sender.email || '',
+        receiverEmail,
+        recordName: recordName || 'a health record',
       });
-      console.log('📝 Blockchain sync failure logged for retry');
-    } catch (logError) {
-      console.error('❌ Failed to log blockchain sync failure:', logError);
+    } catch (error) {
+      console.error('Failed to send invitation email:', error);
+      // Don't throw - the main error message will still be helpful
     }
   }
 }

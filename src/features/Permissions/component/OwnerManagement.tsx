@@ -8,6 +8,8 @@ import { FileObject, BelroseUserProfile } from '@/types/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { getAuth } from 'firebase/auth';
 import UserCard from '@/features/Users/components/ui/UserCard';
+import { AccessEntry } from '@/features/Sharing/components/EncryptionAccessView';
+import RevokeAccessDialog from './ui/RevokeAccessDialog';
 
 interface OwnerManagementProps {
   record: FileObject;
@@ -29,10 +31,12 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
   const [selectedUser, setSelectedUser] = useState<BelroseUserProfile | null>(null);
   const [loadingOwners, setLoadingOwners] = useState(true);
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
+  const [revokeEntry, setRevokeEntry] = useState<AccessEntry | null>(null);
 
-  const { addOwner, isLoading } = usePermissions({
+  const { grantOwner, removeOwner, isLoading } = usePermissions({
     onSuccess: msg => {
       setSelectedUser(null);
+      setRevokeEntry(null); // Close dialog on success
       onSuccess?.();
     },
   });
@@ -43,7 +47,33 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
 
   const handleAddOwner = async () => {
     if (!selectedUser) return;
-    await addOwner(record.id, selectedUser.uid);
+    await grantOwner(record.id, selectedUser.uid);
+  };
+
+  // 1. Trigger the dialog instead of direct removal
+  const initiateRevoke = (userId: string) => {
+    const profile = userProfiles.get(userId);
+    setRevokeEntry({
+      userId,
+      profile,
+      role: 'owner', // This enables both Admin and Viewer demotion buttons
+      status: 'synced',
+      wrappedKey: null,
+    });
+  };
+
+  // 2. Handle the choice from the dialog
+  const handleRevokeConfirm = async (action: 'full-revoke' | 'demote-admin' | 'demote-viewer') => {
+    if (!revokeEntry) return;
+
+    const demoteTo =
+      action === 'demote-admin'
+        ? 'administrator'
+        : action === 'demote-viewer'
+          ? 'viewer'
+          : undefined;
+
+    await removeOwner(record.id, revokeEntry.userId, { demoteTo });
   };
 
   // Fetch access permissions for this record
@@ -112,8 +142,7 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
             <p className="font-semibold mb-2 text-sm">Record Owners have special permissions:</p>
             <ol className="list-decimal list-inside space-y-1 text-xs">
               <li>
-                Owners are automatically Administrators of a record and can do anything with the
-                record
+                Owners have full access to view, edit, share, verify, dispute, and delete records
               </li>
               <li>Only an Owner can add another Owner</li>
               <li>Only an Owner can remove other Administrators</li>
@@ -158,8 +187,8 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
                       </p>
                       <ol className="list-decimal list-inside space-y-1 text-xs">
                         <li>
-                          Owners are automatically Administrators of a record and can do anything
-                          with the record
+                          Owners have full access to view, edit, share, verify, dispute, and delete
+                          records
                         </li>
                         <li>Only an Owner can add another Owner</li>
                         <li>Only an Owner can remove other Administrators</li>
@@ -184,13 +213,14 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
             </div>
           ) : record.owners && record.owners.length > 0 ? (
             <div className="space-y-3 mt-4">
-              {record.owners.map((owner, idx) => {
-                const adminProfile = userProfiles.get(owner);
+              {record.owners.map(ownerId => {
+                const adminProfile = userProfiles.get(ownerId);
                 return (
                   <UserCard
-                    key={owner}
+                    key={ownerId}
                     user={adminProfile}
                     onView={handleAddOwner}
+                    onDelete={() => initiateRevoke(ownerId)}
                     variant="default"
                     color="red"
                   />
@@ -199,12 +229,20 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
             </div>
           ) : (
             <div className="flex justify-between">
-              <p>No record subject</p>
+              <p>No record owner</p>
               {!isAddMode && <Button onClick={onAddMode}>Set Record Owner</Button>}
             </div>
           )}
         </div>
       </div>
+      {/* The Reusable Dialog */}
+      <RevokeAccessDialog
+        isOpen={!!revokeEntry}
+        entry={revokeEntry}
+        onClose={() => setRevokeEntry(null)}
+        onConfirm={handleRevokeConfirm}
+        loading={isLoading}
+      />
 
       {isAddMode && (
         <>
@@ -219,7 +257,7 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
           {selectedUser && (
             <div className="mt-6 pt-6 border-t border-gray-200">
               <p className="text-sm font-medium text-gray-700 mb-3">
-                Ready to add this user as the Record Subject:
+                Ready to add this user as the Record Owner:
               </p>
               <div className="py-3">
                 <UserCard

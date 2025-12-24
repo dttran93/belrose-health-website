@@ -1,0 +1,329 @@
+// src/features/Sharing/components/EncryptionAccessView.tsx
+
+import React, { useState, useEffect } from 'react';
+import {
+  Key,
+  Shield,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  HelpCircle,
+  Users,
+  ArrowLeft,
+} from 'lucide-react';
+import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { getUserProfiles } from '@/features/Users/services/userProfileService';
+import { FileObject, BelroseUserProfile } from '@/types/core';
+import UserCard, { BadgeConfig } from '@/features/Users/components/ui/UserCard';
+import * as Tooltip from '@radix-ui/react-tooltip';
+import { Button } from '@/components/ui/Button';
+import { usePermissions } from '@/features/Permissions/hooks/usePermissions';
+import RevokeAccessDialog from '@/features/Permissions/component/ui/RevokeAccessDialog';
+
+interface WrappedKeyInfo {
+  userId: string;
+  recordId: string;
+  isActive: boolean;
+  isCreator: boolean;
+  createdAt: Date;
+  revokedAt?: Date;
+  reactivatedAt?: Date;
+}
+
+export interface AccessEntry {
+  userId: string;
+  profile: BelroseUserProfile | undefined;
+  wrappedKey: WrappedKeyInfo | null;
+  role: 'owner' | 'administrator' | 'viewer' | 'none';
+  status: 'synced' | 'missing-key' | 'missing-role' | 'revoked';
+}
+
+interface EncryptionAccessViewProps {
+  record: FileObject;
+  onBack?: () => void;
+}
+
+export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ record, onBack }) => {
+  const [accessEntries, setAccessEntries] = useState<AccessEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<AccessEntry | null>(null);
+
+  //Import from usePermissions hook
+  //revokeAllAccess takes any userId, determines the role they have and calls the correct permissionService
+  const {
+    revokeAllAccess,
+    removeAdmin,
+    removeOwner,
+    isLoading: isActionLoading,
+  } = usePermissions();
+
+  const getEntryBadges = (entry: AccessEntry): BadgeConfig[] => {
+    const badges: BadgeConfig[] = [];
+
+    // 1. Subject Badge
+    const isSubject = record.subjects?.includes(entry.userId);
+    if (isSubject) {
+      badges.push({ text: 'Subject', color: 'pink' });
+    }
+
+    // 2. Creator Badge
+    if (entry.wrappedKey?.isCreator) {
+      badges.push({ text: 'Creator', color: 'purple' });
+    }
+
+    // 3. Role Badge
+    const roleConfigs: Record<AccessEntry['role'], BadgeConfig> = {
+      owner: { text: 'Owner', color: 'red' },
+      administrator: { text: 'Admin', color: 'blue' },
+      viewer: { text: 'Viewer', color: 'yellow' },
+      none: { text: 'No Role', color: 'primary' },
+    };
+    badges.push(roleConfigs[entry.role]);
+
+    // 4. Status Badge
+    const statusConfigs: Record<AccessEntry['status'], BadgeConfig> = {
+      synced: {
+        text: 'Synced',
+        color: 'green',
+        icon: <CheckCircle className="w-3 h-3" />,
+        tooltip: 'User has both a role and an active wrapped key. They can decrypt this record.',
+      },
+      'missing-key': {
+        text: 'Missing Key',
+        color: 'red',
+        icon: <AlertTriangle className="w-3 h-3" />,
+        tooltip:
+          'User has a role but no wrapped key. They cannot decrypt this record. Re-grant their role to fix.',
+      },
+      'missing-role': {
+        text: 'Orphaned Key',
+        color: 'yellow',
+        icon: <AlertTriangle className="w-3 h-3" />,
+        tooltip:
+          'User has a wrapped key but no role. They may be able to decrypt but should not have access.',
+      },
+      revoked: {
+        text: 'Revoked',
+        color: 'primary', // primary mapping to gray/default in your card
+        icon: <XCircle className="w-3 h-3" />,
+        tooltip: 'Access was previously granted but has been revoked.',
+      },
+    };
+    badges.push(statusConfigs[entry.status]);
+
+    return badges;
+  };
+
+  const fetchEncryptionAccess = async () => {
+    if (!record.id) return;
+    setLoading(true);
+    try {
+      const db = getFirestore();
+      const wrappedKeysRef = collection(db, 'wrappedKeys');
+      const q = query(wrappedKeysRef, where('recordId', '==', record.id));
+      const querySnapshot = await getDocs(q);
+
+      const wrappedKeys: WrappedKeyInfo[] = querySnapshot.docs.map(
+        doc =>
+          ({
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate(),
+          }) as WrappedKeyInfo
+      );
+
+      const allUserIds = new Set<string>([
+        ...wrappedKeys.map(wk => wk.userId),
+        ...(record.owners || []),
+        ...(record.administrators || []),
+        ...(record.viewers || []),
+        ...(record.subjects || []),
+      ]);
+
+      const profiles = await getUserProfiles(Array.from(allUserIds));
+
+      const entries: AccessEntry[] = Array.from(allUserIds).map(userId => {
+        const wrappedKey = wrappedKeys.find(wk => wk.userId === userId) ?? null;
+        let role: AccessEntry['role'] = 'none';
+        if (record.owners?.includes(userId)) role = 'owner';
+        else if (record.administrators?.includes(userId)) role = 'administrator';
+        else if (record.viewers?.includes(userId)) role = 'viewer';
+
+        let status: AccessEntry['status'] = 'synced';
+        if (wrappedKey && !wrappedKey.isActive) status = 'revoked';
+        else if (wrappedKey && role === 'none') status = 'missing-role';
+        else if (!wrappedKey && role !== 'none') status = 'missing-key';
+
+        return { userId, profile: profiles.get(userId), wrappedKey, role, status };
+      });
+
+      setAccessEntries(entries.sort((a, b) => (a.status === 'synced' ? 1 : -1)));
+    } catch (err) {
+      setError('Failed to load access data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEncryptionAccess();
+  }, [record.id, record.owners, record.administrators, record.viewers]);
+
+  const issueCount = accessEntries.filter(
+    e => e.status !== 'synced' && e.status !== 'revoked'
+  ).length;
+  const activeKeyCount = accessEntries.filter(e => e.wrappedKey?.isActive).length;
+
+  const handleRevokeConfirm = async (action: 'full-revoke' | 'demote-admin' | 'demote-viewer') => {
+    if (!selectedEntry) return;
+
+    const { userId, role } = selectedEntry;
+    let success = false;
+
+    if (action === 'full-revoke') {
+      if (role === 'owner') success = await removeOwner(record.id, userId, {});
+      else if (role === 'administrator')
+        success = await removeAdmin(record.id, userId, { demoteToViewer: false });
+      else success = await revokeAllAccess(record.id, userId);
+    } else if (action === 'demote-admin') {
+      success = await removeOwner(record.id, userId, { demoteTo: 'administrator' });
+    } else if (action === 'demote-viewer') {
+      if (role === 'owner') success = await removeOwner(record.id, userId, { demoteTo: 'viewer' });
+      else success = await removeAdmin(record.id, userId, { demoteToViewer: true });
+    }
+
+    if (success) {
+      setSelectedEntry(null);
+      fetchEncryptionAccess(); // Refresh list
+    }
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      <div>
+        <div className="flex items-center justify-between mb-4 pb-2 border-b">
+          <h3 className="font-semibold text-lg flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            Manage Access
+          </h3>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={onBack}
+              className="w-8 h-8 border-none bg-transparent hover:bg-gray-200"
+            >
+              <ArrowLeft className="text-primary" />
+            </Button>
+          </div>
+        </div>
+      </div>
+      {/* Current Wrapped Keys Section */}
+      <div className="mb-4 border border-gray-200 rounded-lg">
+        <div className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between rounded-t-lg">
+          <div className="flex items-center gap-2">
+            <Key className="w-5 h-5 text-gray-700" />
+            <span className="font-semibold text-gray-900">Encrypted Access</span>
+            <span className="text-xs border border-primary bg-primary/20 text-primary px-2 py-1 rounded-full">
+              {activeKeyCount}
+            </span>
+            {issueCount > 0 && (
+              <span className="text-xs border border-red-700 bg-red-100 text-red-800 px-2 py-1 rounded-full">
+                {issueCount} issue{issueCount > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Tooltip.Provider>
+              <Tooltip.Root>
+                <Tooltip.Trigger asChild>
+                  <button className="inline-flex items-center ml-1">
+                    <span className="text-xs border border-primary bg-primary/20 text-primary px-2 py-1 rounded-full flex items-center">
+                      Encrypted Access
+                      <HelpCircle className="w-4 h-4 ml-1" />
+                    </span>
+                  </button>
+                </Tooltip.Trigger>
+                <Tooltip.Portal>
+                  <Tooltip.Content
+                    className="bg-gray-900 text-white rounded-lg p-4 max-w-sm shadow-xl z-50"
+                    sideOffset={5}
+                  >
+                    <p className="font-semibold mb-2 text-sm">Encryption Access Overview</p>
+                    <p className="text-xs mb-3">
+                      This view shows who has cryptographic access to decrypt this record,
+                      cross-referenced with their permission roles.
+                    </p>
+                    <ol className="list-decimal list-inside space-y-1 text-xs">
+                      <li>
+                        <strong>Synced:</strong> User has both a role and can decrypt
+                      </li>
+                      <li>
+                        <strong>Missing Key:</strong> Has role but can't decrypt (re-grant to fix)
+                      </li>
+                      <li>
+                        <strong>Orphaned Key:</strong> Can decrypt but has no role (security issue)
+                      </li>
+                      <li>
+                        <strong>Revoked:</strong> Previously had access, now revoked
+                      </li>
+                    </ol>
+                    <Tooltip.Arrow className="fill-gray-900" />
+                  </Tooltip.Content>
+                </Tooltip.Portal>
+              </Tooltip.Root>
+            </Tooltip.Provider>
+          </div>
+        </div>
+
+        <div className="p-4 bg-white space-y-2 rounded-b-lg">
+          {loading ? (
+            <div className="flex justify-center items-center py-8">
+              <p className="text-gray-500">Loading encryption access...</p>
+            </div>
+          ) : error ? (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-red-800">{error}</p>
+            </div>
+          ) : accessEntries.length > 0 ? (
+            <div className="space-y-3">
+              {accessEntries.map(entry => {
+                // Determine card styling based on status
+                const hasIssue = entry.status === 'missing-key' || entry.status === 'missing-role';
+                const cardColor = hasIssue ? 'red' : 'primary';
+
+                return (
+                  <UserCard
+                    key={entry.userId}
+                    user={entry.profile}
+                    userId={entry.userId}
+                    onDelete={() => setSelectedEntry(entry)}
+                    color={cardColor}
+                    variant="default"
+                    badges={getEntryBadges(entry)}
+                    showEmail={true}
+                    showUserId={true}
+                    onView={() => {}} // Placeholder as onView is required by UserCardProps
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex justify-center items-center py-8">
+              <p className="text-gray-600">No encryption access found</p>
+            </div>
+          )}
+        </div>
+      </div>
+      <RevokeAccessDialog
+        isOpen={!!selectedEntry}
+        entry={selectedEntry}
+        onClose={() => setSelectedEntry(null)}
+        onConfirm={handleRevokeConfirm}
+        loading={isActionLoading}
+      />
+    </div>
+  );
+};
+
+export default EncryptionAccessView;

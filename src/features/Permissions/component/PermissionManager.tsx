@@ -4,14 +4,14 @@ import { FileObject } from '@/types/core';
 import { Button } from '@/components/ui/Button';
 import { OwnerManagement } from './OwnerManagement';
 import AdminManagement from './AdministratorManagement';
-import { ShareRecordView } from '@/features/Sharing/components/ShareRecordView';
+import ViewerManagement from './ViewerManagement';
 
 interface PermissionsManagerProps {
   record: FileObject;
   onBack: () => void;
 }
 
-type PermissionViewMode = 'manager' | 'add-subject' | 'add-owner' | 'share';
+type PermissionViewMode = 'manager' | 'add-subject' | 'add-owner' | 'add-viewer';
 
 export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ record, onBack }) => {
   const [viewMode, setViewMode] = useState<PermissionViewMode>('manager');
@@ -25,8 +25,8 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ record, 
     setViewMode('add-owner');
   };
 
-  const handleShareViewer = () => {
-    setViewMode('share');
+  const handleAddViewer = () => {
+    setViewMode('add-viewer');
   };
 
   const handleManagerScreen = () => {
@@ -77,12 +77,13 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ record, 
       )}
 
       {/* Viewers Section */}
-      {(viewMode === 'manager' || viewMode === 'share') && (
-        <ShareRecordView
+      {(viewMode === 'manager' || viewMode === 'add-viewer') && (
+        <ViewerManagement
           record={record}
+          currentViewers={record.viewers}
           onBack={handleManagerScreen}
-          onAddMode={handleShareViewer}
-          isAddMode={viewMode === 'share'}
+          onAddMode={handleAddViewer}
+          isAddMode={viewMode === 'add-viewer'}
         />
       )}
     </div>

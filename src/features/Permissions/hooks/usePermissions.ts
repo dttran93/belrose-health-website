@@ -1,7 +1,6 @@
-//src/features/Permissions/hooks/usePermissions.ts
+// src/features/Permissions/hooks/usePermissions.ts
 import { useState } from 'react';
-import { PermissionsService } from '@/features/Permissions/services/permissionsService';
-import { SharingService } from '@/features/Sharing/services/sharingService';
+import { PermissionsService, Role } from '@/features/Permissions/services/permissionsService';
 import { toast } from 'sonner';
 
 interface UsePermissionsOptions {
@@ -13,48 +12,96 @@ interface UsePermissionsOptions {
  * React hook for managing record permissions
  * Wraps the PermissionsService with React state management
  */
-export function usePermissions(options?: UsePermissionsOptions) {
+export function usePermissions(hookOptions?: UsePermissionsOptions) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ============================================================================
+  // GRANT METHODS
+  // ============================================================================
+
   /**
-   * Add an owner to a record
+   * Grant viewer access to a record
    */
-  const addOwner = async (recordId: string, userId: string): Promise<boolean> => {
+  const grantViewer = async (recordId: string, userId: string): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
 
     try {
-      await PermissionsService.addOwner(recordId, userId);
-      const successMessage = 'Owner added successfully';
-      options?.onSuccess?.(successMessage);
+      await PermissionsService.grantViewer(recordId, userId);
+      hookOptions?.onSuccess?.('Viewer added successfully');
+      return true;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add viewer';
+      setError(errorMessage);
+      hookOptions?.onError?.(errorMessage);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Grant admin access to a record
+   */
+  const grantAdmin = async (recordId: string, userId: string): Promise<boolean> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await PermissionsService.grantAdmin(recordId, userId);
+      hookOptions?.onSuccess?.('Administrator added successfully');
+      return true;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add administrator';
+      setError(errorMessage);
+      hookOptions?.onError?.(errorMessage);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Grant owner access to a record
+   */
+  const grantOwner = async (recordId: string, userId: string): Promise<boolean> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await PermissionsService.grantOwner(recordId, userId);
+      hookOptions?.onSuccess?.('Owner added successfully');
       return true;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to add owner';
       setError(errorMessage);
-      options?.onError?.(errorMessage);
+      hookOptions?.onError?.(errorMessage);
       return false;
     } finally {
       setIsLoading(false);
     }
   };
 
+  // ============================================================================
+  // REMOVE METHODS
+  // ============================================================================
+
   /**
-   * Add an admin to a record
+   * Remove viewer access from a record
    */
-  const addAdmin = async (recordId: string, userId: string): Promise<boolean> => {
+  const removeViewer = async (recordId: string, userId: string): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
 
     try {
-      await PermissionsService.addAdmin(recordId, userId);
-      const successMessage = 'Admin added successfully';
-      options?.onSuccess?.(successMessage);
+      await PermissionsService.removeViewer(recordId, userId);
+      hookOptions?.onSuccess?.('Viewer access revoked successfully');
       return true;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to add admin';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to remove viewer';
       setError(errorMessage);
-      options?.onError?.(errorMessage);
+      hookOptions?.onError?.(errorMessage);
       return false;
     } finally {
       setIsLoading(false);
@@ -62,106 +109,137 @@ export function usePermissions(options?: UsePermissionsOptions) {
   };
 
   /**
-   * Remove an admin from a record
+   * Remove admin access from a record
+   * Shows toast with option to demote to viewer or fully revoke
    */
-  const removeAdmin = async (recordId: string, userId: string): Promise<boolean> => {
+  const removeAdmin = async (
+    recordId: string,
+    userId: string,
+    options: { demoteToViewer: boolean }
+  ) => {
+    setIsLoading(true);
+    try {
+      await PermissionsService.removeAdmin(recordId, userId, options);
+      hookOptions?.onSuccess?.(options.demoteToViewer ? 'Demoted to viewer' : 'Access revoked');
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to remove admin';
+      setError(msg);
+      hookOptions?.onError?.(msg);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Remove owner access from a record (self-removal only)
+   * Now purely execution-focused.
+   */
+  const removeOwner = async (
+    recordId: string,
+    userId: string,
+    // Accept the final decision directly from the UI component
+    options?: { demoteTo?: 'administrator' | 'viewer' }
+  ): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
 
     try {
-      await PermissionsService.removeAdmin(recordId, userId);
-
-      // Show toast with option to also revoke viewer access
-      toast.info('Administrator Removed', {
-        description: 'Do you also want to revoke their viewer access as well?',
-        duration: 8000,
-        action: {
-          label: 'Yes, Revoke Access',
-          onClick: async () => {
-            const success = await revokeAccess(recordId, userId);
-            if (success) {
-              toast.success('All access revoked successfully');
-            }
-          },
-        },
-        cancel: {
-          label: 'No, Keep Viewer Access',
-          onClick: () => {
-            toast.success('User can still view as a shared viewer');
-          },
-        },
+      //1. call remove Owner
+      await PermissionsService.removeOwner(recordId, userId, {
+        demoteTo: options?.demoteTo,
       });
 
-      options?.onSuccess?.('Admin status removed successfully');
+      // 2. Determine the success message based on what happened
+      const message = options?.demoteTo
+        ? `Successfully demoted to ${options.demoteTo}`
+        : 'Owner access has been fully revoked';
+
+      // 3. Trigger standard hook callbacks
+      hookOptions?.onSuccess?.(message);
       return true;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to remove admin';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to remove owner';
       setError(errorMessage);
-      options?.onError?.(errorMessage);
+      hookOptions?.onError?.(errorMessage);
       return false;
     } finally {
       setIsLoading(false);
     }
   };
-
   /**
-   * Revoke shared access (remove a viewer)
-   * Also removes them as an administrator if they are one
+   * Fully revoke all access (removes from any role)
+   * Convenience method that determines current role and removes appropriately
    */
-  const revokeAccess = async (recordId: string, receiverId: string): Promise<boolean> => {
+  const revokeAllAccess = async (recordId: string, userId: string): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
 
     try {
-      // First, check if they're an admin and remove admin privileges
-      // We'll do this silently - if they're not an admin, the removeAdmin will throw but we'll catch it
-      try {
-        await PermissionsService.removeAdmin(recordId, receiverId);
-        console.log('✅ Admin privileges removed before revoking access');
-      } catch (adminError) {
-        // They're not an admin, that's fine - continue with revoking viewer access
-        console.log('ℹ️  User is not an admin, proceeding to revoke viewer access');
+      const roles = await PermissionsService.getRecordRoles(recordId);
+
+      if (!roles) {
+        throw new Error('Could not fetch record roles');
       }
 
-      // Revoke viewer access
-      await SharingService.revokeAccess(recordId, receiverId);
-      const successMessage = 'Access revoked successfully';
-      options?.onSuccess?.(successMessage);
+      // Determine user's current role and remove accordingly
+      if (roles.owners.includes(userId)) {
+        // Note: This will fail if caller isn't the user themselves
+        await PermissionsService.removeOwner(recordId, userId, {});
+      } else if (roles.administrators.includes(userId)) {
+        await PermissionsService.removeAdmin(recordId, userId, { demoteToViewer: false });
+      } else if (roles.viewers.includes(userId)) {
+        await PermissionsService.removeViewer(recordId, userId);
+      } else {
+        throw new Error('User does not have any role on this record');
+      }
+
+      hookOptions?.onSuccess?.('Access revoked successfully');
       return true;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to revoke access';
       setError(errorMessage);
-      options?.onError?.(errorMessage);
+      hookOptions?.onError?.(errorMessage);
       return false;
     } finally {
       setIsLoading(false);
     }
   };
 
+  // ============================================================================
+  // PERMISSION CHECK METHODS
+  // ============================================================================
+
   /**
-   * Check if current user can perform owner operations
+   * Check if current user can manage a specific role
    */
-  const canManageAdmins = async (recordId: string): Promise<boolean> => {
-    return PermissionsService.canManageAdmins(recordId);
+  const canManageRole = async (recordId: string, role: Role): Promise<boolean> => {
+    return PermissionsService.canManageRole(recordId, role);
   };
 
   /**
-   * Check if a user can be removed as an owner
+   * Get all roles and management permissions for a record
    */
-  const canRemoveAdmins = async (recordId: string, userId: string): Promise<boolean> => {
-    return PermissionsService.canRemoveAdmins(recordId, userId);
+  const getRecordRoles = async (recordId: string) => {
+    return PermissionsService.getRecordRoles(recordId);
   };
 
   return {
-    // Actions
-    addOwner,
-    revokeAccess,
-    addAdmin,
+    // Grant actions
+    grantViewer,
+    grantAdmin,
+    grantOwner,
+
+    // Remove actions
+    removeViewer,
     removeAdmin,
+    removeOwner,
+    revokeAllAccess,
 
     // Permission checks
-    canManageAdmins,
-    canRemoveAdmins,
+    canManageRole,
+    getRecordRoles,
 
     // State
     isLoading,

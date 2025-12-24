@@ -1,4 +1,9 @@
 //src/features/Permissions/service/permissionsService.ts
+/**
+ * Service for managing record permissions
+ * Handles role assignment (Firestore array + blockchain)
+ * Calls SharingService for encryption Access
+ */
 
 import {
   getFirestore,
@@ -14,15 +19,17 @@ import {
 import { getAuth } from 'firebase/auth';
 import { SharingService } from '@/features/Sharing/services/sharingService';
 import { BlockchainRoleManagerService } from './blockchainRoleManagerService';
+import { getUserProfile } from '@/features/Users/services/userProfileService';
 
-/**
- * Service for managing record permissions
- * Pure business logic - no React dependencies
- */
+export type Role = 'owner' | 'administrator' | 'viewer';
+
 export class PermissionsService {
+  // ============================================================================
+  // HELPER METHODS
+  // ============================================================================
+
   /**
-   * Helper: Get a user's wallet address from Firestore
-   * Throws if user has no wallet
+   * Get a user's wallet address from Firestore
    */
   private static async getUserWalletAddress(userId: string): Promise<string> {
     const db = getFirestore();
@@ -52,7 +59,7 @@ export class PermissionsService {
     action: 'grantRole' | 'changeRole' | 'revokeRole',
     params: {
       walletAddress: string;
-      role?: 'owner' | 'administrator' | 'viewer';
+      role?: Role;
       userId: string;
     },
     error: Error
@@ -78,14 +85,227 @@ export class PermissionsService {
   }
 
   /**
+   * Get current highest role for a user on a record
+   */
+  private static getUserRole(
+    recordData: { owners?: string[]; administrators?: string[]; viewers?: string[] },
+    userId: string
+  ): Role | null {
+    if (recordData.owners?.includes(userId)) return 'owner';
+    if (recordData.administrators?.includes(userId)) return 'administrator';
+    if (recordData.viewers?.includes(userId)) return 'viewer';
+    return null;
+  }
+
+  // ============================================================================
+  // GRANT METHODS
+  // ============================================================================
+
+  /**
    * Add an owner to a record
    * @param recordId - The record ID
-   * @param userId - The user ID to add as owner
+   * @param targetUserId - The user ID to add as owner
    * @throws Error if operation fails or user doesn't have permission
-   * Also adds owner as administrator if they aren't one already
    * Mirrors to blockchain as well. Creates list if blockchain mirroring fails
    */
-  static async addOwner(recordId: string, userId: string): Promise<void> {
+  static async grantViewer(recordId: string, targetUserId: string): Promise<void> {
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    const db = getFirestore();
+    const recordRef = doc(db, 'records', recordId);
+    const recordDoc = await getDoc(recordRef);
+
+    if (!recordDoc.exists()) {
+      throw new Error('Record not found');
+    }
+
+    const recordData = recordDoc.data();
+
+    // Check 1: Permission check - only admins/owners can grant viewer
+    const isCurrentUserAdmin = recordData.administrators?.includes(currentUser.uid);
+    const isCurrentUserOwner = recordData.owners?.includes(currentUser.uid);
+
+    if (!isCurrentUserAdmin && !isCurrentUserOwner) {
+      throw new Error('You do not have permission to share this record');
+    }
+
+    // Check 2: Find and make sure targetUserId exists
+    const targetProfile = await getUserProfile(targetUserId);
+
+    if (!targetProfile) {
+      throw new Error('Target user does not exist or has no profile');
+    }
+
+    // Check 3: Ensure the user has a wallet address for the blockchain transaction
+    const targetUserWalletAddress = targetProfile.wallet?.address;
+
+    if (!targetUserWalletAddress) {
+      throw new Error('Target user does not have a linked blockchain wallet');
+    }
+
+    // Check 4: Check existing role - don't demote owners/admins
+    const existingRole = this.getUserRole(recordData, targetUserId);
+
+    if (existingRole === 'owner') {
+      throw new Error('User is already an owner (higher role than viewer)');
+    }
+    if (existingRole === 'administrator') {
+      throw new Error('User is already an administrator (higher role than viewer)');
+    }
+    if (existingRole === 'viewer') {
+      throw new Error('User is already a viewer');
+    }
+
+    console.log('🔄 Granting viewer access:', targetUserId);
+
+    // Step 1: Grant encryption access
+    await SharingService.grantEncryptionAccess(recordId, targetUserId, currentUser.uid);
+
+    // Step 2: Add to viewers array in Firebase
+    await updateDoc(recordRef, {
+      viewers: arrayUnion(targetUserId),
+    });
+    console.log('✅ Added to viewers array in Firebase');
+
+    // Step 3: Grant viewer role on blockchain
+    try {
+      console.log('🔗 Granting viewer role on blockchain...');
+      await BlockchainRoleManagerService.grantRole(recordId, targetUserWalletAddress, 'viewer');
+      console.log('✅ Blockchain: Viewer role granted');
+    } catch (blockchainError) {
+      console.error('⚠️ Blockchain update failed:', blockchainError);
+      await this.logBlockchainSyncFailure(
+        recordId,
+        'grantRole',
+        { walletAddress: targetUserWalletAddress, role: 'viewer', userId: targetUserId },
+        blockchainError as Error
+      );
+    }
+
+    console.log('✅ Viewer access granted successfully');
+  }
+
+  /**
+   * Add an administrator to a record
+   * @param recordId - The record ID
+   * @param targetUserId - The user ID to add as owner
+   * @throws Error if operation fails or user doesn't have permission
+   */
+  static async grantAdmin(recordId: string, targetUserId: string): Promise<void> {
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    const db = getFirestore();
+    const recordRef = doc(db, 'records', recordId);
+    const recordDoc = await getDoc(recordRef);
+
+    if (!recordDoc.exists()) {
+      throw new Error('Record not found');
+    }
+
+    const recordData = recordDoc.data();
+
+    // Check 1: Permission check - only admins/owners can grant viewer
+    const isCurrentUserAdmin = recordData.administrators?.includes(currentUser.uid);
+    const isCurrentUserOwner = recordData.owners?.includes(currentUser.uid);
+
+    if (!isCurrentUserAdmin && !isCurrentUserOwner) {
+      throw new Error('Only administrators or owners can add other administrators');
+    }
+
+    // Check 2: Find and make sure targetUserId exists
+    const targetProfile = await getUserProfile(targetUserId);
+
+    if (!targetProfile) {
+      throw new Error('Target user does not exist or has no profile');
+    }
+
+    // Check 3: Ensure the user has a wallet address for the blockchain transaction
+    const targetUserWalletAddress = targetProfile.wallet?.address;
+
+    if (!targetUserWalletAddress) {
+      throw new Error('Target user does not have a linked blockchain wallet');
+    }
+
+    //Check 4: Check existing roles - can't demote owners
+    const existingRole = this.getUserRole(recordData, targetUserId);
+
+    if (existingRole === 'owner') {
+      throw new Error('User is already an owner (higher role than administrator)');
+    }
+    if (existingRole === 'administrator') {
+      throw new Error('User is already an administrator');
+    }
+
+    console.log('🔄 Granting administrator role:', targetUserId);
+
+    // Step 1: Grant encryption access
+    await SharingService.grantEncryptionAccess(recordId, targetUserId, currentUser.uid);
+
+    // Step 2: Update arrays - add to admins, remove from viewers (highest role only)
+    await updateDoc(recordRef, {
+      administrators: arrayUnion(targetUserId),
+      viewers: arrayRemove(targetUserId),
+    });
+    console.log('✅ Added to administrators array');
+
+    // Step 3: Blockchain - determine action based on existing role
+    // Change role is in case they're being upgraded from viewer to admin
+    const hasExistingRole = existingRole !== null;
+    const blockchainAction: 'grantRole' | 'changeRole' = hasExistingRole
+      ? 'changeRole'
+      : 'grantRole';
+
+    try {
+      console.log(
+        `🔗 ${hasExistingRole ? 'Upgrading to' : 'Granting'} administrator role on blockchain...`
+      );
+
+      if (hasExistingRole) {
+        await BlockchainRoleManagerService.changeRole(
+          recordId,
+          targetUserWalletAddress,
+          'administrator'
+        );
+      } else {
+        await BlockchainRoleManagerService.grantRole(
+          recordId,
+          targetUserWalletAddress,
+          'administrator'
+        );
+      }
+
+      console.log('✅ Blockchain: Administrator role set');
+    } catch (blockchainError) {
+      console.error('⚠️ Blockchain update failed:', blockchainError);
+      await this.logBlockchainSyncFailure(
+        recordId,
+        blockchainAction,
+        { walletAddress: targetUserWalletAddress, role: 'administrator', userId: targetUserId },
+        blockchainError as Error
+      );
+    }
+
+    console.log('✅ Administrator access granted successfully');
+  }
+
+  /**
+   * Add an owner to a record
+   * @param recordId - The record ID
+   * @param targetUserId - The user ID to add as owner
+   * @throws Error if operation fails or user doesn't have permission
+   * Mirrors to blockchain as well. Creates list if blockchain mirroring fails
+   */
+  static async grantOwner(recordId: string, targetUserId: string): Promise<void> {
     const auth = getAuth();
     const currentUser = auth.currentUser;
 
@@ -94,73 +314,96 @@ export class PermissionsService {
     }
 
     //Get wallet address upfrot - throws if missing
-    const userWalletAddress = await this.getUserWalletAddress(userId);
-
     const db = getFirestore();
     const recordRef = doc(db, 'records', recordId);
-
     const recordDoc = await getDoc(recordRef);
+
     if (!recordDoc.exists()) throw new Error('Record not found');
-
     const recordData = recordDoc.data();
-    const owners: string[] = recordData.owners || [];
-    const admins: string[] = recordData.administrators || [];
 
-    console.log('📝 Current ownership data', { owners, admins, currentUser: currentUser.uid });
+    // Check 1: Permission check - only owners can add owners (or admins if no owners exist)
+    const owners = recordData.owners || [];
+    const admins = recordData.administrators || [];
 
-    // Determine who can add owners
-    const canAddOwner =
-      owners.length > 0
-        ? owners.includes(currentUser.uid) // Only owners if owners array not empty
-        : admins.includes(currentUser.uid); // Admins if owners array is empty
+    const canGrantOwner =
+      owners.length > 0 ? owners.includes(currentUser.uid) : admins.includes(currentUser.uid);
 
-    if (!canAddOwner) {
+    if (!canGrantOwner) {
       throw new Error('You do not have permission to add owners');
     }
 
-    if (owners.includes(userId)) {
+    // Check 2: Find and make sure targetUserId exists
+    const targetProfile = await getUserProfile(targetUserId);
+
+    if (!targetProfile) {
+      throw new Error('Target user does not exist or has no profile');
+    }
+
+    // Check 3: Ensure the user has a wallet for the blockchain transaction
+    const targetUserWalletAddress = targetProfile.wallet?.address;
+
+    if (!targetUserWalletAddress) {
+      throw new Error('Target user does not have a linked blockchain wallet');
+    }
+
+    //Check 4: Check if they're already an owner
+    const existingRole = this.getUserRole(recordData, targetUserId);
+
+    if (existingRole === 'owner') {
       throw new Error('User is already an owner');
     }
 
-    console.log('✅ Adding owner:', userId);
+    console.log('🔄 Granting owner access:', targetUserId);
 
-    // Step 1: Check if they're not an admin and if they aren't add them (owners must be admins as well)
-    if (!admins.includes(userId)) {
-      console.log('📝 User is not yet an admin, adding admin privileges...');
-      await this.addAdmin(recordId, userId);
-      console.log('✅ User added as administrator with encryption access');
-    }
+    // Step 1: Grant encryption access
+    await SharingService.grantEncryptionAccess(recordId, targetUserId, currentUser.uid);
 
-    //Step 2: Add them to the owners array
+    // Step 2: Update arrays - add to owners, remove from lower roles (highest role only)
     await updateDoc(recordRef, {
-      owners: arrayUnion(userId),
+      owners: arrayUnion(targetUserId),
+      administrators: arrayRemove(targetUserId),
+      viewers: arrayRemove(targetUserId),
     });
+    console.log('✅ Added to owners array');
+    // Step 3: Blockchain - determine action based on existing role
+    const hasExistingRole = existingRole !== null;
+    const blockchainAction: 'grantRole' | 'changeRole' = hasExistingRole
+      ? 'changeRole'
+      : 'grantRole';
 
-    // Step 3: Mirror to blockchain
     try {
-      console.log('🔗 Updating role to owner on blockchain...');
-      await BlockchainRoleManagerService.changeRole(recordId, userWalletAddress, 'owner');
-      console.log('✅ Blockchain: Owner role granted');
+      console.log(
+        `🔗 ${hasExistingRole ? 'Upgrading to' : 'Granting'} owner role on blockchain...`
+      );
+
+      if (hasExistingRole) {
+        await BlockchainRoleManagerService.changeRole(recordId, targetUserWalletAddress, 'owner');
+      } else {
+        await BlockchainRoleManagerService.grantRole(recordId, targetUserWalletAddress, 'owner');
+      }
+
+      console.log('✅ Blockchain: Owner role set');
     } catch (blockchainError) {
       console.error('⚠️ Blockchain update failed:', blockchainError);
       await this.logBlockchainSyncFailure(
         recordId,
-        'changeRole',
-        { walletAddress: userWalletAddress, role: 'owner', userId },
+        blockchainAction,
+        { walletAddress: targetUserWalletAddress, role: 'owner', userId: targetUserId },
         blockchainError as Error
       );
     }
 
-    console.log('✅ Owner added successfully with full access');
+    console.log('✅ Owner access granted successfully');
   }
 
+  // ============================================================================
+  // REMOVE METHODS
+  // ============================================================================
+
   /**
-   * Add an administrator to a record
-   * @param recordId - The record ID
-   * @param userId - The user ID to add as owner
-   * @throws Error if operation fails or user doesn't have permission
+   * Remove viewer access from a record
    */
-  static async addAdmin(recordId: string, userId: string): Promise<void> {
+  static async removeViewer(recordId: string, targetUserId: string): Promise<void> {
     const auth = getAuth();
     const currentUser = auth.currentUser;
 
@@ -168,102 +411,72 @@ export class PermissionsService {
       throw new Error('User not authenticated');
     }
 
-    // Get wallet address upfront - throws if missing
-    const userWalletAddress = await this.getUserWalletAddress(userId);
+    const userWalletAddress = await this.getUserWalletAddress(targetUserId);
 
     const db = getFirestore();
     const recordRef = doc(db, 'records', recordId);
-
     const recordDoc = await getDoc(recordRef);
+
     if (!recordDoc.exists()) {
       throw new Error('Record not found');
     }
 
     const recordData = recordDoc.data();
 
-    //Rule 1: Check if user is an admin. (Owners are automatically admins, so owners covered too)
-    if (!recordData.administrators.includes(currentUser.uid)) {
-      throw new Error('Only administrators can add other administrators');
+    // Permission check: only admins/owners can remove viewers
+    const isAdmin = recordData.administrators?.includes(currentUser.uid);
+    const isOwner = recordData.owners?.includes(currentUser.uid);
+
+    if (!isAdmin && !isOwner) {
+      throw new Error('You do not have permission to remove viewers');
     }
 
-    //Rule 2: Can't add as an admin, someone who's already an admin
-    if (recordData.administrators.includes(userId)) {
-      throw new Error('User is already an administrator');
+    // Verify user is actually a viewer
+    if (!recordData.viewers?.includes(targetUserId)) {
+      throw new Error('User is not a viewer of this record');
     }
 
-    // Get the new admin's user data (need their email for sharing)
-    const userDoc = await getDoc(doc(db, 'users', userId));
-    if (!userDoc.exists()) {
-      throw new Error('User not found');
-    }
+    console.log('🔄 Removing viewer access:', targetUserId);
 
-    const userData = userDoc.data();
+    // Step 1: Revoke encryption access
+    await SharingService.revokeEncryptionAccess(recordId, targetUserId, currentUser.uid);
 
-    if (!userData.email) {
-      throw new Error('User does not have an email address');
-    }
-
-    console.log('🔄 Granting encryption access to new admin...');
-
-    // Step 1: Share the record with them (creates wrapped key for encryption access)
-    // This validates they have encryption keys, verified email, etc.
-    // If they already have viewer access, shareRecord will throw an error,
-    let isExistingViewer = false;
-    try {
-      await SharingService.shareRecord({
-        recordId: recordId,
-        receiverEmail: userData.email,
-      });
-      console.log('✅ Admin granted encryption access via wrapped key');
-    } catch (shareError) {
-      const errorMsg = shareError instanceof Error ? shareError.message : '';
-
-      // If they already have access as a viewer, that's fine - they'll keep that key
-      if (errorMsg.includes('This user already has')) {
-        console.log('ℹ️  User already has viewer access, will keep existing wrapped key');
-        isExistingViewer = true;
-      } else {
-        // Some other error - re-throw it
-        throw shareError;
-      }
-    }
-
-    // Step 2: Add  new admin to the administrators array after verifying they can decrypt the record
+    // Step 2: Remove from viewers array
     await updateDoc(recordRef, {
-      administrators: arrayUnion(userId),
+      viewers: arrayRemove(targetUserId),
     });
+    console.log('✅ Removed from viewers array');
 
-    //Step 3: Mirror to Blockchain
+    // Step 3: Revoke role on blockchain
     try {
-      console.log('🔗 Granting administrator role on blockchain...');
-
-      if (isExistingViewer) {
-        await BlockchainRoleManagerService.changeRole(recordId, userWalletAddress, 'administrator');
-        console.log('✅ Blockchain: Upgraded to administrator');
-      } else {
-        await BlockchainRoleManagerService.grantRole(recordId, userWalletAddress, 'administrator');
-        console.log('✅ Blockchain: Administrator role granted');
-      }
+      console.log('🔗 Revoking role on blockchain...');
+      await BlockchainRoleManagerService.revokeRole(recordId, userWalletAddress);
+      console.log('✅ Blockchain: Role revoked');
     } catch (blockchainError) {
       console.error('⚠️ Blockchain update failed:', blockchainError);
       await this.logBlockchainSyncFailure(
         recordId,
-        isExistingViewer ? 'changeRole' : 'grantRole',
-        { walletAddress: userWalletAddress, role: 'administrator', userId },
+        'revokeRole',
+        { walletAddress: userWalletAddress, userId: targetUserId },
         blockchainError as Error
       );
     }
 
-    console.log('✅ Administrator added successfully with full access');
+    console.log('✅ Viewer access removed successfully');
   }
 
   /**
    * Remove an admin from a record
    * @param recordId - The record ID
-   * @param userId - The user ID to remove as owner
+   * @param targetUserId - The user ID to remove as owner
+   * @param options - Can set demote to viewer as true otherwise access fully revoked
    * @throws Error if operation fails or user doesn't have permission
    */
-  static async removeAdmin(recordId: string, userId: string): Promise<void> {
+  static async removeAdmin(
+    recordId: string,
+    targetUserId: string,
+    options?: { demoteToViewer?: boolean }
+  ): Promise<void> {
     const auth = getAuth();
     const currentUser = auth.currentUser;
 
@@ -271,81 +484,216 @@ export class PermissionsService {
       throw new Error('User not authenticated');
     }
 
-    // Get wallet address upfront - throws if missing
-    const userWalletAddress = await this.getUserWalletAddress(userId);
+    const userWalletAddress = await this.getUserWalletAddress(targetUserId);
 
     const db = getFirestore();
     const recordRef = doc(db, 'records', recordId);
-
-    // Check if the current user is an admin
     const recordDoc = await getDoc(recordRef);
+
     if (!recordDoc.exists()) {
       throw new Error('Record not found');
     }
 
     const recordData = recordDoc.data();
-    const isOwner = recordData.owners?.includes(currentUser.uid);
-    const isAdmin = recordData.administrators?.includes(currentUser.uid);
 
-    // Rule 1: Only owners can remove Other admins
-    if (userId !== currentUser.uid && !isOwner) {
+    //Permission checks
+    const isCurrentUserOwner = recordData.owners?.includes(currentUser.uid);
+    const isCurrentUserAdmin = recordData.administrators?.includes(currentUser.uid);
+    const isSelfRemoval = targetUserId === currentUser.uid;
+    const hasOwners = recordData.owners?.length > 0;
+    const isLastAdmin = recordData.administrators?.length === 1;
+
+    // Rule 1: Check if caller is an admin or Owner of this record
+    if (!isCurrentUserOwner && !isCurrentUserAdmin) {
+      throw new Error('You are not an owner or administrator of this record');
+    }
+
+    // Rule 2: If there are owners, only owners can remove other admins. Admins can only remove themselves
+    if (hasOwners && !isSelfRemoval && !isCurrentUserOwner) {
       throw new Error('Only the record owner can remove other administrators');
     }
 
-    // Rule 2: Check if caller is an admin of this record
-    if (userId === currentUser.uid && !isAdmin) {
-      throw new Error('You are not an administrator of this record');
-    }
-
-    // Rule 3: Can't remove owner as admin. (Owner should always be admin)
-    if (recordData.owners?.includes(userId)) {
+    // Rule 3: Can't remove owner via removeAdmin (although this should never come up... but just in case)
+    if (recordData.owners?.includes(targetUserId)) {
       throw new Error('Cannot remove the record owner as administrator');
     }
 
-    // Rule 4: Prevent removing yourself if you're the last administrator
-    if (recordData.administrator?.length === 1) {
-      throw new Error('Cannot remove the last administrator from a record');
-    }
-
-    // Check if user in question is actually an administrator
-    if (!recordData.administrators?.includes(userId)) {
+    // Rule 4: Check if user in question is actually an administrator
+    if (!recordData.administrators?.includes(targetUserId)) {
       throw new Error('User is not an administrator of this record');
     }
 
-    console.log('🔄 Removing administrator:', userId);
+    // Rule 5: Prevent removing yourself if you're the last administrator or owner
+    if (!hasOwners && isLastAdmin) {
+      throw new Error('Cannot remove the last administrator from a record');
+    }
 
-    // Step 1: Remove the user from the owners array
-    await updateDoc(recordRef, {
-      administrators: arrayRemove(userId),
-    });
+    console.log('🔄 Removing administrator access:', targetUserId);
 
-    // Step 2: Mirror to blockchain - demote to viewer
+    const demoteToViewer = options?.demoteToViewer ?? false;
+
+    // Step 1: Update Firestore arrays
+    if (demoteToViewer) {
+      await updateDoc(recordRef, {
+        administrators: arrayRemove(targetUserId),
+        viewers: arrayUnion(targetUserId),
+      });
+      console.log('✅ Demoted to viewer');
+    } else {
+      await updateDoc(recordRef, {
+        administrators: arrayRemove(targetUserId),
+      });
+      console.log('✅ Removed from administrators array');
+
+      // Revoke encryption access only if fully removing
+      await SharingService.revokeEncryptionAccess(recordId, targetUserId, currentUser.uid);
+    }
+
+    // Step 2: Update blockchain
     try {
-      console.log('🔗 Demoting to viewer on blockchain...');
-      await BlockchainRoleManagerService.changeRole(recordId, userWalletAddress, 'viewer');
-      console.log('✅ Blockchain: Demoted to viewer');
+      if (demoteToViewer) {
+        console.log('🔗 Demoting to viewer on blockchain...');
+        await BlockchainRoleManagerService.changeRole(recordId, userWalletAddress, 'viewer');
+        console.log('✅ Blockchain: Demoted to viewer');
+      } else {
+        console.log('🔗 Revoking role on blockchain...');
+        await BlockchainRoleManagerService.revokeRole(recordId, userWalletAddress);
+        console.log('✅ Blockchain: Role revoked');
+      }
     } catch (blockchainError) {
       console.error('⚠️ Blockchain update failed:', blockchainError);
       await this.logBlockchainSyncFailure(
         recordId,
-        'changeRole',
-        { walletAddress: userWalletAddress, role: 'viewer', userId },
+        demoteToViewer ? 'changeRole' : 'revokeRole',
+        {
+          walletAddress: userWalletAddress,
+          role: demoteToViewer ? 'viewer' : undefined,
+          userId: targetUserId,
+        },
         blockchainError as Error
       );
     }
 
-    console.log('✅ User admin priviledges removed successfully', userId);
-    console.log(
-      'ℹ️ Note: This user may still have viewer access. Remove that separately if desired.'
-    );
+    console.log('✅ Administrator access removed successfully');
   }
 
   /**
-   * Check if current user can manage administrators for a record
+   * Remove owner access from a record. Owners can only remove themselves
+   * Optionally demotes to admin or viewer instead of full revocation
    * @param recordId - The record ID
-   * @returns true if user is an admin, false otherwise
+   * @param targetUserId - the user being removed as an owner
+   * @param options - Can demote to 'administrator' or 'viewer' otherwise access fully revoked
    */
-  static async canManageAdmins(recordId: string): Promise<boolean> {
+  static async removeOwner(
+    recordId: string,
+    targetUserId: string,
+    options?: { demoteTo?: 'administrator' | 'viewer' }
+  ): Promise<void> {
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    const userWalletAddress = await this.getUserWalletAddress(targetUserId);
+
+    const db = getFirestore();
+    const recordRef = doc(db, 'records', recordId);
+    const recordDoc = await getDoc(recordRef);
+
+    if (!recordDoc.exists()) {
+      throw new Error('Record not found');
+    }
+
+    const recordData = recordDoc.data();
+
+    // Permission checks
+    const isCurrentUserOwner = recordData.owners?.includes(currentUser.uid);
+    const isSelfRemoval = targetUserId === currentUser.uid;
+
+    // Rule 1: Only owners can remove themselves (no one can remove other owners)
+    if (!isSelfRemoval) {
+      throw new Error('Owners can only remove themselves. You cannot remove other owners.');
+    }
+
+    //Rule 2: Only owners can remove owners
+    if (!isCurrentUserOwner) {
+      throw new Error('You are not an owner of this record');
+    }
+
+    //Rule 3: Verify target is actually an owner
+    if (!recordData.owners?.includes(targetUserId)) {
+      throw new Error('User is not an owner of this record');
+    }
+
+    // Rule 4: Can't remove last owner unless there's at least one admin
+    const isLastOwner = recordData.owners.length === 1;
+    const hasAdmins = recordData.administrators && recordData.administrators.length > 0;
+
+    if (isLastOwner && !hasAdmins) {
+      throw new Error('Cannot remove the last owner when no administrators exist');
+    }
+
+    console.log('🔄 Removing owner access:', targetUserId);
+
+    const demoteTo = options?.demoteTo;
+
+    // Step 1: Update Firestore arrays
+    if (demoteTo === 'administrator') {
+      await updateDoc(recordRef, {
+        owners: arrayRemove(targetUserId),
+        administrators: arrayUnion(targetUserId),
+      });
+      console.log('✅ Demoted to administrator');
+    } else if (demoteTo === 'viewer') {
+      await updateDoc(recordRef, {
+        owners: arrayRemove(targetUserId),
+        viewers: arrayUnion(targetUserId),
+      });
+      console.log('✅ Demoted to viewer');
+    } else {
+      await updateDoc(recordRef, {
+        owners: arrayRemove(targetUserId),
+      });
+      console.log('✅ Removed from owners array');
+
+      // Revoke encryption access only if fully removing
+      await SharingService.revokeEncryptionAccess(recordId, targetUserId, currentUser.uid);
+    }
+
+    // Step 2: Update blockchain
+    try {
+      if (demoteTo) {
+        console.log(`🔗 Demoting to ${demoteTo} on blockchain...`);
+        await BlockchainRoleManagerService.changeRole(recordId, userWalletAddress, demoteTo);
+        console.log(`✅ Blockchain: Demoted to ${demoteTo}`);
+      } else {
+        console.log('🔗 Revoking role on blockchain...');
+        await BlockchainRoleManagerService.revokeRole(recordId, userWalletAddress);
+        console.log('✅ Blockchain: Role revoked');
+      }
+    } catch (blockchainError) {
+      console.error('⚠️ Blockchain update failed:', blockchainError);
+      await this.logBlockchainSyncFailure(
+        recordId,
+        demoteTo ? 'changeRole' : 'revokeRole',
+        {
+          walletAddress: userWalletAddress,
+          role: demoteTo,
+          userId: targetUserId,
+        },
+        blockchainError as Error
+      );
+    }
+
+    console.log('✅ Owner access removed successfully');
+  }
+
+  /**
+   * Check if current user can manage a specific role on a record
+   */
+  static async canManageRole(recordId: string, role: Role): Promise<boolean> {
     try {
       const auth = getAuth();
       const currentUser = auth.currentUser;
@@ -353,13 +701,25 @@ export class PermissionsService {
       if (!currentUser) return false;
 
       const db = getFirestore();
-      const recordRef = doc(db, 'records', recordId);
-      const recordDoc = await getDoc(recordRef);
+      const recordDoc = await getDoc(doc(db, 'records', recordId));
 
       if (!recordDoc.exists()) return false;
 
       const recordData = recordDoc.data();
-      return recordData.administrators.includes(currentUser.uid) || false;
+      const isOwner = recordData.owners?.includes(currentUser.uid);
+      const isAdmin = recordData.administrators?.includes(currentUser.uid);
+
+      switch (role) {
+        case 'owner':
+          // Only owners can manage owners (or admins if no owners exist)
+          return recordData.owners?.length > 0 ? isOwner : isAdmin;
+        case 'administrator':
+          return isOwner || isAdmin;
+        case 'viewer':
+          return isOwner || isAdmin;
+        default:
+          return false;
+      }
     } catch (err) {
       console.error('Error checking permissions:', err);
       return false;
@@ -367,62 +727,40 @@ export class PermissionsService {
   }
 
   /**
-   * Check if a specific user can be removed as an admin
-   * @param recordId - The record ID
-   * @param userId - The user ID to check
-   * @returns true if user can be removed, false otherwise
-   */
-  static async canRemoveAdmins(recordId: string, userId: string): Promise<boolean> {
-    try {
-      const db = getFirestore();
-      const recordRef = doc(db, 'records', recordId);
-      const recordDoc = await getDoc(recordRef);
-
-      if (!recordDoc.exists()) return false;
-
-      const recordData = recordDoc.data();
-
-      // Cannot remove if they're the owner
-      if (recordData.owners === userId) return false;
-
-      // Cannot remove if they're the last administrator
-      if (recordData.administrators.length === 1 && recordData.administrators[0] === userId)
-        return false;
-
-      return true;
-    } catch (err) {
-      console.error('Error checking if owner can be removed:', err);
-      return false;
-    }
-  }
-
-  /**
    * Get record ownership information
-   * @param recordId - The record ID
-   * @returns Object with owners, administrators, and permission info
    */
-  static async getRecordOwnership(recordId: string): Promise<{
+  static async getRecordRoles(recordId: string): Promise<{
     owners: string[];
     administrators: string[];
-    canManage: boolean;
+    viewers: string[];
+    canManageOwners: boolean;
+    canManageAdmins: boolean;
+    canManageViewers: boolean;
   } | null> {
     try {
       const db = getFirestore();
-      const recordRef = doc(db, 'records', recordId);
-      const recordDoc = await getDoc(recordRef);
+      const recordDoc = await getDoc(doc(db, 'records', recordId));
 
       if (!recordDoc.exists()) return null;
 
       const recordData = recordDoc.data();
-      const canManage = await this.canManageAdmins(recordId);
+
+      const [canManageOwners, canManageAdmins, canManageViewers] = await Promise.all([
+        this.canManageRole(recordId, 'owner'),
+        this.canManageRole(recordId, 'administrator'),
+        this.canManageRole(recordId, 'viewer'),
+      ]);
 
       return {
         owners: recordData.owners || [],
         administrators: recordData.administrators || [],
-        canManage,
+        viewers: recordData.viewers || [],
+        canManageOwners,
+        canManageAdmins,
+        canManageViewers,
       };
     } catch (err) {
-      console.error('Error getting record ownership:', err);
+      console.error('Error getting record roles:', err);
       return null;
     }
   }

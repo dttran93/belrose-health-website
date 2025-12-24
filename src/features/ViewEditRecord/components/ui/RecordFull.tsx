@@ -10,7 +10,7 @@ import HealthRecordMenu from './RecordMenu';
 import { VerificationBadge } from '@/features/BlockchainVerification/component/VerificationBadge';
 import RecordView from './RecordView';
 import { TabType } from './RecordView';
-import { ShareRecordView } from '@/features/Sharing/components/ShareRecordView';
+import { EncryptionAccessView } from '@/features/Sharing/components/EncryptionAccessView';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 import { toISOString, formatTimestamp } from '@/utils/dataFormattingUtils';
@@ -492,7 +492,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
 
       {viewMode === 'share' && (
         <div className="p-6">
-          <ShareRecordView record={record} onBack={handleBackToRecord} isAddMode={true} />
+          <EncryptionAccessView record={record} onBack={handleBackToRecord} />
         </div>
       )}
 
