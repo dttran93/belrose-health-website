@@ -248,7 +248,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
                         userId={request.subjectId}
                         onDelete={() => handleCancelPendingRequest(request.subjectId)}
                         variant="default"
-                        color="default"
+                        color="primary"
                         onView={() => {}}
                       />
                     );

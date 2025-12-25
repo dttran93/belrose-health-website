@@ -119,7 +119,6 @@ export class VersionControlService {
       versionNumber: 0,
       //Uses original uploader's info, fall back to unknown user if necessary
       editedBy: originalRecord.uploadedBy || 'Unknown User',
-      editedByName: originalRecord.uploadedByName || 'Unknown User',
       editedAt: originalRecord.uploadedAt || Timestamp.now(),
       commitMessage: 'Original Upload (auto-created baseline)',
       recordHash: originalRecord.recordHash || '',

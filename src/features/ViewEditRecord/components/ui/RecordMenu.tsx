@@ -41,7 +41,7 @@ interface RecordMenuProps {
   onView?: (record: any) => void;
   onEdit?: (record: any) => void;
   onVersion?: (record: any) => void;
-  onShare?: (record: any) => void;
+  onAccess?: (record: any) => void;
   onViewVerification?: (record: any) => void;
   onPermissions?: (record: any) => void;
   onSubject?: (record: any) => void;
@@ -58,7 +58,7 @@ interface RecordMenuProps {
 
   // Configuration - what actions to show
   showEdit?: boolean;
-  showShare?: boolean;
+  showAccess?: boolean;
   showDownload?: boolean;
   showCopy?: boolean;
   showView?: boolean;
@@ -92,7 +92,7 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
   onView,
   onEdit,
   onVersion,
-  onShare,
+  onAccess,
   onViewVerification,
   onPermissions,
   onSubject,
@@ -103,7 +103,7 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
   triggerClassName = 'p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors',
   menuClassName = 'absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[160px]',
   showEdit = true,
-  showShare = true,
+  showAccess = true,
   showDownload = true,
   showCopy = true,
   showView = true,
@@ -189,12 +189,12 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
     }
 
     // Share action
-    if (showShare && onShare) {
+    if (showAccess && onAccess) {
       items.push({
-        key: 'share',
-        label: 'Share Record',
+        key: 'access',
+        label: 'Manage Access',
         icon: Share2,
-        onClick: createHandler(onShare),
+        onClick: createHandler(onAccess),
       });
     }
 

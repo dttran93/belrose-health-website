@@ -24,7 +24,7 @@ type ViewMode =
   | 'versions'
   | 'version-detail'
   | 'verification'
-  | 'share'
+  | 'access'
   | 'permissions'
   | 'subject';
 
@@ -47,7 +47,7 @@ interface RecordFullProps {
     | 'versions'
     | 'verification'
     | 'permissions'
-    | 'share'
+    | 'access'
     | 'subject'; //version-detail can never be the initial view, since it only comes from versions
   comingFromAddRecord?: boolean; //so the Save button is activated when coming from the AddRecord screen, otherwise it'd be disabled and the user is stuck
 }
@@ -173,8 +173,8 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     setViewMode('verification');
   };
 
-  const handleSharePage = () => {
-    setViewMode('share');
+  const handleAccessPage = () => {
+    setViewMode('access');
   };
 
   const handlePermissionManager = () => {
@@ -336,7 +336,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
                 onEdit={viewMode !== 'edit' ? handleEnterEditMode : undefined}
                 onVersion={viewMode !== 'versions' ? handleViewVersionHistory : undefined}
                 onSubject={viewMode !== 'subject' ? handleSubjectPage : undefined}
-                onShare={viewMode !== 'share' ? handleSharePage : undefined}
+                onAccess={viewMode !== 'access' ? handleAccessPage : undefined}
                 onViewVerification={
                   viewMode !== 'verification' ? handleViewVerification : undefined
                 }
@@ -490,7 +490,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
         </LayoutSlot>
       )}
 
-      {viewMode === 'share' && (
+      {viewMode === 'access' && (
         <div className="p-6">
           <EncryptionAccessView record={record} onBack={handleBackToRecord} />
         </div>

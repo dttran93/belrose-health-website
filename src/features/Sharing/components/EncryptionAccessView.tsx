@@ -3,16 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import {
   Key,
-  Shield,
   AlertTriangle,
   CheckCircle,
   XCircle,
   HelpCircle,
-  Users,
   ArrowLeft,
+  Plus,
+  View,
 } from 'lucide-react';
-import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { getFirestore, collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import UserCard, { BadgeConfig } from '@/features/Users/components/ui/UserCard';
@@ -20,6 +19,7 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import { Button } from '@/components/ui/Button';
 import { usePermissions } from '@/features/Permissions/hooks/usePermissions';
 import RevokeAccessDialog from '@/features/Permissions/component/ui/RevokeAccessDialog';
+import GrantAccessModal from './GrantAccessModal';
 
 interface WrappedKeyInfo {
   userId: string;
@@ -49,6 +49,7 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<AccessEntry | null>(null);
+  const [isGrantModalOpen, setIsGrantModalOpen] = useState(false);
 
   //Import from usePermissions hook
   //revokeAllAccess takes any userId, determines the role they have and calls the correct permissionService
@@ -121,6 +122,13 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
     setLoading(true);
     try {
       const db = getFirestore();
+
+      // 1. Fetch the LATEST record data to get updated roles
+      const recordDocRef = doc(db, 'records', record.id); // Adjust 'records' to your actual collection name
+      const recordSnap = await getDoc(recordDocRef);
+      const latestRecord = recordSnap.exists() ? (recordSnap.data() as FileObject) : record;
+
+      // 2. Fetch wrapped keys (Existing logic)
       const wrappedKeysRef = collection(db, 'wrappedKeys');
       const q = query(wrappedKeysRef, where('recordId', '==', record.id));
       const querySnapshot = await getDocs(q);
@@ -133,22 +141,25 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
           }) as WrappedKeyInfo
       );
 
+      // 3. Use latestRecord instead of record for calculating allUserIds
       const allUserIds = new Set<string>([
         ...wrappedKeys.map(wk => wk.userId),
-        ...(record.owners || []),
-        ...(record.administrators || []),
-        ...(record.viewers || []),
-        ...(record.subjects || []),
+        ...(latestRecord.owners || []),
+        ...(latestRecord.administrators || []),
+        ...(latestRecord.viewers || []),
+        ...(latestRecord.subjects || []),
       ]);
 
       const profiles = await getUserProfiles(Array.from(allUserIds));
 
+      // 4. Map entries using latestRecord roles
       const entries: AccessEntry[] = Array.from(allUserIds).map(userId => {
         const wrappedKey = wrappedKeys.find(wk => wk.userId === userId) ?? null;
         let role: AccessEntry['role'] = 'none';
-        if (record.owners?.includes(userId)) role = 'owner';
-        else if (record.administrators?.includes(userId)) role = 'administrator';
-        else if (record.viewers?.includes(userId)) role = 'viewer';
+
+        if (latestRecord.owners?.includes(userId)) role = 'owner';
+        else if (latestRecord.administrators?.includes(userId)) role = 'administrator';
+        else if (latestRecord.viewers?.includes(userId)) role = 'viewer';
 
         let status: AccessEntry['status'] = 'synced';
         if (wrappedKey && !wrappedKey.isActive) status = 'revoked';
@@ -160,7 +171,8 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
 
       setAccessEntries(entries.sort((a, b) => (a.status === 'synced' ? 1 : -1)));
     } catch (err) {
-      setError('Failed to load access data');
+      console.error(err);
+      setError('Failed to load access data. Only Owners and Administrators can Manage Access');
     } finally {
       setLoading(false);
     }
@@ -205,7 +217,7 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
       <div>
         <div className="flex items-center justify-between mb-4 pb-2 border-b">
           <h3 className="font-semibold text-lg flex items-center gap-2">
-            <Users className="w-5 h-5" />
+            <View className="w-5 h-5" />
             Manage Access
           </h3>
           <div className="flex items-center gap-2">
@@ -233,46 +245,55 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <Tooltip.Provider>
-              <Tooltip.Root>
-                <Tooltip.Trigger asChild>
-                  <button className="inline-flex items-center ml-1">
-                    <span className="text-xs border border-primary bg-primary/20 text-primary px-2 py-1 rounded-full flex items-center">
-                      Encrypted Access
-                      <HelpCircle className="w-4 h-4 ml-1" />
-                    </span>
-                  </button>
-                </Tooltip.Trigger>
-                <Tooltip.Portal>
-                  <Tooltip.Content
-                    className="bg-gray-900 text-white rounded-lg p-4 max-w-sm shadow-xl z-50"
-                    sideOffset={5}
-                  >
-                    <p className="font-semibold mb-2 text-sm">Encryption Access Overview</p>
-                    <p className="text-xs mb-3">
-                      This view shows who has cryptographic access to decrypt this record,
-                      cross-referenced with their permission roles.
-                    </p>
-                    <ol className="list-decimal list-inside space-y-1 text-xs">
-                      <li>
-                        <strong>Synced:</strong> User has both a role and can decrypt
-                      </li>
-                      <li>
-                        <strong>Missing Key:</strong> Has role but can't decrypt (re-grant to fix)
-                      </li>
-                      <li>
-                        <strong>Orphaned Key:</strong> Can decrypt but has no role (security issue)
-                      </li>
-                      <li>
-                        <strong>Revoked:</strong> Previously had access, now revoked
-                      </li>
-                    </ol>
-                    <Tooltip.Arrow className="fill-gray-900" />
-                  </Tooltip.Content>
-                </Tooltip.Portal>
-              </Tooltip.Root>
-            </Tooltip.Provider>
+          <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              <Tooltip.Provider>
+                <Tooltip.Root>
+                  <Tooltip.Trigger asChild>
+                    <button className="inline-flex items-center ml-1">
+                      <span className="text-xs border border-primary bg-primary/20 text-primary px-2 py-1 rounded-full flex items-center">
+                        Encrypted Access
+                        <HelpCircle className="w-4 h-4 ml-1" />
+                      </span>
+                    </button>
+                  </Tooltip.Trigger>
+                  <Tooltip.Portal>
+                    <Tooltip.Content
+                      className="bg-gray-900 text-white rounded-lg p-4 max-w-sm shadow-xl z-50"
+                      sideOffset={5}
+                    >
+                      <p className="font-semibold mb-2 text-sm">Encryption Access Overview</p>
+                      <p className="text-xs mb-3">
+                        This view shows who has cryptographic access to decrypt this record,
+                        cross-referenced with their permission roles.
+                      </p>
+                      <ol className="list-decimal list-inside space-y-1 text-xs">
+                        <li>
+                          <strong>Synced:</strong> User has both a role and can decrypt
+                        </li>
+                        <li>
+                          <strong>Missing Key:</strong> Has role but can't decrypt (re-grant to fix)
+                        </li>
+                        <li>
+                          <strong>Orphaned Key:</strong> Can decrypt but has no role (security
+                          issue)
+                        </li>
+                        <li>
+                          <strong>Revoked:</strong> Previously had access, now revoked
+                        </li>
+                      </ol>
+                      <Tooltip.Arrow className="fill-gray-900" />
+                    </Tooltip.Content>
+                  </Tooltip.Portal>
+                </Tooltip.Root>
+              </Tooltip.Provider>
+            </div>
+            <button
+              className="rounded-full hover:bg-gray-300"
+              onClick={() => setIsGrantModalOpen(true)}
+            >
+              <Plus />
+            </button>
           </div>
         </div>
 
@@ -321,6 +342,12 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
         onClose={() => setSelectedEntry(null)}
         onConfirm={handleRevokeConfirm}
         loading={isActionLoading}
+      />
+      <GrantAccessModal
+        record={record}
+        isOpen={isGrantModalOpen}
+        onClose={() => setIsGrantModalOpen(false)}
+        onSuccess={fetchEncryptionAccess} // Refetches the list so the new user appears
       />
     </div>
   );

@@ -44,13 +44,13 @@ const ROLE_CONFIG: Record<
     label: 'Viewer',
     description: 'Can view the record but cannot edit or manage it',
     icon: Shield,
-    color: 'blue',
+    color: 'yellow',
   },
   administrator: {
     label: 'Administrator',
     description: 'Can view, edit, share, and manage the record',
     icon: ShieldCheck,
-    color: 'yellow',
+    color: 'blue',
   },
   owner: {
     label: 'Owner',
