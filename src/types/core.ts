@@ -47,6 +47,10 @@ export interface BelroseUserProfile extends User {
     status: 'Inactive' | 'Active' | 'Verified';
     statusUpdatedAt?: string;
     statusTxHash?: string;
+    smartAccountRegistered?: boolean;
+    smartAccountTxHash: string;
+    smartAccountBlockNumber: number;
+    smartAccountRegisteredAt: Date;
   };
 
   //Other Info
@@ -59,6 +63,7 @@ export type WalletOrigin = 'generated' | 'metamask' | 'walletconnect' | 'hardwar
 export interface UserWallet {
   address: string;
   origin: WalletOrigin;
+  smartAccountAddress?: string; //Smart account used for account abstraction and gasless payments
 
   // Only present for generated wallets (Belrose stores encrypted keys)
   encryptedPrivateKey?: string;
@@ -109,7 +114,15 @@ export interface BelroseFields {
   detailedNarrative?: string; //detailed information on the medical interaction. derived from FHIR, but human readable
 }
 
-export interface BlockchainVerification {
+export interface RoleInitialization {
+  blockchainInitialized: boolean;
+  blockchainInitializedAt: Timestamp;
+  blockchainInitTxHash: string;
+  blockchainInitBlockNumber: number;
+  syncedFromChain: boolean; //For when an intialization had to be self-healed. Indicates there was an issue with updating firebase previously for future debugging/auditing
+}
+
+export interface RecordInitialization {
   blockchainTxId: string; //Transaction ID on the blockchain
   providerSignature?: string; //Digital signature (for provider records)
   signerId?: string; //ID of who signed it
@@ -171,7 +184,6 @@ export interface FileObject {
 
   // === OWNERSHIP AND PERMISSIONS ===
   uploadedBy?: string; // User ID of who created/uploaded the record (for audit trail)
-  uploadedByName?: string; //Display name of subject (for UI)
   owners?: string[]; // Array of user IDs with ultimate ownership access to record (read, update, delete, share)
   administrators: string[]; //Array of userIDs with administrative access to records, can't remove others
   viewers?: string[]; // Array of user IDs with view access to record
@@ -194,7 +206,7 @@ export interface FileObject {
   originalFileHash?: string | null; //hash of the original file that was uploaded
   recordHash?: string | null; //hash of the record content
   previousRecordHash?: string[] | null; //to establish chain of records in case they are edited
-  blockchainVerification?: BlockchainVerification;
+  blockchainRoleInitialization?: RoleInitialization;
 
   // === METADATA ===
   sourceType?: SourceType;

@@ -103,54 +103,31 @@ export class MemberRegistryBlockchain {
   }
 
   /**
-   * Initialize a record's first administrator on the blockchain
-   * Called when a new health record is created
-   *
-   * @param recordId - The record ID
-   * @param adminWalletAddress - The first admin's wallet address
-   * @returns Transaction result
-   */
-  static async initializeRecord(
-    recordId: string,
-    adminWalletAddress: string
-  ): Promise<InitializeRecordResult> {
-    console.log('🔗 Initializing record on blockchain...', { recordId });
-
-    try {
-      const functions = getFunctions();
-      const initFn = httpsCallable<
-        { recordId: string; adminWalletAddress: string },
-        InitializeRecordResult
-      >(functions, 'initializeRecordOnChain');
-
-      const result = await initFn({ recordId, adminWalletAddress });
-
-      console.log('✅ Record initialized:', result.data.txHash);
-      return result.data;
-    } catch (error: any) {
-      console.error('❌ Record initialization failed:', error);
-
-      // Handle "already exists" gracefully
-      if (error.code === 'already-exists') {
-        console.log('ℹ️ Record already initialized on blockchain');
-        return {
-          success: true,
-          txHash: '',
-          blockNumber: 0,
-        };
-      }
-
-      throw new Error(error.message || 'Failed to initialize record on blockchain');
-    }
-  }
-
-  /**
-   * Mark member as verified after identity verification
-   * Convenience method that calls updateMemberStatus with Verified status
+   * Mark member as verified after identity verification.
+   * Convenience method that calls updateMemberStatus with Verified status.
    *
    * @param walletAddress - User's wallet address
    */
   static async markAsVerified(walletAddress: string): Promise<UpdateStatusResult> {
     return this.updateMemberStatus(walletAddress, MemberStatus.Verified);
+  }
+
+  /**
+   * Deactivate a member (set status to Inactive).
+   * Use with caution - this prevents the user from transacting.
+   *
+   * @param walletAddress - User's wallet address
+   */
+  static async deactivateMember(walletAddress: string): Promise<UpdateStatusResult> {
+    return this.updateMemberStatus(walletAddress, MemberStatus.Inactive);
+  }
+
+  /**
+   * Reactivate a member (set status to Active).
+   *
+   * @param walletAddress - User's wallet address
+   */
+  static async reactivateMember(walletAddress: string): Promise<UpdateStatusResult> {
+    return this.updateMemberStatus(walletAddress, MemberStatus.Active);
   }
 }

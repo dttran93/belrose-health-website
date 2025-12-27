@@ -57,12 +57,14 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
 
     // Ownership Fields
     uploadedBy: data.uploadedBy,
-    uploadedByName: data.uploadedByName,
     owners: data.owners || [],
     administrators: data.administrators,
     viewers: data.viewers || [],
     subjects: data.subjects || [],
     pendingSubjectRequests: data.pendingSubjectRequests,
+
+    //Blockchain Verification
+    blockchainRoleInitialization: data.blockchainRoleInitialization,
   } as FileObject;
 };
 

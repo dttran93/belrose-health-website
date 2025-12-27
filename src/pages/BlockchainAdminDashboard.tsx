@@ -34,7 +34,7 @@ import { Button } from '@/components/ui/Button';
 
 // Your deployed MemberRoleManager contract address
 // TODO: Replace with your actual deployed contract address
-const MEMBER_ROLE_MANAGER_ADDRESS = '0xD671B0cB1cB10330d9Ed05dC1D1F6E63802Cf4A9';
+const MEMBER_ROLE_MANAGER_ADDRESS = '0x89839E0c266045c9EA06FdA11152B48129e76Ef2';
 
 // Contract ABI - Only the functions we need for reading data
 // This tells ethers.js how to interact with your smart contract

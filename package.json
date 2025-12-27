@@ -34,6 +34,7 @@
     "date-fns": "^4.1.0",
     "fhirpath": "^4.5.0",
     "firebase": "^11.9.1",
+    "firebase-admin": "^13.6.0",
     "json-diff-ts": "^4.8.2",
     "lucide-react": "^0.511.0",
     "mammoth": "^1.9.1",

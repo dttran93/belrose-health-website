@@ -264,13 +264,6 @@ export const RecordsList: React.FC<RecordsListProps> = ({
     const dateA = toDate(a.createdAt);
     const dateB = toDate(b.createdAt);
 
-    console.log('Comparing:', {
-      aTitle: a.belroseFields?.title,
-      dateA,
-      bTitle: b.belroseFields?.title,
-      dateB,
-    });
-
     if (!dateA && !dateB) return 0;
     if (!dateA) return 1;
     if (!dateB) return -1;

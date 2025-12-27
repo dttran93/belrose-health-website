@@ -84,49 +84,6 @@
         "UserOperationLib"
       ]
     },
-    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\core\\BasePaymaster.sol": {
-      "lastModificationDate": 1766093261284,
-      "contentHash": "b8fa794daa7d572b1e715bca109533f9",
-      "sourceName": "@account-abstraction/contracts/core/BasePaymaster.sol",
-      "solcConfig": {
-        "version": "0.8.23",
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 200
-          },
-          "viaIR": true,
-          "evmVersion": "paris",
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [
-        "@openzeppelin/contracts/access/Ownable.sol",
-        "@openzeppelin/contracts/utils/introspection/IERC165.sol",
-        "../interfaces/IPaymaster.sol",
-        "../interfaces/IEntryPoint.sol",
-        "./UserOperationLib.sol"
-      ],
-      "versionPragmas": [
-        "^0.8.23"
-      ],
-      "artifacts": [
-        "BasePaymaster"
-      ]
-    },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\core\\Helpers.sol": {
       "lastModificationDate": 1766093261320,
       "contentHash": "d9a3c7fc04ae5f3fc8011d8792e8cb18",
@@ -197,6 +154,49 @@
       ],
       "artifacts": [
         "ECDSA"
+      ]
+    },
+    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\core\\BasePaymaster.sol": {
+      "lastModificationDate": 1766093261284,
+      "contentHash": "b8fa794daa7d572b1e715bca109533f9",
+      "sourceName": "@account-abstraction/contracts/core/BasePaymaster.sol",
+      "solcConfig": {
+        "version": "0.8.23",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "viaIR": true,
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "@openzeppelin/contracts/access/Ownable.sol",
+        "@openzeppelin/contracts/utils/introspection/IERC165.sol",
+        "../interfaces/IPaymaster.sol",
+        "../interfaces/IEntryPoint.sol",
+        "./UserOperationLib.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.23"
+      ],
+      "artifacts": [
+        "BasePaymaster"
       ]
     },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@openzeppelin\\contracts\\utils\\cryptography\\MessageHashUtils.sol": {
@@ -273,6 +273,45 @@
       ],
       "artifacts": []
     },
+    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\interfaces\\IPaymaster.sol": {
+      "lastModificationDate": 1766093261353,
+      "contentHash": "0edfe2232b7eb455a17ebaacd0d09243",
+      "sourceName": "@account-abstraction/contracts/interfaces/IPaymaster.sol",
+      "solcConfig": {
+        "version": "0.8.23",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "viaIR": true,
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./PackedUserOperation.sol"
+      ],
+      "versionPragmas": [
+        ">=0.7.5"
+      ],
+      "artifacts": [
+        "IPaymaster"
+      ]
+    },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\interfaces\\IEntryPoint.sol": {
       "lastModificationDate": 1766093261346,
       "contentHash": "d201c25e2806de5038e53c646f93810c",
@@ -313,45 +352,6 @@
       ],
       "artifacts": [
         "IEntryPoint"
-      ]
-    },
-    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\interfaces\\IPaymaster.sol": {
-      "lastModificationDate": 1766093261353,
-      "contentHash": "0edfe2232b7eb455a17ebaacd0d09243",
-      "sourceName": "@account-abstraction/contracts/interfaces/IPaymaster.sol",
-      "solcConfig": {
-        "version": "0.8.23",
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 200
-          },
-          "viaIR": true,
-          "evmVersion": "paris",
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [
-        "./PackedUserOperation.sol"
-      ],
-      "versionPragmas": [
-        ">=0.7.5"
-      ],
-      "artifacts": [
-        "IPaymaster"
       ]
     },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@openzeppelin\\contracts\\access\\Ownable.sol": {
@@ -430,6 +430,45 @@
         "IERC165"
       ]
     },
+    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\interfaces\\IAggregator.sol": {
+      "lastModificationDate": 1766093261338,
+      "contentHash": "ea70aa8db36795540523cebf73f66469",
+      "sourceName": "@account-abstraction/contracts/interfaces/IAggregator.sol",
+      "solcConfig": {
+        "version": "0.8.23",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "viaIR": true,
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./PackedUserOperation.sol"
+      ],
+      "versionPragmas": [
+        ">=0.7.5"
+      ],
+      "artifacts": [
+        "IAggregator"
+      ]
+    },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\interfaces\\INonceManager.sol": {
       "lastModificationDate": 1766093261353,
       "contentHash": "2865a605d4aece6b0d511f573003d167",
@@ -502,45 +541,6 @@
       ],
       "artifacts": [
         "IStakeManager"
-      ]
-    },
-    "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@account-abstraction\\contracts\\interfaces\\IAggregator.sol": {
-      "lastModificationDate": 1766093261338,
-      "contentHash": "ea70aa8db36795540523cebf73f66469",
-      "sourceName": "@account-abstraction/contracts/interfaces/IAggregator.sol",
-      "solcConfig": {
-        "version": "0.8.23",
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 200
-          },
-          "viaIR": true,
-          "evmVersion": "paris",
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [
-        "./PackedUserOperation.sol"
-      ],
-      "versionPragmas": [
-        ">=0.7.5"
-      ],
-      "artifacts": [
-        "IAggregator"
       ]
     },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\node_modules\\@openzeppelin\\contracts\\utils\\Context.sol": {
@@ -734,8 +734,8 @@
       ]
     },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\contracts\\MemberRoleManager.sol": {
-      "lastModificationDate": 1765152289664,
-      "contentHash": "82e35267ed332b1e7dfcc546fd49a8bf",
+      "lastModificationDate": 1766799617804,
+      "contentHash": "adbfbe7cff6046ca0fb3f9af5982f545",
       "sourceName": "contracts/MemberRoleManager.sol",
       "solcConfig": {
         "version": "0.8.23",

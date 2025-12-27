@@ -21,6 +21,10 @@ interface CompleteRecordEncryption {
     encrypted: ArrayBuffer;
     iv: string;
   };
+  contextText?: {
+    encrypted: ArrayBuffer;
+    iv: string;
+  };
   fhirData?: {
     encrypted: ArrayBuffer;
     iv: string;
@@ -42,6 +46,7 @@ interface UseEncryptionReturn {
     file: File | undefined,
     extractedText: string | undefined,
     originalText: string | undefined,
+    contextText: string | undefined,
     fhirData: any | null,
     belroseFields: any | null,
     customData: any | null
@@ -55,6 +60,7 @@ interface UseEncryptionReturn {
     file?: ArrayBuffer;
     extractedText?: string;
     originalText?: string;
+    contextText?: string;
     fhirData?: any;
     belroseFields?: any;
     customData?: any;
@@ -77,6 +83,7 @@ export function useEncryption(): UseEncryptionReturn {
       file: File | undefined,
       extractedText: string | undefined,
       originalText: string | undefined,
+      contextText: string | undefined,
       fhirData: any | null,
       belroseFields: any | null,
       customData: any | null
@@ -103,6 +110,7 @@ export function useEncryption(): UseEncryptionReturn {
             file,
             extractedText,
             originalText,
+            contextText,
             fhirData,
             belroseFields,
             customData,

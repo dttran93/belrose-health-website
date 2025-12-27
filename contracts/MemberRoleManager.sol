@@ -6,30 +6,36 @@ pragma solidity ^0.8.19;
  * @dev Interface for HealthRecordCore to reference
  */
 interface MemberRoleManagerInterface {
-  function isActiveMember(address user) external view returns (bool);
+  function isActiveMember(address wallet) external view returns (bool);
 
-  function isVerifiedMember(address user) external view returns (bool);
+  function isVerifiedMember(address wallet) external view returns (bool);
 
-  function hasActiveRole(string memory recordId, address user) external view returns (bool);
+  function hasActiveRole(string memory recordId, address wallet) external view returns (bool);
 
   function hasRole(
     string memory recordId,
-    address user,
+    address wallet,
     string memory role
   ) external view returns (bool);
 
-  function isOwnerOrAdmin(string memory recordId, address user) external view returns (bool);
+  function isOwnerOrAdmin(string memory recordId, address wallet) external view returns (bool);
 }
 
 /**
  * @title MemberRoleManager
- * @dev Manages member registration and role-based access control for the Belrose Health system
+ * @dev Manages multi-wallet member registration and role-based access control.
+ *
+ * KEY ARCHITECTURE:
+ * - Members are registered by WALLET ADDRESS
+ * - Each wallet is linked to an IDENTITY (userIdHash)
+ * - One identity can have MULTIPLE wallets (EOA, Smart Account, etc.)
+ * - Roles are assigned to IDENTITIES, not wallets
+ * - Any wallet linked to an identity can exercise that identity's roles
  */
 contract MemberRoleManager is MemberRoleManagerInterface {
   // ===============================================================
   // ADMIN MANAGEMENT
   // ===============================================================
-
   address public admin;
 
   event AdminTransferred(address indexed oldAdmin, address indexed newAdmin, uint256 timestamp);
@@ -40,15 +46,12 @@ contract MemberRoleManager is MemberRoleManagerInterface {
   }
 
   modifier onlyActiveMember() {
-    require(
-      members[msg.sender].status != MemberStatus.Inactive && members[msg.sender].joinedAt != 0,
-      'Not an active member'
-    );
+    require(_isActiveMember(msg.sender), 'Not an active member');
     _;
   }
 
   modifier onlyVerifiedMember() {
-    require(members[msg.sender].status == MemberStatus.Verified, 'Not a verified member');
+    require(_isVerifiedMember(msg.sender), 'Not a verified member');
     _;
   }
 
@@ -69,17 +72,20 @@ contract MemberRoleManager is MemberRoleManagerInterface {
   // =================== MEMBER REGISTRY - ENUMS ===================
 
   enum MemberStatus {
-    Inactive, // 0 - Cannot transact (banned/removed)
-    Active, // 1 - Default Status
-    Verified // 2 - User has verified their identity and email
+    NotRegistered, // 0 - Default/uninitialized
+    Inactive, // 1 - Cannot transact (banned/removed)
+    Active, // 2 - Default for new members
+    Verified // 3 - User has verified their identity and email
   }
 
   // =================== MEMBER REGISTRY - EVENTS ===================
 
-  event MemberRegistered(address indexed userWallet, bytes32 indexed userIdHash, uint256 timestamp);
+  event MemberRegistered(address indexed wallet, bytes32 indexed userIdHash, uint256 timestamp);
+
+  event WalletLinked(address indexed wallet, bytes32 indexed userIdHash, uint256 timestamp);
 
   event MemberStatusChanged(
-    address indexed userWallet,
+    bytes32 indexed userIdHash,
     MemberStatus oldStatus,
     MemberStatus newStatus,
     address indexed changedBy,
@@ -88,98 +94,160 @@ contract MemberRoleManager is MemberRoleManagerInterface {
 
   // =================== MEMBER REGISTRY - STRUCTURE ===================
 
-  struct Member {
-    address userWallet;
-    bytes32 userIdHash;
-    MemberStatus status;
-    uint256 joinedAt;
+  // Wallet's Member info - maps a wallet to its identity (userIdHash)
+  struct UserInfo {
+    bytes32 userIdHash; // The identity this wallet belongs to
+    bool isWalletActive; // Whether this wallet can be used
   }
 
   // =================== MEMBER REGISTRY - STORAGE ===================
 
-  mapping(address => Member) public members;
-  mapping(bytes32 => address) public userIdHashToAddress;
-  address[] public memberList; //For enumeration and migrations
-  uint256 public totalMembers;
+  // Map address to UserIdHash and status (whether wallet is active or not)
+  mapping(address => UserInfo) public wallets;
+
+  // map userIdHash with memberStatus
+  mapping(bytes32 => MemberStatus) public userStatus;
+
+  // Identity (userIdHash) => list of wallet addresses
+  mapping(bytes32 => address[]) public userWallets;
+
+  // For enumeration
+  bytes32[] public userList;
+  uint256 public totalUsers;
 
   // =================== MEMBER REGISTRY - FUNCTIONS ===================
 
   /**
-   * @notice Register a new member (can only be called by Belrose Admin)
-   * @param userWallet The user's wallet address
+   * @notice Register a new wallet for an identity (can only be called by Admin)
+   * @dev If this is the first wallet for this userIdHash, creates the identity
+   * @param wallet The wallet address to register
    * @param userIdHash Hash of their off-chain user ID
    */
-  function addMember(address userWallet, bytes32 userIdHash) external onlyAdmin {
-    require(userWallet != address(0), 'Invalid wallet address');
-    require(members[userWallet].joinedAt == 0, 'Already a member');
-    require(userIdHashToAddress[userIdHash] == address(0), 'User ID already registered');
+  function addMember(address wallet, bytes32 userIdHash) external onlyAdmin {
+    require(wallet != address(0), 'Invalid wallet address');
+    require(userIdHash != bytes32(0), 'Invalid user ID hash');
+    require(wallets[wallet].userIdHash == bytes32(0), 'Wallet already registered');
 
-    members[userWallet] = Member({
-      userWallet: userWallet,
-      userIdHash: userIdHash,
-      status: MemberStatus.Active,
-      joinedAt: block.timestamp
-    });
+    // Link wallet to user
+    wallets[wallet] = UserInfo({ userIdHash: userIdHash, isWalletActive: true });
 
-    userIdHashToAddress[userIdHash] = userWallet;
-    memberList.push(userWallet);
-    totalMembers++;
+    // Add to user's's wallet list
+    userWallets[userIdHash].push(wallet);
 
-    emit MemberRegistered(userWallet, userIdHash, block.timestamp);
+    // If new user, initialize active status
+    if (userStatus[userIdHash] == MemberStatus.NotRegistered) {
+      userStatus[userIdHash] = MemberStatus.Active;
+      userList.push(userIdHash);
+      totalUsers++;
+
+      emit MemberRegistered(wallet, userIdHash, block.timestamp);
+    } else {
+      emit WalletLinked(wallet, userIdHash, block.timestamp);
+    }
   }
 
   /**
-   * @notice Change a member's status
-   * @param userWallet The member's wallet
+   * @notice Change an identity's status (affects all their wallets)
+   * @param userIdHash The identity to update
    * @param newStatus The new status
    */
-  function setMemberStatus(address userWallet, MemberStatus newStatus) external onlyAdmin {
-    require(members[userWallet].joinedAt != 0, 'Not a member');
+  function setUserStatus(bytes32 userIdHash, MemberStatus newStatus) external onlyAdmin {
+    require(userStatus[userIdHash] != MemberStatus.NotRegistered, 'User not registered');
 
-    MemberStatus oldStatus = members[userWallet].status;
+    MemberStatus oldStatus = userStatus[userIdHash];
     require(oldStatus != newStatus, 'Already this status');
 
-    members[userWallet].status = newStatus;
+    userStatus[userIdHash] = newStatus;
 
-    emit MemberStatusChanged(userWallet, oldStatus, newStatus, msg.sender, block.timestamp);
+    emit MemberStatusChanged(userIdHash, oldStatus, newStatus, msg.sender, block.timestamp);
   }
 
   /**
-   * @notice Check if address is active (not inactive and is a member)
+   * @notice Deactivate a specific wallet (not the whole user)
+   * @param wallet The wallet to deactivate
    */
-  function isActiveMember(address user) external view override returns (bool) {
-    return members[user].status != MemberStatus.Inactive && members[user].joinedAt != 0;
+  function deactivateWallet(address wallet) external onlyAdmin {
+    require(wallets[wallet].userIdHash != bytes32(0), 'Wallet not registered');
+    require(wallets[wallet].isWalletActive, 'Wallet already inactive');
+
+    wallets[wallet].isWalletActive = false;
   }
 
   /**
-   * @notice Check if address is verified
+   * @notice Reactivate a specific wallet
+   * @param wallet The wallet to reactivate
    */
-  function isVerifiedMember(address user) external view override returns (bool) {
-    return members[user].status == MemberStatus.Verified;
+  function reactivateWallet(address wallet) external onlyAdmin {
+    require(wallets[wallet].userIdHash != bytes32(0), 'Wallet not registered');
+    require(!wallets[wallet].isWalletActive, 'Wallet already active');
+
+    wallets[wallet].isWalletActive = true;
+  }
+
+  // =================== MEMBER REGISTRY - VIEW FUNCTIONS ===================
+
+  /**
+   * @notice Check if wallet belongs to an active member
+   */
+  function isActiveMember(address wallet) external view override returns (bool) {
+    return _isActiveMember(wallet);
+  }
+
+  function _isActiveMember(address wallet) internal view returns (bool) {
+    bytes32 userIdHash = wallets[wallet].userIdHash;
+    if (userIdHash == bytes32(0) || !wallets[wallet].isWalletActive) return false;
+
+    MemberStatus status = userStatus[userIdHash];
+    return status != MemberStatus.Inactive && status != MemberStatus.NotRegistered;
   }
 
   /**
-   * @notice Get member details
+   * @notice Check if wallet belongs to a verified member
    */
-  function getMember(
-    address user
-  ) external view returns (bytes32 userIdHash, MemberStatus status, uint256 joinedAt) {
-    Member memory m = members[user];
-    return (m.userIdHash, m.status, m.joinedAt);
+  function isVerifiedMember(address wallet) external view override returns (bool) {
+    return _isVerifiedMember(wallet);
+  }
+
+  function _isVerifiedMember(address wallet) internal view returns (bool) {
+    bytes32 userIdHash = wallets[wallet].userIdHash;
+    if (userIdHash == bytes32(0) || !wallets[wallet].isWalletActive) return false;
+
+    return userStatus[userIdHash] == MemberStatus.Verified;
   }
 
   /**
-   * @notice Lookup wallet by user ID hash
+   * @notice Get the identity (userIdHash) for a wallet
    */
-  function getWalletByUserIdHash(bytes32 userIdHash) external view returns (address) {
-    return userIdHashToAddress[userIdHash];
+  function getUserForWallet(address wallet) external view returns (bytes32) {
+    return wallets[wallet].userIdHash;
   }
 
   /**
-   * @notice Get all member addresses. Could be very useful for future migration.
+   * @notice Get all wallets for an identity
    */
-  function getAllMembers() external view returns (address[] memory) {
-    return memberList;
+  function getWalletsForUser(bytes32 userIdHash) external view returns (address[] memory) {
+    return userWallets[userIdHash];
+  }
+
+  /**
+   * @notice Get user status (not registered, inactive, active, verified)
+   */
+  function getUserStatus(bytes32 userIdHash) external view returns (MemberStatus status) {
+    return userStatus[userIdHash];
+  }
+
+  /**
+   * @notice Get all Users
+   */
+  function getAllUsers() external view returns (bytes32[] memory) {
+    return userList;
+  }
+
+  /**
+   * @notice Get total number of identities
+   */
+  function getTotalUsers() external view returns (uint256) {
+    return totalUsers;
   }
 
   // ===============================================================
@@ -190,107 +258,147 @@ contract MemberRoleManager is MemberRoleManagerInterface {
 
   event RoleGranted(
     string indexed recordId,
-    address indexed user,
+    bytes32 indexed targetIdHash,
     string role,
-    address indexed grantedBy,
+    bytes32 indexed userIdHash,
     uint256 timestamp
   );
 
   event RoleChanged(
     string indexed recordId,
-    address indexed user,
+    bytes32 indexed targetIdHash,
     string oldRole,
     string newRole,
-    address indexed changedBy,
+    bytes32 indexed userIdHash,
     uint256 timestamp
   );
 
   event RoleRevoked(
     string indexed recordId,
-    address indexed user,
+    bytes32 indexed targetIdHash,
     string role,
-    address indexed revokedBy,
+    bytes32 indexed userIdHash,
     uint256 timestamp
   );
 
-  event OwnerVoluntarilyLeft(string indexed recordId, address indexed owner, uint256 timestamp);
+  event OwnershipVoluntarilyLeft(
+    string indexed recordId,
+    bytes32 indexed userIdHash,
+    uint256 timestamp
+  );
 
   // =================== ROLE MANAGEMENT - STRUCTURE ===================
 
   struct RecordRole {
-    string recordId;
-    address user;
     string role; // "owner", "administrator", "viewer"
-    uint256 grantedAt;
-    uint256 lastModified;
-    address grantedBy;
     bool isActive;
   }
 
   // =================== ROLE MANAGEMENT - STORAGE ===================
 
+  // hash of recordId and userIdHash => RecordRole
   mapping(bytes32 => RecordRole) public recordRoles;
-  mapping(string => address[]) public ownersByRecord;
-  mapping(string => address[]) public adminsByRecord;
-  mapping(string => address[]) public viewersByRecord;
-  mapping(address => string[]) public recordsByUser;
+
+  // recordId => list of identity hashes with each role type
+  mapping(string => bytes32[]) public ownersByRecord;
+  mapping(string => bytes32[]) public adminsByRecord;
+  mapping(string => bytes32[]) public viewersByRecord;
+
+  // userIdHash => list of recordIds where they have a role
+  mapping(bytes32 => string[]) public recordsByUser;
+
   uint256 public totalRoles;
 
   // =================== ROLE MANAGEMENT - INTERNAL HELPERS ===================
 
+  /**
+   * @dev Get the role key for a (recordId, userIdHash) pair
+   */
+  function _getRoleKey(string memory recordId, bytes32 userIdHash) internal pure returns (bytes32) {
+    return keccak256(abi.encodePacked(recordId, userIdHash));
+  }
+
+  /**
+   * @dev Get caller's identity hash
+   */
+  function _getCallerIdHash() internal view returns (bytes32) {
+    return wallets[msg.sender].userIdHash;
+  }
+
+  /**
+   * @dev Makes sure the role is a valid role
+   */
+  function _isValidRole(string memory role) internal pure returns (bool) {
+    bytes32 h = keccak256(bytes(role));
+    return (h == keccak256(bytes('owner')) ||
+      h == keccak256(bytes('administrator')) ||
+      h == keccak256(bytes('viewer')));
+  }
+
   function _grantRoleInternal(
     string memory recordId,
-    address user,
+    bytes32 targetIdHash,
     string memory role,
-    address grantedBy
+    bytes32 userIdHash
   ) internal {
-    bytes32 roleKey = keccak256(abi.encodePacked(recordId, user));
-    bool alreadyHasRole = recordRoles[roleKey].isActive;
+    bytes32 roleKey = _getRoleKey(recordId, targetIdHash);
 
-    recordRoles[roleKey] = RecordRole({
-      recordId: recordId,
-      user: user,
-      role: role,
-      grantedAt: alreadyHasRole ? recordRoles[roleKey].grantedAt : block.timestamp,
-      lastModified: block.timestamp,
-      grantedBy: grantedBy,
-      isActive: true
-    });
+    RecordRole storage currentEntry = recordRoles[roleKey];
+    string memory oldRole = currentEntry.role;
+    bool hasExistingEntry = bytes(oldRole).length > 0;
+    bool isCurrentlyActive = currentEntry.isActive;
 
-    if (!alreadyHasRole) {
-      _addToRoleArray(recordId, user, role);
-      recordsByUser[user].push(recordId);
-      totalRoles++;
+    recordRoles[roleKey] = RecordRole({ role: role, isActive: true });
+
+    if (!isCurrentlyActive) {
+      _addToRoleArray(recordId, targetIdHash, role);
+
+      if (!hasExistingEntry) {
+        recordsByUser[targetIdHash].push(recordId);
+        totalRoles++;
+      }
+      emit RoleGranted(recordId, targetIdHash, role, userIdHash, block.timestamp);
+    } else {
+      if (keccak256(bytes(oldRole)) != keccak256(bytes(role))) {
+        _removeFromRoleArray(recordId, targetIdHash, oldRole);
+        _addToRoleArray(recordId, targetIdHash, role);
+      }
     }
-
-    emit RoleGranted(recordId, user, role, grantedBy, block.timestamp);
   }
 
-  function _addToRoleArray(string memory recordId, address user, string memory role) internal {
+  function _addToRoleArray(
+    string memory recordId,
+    bytes32 userIdHash,
+    string memory role
+  ) internal {
     bytes32 roleHash = keccak256(bytes(role));
 
     if (roleHash == keccak256(bytes('owner'))) {
-      ownersByRecord[recordId].push(user);
+      ownersByRecord[recordId].push(userIdHash);
     } else if (roleHash == keccak256(bytes('administrator'))) {
-      adminsByRecord[recordId].push(user);
+      adminsByRecord[recordId].push(userIdHash);
     } else if (roleHash == keccak256(bytes('viewer'))) {
-      viewersByRecord[recordId].push(user);
+      viewersByRecord[recordId].push(userIdHash);
     }
   }
 
-  function _removeFromRoleArray(string memory recordId, address user, string memory role) internal {
+  function _removeFromRoleArray(
+    string memory recordId,
+    bytes32 userIdHash,
+    string memory role
+  ) internal {
     bytes32 roleHash = keccak256(bytes(role));
 
     if (roleHash == keccak256(bytes('owner'))) {
-      _removeFromAddressArray(ownersByRecord[recordId], user);
+      _removeFromBytes32Array(ownersByRecord[recordId], userIdHash);
     } else if (roleHash == keccak256(bytes('administrator'))) {
-      _removeFromAddressArray(adminsByRecord[recordId], user);
+      _removeFromBytes32Array(adminsByRecord[recordId], userIdHash);
     } else if (roleHash == keccak256(bytes('viewer'))) {
-      _removeFromAddressArray(viewersByRecord[recordId], user);
+      _removeFromBytes32Array(viewersByRecord[recordId], userIdHash);
     }
   }
 
-  function _removeFromAddressArray(address[] storage array, address toRemove) internal {
+  function _removeFromBytes32Array(bytes32[] storage array, bytes32 toRemove) internal {
     for (uint256 i = 0; i < array.length; i++) {
       if (array[i] == toRemove) {
         array[i] = array[array.length - 1];
@@ -300,162 +408,167 @@ contract MemberRoleManager is MemberRoleManagerInterface {
     }
   }
 
+  function _hasActiveRole(string memory recordId, bytes32 userIdHash) internal view returns (bool) {
+    bytes32 roleKey = _getRoleKey(recordId, userIdHash);
+    return recordRoles[roleKey].isActive;
+  }
+
   function _hasRole(
     string memory recordId,
-    address user,
+    bytes32 userIdHash,
     string memory role
   ) internal view returns (bool) {
-    bytes32 roleKey = keccak256(abi.encodePacked(recordId, user));
-    RecordRole memory userRole = recordRoles[roleKey];
-    return userRole.isActive && keccak256(bytes(userRole.role)) == keccak256(bytes(role));
+    bytes32 roleKey = _getRoleKey(recordId, userIdHash);
+    RecordRole memory r = recordRoles[roleKey];
+    return r.isActive && keccak256(bytes(r.role)) == keccak256(bytes(role));
   }
 
-  function _isOwnerOrAdmin(string memory recordId, address user) internal view returns (bool) {
-    return _hasRole(recordId, user, 'owner') || _hasRole(recordId, user, 'administrator');
-  }
-
-  function _hasActiveRole(string memory recordId, address user) internal view returns (bool) {
-    bytes32 roleKey = keccak256(abi.encodePacked(recordId, user));
-    return recordRoles[roleKey].isActive;
+  function _isOwnerOrAdmin(
+    string memory recordId,
+    bytes32 userIdHash
+  ) internal view returns (bool) {
+    return
+      _hasRole(recordId, userIdHash, 'owner') || _hasRole(recordId, userIdHash, 'administrator');
   }
 
   // =================== ROLE MANAGEMENT - EXTERNAL FUNCTIONS ===================
 
   /**
-   * @notice Admin establishes first administrator on a new record
+   * @notice Admin establishes first role (administrator or owner) on a new record
    * @param recordId The record ID
-   * @param firstAdmin The address to make first administrator
+   * @param targetWallet A wallet address belonging to the user to assign the role to
+   * @param role The role to assign ("administrator" or "owner")
    */
-  function initializeRecordRole(string memory recordId, address firstAdmin) external onlyAdmin {
+  function initializeRecordRole(
+    string memory recordId,
+    address targetWallet,
+    string memory role
+  ) external onlyAdmin {
     require(bytes(recordId).length > 0, 'Record ID cannot be empty');
-    require(firstAdmin != address(0), 'Invalid address');
-    require(
-      members[firstAdmin].status != MemberStatus.Inactive && members[firstAdmin].joinedAt != 0,
-      'Must be an active member'
-    );
+    require(targetWallet != address(0), 'Invalid wallet address');
+    require(_isValidRole(role), 'Invalid role string');
+
+    // Get the identity for this wallet
+    bytes32 targetIdHash = wallets[targetWallet].userIdHash;
+    require(targetIdHash != bytes32(0), 'Wallet not registered');
+    require(_isActiveMember(targetWallet), 'Must be an active member');
+
     require(
       ownersByRecord[recordId].length == 0 && adminsByRecord[recordId].length == 0,
       'Record already initialized'
     );
 
-    _grantRoleInternal(recordId, firstAdmin, 'administrator', msg.sender);
+    _grantRoleInternal(recordId, targetIdHash, role, bytes32(0)); // bytes32(0) = admin
   }
 
   /**
    * @notice Grant a role to a user for a specific record
    * @param recordId The record ID
-   * @param user The address to grant the role to
+   * @param targetWallet A wallet address belonging to the target user
    * @param role The role to grant ("owner", "administrator", "viewer")
    */
   function grantRole(
     string memory recordId,
-    address user,
+    address targetWallet,
     string memory role
   ) external onlyActiveMember {
     require(bytes(recordId).length > 0, 'Record ID cannot be empty');
-    require(user != address(0), 'User address cannot be zero');
+    require(targetWallet != address(0), 'Wallet address cannot be zero');
+    require(_isValidRole(role), 'Invalid role string');
+
+    // Get identities
+    bytes32 userIdHash = _getCallerIdHash();
+    bytes32 targetIdHash = wallets[targetWallet].userIdHash;
+    require(targetIdHash != bytes32(0), 'Target wallet not registered');
 
     bytes32 roleHash = keccak256(bytes(role));
-    require(
-      roleHash == keccak256(bytes('owner')) ||
-        roleHash == keccak256(bytes('administrator')) ||
-        roleHash == keccak256(bytes('viewer')),
-      'Invalid role. Must be: owner, administrator, or viewer'
-    );
 
-    bytes32 callerRoleKey = keccak256(abi.encodePacked(recordId, msg.sender));
-    require(recordRoles[callerRoleKey].isActive, 'You have no role for this record');
+    require(_hasActiveRole(recordId, userIdHash), 'You have no role for this record');
 
     bool ownerExists = ownersByRecord[recordId].length > 0;
-    bool callerIsOwner = _hasRole(recordId, msg.sender, 'owner');
-    bool callerIsAdmin = _hasRole(recordId, msg.sender, 'administrator');
+    bool userIsOwner = _hasRole(recordId, userIdHash, 'owner');
+    bool userIsAdmin = _hasRole(recordId, userIdHash, 'administrator');
 
     if (roleHash == keccak256(bytes('owner'))) {
       if (ownerExists) {
-        require(callerIsOwner, 'Only owners can grant owner role');
+        require(userIsOwner, 'Only owners can grant owner role');
       } else {
-        require(callerIsAdmin, 'Only administrators can grant first owner');
+        require(userIsAdmin, 'Only administrators can grant first owner');
       }
     } else if (roleHash == keccak256(bytes('administrator'))) {
       require(
-        callerIsOwner || callerIsAdmin,
+        userIsOwner || userIsAdmin,
         'Only owners and administrators can grant administrator role'
       );
     } else if (roleHash == keccak256(bytes('viewer'))) {
-      require(
-        callerIsOwner || callerIsAdmin,
-        'Only owners and administrators can grant viewer role'
-      );
+      require(userIsOwner || userIsAdmin, 'Only owners and administrators can grant viewer role');
     }
 
-    bytes32 targetRoleKey = keccak256(abi.encodePacked(recordId, user));
     require(
-      !recordRoles[targetRoleKey].isActive,
-      'User already has a role. Use changeRole() instead'
+      !_hasActiveRole(recordId, targetIdHash),
+      'Target already has a role. Use changeRole() instead'
     );
 
-    _grantRoleInternal(recordId, user, role, msg.sender);
+    _grantRoleInternal(recordId, targetIdHash, role, userIdHash);
   }
 
   /**
    * @notice Change a user's existing role to a different role
    * @param recordId The record ID
-   * @param user The address whose role is being changed
+   * @param targetWallet A wallet address belonging to the target user
    * @param newRole The new role ("owner", "administrator", "viewer")
    */
   function changeRole(
     string memory recordId,
-    address user,
+    address targetWallet,
     string memory newRole
   ) external onlyActiveMember {
     require(bytes(recordId).length > 0, 'Record ID cannot be empty');
-    require(user != address(0), 'User address cannot be zero');
+    require(targetWallet != address(0), 'Wallet address cannot be zero');
+    require(_isValidRole(newRole), 'Invalid role string');
+
+    bytes32 userIdHash = _getCallerIdHash();
+    bytes32 targetIdHash = wallets[targetWallet].userIdHash;
+    require(targetIdHash != bytes32(0), 'Target wallet not registered');
 
     bytes32 newRoleHash = keccak256(bytes(newRole));
-    require(
-      newRoleHash == keccak256(bytes('owner')) ||
-        newRoleHash == keccak256(bytes('administrator')) ||
-        newRoleHash == keccak256(bytes('viewer')),
-      'Invalid role. Must be: owner, administrator, or viewer'
-    );
 
-    bytes32 targetRoleKey = keccak256(abi.encodePacked(recordId, user));
-    RecordRole memory currentRole = recordRoles[targetRoleKey];
-    require(currentRole.isActive, 'User does not have an active role');
+    bytes32 targetRoleKey = _getRoleKey(recordId, targetIdHash);
+    require(recordRoles[targetRoleKey].isActive, 'Target does not have an active role');
 
-    string memory oldRole = currentRole.role;
+    string memory oldRole = recordRoles[targetRoleKey].role;
     bytes32 oldRoleHash = keccak256(bytes(oldRole));
 
-    require(oldRoleHash != newRoleHash, 'User already has this role');
+    require(oldRoleHash != newRoleHash, 'Target already has this role');
     require(
       oldRoleHash != keccak256(bytes('owner')),
       'Owners cannot be demoted. Owner must voluntarily remove themselves.'
     );
 
     bool ownerExists = ownersByRecord[recordId].length > 0;
-    bool callerIsOwner = _hasRole(recordId, msg.sender, 'owner');
-    bool callerIsAdmin = _hasRole(recordId, msg.sender, 'administrator');
-    bool callerIsTarget = msg.sender == user;
+    bool userIsOwner = _hasRole(recordId, userIdHash, 'owner');
+    bool userIsAdmin = _hasRole(recordId, userIdHash, 'administrator');
+    bool userIsTarget = userIdHash == targetIdHash;
 
     if (newRoleHash == keccak256(bytes('owner'))) {
       if (ownerExists) {
-        require(callerIsOwner, 'Only owners can promote to owner');
+        require(userIsOwner, 'Only owners can promote to owner');
       } else {
-        require(callerIsAdmin, 'Only administrators can promote first owner');
+        require(userIsAdmin, 'Only administrators can promote first owner');
       }
     } else if (newRoleHash == keccak256(bytes('administrator'))) {
       require(
-        callerIsOwner || callerIsAdmin,
+        userIsOwner || userIsAdmin,
         'Only owners and administrators can promote to administrator'
       );
     } else if (newRoleHash == keccak256(bytes('viewer'))) {
       if (ownerExists) {
         require(
-          callerIsOwner || (callerIsAdmin && callerIsTarget),
+          userIsOwner || (userIsAdmin && userIsTarget),
           'Only owners can demote others. Administrators can only demote themselves.'
         );
       } else {
-        require(callerIsAdmin, 'Only administrators can demote to viewer');
+        require(userIsAdmin, 'Only administrators can demote to viewer');
       }
     }
 
@@ -470,72 +583,69 @@ contract MemberRoleManager is MemberRoleManagerInterface {
       }
     }
 
-    _removeFromRoleArray(recordId, user, oldRole);
-    _addToRoleArray(recordId, user, newRole);
+    _grantRoleInternal(recordId, targetIdHash, newRole, userIdHash);
 
-    recordRoles[targetRoleKey].role = newRole;
-    recordRoles[targetRoleKey].lastModified = block.timestamp;
-
-    emit RoleChanged(recordId, user, oldRole, newRole, msg.sender, block.timestamp);
+    emit RoleChanged(recordId, targetIdHash, oldRole, newRole, userIdHash, block.timestamp);
   }
 
   /**
    * @notice Allows an owner to voluntarily give up their ownership
    * @param recordId The record ID
    */
-  function voluntarilyRemoveOwnOwnership(string memory recordId) external {
+  function voluntarilyLeaveOwnership(string memory recordId) external {
     require(bytes(recordId).length > 0, 'Record ID cannot be empty');
-    require(_hasRole(recordId, msg.sender, 'owner'), 'You are not an owner of this record');
+
+    bytes32 userIdHash = _getCallerIdHash();
+    require(_hasRole(recordId, userIdHash, 'owner'), 'You are not an owner of this record');
 
     bool hasOtherOwners = ownersByRecord[recordId].length > 1;
     bool hasAdmins = adminsByRecord[recordId].length > 0;
 
-    require(
-      hasOtherOwners || hasAdmins,
-      'Cannot remove yourself as last owner with no administrators'
-    );
+    require(hasOtherOwners || hasAdmins, 'Cannot leave as last owner with no administrators');
 
-    bytes32 roleKey = keccak256(abi.encodePacked(recordId, msg.sender));
-    _removeFromRoleArray(recordId, msg.sender, 'owner');
+    bytes32 roleKey = _getRoleKey(recordId, userIdHash);
+    _removeFromRoleArray(recordId, userIdHash, 'owner');
 
     recordRoles[roleKey].isActive = false;
-    recordRoles[roleKey].lastModified = block.timestamp;
 
-    emit OwnerVoluntarilyLeft(recordId, msg.sender, block.timestamp);
+    emit OwnershipVoluntarilyLeft(recordId, userIdHash, block.timestamp);
   }
 
   /**
    * @notice Revoke a user's role entirely
    * @param recordId The record ID
-   * @param user The address whose role is being revoked
+   * @param targetWallet A wallet address belonging to the target user
    */
-  function revokeRole(string memory recordId, address user) external {
+  function revokeRole(string memory recordId, address targetWallet) external {
     require(bytes(recordId).length > 0, 'Record ID cannot be empty');
-    require(user != address(0), 'User address cannot be zero');
+    require(targetWallet != address(0), 'Wallet address cannot be zero');
 
-    bytes32 targetRoleKey = keccak256(abi.encodePacked(recordId, user));
-    RecordRole memory currentRole = recordRoles[targetRoleKey];
-    require(currentRole.isActive, 'User does not have an active role');
+    bytes32 userIdHash = _getCallerIdHash();
+    bytes32 targetIdHash = wallets[targetWallet].userIdHash;
+    require(targetIdHash != bytes32(0), 'Target wallet not registered');
 
-    string memory role = currentRole.role;
+    bytes32 targetRoleKey = _getRoleKey(recordId, targetIdHash);
+    require(recordRoles[targetRoleKey].isActive, 'Target does not have an active role');
+
+    string memory role = recordRoles[targetRoleKey].role;
     bytes32 roleHash = keccak256(bytes(role));
 
     require(
       roleHash != keccak256(bytes('owner')),
-      'Owners cannot be revoked. Owner must use voluntarilyRemoveOwnOwnership().'
+      'Owners cannot be revoked. Owner must use voluntarilyLeaveOwnership().'
     );
 
-    bool isSelfRevoke = msg.sender == user;
+    bool isSelfRevoke = userIdHash == targetIdHash;
 
     if (!isSelfRevoke) {
       require(
-        _isOwnerOrAdmin(recordId, msg.sender),
+        _isOwnerOrAdmin(recordId, userIdHash),
         'Only owners and administrators can revoke roles'
       );
 
-      bool callerIsOwner = _hasRole(recordId, msg.sender, 'owner');
+      bool userIsOwner = _hasRole(recordId, userIdHash, 'owner');
 
-      if (!callerIsOwner) {
+      if (!userIsOwner) {
         bool targetIsAdmin = roleHash == keccak256(bytes('administrator'));
 
         if (targetIsAdmin) {
@@ -555,103 +665,106 @@ contract MemberRoleManager is MemberRoleManagerInterface {
       );
     }
 
-    _removeFromRoleArray(recordId, user, role);
+    _removeFromRoleArray(recordId, targetIdHash, role);
 
     recordRoles[targetRoleKey].isActive = false;
-    recordRoles[targetRoleKey].lastModified = block.timestamp;
 
-    emit RoleRevoked(recordId, user, role, msg.sender, block.timestamp);
+    emit RoleRevoked(recordId, targetIdHash, role, userIdHash, block.timestamp);
   }
 
-  // =================== ROLE MANAGEMENT - VIEW FUNCTIONS (Interface) ===================
+  // =================== ROLE MANAGEMENT - VIEW FUNCTIONS ===================
 
   /**
-   * @notice Check if user has any active role on a record
+   * @notice Check if wallet's identity has any active role on a record
    */
   function hasActiveRole(
     string memory recordId,
-    address user
+    address wallet
   ) external view override returns (bool) {
-    return _hasActiveRole(recordId, user);
+    bytes32 userIdHash = wallets[wallet].userIdHash;
+    if (userIdHash == bytes32(0)) return false;
+    return _hasActiveRole(recordId, userIdHash);
   }
 
   /**
-   * @notice Check if a user has a specific role
+   * @notice Check if wallet's identity has a specific role
    */
   function hasRole(
     string memory recordId,
-    address user,
+    address wallet,
     string memory role
   ) external view override returns (bool) {
-    return _hasRole(recordId, user, role);
+    bytes32 userIdHash = wallets[wallet].userIdHash;
+    if (userIdHash == bytes32(0)) return false;
+    return _hasRole(recordId, userIdHash, role);
   }
 
   /**
-   * @notice Check if user is owner or administrator
+   * @notice Check if wallet's identity is owner or administrator
    */
   function isOwnerOrAdmin(
     string memory recordId,
-    address user
+    address wallet
   ) external view override returns (bool) {
-    return _isOwnerOrAdmin(recordId, user);
+    bytes32 userIdHash = wallets[wallet].userIdHash;
+    if (userIdHash == bytes32(0)) return false;
+    return _isOwnerOrAdmin(recordId, userIdHash);
   }
 
-  // =================== ROLE MANAGEMENT - VIEW FUNCTIONS (Additional) ===================
-
   /**
-   * @notice Get full role details
+   * @notice Get full role details by wallet
    */
   function getRoleDetails(
     string memory recordId,
-    address user
-  )
-    external
-    view
-    returns (
-      string memory role,
-      uint256 grantedAt,
-      uint256 lastModified,
-      address grantedBy,
-      bool isActive
-    )
-  {
-    bytes32 roleKey = keccak256(abi.encodePacked(recordId, user));
-    RecordRole memory userRole = recordRoles[roleKey];
-    return (
-      userRole.role,
-      userRole.grantedAt,
-      userRole.lastModified,
-      userRole.grantedBy,
-      userRole.isActive
-    );
+    address wallet
+  ) external view returns (string memory role, bool isActive) {
+    bytes32 userIdHash = wallets[wallet].userIdHash;
+    if (userIdHash == bytes32(0)) {
+      return ('', false);
+    }
+    bytes32 roleKey = _getRoleKey(recordId, userIdHash);
+    RecordRole memory r = recordRoles[roleKey];
+    return (r.role, r.isActive);
   }
 
   /**
-   * @notice Get all owners of a record
+   * @notice Get full role details by identity
    */
-  function getRecordOwners(string memory recordId) external view returns (address[] memory) {
+  function getRoleDetailsByUser(
+    string memory recordId,
+    bytes32 userIdHash
+  ) external view returns (string memory role, bool isActive) {
+    bytes32 roleKey = _getRoleKey(recordId, userIdHash);
+    RecordRole memory r = recordRoles[roleKey];
+    return (r.role, r.isActive);
+  }
+
+  /**
+   * @notice Get all owner identities of a record
+   */
+  function getRecordOwners(string memory recordId) external view returns (bytes32[] memory) {
     return ownersByRecord[recordId];
   }
 
   /**
-   * @notice Get all administrators of a record
+   * @notice Get all admin identities of a record
    */
-  function getRecordAdmins(string memory recordId) external view returns (address[] memory) {
+  function getRecordAdmins(string memory recordId) external view returns (bytes32[] memory) {
     return adminsByRecord[recordId];
   }
 
   /**
-   * @notice Get all viewers of a record
+   * @notice Get all viewer identities of a record
    */
-  function getRecordViewers(string memory recordId) external view returns (address[] memory) {
+  function getRecordViewers(string memory recordId) external view returns (bytes32[] memory) {
     return viewersByRecord[recordId];
   }
 
   /**
    * @notice Get all records where a user has any role
    */
-  function getRecordsByUser(address user) external view returns (string[] memory) {
-    return recordsByUser[user];
+  function getRecordsByUser(bytes32 userIdHash) external view returns (string[] memory) {
+    return recordsByUser[userIdHash];
   }
 
   /**

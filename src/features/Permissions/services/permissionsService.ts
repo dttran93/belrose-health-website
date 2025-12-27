@@ -3,6 +3,7 @@
  * Service for managing record permissions
  * Handles role assignment (Firestore array + blockchain)
  * Calls SharingService for encryption Access
+ * Integrates with roleInitializationService for first-time blockchain permission setup
  */
 
 import {
@@ -20,6 +21,7 @@ import { getAuth } from 'firebase/auth';
 import { SharingService } from '@/features/Sharing/services/sharingService';
 import { BlockchainRoleManagerService } from './blockchainRoleManagerService';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
+import { InitialRole, RoleInitializationService } from './roleInitializationService';
 
 export type Role = 'owner' | 'administrator' | 'viewer';
 
@@ -56,11 +58,13 @@ export class PermissionsService {
    */
   private static async logBlockchainSyncFailure(
     recordId: string,
-    action: 'grantRole' | 'changeRole' | 'revokeRole',
+    action: 'grantRole' | 'changeRole' | 'revokeRole' | 'initializeRole',
     params: {
-      walletAddress: string;
-      role?: Role;
-      userId: string;
+      userId: string; //Current User trying to call the function
+      userWalletAddress: string;
+      role: Role | InitialRole;
+      targetUserId?: string;
+      targetWalletAddress?: string;
     },
     error: Error
   ): Promise<void> {
@@ -69,9 +73,11 @@ export class PermissionsService {
       await addDoc(collection(db, 'blockchainSyncQueue'), {
         recordId,
         action,
-        walletAddress: params.walletAddress,
         role: params.role || null,
         userId: params.userId,
+        userWalletAddress: params.userWalletAddress,
+        targetUserId: params.targetUserId ?? null,
+        targetWalletAddress: params.targetWalletAddress ?? null,
         error: error.message,
         status: 'pending',
         retryCount: 0,
@@ -102,11 +108,11 @@ export class PermissionsService {
   // ============================================================================
 
   /**
-   * Add an owner to a record
+   * Add a viewer to a record
    * @param recordId - The record ID
-   * @param targetUserId - The user ID to add as owner
+   * @param targetUserId - The user ID to add as viewer
    * @throws Error if operation fails or user doesn't have permission
-   * Mirrors to blockchain as well. Creates list if blockchain mirroring fails
+   * Mirrors to blockchain as well. Creates retry queue entry if blockchain mirroring fails
    */
   static async grantViewer(recordId: string, targetUserId: string): Promise<void> {
     const auth = getAuth();
@@ -141,10 +147,15 @@ export class PermissionsService {
       throw new Error('Target user does not exist or has no profile');
     }
 
-    // Check 3: Ensure the user has a wallet address for the blockchain transaction
-    const targetUserWalletAddress = targetProfile.wallet?.address;
+    // Check 3: Ensure the user and target have wallet addresses for the blockchain transaction
+    const userWalletAddress = await this.getUserWalletAddress(currentUser.uid);
+    const targetWalletAddress = targetProfile.wallet?.address;
 
-    if (!targetUserWalletAddress) {
+    if (!userWalletAddress) {
+      throw new Error('Target user does not have a linked blockchain wallet');
+    }
+
+    if (!targetWalletAddress) {
       throw new Error('Target user does not have a linked blockchain wallet');
     }
 
@@ -163,26 +174,52 @@ export class PermissionsService {
 
     console.log('🔄 Granting viewer access:', targetUserId);
 
-    // Step 1: Grant encryption access
+    // Step 1: Initialize record on blockchain if needed (backend handles all validation)
+    const currentUserRole = this.getUserRole(recordData, currentUser.uid);
+    const initialRole: InitialRole = currentUserRole === 'owner' ? 'owner' : 'administrator';
+
+    try {
+      await RoleInitializationService.initializeRecordRole(
+        recordId,
+        userWalletAddress,
+        initialRole
+      );
+    } catch (initError: any) {
+      console.error('⚠️ Blockchain initialization failed:', initError);
+      await this.logBlockchainSyncFailure(
+        recordId,
+        'initializeRole',
+        { userId: currentUser.uid, userWalletAddress: userWalletAddress, role: initialRole },
+        initError as Error
+      );
+    }
+
+    // Step 2: Grant encryption access
     await SharingService.grantEncryptionAccess(recordId, targetUserId, currentUser.uid);
 
-    // Step 2: Add to viewers array in Firebase
+    // Step 3: Add to viewers array in Firebase
     await updateDoc(recordRef, {
       viewers: arrayUnion(targetUserId),
     });
     console.log('✅ Added to viewers array in Firebase');
 
-    // Step 3: Grant viewer role on blockchain
+    // Step 4: Grant viewer role on blockchain
     try {
       console.log('🔗 Granting viewer role on blockchain...');
-      await BlockchainRoleManagerService.grantRole(recordId, targetUserWalletAddress, 'viewer');
+      await BlockchainRoleManagerService.grantRole(recordId, targetWalletAddress, 'viewer');
       console.log('✅ Blockchain: Viewer role granted');
     } catch (blockchainError) {
       console.error('⚠️ Blockchain update failed:', blockchainError);
       await this.logBlockchainSyncFailure(
         recordId,
         'grantRole',
-        { walletAddress: targetUserWalletAddress, role: 'viewer', userId: targetUserId },
+        {
+          userId: currentUser.uid,
+          userWalletAddress: userWalletAddress,
+          targetUserId: targetUserId,
+          targetWalletAddress: targetWalletAddress,
+          role: 'viewer',
+        },
         blockchainError as Error
       );
     }
@@ -193,7 +230,7 @@ export class PermissionsService {
   /**
    * Add an administrator to a record
    * @param recordId - The record ID
-   * @param targetUserId - The user ID to add as owner
+   * @param targetUserId - The user ID to add as administrator
    * @throws Error if operation fails or user doesn't have permission
    */
   static async grantAdmin(recordId: string, targetUserId: string): Promise<void> {
@@ -214,7 +251,7 @@ export class PermissionsService {
 
     const recordData = recordDoc.data();
 
-    // Check 1: Permission check - only admins/owners can grant viewer
+    // Check 1: Permission check - only admins/owners can grant admin
     const isCurrentUserAdmin = recordData.administrators?.includes(currentUser.uid);
     const isCurrentUserOwner = recordData.owners?.includes(currentUser.uid);
 
@@ -229,14 +266,19 @@ export class PermissionsService {
       throw new Error('Target user does not exist or has no profile');
     }
 
-    // Check 3: Ensure the user has a wallet address for the blockchain transaction
-    const targetUserWalletAddress = targetProfile.wallet?.address;
+    // Check 3: Ensure the user and target have wallet addresses for the blockchain transaction
+    const userWalletAddress = await this.getUserWalletAddress(currentUser.uid);
+    const targetWalletAddress = targetProfile.wallet?.address;
 
-    if (!targetUserWalletAddress) {
+    if (!userWalletAddress) {
+      throw new Error('Current user does not have a linked blockchain wallet');
+    }
+
+    if (!targetWalletAddress) {
       throw new Error('Target user does not have a linked blockchain wallet');
     }
 
-    //Check 4: Check existing roles - can't demote owners
+    // Check 4: Check existing roles - can't demote owners
     const existingRole = this.getUserRole(recordData, targetUserId);
 
     if (existingRole === 'owner') {
@@ -248,18 +290,38 @@ export class PermissionsService {
 
     console.log('🔄 Granting administrator role:', targetUserId);
 
-    // Step 1: Grant encryption access
+    // Step 1: Initialize record on blockchain if needed (backend handles all validation)
+    const currentUserRole = this.getUserRole(recordData, currentUser.uid);
+    const initialRole: InitialRole = currentUserRole === 'owner' ? 'owner' : 'administrator';
+
+    try {
+      await RoleInitializationService.initializeRecordRole(
+        recordId,
+        userWalletAddress,
+        initialRole
+      );
+    } catch (initError: any) {
+      console.error('⚠️ Blockchain initialization failed:', initError);
+      await this.logBlockchainSyncFailure(
+        recordId,
+        'initializeRole',
+        { userId: currentUser.uid, userWalletAddress: userWalletAddress, role: initialRole },
+        initError as Error
+      );
+    }
+
+    // Step 2: Grant encryption access
     await SharingService.grantEncryptionAccess(recordId, targetUserId, currentUser.uid);
 
-    // Step 2: Update arrays - add to admins, remove from viewers (highest role only)
+    // Step 3: Update arrays - add to admins, remove from viewers (highest role only)
     await updateDoc(recordRef, {
       administrators: arrayUnion(targetUserId),
       viewers: arrayRemove(targetUserId),
     });
     console.log('✅ Added to administrators array');
 
-    // Step 3: Blockchain - determine action based on existing role
-    // Change role is in case they're being upgraded from viewer to admin
+    // Step 4: Blockchain - determine action based on existing role
+    // changeRole is in case they're being upgraded from viewer to admin
     const hasExistingRole = existingRole !== null;
     const blockchainAction: 'grantRole' | 'changeRole' = hasExistingRole
       ? 'changeRole'
@@ -273,13 +335,13 @@ export class PermissionsService {
       if (hasExistingRole) {
         await BlockchainRoleManagerService.changeRole(
           recordId,
-          targetUserWalletAddress,
+          targetWalletAddress,
           'administrator'
         );
       } else {
         await BlockchainRoleManagerService.grantRole(
           recordId,
-          targetUserWalletAddress,
+          targetWalletAddress,
           'administrator'
         );
       }
@@ -290,7 +352,13 @@ export class PermissionsService {
       await this.logBlockchainSyncFailure(
         recordId,
         blockchainAction,
-        { walletAddress: targetUserWalletAddress, role: 'administrator', userId: targetUserId },
+        {
+          userId: currentUser.uid,
+          userWalletAddress: userWalletAddress,
+          targetUserId: targetUserId,
+          targetWalletAddress: targetWalletAddress,
+          role: 'administrator',
+        },
         blockchainError as Error
       );
     }
@@ -303,7 +371,7 @@ export class PermissionsService {
    * @param recordId - The record ID
    * @param targetUserId - The user ID to add as owner
    * @throws Error if operation fails or user doesn't have permission
-   * Mirrors to blockchain as well. Creates list if blockchain mirroring fails
+   * Mirrors to blockchain as well. Creates retry queue entry if blockchain mirroring fails
    */
   static async grantOwner(recordId: string, targetUserId: string): Promise<void> {
     const auth = getAuth();
@@ -340,13 +408,18 @@ export class PermissionsService {
     }
 
     // Check 3: Ensure the user has a wallet for the blockchain transaction
-    const targetUserWalletAddress = targetProfile.wallet?.address;
+    const userWalletAddress = await this.getUserWalletAddress(currentUser.uid);
+    const targetWalletAddress = targetProfile.wallet?.address;
 
-    if (!targetUserWalletAddress) {
+    if (!userWalletAddress) {
+      throw new Error('Current user does not have a linked blockchain wallet');
+    }
+
+    if (!targetWalletAddress) {
       throw new Error('Target user does not have a linked blockchain wallet');
     }
 
-    //Check 4: Check if they're already an owner
+    // Check 4: Check if they're already an owner
     const existingRole = this.getUserRole(recordData, targetUserId);
 
     if (existingRole === 'owner') {
@@ -355,17 +428,42 @@ export class PermissionsService {
 
     console.log('🔄 Granting owner access:', targetUserId);
 
-    // Step 1: Grant encryption access
+    // Step 1: Initialize record on blockchain if needed (backend handles all validation)
+    const currentUserRole = this.getUserRole(recordData, currentUser.uid);
+    const initialRole: InitialRole = currentUserRole === 'owner' ? 'owner' : 'administrator';
+
+    try {
+      await RoleInitializationService.initializeRecordRole(
+        recordId,
+        userWalletAddress,
+        initialRole
+      );
+    } catch (initError: any) {
+      console.error('⚠️ Blockchain initialization failed:', initError);
+      await this.logBlockchainSyncFailure(
+        recordId,
+        'initializeRole',
+        {
+          userId: currentUser.uid,
+          userWalletAddress: userWalletAddress,
+          role: initialRole,
+        },
+        initError as Error
+      );
+    }
+
+    // Step 2: Grant encryption access
     await SharingService.grantEncryptionAccess(recordId, targetUserId, currentUser.uid);
 
-    // Step 2: Update arrays - add to owners, remove from lower roles (highest role only)
+    // Step 3: Update arrays - add to owners, remove from lower roles (highest role only)
     await updateDoc(recordRef, {
       owners: arrayUnion(targetUserId),
       administrators: arrayRemove(targetUserId),
       viewers: arrayRemove(targetUserId),
     });
     console.log('✅ Added to owners array');
-    // Step 3: Blockchain - determine action based on existing role
+
+    // Step 4: Blockchain - determine action based on existing role
     const hasExistingRole = existingRole !== null;
     const blockchainAction: 'grantRole' | 'changeRole' = hasExistingRole
       ? 'changeRole'
@@ -377,9 +475,9 @@ export class PermissionsService {
       );
 
       if (hasExistingRole) {
-        await BlockchainRoleManagerService.changeRole(recordId, targetUserWalletAddress, 'owner');
+        await BlockchainRoleManagerService.changeRole(recordId, targetWalletAddress, 'owner');
       } else {
-        await BlockchainRoleManagerService.grantRole(recordId, targetUserWalletAddress, 'owner');
+        await BlockchainRoleManagerService.grantRole(recordId, targetWalletAddress, 'owner');
       }
 
       console.log('✅ Blockchain: Owner role set');
@@ -388,7 +486,13 @@ export class PermissionsService {
       await this.logBlockchainSyncFailure(
         recordId,
         blockchainAction,
-        { walletAddress: targetUserWalletAddress, role: 'owner', userId: targetUserId },
+        {
+          userId: currentUser.uid,
+          userWalletAddress: userWalletAddress,
+          targetUserId: targetUserId,
+          targetWalletAddress: targetWalletAddress,
+          role: 'owner',
+        },
         blockchainError as Error
       );
     }
@@ -401,7 +505,10 @@ export class PermissionsService {
   // ============================================================================
 
   /**
-   * Remove viewer access from a record
+   * Remove an viewer from a record
+   * @param recordId - The record ID
+   * @param targetUserId - The user ID to remove as viewer
+   * @throws Error if operation fails or user doesn't have permission
    */
   static async removeViewer(recordId: string, targetUserId: string): Promise<void> {
     const auth = getAuth();
@@ -411,7 +518,8 @@ export class PermissionsService {
       throw new Error('User not authenticated');
     }
 
-    const userWalletAddress = await this.getUserWalletAddress(targetUserId);
+    const userWalletAddress = await this.getUserWalletAddress(currentUser.uid);
+    const targetWalletAddress = await this.getUserWalletAddress(targetUserId);
 
     const db = getFirestore();
     const recordRef = doc(db, 'records', recordId);
@@ -450,14 +558,20 @@ export class PermissionsService {
     // Step 3: Revoke role on blockchain
     try {
       console.log('🔗 Revoking role on blockchain...');
-      await BlockchainRoleManagerService.revokeRole(recordId, userWalletAddress);
+      await BlockchainRoleManagerService.revokeRole(recordId, targetWalletAddress);
       console.log('✅ Blockchain: Role revoked');
     } catch (blockchainError) {
       console.error('⚠️ Blockchain update failed:', blockchainError);
       await this.logBlockchainSyncFailure(
         recordId,
         'revokeRole',
-        { walletAddress: userWalletAddress, userId: targetUserId },
+        {
+          userId: currentUser.uid,
+          userWalletAddress: userWalletAddress,
+          targetUserId: targetUserId,
+          targetWalletAddress: targetWalletAddress,
+          role: 'viewer',
+        },
         blockchainError as Error
       );
     }
@@ -468,7 +582,7 @@ export class PermissionsService {
   /**
    * Remove an admin from a record
    * @param recordId - The record ID
-   * @param targetUserId - The user ID to remove as owner
+   * @param targetUserId - The user ID to remove as admin
    * @param options - Can set demote to viewer as true otherwise access fully revoked
    * @throws Error if operation fails or user doesn't have permission
    */
@@ -484,7 +598,8 @@ export class PermissionsService {
       throw new Error('User not authenticated');
     }
 
-    const userWalletAddress = await this.getUserWalletAddress(targetUserId);
+    const userWalletAddress = await this.getUserWalletAddress(currentUser.uid);
+    const targetWalletAddress = await this.getUserWalletAddress(targetUserId);
 
     const db = getFirestore();
     const recordRef = doc(db, 'records', recordId);
@@ -496,7 +611,7 @@ export class PermissionsService {
 
     const recordData = recordDoc.data();
 
-    //Permission checks
+    // Permission checks
     const isCurrentUserOwner = recordData.owners?.includes(currentUser.uid);
     const isCurrentUserAdmin = recordData.administrators?.includes(currentUser.uid);
     const isSelfRemoval = targetUserId === currentUser.uid;
@@ -553,11 +668,11 @@ export class PermissionsService {
     try {
       if (demoteToViewer) {
         console.log('🔗 Demoting to viewer on blockchain...');
-        await BlockchainRoleManagerService.changeRole(recordId, userWalletAddress, 'viewer');
+        await BlockchainRoleManagerService.changeRole(recordId, targetWalletAddress, 'viewer');
         console.log('✅ Blockchain: Demoted to viewer');
       } else {
         console.log('🔗 Revoking role on blockchain...');
-        await BlockchainRoleManagerService.revokeRole(recordId, userWalletAddress);
+        await BlockchainRoleManagerService.revokeRole(recordId, targetWalletAddress);
         console.log('✅ Blockchain: Role revoked');
       }
     } catch (blockchainError) {
@@ -566,9 +681,11 @@ export class PermissionsService {
         recordId,
         demoteToViewer ? 'changeRole' : 'revokeRole',
         {
-          walletAddress: userWalletAddress,
-          role: demoteToViewer ? 'viewer' : undefined,
-          userId: targetUserId,
+          userId: currentUser.uid,
+          userWalletAddress: userWalletAddress,
+          targetUserId: targetUserId,
+          targetWalletAddress: targetWalletAddress,
+          role: demoteToViewer ? 'viewer' : 'administrator',
         },
         blockchainError as Error
       );
@@ -596,7 +713,8 @@ export class PermissionsService {
       throw new Error('User not authenticated');
     }
 
-    const userWalletAddress = await this.getUserWalletAddress(targetUserId);
+    const userWalletAddress = await this.getUserWalletAddress(currentUser.uid);
+    const targetWalletAddress = await this.getUserWalletAddress(targetUserId);
 
     const db = getFirestore();
     const recordRef = doc(db, 'records', recordId);
@@ -617,12 +735,12 @@ export class PermissionsService {
       throw new Error('Owners can only remove themselves. You cannot remove other owners.');
     }
 
-    //Rule 2: Only owners can remove owners
+    // Rule 2: Only owners can remove owners
     if (!isCurrentUserOwner) {
       throw new Error('You are not an owner of this record');
     }
 
-    //Rule 3: Verify target is actually an owner
+    // Rule 3: Verify target is actually an owner
     if (!recordData.owners?.includes(targetUserId)) {
       throw new Error('User is not an owner of this record');
     }
@@ -662,33 +780,56 @@ export class PermissionsService {
       await SharingService.revokeEncryptionAccess(recordId, targetUserId, currentUser.uid);
     }
 
-    // Step 2: Update blockchain
+    // Step 2: Update blockchain - owners must use voluntarilyRemoveOwnOwnership
     try {
-      if (demoteTo) {
-        console.log(`🔗 Demoting to ${demoteTo} on blockchain...`);
-        await BlockchainRoleManagerService.changeRole(recordId, userWalletAddress, demoteTo);
-        console.log(`✅ Blockchain: Demoted to ${demoteTo}`);
-      } else {
-        console.log('🔗 Revoking role on blockchain...');
-        await BlockchainRoleManagerService.revokeRole(recordId, userWalletAddress);
-        console.log('✅ Blockchain: Role revoked');
-      }
+      console.log('🔗 Removing ownership on blockchain...');
+      await BlockchainRoleManagerService.voluntarilyRemoveOwnOwnership(recordId);
+      console.log('✅ Blockchain: Ownership removed');
     } catch (blockchainError) {
-      console.error('⚠️ Blockchain update failed:', blockchainError);
+      console.error('⚠️ Blockchain ownership removal failed:', blockchainError);
       await this.logBlockchainSyncFailure(
         recordId,
-        demoteTo ? 'changeRole' : 'revokeRole',
+        'revokeRole',
         {
-          walletAddress: userWalletAddress,
-          role: demoteTo,
-          userId: targetUserId,
+          userId: currentUser.uid,
+          userWalletAddress: userWalletAddress,
+          targetUserId: targetUserId,
+          targetWalletAddress: targetWalletAddress,
+          role: 'owner',
         },
         blockchainError as Error
       );
     }
 
+    // Step 3: If demoting, need to grant the new role
+    if (demoteTo) {
+      try {
+        console.log(`🔗 Demoting to ${demoteTo} on blockchain...`);
+        await BlockchainRoleManagerService.grantRole(recordId, targetWalletAddress, demoteTo);
+        console.log(`✅ Blockchain: Demoted to ${demoteTo}`);
+      } catch (blockchainError) {
+        console.error('⚠️ Blockchain update failed:', blockchainError);
+        await this.logBlockchainSyncFailure(
+          recordId,
+          'grantRole',
+          {
+            userId: currentUser.uid,
+            userWalletAddress: userWalletAddress,
+            targetUserId: targetUserId,
+            targetWalletAddress: targetWalletAddress,
+            role: demoteTo,
+          },
+          blockchainError as Error
+        );
+      }
+    }
+
     console.log('✅ Owner access removed successfully');
   }
+
+  // ============================================================================
+  // QUERY METHODS
+  // ============================================================================
 
   /**
    * Check if current user can manage a specific role on a record
@@ -762,6 +903,24 @@ export class PermissionsService {
     } catch (err) {
       console.error('Error getting record roles:', err);
       return null;
+    }
+  }
+
+  /**
+   * Check if a record is initialized on blockchain
+   */
+  static async isRecordInitialized(recordId: string): Promise<boolean> {
+    try {
+      const db = getFirestore();
+      const recordDoc = await getDoc(doc(db, 'records', recordId));
+
+      if (!recordDoc.exists()) return false;
+
+      const recordData = recordDoc.data();
+      return recordData?.blockchain?.roleInitialization?.blockchainInitialized === true;
+    } catch (err) {
+      console.error('Error checking record initialization:', err);
+      return false;
     }
   }
 }

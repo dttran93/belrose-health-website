@@ -1,14 +1,18 @@
 // src/features/BlockchainWallet/services/paymasterService.ts
 
 /**
- * PaymasterService - Handles gasless transactions via Account Abstraction (ERC-4337)
+ * PaymasterService - Handles all blockchain write transactions
+ *
+ * This service is the main entry point for sending blockchain transactions:
  *
  * This service abstracts away the complexity of:
  * - Creating smart account clients
  * - Requesting gas sponsorship from our backend
  * - Submitting UserOperations through a bundler
  *
- * Any feature needing gasless transactions can use this service.
+ * OR - directs transactions to direct signing where the user pays for gas
+ *
+ * Any feature needing to write to blockchain should use this service.
  */
 
 import { createPublicClient, http, type Hex, concat, pad, toHex } from 'viem';
@@ -55,6 +59,45 @@ export interface TransactionRequest {
 
 export class PaymasterService {
   /**
+   * Send a transaction - automatically routes to sponsored or direct based on wallet type
+   *
+   * This is the main entry point for all blockchain write operations.
+   * - Generated wallets: Uses paymaster for gasless transactions
+   * - MetaMask/external wallets: User pays gas directly
+   *
+   * @param request - The transaction to send (to, data, value)
+   * @returns Transaction hash
+   */
+  static async sendTransaction(request: TransactionRequest): Promise<string> {
+    const wallet = await WalletService.getCurrentUserWallet();
+
+    if (wallet?.origin === 'generated') {
+      return this.sendSponsoredTransaction(request);
+    } else {
+      return this.sendDirectTransaction(request);
+    }
+  }
+
+  /**
+   * Send a direct transaction where user pays gas (MetaMask, etc.)
+   */
+  private static async sendDirectTransaction(request: TransactionRequest): Promise<string> {
+    console.log('🦊 PaymasterService: Sending direct transaction (user pays gas)...');
+
+    const { signer } = await WalletService.getSigner();
+    const tx = await signer.sendTransaction({
+      to: request.to,
+      data: request.data,
+      value: request.value ?? 0n,
+    });
+
+    const receipt = await tx.wait();
+    console.log('✅ PaymasterService: Direct transaction confirmed:', tx.hash);
+
+    return tx.hash;
+  }
+
+  /**
    * Check if user can use sponsored (gasless) transactions
    *
    * Requirements:
@@ -90,10 +133,11 @@ export class PaymasterService {
   /**
    * Send a sponsored (gasless) transaction
    *
-   * This is the main entry point for other services. It handles:
-   * 1. Creating the smart account client
-   * 2. Getting sponsorship from backend
-   * 3. Submitting the UserOperation
+   * This handles:
+   * 1. Ensuring smart account is registered on-chain (lazy registration)
+   * 2. Creating the smart account client
+   * 3. Getting sponsorship from backend
+   * 4. Submitting the UserOperation
    *
    * @param request - The transaction to send (to, data, value)
    * @returns Transaction hash
@@ -108,6 +152,9 @@ export class PaymasterService {
       throw new Error(`Cannot use sponsored transactions: ${sponsorCheck.reason}`);
     }
 
+    // Ensure smart account is registered on-chain before first tx
+    await this.ensureSmartAccountRegistered();
+
     // Create the smart account client with paymaster
     const client = await this.createSmartAccountClient();
 
@@ -120,6 +167,77 @@ export class PaymasterService {
 
     console.log('✅ PaymasterService: Transaction submitted:', txHash);
     return txHash;
+  }
+
+  /**
+   * Ensure the user's Smart Account is registered on-chain as a member.
+   * This is lazy - only happens on first sponsored transaction.
+   *
+   * Smart Accounts have a deterministic address based on the EOA owner,
+   * so we can compute it without deploying the contract.
+   */
+  private static async ensureSmartAccountRegistered(): Promise<void> {
+    const wallet = await WalletService.getCurrentUserWallet();
+
+    // Already registered? Skip
+    if (wallet?.smartAccountAddress) {
+      console.log('✅ PaymasterService: Smart account already registered');
+      return;
+    }
+
+    console.log('🔐 PaymasterService: Registering smart account on-chain...');
+
+    // Compute the deterministic smart account address
+    const smartAccountAddress = await this.computeSmartAccountAddress();
+    console.log('📱 PaymasterService: Computed smart account:', smartAccountAddress);
+
+    // Register on-chain via Cloud Function
+    // This will call addMember(smartAccountAddress, userIdHash) and update Firestore
+    const functions = getFunctions();
+    const registerFn = httpsCallable<
+      { smartAccountAddress: string },
+      { success: boolean; txHash: string }
+    >(functions, 'registerSmartAccount');
+
+    const result = await registerFn({ smartAccountAddress });
+
+    if (!result.data.success) {
+      throw new Error('Failed to register smart account on-chain');
+    }
+
+    console.log('✅ PaymasterService: Smart account registered:', result.data.txHash);
+  }
+
+  /**
+   * Compute the deterministic Smart Account address for the current user.
+   *
+   * The address is derived from:
+   * - The EOA owner address
+   * - The EntryPoint address
+   * - The SimpleAccount factory
+   *
+   * This is the same address every time for the same EOA.
+   */
+  private static async computeSmartAccountAddress(): Promise<string> {
+    const { signer } = await WalletService.getSigner();
+    const privateKey = (signer as any).privateKey as Hex;
+    const viemAccount = privateKeyToAccount(privateKey);
+
+    const publicClient = createPublicClient({
+      chain: CHAIN,
+      transport: http(),
+    });
+
+    const simpleAccount = await toSimpleSmartAccount({
+      client: publicClient,
+      owner: viemAccount,
+      entryPoint: {
+        address: entryPoint07Address,
+        version: '0.7',
+      },
+    });
+
+    return simpleAccount.address;
   }
 
   /**
