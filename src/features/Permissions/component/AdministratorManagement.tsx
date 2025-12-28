@@ -1,16 +1,15 @@
+// src/features/Permissions/components/AdminManagement.tsx
+
 import React, { useState, useEffect } from 'react';
 import { Users, ArrowLeft, HelpCircle, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { usePermissions } from '@/features/Permissions/hooks/usePermissions';
+import { usePermissionFlow } from '@/features/Permissions/hooks/usePermissionFlow';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import UserSearch from '@/features/Users/components/UserSearch';
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
 import UserCard from '@/features/Users/components/ui/UserCard';
-import { AccessEntry } from '@/features/Sharing/components/EncryptionAccessView';
-import RevokeAccessDialog from './ui/RevokeAccessDialog';
+import PermissionActionDialog from './ui/PermissionActionDialog';
 
 interface AdminManagementProps {
   record: FileObject;
@@ -32,107 +31,80 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
   const [selectedUser, setSelectedUser] = useState<BelroseUserProfile | null>(null);
   const [loadingAdmins, setLoadingAdmins] = useState(true);
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
-  const [refreshAdminsTrigger, setRefreshAdminsTrigger] = useState(0);
-  const [revokeEntry, setRevokeEntry] = useState<AccessEntry | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const { grantAdmin, removeAdmin, isLoading } = usePermissions({
-    onSuccess: msg => {
+  // Use the new permission flow hook
+  const { dialogProps, initiateGrant, initiateRevoke, isLoading } = usePermissionFlow({
+    recordId: record.id,
+    onSuccess: () => {
       setSelectedUser(null);
-      setRevokeEntry(null); // Clear dialog on success
-      setRefreshAdminsTrigger(prev => prev + 1);
+      setRefreshTrigger(prev => prev + 1);
       onSuccess?.();
     },
   });
 
+  // Handle user selection from search
   const handleUserSelect = (user: BelroseUserProfile) => {
     setSelectedUser(user);
   };
 
-  const handleAddAdmin = async () => {
+  // Handle "Add Administrator" button click
+  const handleAddAdmin = () => {
     if (!selectedUser) return;
-    await grantAdmin(record.id, selectedUser.uid);
+    initiateGrant(selectedUser, 'administrator');
   };
 
-  // 1. Trigger the dialog instead of direct delete
-  const initiateDelete = (userId: string) => {
+  // Handle delete button click on an admin
+  const handleDeleteAdmin = (userId: string) => {
     const profile = userProfiles.get(userId);
-    setRevokeEntry({
-      userId,
-      profile,
-      role: 'administrator',
-      status: 'synced', // Context for the dialog
-      wrappedKey: null,
-    });
+    if (!profile) return;
+    initiateRevoke(profile, 'administrator');
   };
 
-  // 2. Handle the choice from the dialog
-  const handleRevokeConfirm = async (action: 'full-revoke' | 'demote-admin' | 'demote-viewer') => {
-    if (!revokeEntry) return;
-
-    // Administrators only have two paths: Full Revoke or Demote to Viewer
-    const demote = action === 'demote-viewer';
-    await removeAdmin(record.id, revokeEntry.userId, { demoteToViewer: demote });
-  };
-
-  // Fetch access permissions for this record
+  // Fetch user profiles for all administrators
   useEffect(() => {
-    const fetchAccessPermissions = async () => {
+    const fetchAdminProfiles = async () => {
       if (!record.id) return;
 
       setLoadingAdmins(true);
       try {
-        const db = getFirestore();
-        const auth = getAuth();
-        const currentUser = auth.currentUser;
-
-        if (!currentUser) {
-          console.error('No authenticated user');
-          return;
-        }
-
-        // Fetch user profiles for all administrators
         const userIds = new Set<string>();
-
-        // Add admins
         record.administrators?.forEach(adminId => userIds.add(adminId));
 
-        // Fetch all user profiles at once
         const profiles = await getUserProfiles(Array.from(userIds));
         setUserProfiles(profiles);
       } catch (error) {
-        console.error('Error fetching access permissions:', error);
+        console.error('Error fetching admin profiles:', error);
       } finally {
         setLoadingAdmins(false);
       }
     };
 
-    fetchAccessPermissions();
-  }, [record.id, record.administrators, refreshAdminsTrigger]);
+    fetchAdminProfiles();
+  }, [record.id, record.administrators, refreshTrigger]);
 
   return (
     <div>
       {isAddMode && (
         <>
           {/* Header */}
-          <div>
-            <div className="flex items-center justify-between mb-4 pb-2 border-b">
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                Manage Administrators
-              </h3>
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={onBack}
-                  className="w-8 h-8 border-none bg-transparent hover:bg-gray-200"
-                >
-                  <ArrowLeft className="text-primary" />
-                </Button>
-              </div>
+          <div className="flex items-center justify-between mb-4 pb-2 border-b">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Manage Administrators
+            </h3>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={onBack}
+                className="w-8 h-8 border-none bg-transparent hover:bg-gray-200"
+              >
+                <ArrowLeft className="text-primary" />
+              </Button>
             </div>
           </div>
 
           {/* Info */}
-          <div className="bg-chart-4/20 border border-chart-4 rounded-lg p-4 mb-6">
+          <div className="bg-chart-2/20 border border-chart-2 rounded-lg p-4 mb-6">
             <p className="font-semibold mb-2 text-sm">
               Administrators have full access to view, edit, share, verify, and dispute records
             </p>
@@ -143,7 +115,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
                 If there is an Owner, Administrators can add other Administrators but may not remove
                 other Administrators
               </li>
-              <li>There must be at least one Administrator in every record</li>
+              <li>There must be at least one Administrator or Owner in every record</li>
             </ol>
           </div>
         </>
@@ -197,15 +169,18 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
                   </Tooltip.Portal>
                 </Tooltip.Root>
               </Tooltip.Provider>
-              <button className="rounded-full hover:bg-gray-300">
-                <Plus onClick={onAddMode} />
+
+              <button
+                onClick={onAddMode}
+                className="p-1 rounded-full hover:bg-gray-200 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
               </button>
             </div>
           )}
         </div>
 
-        <div className="p-4 bg-white space-y-2 rounded-lg">
-          {/* Revise the ! thing eventually when you split up the FileObject */}
+        <div className="p-4 bg-white rounded-b-lg">
           {loadingAdmins ? (
             <div className="flex justify-center items-center py-8">
               <p className="text-gray-500">Loading administrators...</p>
@@ -219,8 +194,8 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
                   <UserCard
                     key={admin}
                     user={adminProfile}
-                    onView={handleAddAdmin}
-                    onDelete={() => initiateDelete(admin)}
+                    onView={() => {}}
+                    onDelete={() => handleDeleteAdmin(admin)}
                     variant="default"
                     color="blue"
                   />
@@ -236,14 +211,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
         </div>
       </div>
 
-      <RevokeAccessDialog
-        isOpen={!!revokeEntry}
-        entry={revokeEntry}
-        onClose={() => setRevokeEntry(null)}
-        onConfirm={handleRevokeConfirm}
-        loading={isLoading}
-      />
-
+      {/* Add Mode: User Search and Selection */}
       {isAddMode && (
         <>
           {/* User Search Component */}
@@ -270,12 +238,15 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
                 />
               </div>
               <Button onClick={handleAddAdmin} disabled={isLoading} className="w-full">
-                {isLoading ? 'Adding Administrator...' : 'Confirm & Add Administrator'}
+                {isLoading ? 'Processing...' : 'Add Administrator'}
               </Button>
             </div>
           )}
         </>
       )}
+
+      {/* Unified Permission Action Dialog */}
+      <PermissionActionDialog {...dialogProps} />
     </div>
   );
 };

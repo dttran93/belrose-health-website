@@ -112,7 +112,7 @@ exports.createWallet = (0, https_1.onRequest)({ cors: true }, async (req, res) =
             origin: 'generated',
             //Encrypted private key data
             encryptedPrivateKey: encryptedData.encryptedKey,
-            keyIv: encryptedData.iv,
+            encryptedPrivateKeyIV: encryptedData.iv,
             keyAuthTag: encryptedData.authTag,
             keySalt: encryptedData.salt,
             //Encrypted Mnemonic Data
@@ -131,6 +131,9 @@ exports.createWallet = (0, https_1.onRequest)({ cors: true }, async (req, res) =
             success: true,
             walletAddress: wallet.address,
             message: 'Wallet created successfully',
+            encryptedPrivateKey: encryptedData.encryptedKey,
+            encryptedPrivateKeyIV: encryptedData.iv,
+            authTag: encryptedData.authTag,
         };
         res.status(201).json(response);
     }
@@ -183,7 +186,10 @@ exports.getEncryptedWallet = (0, https_1.onRequest)({ cors: true }, async (req, 
             return;
         }
         // Validate all required fields exist
-        if (!wallet.encryptedPrivateKey || !wallet.keyIv || !wallet.keyAuthTag || !wallet.keySalt) {
+        if (!wallet.encryptedPrivateKey ||
+            !wallet.encryptedPrivateKeyIV ||
+            !wallet.keyAuthTag ||
+            !wallet.keySalt) {
             console.error('❌ Generated wallet missing encryption fields:', userId);
             res.status(500).json({
                 error: 'Wallet data corrupted',
@@ -196,7 +202,7 @@ exports.getEncryptedWallet = (0, https_1.onRequest)({ cors: true }, async (req, 
         const response = {
             walletAddress: wallet.address,
             encryptedPrivateKey: wallet.encryptedPrivateKey,
-            iv: wallet.keyIv,
+            iv: wallet.encryptedPrivateKeyIV,
             authTag: wallet.keyAuthTag,
             salt: wallet.keySalt,
             walletType: wallet.origin,

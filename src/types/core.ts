@@ -36,21 +36,14 @@ export interface BelroseUserProfile extends User {
   identityVerified: boolean;
   identityVerifiedAt?: any;
 
-  // Blockchain membership status
-  blockchainMember?: {
-    registered: boolean;
-    walletAddress: string;
-    userIdHash: string;
-    txHash: string;
-    blockNumber: number;
-    registeredAt: string;
+  onChainIdentity?: {
+    userIdHash: string; // The keccak256 hash of the UID
     status: 'Inactive' | 'Active' | 'Verified';
-    statusUpdatedAt?: string;
+    statusUpdatedAt?: any;
     statusTxHash?: string;
-    smartAccountRegistered?: boolean;
-    smartAccountTxHash: string;
-    smartAccountBlockNumber: number;
-    smartAccountRegisteredAt: Date;
+
+    // The collection of all linked wallets to this identity on the contract
+    linkedWallets: LinkedWalletRecord[];
   };
 
   //Other Info
@@ -67,13 +60,25 @@ export interface UserWallet {
 
   // Only present for generated wallets (Belrose stores encrypted keys)
   encryptedPrivateKey?: string;
-  keyIv?: string;
+  encryptedPrivateKeyIV?: string;
   keyAuthTag?: string;
   keySalt?: string;
   encryptedMnemonic?: string;
   mnemonicIv?: string;
   mnemonicAuthTag?: string;
   mnemonicSalt?: string;
+}
+
+/**
+ * Represents a single wallet address linked to a user's on-chain identity
+ */
+export interface LinkedWalletRecord {
+  address: string;
+  type: 'eoa' | 'smart-account';
+  txHash: string;
+  blockNumber: number;
+  linkedAt: any; // Timestamp
+  isWalletActive: boolean; // Reflects contract's isWalletActive status
 }
 
 // Authentication context data structure

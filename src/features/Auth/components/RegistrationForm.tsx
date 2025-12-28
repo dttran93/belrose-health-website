@@ -14,6 +14,7 @@ import { SharingKeyManagementService } from '@/features/Sharing/services/sharing
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { MemberRegistryBlockchain } from '../services/memberRegistryBlockchain';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
+import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 
 interface StepConfig {
   number: number;
@@ -40,6 +41,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     password: '',
     walletAddress: '',
     walletType: '' as 'generated' | 'metamask' | undefined,
+    smartAccountAddress: '',
     recoveryKey: '',
     recoveryKeyHash: '',
     acknowledgedRecoveryKey: false,
@@ -176,7 +178,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
   const registerMemberOnBlockchain = async (walletAddress: string): Promise<void> => {
     try {
       console.log('🔗 Registering member on blockchain...');
-      const result = await MemberRegistryBlockchain.registerMember(walletAddress);
+      const result = await MemberRegistryBlockchain.registerMemberWallet(walletAddress);
 
       if (result.txHash) {
         console.log('✅ Blockchain registration complete:', result.txHash);
@@ -185,14 +187,18 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
       }
     } catch (error: any) {
       console.error('⚠️ Blockchain registration failed (non-blocking):', error);
-
-      // Log to Firestore for retry later
       try {
         const db = getFirestore();
-        await updateDoc(doc(db, 'users', registrationData.userId), {
-          'blockchainMember.pendingRegistration': true,
-          'blockchainMember.registrationError': error.message,
-          'blockchainMember.lastAttempt': new Date().toISOString(),
+        await BlockchainSyncQueueService.logFailure({
+          contract: 'MemberRoleManager',
+          action: 'registerMember',
+          userId: registrationData.userId,
+          userWalletAddress: walletAddress,
+          error: error as string,
+          context: {
+            type: 'memberRegistry',
+            newStatus: 'Active',
+          },
         });
       } catch (logError) {
         console.error('Failed to log blockchain error:', logError);
@@ -244,6 +250,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
       });
 
       //2. Register member on blockchain (non-blocking, can run in background)
+      //Registers both EOA wallet and smartAccountAddress
       registerMemberOnBlockchain(registrationData.walletAddress);
 
       // Navigate to verification hub instead of dashboard
@@ -351,6 +358,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
                 initialWalletData={{
                   walletAddress: registrationData.walletAddress,
                   walletType: registrationData.walletType,
+                  smartAccountAddress: registrationData.smartAccountAddress,
                 }}
                 onComplete={data => handleStepComplete(2, data)}
                 isCompleted={isStepCompleted(2)}

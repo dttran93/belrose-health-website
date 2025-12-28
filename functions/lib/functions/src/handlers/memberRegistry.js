@@ -2,44 +2,25 @@
 // functions/src/handlers/memberRegistry.ts
 // Backend functions for blockchain operations using admin wallet
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.initializeRoleOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = void 0;
+exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const ethers_1 = require("ethers");
 const MEMBER_ROLE_MANAGER_ADDRESS = '0x0FdDcE7EdebD73C6d1A11983bb6a759132543aaD';
-// ABI - only admin functions
 const MEMBER_ROLE_MANAGER_ABI = [
-    {
-        inputs: [
-            { internalType: 'address', name: 'userWallet', type: 'address' },
-            { internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' },
-        ],
-        name: 'addMember',
-        outputs: [],
-        stateMutability: 'nonpayable',
-        type: 'function',
-    },
-    {
-        inputs: [
-            { internalType: 'address', name: 'userWallet', type: 'address' },
-            { internalType: 'uint8', name: 'newStatus', type: 'uint8' },
-        ],
-        name: 'setMemberStatus',
-        outputs: [],
-        stateMutability: 'nonpayable',
-        type: 'function',
-    },
-    {
-        inputs: [
-            { internalType: 'string', name: 'recordId', type: 'string' },
-            { internalType: 'address', name: 'firstUser', type: 'address' },
-            { internalType: 'string', name: 'role', type: 'string' },
-        ],
-        name: 'initializeRecordRole',
-        outputs: [],
-        stateMutability: 'nonpayable',
-        type: 'function',
-    },
+    // Admin Functions
+    'function addMember(address wallet, bytes32 userIdHash) external',
+    'function setUserStatus(bytes32 userIdHash, uint8 newStatus) external',
+    'function deactivateWallet(address wallet) external',
+    'function reactivateWallet(address wallet) external',
+    'function initializeRecordRole(string recordId, address targetWallet, string role) external',
+    // View Functions
+    'function ownersByRecord(string recordId, uint256 index) external view returns (bytes32)',
+    'function adminsByRecord(string recordId, uint256 index) external view returns (bytes32)',
+    'function getRecordOwners(string recordId) external view returns (bytes32[])',
+    'function getRecordAdmins(string recordId) external view returns (bytes32[])',
+    'function getUserForWallet(address wallet) external view returns (bytes32)',
+    'function wallets(address wallet) external view returns (bytes32 userIdHash, bool isWalletActive)',
 ];
 // ============================================================================
 // HELPERS
@@ -50,9 +31,8 @@ const MEMBER_ROLE_MANAGER_ABI = [
 function getAdminWallet() {
     const privateKey = process.env.ADMIN_WALLET_PRIVATE_KEY;
     const rpcUrl = process.env.RPC_URL || 'https://1rpc.io/sepolia';
-    if (!privateKey) {
-        throw new Error('Admin wallet private key not found in environment secrets');
-    }
+    if (!privateKey)
+        throw new Error('Admin wallet private key not found');
     const provider = new ethers_1.ethers.JsonRpcProvider(rpcUrl);
     return new ethers_1.ethers.Wallet(privateKey, provider);
 }
@@ -60,72 +40,70 @@ function getAdminWallet() {
  * Get contract instance with admin signer
  */
 function getAdminContract() {
-    const wallet = getAdminWallet();
-    return new ethers_1.ethers.Contract(MEMBER_ROLE_MANAGER_ADDRESS, MEMBER_ROLE_MANAGER_ABI, wallet);
+    return new ethers_1.ethers.Contract(MEMBER_ROLE_MANAGER_ADDRESS, MEMBER_ROLE_MANAGER_ABI, getAdminWallet());
 }
 // ============================================================================
-// MEMBER REGISTRATION
+// MEMBER REGISTRATION & WALLET LINKING
 // ============================================================================
 /**
- * Register a new member on the blockchain
- * Called after user completes registration
+ * Register a new member/Wallet combination on the blockchain
+ * One member can be associated with multiple wallets, so this can be
  */
 exports.registerMemberOnChain = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_PRIVATE_KEY', 'RPC_URL'] }, async (request) => {
-    // Verify user is authenticated
-    if (!request.auth) {
+    if (!request.auth)
         throw new https_1.HttpsError('unauthenticated', 'User must be authenticated');
-    }
     const { walletAddress } = request.data;
     const userId = request.auth.uid;
+    const db = (0, firestore_1.getFirestore)();
     // Validate wallet address
     if (!walletAddress || !ethers_1.ethers.isAddress(walletAddress)) {
         throw new https_1.HttpsError('invalid-argument', 'Invalid wallet address');
     }
     console.log('🔗 Registering member on blockchain:', { userId, walletAddress });
     try {
-        // Create userIdHash from Firebase UID
-        const userIdHash = ethers_1.ethers.id(userId); // keccak256 hash of the userId
-        // Get admin contract
+        const userDoc = await db.collection('users').doc(userId).get();
+        const userData = userDoc.data();
+        if (!userData)
+            throw new https_1.HttpsError('not-found', 'User profile not found');
+        // IDEMPOTENCY CHECK: Don't re-register if this specific wallet is already in our array
+        const existingWallets = userData.onChainIdentity?.linkedWallets || [];
+        const alreadyLinked = existingWallets.some((w) => w.address.toLowerCase() === walletAddress.toLowerCase());
+        if (alreadyLinked) {
+            return { success: true, message: 'Wallet already registered in Firestore' };
+        }
+        const isSmartAccount = walletAddress.toLowerCase() === userData.wallet?.smartAccountAddress?.toLowerCase();
+        const walletLabel = isSmartAccount ? 'smart-account' : 'eoa';
+        // 3. Contract Call
+        const userIdHash = ethers_1.ethers.id(userId);
         const contract = getAdminContract();
-        // Call addMember
-        console.log('📝 Calling addMember...');
+        // Smart Contract Call
         const tx = await contract.addMember(walletAddress, userIdHash);
-        console.log('⏳ Transaction sent:', tx.hash);
-        // Wait for confirmation
         const receipt = await tx.wait();
-        console.log('✅ Member registered on blockchain, block:', receipt?.blockNumber);
-        // Update Firestore with blockchain registration info
-        const db = (0, firestore_1.getFirestore)();
+        //4. Update Firestore
         await db
             .collection('users')
             .doc(userId)
             .update({
-            blockchainMember: {
-                registered: true,
-                walletAddress: walletAddress,
-                userIdHash: userIdHash,
+            'onChainIdentity.userIdHash': userIdHash,
+            'onChainIdentity.status': userData.onChainIdentity?.status || 'Active',
+            'onChainIdentity.linkedWallets': firestore_1.FieldValue.arrayUnion({
+                address: walletAddress,
+                type: walletLabel,
                 txHash: tx.hash,
                 blockNumber: receipt?.blockNumber,
-                registeredAt: firestore_1.Timestamp.now(),
-                status: 'Active',
-            },
+                linkedAt: firestore_1.Timestamp.now(),
+                isWalletActive: true,
+            }),
         });
-        return {
-            success: true,
-            txHash: tx.hash,
-            blockNumber: receipt?.blockNumber,
-        };
+        return { success: true, txHash: tx.hash, blockNumber: receipt?.blockNumber };
     }
     catch (error) {
-        console.error('❌ Failed to register member on blockchain:', error);
-        // Handle specific errors
-        if (error.message?.includes('Already a member')) {
-            throw new https_1.HttpsError('already-exists', 'User is already registered on blockchain');
+        console.error('❌ Member registration failed:', error);
+        // Handle "already registered" from smart contract
+        if (error.message?.includes('Wallet already registered')) {
+            return { success: true, message: 'Wallet already registered on chain' };
         }
-        if (error.message?.includes('User ID already registered')) {
-            throw new https_1.HttpsError('already-exists', 'User ID is already registered');
-        }
-        throw new https_1.HttpsError('internal', `Blockchain registration failed: ${error.message}`);
+        throw new https_1.HttpsError('internal', error.message);
     }
 });
 // ============================================================================
@@ -136,184 +114,190 @@ exports.registerMemberOnChain = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_PR
  * Called by backend after Persona verification completes
  */
 exports.updateMemberStatus = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_PRIVATE_KEY', 'RPC_URL'] }, async (request) => {
-    if (!request.auth) {
-        throw new https_1.HttpsError('unauthenticated', 'User must be authenticated');
+    const { userId, status } = request.data;
+    if (!userId || ![1, 2, 3].includes(status)) {
+        throw new https_1.HttpsError('invalid-argument', 'Invalid userId or status');
     }
-    const { walletAddress, status } = request.data;
-    // Validate inputs
+    try {
+        const userIdHash = ethers_1.ethers.id(userId);
+        const contract = getAdminContract();
+        const tx = await contract.setUserStatus(userIdHash, status);
+        const receipt = await tx.wait();
+        // Sync the status change to Firestore
+        const statusMap = { 1: 'Inactive', 2: 'Active', 3: 'Verified' };
+        await (0, firestore_1.getFirestore)().collection('users').doc(userId).update({
+            'onChainIdentity.status': statusMap[status],
+            'onChainIdentity.statusUpdatedAt': firestore_1.Timestamp.now(),
+            'onChainIdentity.statusTxHash': tx.hash,
+        });
+        return { success: true, txHash: tx.hash, blockNumber: receipt?.blockNumber };
+    }
+    catch (error) {
+        console.error('❌ Status update failed:', error);
+        throw new https_1.HttpsError('internal', error.message);
+    }
+});
+// ============================================================================
+// WALLET STATUS (INDIVIDUAL WALLET)
+// ============================================================================
+/**
+ * Deactivate a specific wallet on the blockchain
+ * The user's identity remains active, but this wallet cannot transact
+ */
+exports.deactivateWalletOnChain = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_PRIVATE_KEY', 'RPC_URL'] }, async (request) => {
+    if (!request.auth)
+        throw new https_1.HttpsError('unauthenticated', 'User must be authenticated');
+    const { walletAddress } = request.data;
+    const userId = request.auth.uid;
+    const db = (0, firestore_1.getFirestore)();
     if (!walletAddress || !ethers_1.ethers.isAddress(walletAddress)) {
         throw new https_1.HttpsError('invalid-argument', 'Invalid wallet address');
     }
-    if (status === undefined || ![0, 1, 2].includes(status)) {
-        throw new https_1.HttpsError('invalid-argument', 'Invalid status. Must be 0 (Inactive), 1 (Active), or 2 (Verified)');
-    }
-    console.log('🔗 Updating member status on blockchain:', { walletAddress, status });
+    console.log('🔗 Deactivating wallet on blockchain:', { userId, walletAddress });
     try {
+        // Verify wallet belongs to this user
+        const userDoc = await db.collection('users').doc(userId).get();
+        const userData = userDoc.data();
+        if (!userData)
+            throw new https_1.HttpsError('not-found', 'User profile not found');
+        const linkedWallets = userData.onChainIdentity?.linkedWallets || [];
+        const walletEntry = linkedWallets.find((w) => w.address.toLowerCase() === walletAddress.toLowerCase());
+        if (!walletEntry) {
+            throw new https_1.HttpsError('permission-denied', 'Wallet not linked to your account');
+        }
+        if (!walletEntry.isWalletActive) {
+            return { success: true, message: 'Wallet already inactive' };
+        }
+        // Call smart contract
         const contract = getAdminContract();
-        const tx = await contract.setMemberStatus(walletAddress, status);
-        console.log('⏳ Transaction sent:', tx.hash);
+        const tx = await contract.deactivateWallet(walletAddress);
         const receipt = await tx.wait();
-        console.log('✅ Member status updated, block:', receipt?.blockNumber);
-        return {
-            success: true,
-            txHash: tx.hash,
-            blockNumber: receipt?.blockNumber,
-        };
+        // Update Firestore - mark wallet as inactive
+        const updatedWallets = linkedWallets.map((w) => w.address.toLowerCase() === walletAddress.toLowerCase()
+            ? {
+                ...w,
+                isWalletActive: false,
+                deactivatedAt: firestore_1.Timestamp.now(),
+                deactivateTxHash: tx.hash,
+            }
+            : w);
+        await db.collection('users').doc(userId).update({
+            'onChainIdentity.linkedWallets': updatedWallets,
+        });
+        console.log('✅ Wallet deactivated:', tx.hash);
+        return { success: true, txHash: tx.hash, blockNumber: receipt?.blockNumber };
     }
     catch (error) {
-        console.error('❌ Failed to update member status:', error);
-        throw new https_1.HttpsError('internal', `Status update failed: ${error.message}`);
+        console.error('❌ Wallet deactivation failed:', error);
+        if (error instanceof https_1.HttpsError)
+            throw error;
+        throw new https_1.HttpsError('internal', error.message);
+    }
+});
+/**
+ * Reactivate a specific wallet on the blockchain
+ */
+exports.reactivateWalletOnChain = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_PRIVATE_KEY', 'RPC_URL'] }, async (request) => {
+    if (!request.auth)
+        throw new https_1.HttpsError('unauthenticated', 'User must be authenticated');
+    const { walletAddress } = request.data;
+    const userId = request.auth.uid;
+    const db = (0, firestore_1.getFirestore)();
+    if (!walletAddress || !ethers_1.ethers.isAddress(walletAddress)) {
+        throw new https_1.HttpsError('invalid-argument', 'Invalid wallet address');
+    }
+    console.log('🔗 Reactivating wallet on blockchain:', { userId, walletAddress });
+    try {
+        // Verify wallet belongs to this user
+        const userDoc = await db.collection('users').doc(userId).get();
+        const userData = userDoc.data();
+        if (!userData)
+            throw new https_1.HttpsError('not-found', 'User profile not found');
+        const linkedWallets = userData.onChainIdentity?.linkedWallets || [];
+        const walletEntry = linkedWallets.find((w) => w.address.toLowerCase() === walletAddress.toLowerCase());
+        if (!walletEntry) {
+            throw new https_1.HttpsError('permission-denied', 'Wallet not linked to your account');
+        }
+        if (walletEntry.isWalletActive) {
+            return { success: true, message: 'Wallet already active' };
+        }
+        // Call smart contract
+        const contract = getAdminContract();
+        const tx = await contract.reactivateWallet(walletAddress);
+        const receipt = await tx.wait();
+        // Update Firestore - mark wallet as active
+        const updatedWallets = linkedWallets.map((w) => w.address.toLowerCase() === walletAddress.toLowerCase()
+            ? {
+                ...w,
+                isWalletActive: true,
+                reactivatedAt: firestore_1.Timestamp.now(),
+                reactivateTxHash: tx.hash,
+            }
+            : w);
+        await db.collection('users').doc(userId).update({
+            'onChainIdentity.linkedWallets': updatedWallets,
+        });
+        console.log('✅ Wallet reactivated:', tx.hash);
+        return { success: true, txHash: tx.hash, blockNumber: receipt?.blockNumber };
+    }
+    catch (error) {
+        console.error('❌ Wallet reactivation failed:', error);
+        if (error instanceof https_1.HttpsError)
+            throw error;
+        throw new https_1.HttpsError('internal', error.message);
     }
 });
 // ============================================================================
 // RECORD INITIALIZATION
 // ============================================================================
-// Read-only ABI for checking blockchain state
-const MEMBER_ROLE_MANAGER_READ_ABI = [
-    {
-        inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
-        name: 'getRecordAdmins',
-        outputs: [{ internalType: 'address[]', name: '', type: 'address[]' }],
-        stateMutability: 'view',
-        type: 'function',
-    },
-    {
-        inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
-        name: 'getRecordOwners',
-        outputs: [{ internalType: 'address[]', name: '', type: 'address[]' }],
-        stateMutability: 'view',
-        type: 'function',
-    },
-];
-/**
- * Get read-only contract instance for checking blockchain state
- */
-function getReadOnlyContract() {
-    const rpcUrl = process.env.RPC_URL || 'https://1rpc.io/sepolia';
-    const provider = new ethers_1.ethers.JsonRpcProvider(rpcUrl);
-    return new ethers_1.ethers.Contract(MEMBER_ROLE_MANAGER_ADDRESS, MEMBER_ROLE_MANAGER_READ_ABI, provider);
-}
-/**
- * Initialize a record with its first manager (administrator or owner)
- * Called when uploader first wants to share a record
- *
- * Validation order:
- * 1. Input validation
- * 2. Firestore validation (record exists, user is creator, wallet matches)
- * 3. Blockchain validation (not already initialized) - authoritative check
- * 4. Execute blockchain transaction
- * 5. Update Firestore with tx details
- *
- * Self-heals Firestore if it's out of sync with blockchain.
- */
 exports.initializeRoleOnChain = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_PRIVATE_KEY', 'RPC_URL'] }, async (request) => {
-    if (!request.auth) {
+    if (!request.auth)
         throw new https_1.HttpsError('unauthenticated', 'User must be authenticated');
-    }
     const { recordId, walletAddress, role } = request.data;
     const userId = request.auth.uid;
-    // ======================== INPUT VALIDATION =========================
-    if (!recordId || typeof recordId !== 'string') {
-        throw new https_1.HttpsError('invalid-argument', 'Invalid record ID');
+    if (!recordId || !ethers_1.ethers.isAddress(walletAddress)) {
+        throw new https_1.HttpsError('invalid-argument', 'Missing recordId or walletAddress');
     }
-    if (!walletAddress || !ethers_1.ethers.isAddress(walletAddress)) {
-        throw new https_1.HttpsError('invalid-argument', 'Invalid wallet address');
+    if (role !== 'administrator' && role !== 'owner') {
+        throw new https_1.HttpsError('invalid-argument', 'Role must be "administrator" or "owner"');
     }
-    // Validate role is either administrator or owner
-    if (!role || (role !== 'administrator' && role !== 'owner')) {
-        throw new https_1.HttpsError('invalid-argument', 'Invalid role. Must be "administrator" or "owner"');
-    }
-    const validatedRole = role;
-    console.log('🔗 Initializing record role on blockchain:', {
-        recordId,
-        walletAddress,
-        role: validatedRole,
-        requestedBy: userId,
-    });
     const db = (0, firestore_1.getFirestore)();
-    // ======================== FIRESTORE VALIDATION =========================
-    // 1. Verify record exists in Firestore
-    const recordDoc = await db.collection('records').doc(recordId).get();
-    if (!recordDoc.exists) {
-        console.error('❌ Record not found in Firestore:', recordId);
-        throw new https_1.HttpsError('not-found', 'Record does not exist');
-    }
-    const recordData = recordDoc.data();
-    // 2. Verify the requesting user is the record creator
-    if (recordData?.uploadedBy !== userId) {
-        console.error('❌ User is not the record creator:', {
-            uploadedBy: recordData?.uploadedBy,
-            requestedBy: userId,
-        });
-        throw new https_1.HttpsError('permission-denied', 'Only the record creator can initialize blockchain roles');
-    }
-    // 3. Verify the wallet matches the user's registered wallet
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists) {
-        throw new https_1.HttpsError('not-found', 'User profile not found');
-    }
+    // 1. Fetch User and Record Data
+    const [userDoc, recordDoc] = await Promise.all([
+        db.collection('users').doc(userId).get(),
+        db.collection('records').doc(recordId).get(),
+    ]);
     const userData = userDoc.data();
-    const userWallet = userData?.wallet?.address;
-    if (!userWallet) {
-        throw new https_1.HttpsError('failed-precondition', 'User does not have a registered wallet');
+    const recordData = recordDoc.data();
+    if (!userData || !recordData)
+        throw new https_1.HttpsError('not-found', 'Data not found');
+    // 2. Validate multi-wallet ownership via our new array
+    const linkedWallets = userData.onChainIdentity?.linkedWallets || [];
+    const isAuthorized = linkedWallets.some((w) => w.address.toLowerCase() === walletAddress.toLowerCase() && w.isWalletActive);
+    if (!isAuthorized) {
+        throw new https_1.HttpsError('permission-denied', 'Wallet not linked or inactive');
     }
-    if (userWallet.toLowerCase() !== walletAddress.toLowerCase()) {
-        console.error('❌ Wallet address mismatch:', {
-            userWallet,
-            providedWallet: walletAddress,
-        });
-        throw new https_1.HttpsError('invalid-argument', 'Wallet address must match your registered wallet');
+    if (recordData?.uploadedBy !== userId) {
+        throw new https_1.HttpsError('permission-denied', 'Only the creator can initialize roles');
     }
-    // ======================== BLOCKCHAIN VALIDATION =========================
-    try {
-        const readOnlyContract = getReadOnlyContract();
-        // Check if record already has admins or owners on-chain
-        const [admins, owners] = await Promise.all([
-            readOnlyContract.getRecordAdmins(recordId),
-            readOnlyContract.getRecordOwners(recordId),
-        ]);
-        if (admins.length > 0 || owners.length > 0) {
-            console.log('ℹ️ Record already initialized on blockchain:', {
-                adminCount: admins.length,
-                ownerCount: owners.length,
-            });
-            // Self-heal: sync Firestore if it was out of sync
-            if (!recordData?.blockchainRoleInitialization?.blockchainInitialized) {
-                console.log('🔄 Syncing Firestore with blockchain state...');
-                await db
-                    .collection('records')
-                    .doc(recordId)
-                    .update({
-                    blockchainRoleInitialization: {
-                        blockchainInitialized: true,
-                        syncedFromChain: true, // Flag that this was a sync, not original init
-                    },
-                });
-            }
-            throw new https_1.HttpsError('already-exists', 'Record already initialized on blockchain');
-        }
-        // Edge case: Firestore says initialized but blockchain doesn't
-        // This is unusual but blockchain is truth - proceed with initialization
-        if (recordData?.blockchainRoleInitialization.blockchainInitialized) {
-            console.warn('⚠️ Firestore marked as initialized but blockchain is not. Proceeding with initialization...');
-        }
-    }
-    catch (error) {
-        // Re-throw HttpsError (from already-exists check above)
-        if (error instanceof https_1.HttpsError) {
-            throw error;
-        }
-        // RPC error - log but continue (fail-safe: let smart contract be the final check)
-        console.warn('⚠️ Could not verify blockchain state, proceeding anyway:', error.message);
-    }
-    // ======================== BLOCKCHAIN TRANSACTION =========================
+    // 3. Authority Check
     try {
         const contract = getAdminContract();
-        const tx = await contract.initializeRecordRole(recordId, walletAddress, validatedRole);
-        console.log('⏳ Transaction sent:', tx.hash);
+        const owners = await contract.getRecordOwners(recordId);
+        const admins = await contract.getRecordAdmins(recordId);
+        if (owners.length > 0 || admins.length > 0) {
+            // Self-heal Firestore if needed
+            if (!recordData?.blockchainRoleInitialization?.blockchainInitialized) {
+                await db.collection('records').doc(recordId).update({
+                    'blockchainRoleInitialization.blockchainInitialized': true,
+                    'blockchainRoleInitialization.syncedFromChain': true,
+                });
+            }
+            throw new https_1.HttpsError('already-exists', 'Record already initialized on chain');
+        }
+        // 4. Execution
+        const tx = await contract.initializeRecordRole(recordId, walletAddress, role);
         const receipt = await tx.wait();
-        console.log('✅ Record role initialized, block:', receipt?.blockNumber);
-        // Update Firestore to mark record as blockchain-initialized
         await db
             .collection('records')
             .doc(recordId)
@@ -322,34 +306,15 @@ exports.initializeRoleOnChain = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_PR
                 blockchainInitialized: true,
                 blockchainInitializedAt: firestore_1.Timestamp.now(),
                 blockchainInitTxHash: tx.hash,
-                blockchainInitBlockNumber: receipt?.blockNumber,
-                initialRole: validatedRole,
+                blockchainInitBlockNumber: receipt.blockNumber,
             },
         });
-        return {
-            success: true,
-            txHash: tx.hash,
-            blockNumber: receipt?.blockNumber,
-            role: validatedRole,
-        };
+        return { success: true, txHash: tx.hash, blockNumber: receipt?.blockNumber };
     }
     catch (error) {
-        console.error('❌ Failed to initialize record role:', error);
-        // Handle smart contract "already initialized" error (final safety net)
-        if (error.message?.includes('Record already initialized')) {
-            // Sync Firestore state
-            await db
-                .collection('records')
-                .doc(recordId)
-                .update({
-                blockchainRoleInitialization: {
-                    blockchainInitialized: true,
-                    syncedFromChain: true,
-                },
-            });
-            throw new https_1.HttpsError('already-exists', 'Record already has roles assigned on blockchain');
-        }
-        throw new https_1.HttpsError('internal', `Record initialization failed: ${error.message}`);
+        if (error instanceof https_1.HttpsError)
+            throw error;
+        throw new https_1.HttpsError('internal', `Blockchain error: ${error.message}`);
     }
 });
 //# sourceMappingURL=memberRegistry.js.map

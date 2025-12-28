@@ -34,7 +34,7 @@ interface UserCardProps {
 
   // Actions
   onCardClick?: () => void;
-  onView: () => void;
+  onView?: () => void;
   onShare?: () => void;
   onDelete?: () => void;
   onCancel?: () => void;

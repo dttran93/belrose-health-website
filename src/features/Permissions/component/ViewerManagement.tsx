@@ -113,10 +113,10 @@ export const ViewerManagement: React.FC<ViewerManagementProps> = ({
           {/* Info */}
           <div className="bg-chart-4/20 border border-chart-4 rounded-lg p-4 mb-6">
             <p className="font-semibold mb-2 text-sm">
-              Viewers are granted record access by Owners or Administrators:
+              Viewers can view, verify, and dispute records.
             </p>
             <ol className="list-decimal list-inside space-y-1 text-xs">
-              <li>Viewers can view, verify, or dispute records.</li>
+              <li>Viewers are granted access by Owners or Administrators</li>
               <li>They may not edit, share, or delete records.</li>
               <li>Their access may be revoked at any time by Owners or Administrators.</li>
               <li>

@@ -3,17 +3,24 @@
 // Frontend service for blockchain role management.
 // Uses PaymasterService for all write transactions (handles sponsored vs direct).
 //
+// KEY ARCHITECTURE (matches MemberRoleManager.sol):
+// - Members are registered by WALLET ADDRESS
+// - Each wallet is linked to an IDENTITY (userIdHash)
+// - One identity can have MULTIPLE wallets (EOA, Smart Account, etc.)
+// - Roles are assigned to IDENTITIES, not wallets
+// - Any wallet linked to an identity can exercise that identity's roles
+//
 // Read operations: No wallet needed (uses public RPC)
 // Write operations: Routes through PaymasterService
 //
-// Note: Admin-only functions (addMember, setMemberStatus, initializeRecordRole)
-// are handled by Cloud Functions, not this frontend service.
+// Note: Admin-only functions (addMember, setUserStatus, initializeRecordRole,
+// deactivateWallet, reactivateWallet) are handled by Cloud Functions, not this frontend service.
 
 import { ethers, Contract } from 'ethers';
 import { PaymasterService } from '@/features/BlockchainWallet/services/paymasterService';
 
 // Contract address
-const MEMBER_ROLE_MANAGER_ADDRESS = '0x89839E0c266045c9EA06FdA11152B48129e76Ef2';
+const MEMBER_ROLE_MANAGER_ADDRESS = '0x0FdDcE7EdebD73C6d1A11983bb6a759132543aaD';
 
 // RPC for read-only operations
 const RPC_URL = 'https://1rpc.io/sepolia';
@@ -23,48 +30,73 @@ const MEMBER_ROLE_MANAGER_ABI = [
   // ============================================================================
   // MEMBER REGISTRY - VIEW FUNCTIONS
   // ============================================================================
+
+  // wallets(address) -> (userIdHash, isWalletActive)
   {
-    inputs: [{ internalType: 'address', name: 'user', type: 'address' }],
+    inputs: [{ internalType: 'address', name: '', type: 'address' }],
+    name: 'wallets',
+    outputs: [
+      { internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' },
+      { internalType: 'bool', name: 'isWalletActive', type: 'bool' },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  // userStatus(bytes32) -> MemberStatus
+  {
+    inputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
+    name: 'userStatus',
+    outputs: [{ internalType: 'enum MemberRoleManager.MemberStatus', name: '', type: 'uint8' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ internalType: 'address', name: 'wallet', type: 'address' }],
     name: 'isActiveMember',
     outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'address', name: 'user', type: 'address' }],
+    inputs: [{ internalType: 'address', name: 'wallet', type: 'address' }],
     name: 'isVerifiedMember',
     outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'address', name: 'user', type: 'address' }],
-    name: 'getMember',
-    outputs: [
-      { internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' },
-      { internalType: 'uint8', name: 'status', type: 'uint8' },
-      { internalType: 'uint256', name: 'joinedAt', type: 'uint256' },
-    ],
+    inputs: [{ internalType: 'address', name: 'wallet', type: 'address' }],
+    name: 'getUserForWallet',
+    outputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
     inputs: [{ internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' }],
-    name: 'getWalletByUserIdHash',
-    outputs: [{ internalType: 'address', name: '', type: 'address' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'getAllMembers',
+    name: 'getWalletsForUser',
     outputs: [{ internalType: 'address[]', name: '', type: 'address[]' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
+    inputs: [{ internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' }],
+    name: 'getUserStatus',
+    outputs: [
+      { internalType: 'enum MemberRoleManager.MemberStatus', name: 'status', type: 'uint8' },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
     inputs: [],
-    name: 'totalMembers',
+    name: 'getAllUsers',
+    outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'getTotalUsers',
     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
     stateMutability: 'view',
     type: 'function',
@@ -76,7 +108,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   {
     inputs: [
       { internalType: 'string', name: 'recordId', type: 'string' },
-      { internalType: 'address', name: 'user', type: 'address' },
+      { internalType: 'address', name: 'wallet', type: 'address' },
     ],
     name: 'hasActiveRole',
     outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
@@ -86,7 +118,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   {
     inputs: [
       { internalType: 'string', name: 'recordId', type: 'string' },
-      { internalType: 'address', name: 'user', type: 'address' },
+      { internalType: 'address', name: 'wallet', type: 'address' },
       { internalType: 'string', name: 'role', type: 'string' },
     ],
     name: 'hasRole',
@@ -97,7 +129,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   {
     inputs: [
       { internalType: 'string', name: 'recordId', type: 'string' },
-      { internalType: 'address', name: 'user', type: 'address' },
+      { internalType: 'address', name: 'wallet', type: 'address' },
     ],
     name: 'isOwnerOrAdmin',
     outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
@@ -107,14 +139,24 @@ const MEMBER_ROLE_MANAGER_ABI = [
   {
     inputs: [
       { internalType: 'string', name: 'recordId', type: 'string' },
-      { internalType: 'address', name: 'user', type: 'address' },
+      { internalType: 'address', name: 'wallet', type: 'address' },
     ],
     name: 'getRoleDetails',
     outputs: [
       { internalType: 'string', name: 'role', type: 'string' },
-      { internalType: 'uint256', name: 'grantedAt', type: 'uint256' },
-      { internalType: 'uint256', name: 'lastModified', type: 'uint256' },
-      { internalType: 'address', name: 'grantedBy', type: 'address' },
+      { internalType: 'bool', name: 'isActive', type: 'bool' },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' },
+    ],
+    name: 'getRoleDetailsByUser',
+    outputs: [
+      { internalType: 'string', name: 'role', type: 'string' },
       { internalType: 'bool', name: 'isActive', type: 'bool' },
     ],
     stateMutability: 'view',
@@ -123,26 +165,26 @@ const MEMBER_ROLE_MANAGER_ABI = [
   {
     inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
     name: 'getRecordOwners',
-    outputs: [{ internalType: 'address[]', name: '', type: 'address[]' }],
+    outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
     inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
     name: 'getRecordAdmins',
-    outputs: [{ internalType: 'address[]', name: '', type: 'address[]' }],
+    outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
     inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
     name: 'getRecordViewers',
-    outputs: [{ internalType: 'address[]', name: '', type: 'address[]' }],
+    outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'address', name: 'user', type: 'address' }],
+    inputs: [{ internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' }],
     name: 'getRecordsByUser',
     outputs: [{ internalType: 'string[]', name: '', type: 'string[]' }],
     stateMutability: 'view',
@@ -173,7 +215,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   {
     inputs: [
       { internalType: 'string', name: 'recordId', type: 'string' },
-      { internalType: 'address', name: 'user', type: 'address' },
+      { internalType: 'address', name: 'targetWallet', type: 'address' },
       { internalType: 'string', name: 'role', type: 'string' },
     ],
     name: 'grantRole',
@@ -184,7 +226,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   {
     inputs: [
       { internalType: 'string', name: 'recordId', type: 'string' },
-      { internalType: 'address', name: 'user', type: 'address' },
+      { internalType: 'address', name: 'targetWallet', type: 'address' },
       { internalType: 'string', name: 'newRole', type: 'string' },
     ],
     name: 'changeRole',
@@ -195,7 +237,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   {
     inputs: [
       { internalType: 'string', name: 'recordId', type: 'string' },
-      { internalType: 'address', name: 'user', type: 'address' },
+      { internalType: 'address', name: 'targetWallet', type: 'address' },
     ],
     name: 'revokeRole',
     outputs: [],
@@ -204,7 +246,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   },
   {
     inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
-    name: 'voluntarilyRemoveOwnOwnership',
+    name: 'voluntarilyLeaveOwnership',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function',
@@ -215,25 +257,44 @@ const MEMBER_ROLE_MANAGER_ABI = [
 // TYPES
 // ============================================================================
 
+/**
+ * Member status enum - matches MemberRoleManager.sol
+ * NotRegistered = 0: Default/uninitialized
+ * Inactive = 1: Cannot transact (banned/removed)
+ * Active = 2: Default for new members
+ * Verified = 3: User has verified their identity and email
+ */
 export enum MemberStatus {
-  Inactive = 0,
-  Active = 1,
-  Verified = 2,
+  NotRegistered = 0,
+  Inactive = 1,
+  Active = 2,
+  Verified = 3,
 }
 
 export type RoleType = 'owner' | 'administrator' | 'viewer';
 
-export interface MemberInfo {
+/**
+ * Wallet info from the wallets() mapping
+ */
+export interface WalletInfo {
   userIdHash: string;
-  status: MemberStatus;
-  joinedAt: Date | null;
+  isWalletActive: boolean;
 }
 
+/**
+ * Combined member info (wallet + identity status)
+ */
+export interface MemberInfo {
+  userIdHash: string;
+  isWalletActive: boolean;
+  status: MemberStatus;
+}
+
+/**
+ * Role details - simplified in new contract (no timestamps/grantedBy on-chain)
+ */
 export interface RoleDetails {
   role: RoleType | '';
-  grantedAt: Date | null;
-  lastModified: Date | null;
-  grantedBy: string;
   isActive: boolean;
 }
 
@@ -268,7 +329,7 @@ export class BlockchainRoleManagerService {
   /**
    * Encode function call data for a write transaction
    */
-  private static encodeFunctionData(functionName: string, args: any[]): `0x${string}` {
+  private static encodeFunctionData(functionName: string, args: unknown[]): `0x${string}` {
     const iface = new ethers.Interface(MEMBER_ROLE_MANAGER_ABI);
     return iface.encodeFunctionData(functionName, args) as `0x${string}`;
   }
@@ -276,7 +337,10 @@ export class BlockchainRoleManagerService {
   /**
    * Execute a write transaction via PaymasterService
    */
-  private static async executeWrite(functionName: string, args: any[]): Promise<TransactionResult> {
+  private static async executeWrite(
+    functionName: string,
+    args: unknown[]
+  ): Promise<TransactionResult> {
     const data = this.encodeFunctionData(functionName, args);
 
     const txHash = await PaymasterService.sendTransaction({
@@ -292,13 +356,38 @@ export class BlockchainRoleManagerService {
   // ==========================================================================
 
   /**
-   * Check if an address is an active member (not inactive and is registered)
+   * Get raw wallet info from the wallets() mapping
    */
-  static async isActiveMember(userAddress: string): Promise<boolean> {
+  static async getWalletInfo(walletAddress: string): Promise<WalletInfo | null> {
+    try {
+      const contract = this.getReadOnlyContract();
+      const fn = contract.getFunction('wallets');
+      const result = await fn(walletAddress);
+
+      // If userIdHash is zero, wallet isn't registered
+      if (result[0] === ethers.ZeroHash) {
+        return null;
+      }
+
+      return {
+        userIdHash: result[0],
+        isWalletActive: result[1],
+      };
+    } catch (error) {
+      console.error('Error getting wallet info:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if an address is an active member
+   * (wallet is active AND identity status is Active or Verified)
+   */
+  static async isActiveMember(walletAddress: string): Promise<boolean> {
     try {
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('isActiveMember');
-      return await fn(userAddress);
+      return await fn(walletAddress);
     } catch (error) {
       console.error('Error checking active member status:', error);
       return false;
@@ -308,11 +397,11 @@ export class BlockchainRoleManagerService {
   /**
    * Check if an address is a verified member
    */
-  static async isVerifiedMember(userAddress: string): Promise<boolean> {
+  static async isVerifiedMember(walletAddress: string): Promise<boolean> {
     try {
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('isVerifiedMember');
-      return await fn(userAddress);
+      return await fn(walletAddress);
     } catch (error) {
       console.error('Error checking verified member status:', error);
       return false;
@@ -320,72 +409,102 @@ export class BlockchainRoleManagerService {
   }
 
   /**
-   * Get member details by wallet address
-   * Returns null if member doesn't exist
+   * Get the identity (userIdHash) for a wallet address
+   * Returns null/zero hash if wallet not registered
    */
-  static async getMember(userAddress: string): Promise<MemberInfo | null> {
+  static async getUserForWallet(walletAddress: string): Promise<string | null> {
     try {
       const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getMember');
-      const result = await fn(userAddress);
+      const fn = contract.getFunction('getUserForWallet');
+      const userIdHash = await fn(walletAddress);
 
-      // If joinedAt is 0, member doesn't exist
-      if (Number(result[2]) === 0) {
+      if (userIdHash === ethers.ZeroHash) {
         return null;
       }
 
-      return {
-        userIdHash: result[0],
-        status: Number(result[1]) as MemberStatus,
-        joinedAt: new Date(Number(result[2]) * 1000),
-      };
+      return userIdHash;
     } catch (error) {
-      console.error('Error getting member:', error);
+      console.error('Error getting user for wallet:', error);
       return null;
     }
   }
 
   /**
-   * Lookup wallet address by user ID hash
-   * Returns zero address if not found
+   * Get all wallet addresses linked to an identity
    */
-  static async getWalletByUserIdHash(userIdHash: string): Promise<string> {
+  static async getWalletsForUser(userIdHash: string): Promise<string[]> {
     try {
       const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getWalletByUserIdHash');
+      const fn = contract.getFunction('getWalletsForUser');
       return await fn(userIdHash);
     } catch (error) {
-      console.error('Error getting wallet by user ID hash:', error);
-      return ethers.ZeroAddress;
-    }
-  }
-
-  /**
-   * Get all registered member addresses
-   * Useful for admin dashboards and migrations
-   */
-  static async getAllMembers(): Promise<string[]> {
-    try {
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getAllMembers');
-      return await fn();
-    } catch (error) {
-      console.error('Error getting all members:', error);
+      console.error('Error getting wallets for user:', error);
       return [];
     }
   }
 
   /**
-   * Get total number of registered members
+   * Get the status of an identity (by userIdHash)
    */
-  static async getTotalMembers(): Promise<number> {
+  static async getUserStatus(userIdHash: string): Promise<MemberStatus> {
     try {
       const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('totalMembers');
+      const fn = contract.getFunction('getUserStatus');
+      const status = await fn(userIdHash);
+      return Number(status) as MemberStatus;
+    } catch (error) {
+      console.error('Error getting user status:', error);
+      return MemberStatus.NotRegistered;
+    }
+  }
+
+  /**
+   * Get combined member info for a wallet (convenience method)
+   * Returns null if wallet isn't registered
+   */
+  static async getMemberInfo(walletAddress: string): Promise<MemberInfo | null> {
+    try {
+      const walletInfo = await this.getWalletInfo(walletAddress);
+      if (!walletInfo) return null;
+
+      const status = await this.getUserStatus(walletInfo.userIdHash);
+
+      return {
+        userIdHash: walletInfo.userIdHash,
+        isWalletActive: walletInfo.isWalletActive,
+        status,
+      };
+    } catch (error) {
+      console.error('Error getting member info:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get all registered user identity hashes
+   */
+  static async getAllUsers(): Promise<string[]> {
+    try {
+      const contract = this.getReadOnlyContract();
+      const fn = contract.getFunction('getAllUsers');
+      return await fn();
+    } catch (error) {
+      console.error('Error getting all users:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get total number of registered identities
+   */
+  static async getTotalUsers(): Promise<number> {
+    try {
+      const contract = this.getReadOnlyContract();
+      const fn = contract.getFunction('getTotalUsers');
       const total = await fn();
       return Number(total);
     } catch (error) {
-      console.error('Error getting total members:', error);
+      console.error('Error getting total users:', error);
       return 0;
     }
   }
@@ -395,13 +514,13 @@ export class BlockchainRoleManagerService {
   // ==========================================================================
 
   /**
-   * Check if user has any active role on a record
+   * Check if wallet's identity has any active role on a record
    */
-  static async hasActiveRole(recordId: string, userAddress: string): Promise<boolean> {
+  static async hasActiveRole(recordId: string, walletAddress: string): Promise<boolean> {
     try {
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('hasActiveRole');
-      return await fn(recordId, userAddress);
+      return await fn(recordId, walletAddress);
     } catch (error) {
       console.error('Error checking active role:', error);
       return false;
@@ -409,13 +528,13 @@ export class BlockchainRoleManagerService {
   }
 
   /**
-   * Check if user has a specific role on a record
+   * Check if wallet's identity has a specific role on a record
    */
-  static async hasRole(recordId: string, userAddress: string, role: RoleType): Promise<boolean> {
+  static async hasRole(recordId: string, walletAddress: string, role: RoleType): Promise<boolean> {
     try {
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('hasRole');
-      return await fn(recordId, userAddress, role);
+      return await fn(recordId, walletAddress, role);
     } catch (error) {
       console.error('Error checking role:', error);
       return false;
@@ -423,13 +542,13 @@ export class BlockchainRoleManagerService {
   }
 
   /**
-   * Check if user is owner or administrator of a record
+   * Check if wallet's identity is owner or administrator of a record
    */
-  static async isOwnerOrAdmin(recordId: string, userAddress: string): Promise<boolean> {
+  static async isOwnerOrAdmin(recordId: string, walletAddress: string): Promise<boolean> {
     try {
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('isOwnerOrAdmin');
-      return await fn(recordId, userAddress);
+      return await fn(recordId, walletAddress);
     } catch (error) {
       console.error('Error checking owner/admin status:', error);
       return false;
@@ -437,35 +556,46 @@ export class BlockchainRoleManagerService {
   }
 
   /**
-   * Get full role details for a user on a record
+   * Get role details for a wallet on a record
    */
-  static async getRoleDetails(recordId: string, userAddress: string): Promise<RoleDetails> {
+  static async getRoleDetails(recordId: string, walletAddress: string): Promise<RoleDetails> {
     try {
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('getRoleDetails');
-      const result = await fn(recordId, userAddress);
+      const result = await fn(recordId, walletAddress);
 
       return {
         role: (result[0] as RoleType) || '',
-        grantedAt: Number(result[1]) > 0 ? new Date(Number(result[1]) * 1000) : null,
-        lastModified: Number(result[2]) > 0 ? new Date(Number(result[2]) * 1000) : null,
-        grantedBy: result[3],
-        isActive: result[4],
+        isActive: result[1],
       };
     } catch (error) {
       console.error('Error getting role details:', error);
-      return {
-        role: '',
-        grantedAt: null,
-        lastModified: null,
-        grantedBy: ethers.ZeroAddress,
-        isActive: false,
-      };
+      return { role: '', isActive: false };
     }
   }
 
   /**
-   * Get all owners of a record
+   * Get role details by identity hash (instead of wallet)
+   */
+  static async getRoleDetailsByUser(recordId: string, userIdHash: string): Promise<RoleDetails> {
+    try {
+      const contract = this.getReadOnlyContract();
+      const fn = contract.getFunction('getRoleDetailsByUser');
+      const result = await fn(recordId, userIdHash);
+
+      return {
+        role: (result[0] as RoleType) || '',
+        isActive: result[1],
+      };
+    } catch (error) {
+      console.error('Error getting role details by user:', error);
+      return { role: '', isActive: false };
+    }
+  }
+
+  /**
+   * Get all owner identity hashes for a record
+   * Note: Returns userIdHashes, not wallet addresses
    */
   static async getRecordOwners(recordId: string): Promise<string[]> {
     try {
@@ -479,7 +609,8 @@ export class BlockchainRoleManagerService {
   }
 
   /**
-   * Get all administrators of a record
+   * Get all administrator identity hashes for a record
+   * Note: Returns userIdHashes, not wallet addresses
    */
   static async getRecordAdmins(recordId: string): Promise<string[]> {
     try {
@@ -493,7 +624,8 @@ export class BlockchainRoleManagerService {
   }
 
   /**
-   * Get all viewers of a record
+   * Get all viewer identity hashes for a record
+   * Note: Returns userIdHashes, not wallet addresses
    */
   static async getRecordViewers(recordId: string): Promise<string[]> {
     try {
@@ -507,13 +639,14 @@ export class BlockchainRoleManagerService {
   }
 
   /**
-   * Get all records where a user has any role
+   * Get all records where an identity has any role
+   * Note: Takes userIdHash, not wallet address
    */
-  static async getRecordsByUser(userAddress: string): Promise<string[]> {
+  static async getRecordsByUser(userIdHash: string): Promise<string[]> {
     try {
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('getRecordsByUser');
-      return await fn(userAddress);
+      return await fn(userIdHash);
     } catch (error) {
       console.error('Error getting records by user:', error);
       return [];
@@ -567,15 +700,15 @@ export class BlockchainRoleManagerService {
    * - Caller must have an active role on the record
    * - To grant 'owner': caller must be owner (or admin if no owner exists)
    * - To grant 'administrator' or 'viewer': caller must be owner or admin
-   * - Target user must not already have a role (use changeRole instead)
+   * - Target identity must not already have a role (use changeRole instead)
    */
   static async grantRole(
     recordId: string,
-    userAddress: string,
+    targetWalletAddress: string,
     role: RoleType
   ): Promise<TransactionResult> {
-    console.log('🔗 Granting role on blockchain...', { recordId, userAddress, role });
-    const result = await this.executeWrite('grantRole', [recordId, userAddress, role]);
+    console.log('🔗 Granting role on blockchain...', { recordId, targetWalletAddress, role });
+    const result = await this.executeWrite('grantRole', [recordId, targetWalletAddress, role]);
     console.log('✅ Role granted:', result.txHash);
     return result;
   }
@@ -585,19 +718,19 @@ export class BlockchainRoleManagerService {
    *
    * Requirements (enforced by smart contract):
    * - Caller must be an active member
-   * - Target user must have an active role
-   * - Owners cannot be demoted (must use voluntarilyRemoveOwnOwnership)
+   * - Target identity must have an active role
+   * - Owners cannot be demoted (must use voluntarilyLeaveOwnership)
    * - To promote to 'owner': caller must be owner (or admin if no owner exists)
    * - To promote to 'administrator': caller must be owner or admin
    * - To demote to 'viewer': caller must be owner, or admin demoting themselves
    */
   static async changeRole(
     recordId: string,
-    userAddress: string,
+    targetWalletAddress: string,
     newRole: RoleType
   ): Promise<TransactionResult> {
-    console.log('🔗 Changing role on blockchain...', { recordId, userAddress, newRole });
-    const result = await this.executeWrite('changeRole', [recordId, userAddress, newRole]);
+    console.log('🔗 Changing role on blockchain...', { recordId, targetWalletAddress, newRole });
+    const result = await this.executeWrite('changeRole', [recordId, targetWalletAddress, newRole]);
     console.log('✅ Role changed:', result.txHash);
     return result;
   }
@@ -606,16 +739,19 @@ export class BlockchainRoleManagerService {
    * Revoke a user's role entirely
    *
    * Requirements (enforced by smart contract):
-   * - Target user must have an active role
-   * - Owners cannot be revoked (must use voluntarilyRemoveOwnOwnership)
+   * - Target identity must have an active role
+   * - Owners cannot be revoked (must use voluntarilyLeaveOwnership)
    * - Self-revoke is always allowed (for non-owners)
    * - To revoke others: caller must be owner or admin
    * - Admins can only revoke other admins if no owner exists
    * - Cannot revoke last administrator if no owner exists
    */
-  static async revokeRole(recordId: string, userAddress: string): Promise<TransactionResult> {
-    console.log('🔗 Revoking role on blockchain...', { recordId, userAddress });
-    const result = await this.executeWrite('revokeRole', [recordId, userAddress]);
+  static async revokeRole(
+    recordId: string,
+    targetWalletAddress: string
+  ): Promise<TransactionResult> {
+    console.log('🔗 Revoking role on blockchain...', { recordId, targetWalletAddress });
+    const result = await this.executeWrite('revokeRole', [recordId, targetWalletAddress]);
     console.log('✅ Role revoked:', result.txHash);
     return result;
   }
@@ -625,12 +761,12 @@ export class BlockchainRoleManagerService {
    *
    * Requirements (enforced by smart contract):
    * - Caller must be an owner of the record
-   * - Cannot remove yourself if you're the last owner AND there are no admins
+   * - Cannot leave if you're the last owner AND there are no admins
    */
-  static async voluntarilyRemoveOwnOwnership(recordId: string): Promise<TransactionResult> {
-    console.log('🔗 Removing own ownership on blockchain...', { recordId });
-    const result = await this.executeWrite('voluntarilyRemoveOwnOwnership', [recordId]);
-    console.log('✅ Ownership removed:', result.txHash);
+  static async voluntarilyLeaveOwnership(recordId: string): Promise<TransactionResult> {
+    console.log('🔗 Leaving ownership on blockchain...', { recordId });
+    const result = await this.executeWrite('voluntarilyLeaveOwnership', [recordId]);
+    console.log('✅ Ownership left:', result.txHash);
     return result;
   }
 

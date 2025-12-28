@@ -296,3 +296,12 @@ export function uint8ArrayToHex(bytes: Uint8Array): string {
     .map(byte => byte.toString(16).padStart(2, '0'))
     .join('');
 }
+
+/**
+ * Convert hex string to Uint8Array
+ */
+export const hexToArrayBuffer = (hex: string): ArrayBuffer => {
+  const matches = hex.match(/[\da-f]{2}/gi);
+  if (!matches) return new Uint8Array([]).buffer;
+  return new Uint8Array(matches.map(h => parseInt(h, 16))).buffer;
+};

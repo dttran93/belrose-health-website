@@ -18,8 +18,6 @@ import UserCard, { BadgeConfig } from '@/features/Users/components/ui/UserCard';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { Button } from '@/components/ui/Button';
 import { usePermissions } from '@/features/Permissions/hooks/usePermissions';
-import RevokeAccessDialog from '@/features/Permissions/component/ui/RevokeAccessDialog';
-import GrantAccessModal from './GrantAccessModal';
 
 interface WrappedKeyInfo {
   userId: string;
@@ -336,19 +334,6 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
           )}
         </div>
       </div>
-      <RevokeAccessDialog
-        isOpen={!!selectedEntry}
-        entry={selectedEntry}
-        onClose={() => setSelectedEntry(null)}
-        onConfirm={handleRevokeConfirm}
-        loading={isActionLoading}
-      />
-      <GrantAccessModal
-        record={record}
-        isOpen={isGrantModalOpen}
-        onClose={() => setIsGrantModalOpen(false)}
-        onSuccess={fetchEncryptionAccess} // Refetches the list so the new user appears
-      />
     </div>
   );
 };

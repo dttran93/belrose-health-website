@@ -1,47 +1,57 @@
-// src/components/auth/services/memberRegistryBlockchain.ts
+// src/features/Auth/services/memberRegistryBlockchain.ts
 // Frontend service for member registry blockchain operations.
 // Calls backend Cloud Functions which use the admin wallet to write to blockchain.
 
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // ==================== TYPES ====================
+export enum MemberStatus {
+  NotRegistered = 0,
+  Inactive = 1,
+  Active = 2,
+  Verified = 3,
+}
 
 interface RegisterMemberResult {
   success: boolean;
-  txHash: string;
-  blockNumber: number;
+  txHash?: string;
+  message?: string;
 }
 
-interface UpdateStatusResult {
+interface UpdateUserStatusResult {
+  success: boolean;
+  txHash?: string;
+}
+
+interface WalletStatusResult {
   success: boolean;
   txHash: string;
   blockNumber: number;
-}
-
-interface InitializeRecordResult {
-  success: boolean;
-  txHash: string;
-  blockNumber: number;
-}
-
-export enum MemberStatus {
-  Inactive = 0,
-  Active = 1,
-  Verified = 2,
 }
 
 // ==================== SERVICE ====================
 
+/**
+ * MemberRegistryBlockchain - Frontend service for blockchain member operations
+ *
+ * Key concepts from the smart contract:
+ * - Members are identified by userIdHash (keccak256 of Firebase UID)
+ * - Each identity can have multiple wallets (EOA, Smart Account, etc.)
+ * - Status is set at the IDENTITY level, not wallet level
+ * - Individual wallets can be activated/deactivated independently
+ */
 export class MemberRegistryBlockchain {
+  // ==================== MEMBER REGISTRATION ====================
+
   /**
-   * Register a new member on the blockchain
-   * Called after user completes registration with a wallet
+   * Register a wallet on the blockchain
+   * - If first wallet for user: creates identity + links wallet
+   * - If user exists: links additional wallet to existing identity
    *
-   * @param walletAddress - User's wallet address
-   * @returns Transaction result
+   * @param walletAddress - Wallet address (EOA or Smart Account)
    */
-  static async registerMember(walletAddress: string): Promise<RegisterMemberResult> {
-    console.log('🔗 Registering member on blockchain...');
+  static async registerMemberWallet(walletAddress: string): Promise<RegisterMemberResult> {
+    console.log('🔗 Registering wallet on blockchain...', walletAddress);
 
     try {
       const functions = getFunctions();
@@ -52,49 +62,49 @@ export class MemberRegistryBlockchain {
 
       const result = await registerFn({ walletAddress });
 
-      console.log('✅ Member registered:', result.data.txHash);
+      console.log('✅ Wallet registered:', result.data);
       return result.data;
     } catch (error: any) {
-      console.error('❌ Member registration failed:', error);
+      console.error('❌ Wallet registration failed:', error);
 
-      // Handle "already exists" gracefully
-      if (error.code === 'already-exists') {
-        console.log('ℹ️ Member already registered on blockchain');
-        return {
-          success: true,
-          txHash: '',
-          blockNumber: 0,
-        };
+      if (
+        error.code === 'already-exists' ||
+        error.code === 'functions/already-exists' ||
+        error.message?.includes('already registered')
+      ) {
+        console.log('ℹ️ Wallet already registered on blockchain');
+        return { success: true, message: 'Already registered' };
       }
 
       throw new Error(error.message || 'Failed to register on blockchain');
     }
   }
 
+  // ==================== USER STATUS (IDENTITY LEVEL) ====================
+
   /**
-   * Update member status on the blockchain
-   * Called after identity verification completes
+   * Update a user's status on the blockchain
+   * This affects ALL wallets linked to this identity
    *
-   * @param walletAddress - User's wallet address
-   * @param status - New status (Active, Verified, etc.)
-   * @returns Transaction result
+   * @param userId - Firebase user ID (backend hashes it)
+   * @param status - New status (Inactive, Active, Verified)
    */
-  static async updateMemberStatus(
-    walletAddress: string,
+  static async setUserStatus(
+    userId: string,
     status: MemberStatus
-  ): Promise<UpdateStatusResult> {
-    console.log('🔗 Updating member status on blockchain...', { status });
+  ): Promise<UpdateUserStatusResult> {
+    console.log('🔗 Updating user status on blockchain...', { status: MemberStatus[status] });
 
     try {
       const functions = getFunctions();
-      const updateFn = httpsCallable<{ walletAddress: string; status: number }, UpdateStatusResult>(
+      const updateFn = httpsCallable<{ userId: string; status: number }, UpdateUserStatusResult>(
         functions,
         'updateMemberStatus'
       );
 
-      const result = await updateFn({ walletAddress, status });
+      const result = await updateFn({ userId, status });
 
-      console.log('✅ Status updated:', result.data.txHash);
+      console.log('✅ User status updated:', result.data);
       return result.data;
     } catch (error: any) {
       console.error('❌ Status update failed:', error);
@@ -103,31 +113,72 @@ export class MemberRegistryBlockchain {
   }
 
   /**
-   * Mark member as verified after identity verification.
-   * Convenience method that calls updateMemberStatus with Verified status.
-   *
-   * @param walletAddress - User's wallet address
+   * Mark user as verified after identity verification
    */
-  static async markAsVerified(walletAddress: string): Promise<UpdateStatusResult> {
-    return this.updateMemberStatus(walletAddress, MemberStatus.Verified);
+  static async markUserAsVerified(userId: string): Promise<UpdateUserStatusResult> {
+    return this.setUserStatus(userId, MemberStatus.Verified);
   }
 
   /**
-   * Deactivate a member (set status to Inactive).
-   * Use with caution - this prevents the user from transacting.
-   *
-   * @param walletAddress - User's wallet address
+   * Deactivate a user - prevents ALL their wallets from transacting
    */
-  static async deactivateMember(walletAddress: string): Promise<UpdateStatusResult> {
-    return this.updateMemberStatus(walletAddress, MemberStatus.Inactive);
+  static async deactivateUser(userId: string): Promise<UpdateUserStatusResult> {
+    return this.setUserStatus(userId, MemberStatus.Inactive);
   }
 
   /**
-   * Reactivate a member (set status to Active).
-   *
-   * @param walletAddress - User's wallet address
+   * Reactivate a user
    */
-  static async reactivateMember(walletAddress: string): Promise<UpdateStatusResult> {
-    return this.updateMemberStatus(walletAddress, MemberStatus.Active);
+  static async reactivateUser(userId: string): Promise<UpdateUserStatusResult> {
+    return this.setUserStatus(userId, MemberStatus.Active);
+  }
+
+  // ==================== WALLET STATUS (INDIVIDUAL WALLET) ====================
+
+  /**
+   * Deactivate a specific wallet
+   * The identity remains active, but this wallet cannot transact
+   */
+  static async deactivateWallet(walletAddress: string): Promise<WalletStatusResult> {
+    console.log('🔗 Deactivating wallet on blockchain...');
+
+    try {
+      const functions = getFunctions();
+      const deactivateFn = httpsCallable<{ walletAddress: string }, WalletStatusResult>(
+        functions,
+        'deactivateWalletOnChain'
+      );
+
+      const result = await deactivateFn({ walletAddress });
+
+      console.log('✅ Wallet deactivated:', result.data.txHash);
+      return result.data;
+    } catch (error: any) {
+      console.error('❌ Wallet deactivation failed:', error);
+      throw new Error(error.message || 'Failed to deactivate wallet on blockchain');
+    }
+  }
+
+  /**
+   * Reactivate a specific wallet
+   */
+  static async reactivateWallet(walletAddress: string): Promise<WalletStatusResult> {
+    console.log('🔗 Reactivating wallet on blockchain...');
+
+    try {
+      const functions = getFunctions();
+      const reactivateFn = httpsCallable<{ walletAddress: string }, WalletStatusResult>(
+        functions,
+        'reactivateWalletOnChain'
+      );
+
+      const result = await reactivateFn({ walletAddress });
+
+      console.log('✅ Wallet reactivated:', result.data.txHash);
+      return result.data;
+    } catch (error: any) {
+      console.error('❌ Wallet reactivation failed:', error);
+      throw new Error(error.message || 'Failed to reactivate wallet on blockchain');
+    }
   }
 }

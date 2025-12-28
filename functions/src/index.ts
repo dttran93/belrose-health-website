@@ -34,10 +34,10 @@ export { health, healthDetailed } from './handlers/healthCheck';
 export {
   registerMemberOnChain,
   updateMemberStatus,
+  deactivateWalletOnChain,
+  reactivateWalletOnChain,
   initializeRoleOnChain,
 } from './handlers/memberRegistry';
-
-export { registerSmartAccount } from './handlers/smartAccountRegistry';
 
 // ==================== NOTIFICATIONS ====================
 export {

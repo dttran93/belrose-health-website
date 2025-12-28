@@ -9,7 +9,6 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import { getAuth } from 'firebase/auth';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { AccessEntry } from '@/features/Sharing/components/EncryptionAccessView';
-import RevokeAccessDialog from './ui/RevokeAccessDialog';
 
 interface OwnerManagementProps {
   record: FileObject;
@@ -235,14 +234,7 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
           )}
         </div>
       </div>
-      {/* The Reusable Dialog */}
-      <RevokeAccessDialog
-        isOpen={!!revokeEntry}
-        entry={revokeEntry}
-        onClose={() => setRevokeEntry(null)}
-        onConfirm={handleRevokeConfirm}
-        loading={isLoading}
-      />
+      {/* The Reusable Dialog Add Permission Action Dialog here when available */}
 
       {isAddMode && (
         <>

@@ -22,9 +22,17 @@ import { getFirestore, collection, query, where, getDocs } from 'firebase/firest
 
 interface WalletSetupProps {
   userId: string;
-  onComplete: (data: { walletAddress: string; walletType: 'generated' | 'metamask' }) => void;
+  onComplete: (data: {
+    walletAddress: string;
+    walletType: 'generated' | 'metamask';
+    smartAccountAddress?: string;
+  }) => void;
   isCompleted: boolean;
-  initialWalletData?: { walletAddress?: string; walletType?: 'generated' | 'metamask' };
+  initialWalletData?: {
+    walletAddress?: string;
+    walletType?: 'generated' | 'metamask';
+    smartAccountAddress?: string;
+  };
   isActivated: boolean;
 }
 
@@ -174,17 +182,6 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
       const data = await response.json();
       console.log('✅ Wallet created:', data.walletAddress);
 
-      /* Top up gas so user can transact
-      console.log('⛽ Requesting initial gas...');
-      try {
-        await GasService.requestTopUp(data.walletAddress);
-        console.log('✅ Gas topped up');
-      } catch (gasError) {
-        // Don't fail registration if gas top-up fails
-        console.warn('⚠️ Gas top-up failed, user can request later:', gasError);
-      }
-      */
-
       toast.success('Wallet created successfully!');
 
       onComplete({
@@ -274,7 +271,8 @@ export const WalletSetup: React.FC<WalletSetupProps> = ({
           </div>
           <h2 className="text-2xl font-bold text-primary">Blockchain Connection</h2>
           <p className="text-gray-600 mt-2">
-            A blockchain connection ensures record reliability and Belrose platform's auditability.
+            A blockchain connection ensures record reliability and the Belrose platform's
+            auditability.
           </p>
         </div>
 

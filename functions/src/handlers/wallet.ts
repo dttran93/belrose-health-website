@@ -22,6 +22,9 @@ interface CreateWalletResponse {
   success: boolean;
   walletAddress: string;
   message: string;
+  encryptedPrivateKey: string;
+  encryptedPrivateKeyIV: string;
+  authTag: string;
 }
 
 interface GetWalletResponse {
@@ -39,7 +42,7 @@ interface UserWallet {
   address: string;
   origin: WalletOrigin;
   encryptedPrivateKey?: string;
-  keyIv?: string;
+  encryptedPrivateKeyIV?: string;
   keyAuthTag?: string;
   keySalt?: string;
   encryptedMnemonic?: string;
@@ -135,7 +138,7 @@ export const createWallet = onRequest({ cors: true }, async (req: Request, res: 
       origin: 'generated',
       //Encrypted private key data
       encryptedPrivateKey: encryptedData.encryptedKey,
-      keyIv: encryptedData.iv,
+      encryptedPrivateKeyIV: encryptedData.iv,
       keyAuthTag: encryptedData.authTag,
       keySalt: encryptedData.salt,
       //Encrypted Mnemonic Data
@@ -157,6 +160,9 @@ export const createWallet = onRequest({ cors: true }, async (req: Request, res: 
       success: true,
       walletAddress: wallet.address,
       message: 'Wallet created successfully',
+      encryptedPrivateKey: encryptedData.encryptedKey,
+      encryptedPrivateKeyIV: encryptedData.iv,
+      authTag: encryptedData.authTag,
     };
 
     res.status(201).json(response);
@@ -219,7 +225,12 @@ export const getEncryptedWallet = onRequest({ cors: true }, async (req: Request,
     }
 
     // Validate all required fields exist
-    if (!wallet.encryptedPrivateKey || !wallet.keyIv || !wallet.keyAuthTag || !wallet.keySalt) {
+    if (
+      !wallet.encryptedPrivateKey ||
+      !wallet.encryptedPrivateKeyIV ||
+      !wallet.keyAuthTag ||
+      !wallet.keySalt
+    ) {
       console.error('❌ Generated wallet missing encryption fields:', userId);
       res.status(500).json({
         error: 'Wallet data corrupted',
@@ -234,7 +245,7 @@ export const getEncryptedWallet = onRequest({ cors: true }, async (req: Request,
     const response: GetWalletResponse = {
       walletAddress: wallet.address,
       encryptedPrivateKey: wallet.encryptedPrivateKey,
-      iv: wallet.keyIv,
+      iv: wallet.encryptedPrivateKeyIV,
       authTag: wallet.keyAuthTag,
       salt: wallet.keySalt,
       walletType: wallet.origin,

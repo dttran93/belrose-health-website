@@ -456,7 +456,12 @@ export class WalletService {
    */
   private static async getGeneratedWalletSigner(wallet: UserWallet): Promise<Signer> {
     // Verify we have encrypted key data
-    if (!wallet.encryptedPrivateKey || !wallet.keyIv || !wallet.keyAuthTag || !wallet.keySalt) {
+    if (
+      !wallet.encryptedPrivateKey ||
+      !wallet.encryptedPrivateKeyIV ||
+      !wallet.keyAuthTag ||
+      !wallet.keySalt
+    ) {
       throw new Error('Generated wallet is missing encryption data');
     }
 
@@ -469,7 +474,7 @@ export class WalletService {
     // Decrypt private key
     const privateKey = await decryptWalletPrivateKey(
       wallet.encryptedPrivateKey,
-      wallet.keyIv,
+      wallet.encryptedPrivateKeyIV,
       wallet.keyAuthTag,
       wallet.keySalt,
       masterKey
