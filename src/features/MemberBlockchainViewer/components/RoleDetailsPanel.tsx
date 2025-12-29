@@ -2,8 +2,12 @@
 
 import React from 'react';
 import { XCircle, Users, Loader2, User } from 'lucide-react';
-import type { UserData, RoleAssignment } from '@/features/MemberManagement/lib/types';
-import { truncateHash, getRoleInfo, capitalizeFirst } from '@/features/MemberManagement/lib/utils';
+import type { UserData, RoleAssignment } from '@/features/MemberBlockchainViewer/lib/types';
+import {
+  truncateHash,
+  getRoleInfo,
+  capitalizeFirst,
+} from '@/features/MemberBlockchainViewer/lib/utils';
 
 interface RoleDetailsPanelProps {
   user: UserData;

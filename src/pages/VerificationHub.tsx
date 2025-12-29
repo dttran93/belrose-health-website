@@ -24,6 +24,8 @@ import { VerificationResult, VerifiedData } from '@/types/identity';
 import { getAuth, sendEmailVerification } from 'firebase/auth';
 import { getFirestore, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { useAuthContext } from '@/features/Auth/AuthContext';
+import { authService } from '@/features/Auth/services/authServices';
 
 interface VerificationHubProps {
   userId?: string;
@@ -34,6 +36,7 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
   userId: propUserId,
   email: propEmail,
 }) => {
+  const { refreshUser } = useAuthContext();
   const navigate = useNavigate();
   const location = useLocation();
   const auth = getAuth();
@@ -83,44 +86,30 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
 
   const handleEmailVerificationCheck = async () => {
     setIsCheckingEmail(true);
-    setEmailCheckAttempts(prev => prev + 1);
-
     try {
-      await checkEmailVerification();
-      const currentUser = auth.currentUser;
+      // This now forces the whole app to see the updated emailVerified status
+      await refreshUser();
 
+      // Check the local auth instance for the UI logic
+      const currentUser = authService.getCurrentUser();
       if (currentUser?.emailVerified) {
         setEmailVerified(true);
 
-        // Update Firestore
+        // Update Firestore so the database reflects the verification too
         if (userId) {
           const userDocRef = doc(db, 'users', userId);
           await updateDoc(userDocRef, {
             emailVerified: true,
             emailVerifiedAt: new Date().toISOString(),
           });
+        }
 
-          await writeVerificationToBlockchain(true, identityVerified);
-          toast.success('Email verified!', {
-            description: 'Your email has been successfully verified',
-          });
-        }
+        toast.success('Email verified!');
       } else {
-        // Show helpful message based on attempt count
-        if (emailCheckAttempts >= 2) {
-          toast.error('Still not verified', {
-            description:
-              "Check your spam folder, or click 'Resend' to get a new verification email",
-          });
-        } else {
-          toast.error('Email not verified yet', {
-            description: 'Please check your inbox and click the verification link',
-          });
-        }
+        toast.error('Not verified yet', { description: 'Please check your email link.' });
       }
     } catch (error) {
-      console.error('Error checking email verification:', error);
-      toast.error('Failed to check verification status');
+      console.error('Refresh error:', error);
     } finally {
       setIsCheckingEmail(false);
     }
@@ -203,22 +192,15 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
     navigate('/dashboard', { replace: true });
   };
 
-  const handleContinueToDashboard = () => {
-    if (!emailVerified) {
+  const handleContinueToDashboard = async () => {
+    await auth.currentUser?.reload();
+    if (!auth.currentUser?.emailVerified) {
       toast.error('Email verification required', {
         description: 'Please verify your email before continuing',
       });
+      // Explicitly update local state so the UI matches reality
+      setEmailVerified(false);
       return;
-    }
-
-    if (emailVerified && identityVerified) {
-      toast.success('All set!', {
-        description: 'Welcome to Belrose - your account is fully verified',
-      });
-    } else {
-      toast.success('Welcome to Belrose!', {
-        description: 'Complete identity verification anytime for enhanced features',
-      });
     }
     navigate('/dashboard', { replace: true });
   };

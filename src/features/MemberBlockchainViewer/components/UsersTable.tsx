@@ -3,12 +3,12 @@
 import React from 'react';
 import { Eye, Wallet, User, Mail, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import type { UserData } from '@/features/MemberManagement/lib/types';
+import type { UserData } from '@/features/MemberBlockchainViewer/lib/types';
 import {
   truncateHash,
   copyToClipboard,
   getStatusInfo,
-} from '@/features/MemberManagement/lib/utils';
+} from '@/features/MemberBlockchainViewer/lib/utils';
 import { EtherscanLink } from './EtherscanLink';
 
 interface UsersTableProps {

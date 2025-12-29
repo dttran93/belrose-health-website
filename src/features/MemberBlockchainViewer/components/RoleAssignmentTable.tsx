@@ -2,13 +2,13 @@
 
 import React from 'react';
 import { User, FileText } from 'lucide-react';
-import type { RoleAssignment } from '@/features/MemberManagement/lib/types';
+import type { RoleAssignment } from '@/features/MemberBlockchainViewer/lib/types';
 import {
   truncateHash,
   copyToClipboard,
   getRoleInfo,
   capitalizeFirst,
-} from '@/features/MemberManagement/lib/utils';
+} from '@/features/MemberBlockchainViewer/lib/utils';
 import { EtherscanLink } from './EtherscanLink';
 
 interface RoleAssignmentsTableProps {

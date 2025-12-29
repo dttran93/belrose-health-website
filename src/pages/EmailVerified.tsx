@@ -30,7 +30,6 @@ const EmailVerifiedPage: React.FC = () => {
   const [isVerified, setIsVerified] = useState(false);
 
   const searchParams = new URLSearchParams(window.location.search);
-  const testMode = import.meta.env.DEV ? searchParams.get('test') : null;
 
   /**
    * useEffect Hook
@@ -38,22 +37,6 @@ const EmailVerifiedPage: React.FC = () => {
    * It checks if the user's email is verified and updates the database
    */
   useEffect(() => {
-    // TEST MODE: Skip verification and show requested state
-    if (testMode === 'success') {
-      setIsVerified(true);
-      setIsLoading(false);
-      return;
-    }
-    if (testMode === 'error') {
-      setIsVerified(false);
-      setIsLoading(false);
-      return;
-    }
-    if (testMode === 'loading') {
-      // Stay in loading state forever
-      return;
-    }
-
     const verifyEmail = async () => {
       try {
         const currentUser = auth.currentUser;

@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, HelpCircle, Plus, CircleUser, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { usePermissions } from '@/features/Permissions/hooks/usePermissions';
+import { usePermissionFlow } from '@/features/Permissions/hooks/usePermissionFlow';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import UserSearch from '@/features/Users/components/UserSearch';
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { getAuth } from 'firebase/auth';
 import UserCard from '@/features/Users/components/ui/UserCard';
-import { AccessEntry } from '@/features/Sharing/components/EncryptionAccessView';
+import PermissionActionDialog from './ui/PermissionActionDialog';
 
 interface OwnerManagementProps {
   record: FileObject;
@@ -30,12 +29,14 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
   const [selectedUser, setSelectedUser] = useState<BelroseUserProfile | null>(null);
   const [loadingOwners, setLoadingOwners] = useState(true);
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
-  const [revokeEntry, setRevokeEntry] = useState<AccessEntry | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const { grantOwner, removeOwner, isLoading } = usePermissions({
-    onSuccess: msg => {
+  // 3. Initialize the flow hook
+  const { dialogProps, initiateGrant, initiateRevoke, isLoading } = usePermissionFlow({
+    recordId: record.id,
+    onSuccess: () => {
       setSelectedUser(null);
-      setRevokeEntry(null); // Close dialog on success
+      setRefreshTrigger(prev => prev + 1);
       onSuccess?.();
     },
   });
@@ -44,70 +45,39 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
     setSelectedUser(user);
   };
 
-  const handleAddOwner = async () => {
+  const handleAddOwner = () => {
     if (!selectedUser) return;
-    await grantOwner(record.id, selectedUser.uid);
+    initiateGrant(selectedUser, 'owner');
   };
 
-  // 1. Trigger the dialog instead of direct removal
-  const initiateRevoke = (userId: string) => {
+  const handleDeleteOwner = (userId: string) => {
     const profile = userProfiles.get(userId);
-    setRevokeEntry({
-      userId,
-      profile,
-      role: 'owner', // This enables both Admin and Viewer demotion buttons
-      status: 'synced',
-      wrappedKey: null,
-    });
-  };
-
-  // 2. Handle the choice from the dialog
-  const handleRevokeConfirm = async (action: 'full-revoke' | 'demote-admin' | 'demote-viewer') => {
-    if (!revokeEntry) return;
-
-    const demoteTo =
-      action === 'demote-admin'
-        ? 'administrator'
-        : action === 'demote-viewer'
-          ? 'viewer'
-          : undefined;
-
-    await removeOwner(record.id, revokeEntry.userId, { demoteTo });
+    if (!profile) return;
+    // 5. Use initiateRevoke - the hook handles the 'demote' logic internally
+    initiateRevoke(profile, 'owner');
   };
 
   // Fetch access permissions for this record
   useEffect(() => {
-    const fetchAccessPermissions = async () => {
+    const fetchOwnerProfiles = async () => {
       if (!record.id) return;
 
       setLoadingOwners(true);
       try {
-        const auth = getAuth();
-        const currentUser = auth.currentUser;
-
-        if (!currentUser) {
-          console.error('No authenticated user');
-          return;
-        }
-
-        // Fetch user profiles for all owners and receivers
         const userIds = new Set<string>();
-
-        // Add owners
         record.owners?.forEach(ownerId => userIds.add(ownerId));
 
-        // Fetch all user profiles at once
         const profiles = await getUserProfiles(Array.from(userIds));
         setUserProfiles(profiles);
       } catch (error) {
-        console.error('Error fetching access permissions:', error);
+        console.error('Error fetching owner profiles:', error);
       } finally {
         setLoadingOwners(false);
       }
     };
 
-    fetchAccessPermissions();
-  }, [record.id, record.owners]);
+    fetchOwnerProfiles();
+  }, [record.id, record.owners, refreshTrigger]);
 
   return (
     <div>
@@ -198,8 +168,8 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
                   </Tooltip.Portal>
                 </Tooltip.Root>
               </Tooltip.Provider>
-              <button className="rounded-full hover:bg-gray-300">
-                <Plus onClick={onAddMode} />
+              <button onClick={onAddMode} className="rounded-full hover:bg-gray-300">
+                <Plus />
               </button>
             </div>
           )}
@@ -213,13 +183,13 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
           ) : record.owners && record.owners.length > 0 ? (
             <div className="space-y-3 mt-4">
               {record.owners.map(ownerId => {
-                const adminProfile = userProfiles.get(ownerId);
+                const profile = userProfiles.get(ownerId);
                 return (
                   <UserCard
                     key={ownerId}
-                    user={adminProfile}
-                    onView={handleAddOwner}
-                    onDelete={() => initiateRevoke(ownerId)}
+                    user={profile}
+                    onView={() => {}}
+                    onDelete={() => handleDeleteOwner(ownerId)}
                     variant="default"
                     color="red"
                   />
@@ -227,21 +197,20 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
               })}
             </div>
           ) : (
-            <div className="flex justify-between">
-              <p>No record owner</p>
+            <div className="flex justify-between items-center">
+              <p className="text-gray-600">No owners assigned</p>
               {!isAddMode && <Button onClick={onAddMode}>Set Record Owner</Button>}
             </div>
           )}
         </div>
       </div>
-      {/* The Reusable Dialog Add Permission Action Dialog here when available */}
 
       {isAddMode && (
         <>
           {/* User Search Component */}
           <UserSearch
             onUserSelect={handleUserSelect}
-            excludeUserIds={currentOwners ? currentOwners : []}
+            excludeUserIds={currentOwners || []}
             placeholder="Search by name, email, or ID..."
           />
 
@@ -262,12 +231,14 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
                 />
               </div>
               <Button onClick={handleAddOwner} disabled={isLoading} className="w-full">
-                {isLoading ? 'Adding Owner...' : 'Confirm & Add Record Subject'}
+                {isLoading ? 'Adding Owner...' : 'Confirm & Add Owner'}
               </Button>
             </div>
           )}
         </>
       )}
+
+      <PermissionActionDialog {...dialogProps} />
     </div>
   );
 };

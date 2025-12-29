@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Users, ArrowLeft, HelpCircle, Plus, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { usePermissions } from '@/features/Permissions/hooks/usePermissions';
+import { usePermissionFlow } from '@/features/Permissions/hooks/usePermissionFlow';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import UserSearch from '@/features/Users/components/UserSearch';
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
 import UserCard from '@/features/Users/components/ui/UserCard';
+import PermissionActionDialog from './ui/PermissionActionDialog';
 
 interface ViewerManagementProps {
   record: FileObject;
@@ -30,12 +29,14 @@ export const ViewerManagement: React.FC<ViewerManagementProps> = ({
   const [selectedUser, setSelectedUser] = useState<BelroseUserProfile | null>(null);
   const [loadingViewers, setLoadingViewers] = useState(true);
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
-  const [refreshViewersTrigger, setRefreshViewersTrigger] = useState(0);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const { grantViewer, removeViewer, isLoading } = usePermissions({
-    onSuccess: msg => {
+  // 3. Initialize the flow hook
+  const { dialogProps, initiateGrant, initiateRevoke, isLoading } = usePermissionFlow({
+    recordId: record.id,
+    onSuccess: () => {
       setSelectedUser(null);
-      setRefreshViewersTrigger(prev => prev + 1);
+      setRefreshTrigger(prev => prev + 1);
       onSuccess?.();
     },
   });
@@ -44,49 +45,37 @@ export const ViewerManagement: React.FC<ViewerManagementProps> = ({
     setSelectedUser(user);
   };
 
-  const handleAddViewer = async () => {
+  const handleAddViewer = () => {
     if (!selectedUser) return;
-    await grantViewer(record.id, selectedUser.uid);
+    initiateGrant(selectedUser, 'viewer');
   };
 
-  const handleDeleteViewer = async (userIdToRemove: string) => {
-    await removeViewer(record.id, userIdToRemove);
+  const handleDeleteViewer = (userId: string) => {
+    const profile = userProfiles.get(userId);
+    if (!profile) return;
+    initiateRevoke(profile, 'viewer');
   };
 
-  // Fetch access permissions for this record
   useEffect(() => {
-    const fetchAccessPermissions = async () => {
+    const fetchViewerProfiles = async () => {
       if (!record.id) return;
 
       setLoadingViewers(true);
       try {
-        const db = getFirestore();
-        const auth = getAuth();
-        const currentUser = auth.currentUser;
-
-        if (!currentUser) {
-          console.error('No authenticated user');
-          return;
-        }
-
-        // Fetch user profiles for all viewers
         const userIds = new Set<string>();
-
-        // Add viewers
         record.viewers?.forEach(viewerId => userIds.add(viewerId));
 
-        // Fetch all user profiles at once
         const profiles = await getUserProfiles(Array.from(userIds));
         setUserProfiles(profiles);
       } catch (error) {
-        console.error('Error fetching access permissions:', error);
+        console.error('Error fetching viewer profiles:', error);
       } finally {
         setLoadingViewers(false);
       }
     };
 
-    fetchAccessPermissions();
-  }, [record.id, record.viewers, refreshViewersTrigger]);
+    fetchViewerProfiles();
+  }, [record.id, record.viewers, refreshTrigger]);
 
   return (
     <div>
@@ -170,30 +159,28 @@ export const ViewerManagement: React.FC<ViewerManagementProps> = ({
                   </Tooltip.Portal>
                 </Tooltip.Root>
               </Tooltip.Provider>
-              <button className="rounded-full hover:bg-gray-300">
-                <Plus onClick={onAddMode} />
+              <button onClick={onAddMode} className="rounded-full hover:bg-gray-300">
+                <Plus />
               </button>
             </div>
           )}
         </div>
 
-        <div className="p-4 bg-white space-y-2 rounded-lg">
-          {/* Revise the ! thing eventually when you split up the FileObject */}
+        <div className="p-4 bg-white rounded-b-lg">
           {loadingViewers ? (
             <div className="flex justify-center items-center py-8">
               <p className="text-gray-500">Loading viewers...</p>
             </div>
           ) : record.viewers && record.viewers.length > 0 ? (
-            // Display Viewers
-            <div className="space-y-3 mt-4">
-              {record.viewers.map(viewer => {
-                const viewerProfile = userProfiles.get(viewer);
+            <div className="space-y-3">
+              {record.viewers.map(viewerId => {
+                const profile = userProfiles.get(viewerId);
                 return (
                   <UserCard
-                    key={viewer}
-                    user={viewerProfile}
+                    key={viewerId}
+                    user={profile}
                     onView={() => {}}
-                    onDelete={() => handleDeleteViewer(viewer)}
+                    onDelete={() => handleDeleteViewer(viewerId)}
                     variant="default"
                     color="yellow"
                   />
@@ -203,7 +190,7 @@ export const ViewerManagement: React.FC<ViewerManagementProps> = ({
           ) : (
             <div className="flex justify-between items-center mt-4">
               <p className="text-gray-600">No viewers assigned</p>
-              <Button onClick={onAddMode}>Manage Viewers</Button>
+              {!isAddMode && <Button onClick={onAddMode}>Add Viewer</Button>}
             </div>
           )}
         </div>
@@ -213,7 +200,7 @@ export const ViewerManagement: React.FC<ViewerManagementProps> = ({
           {/* User Search Component */}
           <UserSearch
             onUserSelect={handleUserSelect}
-            excludeUserIds={currentViewers}
+            excludeUserIds={currentViewers || []}
             placeholder="Search by name, email, or ID..."
           />
 
@@ -221,7 +208,7 @@ export const ViewerManagement: React.FC<ViewerManagementProps> = ({
           {selectedUser && (
             <div className="mt-6 pt-6 border-t border-gray-200">
               <p className="text-sm font-medium text-gray-700 mb-3">
-                Ready to add this user as an viewer:
+                Ready to add this user as a Viewer:
               </p>
               <div className="py-3">
                 <UserCard
@@ -240,6 +227,9 @@ export const ViewerManagement: React.FC<ViewerManagementProps> = ({
           )}
         </>
       )}
+
+      {/* 6. Unified Dialog */}
+      <PermissionActionDialog {...dialogProps} />
     </div>
   );
 };

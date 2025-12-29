@@ -87,6 +87,7 @@ export interface AuthContextData {
   loading: boolean;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
+  refreshUser: () => {};
 }
 
 // Props for components that need auth context

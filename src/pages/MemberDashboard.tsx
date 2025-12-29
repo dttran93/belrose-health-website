@@ -12,14 +12,14 @@ import {
   Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { StatsCard } from '@/features/MemberManagement/components/StatsCard';
-import { UsersTable } from '@/features/MemberManagement/components/UsersTable';
-import { WalletsPanel } from '@/features/MemberManagement/components/WalletsPanel';
-import { RoleDetailsPanel } from '@/features/MemberManagement/components/RoleDetailsPanel';
-import { UserStatus } from '@/features/MemberManagement/lib/types';
-import { getStatusInfo } from '@/features/MemberManagement/lib/utils';
-import { useMemberDashboard } from '@/features/MemberManagement/hooks/useMemberDashboards';
-import { RoleAssignmentsTable } from '@/features/MemberManagement/components/RoleAssignmentTable';
+import { StatsCard } from '@/features/MemberBlockchainViewer/components/StatsCard';
+import { UsersTable } from '@/features/MemberBlockchainViewer/components/UsersTable';
+import { WalletsPanel } from '@/features/MemberBlockchainViewer/components/WalletsPanel';
+import { RoleDetailsPanel } from '@/features/MemberBlockchainViewer/components/RoleDetailsPanel';
+import { UserStatus } from '@/features/MemberBlockchainViewer/lib/types';
+import { getStatusInfo } from '@/features/MemberBlockchainViewer/lib/utils';
+import { useMemberDashboard } from '@/features/MemberBlockchainViewer/hooks/useMemberDashboards';
+import { RoleAssignmentsTable } from '@/features/MemberBlockchainViewer/components/RoleAssignmentTable';
 
 interface SearchInputProps {
   value: string;

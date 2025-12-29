@@ -47,7 +47,7 @@ export const useAuth = (): AuthContextData => {
           emailVerifiedAt: profile.emailVerifiedAt || null,
           identityVerified: profile.identityVerified || false, // Use false if missing
           identityVerifiedAt: profile.identityVerifiedAt || null,
-          blockchainMember: profile.blockchainMember || undefined,
+          onChainIdentity: profile.onChainIdentity || undefined,
           affiliations: profile.affiliations || [],
         } as BelroseUserProfile;
 
@@ -139,12 +139,35 @@ export const useAuth = (): AuthContextData => {
   // Memoize isAuthenticated
   const isAuthenticated = useMemo(() => !!authState.user, [authState.user]);
 
+  const refreshUser = useCallback(async () => {
+    const currentUser = authService.getCurrentUser();
+    if (currentUser) {
+      // 1. Force Firebase to fetch the latest token/state (emailVerified)
+      await currentUser.reload();
+
+      // 2. Get the fresh reloaded user instance
+      const freshUser = authService.getCurrentUser();
+
+      if (freshUser) {
+        // 3. Re-run your merge logic to get a fresh BelroseUserProfile
+        const mergedUser = await fetchAndMergeProfile(freshUser);
+
+        // 4. Update state to trigger re-renders globally
+        setAuthState({
+          user: mergedUser,
+          loading: false,
+        });
+      }
+    }
+  }, [fetchAndMergeProfile]);
+
   // Return the data that satisfies the AuthContextData type
   return {
     user: authState.user,
     loading: authState.loading,
     signOut,
     isAuthenticated,
+    refreshUser,
   };
 };
 
