@@ -8,8 +8,8 @@ import {
   Smile,
   CircleEllipsisIcon,
   LucideIcon,
-  ShieldCheck,
   Share2,
+  Link,
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -19,6 +19,7 @@ export interface NavigationItem {
 }
 
 export const healthRecords: NavigationItem[] = [
+  { title: 'Admin Dashboard', url: '/dashboard/blockchain-admin', icon: Link },
   { title: 'Overview', url: '/dashboard', icon: Activity },
   { title: 'All Records', url: '/dashboard/all-records', icon: Clipboard },
   { title: 'Add Record', url: '/dashboard/add-record', icon: FilePlus2 },

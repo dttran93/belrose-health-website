@@ -19,7 +19,7 @@ import { EncryptionGate } from './features/Encryption/components/EncryptionGate'
 import VerificationHub from './pages/VerificationHub';
 import EmailVerifiedPage from './pages/EmailVerified';
 import NotificationsManager from './features/Notifications/component/NotificationsManager';
-import BlockchainAdminDashboard from './pages/BlockchainAdminDashboard';
+import BlockchainAdminDashboard from './pages/MemberDashboard';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();

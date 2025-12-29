@@ -82,27 +82,6 @@ function DesktopSidebar({
 
       {/* Navigation */}
       <div className="flex-1 p-4 space-y-6 overflow-y-auto">
-        {/* AI Assistant Button */}
-        <div className="mb-4">
-          <button
-            onClick={() => {
-              onToggleAI();
-              onCloseAI();
-            }}
-            className={`
-                w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
-                ${
-                  isAIOpen
-                    ? 'bg-secondary text-primary font-medium'
-                    : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                }
-              `}
-          >
-            <Bot className="w-5 h-5 flex-shrink-0" />
-            {!isCollapsed && <span className="text-sm">AI Assistant</span>}
-          </button>
-        </div>
-
         {/* Health Records Section */}
         <div>
           {!isCollapsed && (
