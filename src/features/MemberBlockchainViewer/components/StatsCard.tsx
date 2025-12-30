@@ -4,7 +4,7 @@ import React from 'react';
 
 interface StatsCardProps {
   title: string;
-  value: number;
+  value: number | string;
   icon: React.ReactNode;
   color: string; // Tailwind classes for bg, border, text colors
 }

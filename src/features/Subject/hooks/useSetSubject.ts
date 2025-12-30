@@ -84,7 +84,7 @@ export const useSetSubject = (options: UseSetSubjectOptions = {}): UseSetSubject
   const auth = getAuth();
 
   // Use the permissions hook for role management
-  const { addOwner, addAdmin } = usePermissions();
+  const { grantOwner, grantAdmin, grantViewer } = usePermissions();
 
   /**
    * Grant a role to a user for a record using existing permission services
@@ -92,15 +92,13 @@ export const useSetSubject = (options: UseSetSubjectOptions = {}): UseSetSubject
   const grantRole = async (recordId: string, userId: string, role: SubjectRole): Promise<void> => {
     switch (role) {
       case 'owner':
-        await addOwner(recordId, userId);
+        await grantOwner(recordId, userId);
         break;
       case 'administrator':
-        await addAdmin(recordId, userId);
+        await grantAdmin(recordId, userId);
         break;
       case 'viewer':
-        // For viewer, use SharingService to share the record
-        // This handles encryption key sharing properly
-        await SharingService.shareRecord({ recordId, receiverUserId: userId });
+        await grantViewer(recordId, userId);
         break;
     }
   };

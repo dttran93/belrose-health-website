@@ -10,6 +10,7 @@ import { useAuthForm } from '../hooks/useAuthForm';
 import { SocialAuthButtons } from './ui/SocialAuthButtons';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import InputField from './ui/InputField';
 
 interface LoginFormData {
   email: string;
@@ -215,12 +216,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onForgotPassw
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-gray-400" />
                 </div>
-                <input
+                <InputField
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={`w-full pl-10 pr-12 py-3 bg-background border focus:outline-none focus:ring-1 focus:ring-chart-1 focus:border-none rounded-xl ${
+                  className={`w-full rounded-xl transition-all ${
                     errors.email ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder="Enter your email"
@@ -236,12 +237,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onForgotPassw
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-gray-400" />
                 </div>
-                <input
+                <InputField
                   type={showPassword ? 'text' : 'password'}
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={`w-full pl-10 pr-12 py-3 bg-background border focus:outline-none focus:ring-1 focus:ring-chart-1 focus:border-none rounded-xl ${
+                  className={`w-full rounded-xl transition-all ${
                     errors.password ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder="Enter your password"

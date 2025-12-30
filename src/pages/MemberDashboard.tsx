@@ -10,6 +10,7 @@ import {
   Loader2,
   Crown,
   Eye,
+  Wallet,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { StatsCard } from '@/features/MemberBlockchainViewer/components/StatsCard';
@@ -20,6 +21,7 @@ import { UserStatus } from '@/features/MemberBlockchainViewer/lib/types';
 import { getStatusInfo } from '@/features/MemberBlockchainViewer/lib/utils';
 import { useMemberDashboard } from '@/features/MemberBlockchainViewer/hooks/useMemberDashboards';
 import { RoleAssignmentsTable } from '@/features/MemberBlockchainViewer/components/RoleAssignmentTable';
+import { usePaymasterDeposit } from '@/features/MemberBlockchainViewer/hooks/usePaymasterDeposit';
 
 interface SearchInputProps {
   value: string;
@@ -232,6 +234,8 @@ const MemberDashboard: React.FC = () => {
     closeWalletsModal,
   } = useMemberDashboard();
 
+  const { deposit, isLoading: isLoadingDeposit } = usePaymasterDeposit(0.01);
+
   const hasFilters = searchQuery !== '' || statusFilter !== 'all' || roleFilter !== 'all';
 
   return (
@@ -264,7 +268,7 @@ const MemberDashboard: React.FC = () => {
         )}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <button
             onClick={() => setCurrentView('users')}
             className="text-left transition-transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-xl"
@@ -300,6 +304,29 @@ const MemberDashboard: React.FC = () => {
               color={`${currentView === 'roles' ? 'ring-2 ring-purple-500' : ''} bg-purple-50 border-purple-200 text-purple-900`}
             />
           </button>
+          <div className="text-left">
+            <StatsCard
+              title="Paymaster Deposit"
+              value={
+                isLoadingDeposit
+                  ? '...'
+                  : `${parseFloat(deposit?.depositEth || '0').toFixed(4)} ETH`
+              }
+              icon={
+                <Wallet
+                  className={`w-6 h-6 ${deposit?.isLow ? 'text-red-600' : 'text-cyan-600'}`}
+                />
+              }
+              color={
+                deposit?.isLow
+                  ? 'bg-red-50 border-red-200 text-red-900'
+                  : 'bg-cyan-50 border-cyan-200 text-cyan-900'
+              }
+            />
+            {deposit?.isLow && (
+              <p className="text-xs text-red-600 mt-1 ml-1">⚠️ Low balance - needs funding</p>
+            )}
+          </div>
         </div>
 
         {/* View indicator */}
