@@ -361,7 +361,9 @@ contract HealthRecordCore {
 
   event RecordVerified(
     string indexed recordHash,
+    string indexed recordId,
     bytes32 indexed verifierIdHash,
+    VerificationLevel level,
     uint256 timestamp
   );
 
@@ -371,8 +373,17 @@ contract HealthRecordCore {
     uint256 timestamp
   );
 
+  event VerificationLevelModified(
+    string indexed recordHash,
+    bytes32 indexed verifierIdHash,
+    VerificationLevel oldLevel,
+    VerificationLevel newLevel,
+    uint256 timestamp
+  );
+
   event RecordDisputed(
     string indexed recordHash,
+    string indexed recordId,
     bytes32 indexed disputerIdHash,
     DisputeSeverity severity,
     DisputeCulpability culpability,
@@ -419,17 +430,39 @@ contract HealthRecordCore {
     uint256 timestamp
   );
 
+  event UnacceptedUpdateFlagged(
+    bytes32 indexed subjectIdHash,
+    string indexed recordId,
+    string indexed noteHash,
+    uint256 flagIndex,
+    uint256 timestamp
+  );
+
+  event UnacceptedUpdateResolved(
+    bytes32 indexed subjectIdHash,
+    uint256 indexed flagIndex,
+    ResolutionType resolution,
+    uint256 timestamp
+  );
+
   // =================== RECORD REVIEWS - ENUMS ===================
 
-  enum DisputeSeverity {
+  enum VerificationLevel {
     None,
+    Provenance,
+    Content,
+    Full
+  }
+
+  enum DisputeSeverity {
+    None, //For returning missing
     Negligible,
     Moderate,
     Major
   }
 
   enum DisputeCulpability {
-    None,
+    None, //For returning missing
     NoFault,
     Systemic,
     Preventable,
@@ -437,16 +470,27 @@ contract HealthRecordCore {
     Intentional
   }
 
+  enum ResolutionType {
+    None, // 0 - Unresolved
+    PatientAccepted, // 1 - Patient eventually accepted the update
+    DoctorWithdrew, // 2 - Doctor withdrew the proposed update
+    Arbitrated, // 3 - Belrose made a decision
+    Expired // 4 - No resolution after time limit
+  }
+
   // =================== RECORD REVIEWS - STRUCTURES ===================
 
   struct Verification {
-    bytes32 reviewerIdHash;
+    bytes32 verifierIdHash;
+    string recordId;
+    VerificationLevel level;
     uint256 createdAt;
     bool isActive;
   }
 
   struct Dispute {
     bytes32 disputerIdHash;
+    string recordId;
     DisputeSeverity severity;
     DisputeCulpability culpability;
     string notes;
@@ -458,6 +502,15 @@ contract HealthRecordCore {
     bytes32 reactorIdHash;
     bool supportsDispute;
     uint256 timestamp;
+    bool isActive;
+  }
+
+  struct UnacceptedUpdateFlag {
+    string recordId;
+    string noteHash;
+    uint256 createdAt;
+    ResolutionType resolution;
+    uint256 resolvedAt;
     bool isActive;
   }
 
@@ -478,12 +531,17 @@ contract HealthRecordCore {
   mapping(string => mapping(bytes32 => mapping(bytes32 => bool))) public hasReactedToDispute;
   mapping(string => mapping(bytes32 => mapping(bytes32 => uint256))) public reactionIndex;
 
+  //Unaccepted Update Flags
+  mapping(bytes32 => UnacceptedUpdateFlag[]) public unacceptedUpdateFlags;
+  mapping(bytes32 => uint256) public activeUnacceptedFlagCount;
+
   // User history
   mapping(bytes32 => string[]) public verificationsByUser;
   mapping(bytes32 => string[]) public disputesByUser;
 
   uint256 public totalVerifications;
   uint256 public totalDisputes;
+  uint256 public totalUnacceptedFlags;
 
   // =================== RECORD REVIEWS - FUNCTIONS ===================
 
@@ -491,13 +549,17 @@ contract HealthRecordCore {
 
   /**
    * @notice Verify a record hash (vouch for its accuracy)
+   * @param recordId The recordId this hash is claimed to be for
    * @param recordHash The hash being verified
    */
-  function verifyRecord(string memory recordHash) external onlyVerifiedMember {
-    require(hashExists[recordHash], 'Hash does not exist');
-
-    string memory recordId = recordIdForHash[recordHash];
-    require(memberRoleManager.hasActiveRole(recordId, msg.sender), 'No access to this record');
+  function verifyRecord(
+    string memory recordId,
+    string memory recordHash,
+    uint8 level
+  ) external onlyVerifiedMember onlyRecordParticipant(recordId) {
+    require(bytes(recordId).length > 0, 'Record ID cannot be empty');
+    require(bytes(recordHash).length > 0, 'Record hash cannot be empty');
+    require(level >= 1 && level <= 3, 'Level must be 1-3');
 
     bytes32 verifierIdHash = memberRoleManager.getUserForWallet(msg.sender);
     require(verifierIdHash != bytes32(0), 'Wallet not registered');
@@ -506,7 +568,13 @@ contract HealthRecordCore {
     uint256 newIndex = verifications[recordHash].length;
 
     verifications[recordHash].push(
-      Verification({ reviewerIdHash: verifierIdHash, createdAt: block.timestamp, isActive: true })
+      Verification({
+        verifierIdHash: verifierIdHash,
+        recordId: recordId,
+        level: VerificationLevel(level),
+        createdAt: block.timestamp,
+        isActive: true
+      })
     );
 
     hasVerified[recordHash][verifierIdHash] = true;
@@ -514,7 +582,13 @@ contract HealthRecordCore {
     verificationsByUser[verifierIdHash].push(recordHash);
     totalVerifications++;
 
-    emit RecordVerified(recordHash, verifierIdHash, block.timestamp);
+    emit RecordVerified(
+      recordHash,
+      recordId,
+      verifierIdHash,
+      VerificationLevel(level),
+      block.timestamp
+    );
   }
 
   /**
@@ -534,27 +608,57 @@ contract HealthRecordCore {
     emit VerificationRetracted(recordHash, verifierIdHash, block.timestamp);
   }
 
+  /**
+   * @notice Modify your verification level
+   * @param recordHash The hash you verified
+   * @param newLevel New level (1-3)
+   */
+  function modifyVerificationLevel(string memory recordHash, uint8 newLevel) external {
+    require(newLevel >= 1 && newLevel <= 3, 'Level must be 1-3');
+
+    bytes32 verifierIdHash = memberRoleManager.getUserForWallet(msg.sender);
+    require(verifierIdHash != bytes32(0), 'Wallet not registered');
+    require(hasVerified[recordHash][verifierIdHash], 'No verification to modify');
+
+    uint256 idx = verificationIndex[recordHash][verifierIdHash];
+    Verification storage verification = verifications[recordHash][idx];
+    require(verification.isActive, 'Verification has been retracted');
+
+    VerificationLevel oldLevel = verification.level;
+    require(oldLevel != VerificationLevel(newLevel), 'Already this level');
+
+    verification.level = VerificationLevel(newLevel);
+
+    emit VerificationLevelModified(
+      recordHash,
+      verifierIdHash,
+      oldLevel,
+      VerificationLevel(newLevel),
+      block.timestamp
+    );
+  }
+
   // ------------------- DISPUTES -------------------
 
   /**
    * @notice Dispute a record hash (flag it as inaccurate)
+   * @param recordId The record this hash is claimed to be for
    * @param recordHash The hash being disputed
    * @param severity 1=Negligible, 2=Moderate, 3=Major
    * @param culpability 1=NoFault, 2=Systemic, 3=Preventable, 4=Reckless, 5=Intentional
    * @param notes Off-chain reference for detailed reasoning (IPFS hash, etc.)
    */
   function disputeRecord(
+    string memory recordId,
     string memory recordHash,
     uint8 severity,
     uint8 culpability,
     string memory notes
-  ) external onlyVerifiedMember {
-    require(hashExists[recordHash], 'Hash does not exist');
+  ) external onlyVerifiedMember onlyRecordParticipant(recordId) {
+    require(bytes(recordId).length > 0, 'Record ID cannot be empty');
+    require(bytes(recordHash).length > 0, 'Record hash cannot be empty');
     require(severity >= 1 && severity <= 3, 'Severity must be 1-3');
     require(culpability >= 1 && culpability <= 5, 'Culpability must be 1-5');
-
-    string memory recordId = recordIdForHash[recordHash];
-    require(memberRoleManager.hasActiveRole(recordId, msg.sender), 'No access to this record');
 
     bytes32 disputerIdHash = memberRoleManager.getUserForWallet(msg.sender);
     require(disputerIdHash != bytes32(0), 'Wallet not registered');
@@ -565,6 +669,7 @@ contract HealthRecordCore {
     disputes[recordHash].push(
       Dispute({
         disputerIdHash: disputerIdHash,
+        recordId: recordId,
         severity: DisputeSeverity(severity),
         culpability: DisputeCulpability(culpability),
         notes: notes,
@@ -580,6 +685,7 @@ contract HealthRecordCore {
 
     emit RecordDisputed(
       recordHash,
+      recordId,
       disputerIdHash,
       DisputeSeverity(severity),
       DisputeCulpability(culpability),
@@ -656,18 +762,16 @@ contract HealthRecordCore {
     bytes32 disputerIdHash,
     bool supportsDispute
   ) external onlyActiveMember {
-    require(hashExists[recordHash], 'Hash does not exist');
     require(hasDisputed[recordHash][disputerIdHash], 'No dispute from this user');
 
-    string memory recordId = recordIdForHash[recordHash];
+    uint256 idx = disputeIndex[recordHash][disputerIdHash];
+    string memory recordId = disputes[recordHash][idx].recordId;
     require(memberRoleManager.hasActiveRole(recordId, msg.sender), 'No access to this record');
 
     bytes32 reactorIdHash = memberRoleManager.getUserForWallet(msg.sender);
     require(reactorIdHash != bytes32(0), 'Wallet not registered');
     require(reactorIdHash != disputerIdHash, 'Cannot react to your own dispute');
     require(!hasReactedToDispute[recordHash][disputerIdHash][reactorIdHash], 'Already reacted');
-
-    uint256 idx = disputeIndex[recordHash][disputerIdHash];
     require(disputes[recordHash][idx].isActive, 'Dispute has been retracted');
 
     uint256 newReactionIndex = disputeReactions[recordHash][disputerIdHash].length;
@@ -752,6 +856,69 @@ contract HealthRecordCore {
     );
   }
 
+  // ------------------- UNACCEPTED UPDATE FLAGS -------------------
+
+  /**
+   * @notice Flag that an unaccepted update exists for a record or user
+   * @dev Only admin can call this to protect privacy
+   * @param subjectIdHash The subject this flag is about
+   * @param recordId The record ID, optional if there's no recordID associated to patient yet
+   * @param noteHash Hash of encrypted details stored off-chain
+   */
+  function flagUnacceptedUpdate(
+    bytes32 subjectIdHash,
+    string memory recordId,
+    string memory noteHash
+  ) external onlyAdmin {
+    require(subjectIdHash != bytes32(0), 'Subject ID hash cannot be empty');
+    require(bytes(noteHash).length > 0, 'Note hash cannot be empty');
+
+    uint256 flagIndex = unacceptedUpdateFlags[subjectIdHash].length;
+
+    unacceptedUpdateFlags[subjectIdHash].push(
+      UnacceptedUpdateFlag({
+        recordId: recordId,
+        noteHash: noteHash,
+        createdAt: block.timestamp,
+        resolution: ResolutionType.None,
+        resolvedAt: 0,
+        isActive: true
+      })
+    );
+
+    activeUnacceptedFlagCount[subjectIdHash]++;
+    totalUnacceptedFlags++;
+
+    emit UnacceptedUpdateFlagged(subjectIdHash, recordId, noteHash, flagIndex, block.timestamp);
+  }
+
+  /**
+   * @notice Resolve an unaccepted update flag
+   * @dev Only admin can call this
+   * @param subjectIdHash the subject this flag is about
+   * @param flagIndex The index of the flag to resolve
+   * @param resolution The resolution type
+   */
+  function resolveUnacceptedUpdate(
+    bytes32 subjectIdHash,
+    uint256 flagIndex,
+    ResolutionType resolution
+  ) external onlyAdmin {
+    require(flagIndex < unacceptedUpdateFlags[subjectIdHash].length, 'Flag does not exist');
+    require(resolution != ResolutionType.None, 'Must provide resolution type');
+
+    UnacceptedUpdateFlag storage flag = unacceptedUpdateFlags[subjectIdHash][flagIndex];
+    require(flag.isActive, 'Flag already resolved');
+
+    flag.resolution = resolution;
+    flag.resolvedAt = block.timestamp;
+    flag.isActive = false;
+
+    activeUnacceptedFlagCount[subjectIdHash]--;
+
+    emit UnacceptedUpdateResolved(subjectIdHash, flagIndex, resolution, block.timestamp);
+  }
+
   // =================== RECORD REVIEWS - VIEW FUNCTIONS ===================
 
   // ------------------- VERIFICATION VIEWS -------------------
@@ -781,15 +948,25 @@ contract HealthRecordCore {
   function getUserVerification(
     string memory recordHash,
     bytes32 userIdHash
-  ) external view returns (bool exists, uint256 createdAt, bool isActive) {
+  )
+    external
+    view
+    returns (
+      bool exists,
+      string memory recordId,
+      VerificationLevel level,
+      uint256 createdAt,
+      bool isActive
+    )
+  {
     if (!hasVerified[recordHash][userIdHash]) {
-      return (false, 0, false);
+      return (false, '', VerificationLevel.None, 0, false);
     }
 
     uint256 idx = verificationIndex[recordHash][userIdHash];
     Verification memory v = verifications[recordHash][idx];
 
-    return (true, v.createdAt, v.isActive);
+    return (true, v.recordId, v.level, v.createdAt, v.isActive);
   }
 
   /**
@@ -808,6 +985,42 @@ contract HealthRecordCore {
     }
 
     return (total, active);
+  }
+
+  /**
+   * @notice Get verification stats by level for a record hash
+   */
+  function getVerificationStatsByLevel(
+    string memory recordHash
+  )
+    external
+    view
+    returns (
+      uint256 total,
+      uint256 active,
+      uint256 provenanceCount,
+      uint256 contentCount,
+      uint256 fullCount
+    )
+  {
+    Verification[] memory vers = verifications[recordHash];
+    total = vers.length;
+
+    for (uint256 i = 0; i < vers.length; i++) {
+      if (vers[i].isActive) {
+        active++;
+
+        if (vers[i].level == VerificationLevel.Provenance) {
+          provenanceCount++;
+        } else if (vers[i].level == VerificationLevel.Content) {
+          contentCount++;
+        } else if (vers[i].level == VerificationLevel.Full) {
+          fullCount++;
+        }
+      }
+    }
+
+    return (total, active, provenanceCount, contentCount, fullCount);
   }
 
   /**
@@ -847,6 +1060,7 @@ contract HealthRecordCore {
     view
     returns (
       bool exists,
+      string memory recordId,
       DisputeSeverity severity,
       DisputeCulpability culpability,
       string memory notes,
@@ -855,13 +1069,13 @@ contract HealthRecordCore {
     )
   {
     if (!hasDisputed[recordHash][userIdHash]) {
-      return (false, DisputeSeverity.None, DisputeCulpability.None, '', 0, false);
+      return (false, '', DisputeSeverity.None, DisputeCulpability.None, '', 0, false);
     }
 
     uint256 idx = disputeIndex[recordHash][userIdHash];
     Dispute memory d = disputes[recordHash][idx];
 
-    return (true, d.severity, d.culpability, d.notes, d.createdAt, d.isActive);
+    return (true, d.recordId, d.severity, d.culpability, d.notes, d.createdAt, d.isActive);
   }
 
   /**
@@ -880,6 +1094,42 @@ contract HealthRecordCore {
     }
 
     return (total, active);
+  }
+
+  /**
+   * @notice Get dispute stats by severity for a record hash
+   */
+  function getDisputeStatsBySeverity(
+    string memory recordHash
+  )
+    external
+    view
+    returns (
+      uint256 total,
+      uint256 active,
+      uint256 negligibleCount,
+      uint256 moderateCount,
+      uint256 majorCount
+    )
+  {
+    Dispute[] memory disps = disputes[recordHash];
+    total = disps.length;
+
+    for (uint256 i = 0; i < disps.length; i++) {
+      if (disps[i].isActive) {
+        active++;
+
+        if (disps[i].severity == DisputeSeverity.Negligible) {
+          negligibleCount++;
+        } else if (disps[i].severity == DisputeSeverity.Moderate) {
+          moderateCount++;
+        } else if (disps[i].severity == DisputeSeverity.Major) {
+          majorCount++;
+        }
+      }
+    }
+
+    return (total, active, negligibleCount, moderateCount, majorCount);
   }
 
   /**
@@ -951,6 +1201,69 @@ contract HealthRecordCore {
     }
 
     return (totalReactions, activeSupports, activeOpposes);
+  }
+
+  // ------------------- UNACCEPTED UPDATE FLAGS VIEW -------------------
+
+  /**
+   * @notice Get all flags for a subject
+   */
+  function getUnacceptedUpdateFlags(
+    bytes32 subjectIdHash
+  ) external view returns (UnacceptedUpdateFlag[] memory) {
+    return unacceptedUpdateFlags[subjectIdHash];
+  }
+
+  /**
+   * @notice Get count of active (unresolved) flags for a subject
+   */
+  function getActiveUnacceptedFlagCount(bytes32 subjectIdHash) external view returns (uint256) {
+    return activeUnacceptedFlagCount[subjectIdHash];
+  }
+
+  /**
+   * @notice Get a specific flag
+   */
+  function getUnacceptedUpdateFlag(
+    bytes32 subjectIdHash,
+    uint256 flagIndex
+  )
+    external
+    view
+    returns (
+      string memory recordId,
+      string memory noteHash,
+      uint256 createdAt,
+      ResolutionType resolution,
+      uint256 resolvedAt,
+      bool isActive
+    )
+  {
+    require(flagIndex < unacceptedUpdateFlags[subjectIdHash].length, 'Flag does not exist');
+
+    UnacceptedUpdateFlag memory flag = unacceptedUpdateFlags[subjectIdHash][flagIndex];
+    return (
+      flag.recordId,
+      flag.noteHash,
+      flag.createdAt,
+      flag.resolution,
+      flag.resolvedAt,
+      flag.isActive
+    );
+  }
+
+  /**
+   * @notice Check if a subject has any active flags
+   */
+  function hasActiveUnacceptedFlags(bytes32 subjectIdHash) external view returns (bool) {
+    return activeUnacceptedFlagCount[subjectIdHash] > 0;
+  }
+
+  /**
+   * @notice Get total flag stats
+   */
+  function getTotalUnacceptedFlagStats() external view returns (uint256) {
+    return totalUnacceptedFlags;
   }
 
   // ------------------- COMBINED / SUMMARY VIEWS -------------------

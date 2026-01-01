@@ -1,14 +1,14 @@
 import React from 'react';
 import { FileObject } from '@/types/core';
 
-interface VerificationBadgeProps {
+interface CredibilityBadgeProps {
   fileObject: FileObject;
   size?: 'sm' | 'md' | 'lg';
   showDetails?: boolean;
   onClick?: () => void;
 }
 
-export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
+export const CredibilityBadge: React.FC<CredibilityBadgeProps> = ({
   fileObject,
   size = 'sm',
   showDetails = false,

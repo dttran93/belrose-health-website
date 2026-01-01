@@ -210,22 +210,17 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
   };
 
   return (
-    <div>
+    <div className="w-full mx-auto p-8 space-y-6">
       {/* Header */}
-      <div>
-        <div className="flex items-center justify-between mb-4 pb-2 border-b">
-          <h3 className="font-semibold text-lg flex items-center gap-2">
-            <View className="w-5 h-5" />
-            Manage Access
-          </h3>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={onBack}
-              className="w-8 h-8 border-none bg-transparent hover:bg-gray-200"
-            >
-              <ArrowLeft className="text-primary" />
-            </Button>
-          </div>
+      <div className="flex items-center justify-between mb-4 pb-2 border-b">
+        <h3 className="font-semibold text-lg flex items-center gap-2">
+          <View className="w-5 h-5" />
+          Manage Access
+        </h3>
+        <div className="flex items-center gap-2">
+          <Button onClick={onBack} className="w-8 h-8 border-none bg-transparent hover:bg-gray-200">
+            <ArrowLeft className="text-primary" />
+          </Button>
         </div>
       </div>
       {/* Current Wrapped Keys Section */}

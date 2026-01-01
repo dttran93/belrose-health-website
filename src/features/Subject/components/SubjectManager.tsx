@@ -123,7 +123,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
   const currentSubjects = record.subjects || [];
 
   return (
-    <div className="w-full mx-auto p-6 space-y-6">
+    <div className="w-full mx-auto p-8 space-y-6">
       <div className="flex items-center justify-between mb-4 pb-2 border-b">
         <h3 className="font-semibold text-lg flex items-center gap-2">
           <FileUser className="w-5 h-5" />
@@ -257,7 +257,6 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
               ) : (
                 <div className="flex justify-between items-center">
                   <p className="text-gray-500">No pending subject requests</p>
-                  <Button onClick={handleOpenModal}>Set Record Subject</Button>
                 </div>
               )}
             </div>

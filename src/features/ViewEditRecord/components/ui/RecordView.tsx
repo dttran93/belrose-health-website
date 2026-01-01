@@ -64,7 +64,7 @@ export const RecordView: React.FC<RecordViewProps> = ({
   };
 
   return (
-    <div className={className}>
+    <div className="p-8">
       {/* Tab Navigation */}
       <TabNavigation tabs={tabs} activeTab={activeTab} onTabChange={handleTabChange} />
 

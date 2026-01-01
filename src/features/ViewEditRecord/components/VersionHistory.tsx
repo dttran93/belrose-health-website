@@ -251,25 +251,6 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
 
   return (
     <div className="space-y-1">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4 pb-2 border-b">
-        <h3 className="font-semibold text-lg flex items-center gap-2">
-          <GitBranch className="w-5 h-5" />
-          Version History
-        </h3>
-        <div className="flex items-center gap-2">
-          <div className="text-sm text-gray-600">
-            {versions.length} version{versions.length !== 1 ? 's' : ''}
-          </div>
-          {selectedVersions.length > 0 && (
-            <div className="text-xs text-gray-500">({selectedVersions.length} selected)</div>
-          )}
-          <Button onClick={onBack} className="w-8 h-8 border-none bg-transparent hover:bg-gray-200">
-            <ArrowLeft className="text-primary" />
-          </Button>
-        </div>
-      </div>
-
       {/* Version List */}
       <div className="space-y-2">
         {versions.map((version, index) => {
@@ -441,8 +422,8 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                               change.operation === 'create'
                                 ? 'bg-green-100 text-green-800'
                                 : change.operation === 'update'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-red-100 text-red-800'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-red-100 text-red-800'
                             }`}
                           >
                             <div className="font-medium">

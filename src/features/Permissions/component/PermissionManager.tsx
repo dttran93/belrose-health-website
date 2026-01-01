@@ -34,7 +34,7 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ record, 
   };
 
   return (
-    <div className="w-full mx-auto p-6 space-y-6">
+    <div className="w-full mx-auto p-8 space-y-6">
       {/* Page Header */}
       {viewMode === 'manager' && (
         <div className="flex items-center justify-between mb-4 pb-2 border-b">

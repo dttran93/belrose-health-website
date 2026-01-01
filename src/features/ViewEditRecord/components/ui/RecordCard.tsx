@@ -3,7 +3,7 @@ import { Calendar, Edit, Eye, User, Hospital, Ellipsis, BriefcaseMedical } from 
 import { Button } from '@/components/ui/Button';
 import { FileObject } from '@/types/core';
 import HealthRecordMenu from '@/features/ViewEditRecord/components/ui/RecordMenu';
-import { VerificationBadge } from '@/features/BlockchainVerification/component/VerificationBadge';
+import { CredibilityBadge } from '@/features/Credibility/component/CredibilityBadge';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import SubjectBadge from '@/features/Subject/components/SubjectBadge';
 
@@ -14,7 +14,7 @@ interface HealthRecordCardProps {
   onVersions?: (record: FileObject) => void;
   onSubject?: (record: FileObject) => void;
   onAccess?: (record: FileObject) => void;
-  onViewVerification?: (record: FileObject) => void;
+  onCredibility?: (record: FileObject) => void;
   onPermissions?: (record: FileObject) => void;
 
   onDownload?: (record: FileObject) => void;
@@ -40,7 +40,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
   onSubject,
   onAccess,
   onVersions,
-  onViewVerification,
+  onCredibility,
   onPermissions,
   onDownload,
   onCopy,
@@ -72,7 +72,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
               onSuccess={() => {}}
             />
             <div className="flex items-center">
-              <VerificationBadge fileObject={record} />
+              <CredibilityBadge fileObject={record} />
             </div>
             <HealthRecordMenu
               record={record}
@@ -83,7 +83,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
               onVersion={onVersions}
               onSubject={onSubject}
               onAccess={onAccess}
-              onViewVerification={onViewVerification}
+              onCredibility={onCredibility}
               onPermissions={onPermissions}
               onDownload={onDownload}
               onCopy={onCopy}

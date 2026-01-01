@@ -47,7 +47,7 @@ export class PermissionsService {
   /**
    * Get current highest role for a user on a record
    */
-  private static getUserRole(
+  static getUserRole(
     recordData: { owners?: string[]; administrators?: string[]; viewers?: string[] },
     userId: string
   ): Role | null {

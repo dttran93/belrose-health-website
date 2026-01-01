@@ -1,7 +1,6 @@
 // src/features/Permissions/hooks/usePermissions.ts
 import { useState } from 'react';
 import { PermissionsService, Role } from '@/features/Permissions/services/permissionsService';
-import { toast } from 'sonner';
 
 interface UsePermissionsOptions {
   onSuccess?: (message: string) => void;

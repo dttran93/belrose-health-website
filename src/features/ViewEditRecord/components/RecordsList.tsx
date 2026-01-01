@@ -44,9 +44,9 @@ export const RecordsList: React.FC<RecordsListProps> = ({
   const [viewMode, setViewMode] = useState<'summary' | 'detailed'>('summary');
   const [selectedRecord, setSelectedRecord] = useState<FileObject | null>(null);
   const [editMode, setEditMode] = useState(false);
-  // Track what view RecordFull should open in ('record', 'versions', 'verification', 'share')
+  // Track what view RecordFull should open in ('record', 'versions', 'credibility', 'share')
   const [initialRecordView, setInitialRecordView] = useState<
-    'record' | 'edit' | 'versions' | 'verification' | 'permissions' | 'access' | 'subject'
+    'record' | 'edit' | 'versions' | 'credibility' | 'permissions' | 'access' | 'subject'
   >('record');
   const [comingFromAddRecord, setComingFromAddRecord] = useState(false);
 
@@ -132,14 +132,14 @@ export const RecordsList: React.FC<RecordsListProps> = ({
   };
 
   /**
-   * Opens blockchain verification view for a record
+   * Opens credibility view for a record
    */
-  const handleViewVerification = (record: FileObject) => {
+  const handleViewCredibility = (record: FileObject) => {
     setSelectedRecord(record);
     setViewMode('detailed');
     setEditMode(false);
-    setInitialRecordView('verification'); // Open in verification view
-    console.log('View verification for:', record);
+    setInitialRecordView('credibility'); // Open in verification view
+    console.log('View credibility page for:', record);
   };
 
   /**
@@ -421,7 +421,7 @@ export const RecordsList: React.FC<RecordsListProps> = ({
                 onVersions={handleViewVersions}
                 onSubject={handleSubjectPage}
                 onAccess={handleAccessPage}
-                onViewVerification={handleViewVerification}
+                onCredibility={handleViewCredibility}
                 onPermissions={handlePermissionManager}
                 onDelete={handleDeleteRecord}
                 onCopy={handleCopyRecord}

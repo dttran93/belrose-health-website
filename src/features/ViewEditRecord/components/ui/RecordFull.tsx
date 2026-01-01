@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { X, Save, Ellipsis, Info } from 'lucide-react';
 import { FileObject, BelroseFields } from '@/types/core';
 import { LayoutSlot } from '@/components/app/LayoutProvider';
 import VersionControlPanel from '../VersionControlPanel';
 import { RecordVersion } from '../../services/versionControlService.types';
-import { VerificationView } from '@/features/BlockchainVerification/component/VerificationView';
+import { CredibilityView } from '@/features/Credibility/component/CredibilityView';
 import HealthRecordMenu from './RecordMenu';
-import { VerificationBadge } from '@/features/BlockchainVerification/component/VerificationBadge';
+import { CredibilityBadge } from '@/features/Credibility/component/CredibilityBadge';
 import RecordView from './RecordView';
 import { TabType } from './RecordView';
 import { EncryptionAccessView } from '@/features/Sharing/components/EncryptionAccessView';
@@ -17,13 +17,16 @@ import { toISOString, formatTimestamp } from '@/utils/dataFormattingUtils';
 import PermissionsManager from '@/features/Permissions/component/PermissionManager';
 import SubjectManager from '@/features/Subject/components/SubjectManager';
 import SubjectBadge from '@/features/Subject/components/SubjectBadge';
+import { PermissionsService } from '@/features/Permissions/services/permissionsService';
+import useAuth from '@/features/Auth/hooks/useAuth';
+import { logRecordView } from '../../services/logRecordViewService';
 
 type ViewMode =
   | 'record'
   | 'edit'
   | 'versions'
   | 'version-detail'
-  | 'verification'
+  | 'credibility'
   | 'access'
   | 'permissions'
   | 'subject';
@@ -45,7 +48,7 @@ interface RecordFullProps {
     | 'record'
     | 'edit'
     | 'versions'
-    | 'verification'
+    | 'credibility'
     | 'permissions'
     | 'access'
     | 'subject'; //version-detail can never be the initial view, since it only comes from versions
@@ -62,6 +65,32 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   initialViewMode = 'record',
   comingFromAddRecord = false,
 }) => {
+  const { user } = useAuth();
+
+  // Log view on mount
+  useEffect(() => {
+    const logView = async () => {
+      if (!user || !record.id || !record.recordHash) return;
+
+      try {
+        const viewerRole =
+          (await PermissionsService.getUserRole(record, user.uid)) || 'Investigate Unknown Role';
+
+        await logRecordView(
+          record.id,
+          record.recordHash,
+          user.uid, // or however you get the hashed user ID
+          viewerRole
+        );
+      } catch (error) {
+        // Silent fail - don't block the UI for logging
+        console.error('Failed to log record view:', error);
+      }
+    };
+
+    logView();
+  }, [record.id]); // Only run when record changes
+
   const getInitialViewMode = (): ViewMode => {
     return initialViewMode as ViewMode;
   };
@@ -169,8 +198,8 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     setViewMode('versions');
   };
 
-  const handleViewVerification = () => {
-    setViewMode('verification');
+  const handleViewCredibility = () => {
+    setViewMode('credibility');
   };
 
   const handleAccessPage = () => {
@@ -327,7 +356,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
                 onOpenManager={handleSubjectPage}
                 onSuccess={() => {}}
               />
-              <VerificationBadge fileObject={record} />
+              <CredibilityBadge fileObject={record} />
               <HealthRecordMenu
                 record={record}
                 triggerIcon={Ellipsis}
@@ -337,9 +366,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
                 onVersion={viewMode !== 'versions' ? handleViewVersionHistory : undefined}
                 onSubject={viewMode !== 'subject' ? handleSubjectPage : undefined}
                 onAccess={viewMode !== 'access' ? handleAccessPage : undefined}
-                onViewVerification={
-                  viewMode !== 'verification' ? handleViewVerification : undefined
-                }
+                onCredibility={viewMode !== 'credibility' ? handleViewCredibility : undefined}
                 onPermissions={viewMode !== 'permissions' ? handlePermissionManager : undefined}
                 onDownload={onDownload}
                 onCopy={onCopy}
@@ -399,40 +426,32 @@ export const RecordFull: React.FC<RecordFullProps> = ({
 
       {/* ===== MAIN CONTENT AREA ===== */}
       {viewMode === 'versions' && (
-        <div className="p-8">
-          <VersionControlPanel
-            documentId={record.id}
-            onBack={handleBackToRecord}
-            onRollback={handleVersionControlRollback}
-            onViewVersion={handleViewVersion}
-          />
-        </div>
+        <VersionControlPanel
+          documentId={record.id}
+          onBack={handleBackToRecord}
+          onRollback={handleVersionControlRollback}
+          onViewVersion={handleViewVersion}
+        />
       )}
 
       {(viewMode === 'record' || viewMode === 'edit' || viewMode === 'version-detail') && (
-        <div className="px-4 py-2">
-          <RecordView
-            record={displayRecord}
-            editable={viewMode === 'edit'}
-            onFhirChanged={handleFhirChanged}
-            onFhirDataChange={handleFhirDataChange}
-            onBelroseFieldsChange={handleBelroseFieldsChange}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
-        </div>
+        <RecordView
+          record={displayRecord}
+          editable={viewMode === 'edit'}
+          onFhirChanged={handleFhirChanged}
+          onFhirDataChange={handleFhirDataChange}
+          onBelroseFieldsChange={handleBelroseFieldsChange}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
       )}
 
       {viewMode === 'permissions' && (
-        <div className="px-4 py-2">
-          <PermissionsManager record={displayRecord} onBack={handleBackToRecord} />
-        </div>
+        <PermissionsManager record={displayRecord} onBack={handleBackToRecord} />
       )}
 
       {viewMode === 'subject' && (
-        <div className="px-4 py-2">
-          <SubjectManager record={displayRecord} onBack={handleBackToRecord} />
-        </div>
+        <SubjectManager record={displayRecord} onBack={handleBackToRecord} />
       )}
 
       {/* ===== FOOTER SECTIONS ===== */}
@@ -491,13 +510,11 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       )}
 
       {viewMode === 'access' && (
-        <div className="p-6">
-          <EncryptionAccessView record={record} onBack={handleBackToRecord} />
-        </div>
+        <EncryptionAccessView record={record} onBack={handleBackToRecord} />
       )}
 
-      {viewMode === 'verification' && (
-        <VerificationView record={record} onBack={handleBackToRecord} />
+      {viewMode === 'credibility' && (
+        <CredibilityView record={record} onBack={handleBackToRecord} />
       )}
     </div>
   );

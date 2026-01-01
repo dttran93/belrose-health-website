@@ -9,9 +9,9 @@ import {
   Trash2,
   LucideIcon,
   GitBranch,
-  Shield,
   UserLock,
   FileUser,
+  HeartHandshake,
 } from 'lucide-react';
 
 // Types for the menu system
@@ -42,9 +42,9 @@ interface RecordMenuProps {
   onEdit?: (record: any) => void;
   onVersion?: (record: any) => void;
   onAccess?: (record: any) => void;
-  onViewVerification?: (record: any) => void;
   onPermissions?: (record: any) => void;
   onSubject?: (record: any) => void;
+  onCredibility?: (record: any) => void;
 
   //File Management Props
   onDownload?: (record: any) => void;
@@ -65,7 +65,7 @@ interface RecordMenuProps {
   showArchive?: boolean;
   showDelete?: boolean;
   showVersions?: boolean;
-  showVerification?: boolean;
+  showCredibility?: boolean;
   showPermissions?: boolean;
   showSubject?: boolean;
 
@@ -93,7 +93,7 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
   onEdit,
   onVersion,
   onAccess,
-  onViewVerification,
+  onCredibility,
   onPermissions,
   onSubject,
   onDownload,
@@ -109,7 +109,7 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
   showView = true,
   showDelete = true,
   showVersions = true,
-  showVerification = true,
+  showCredibility = true,
   showPermissions = true,
   showSubject = true,
   additionalItems = [],
@@ -207,12 +207,12 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
       });
     }
 
-    if (showVerification && onViewVerification) {
+    if (showCredibility && onCredibility) {
       items.push({
-        key: 'verification',
-        label: 'Verify Record',
-        icon: Shield,
-        onClick: createHandler(onViewVerification),
+        key: 'credibility',
+        label: 'Credibility',
+        icon: HeartHandshake,
+        onClick: createHandler(onCredibility),
       });
     }
 
