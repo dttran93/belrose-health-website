@@ -2,13 +2,11 @@ import React from 'react';
 import { cn } from '@/utils/utils';
 import { Button } from '@/components/ui/Button';
 import { AlertTriangle, Circle, CircleDot, CircleDotDashed } from 'lucide-react';
+import { DisputeCulpability, DisputeSeverity } from '../../services/disputeService';
 
 // ============================================================
 // TYPES
 // ============================================================
-
-export type DisputeSeverity = 1 | 2 | 3;
-export type DisputeCulpability = 0 | 1 | 2 | 3 | 4 | 5;
 
 export interface DisputeData {
   recordId: string;
@@ -158,7 +156,7 @@ const DisputeForm: React.FC<DisputeFormProps> = ({
                 'w-full flex items-center gap-3 p-3 border-2 rounded-xl transition-all text-left',
                 culpability === level.value
                   ? 'border-red-700 bg-red-100'
-                  : 'border-border hover:border-primary/50 bg-background'
+                  : 'border-border hover:border-red-300 bg-background'
               )}
               onClick={() => onSelectCulpability(level.value)}
             >

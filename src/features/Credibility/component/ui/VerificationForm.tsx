@@ -1,29 +1,26 @@
+// src/features/Credibility/components/ui/VerificationForm.tsx
+
+import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/utils/utils';
-import { CheckCircle, FileText, Lock, MapPin } from 'lucide-react';
+import { CheckCircle, FileText, Lock, MapPin, Loader2, Undo2, Edit2 } from 'lucide-react';
+import {
+  VerificationDoc,
+  VerificationLevel,
+  LEVEL_NAMES,
+} from '../../services/verificationService';
 
 // ============================================================
 // TYPES
 // ============================================================
 
-export type VerificationLevel = 1 | 2 | 3;
-
-export interface VerificationData {
-  recordId: string;
-  recordHash: string;
-  level: VerificationLevel;
-}
-
-export interface ExistingVerification {
-  level: VerificationLevel;
-  createdAt: string;
-  isActive: boolean;
-}
-
 interface VerificationFormProps {
   selectedLevel: VerificationLevel | null;
   onSelectLevel: (level: VerificationLevel) => void;
-  existingVerification: ExistingVerification | null;
+  verification: VerificationDoc | null;
+  onModify?: (newLevel: VerificationLevel) => Promise<void>;
+  onRetract?: () => Promise<void>;
+  isSubmitting?: boolean;
 }
 
 // ============================================================
@@ -46,7 +43,7 @@ const VERIFICATION_LEVELS: VerificationLevelConfig[] = [
     description:
       'I created this record or am willing to vouch for both the content and provenance of the record',
     examples:
-      'You are the original provider who created this record or directly observed the interaction.',
+      'You directly observed this interaction or are the original provider who created this record.',
   },
   {
     value: 2,
@@ -54,7 +51,7 @@ const VERIFICATION_LEVELS: VerificationLevelConfig[] = [
     icon: <FileText className="w-5 h-5" />,
     description: 'I vouch for the medical accuracy of this record',
     examples:
-      "You reviewed the diagnosis and agree with it, even if you weren't the original provider.",
+      "You reviewed the record and agree with it, even if you weren't the original provider.",
   },
   {
     value: 1,
@@ -62,34 +59,209 @@ const VERIFICATION_LEVELS: VerificationLevelConfig[] = [
     icon: <MapPin className="w-5 h-5" />,
     description: 'I can verify where this record came from',
     examples:
-      'You confirmed the origin of the record by viewing a paper trail, confirming it came from the stated hospital, etc.',
+      'You confirmed the origin of the record by viewing a paper trail, reviewed communications, or interacted with the stated provider, etc.',
   },
 ];
+
+// ============================================================
+// SUB-COMPONENTS
+// ============================================================
+
+interface LevelSelectorProps {
+  selectedLevel: VerificationLevel | null;
+  onSelectLevel: (level: VerificationLevel) => void;
+  disabled?: boolean;
+  currentLevel?: VerificationLevel;
+}
+
+const LevelSelector: React.FC<LevelSelectorProps> = ({
+  selectedLevel,
+  onSelectLevel,
+  disabled,
+  currentLevel,
+}) => (
+  <div className="space-y-3">
+    {VERIFICATION_LEVELS.map(level => {
+      const isSelected = selectedLevel === level.value;
+      const isCurrent = currentLevel === level.value;
+
+      return (
+        <button
+          key={level.value}
+          disabled={disabled}
+          className={cn(
+            'w-full p-4 text-left border-2 rounded-xl transition-all',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+            isSelected
+              ? 'border-chart-3 bg-chart-3/5'
+              : isCurrent
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-border hover:border-chart-3/50 bg-background'
+          )}
+          onClick={() => onSelectLevel(level.value)}
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <div
+              className={cn(
+                'w-9 h-9 rounded-lg flex items-center justify-center',
+                isSelected
+                  ? 'bg-chart-3/20 text-chart-3'
+                  : isCurrent
+                    ? 'bg-blue-100 text-blue-600'
+                    : 'bg-muted text-muted-foreground'
+              )}
+            >
+              {level.icon}
+            </div>
+            <span className="flex-1 font-semibold text-primary">
+              {level.name}
+              {isCurrent && !isSelected && (
+                <span className="ml-2 text-xs font-normal text-blue-600">(current)</span>
+              )}
+            </span>
+            {isSelected && (
+              <div className="w-6 h-6 bg-chart-3 text-white rounded-full flex items-center justify-center">
+                <CheckCircle className="w-4 h-4" />
+              </div>
+            )}
+          </div>
+          <p className="text-sm text-foreground mb-1">{level.description}</p>
+          <p className="text-xs text-muted-foreground italic">{level.examples}</p>
+        </button>
+      );
+    })}
+  </div>
+);
+
+// ============================================================
+// MAIN COMPONENT
+// ============================================================
 
 const VerificationForm: React.FC<VerificationFormProps> = ({
   selectedLevel,
   onSelectLevel,
-  existingVerification,
+  verification,
+  onModify,
+  onRetract,
+  isSubmitting = false,
 }) => {
-  if (existingVerification) {
-    const level = VERIFICATION_LEVELS.find(l => l.value === existingVerification.level);
+  const [isModifying, setIsModifying] = useState(false);
+  const [modifyLevel, setModifyLevel] = useState<VerificationLevel | null>(null);
+
+  const handleStartModify = () => {
+    setIsModifying(true);
+    setModifyLevel(verification?.level || null);
+  };
+
+  const handleCancelModify = () => {
+    setIsModifying(false);
+    setModifyLevel(null);
+  };
+
+  const handleConfirmModify = async () => {
+    if (!modifyLevel || modifyLevel === verification?.level) return;
+    await onModify?.(modifyLevel);
+    setIsModifying(false);
+    setModifyLevel(null);
+  };
+
+  const handleRetract = async () => {
+    if (!confirm('Are you sure you want to retract your verification?')) return;
+    await onRetract?.();
+  };
+
+  // ============================================================
+  // MODIFY VIEW
+  // ============================================================
+
+  if (isModifying && verification) {
+    return (
+      <div>
+        <h3 className="text-base font-semibold text-primary mb-1">Modify Verification Level</h3>
+        <p className="text-sm text-foreground mb-5">
+          Current level: <strong>{LEVEL_NAMES[verification.level]}</strong>. Select a new level.
+        </p>
+
+        <LevelSelector
+          selectedLevel={modifyLevel}
+          onSelectLevel={setModifyLevel}
+          disabled={isSubmitting}
+          currentLevel={verification.level}
+        />
+
+        <div className="flex gap-3 mt-6">
+          <Button
+            variant="outline"
+            onClick={handleCancelModify}
+            disabled={isSubmitting}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmModify}
+            disabled={isSubmitting || !modifyLevel || modifyLevel === verification.level}
+            className="flex-1 bg-chart-3 hover:bg-chart-3/90"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Updating...
+              </>
+            ) : (
+              'Confirm Change'
+            )}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // EXISTING VERIFICATION VIEW
+  // ============================================================
+
+  if (verification?.isActive) {
+    const formattedDate = verification.createdAt.toDate().toLocaleDateString();
+
     return (
       <div className="text-center py-10">
         <div className="w-16 h-16 mx-auto mb-5 bg-chart-3/10 text-chart-3 rounded-full flex items-center justify-center">
           <CheckCircle className="w-8 h-8" />
         </div>
-        <h3 className="text-lg font-semibold text-primary mb-2">
-          You've already verified this record
-        </h3>
-        <p className="text-sm text-foreground mb-6">
-          Level: <strong>{level?.name}</strong>
+        <h3 className="text-lg font-semibold text-primary mb-2">You've verified this record</h3>
+        <p className="text-sm text-foreground mb-1">
+          Level: <strong>{LEVEL_NAMES[verification.level]}</strong>
         </p>
-        <Button variant="outline" className="border-chart-3 text-chart-3 hover:bg-chart-3/10">
-          Modify Verification
-        </Button>
+        <p className="text-xs text-muted-foreground mb-6">Verified on {formattedDate}</p>
+
+        <div className="flex gap-3 justify-center">
+          <Button
+            variant="outline"
+            className="border-chart-3 text-chart-3 hover:bg-chart-3/10"
+            onClick={handleStartModify}
+            disabled={isSubmitting}
+          >
+            <Edit2 className="w-4 h-4 mr-2" />
+            Modify Level
+          </Button>
+          <Button
+            variant="outline"
+            className="border-destructive text-destructive hover:bg-destructive/10"
+            onClick={handleRetract}
+            disabled={isSubmitting}
+          >
+            <Undo2 className="w-4 h-4 mr-2" />
+            Retract
+          </Button>
+        </div>
       </div>
     );
   }
+
+  // ============================================================
+  // NEW VERIFICATION VIEW
+  // ============================================================
 
   return (
     <div>
@@ -98,41 +270,11 @@ const VerificationForm: React.FC<VerificationFormProps> = ({
         Select the level of verification you can provide for this record.
       </p>
 
-      <div className="space-y-3">
-        {VERIFICATION_LEVELS.map(level => (
-          <button
-            key={level.value}
-            className={cn(
-              'w-full p-4 text-left border-2 rounded-xl transition-all',
-              selectedLevel === level.value
-                ? 'border-chart-3 bg-chart-3/5'
-                : 'border-border hover:border-chart-3/50 bg-background'
-            )}
-            onClick={() => onSelectLevel(level.value)}
-          >
-            <div className="flex items-center gap-3 mb-2">
-              <div
-                className={cn(
-                  'w-9 h-9 rounded-lg flex items-center justify-center',
-                  selectedLevel === level.value
-                    ? 'bg-chart-3/20 text-chart-3'
-                    : 'bg-muted text-muted-foreground'
-                )}
-              >
-                {level.icon}
-              </div>
-              <span className="flex-1 font-semibold text-primary">{level.name}</span>
-              {selectedLevel === level.value && (
-                <div className="w-6 h-6 bg-chart-3 text-white rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-4 h-4" />
-                </div>
-              )}
-            </div>
-            <p className="text-sm text-foreground mb-1">{level.description}</p>
-            <p className="text-xs text-muted-foreground italic">{level.examples}</p>
-          </button>
-        ))}
-      </div>
+      <LevelSelector
+        selectedLevel={selectedLevel}
+        onSelectLevel={onSelectLevel}
+        disabled={isSubmitting}
+      />
     </div>
   );
 };

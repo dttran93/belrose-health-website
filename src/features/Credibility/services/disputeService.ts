@@ -1,11 +1,16 @@
-//src/features/Credibility/services/disputeService.ts
-
+// 1. Change the imports to the client SDK
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  updateDoc,
+  doc,
+  serverTimestamp,
+} from 'firebase/firestore';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 import { keccak256, toUtf8Bytes } from 'ethers';
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { SEVERITY_LEVELS } from '../component/ui/DisputeForm';
 import { blockchainHealthRecordService } from './blockchainHealthRecordService';
 
 export type DisputeSeverity = 1 | 2 | 3;
@@ -37,22 +42,27 @@ export interface DisputeDoc {
   createdAt: number;
   isActive: boolean;
   txHash: string;
+  chainStatus: 'pending' | 'confirmed' | 'failed';
 }
 
 export interface ReactionDoc {
+  disputeId: string;
   recordHash: string;
-  disputerIdHash: string;
-  reactorIdHash: string;
+  disputerId: string;
+  reactorId: string;
   supportsDispute: boolean;
-  timestamp: number;
+  createdAt: number;
   isActive: boolean;
   txHash: string;
+  chainStatus: 'pending' | 'confirmed' | 'failed';
 }
+
+const db = getFirestore();
 
 export async function createDispute(
   recordId: string,
   recordHash: string,
-  disputerOdysId: string,
+  disputerId: string,
   severity: DisputeSeverity,
   culpability: DisputeCulpability,
   notes: string
@@ -72,19 +82,18 @@ export async function createDispute(
   // 3. Generate hash of plaintext notes for blockchain
   const notesHash = keccak256(toUtf8Bytes(notes));
 
-  // 4. Create Firestore document
-  const db = getFirestore();
-  const disputeRef = await db.collection('disputes').add({
+  // 4. Create Firestore document (Client SDK Syntax)
+  const disputeRef = await addDoc(collection(db, 'disputes'), {
     recordId,
     recordHash,
-    disputerOdysId,
-    disputerIdHash: keccak256(toUtf8Bytes(disputerOdysId)),
+    disputerId,
+    disputerIdHash: keccak256(toUtf8Bytes(disputerId)),
     severity: SEVERITY_NAMES[severity],
     culpability: CULPABILITY_NAMES[culpability],
     encryptedNotes,
     notesHash,
     isActive: true,
-    createdAt: Timestamp.now(),
+    createdAt: serverTimestamp(), // Use serverTimestamp() for client-side
     chainStatus: 'pending',
   });
 
@@ -97,12 +106,45 @@ export async function createDispute(
     notesHash // Only hash goes on-chain
   );
 
-  // 6. Update with tx confirmation
-  await disputeRef.update({
+  // 6. Update document (Client SDK Syntax)
+  await updateDoc(disputeRef, {
     chainStatus: 'confirmed',
     txHash: tx.txHash,
     blockNumber: tx.blockNumber,
   });
 
   return disputeRef.id;
+}
+
+export async function reactToDispute(
+  disputerId: string,
+  recordHash: string,
+  supportsDispute: boolean
+): Promise<string> {
+  // 1. Create Firestore document
+  const reactionRef = await addDoc(collection(db, 'disputeReactions'), {
+    disputerId,
+    recordHash,
+    isActive: true,
+    createdAt: serverTimestamp(),
+    chainStatus: 'pending',
+  });
+
+  const disputerIdHash = keccak256(toUtf8Bytes(disputerId));
+
+  // 2. Submit to blockchain
+  const tx = await blockchainHealthRecordService.reactToDispute(
+    recordHash,
+    disputerIdHash,
+    supportsDispute
+  );
+
+  // 3. Update document
+  await updateDoc(reactionRef, {
+    chainStatus: 'confirmed',
+    txHash: tx.txHash,
+    blockNumber: tx.blockNumber,
+  });
+
+  return reactionRef.id;
 }

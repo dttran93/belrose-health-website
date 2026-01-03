@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
+// src/features/Credibility/components/CredibilityView.tsx
+
+import React, { useState } from 'react';
 import { FileObject } from '@/types/core';
 import { RecordHashService } from '@/features/ViewEditRecord/services/generateRecordHash';
-import { ArrowLeft, Shield, HeartHandshake, X } from 'lucide-react';
+import { ArrowLeft, Shield, HeartHandshake } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { RecordReviewPanel } from './RecordReviewPanel';
-import { VerificationData } from './ui/VerificationForm';
 import { DisputeData } from './ui/DisputeForm';
+import { useAuth } from '@/features/Auth/hooks/useAuth'; // Adjust import path as needed
 
 interface CredibilityViewProps {
   record: FileObject;
@@ -14,24 +16,18 @@ interface CredibilityViewProps {
 
 export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack }) => {
   const [showReviewPanel, setShowReviewPanel] = useState(false);
+  const { user } = useAuth(); // Get current user for verifierId
 
   // Generate or retrieve the record hash
   const recordHash = (record.recordHash || RecordHashService.generateRecordHash(record)) as string;
 
-  const handleCloseReviewPanel = async () => {
+  const handleCloseReviewPanel = () => {
     setShowReviewPanel(false);
   };
 
-  const handleSubmitVerification = async (data: VerificationData) => {
-    // TODO: Call your blockchain/Firebase service
-    console.log('Submitting verification:', data);
-    // await verificationService.createVerification(data);
-
-    // After successful submission, you might want to:
-    // - Refresh the credibility data
-    // - Show success state
-    // - Close the panel
-    setShowReviewPanel(false);
+  const handleVerificationSuccess = () => {
+    // Optionally refresh data, show toast, etc.
+    console.log('Verification succeeded');
   };
 
   const handleSubmitDispute = async (data: DisputeData) => {
@@ -41,6 +37,10 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
 
     setShowReviewPanel(false);
   };
+
+  if (!user) {
+    return <div>Please log in to view credibility information.</div>;
+  }
 
   return (
     <div className="w-full mx-auto p-8 space-y-6">
@@ -60,21 +60,16 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
         </div>
       </div>
 
-      {/* Review Panel (shown when triggered) */}
+      {/* Review Panel */}
       {showReviewPanel ? (
-        <div>
-          {/* Review Panel */}
-          <RecordReviewPanel
-            recordId={record.id}
-            recordHash={recordHash}
-            recordTitle={record.belroseFields?.title || record.fileName || 'Medical Record'}
-            onSubmitVerification={handleSubmitVerification}
-            onSubmitDispute={handleSubmitDispute}
-            onViewRecord={onBack}
-            existingVerification={null}
-            existingDispute={null}
-          />
-        </div>
+        <RecordReviewPanel
+          recordId={record.id}
+          recordHash={recordHash}
+          recordTitle={record.belroseFields?.title || record.fileName || 'Medical Record'}
+          onViewRecord={onBack}
+          onSuccess={handleVerificationSuccess}
+          existingDispute={null}
+        />
       ) : (
         /* Empty State Content */
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">

@@ -12,7 +12,7 @@ import { SharingService } from '@/features/Sharing/services/sharingService';
 import { BlockchainRoleManagerService } from './blockchainRoleManagerService';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
 import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
-import { PreparationService } from './preparationService';
+import { PermissionPreparationService } from './permissionPreparationService';
 
 export type Role = 'owner' | 'administrator' | 'viewer';
 
@@ -128,7 +128,7 @@ export class PermissionsService {
     }
 
     // Check 6: Check for Initialization and wallet registration on chain
-    const prereqs = await PreparationService.verifyPermissionPrerequisites(
+    const prereqs = await PermissionPreparationService.verifyPrerequisites(
       recordId,
       targetWalletAddress
     );
@@ -237,7 +237,7 @@ export class PermissionsService {
     }
 
     // Check 6: Check for Initialization and wallet registration on chain
-    const prereqs = await PreparationService.verifyPermissionPrerequisites(
+    const prereqs = await PermissionPreparationService.verifyPrerequisites(
       recordId,
       targetWalletAddress
     );
@@ -364,7 +364,7 @@ export class PermissionsService {
     }
 
     // Check 6: Check for Initialization and wallet registration on chain
-    const prereqs = await PreparationService.verifyPermissionPrerequisites(
+    const prereqs = await PermissionPreparationService.verifyPrerequisites(
       recordId,
       targetWalletAddress
     );
@@ -472,7 +472,7 @@ export class PermissionsService {
     }
 
     // Check 4: Check for Initialization and wallet registration on chain
-    const prereqs = await PreparationService.verifyPermissionPrerequisites(
+    const prereqs = await PermissionPreparationService.verifyPrerequisites(
       recordId,
       targetWalletAddress
     );
@@ -584,7 +584,7 @@ export class PermissionsService {
     }
 
     // Check 3: Check for Initialization and wallet registration on chain
-    const prereqs = await PreparationService.verifyPermissionPrerequisites(
+    const prereqs = await PermissionPreparationService.verifyPrerequisites(
       recordId,
       targetWalletAddress
     );

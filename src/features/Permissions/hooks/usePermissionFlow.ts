@@ -1,7 +1,10 @@
 // src/features/Permissions/hooks/usePermissionFlow.ts
 
 import { useState, useCallback } from 'react';
-import { PreparationService, InitialRole } from '../services/preparationService';
+import {
+  PermissionPreparationService,
+  InitialRole,
+} from '../services/permissionPreparationService';
 import { PermissionsService, Role } from '../services/permissionsService';
 import { BelroseUserProfile } from '@/types/core';
 import { toast } from 'sonner';
@@ -110,7 +113,7 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
 
       try {
         // Check if prerequisites are already met
-        const prereqs = await PreparationService.verifyPermissionPrerequisites(
+        const prereqs = await PermissionPreparationService.verifyPrerequisites(
           recordId,
           walletAddress
         );
@@ -118,10 +121,10 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
         if (!prereqs.ready) {
           // Need to prepare - get caller's role for initialization
           const initialRole = await getCurrentUserRole();
-          await PreparationService.prepare(recordId, initialRole);
+          await PermissionPreparationService.prepare(recordId, initialRole);
 
           // Verify preparation succeeded
-          const finalCheck = await PreparationService.verifyPermissionPrerequisites(
+          const finalCheck = await PermissionPreparationService.verifyPrerequisites(
             recordId,
             walletAddress
           );
@@ -212,7 +215,7 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
 
       try {
         // For revokes, just verify prerequisites (no new preparation needed)
-        const prereqs = await PreparationService.verifyPermissionPrerequisites(
+        const prereqs = await PermissionPreparationService.verifyPrerequisites(
           recordId,
           walletAddress
         );

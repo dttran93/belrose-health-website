@@ -20,7 +20,7 @@ import { PaymasterService } from '@/features/BlockchainWallet/services/paymaster
 // CONFIG
 // ============================================================================
 
-const HEALTH_RECORD_CORE_ADDRESS = '0xEBe378A5190EF142E40a89066041fF6eE8d18142';
+const HEALTH_RECORD_CORE_ADDRESS = '0xDC79F803594232421f49a29D9EcEbe78015d48e1';
 const RPC_URL = 'https://1rpc.io/sepolia';
 
 // ============================================================================

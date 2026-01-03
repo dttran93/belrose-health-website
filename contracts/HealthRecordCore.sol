@@ -113,6 +113,8 @@ contract HealthRecordCore {
     uint256 timestamp
   );
 
+  event RecordHashRetracted(string indexed recordId, string indexed recordHash, uint256 timestamp);
+
   // =================== RECORD ANCHORING - STORAGE ===================
 
   //recordId => list of subject userIdHashes (who is this record about)
@@ -127,14 +129,14 @@ contract HealthRecordCore {
   // recordId => subjectIdHash => bool (is this subject link active?)
   mapping(string => mapping(bytes32 => bool)) public isSubjectActive;
 
-  //recordHash => recordId (each has belongs to exactly one record)
+  //recordHash => recordId (each hash belongs to exactly one record)
   mapping(string => string) public recordIdForHash;
 
   //recordId => list of hashes (versionhistory)
   mapping(string => string[]) public recordVersionHistory;
 
-  // recordHash => bool (does this hash exist)
-  mapping(string => bool) public hashExists;
+  // recordHash => bool (is this hash actively attached to a record)
+  mapping(string => bool) public isHashActive; //soft-delete toggle
 
   uint256 public totalAnchoredRecords;
 
@@ -152,6 +154,7 @@ contract HealthRecordCore {
   ) external onlyActiveMember onlyRecordParticipant(recordId) {
     require(bytes(recordId).length > 0, 'Record ID cannot be empty');
     require(bytes(recordHash).length > 0, 'Record hash cannot be empty');
+    require(bytes(recordIdForHash[recordHash]).length == 0, 'Hash already in use');
 
     //Caller is the Subject
     bytes32 subjectIdHash = memberRoleManager.getUserForWallet(msg.sender);
@@ -164,11 +167,11 @@ contract HealthRecordCore {
     bool isFirstSubject = recordSubjects[recordId].length == 0;
 
     if (isFirstSubject) {
-      require(!hashExists[recordHash], 'Hash already used');
+      require(!isHashActive[recordHash], 'Hash already used');
 
       recordIdForHash[recordHash] = recordId;
       recordVersionHistory[recordId].push(recordHash);
-      hashExists[recordHash] = true;
+      isHashActive[recordHash] = true;
     }
 
     recordSubjects[recordId].push(subjectIdHash);
@@ -194,6 +197,7 @@ contract HealthRecordCore {
     require(isSubjectActive[recordId][subjectIdHash], 'Already unanchored');
 
     isSubjectActive[recordId][subjectIdHash] = false;
+    //Don't remove from subjectMedicalHistory to preserve audit trail
 
     emit RecordUnanchored(recordId, subjectIdHash, block.timestamp);
   }
@@ -225,17 +229,51 @@ contract HealthRecordCore {
     string memory recordId,
     string memory newHash
   ) external onlyActiveMember onlyOwnerOrAdmin(recordId) {
+    require(bytes(recordIdForHash[newHash]).length == 0, 'Hash already bound to a record');
     require(bytes(newHash).length > 0, 'Hash cannot be empty');
     require(recordSubjects[recordId].length > 0, 'Record not anchored');
-    require(!hashExists[newHash], 'Hash already exists');
 
     bytes32 userIdHash = memberRoleManager.getUserForWallet(msg.sender);
 
     recordIdForHash[newHash] = recordId;
     recordVersionHistory[recordId].push(newHash);
-    hashExists[newHash] = true;
+    isHashActive[newHash] = true;
 
     emit RecordHashAdded(recordId, newHash, userIdHash, block.timestamp);
+  }
+
+  /**
+   * @notice Retract a specific version of a record (e.g., if uploaded in error)
+   * @dev Prevents retraction if it is the only active hash remaining
+   */
+  function retractRecordHash(
+    string memory recordId,
+    string memory recordHash
+  ) external onlyActiveMember onlyOwnerOrAdmin(recordId) {
+    // Ensure this hash actually belongs to this recordId
+    require(
+      keccak256(bytes(recordIdForHash[recordHash])) == keccak256(bytes(recordId)),
+      'Hash-Record mismatch'
+    );
+    require(isHashActive[recordHash], 'Already retracted');
+
+    // Ensure there is at least one hash remaining to be associated with the recordId
+    uint256 activeCount = 0;
+    string[] memory history = recordVersionHistory[recordId];
+
+    for (uint256 i = 0; i < history.length; i++) {
+      if (isHashActive[history[i]]) {
+        activeCount++;
+      }
+    }
+
+    require(activeCount > 1, 'Cannot retract the last active version of a record');
+
+    isHashActive[recordHash] = false;
+    delete recordIdForHash[recordHash];
+    //Don't remove from recordVersionHistory to preserve audit trail
+
+    emit RecordHashRetracted(recordId, recordHash, block.timestamp);
   }
 
   // =================== RECORD ANCHORING - VIEW FUNCTIONS ===================
@@ -328,7 +366,7 @@ contract HealthRecordCore {
    * @notice Get the recordId that a hash belongs to
    */
   function getRecordIdForHash(string memory recordHash) external view returns (string memory) {
-    require(hashExists[recordHash], 'Hash does not exist');
+    require(isHashActive[recordHash], 'Hash does not exist');
     return recordIdForHash[recordHash];
   }
 
@@ -336,7 +374,7 @@ contract HealthRecordCore {
    * @notice Check if a hash exists
    */
   function doesHashExist(string memory recordHash) external view returns (bool) {
-    return hashExists[recordHash];
+    return isHashActive[recordHash];
   }
 
   /**
@@ -448,7 +486,7 @@ contract HealthRecordCore {
   // =================== RECORD REVIEWS - ENUMS ===================
 
   enum VerificationLevel {
-    None,
+    None, //For returning missing
     Provenance,
     Content,
     Full
@@ -518,17 +556,17 @@ contract HealthRecordCore {
 
   // Verifications
   mapping(string => Verification[]) public verifications;
-  mapping(string => mapping(bytes32 => bool)) public hasVerified;
+  mapping(string => mapping(bytes32 => bool)) public currentlyVerified;
   mapping(string => mapping(bytes32 => uint256)) public verificationIndex;
 
   // Disputes
   mapping(string => Dispute[]) public disputes;
-  mapping(string => mapping(bytes32 => bool)) public hasDisputed;
+  mapping(string => mapping(bytes32 => bool)) public currentlyDisputed;
   mapping(string => mapping(bytes32 => uint256)) public disputeIndex;
 
   // Reactions to disputes
   mapping(string => mapping(bytes32 => Reaction[])) public disputeReactions;
-  mapping(string => mapping(bytes32 => mapping(bytes32 => bool))) public hasReactedToDispute;
+  mapping(string => mapping(bytes32 => mapping(bytes32 => bool))) public currentlyReacted;
   mapping(string => mapping(bytes32 => mapping(bytes32 => uint256))) public reactionIndex;
 
   //Unaccepted Update Flags
@@ -556,14 +594,14 @@ contract HealthRecordCore {
     string memory recordId,
     string memory recordHash,
     uint8 level
-  ) external onlyVerifiedMember onlyRecordParticipant(recordId) {
+  ) external onlyActiveMember onlyRecordParticipant(recordId) {
     require(bytes(recordId).length > 0, 'Record ID cannot be empty');
     require(bytes(recordHash).length > 0, 'Record hash cannot be empty');
     require(level >= 1 && level <= 3, 'Level must be 1-3');
 
     bytes32 verifierIdHash = memberRoleManager.getUserForWallet(msg.sender);
     require(verifierIdHash != bytes32(0), 'Wallet not registered');
-    require(!hasVerified[recordHash][verifierIdHash], 'Already verified this hash');
+    require(!currentlyVerified[recordHash][verifierIdHash], 'Already verified this hash');
 
     uint256 newIndex = verifications[recordHash].length;
 
@@ -577,7 +615,7 @@ contract HealthRecordCore {
       })
     );
 
-    hasVerified[recordHash][verifierIdHash] = true;
+    currentlyVerified[recordHash][verifierIdHash] = true;
     verificationIndex[recordHash][verifierIdHash] = newIndex;
     verificationsByUser[verifierIdHash].push(recordHash);
     totalVerifications++;
@@ -598,12 +636,15 @@ contract HealthRecordCore {
   function retractVerification(string memory recordHash) external {
     bytes32 verifierIdHash = memberRoleManager.getUserForWallet(msg.sender);
     require(verifierIdHash != bytes32(0), 'Wallet not registered');
-    require(hasVerified[recordHash][verifierIdHash], 'No verification to retract');
+    require(currentlyVerified[recordHash][verifierIdHash], 'No verification to retract');
 
     uint256 idx = verificationIndex[recordHash][verifierIdHash];
     require(verifications[recordHash][idx].isActive, 'Already retracted');
 
+    // 1. Kill the active flag in the historical array
     verifications[recordHash][idx].isActive = false;
+    // 2. Reset mapping to reflect current verification state
+    currentlyVerified[recordHash][verifierIdHash] = false;
 
     emit VerificationRetracted(recordHash, verifierIdHash, block.timestamp);
   }
@@ -618,7 +659,7 @@ contract HealthRecordCore {
 
     bytes32 verifierIdHash = memberRoleManager.getUserForWallet(msg.sender);
     require(verifierIdHash != bytes32(0), 'Wallet not registered');
-    require(hasVerified[recordHash][verifierIdHash], 'No verification to modify');
+    require(currentlyVerified[recordHash][verifierIdHash], 'No verification to modify');
 
     uint256 idx = verificationIndex[recordHash][verifierIdHash];
     Verification storage verification = verifications[recordHash][idx];
@@ -654,7 +695,7 @@ contract HealthRecordCore {
     uint8 severity,
     uint8 culpability,
     string memory notes
-  ) external onlyVerifiedMember onlyRecordParticipant(recordId) {
+  ) external onlyActiveMember onlyRecordParticipant(recordId) {
     require(bytes(recordId).length > 0, 'Record ID cannot be empty');
     require(bytes(recordHash).length > 0, 'Record hash cannot be empty');
     require(severity >= 1 && severity <= 3, 'Severity must be 1-3');
@@ -662,7 +703,7 @@ contract HealthRecordCore {
 
     bytes32 disputerIdHash = memberRoleManager.getUserForWallet(msg.sender);
     require(disputerIdHash != bytes32(0), 'Wallet not registered');
-    require(!hasDisputed[recordHash][disputerIdHash], 'Already disputed this hash');
+    require(!currentlyDisputed[recordHash][disputerIdHash], 'Already disputed this hash');
 
     uint256 newIndex = disputes[recordHash].length;
 
@@ -678,7 +719,7 @@ contract HealthRecordCore {
       })
     );
 
-    hasDisputed[recordHash][disputerIdHash] = true;
+    currentlyDisputed[recordHash][disputerIdHash] = true;
     disputeIndex[recordHash][disputerIdHash] = newIndex;
     disputesByUser[disputerIdHash].push(recordHash);
     totalDisputes++;
@@ -700,12 +741,13 @@ contract HealthRecordCore {
   function retractDispute(string memory recordHash) external {
     bytes32 disputerIdHash = memberRoleManager.getUserForWallet(msg.sender);
     require(disputerIdHash != bytes32(0), 'Wallet not registered');
-    require(hasDisputed[recordHash][disputerIdHash], 'No dispute to retract');
+    require(currentlyDisputed[recordHash][disputerIdHash], 'No dispute to retract');
 
     uint256 idx = disputeIndex[recordHash][disputerIdHash];
     require(disputes[recordHash][idx].isActive, 'Already retracted');
 
     disputes[recordHash][idx].isActive = false;
+    currentlyDisputed[recordHash][disputerIdHash] = false;
 
     emit DisputeRetracted(recordHash, disputerIdHash, block.timestamp);
   }
@@ -726,7 +768,7 @@ contract HealthRecordCore {
 
     bytes32 disputerIdHash = memberRoleManager.getUserForWallet(msg.sender);
     require(disputerIdHash != bytes32(0), 'Wallet not registered');
-    require(hasDisputed[recordHash][disputerIdHash], 'No dispute to modify');
+    require(currentlyDisputed[recordHash][disputerIdHash], 'No dispute to modify');
 
     uint256 idx = disputeIndex[recordHash][disputerIdHash];
     Dispute storage dispute = disputes[recordHash][idx];
@@ -762,7 +804,7 @@ contract HealthRecordCore {
     bytes32 disputerIdHash,
     bool supportsDispute
   ) external onlyActiveMember {
-    require(hasDisputed[recordHash][disputerIdHash], 'No dispute from this user');
+    require(currentlyDisputed[recordHash][disputerIdHash], 'No dispute from this user');
 
     uint256 idx = disputeIndex[recordHash][disputerIdHash];
     string memory recordId = disputes[recordHash][idx].recordId;
@@ -771,7 +813,7 @@ contract HealthRecordCore {
     bytes32 reactorIdHash = memberRoleManager.getUserForWallet(msg.sender);
     require(reactorIdHash != bytes32(0), 'Wallet not registered');
     require(reactorIdHash != disputerIdHash, 'Cannot react to your own dispute');
-    require(!hasReactedToDispute[recordHash][disputerIdHash][reactorIdHash], 'Already reacted');
+    require(!currentlyReacted[recordHash][disputerIdHash][reactorIdHash], 'Already reacted');
     require(disputes[recordHash][idx].isActive, 'Dispute has been retracted');
 
     uint256 newReactionIndex = disputeReactions[recordHash][disputerIdHash].length;
@@ -785,7 +827,7 @@ contract HealthRecordCore {
       })
     );
 
-    hasReactedToDispute[recordHash][disputerIdHash][reactorIdHash] = true;
+    currentlyReacted[recordHash][disputerIdHash][reactorIdHash] = true;
     reactionIndex[recordHash][disputerIdHash][reactorIdHash] = newReactionIndex;
 
     emit DisputeReaction(
@@ -805,15 +847,13 @@ contract HealthRecordCore {
   function retractReaction(string memory recordHash, bytes32 disputerIdHash) external {
     bytes32 reactorIdHash = memberRoleManager.getUserForWallet(msg.sender);
     require(reactorIdHash != bytes32(0), 'Wallet not registered');
-    require(
-      hasReactedToDispute[recordHash][disputerIdHash][reactorIdHash],
-      'No reaction to retract'
-    );
+    require(currentlyReacted[recordHash][disputerIdHash][reactorIdHash], 'No reaction to retract');
 
     uint256 idx = reactionIndex[recordHash][disputerIdHash][reactorIdHash];
     require(disputeReactions[recordHash][disputerIdHash][idx].isActive, 'Already retracted');
 
     disputeReactions[recordHash][disputerIdHash][idx].isActive = false;
+    currentlyReacted[recordHash][disputerIdHash][reactorIdHash] = false;
 
     emit ReactionRetracted(recordHash, reactorIdHash, disputerIdHash, block.timestamp);
   }
@@ -831,10 +871,7 @@ contract HealthRecordCore {
   ) external {
     bytes32 reactorIdHash = memberRoleManager.getUserForWallet(msg.sender);
     require(reactorIdHash != bytes32(0), 'Wallet not registered');
-    require(
-      hasReactedToDispute[recordHash][disputerIdHash][reactorIdHash],
-      'No reaction to modify'
-    );
+    require(currentlyReacted[recordHash][disputerIdHash][reactorIdHash], 'No reaction to modify');
 
     uint256 idx = reactionIndex[recordHash][disputerIdHash][reactorIdHash];
     Reaction storage reaction = disputeReactions[recordHash][disputerIdHash][idx];
@@ -939,7 +976,7 @@ contract HealthRecordCore {
     string memory recordHash,
     bytes32 userIdHash
   ) external view returns (bool) {
-    return hasVerified[recordHash][userIdHash];
+    return currentlyVerified[recordHash][userIdHash];
   }
 
   /**
@@ -959,7 +996,7 @@ contract HealthRecordCore {
       bool isActive
     )
   {
-    if (!hasVerified[recordHash][userIdHash]) {
+    if (!currentlyVerified[recordHash][userIdHash]) {
       return (false, '', VerificationLevel.None, 0, false);
     }
 
@@ -1046,7 +1083,7 @@ contract HealthRecordCore {
     string memory recordHash,
     bytes32 userIdHash
   ) external view returns (bool) {
-    return hasDisputed[recordHash][userIdHash];
+    return currentlyDisputed[recordHash][userIdHash];
   }
 
   /**
@@ -1068,7 +1105,7 @@ contract HealthRecordCore {
       bool isActive
     )
   {
-    if (!hasDisputed[recordHash][userIdHash]) {
+    if (!currentlyDisputed[recordHash][userIdHash]) {
       return (false, '', DisputeSeverity.None, DisputeCulpability.None, '', 0, false);
     }
 
@@ -1159,7 +1196,7 @@ contract HealthRecordCore {
     bytes32 disputerIdHash,
     bytes32 reactorIdHash
   ) external view returns (bool) {
-    return hasReactedToDispute[recordHash][disputerIdHash][reactorIdHash];
+    return currentlyReacted[recordHash][disputerIdHash][reactorIdHash];
   }
 
   /**
@@ -1170,7 +1207,7 @@ contract HealthRecordCore {
     bytes32 disputerIdHash,
     bytes32 reactorIdHash
   ) external view returns (bool exists, bool supportsDispute, uint256 timestamp, bool isActive) {
-    if (!hasReactedToDispute[recordHash][disputerIdHash][reactorIdHash]) {
+    if (!currentlyReacted[recordHash][disputerIdHash][reactorIdHash]) {
       return (false, false, 0, false);
     }
 

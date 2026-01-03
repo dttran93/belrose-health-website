@@ -1,7 +1,7 @@
 // src/features/BlockchainWallet/services/smartAccountService.ts
 /**
  * Service to generate smartAccountAddresses from Wallet addresses
- * Called after registration and the user's wallet has been generated
+ * Called in blockchainPreprationService
  */
 
 import { createPublicClient, http, type Hex, type Address } from 'viem';

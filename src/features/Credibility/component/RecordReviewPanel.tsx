@@ -1,28 +1,27 @@
+// src/features/Credibility/components/RecordReviewPanel.tsx
+
 import React, { useState } from 'react';
 import { cn } from '@/utils/utils';
 import { Button } from '@/components/ui/Button';
-import { CheckCircle, AlertTriangle, ChevronRight, HelpCircle } from 'lucide-react';
-import VerificationForm, {
-  ExistingVerification,
-  VerificationData,
-  VerificationLevel,
-} from './ui/VerificationForm';
-import DisputeForm, {
-  DisputeCulpability,
-  DisputeData,
-  DisputeSeverity,
-  ExistingDispute,
-} from './ui/DisputeForm';
+import { CheckCircle, AlertTriangle, ChevronRight, HelpCircle, Loader2 } from 'lucide-react';
+import VerificationForm from './ui/VerificationForm';
+import DisputeForm, { ExistingDispute } from './ui/DisputeForm';
+import CredibilityActionDialog from './ui/CredibilityActionDialog';
 import * as Tooltip from '@radix-ui/react-tooltip';
+import { useCredibilityFlow } from '../hooks/useCredibilityFlow';
+import { DisputeCulpability, DisputeSeverity } from '../services/disputeService';
+import { VerificationLevel } from '../services/verificationService';
+
+// ============================================================
+// TYPES
+// ============================================================
 
 export interface RecordReviewPanelProps {
   recordId: string;
   recordHash: string;
   recordTitle?: string;
-  onSubmitVerification?: (data: VerificationData) => Promise<void>;
-  onSubmitDispute?: (data: DisputeData) => Promise<void>;
   onViewRecord?: () => void;
-  existingVerification?: ExistingVerification | null;
+  onSuccess?: () => void;
   existingDispute?: ExistingDispute | null;
   className?: string;
 }
@@ -34,74 +33,68 @@ export interface RecordReviewPanelProps {
 export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
   recordId,
   recordHash,
-  onSubmitVerification,
-  onSubmitDispute,
   onViewRecord,
-  existingVerification = null,
+  onSuccess,
   existingDispute = null,
 }) => {
   const [activeTab, setActiveTab] = useState<'verify' | 'dispute'>('verify');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
 
-  // Verification state
-  const [verificationLevel, setVerificationLevel] = useState<VerificationLevel | null>(null);
+  // Credibility flow hook - manages dialog, fetches existing verification
+  const {
+    dialogProps,
+    verification,
+    isLoadingVerification,
+    initiateVerification,
+    initiateRetractVerification,
+    initiateModifyVerification,
+    initiateDispute,
+    isLoading,
+  } = useCredibilityFlow({
+    recordId,
+    recordHash,
+    onSuccess,
+  });
 
-  // Dispute state
+  // Local form state for selections (before submitting)
+  const [selectedLevel, setSelectedLevel] = useState<VerificationLevel | null>(null);
+
+  // Dispute form state
   const [severity, setSeverity] = useState<DisputeSeverity | null>(null);
   const [culpability, setCulpability] = useState<DisputeCulpability | null>(null);
   const [disputeNotes, setDisputeNotes] = useState('');
 
-  const handleSubmitVerification = async () => {
-    if (!verificationLevel) return;
+  // ============================================================
+  // HANDLERS
+  // ============================================================
 
-    setIsSubmitting(true);
-    try {
-      await onSubmitVerification?.({
-        recordId,
-        recordHash,
-        level: verificationLevel,
-      });
-      setShowSuccess(true);
-      setTimeout(() => {
-        setShowSuccess(false);
-        setVerificationLevel(null);
-      }, 2000);
-    } catch (error) {
-      console.error('Verification failed:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleSubmitVerification = () => {
+    if (!selectedLevel) return;
+    initiateVerification(selectedLevel);
+  };
+
+  const handleRetract = async () => {
+    initiateRetractVerification();
+  };
+
+  const handleModifyLevel = async (newLevel: VerificationLevel) => {
+    initiateModifyVerification(newLevel);
   };
 
   const handleSubmitDispute = async () => {
     if (!severity || !culpability) return;
-
-    setIsSubmitting(true);
-    try {
-      await onSubmitDispute?.({
-        recordId,
-        recordHash,
-        severity,
-        culpability,
-        notes: disputeNotes,
-      });
-      setShowSuccess(true);
-      setTimeout(() => {
-        setShowSuccess(false);
-        setSeverity(null);
-        setCulpability(null);
-        setDisputeNotes('');
-      }, 2000);
-    } catch (error) {
-      console.error('Dispute failed:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
+    //initiateDispute(severity, culpability, disputeNotes || undefined);
   };
 
-  const canSubmitVerification = verificationLevel !== null;
+  // ============================================================
+  // COMPUTED
+  // ============================================================
+
+  const canSubmitVerification = selectedLevel !== null && !verification?.isActive;
   const canSubmitDispute = severity !== null && culpability !== null;
+
+  // ============================================================
+  // RENDER
+  // ============================================================
 
   return (
     <div>
@@ -129,8 +122,7 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
                 <ol className="list-decimal list-inside space-y-1 text-xs">
                   <li>Your verification or dispute is tied to this hash specifically.</li>
                   <li>
-                    If this record is changed, your review will not transfer to the new record. You
-                    will have to write another review if desired.
+                    If this record is changed, your review will not transfer to the new record.
                   </li>
                   <li>You may remove or edit your review at any time.</li>
                 </ol>
@@ -171,11 +163,18 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
 
       {/* Content */}
       <div className="p-5 min-h-[360px]">
-        {activeTab === 'verify' ? (
+        {isLoadingVerification ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : activeTab === 'verify' ? (
           <VerificationForm
-            selectedLevel={verificationLevel}
-            onSelectLevel={setVerificationLevel}
-            existingVerification={existingVerification}
+            selectedLevel={selectedLevel}
+            onSelectLevel={setSelectedLevel}
+            verification={verification}
+            onModify={handleModifyLevel}
+            onRetract={handleRetract}
+            isSubmitting={isLoading}
           />
         ) : (
           <DisputeForm
@@ -192,36 +191,40 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
 
       {/* Footer */}
       <div className="px-5 pb-5 pt-4 border-t border-border">
-        {showSuccess ? (
-          <div className="flex items-center justify-center gap-3 py-3 bg-chart-3/10 text-chart-3 rounded-xl">
-            <div className="w-6 h-6 bg-chart-3 text-white rounded-full flex items-center justify-center">
-              <CheckCircle className="w-4 h-4" />
-            </div>
-            <span className="font-semibold">
-              {activeTab === 'verify' ? 'Verification submitted!' : 'Dispute submitted!'}
-            </span>
-          </div>
-        ) : (
-          <Button
-            className={cn(
-              'w-full py-3 text-sm font-semibold',
-              activeTab === 'verify'
-                ? 'bg-chart-3 hover:bg-chart-3/90'
-                : 'bg-red-600 hover:bg-red-700'
-            )}
-            disabled={activeTab === 'verify' ? !canSubmitVerification : !canSubmitDispute}
-            loading={isSubmitting}
-            onClick={activeTab === 'verify' ? handleSubmitVerification : handleSubmitDispute}
-          >
-            {activeTab === 'verify' ? 'Submit Verification' : 'Submit Dispute'}
-            <ChevronRight className="w-4 h-4 ml-1" />
-          </Button>
-        )}
+        <Button
+          className={cn(
+            'w-full py-3 text-sm font-semibold',
+            activeTab === 'verify'
+              ? 'bg-chart-3 hover:bg-chart-3/90'
+              : 'bg-red-600 hover:bg-red-700'
+          )}
+          disabled={
+            activeTab === 'verify'
+              ? !canSubmitVerification || isLoading
+              : !canSubmitDispute || isLoading
+          }
+          onClick={activeTab === 'verify' ? handleSubmitVerification : handleSubmitDispute}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              Processing...
+            </>
+          ) : (
+            <>
+              {activeTab === 'verify' ? 'Submit Verification' : 'Submit Dispute'}
+              <ChevronRight className="w-4 h-4 ml-1" />
+            </>
+          )}
+        </Button>
         <p className="mt-3 text-xs text-muted-foreground text-center">
           Your review will be recorded on the blockchain and cannot be deleted. You can retract or
           modify it later.
         </p>
       </div>
+
+      {/* Credibility Action Dialog */}
+      <CredibilityActionDialog {...dialogProps} />
     </div>
   );
 };

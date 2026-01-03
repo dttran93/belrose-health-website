@@ -1,15 +1,18 @@
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { getFirestore, collection, addDoc, serverTimestamp, FieldValue } from 'firebase/firestore';
 
-// Firestore collection: recordViews
+// 1. Update the Interface
+// In the client SDK, the type for a timestamp pending write is FieldValue
 export interface RecordViewDoc {
   recordId: string;
   recordHash: string;
   viewerId: string;
-  viewedAt: Timestamp;
+  viewedAt: FieldValue;
   viewerRole: 'owner' | 'administrator' | 'viewer';
 }
 
-// When a provider views a record in your app:
+/**
+ * Logs a record view
+ */
 export async function logRecordView(
   recordId: string,
   recordHash: string,
@@ -17,11 +20,18 @@ export async function logRecordView(
   viewerRole: string
 ) {
   const db = getFirestore();
-  await db.collection('recordViews').add({
-    recordId,
-    recordHash,
-    viewerId,
-    viewerRole,
-    viewedAt: Timestamp.now(),
-  });
+
+  try {
+    // 2. Use addDoc and collection() helper functions
+    await addDoc(collection(db, 'recordViews'), {
+      recordId,
+      recordHash,
+      viewerId,
+      viewerRole,
+      viewedAt: serverTimestamp(), // Records the time based on Google's servers
+    });
+  } catch (error) {
+    console.error('Error logging record view: ', error);
+    throw error;
+  }
 }
