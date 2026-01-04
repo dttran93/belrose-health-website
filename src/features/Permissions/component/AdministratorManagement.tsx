@@ -194,7 +194,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
                   <UserCard
                     key={admin}
                     user={adminProfile}
-                    onView={() => {}}
+                    onViewUser={() => {}}
                     onDelete={() => handleDeleteAdmin(admin)}
                     variant="default"
                     color="blue"
@@ -230,7 +230,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
               <div className="py-3">
                 <UserCard
                   user={selectedUser}
-                  onView={() => {}}
+                  onViewUser={() => {}}
                   variant="default"
                   color="green"
                   menuType="cancel"

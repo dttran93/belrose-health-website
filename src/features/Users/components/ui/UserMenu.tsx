@@ -1,7 +1,16 @@
 //src/features/Users/components/ui/UserMenu.tsx
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MoreHorizontal, Share2, Eye, Trash2, LucideIcon, Blocks, User } from 'lucide-react';
+import {
+  MoreHorizontal,
+  Share2,
+  Eye,
+  Trash2,
+  LucideIcon,
+  Blocks,
+  User,
+  NotepadText,
+} from 'lucide-react';
 import { BelroseUserProfile } from '@/types/core';
 
 // Types for the menu system
@@ -28,7 +37,8 @@ interface UserMenuProps {
   user: BelroseUserProfile | null | undefined;
 
   // Action handlers - parent provides these
-  onView?: (record: any) => void;
+  onViewUser?: (record: any) => void;
+  onViewDetails?: (record: any) => void;
   onShare?: (record: any) => void;
   onDelete?: (record: any) => void;
   onVerifyBlockchain?: (record: any) => void;
@@ -39,7 +49,8 @@ interface UserMenuProps {
   menuClassName?: string;
 
   // Configuration - what actions to show
-  showView?: boolean;
+  showViewUser?: boolean;
+  showViewDetails?: boolean;
   showShare?: boolean;
   showDelete?: boolean;
   showBlockchain?: boolean;
@@ -58,7 +69,8 @@ interface UserMenuProps {
 
 const UserMenu: React.FC<UserMenuProps> = ({
   user,
-  onView,
+  onViewUser,
+  onViewDetails,
   onShare,
   onDelete,
   onVerifyBlockchain,
@@ -66,7 +78,8 @@ const UserMenu: React.FC<UserMenuProps> = ({
   triggerClassName = 'p-2 text-primary hover:text-primary hover:bg-gray-100 rounded-lg transition-colors',
   menuClassName = 'absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[210px]',
   showShare = true,
-  showView = true,
+  showViewUser = true,
+  showViewDetails = true,
   showDelete = true,
   showBlockchain = true,
   additionalItems = [],
@@ -108,13 +121,23 @@ const UserMenu: React.FC<UserMenuProps> = ({
   const buildMenuItems = (): MenuItem[] => {
     const items: MenuItem[] = [];
 
-    // View action
-    if (showView && onView) {
+    // View User Profile action
+    if (showViewUser && onViewUser) {
       items.push({
         key: 'user',
         label: 'User Profile',
         icon: User,
-        onClick: createHandler(onView),
+        onClick: createHandler(onViewUser),
+      });
+    }
+
+    // View details of whereever card is, verification details, permission details etc.
+    if (showViewDetails && onViewDetails) {
+      items.push({
+        key: 'details',
+        label: 'Details',
+        icon: NotepadText,
+        onClick: createHandler(onViewDetails),
       });
     }
 
@@ -144,7 +167,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
     }
 
     // Add divider before destructive actions if we have any non-destructive items
-    if (items.length > 0 && showDelete) {
+    if (items.length > 0 && showDelete && onDelete) {
       items.push({ type: 'divider', key: 'divider-1' });
     }
 

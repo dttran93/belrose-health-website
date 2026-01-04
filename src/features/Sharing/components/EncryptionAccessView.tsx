@@ -317,7 +317,7 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
                     badges={getEntryBadges(entry)}
                     showEmail={true}
                     showUserId={true}
-                    onView={() => {}} // Placeholder as onView is required by UserCardProps
+                    onViewUser={() => {}}
                   />
                 );
               })}

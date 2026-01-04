@@ -28,8 +28,8 @@ interface VerificationDetailModalProps {
 
 const CHAIN_STATUS_DISPLAY = {
   pending: { text: 'Pending confirmation', color: 'text-yellow-600', bg: 'bg-yellow-50' },
-  confirmed: { text: 'Confirmed on-chain', color: 'text-green-600', bg: 'bg-green-50' },
-  failed: { text: 'Transaction failed', color: 'text-red-600', bg: 'bg-red-50' },
+  confirmed: { text: 'Confirmed on-network', color: 'text-green-600', bg: 'bg-green-50' },
+  failed: { text: 'Network confirmation failed', color: 'text-red-600', bg: 'bg-red-50' },
 };
 
 // ============================================================
@@ -74,6 +74,7 @@ export const VerificationDetailModal: React.FC<VerificationDetailModalProps> = (
                 <CheckCircle className="w-5 h-5 text-green-600" />
                 Verification Details
               </Dialog.Title>
+              <Dialog.Description />
               <Dialog.Close asChild>
                 <button className="p-1 rounded-full hover:bg-gray-100 transition-colors">
                   <X className="w-5 h-5 text-gray-500" />
@@ -174,7 +175,7 @@ export const VerificationDetailModal: React.FC<VerificationDetailModalProps> = (
                 className="text-gray-600"
               >
                 <ExternalLink className="w-4 h-4 mr-1" />
-                View on Blockchain
+                View on Network
               </Button>
 
               {isOwnVerification && verification.isActive && (

@@ -34,7 +34,8 @@ interface UserCardProps {
 
   // Actions
   onCardClick?: () => void;
-  onView?: () => void;
+  onViewUser?: () => void;
+  onViewDetails?: () => void;
   onShare?: () => void;
   onDelete?: () => void;
   onCancel?: () => void;
@@ -114,7 +115,8 @@ export const UserCard: React.FC<UserCardProps> = ({
   variant = 'default',
   color = 'primary',
   badges,
-  onView,
+  onViewUser,
+  onViewDetails,
   onShare,
   onDelete,
   onCardClick,
@@ -236,7 +238,8 @@ export const UserCard: React.FC<UserCardProps> = ({
     return (
       <UserMenu
         user={user}
-        onView={onView}
+        onViewUser={onViewUser}
+        onViewDetails={onViewDetails}
         onShare={onShare}
         onDelete={onDelete}
         onVerifyBlockchain={onVerifyBlockchain}

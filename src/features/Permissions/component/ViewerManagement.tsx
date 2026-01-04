@@ -179,7 +179,7 @@ export const ViewerManagement: React.FC<ViewerManagementProps> = ({
                   <UserCard
                     key={viewerId}
                     user={profile}
-                    onView={() => {}}
+                    onViewUser={() => {}}
                     onDelete={() => handleDeleteViewer(viewerId)}
                     variant="default"
                     color="yellow"
@@ -213,7 +213,7 @@ export const ViewerManagement: React.FC<ViewerManagementProps> = ({
               <div className="py-3">
                 <UserCard
                   user={selectedUser}
-                  onView={() => {}}
+                  onViewUser={() => {}}
                   variant="default"
                   color="green"
                   menuType="cancel"

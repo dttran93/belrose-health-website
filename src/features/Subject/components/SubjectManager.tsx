@@ -204,7 +204,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
                         onDelete={() => handleRemoveSubject(subjectId)}
                         variant="default"
                         color="red"
-                        onView={() => {}}
+                        onViewUser={() => {}}
                       />
                     );
                   })}
@@ -249,7 +249,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
                         onDelete={() => handleCancelPendingRequest(request.subjectId)}
                         variant="default"
                         color="primary"
-                        onView={() => {}}
+                        onViewUser={() => {}}
                       />
                     );
                   })}

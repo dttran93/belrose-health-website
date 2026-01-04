@@ -112,6 +112,7 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
                 <AlertTriangle className="w-5 h-5 text-red-600" />
                 Dispute Details
               </Dialog.Title>
+              <Dialog.Description />
               <Dialog.Close asChild>
                 <button className="p-1 rounded-full hover:bg-gray-100 transition-colors">
                   <X className="w-5 h-5 text-gray-500" />

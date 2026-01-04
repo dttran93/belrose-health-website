@@ -281,7 +281,7 @@ export const SetSubject: React.FC<SetSubjectProps> = ({
                     userId={subjectId}
                     variant="compact"
                     color="green"
-                    onView={() => {}}
+                    onViewUser={() => {}}
                   />
                 );
               })}
@@ -374,7 +374,7 @@ export const SetSubject: React.FC<SetSubjectProps> = ({
                   variant="default"
                   color="yellow"
                   menuType="cancel"
-                  onView={() => {}}
+                  onViewUser={() => {}}
                   onCancel={() => setSelectedUser(null)}
                 />
               </div>

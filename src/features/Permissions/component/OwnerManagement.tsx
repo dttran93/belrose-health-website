@@ -188,7 +188,7 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
                   <UserCard
                     key={ownerId}
                     user={profile}
-                    onView={() => {}}
+                    onViewUser={() => {}}
                     onDelete={() => handleDeleteOwner(ownerId)}
                     variant="default"
                     color="red"
@@ -223,7 +223,7 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
               <div className="py-3">
                 <UserCard
                   user={selectedUser}
-                  onView={() => {}}
+                  onViewUser={() => {}}
                   variant="default"
                   color="green"
                   menuType="cancel"

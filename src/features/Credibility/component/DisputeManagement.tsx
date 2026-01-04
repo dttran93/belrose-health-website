@@ -216,7 +216,10 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
                     dispute={dispute}
                     userProfile={disputerProfile}
                     isInactive={isInactive}
-                    onClick={() => handleCardClick(dispute)}
+                    onViewUser={() => {}}
+                    onViewDetails={() => {
+                      handleCardClick(dispute);
+                    }}
                   />
                 );
               })}
@@ -259,10 +262,19 @@ interface DisputeCardProps {
   dispute: DisputeWithVersion;
   userProfile: BelroseUserProfile | undefined;
   isInactive: boolean;
-  onClick: () => void;
+  onViewUser: () => void;
+  onViewDetails: () => void;
+  onClick?: () => void;
 }
 
-const DisputeCard: React.FC<DisputeCardProps> = ({ dispute, userProfile, isInactive, onClick }) => {
+const DisputeCard: React.FC<DisputeCardProps> = ({
+  dispute,
+  userProfile,
+  isInactive,
+  onViewUser,
+  onViewDetails,
+  onClick,
+}) => {
   const severityInfo = getSeverityConfig(dispute.severity);
   const culpabilityInfo = getCulpabilityConfig(dispute.culpability);
 
@@ -331,7 +343,8 @@ const DisputeCard: React.FC<DisputeCardProps> = ({ dispute, userProfile, isInact
         variant="default"
         color={isInactive ? 'red' : 'yellow'}
         badges={badges}
-        menuType="none"
+        onViewUser={onViewUser}
+        onViewDetails={onViewDetails}
         metadata={[
           {
             label: 'Filed',

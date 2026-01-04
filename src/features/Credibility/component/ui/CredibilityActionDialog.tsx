@@ -156,10 +156,10 @@ const PreparingContent: React.FC<{ progress?: CredibilityPreparationProgress | n
   <div className="flex flex-col items-center gap-4 py-4">
     <Loader2 className="w-10 h-10 text-chart-3 animate-spin" />
     <AlertDialog.Title className="text-lg font-bold text-center">
-      Preparing Blockchain
+      Preparing Secure Network
     </AlertDialog.Title>
     <AlertDialog.Description className="text-sm text-gray-600 text-center">
-      {progress?.message || 'Setting up your blockchain wallet...'}
+      {progress?.message || 'Setting up your network account...'}
     </AlertDialog.Description>
 
     {/* Progress Steps */}

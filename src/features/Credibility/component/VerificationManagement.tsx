@@ -206,7 +206,8 @@ export const VerificationManagement: React.FC<VerificationManagementProps> = ({
                     verification={verification}
                     userProfile={verifierProfile}
                     isInactive={isInactive}
-                    onClick={() => handleCardClick(verification)}
+                    onViewUser={() => {}}
+                    onViewDetails={() => handleCardClick(verification)}
                   />
                 );
               })}
@@ -244,13 +245,17 @@ interface VerificationCardProps {
   verification: VerificationWithVersion;
   userProfile: BelroseUserProfile | undefined;
   isInactive: boolean;
-  onClick: () => void;
+  onViewUser: () => void;
+  onViewDetails: () => void;
+  onClick?: () => void;
 }
 
 const VerificationCard: React.FC<VerificationCardProps> = ({
   verification,
   userProfile,
   isInactive,
+  onViewUser,
+  onViewDetails,
   onClick,
 }) => {
   const levelInfo = getVerificationConfig(verification.level);
@@ -283,21 +288,6 @@ const VerificationCard: React.FC<VerificationCardProps> = ({
     });
   }
 
-  // Chain status badge
-  if (verification.chainStatus === 'pending') {
-    badges.push({
-      text: 'Pending',
-      color: 'yellow',
-      tooltip: 'Awaiting blockchain confirmation',
-    });
-  } else if (verification.chainStatus === 'failed') {
-    badges.push({
-      text: 'Failed',
-      color: 'red',
-      tooltip: 'Blockchain transaction failed',
-    });
-  }
-
   return (
     <div
       className={`cursor-pointer hover:bg-gray-50 rounded-lg transition-colors ${isInactive ? 'opacity-50' : ''}`}
@@ -309,7 +299,8 @@ const VerificationCard: React.FC<VerificationCardProps> = ({
         variant="default"
         color={isInactive ? 'red' : 'green'}
         badges={badges}
-        menuType="none"
+        onViewUser={onViewUser}
+        onViewDetails={onViewDetails}
         metadata={[
           {
             label: 'Verified',
