@@ -9,8 +9,10 @@ import { RecordReviewPanel } from './RecordReviewPanel';
 import { useAuth } from '@/features/Auth/hooks/useAuth';
 import VerificationManagement from './VerificationManagement';
 import { getVerificationsByRecordId, VerificationDoc } from '../services/verificationService';
-import { DisputeDoc } from '../services/disputeService';
+import { getDisputesByRecordId } from '../services/disputeService';
 import DisputeManagement from './DisputeManagement';
+import { useCredibilityFlow } from '../hooks/useCredibilityFlow';
+import CredibilityActionDialog from './ui/CredibilityActionDialog';
 
 type ViewMode = 'loading' | 'empty' | 'list' | 'add';
 type ReviewTab = 'verify' | 'dispute';
@@ -26,9 +28,52 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
   const [verifications, setVerifications] = useState<VerificationDoc[]>([]);
   const { user } = useAuth();
 
-  // Generate or retrieve the record hash
+  // Generate and retrieve the record hash
   const recordHash = (record.recordHash || RecordHashService.generateRecordHash(record)) as string;
   const recordId = record.firestoreId || record.id;
+
+  const handleOperationSuccess = async () => {
+    try {
+      // 1. Refresh the hook's internal state (user's specific verification/dispute)
+      await refetch();
+
+      // 2. Refresh the lists of verifications/disputes for this record
+      const [fetchedVerifications, fetchedDisputes] = await Promise.all([
+        getVerificationsByRecordId(recordId),
+        // Assuming you have this service function:
+        getDisputesByRecordId(recordId),
+      ]);
+
+      setVerifications(fetchedVerifications);
+      // setDisputes(fetchedDisputes); // If you add a state for this
+
+      // 3. Navigation logic
+      if (viewMode === 'add') {
+        setViewMode('list');
+      }
+
+      console.log('Credibility data synchronized.');
+    } catch (error) {
+      console.error('Error refreshing credibility data:', error);
+    }
+  };
+
+  const {
+    dialogProps,
+    verification,
+    initiateVerification,
+    initiateRetractVerification,
+    initiateModifyVerification,
+    initiateDispute,
+    initiateRetractDispute,
+    initiateReaction,
+    isLoading,
+    refetch,
+  } = useCredibilityFlow({
+    recordId,
+    recordHash,
+    onSuccess: handleOperationSuccess,
+  });
 
   // Fetch verifications on mount and when record changes
   useEffect(() => {
@@ -74,28 +119,6 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
   const handleAddDispute = () => {
     setReviewPanelInitialTab('dispute');
     setViewMode('add');
-  };
-
-  const handleVerificationSuccess = () => {
-    // Refresh verifications and go back to list view
-    const refreshAndShowList = async () => {
-      try {
-        const fetchedVerifications = await getVerificationsByRecordId(recordId);
-        setVerifications(fetchedVerifications);
-        setViewMode('list');
-      } catch (error) {
-        console.error('Error refreshing verifications:', error);
-        setViewMode('list');
-      }
-    };
-    refreshAndShowList();
-  };
-
-  const handleSubmitDispute = async (data: DisputeDoc) => {
-    // TODO: Call your blockchain/Firebase service
-    console.log('Submitting dispute:', data);
-    // await disputeService.createDispute(data);
-    setViewMode(verifications.length > 0 ? 'list' : 'empty');
   };
 
   if (!user) {
@@ -160,6 +183,7 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
             onBack={onBack}
             onAddMode={handleAddDispute}
             isAddMode={false}
+            onReact={initiateReaction}
           />
         </>
       )}
@@ -171,11 +195,20 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
           recordHash={recordHash}
           recordTitle={record.belroseFields?.title || record.fileName || 'Medical Record'}
           onViewRecord={handleBackClick}
-          onSuccess={handleVerificationSuccess}
+          onSuccess={handleOperationSuccess}
           initialTab={reviewPanelInitialTab}
           existingDispute={null}
+          initiateVerification={initiateVerification}
+          initiateDispute={initiateDispute}
+          initiateRetractVerification={initiateRetractVerification}
+          initiateRetractDispute={initiateRetractDispute}
+          initiateModifyVerification={initiateModifyVerification}
+          verification={verification}
+          isLoading={isLoading}
         />
       )}
+
+      <CredibilityActionDialog {...dialogProps} />
     </div>
   );
 };

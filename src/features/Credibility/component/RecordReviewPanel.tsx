@@ -10,7 +10,7 @@ import CredibilityActionDialog from './ui/CredibilityActionDialog';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { useCredibilityFlow } from '../hooks/useCredibilityFlow';
 import { DisputeCulpability, DisputeDoc, DisputeSeverity } from '../services/disputeService';
-import { VerificationLevel } from '../services/verificationService';
+import { VerificationDoc, VerificationLevel } from '../services/verificationService';
 
 // ============================================================
 // TYPES
@@ -23,8 +23,13 @@ export interface RecordReviewPanelProps {
   onViewRecord?: () => void;
   onSuccess?: () => void;
   existingDispute?: DisputeDoc | null;
-  className?: string;
   initialTab?: 'verify' | 'dispute';
+  initiateVerification: (level: VerificationLevel) => void;
+  initiateDispute: (sev: DisputeSeverity, culp: DisputeCulpability, notes?: string) => void;
+  initiateRetractVerification: () => void;
+  initiateModifyVerification: (newLevel: VerificationLevel) => void;
+  verification: VerificationDoc | null;
+  isLoading: boolean;
 }
 
 // ============================================================
@@ -38,24 +43,14 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
   onSuccess,
   existingDispute = null,
   initialTab = 'verify',
+  initiateVerification,
+  initiateDispute,
+  initiateRetractVerification,
+  initiateModifyVerification,
+  verification,
+  isLoading,
 }) => {
   const [activeTab, setActiveTab] = useState<'verify' | 'dispute'>(initialTab);
-
-  // Credibility flow hook - manages dialog, fetches existing verification
-  const {
-    dialogProps,
-    verification,
-    isLoadingVerification,
-    initiateVerification,
-    initiateRetractVerification,
-    initiateModifyVerification,
-    initiateDispute,
-    isLoading,
-  } = useCredibilityFlow({
-    recordId,
-    recordHash,
-    onSuccess,
-  });
 
   // Local form state for selections (before submitting)
   const [selectedLevel, setSelectedLevel] = useState<VerificationLevel | null>(null);
@@ -165,7 +160,7 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
 
       {/* Content */}
       <div className="p-5 min-h-[360px]">
-        {isLoadingVerification ? (
+        {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
@@ -224,9 +219,6 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
           modify it later.
         </p>
       </div>
-
-      {/* Credibility Action Dialog */}
-      <CredibilityActionDialog {...dialogProps} />
     </div>
   );
 };

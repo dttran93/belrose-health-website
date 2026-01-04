@@ -34,12 +34,12 @@ interface DisputeDetailModalProps {
   isOwnDispute?: boolean;
   onModify?: () => void;
   onRetract?: () => void;
-  onReact?: (support: boolean) => void;
-  // Reaction counts (optional - can be fetched separately)
+  onReact?: (disputerId: string, support: boolean) => void;
   reactionStats?: {
     supports: number;
     opposes: number;
   };
+  isLoadingStats: boolean;
 }
 
 // ============================================================
@@ -66,6 +66,7 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
   onRetract,
   onReact,
   reactionStats,
+  isLoadingStats,
 }) => {
   const severityInfo = getSeverityConfig(dispute.severity);
   const culpabilityInfo = getCulpabilityConfig(dispute.culpability);
@@ -169,25 +170,6 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
                 </div>
               )}
 
-              {/* Reactions Section */}
-              {reactionStats && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500 mb-2">Community Reactions</h4>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-lg">
-                      <ThumbsUp className="w-4 h-4 text-green-600" />
-                      <span className="font-medium text-green-700">{reactionStats.supports}</span>
-                      <span className="text-sm text-green-600">support</span>
-                    </div>
-                    <div className="flex items-center gap-2 bg-red-50 px-3 py-2 rounded-lg">
-                      <ThumbsDown className="w-4 h-4 text-red-600" />
-                      <span className="font-medium text-red-700">{reactionStats.opposes}</span>
-                      <span className="text-sm text-red-600">oppose</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               <hr className="border-gray-200" />
 
               {/* Metadata Grid */}
@@ -221,6 +203,25 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
                     })}
                   </p>
                 </div>
+
+                {/* Reactions Section */}
+                {reactionStats && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500 mb-1">Community Reactions</h4>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 bg-green-50 px-2 py-1 rounded-lg">
+                        <ThumbsUp className="w-3 h-3 text-green-600" />
+                        <span className="font-medium text-green-700">{reactionStats.supports}</span>
+                        <span className="text-xs text-green-600">support</span>
+                      </div>
+                      <div className="flex items-center gap-2 bg-red-50 px-2 py-1 rounded-lg">
+                        <ThumbsDown className="w-3 h-3 text-red-600" />
+                        <span className="font-medium text-red-700">{reactionStats.opposes}</span>
+                        <span className="text-xs text-red-600">oppose</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {dispute.lastModified && (
                   <div>
@@ -266,7 +267,7 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => onReact(true)}
+                      onClick={() => onReact(dispute.disputerId, true)}
                       className="text-green-600 border-green-300 hover:bg-green-50"
                     >
                       <ThumbsUp className="w-4 h-4 mr-1" />
@@ -275,7 +276,7 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => onReact(false)}
+                      onClick={() => onReact(dispute.disputerId, false)}
                       className="text-red-600 border-red-300 hover:bg-red-50"
                     >
                       <ThumbsDown className="w-4 h-4 mr-1" />

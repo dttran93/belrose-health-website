@@ -48,10 +48,12 @@ interface CredibilityActionDialogProps {
   pendingSeverity?: DisputeSeverity;
   pendingCulpability?: DisputeCulpability;
   pendingNotes?: string;
+  pendingReaction?: boolean;
   onClose: () => void;
   onConfirmVerification: (level: VerificationLevel) => void;
   onConfirmRetract: () => void;
   onConfirmDispute: () => void;
+  onConfirmReaction: (supports: boolean) => void;
 }
 
 // ============================================================================
@@ -68,10 +70,12 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
   pendingSeverity,
   pendingCulpability,
   pendingNotes,
+  pendingReaction,
   onClose,
   onConfirmVerification,
   onConfirmRetract,
   onConfirmDispute,
+  onConfirmReaction,
 }) => {
   if (!isOpen) return null;
 
@@ -137,6 +141,17 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
                 culpability={pendingCulpability}
                 notes={pendingNotes}
                 onConfirm={onConfirmDispute}
+                onClose={onClose}
+              />
+            )}
+
+          {/* Confirming Phase - React */}
+          {phase === 'confirming' &&
+            operationType === 'reactToDispute' &&
+            pendingReaction !== undefined && (
+              <ConfirmReactionContent
+                onConfirm={onConfirmReaction}
+                pendingReaction={pendingReaction}
                 onClose={onClose}
               />
             )}
@@ -527,10 +542,11 @@ const ConfirmDisputeContent: React.FC<{
 // ============================================================================
 
 const ConfirmReactionContent: React.FC<{
+  pendingReaction: boolean;
   onConfirm: (supportsDispute: boolean) => void;
   onClose: () => void;
-}> = ({ onConfirm, onClose }) => {
-  const [supports, setSupports] = useState<boolean | null>(null);
+}> = ({ pendingReaction, onConfirm, onClose }) => {
+  const [supports, setSupports] = useState<boolean | null>(pendingReaction);
 
   return (
     <>

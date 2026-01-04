@@ -25,6 +25,7 @@ import {
   type DisputeDocDecrypted,
   getSeverityConfig,
   getCulpabilityConfig,
+  reactToDispute,
 } from '../services/disputeService';
 import { toast } from 'sonner';
 import { DialogPhase } from '../component/ui/CredibilityActionDialog';
@@ -45,12 +46,14 @@ interface PendingOperation {
   type: CredibilityOperationType;
   recordId: string;
   recordHash: string;
+  disputerId?: string;
   // Verification-specific
   verificationLevel?: VerificationLevel;
   // Dispute-specific
   disputeSeverity?: DisputeSeverity;
   disputeCulpability?: DisputeCulpability;
   disputeNotes?: string;
+  reactionSupport?: boolean;
 }
 
 // ============================================================================
@@ -527,33 +530,50 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
   /**
    * Start a reaction flow (support or oppose a dispute)
    */
-  const initiateReaction = useCallback(async () => {
-    setPendingOperation({
-      type: 'reactToDispute',
-      recordId,
-      recordHash,
-    });
+  const initiateReaction = useCallback(
+    async (disputerId: string, supports: boolean) => {
+      setPendingOperation({
+        type: 'reactToDispute',
+        recordId,
+        recordHash,
+        disputerId,
+        reactionSupport: supports,
+      });
 
-    const ready = await runPreparation();
-    if (ready) {
-      setPhase('confirming');
-    }
-  }, [recordId, recordHash, runPreparation]);
+      const ready = await runPreparation();
+      if (ready) {
+        setPhase('confirming');
+      }
+    },
+    [recordId, recordHash, runPreparation]
+  );
 
   /**
    * Execute a confirmed reaction
    */
   const confirmReaction = useCallback(
-    async (disputerIdHash: string, supportsDispute: boolean) => {
-      if (!pendingOperation || pendingOperation.type !== 'reactToDispute') return;
+    async (supports: boolean) => {
+      const disputerId = pendingOperation?.disputerId;
+
+      if (!pendingOperation || pendingOperation.type !== 'reactToDispute' || !disputerId) {
+        setError('Dispute information missing.');
+        return;
+      }
+
+      const auth = getAuth();
+      const reactorId = auth.currentUser?.uid;
+
+      if (!reactorId) {
+        setError('You must be signed in to react to disputes');
+        setPhase('error');
+        return;
+      }
 
       setPhase('executing');
 
       try {
-        // TODO: Call reactToDispute from disputeService when ready
-        // await reactToDispute(recordHash, disputerIdHash, reactorId, supportsDispute);
-
-        toast.success(supportsDispute ? 'Supported dispute' : 'Opposed dispute');
+        await reactToDispute(recordId, recordHash, disputerId, reactorId, supports);
+        toast.success(supports ? 'Supported dispute' : 'Opposed dispute');
         reset();
         onSuccess?.();
       } catch (err) {
@@ -563,7 +583,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
         toast.error(message);
       }
     },
-    [pendingOperation, reset, onSuccess]
+    [pendingOperation, recordId, recordHash, reset, onSuccess]
   );
 
   // ==========================================================================
@@ -582,12 +602,15 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       pendingSeverity: pendingOperation?.disputeSeverity,
       pendingCulpability: pendingOperation?.disputeCulpability,
       pendingNotes: pendingOperation?.disputeNotes,
+      pendingReaction: pendingOperation?.reactionSupport,
       onClose: reset,
       onConfirmVerification: confirmVerification,
-      onConfirmRetract: confirmRetractVerification,
       onConfirmDispute: confirmDispute,
-      onConfirmRetractDispute: confirmRetractDispute,
       onConfirmReaction: confirmReaction,
+      onConfirmRetract:
+        pendingOperation?.type === 'retractVerification'
+          ? confirmRetractVerification
+          : confirmRetractDispute,
     },
 
     // Existing data

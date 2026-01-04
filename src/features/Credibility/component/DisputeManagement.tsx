@@ -13,8 +13,10 @@ import {
   CULPABILITY_OPTIONS,
   DisputeWithVersion,
   getCulpabilityConfig,
+  getDisputeReactionStats,
   getDisputesByRecordId,
   getSeverityConfig,
+  ReactionStats,
   SEVERITY_OPTIONS,
 } from '../services/disputeService';
 import DisputeDetailModal from './ui/DisputeDetailModal';
@@ -26,7 +28,7 @@ interface DisputeManagementProps {
   isAddMode?: boolean;
   onModify?: (dispute: DisputeWithVersion) => void;
   onRetract?: (dispute: DisputeWithVersion) => void;
-  onReact?: (dispute: DisputeWithVersion, support: boolean) => void;
+  onReact?: (disputerId: string, support: boolean) => void;
 }
 
 export const DisputeManagement: React.FC<DisputeManagementProps> = ({
@@ -43,6 +45,8 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
   const [disputes, setDisputes] = useState<DisputeWithVersion[]>([]);
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [reactionStats, setReactionStats] = useState<Record<string, ReactionStats>>({});
+  const [loadingStats, setLoadingStats] = useState(false);
 
   // Modal state
   const [selectedDispute, setSelectedDispute] = useState<DisputeWithVersion | null>(null);
@@ -87,10 +91,29 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
 
         // 4. Get unique disputer IDs and fetch their profiles
         const disputerIds = [...new Set(allDisputes.map(d => d.disputerId))];
-        if (disputerIds.length > 0) {
-          const profiles = await getUserProfiles(disputerIds);
-          setUserProfiles(profiles);
-        }
+
+        //5. Fetch Reaction stats for all disputes
+        const statsMap = new Map<string, ReactionStats>();
+
+        const statsPromises = allDisputes.map(async d => {
+          const stats = await getDisputeReactionStats(
+            d.recordId,
+            d.recordHash,
+            d.disputerId,
+            user?.uid
+          );
+          statsMap.set(`${d.recordHash}_${d.disputerId}`, stats);
+        });
+
+        await Promise.all([
+          disputerIds.length > 0
+            ? getUserProfiles(disputerIds).then(setUserProfiles)
+            : Promise.resolve(),
+          ...statsPromises,
+        ]);
+
+        setReactionStats(Object.fromEntries(statsMap));
+        setDisputes(disputesWithVersion);
       } catch (error) {
         console.error('Error fetching disputes:', error);
       } finally {
@@ -126,10 +149,10 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
     }
   };
 
-  const handleReact = (support: boolean) => {
+  const handleReact = (disputerId: string, support: boolean) => {
     if (selectedDispute && onReact) {
       handleCloseModal();
-      onReact(selectedDispute, support);
+      onReact(disputerId, support);
     }
   };
 
@@ -246,8 +269,13 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
           onModify={handleModify}
           onRetract={handleRetract}
           onReact={handleReact}
-          // TODO: Fetch reaction stats
-          // reactionStats={{ supports: 2, opposes: 1 }}
+          reactionStats={
+            reactionStats[`${selectedDispute.recordHash}_${selectedDispute.disputerId}`] || {
+              supports: 0,
+              opposes: 0,
+            }
+          }
+          isLoadingStats={loadingStats}
         />
       )}
     </div>

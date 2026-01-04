@@ -44,7 +44,6 @@ export interface SeverityConfig {
   description: string;
   shortDescription: string;
   color: 'blue' | 'yellow' | 'red';
-  icon: LucideIcon;
 }
 
 export interface CulpabilityConfig {
@@ -87,6 +86,12 @@ export interface DisputeWithVersion extends DisputeDocDecrypted {
   totalVersions: number;
 }
 
+export interface ReactionStats {
+  supports: number;
+  opposes: number;
+  userReaction?: boolean | null;
+}
+
 // ============================================================
 // CONSTANTS
 // ============================================================
@@ -95,7 +100,6 @@ export const SEVERITY_CONFIG: Record<DisputeSeverity, SeverityConfig> = {
   1: {
     value: 1,
     name: 'Negligible',
-    icon: CircleDashed,
     description:
       'A minor issue that does not significantly affect the usefulness or accuracy of the record. Unlikely to impact care decisions.',
     shortDescription: "Minor issue that doesn't affect clinical decisions",
@@ -104,7 +108,6 @@ export const SEVERITY_CONFIG: Record<DisputeSeverity, SeverityConfig> = {
   2: {
     value: 2,
     name: 'Moderate',
-    icon: CircleDotDashed,
     description:
       'An issue that could potentially affect care decisions or treatment planning. Should be reviewed and corrected.',
     shortDescription: 'Noticeable error that could cause confusion',
@@ -113,7 +116,6 @@ export const SEVERITY_CONFIG: Record<DisputeSeverity, SeverityConfig> = {
   3: {
     value: 3,
     name: 'Major',
-    icon: CircleDot,
     description:
       'A serious inaccuracy that could lead to incorrect diagnoses or harmful treatment decisions. Requires immediate attention.',
     shortDescription: 'Serious error that could affect patient safety',
@@ -583,22 +585,23 @@ export async function getDispute(
  * React to a dispute (support or oppose).
  * @param recordId - The record ID (needed for Firestore security rules)
  * @param recordHash - The record hash the dispute is for
- * @param disputerIdHash - The hashed ID of the disputer
+ * @param disputerId - The ID of the disputer
  * @param reactorId - The ID of the user reacting
  * @param supportsDispute - true to support, false to oppose
  */
 export async function reactToDispute(
   recordId: string,
   recordHash: string,
-  disputerIdHash: string,
+  disputerId: string,
   reactorId: string,
   supportsDispute: boolean
 ): Promise<string> {
   const db = getFirestore();
   const reactorIdHash = ethers.keccak256(ethers.toUtf8Bytes(reactorId));
+  const disputerIdHash = ethers.keccak256(ethers.toUtf8Bytes(disputerId));
 
   // Generate deterministic ID
-  const reactionId = `${recordHash}_${disputerIdHash}_${reactorId}`;
+  const reactionId = `${recordHash}_${disputerId}_${reactorId}`;
   const docRef = doc(db, 'disputeReactions', reactionId);
 
   const existing = await getDoc(docRef);
@@ -624,7 +627,7 @@ export async function reactToDispute(
     await setDoc(docRef, {
       recordId,
       recordHash,
-      disputerIdHash,
+      disputerId,
       reactorId,
       reactorIdHash,
       supportsDispute,
@@ -765,4 +768,48 @@ export async function modifyReaction(
     });
     throw error;
   }
+}
+
+/**
+ * Fetches reaction counts for a specific dispute
+ */
+export async function getDisputeReactionStats(
+  recordId: string,
+  recordHash: string,
+  disputerId: string,
+  currentUserId?: string
+): Promise<ReactionStats> {
+  const db = getFirestore();
+  const reactionsRef = collection(db, 'disputeReactions');
+
+  // Query all active reactions for this specific dispute
+  const q = query(
+    reactionsRef,
+    where('recordId', '==', recordId),
+    where('recordHash', '==', recordHash),
+    where('disputerId', '==', disputerId),
+    where('isActive', '==', true)
+  );
+
+  const querySnapshot = await getDocs(q);
+
+  let supports = 0;
+  let opposes = 0;
+  let userReaction: boolean | null = null;
+
+  querySnapshot.forEach(doc => {
+    const data = doc.data();
+    if (data.supportsDispute) {
+      supports++;
+    } else {
+      opposes++;
+    }
+
+    // Track if the current user is one of the reactors
+    if (currentUserId && data.reactorId === currentUserId) {
+      userReaction = data.supportsDispute;
+    }
+  });
+
+  return { supports, opposes, userReaction };
 }
