@@ -2,26 +2,20 @@ import React from 'react';
 import { cn } from '@/utils/utils';
 import { Button } from '@/components/ui/Button';
 import { AlertTriangle, Circle, CircleDot, CircleDotDashed } from 'lucide-react';
-import { DisputeCulpability, DisputeSeverity } from '../../services/disputeService';
+import { DisputeCulpability, DisputeDoc, DisputeSeverity } from '../../services/disputeService';
 
 // ============================================================
 // TYPES
 // ============================================================
 
-export interface DisputeData {
-  recordId: string;
-  recordHash: string;
-  severity: DisputeSeverity;
-  culpability: DisputeCulpability;
+interface DisputeFormProps {
+  severity: DisputeSeverity | null;
+  culpability: DisputeCulpability | null;
   notes: string;
-}
-
-export interface ExistingDispute {
-  severity: DisputeSeverity;
-  culpability: DisputeCulpability;
-  notes: string;
-  createdAt: string;
-  isActive: boolean;
+  onSelectSeverity: (severity: DisputeSeverity) => void;
+  onSelectCulpability: (culpability: DisputeCulpability) => void;
+  onNotesChange: (notes: string) => void;
+  existingDispute: DisputeDoc | null;
 }
 
 // ============================================================
@@ -74,16 +68,6 @@ export const CULPABILITY_LEVELS: CulpabilityLevelConfig[] = [
   { value: 4, name: 'Reckless', description: 'Serious negligence in documentation' },
   { value: 5, name: 'Intentional', description: 'Deliberate falsification or manipulation' },
 ];
-
-interface DisputeFormProps {
-  severity: DisputeSeverity | null;
-  culpability: DisputeCulpability | null;
-  notes: string;
-  onSelectSeverity: (severity: DisputeSeverity) => void;
-  onSelectCulpability: (culpability: DisputeCulpability) => void;
-  onNotesChange: (notes: string) => void;
-  existingDispute: ExistingDispute | null;
-}
 
 const DisputeForm: React.FC<DisputeFormProps> = ({
   severity,

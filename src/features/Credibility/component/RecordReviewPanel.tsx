@@ -5,11 +5,11 @@ import { cn } from '@/utils/utils';
 import { Button } from '@/components/ui/Button';
 import { CheckCircle, AlertTriangle, ChevronRight, HelpCircle, Loader2 } from 'lucide-react';
 import VerificationForm from './ui/VerificationForm';
-import DisputeForm, { ExistingDispute } from './ui/DisputeForm';
+import DisputeForm from './ui/DisputeForm';
 import CredibilityActionDialog from './ui/CredibilityActionDialog';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { useCredibilityFlow } from '../hooks/useCredibilityFlow';
-import { DisputeCulpability, DisputeSeverity } from '../services/disputeService';
+import { DisputeCulpability, DisputeDoc, DisputeSeverity } from '../services/disputeService';
 import { VerificationLevel } from '../services/verificationService';
 
 // ============================================================
@@ -22,8 +22,9 @@ export interface RecordReviewPanelProps {
   recordTitle?: string;
   onViewRecord?: () => void;
   onSuccess?: () => void;
-  existingDispute?: ExistingDispute | null;
+  existingDispute?: DisputeDoc | null;
   className?: string;
+  initialTab?: 'verify' | 'dispute';
 }
 
 // ============================================================
@@ -36,8 +37,9 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
   onViewRecord,
   onSuccess,
   existingDispute = null,
+  initialTab = 'verify',
 }) => {
-  const [activeTab, setActiveTab] = useState<'verify' | 'dispute'>('verify');
+  const [activeTab, setActiveTab] = useState<'verify' | 'dispute'>(initialTab);
 
   // Credibility flow hook - manages dialog, fetches existing verification
   const {
@@ -82,7 +84,7 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
 
   const handleSubmitDispute = async () => {
     if (!severity || !culpability) return;
-    //initiateDispute(severity, culpability, disputeNotes || undefined);
+    initiateDispute(severity, culpability, disputeNotes || undefined);
   };
 
   // ============================================================

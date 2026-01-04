@@ -1,13 +1,19 @@
 // src/features/Credibility/components/CredibilityView.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileObject } from '@/types/core';
 import { RecordHashService } from '@/features/ViewEditRecord/services/generateRecordHash';
 import { ArrowLeft, Shield, HeartHandshake } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { RecordReviewPanel } from './RecordReviewPanel';
-import { DisputeData } from './ui/DisputeForm';
-import { useAuth } from '@/features/Auth/hooks/useAuth'; // Adjust import path as needed
+import { useAuth } from '@/features/Auth/hooks/useAuth';
+import VerificationManagement from './VerificationManagement';
+import { getVerificationsByRecordId, VerificationDoc } from '../services/verificationService';
+import { DisputeDoc } from '../services/disputeService';
+import DisputeManagement from './DisputeManagement';
+
+type ViewMode = 'loading' | 'empty' | 'list' | 'add';
+type ReviewTab = 'verify' | 'dispute';
 
 interface CredibilityViewProps {
   record: FileObject;
@@ -15,27 +21,81 @@ interface CredibilityViewProps {
 }
 
 export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack }) => {
-  const [showReviewPanel, setShowReviewPanel] = useState(false);
-  const { user } = useAuth(); // Get current user for verifierId
+  const [viewMode, setViewMode] = useState<ViewMode>('loading');
+  const [reviewPanelInitialTab, setReviewPanelInitialTab] = useState<ReviewTab>('verify');
+  const [verifications, setVerifications] = useState<VerificationDoc[]>([]);
+  const { user } = useAuth();
 
   // Generate or retrieve the record hash
   const recordHash = (record.recordHash || RecordHashService.generateRecordHash(record)) as string;
+  const recordId = record.firestoreId || record.id;
 
-  const handleCloseReviewPanel = () => {
-    setShowReviewPanel(false);
+  // Fetch verifications on mount and when record changes
+  useEffect(() => {
+    const fetchVerifications = async () => {
+      if (!recordId) {
+        setViewMode('empty');
+        return;
+      }
+
+      try {
+        const fetchedVerifications = await getVerificationsByRecordId(recordId);
+        setVerifications(fetchedVerifications);
+
+        // Determine initial view mode based on whether verifications exist
+        if (fetchedVerifications.length > 0) {
+          setViewMode('list');
+        } else {
+          setViewMode('empty');
+        }
+      } catch (error) {
+        console.error('Error fetching verifications:', error);
+        setViewMode('empty');
+      }
+    };
+
+    fetchVerifications();
+  }, [recordId]);
+
+  const handleBackClick = () => {
+    if (viewMode === 'add') {
+      // Go back to list or empty state
+      setViewMode(verifications.length > 0 ? 'list' : 'empty');
+    } else {
+      onBack();
+    }
+  };
+
+  const handleAddVerification = () => {
+    setReviewPanelInitialTab('verify');
+    setViewMode('add');
+  };
+
+  const handleAddDispute = () => {
+    setReviewPanelInitialTab('dispute');
+    setViewMode('add');
   };
 
   const handleVerificationSuccess = () => {
-    // Optionally refresh data, show toast, etc.
-    console.log('Verification succeeded');
+    // Refresh verifications and go back to list view
+    const refreshAndShowList = async () => {
+      try {
+        const fetchedVerifications = await getVerificationsByRecordId(recordId);
+        setVerifications(fetchedVerifications);
+        setViewMode('list');
+      } catch (error) {
+        console.error('Error refreshing verifications:', error);
+        setViewMode('list');
+      }
+    };
+    refreshAndShowList();
   };
 
-  const handleSubmitDispute = async (data: DisputeData) => {
+  const handleSubmitDispute = async (data: DisputeDoc) => {
     // TODO: Call your blockchain/Firebase service
     console.log('Submitting dispute:', data);
     // await disputeService.createDispute(data);
-
-    setShowReviewPanel(false);
+    setViewMode(verifications.length > 0 ? 'list' : 'empty');
   };
 
   if (!user) {
@@ -52,7 +112,7 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
         </h3>
         <div className="flex items-center gap-2">
           <Button
-            onClick={showReviewPanel ? handleCloseReviewPanel : onBack}
+            onClick={handleBackClick}
             className="w-8 h-8 border-none bg-transparent hover:bg-gray-200"
           >
             <ArrowLeft className="text-primary" />
@@ -60,18 +120,15 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
         </div>
       </div>
 
-      {/* Review Panel */}
-      {showReviewPanel ? (
-        <RecordReviewPanel
-          recordId={record.id}
-          recordHash={recordHash}
-          recordTitle={record.belroseFields?.title || record.fileName || 'Medical Record'}
-          onViewRecord={onBack}
-          onSuccess={handleVerificationSuccess}
-          existingDispute={null}
-        />
-      ) : (
-        /* Empty State Content */
+      {/* Loading State */}
+      {viewMode === 'loading' && (
+        <div className="flex justify-center items-center py-12">
+          <p className="text-gray-500">Loading credibility data...</p>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {viewMode === 'empty' && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="p-12 text-center">
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -84,11 +141,40 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
               This record has no verifications or disputes and is fully self-reported. Click below
               to file this record's first credibility review:
             </p>
-            <Button onClick={() => setShowReviewPanel(true)}>
-              Create Record Credibility Review
-            </Button>
+            <Button onClick={handleAddVerification}>Create Record Credibility Review</Button>
           </div>
         </div>
+      )}
+
+      {/* List State - Show VerificationManagement */}
+      {viewMode === 'list' && (
+        <>
+          <VerificationManagement
+            record={record}
+            onBack={onBack}
+            onAddMode={handleAddVerification}
+            isAddMode={false}
+          />
+          <DisputeManagement
+            record={record}
+            onBack={onBack}
+            onAddMode={handleAddDispute}
+            isAddMode={false}
+          />
+        </>
+      )}
+
+      {/* Add State - Show RecordReviewPanel */}
+      {viewMode === 'add' && (
+        <RecordReviewPanel
+          recordId={recordId}
+          recordHash={recordHash}
+          recordTitle={record.belroseFields?.title || record.fileName || 'Medical Record'}
+          onViewRecord={handleBackClick}
+          onSuccess={handleVerificationSuccess}
+          initialTab={reviewPanelInitialTab}
+          existingDispute={null}
+        />
       )}
     </div>
   );

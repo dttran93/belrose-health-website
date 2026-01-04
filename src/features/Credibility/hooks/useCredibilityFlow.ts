@@ -15,6 +15,17 @@ import {
   type VerificationLevel,
   type VerificationDoc,
 } from '../services/verificationService';
+import {
+  createDispute,
+  retractDispute,
+  modifyDispute,
+  getDispute,
+  type DisputeSeverity,
+  type DisputeCulpability,
+  type DisputeDocDecrypted,
+  SEVERITY_MAPPING,
+  CULPABILITY_MAPPING,
+} from '../services/disputeService';
 import { toast } from 'sonner';
 import { DialogPhase } from '../component/ui/CredibilityActionDialog';
 
@@ -37,8 +48,8 @@ interface PendingOperation {
   // Verification-specific
   verificationLevel?: VerificationLevel;
   // Dispute-specific
-  disputeSeverity?: 1 | 2 | 3;
-  disputeCulpability?: 1 | 2 | 3 | 4 | 5;
+  disputeSeverity?: DisputeSeverity;
+  disputeCulpability?: DisputeCulpability;
   disputeNotes?: string;
 }
 
@@ -50,12 +61,6 @@ const LEVEL_LABELS: Record<VerificationLevel, string> = {
   1: 'Provenance',
   2: 'Content',
   3: 'Full',
-};
-
-const SEVERITY_LABELS: Record<1 | 2 | 3, string> = {
-  1: 'Negligible',
-  2: 'Moderate',
-  3: 'Major',
 };
 
 // ============================================================================
@@ -72,9 +77,8 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
   // Existing data state
   const [verification, setVerification] = useState<VerificationDoc | null>(null);
   const [isLoadingVerification, setIsLoadingVerification] = useState(true);
-  // TODO: Add dispute state when disputeService is ready
-  // const [dispute, setDispute] = useState<DisputeDoc | null>(null);
-  // const [isLoadingDispute, setIsLoadingDispute] = useState(true);
+  const [dispute, setDispute] = useState<DisputeDocDecrypted | null>(null);
+  const [isLoadingDispute, setIsLoadingDispute] = useState(true);
 
   // ==========================================================================
   // FETCH EXISTING DATA
@@ -95,17 +99,40 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       const existing = await getVerification(recordHash, verifierId);
       setVerification(existing);
     } catch (err) {
-      console.error('Error fetching verification:', err);
+      console.debug('Error fetching verification:', err);
       setVerification(null);
     } finally {
       setIsLoadingVerification(false);
     }
   }, [recordHash]);
 
+  const fetchDispute = useCallback(async () => {
+    const auth = getAuth();
+    const disputerId = auth.currentUser?.uid;
+
+    if (!disputerId || !recordHash) {
+      setDispute(null);
+      setIsLoadingDispute(false);
+      return;
+    }
+
+    setIsLoadingDispute(true);
+    try {
+      const existing = await getDispute(recordHash, disputerId);
+      setDispute(existing);
+    } catch (err) {
+      console.debug('Error fetching dispute:', err);
+      setDispute(null);
+    } finally {
+      setIsLoadingDispute(false);
+    }
+  }, [recordHash]);
+
   // Fetch on mount and when recordHash changes
   useEffect(() => {
     fetchVerification();
-  }, [fetchVerification]);
+    fetchDispute();
+  }, [fetchVerification, fetchDispute]);
 
   // ==========================================================================
   // HELPERS
@@ -125,9 +152,8 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
    * Refetch all data after a successful operation
    */
   const refetchAll = useCallback(async () => {
-    await fetchVerification();
-    // TODO: await fetchDispute();
-  }, [fetchVerification]);
+    await Promise.all([fetchVerification(), fetchDispute()]);
+  }, [fetchVerification, fetchDispute]);
 
   /**
    * Handle preparation with progress updates
@@ -179,7 +205,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
 
   /**
    * Start a verification flow
-   * @param level - Optional pre-selected verification level. If not provided, dialog will show level picker.
+   * @param level - Optional pre-selected verification level
    */
   const initiateVerification = useCallback(
     async (level?: VerificationLevel) => {
@@ -200,7 +226,6 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
 
   /**
    * Execute a confirmed verification
-   * @param level - The verification level (passed from dialog, may differ from pendingOperation if user changed it)
    */
   const confirmVerification = useCallback(
     async (level: VerificationLevel) => {
@@ -241,7 +266,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
    */
   const initiateRetractVerification = useCallback(async () => {
     setPendingOperation({
-      type: 'retract',
+      type: 'retractDispute',
       recordId,
       recordHash,
     });
@@ -256,7 +281,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
    * Execute a confirmed retraction
    */
   const confirmRetractVerification = useCallback(async () => {
-    if (!pendingOperation || pendingOperation.type !== 'retract') return;
+    if (!pendingOperation || pendingOperation.type !== 'retractVerification') return;
 
     const auth = getAuth();
     const verifierId = auth.currentUser?.uid;
@@ -285,7 +310,6 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
 
   /**
    * Start a modify verification flow
-   * @param newLevel - The new verification level
    */
   const initiateModifyVerification = useCallback(
     async (newLevel: VerificationLevel) => {
@@ -296,7 +320,6 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
         verificationLevel: newLevel,
       });
 
-      // For modify, we go straight to executing (no confirmation needed)
       const auth = getAuth();
       const verifierId = auth.currentUser?.uid;
 
@@ -334,11 +357,11 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
   /**
    * Start a dispute flow
    * @param severity - Dispute severity (1-3)
-   * @param culpability - Dispute culpability (1-5)
+   * @param culpability - Dispute culpability (0-5)
    * @param notes - Optional notes
    */
   const initiateDispute = useCallback(
-    async (severity: 1 | 2 | 3, culpability: 1 | 2 | 3 | 4 | 5, notes?: string) => {
+    async (severity: DisputeSeverity, culpability: DisputeCulpability, notes?: string) => {
       setPendingOperation({
         type: 'dispute',
         recordId,
@@ -381,19 +404,17 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
     setPhase('executing');
 
     try {
-      // TODO: Call disputeService.createDispute when implemented
-      // await createDispute(
-      //   recordId,
-      //   recordHash,
-      //   disputerId,
-      //   pendingOperation.disputeSeverity,
-      //   pendingOperation.disputeCulpability,
-      //   pendingOperation.disputeNotes
-      // );
-
-      toast.success(
-        `Dispute filed with ${SEVERITY_LABELS[pendingOperation.disputeSeverity]} severity`
+      await createDispute(
+        recordId,
+        recordHash,
+        disputerId,
+        pendingOperation.disputeSeverity,
+        pendingOperation.disputeCulpability,
+        pendingOperation.disputeNotes
       );
+
+      const severityLabel = SEVERITY_MAPPING[pendingOperation.disputeSeverity];
+      toast.success(`Dispute filed with ${severityLabel} severity`);
       reset();
       await refetchAll();
       onSuccess?.();
@@ -403,7 +424,99 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       setPhase('error');
       toast.error(message);
     }
-  }, [pendingOperation, reset, refetchAll, onSuccess]);
+  }, [pendingOperation, recordId, recordHash, reset, refetchAll, onSuccess]);
+
+  /**
+   * Start a retract dispute flow
+   */
+  const initiateRetractDispute = useCallback(async () => {
+    setPendingOperation({
+      type: 'retractDispute',
+      recordId,
+      recordHash,
+    });
+
+    const ready = await runPreparation();
+    if (ready) {
+      setPhase('confirming');
+    }
+  }, [recordId, recordHash, runPreparation]);
+
+  /**
+   * Execute a confirmed dispute retraction
+   */
+  const confirmRetractDispute = useCallback(async () => {
+    if (!pendingOperation || pendingOperation.type !== 'retractDispute') return;
+
+    const auth = getAuth();
+    const disputerId = auth.currentUser?.uid;
+
+    if (!disputerId) {
+      setError('You must be signed in to retract disputes');
+      setPhase('error');
+      return;
+    }
+
+    setPhase('executing');
+
+    try {
+      await retractDispute(recordHash, disputerId);
+      toast.success('Dispute retracted');
+      reset();
+      await refetchAll();
+      onSuccess?.();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to retract dispute';
+      setError(message);
+      setPhase('error');
+      toast.error(message);
+    }
+  }, [pendingOperation, recordHash, reset, refetchAll, onSuccess]);
+
+  /**
+   * Start a modify dispute flow
+   */
+  const initiateModifyDispute = useCallback(
+    async (newSeverity: DisputeSeverity, newCulpability: DisputeCulpability) => {
+      setPendingOperation({
+        type: 'dispute',
+        recordId,
+        recordHash,
+        disputeSeverity: newSeverity,
+        disputeCulpability: newCulpability,
+      });
+
+      const auth = getAuth();
+      const disputerId = auth.currentUser?.uid;
+
+      if (!disputerId) {
+        setError('You must be signed in to modify disputes');
+        setPhase('error');
+        return;
+      }
+
+      const ready = await runPreparation();
+      if (!ready) return;
+
+      setPhase('executing');
+
+      try {
+        await modifyDispute(recordHash, disputerId, newSeverity, newCulpability);
+        const severityLabel = SEVERITY_MAPPING[newSeverity];
+        const culpabilityLabel = CULPABILITY_MAPPING[newCulpability];
+        toast.success(`Dispute updated to ${severityLabel} severity, ${culpabilityLabel}`);
+        reset();
+        await refetchAll();
+        onSuccess?.();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to modify dispute';
+        setError(message);
+        setPhase('error');
+        toast.error(message);
+      }
+    },
+    [recordId, recordHash, runPreparation, reset, refetchAll, onSuccess]
+  );
 
   // ==========================================================================
   // REACT TO DISPUTE FLOW
@@ -414,7 +527,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
    */
   const initiateReaction = useCallback(async () => {
     setPendingOperation({
-      type: 'react',
+      type: 'reactToDispute',
       recordId,
       recordHash,
     });
@@ -430,13 +543,13 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
    */
   const confirmReaction = useCallback(
     async (disputerIdHash: string, supportsDispute: boolean) => {
-      if (!pendingOperation || pendingOperation.type !== 'react') return;
+      if (!pendingOperation || pendingOperation.type !== 'reactToDispute') return;
 
       setPhase('executing');
 
       try {
-        // TODO: Call reactionService when implemented
-        // await reactToDispute(recordHash, disputerIdHash, supportsDispute);
+        // TODO: Call reactToDispute from disputeService when ready
+        // await reactToDispute(recordHash, disputerIdHash, reactorId, supportsDispute);
 
         toast.success(supportsDispute ? 'Supported dispute' : 'Opposed dispute');
         reset();
@@ -471,13 +584,15 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       onConfirmVerification: confirmVerification,
       onConfirmRetract: confirmRetractVerification,
       onConfirmDispute: confirmDispute,
+      onConfirmRetractDispute: confirmRetractDispute,
       onConfirmReaction: confirmReaction,
     },
 
     // Existing data
     verification,
     isLoadingVerification,
-    // TODO: dispute, isLoadingDispute
+    dispute,
+    isLoadingDispute,
 
     // Verification actions
     initiateVerification,
@@ -486,6 +601,11 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
 
     // Dispute actions
     initiateDispute,
+    initiateRetractDispute,
+    initiateModifyDispute,
+
+    // Reaction actions
+    initiateReaction,
 
     // Refetch
     refetch: refetchAll,

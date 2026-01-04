@@ -31,7 +31,14 @@ import {
 
 // ==================== TYPES ====================
 
-export type CredibilityOperationType = 'verify' | 'dispute' | 'react' | 'retract';
+export type CredibilityOperationType =
+  | 'verify'
+  | 'dispute'
+  | 'retractVerification'
+  | 'retractDispute'
+  | 'modifyVerification'
+  | 'modifyDispute'
+  | 'reactToDispute';
 
 export interface CredibilityPrerequisites {
   ready: boolean;

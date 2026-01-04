@@ -21,6 +21,12 @@ import type {
   CredibilityPreparationProgress,
 } from '@/features/Credibility/services/credibilityPreparationService';
 import { VerificationLevel, VerificationLevelName } from '../../services/verificationService';
+import {
+  CULPABILITY_MAPPING,
+  DisputeCulpability,
+  DisputeSeverity,
+  SEVERITY_MAPPING,
+} from '../../services/disputeService';
 
 // ============================================================================
 // TYPES
@@ -37,7 +43,7 @@ interface CredibilityActionDialogProps {
   // Pre-selected values from the form (if any)
   pendingLevel?: VerificationLevel;
   pendingSeverity?: 1 | 2 | 3;
-  pendingCulpability?: 1 | 2 | 3 | 4 | 5;
+  pendingCulpability?: 0 | 1 | 2 | 3 | 4 | 5;
   pendingNotes?: string;
   onClose: () => void;
   onConfirmVerification: (level: VerificationLevel) => void;
@@ -81,20 +87,6 @@ const VERIFICATION_LEVELS = VERIFICATION_LEVEL_CONFIGS.reduce(
   },
   {} as Record<VerificationLevel, (typeof VERIFICATION_LEVEL_CONFIGS)[number]>
 );
-
-const SEVERITY_LABELS: Record<1 | 2 | 3, { label: string; color: string }> = {
-  1: { label: 'Negligible', color: 'text-yellow-600' },
-  2: { label: 'Moderate', color: 'text-orange-600' },
-  3: { label: 'Major', color: 'text-red-600' },
-};
-
-const CULPABILITY_LABELS: Record<1 | 2 | 3 | 4 | 5, string> = {
-  1: 'No Fault',
-  2: 'Systemic',
-  3: 'Preventable',
-  4: 'Reckless',
-  5: 'Intentional',
-};
 
 // ============================================================================
 // COMPONENT
@@ -148,7 +140,7 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
           )}
 
           {/* Confirming Phase - Retract */}
-          {phase === 'confirming' && operationType === 'retract' && (
+          {phase === 'confirming' && operationType === 'retractVerification' && (
             <ConfirmRetractContent onConfirm={onConfirmRetract} onClose={onClose} />
           )}
 
@@ -245,19 +237,23 @@ const ExecutingContent: React.FC<{ operationType: CredibilityOperationType }> = 
   const messages: Record<CredibilityOperationType, { title: string; description: string }> = {
     verify: {
       title: 'Submitting Verification',
-      description: 'Recording your verification on the blockchain...',
+      description: 'Recording your verification on the record...',
     },
     dispute: {
       title: 'Filing Dispute',
-      description: 'Recording your dispute on the blockchain...',
+      description: 'Recording your dispute on the record...',
     },
-    react: {
+    retractVerification: {
+      title: 'Retracting Verification',
+      description: 'Removing your verification from the record...',
+    },
+    retractDispute: {
+      title: 'Retracting Dispute',
+      description: 'Removing your dispute from the record...',
+    },
+    reactToDispute: {
       title: 'Submitting Reaction',
-      description: 'Recording your reaction on the blockchain...',
-    },
-    retract: {
-      title: 'Retracting',
-      description: 'Removing your verification from the blockchain...',
+      description: 'Recording your reaction on the record...',
     },
   };
 
@@ -299,8 +295,9 @@ const SuccessContent: React.FC<{
   const messages: Record<CredibilityOperationType, string> = {
     verify: 'Verification submitted successfully!',
     dispute: 'Dispute filed successfully!',
-    react: 'Reaction submitted successfully!',
-    retract: 'Successfully retracted!',
+    retractVerification: 'Successfully retracted verification!',
+    retractDispute: 'Successfully retracted dispute!',
+    reactToDispute: 'Reaction submitted successfully!',
   };
 
   return (
@@ -461,14 +458,12 @@ const ConfirmRetractContent: React.FC<{
 // ============================================================================
 
 const ConfirmDisputeContent: React.FC<{
-  severity: 1 | 2 | 3;
-  culpability: 1 | 2 | 3 | 4 | 5;
+  severity: DisputeSeverity;
+  culpability: DisputeCulpability;
   notes?: string;
   onConfirm: () => void;
   onClose: () => void;
 }> = ({ severity, culpability, notes, onConfirm, onClose }) => {
-  const severityConfig = SEVERITY_LABELS[severity];
-
   return (
     <>
       <AlertDialog.Title className="text-lg font-bold flex items-center gap-2">
@@ -484,12 +479,12 @@ const ConfirmDisputeContent: React.FC<{
       <div className="my-4 space-y-3">
         <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
           <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Severity</div>
-          <div className={`font-semibold ${severityConfig.color}`}>{severityConfig.label}</div>
+          <div className="font-semibold text-gray-900">{SEVERITY_MAPPING[severity]}</div>
         </div>
 
         <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
           <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Culpability</div>
-          <div className="font-semibold text-gray-900">{CULPABILITY_LABELS[culpability]}</div>
+          <div className="font-semibold text-gray-900">{CULPABILITY_MAPPING[culpability]}</div>
         </div>
 
         {notes && (
@@ -503,7 +498,7 @@ const ConfirmDisputeContent: React.FC<{
       <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
         <p className="text-xs text-red-800">
           <strong>Warning:</strong> Filing a dispute is a serious action. This will be permanently
-          recorded on the blockchain and visible to all participants.
+          recorded on a secured digital network and visible to all participants.
         </p>
       </div>
 

@@ -1,7 +1,18 @@
 //src/features/Credibility/services/verificationService.ts
 
 import { ethers } from 'ethers';
-import { getFirestore, doc, setDoc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  Timestamp,
+  collection,
+  where,
+  query,
+  getDocs,
+} from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { blockchainHealthRecordService } from './blockchainHealthRecordService';
 
@@ -31,6 +42,12 @@ export interface VerificationDoc {
   lastModified?: Timestamp;
   chainStatus: 'pending' | 'confirmed' | 'failed';
   txHash?: string;
+}
+
+/** Extended type that includes version info for display */
+export interface VerificationWithVersion extends VerificationDoc {
+  versionNumber: number;
+  totalVersions: number;
 }
 
 // ============================================================
@@ -67,6 +84,91 @@ export function getVerificationId(recordHash: string, verifierId: string): strin
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+// ============================================================
+// QUERY FUNCTIONS
+// ============================================================
+
+/**
+ * Fetches all verifications for a record (across all versions/hashes).
+ * Uses Firestore query on recordId field.
+ *
+ * @param recordId - The record ID to fetch verifications for
+ * @returns Array of VerificationDoc objects
+ */
+export async function getVerificationsByRecordId(recordId: string): Promise<VerificationDoc[]> {
+  const db = getFirestore();
+  const verificationsRef = collection(db, 'verifications');
+
+  // Query all verifications where recordId matches
+  const q = query(verificationsRef, where('recordId', '==', recordId));
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs.map(
+    doc =>
+      ({
+        id: doc.id,
+        ...doc.data(),
+      }) as VerificationDoc
+  );
+}
+
+/**
+ * Fetches verifications with version information.
+ * Groups verifications by hash and includes version numbers.
+ *
+ * @param recordId - The record ID
+ * @param hashVersionMap - Map of recordHash -> versionNumber (from record's version history)
+ * @returns Array of verifications with version info attached
+ */
+export async function getVerificationsWithVersionInfo(
+  recordId: string,
+  hashVersionMap: Map<string, number>
+): Promise<VerificationWithVersion[]> {
+  const verifications = await getVerificationsByRecordId(recordId);
+  const totalVersions = hashVersionMap.size;
+
+  return verifications.map(v => ({
+    ...v,
+    versionNumber: hashVersionMap.get(v.recordHash) ?? 0,
+    totalVersions,
+  }));
+}
+
+/**
+ * Builds a hash-to-version map from record data.
+ * Version 1 is the current hash, version 2+ are previous hashes (newest to oldest).
+ *
+ * @param currentHash - Current recordHash
+ * @param previousHashes - Array of previous hashes (oldest first typically)
+ * @returns Map of hash -> version number
+ */
+export function buildHashVersionMap(
+  currentHash: string | undefined,
+  previousHashes: string[] | undefined
+): Map<string, number> {
+  const map = new Map<string, number>();
+
+  // Previous hashes are typically stored oldest-first, so reverse for version numbering
+  const allHashes: string[] = [];
+
+  if (previousHashes && previousHashes.length > 0) {
+    // previousRecordHash array - add in reverse order (newest previous = version 2)
+    allHashes.push(...[...previousHashes].reverse());
+  }
+
+  if (currentHash) {
+    // Current hash is always version 1
+    map.set(currentHash, 1);
+  }
+
+  // Assign version numbers to previous hashes (2, 3, 4, etc.)
+  allHashes.forEach((hash, index) => {
+    map.set(hash, index + 2);
+  });
+
+  return map;
 }
 
 // ============================================================
@@ -278,9 +380,14 @@ export async function getVerification(
   const verificationId = getVerificationId(recordHash, verifierId);
 
   const db = getFirestore();
-  const snapshot = await getDoc(doc(db, 'verifications', verificationId));
+  try {
+    const snapshot = await getDoc(doc(db, 'verifications', verificationId));
 
-  if (!snapshot.exists()) return null;
+    if (!snapshot.exists()) return null;
 
-  return { id: snapshot.id, ...snapshot.data() } as VerificationDoc;
+    return { id: snapshot.id, ...snapshot.data() } as VerificationDoc;
+  } catch (error) {
+    console.debug('Verification not found or not accessible:', verificationId);
+    return null;
+  }
 }
