@@ -18,6 +18,11 @@ import { EncryptionService } from '@/features/Encryption/services/encryptionServ
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 import { blockchainHealthRecordService } from './blockchainHealthRecordService';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
+import { CircleDashed, CircleDot, CircleDotDashed, LucideIcon } from 'lucide-react';
+
+// ============================================================
+// TYPES
+// ============================================================
 
 export type DisputeSeverity = 1 | 2 | 3;
 
@@ -33,12 +38,20 @@ export type DisputeCulpabilityName =
   | 'Reckless'
   | 'Intentional';
 
-export interface DisputeData {
-  recordId: string;
-  recordHash: string;
-  severity: DisputeSeverity;
-  culpability: DisputeCulpability;
-  notes?: string;
+export interface SeverityConfig {
+  value: DisputeSeverity;
+  name: DisputeSeverityName;
+  description: string;
+  shortDescription: string;
+  color: 'blue' | 'yellow' | 'red';
+  icon: LucideIcon;
+}
+
+export interface CulpabilityConfig {
+  value: DisputeCulpability;
+  name: DisputeCulpabilityName;
+  description: string;
+  shortDescription: string;
 }
 
 export interface EncryptedField {
@@ -78,22 +91,87 @@ export interface DisputeWithVersion extends DisputeDocDecrypted {
 // CONSTANTS
 // ============================================================
 
-/** Severity configuration - single source of truth */
-export const SEVERITY_MAPPING: Record<DisputeSeverity, DisputeSeverityName> = {
-  1: 'Negligible',
-  2: 'Moderate',
-  3: 'Major',
+export const SEVERITY_CONFIG: Record<DisputeSeverity, SeverityConfig> = {
+  1: {
+    value: 1,
+    name: 'Negligible',
+    icon: CircleDashed,
+    description:
+      'A minor issue that does not significantly affect the usefulness or accuracy of the record. Unlikely to impact care decisions.',
+    shortDescription: "Minor issue that doesn't affect clinical decisions",
+    color: 'blue',
+  },
+  2: {
+    value: 2,
+    name: 'Moderate',
+    icon: CircleDotDashed,
+    description:
+      'An issue that could potentially affect care decisions or treatment planning. Should be reviewed and corrected.',
+    shortDescription: 'Noticeable error that could cause confusion',
+    color: 'yellow',
+  },
+  3: {
+    value: 3,
+    name: 'Major',
+    icon: CircleDot,
+    description:
+      'A serious inaccuracy that could lead to incorrect diagnoses or harmful treatment decisions. Requires immediate attention.',
+    shortDescription: 'Serious error that could affect patient safety',
+    color: 'red',
+  },
 };
 
-/** Culpability configuration - single source of truth */
-export const CULPABILITY_MAPPING: Record<DisputeCulpability, DisputeCulpabilityName> = {
-  0: 'Unknown',
-  1: 'No Fault',
-  2: 'Systemic',
-  3: 'Preventable',
-  4: 'Reckless',
-  5: 'Intentional',
+export const CULPABILITY_CONFIG: Record<DisputeCulpability, CulpabilityConfig> = {
+  0: {
+    value: 0,
+    name: 'Unknown',
+    description: 'Unknown why the error occurred.',
+    shortDescription: 'Do not know why the mistake happened',
+  },
+  1: {
+    value: 1,
+    name: 'No Fault',
+    description:
+      'Unavoidable mistake, such as a false positive on a diagnostic test. No individual is responsible for the error.',
+    shortDescription: 'Unavoidable mistake, no one to blame',
+  },
+  2: {
+    value: 2,
+    name: 'Systemic',
+    description:
+      'An organizational or process failure. The error stems from flawed procedures or systems.',
+    shortDescription: 'Process or system issue, not individual error',
+  },
+  3: {
+    value: 3,
+    name: 'Preventable',
+    description: 'An error that should have been caught through normal review processes.',
+    shortDescription: 'Could have been caught with normal diligence',
+  },
+  4: {
+    value: 4,
+    name: 'Reckless',
+    description: 'Careless disregard for accuracy or proper procedures.',
+    shortDescription: 'Serious negligence in documentation',
+  },
+  5: {
+    value: 5,
+    name: 'Intentional',
+    description: 'Deliberate falsification or manipulation of the record.',
+    shortDescription: 'Deliberate falsification or manipulation',
+  },
 };
+
+// Helper functions to access config
+export const getSeverityConfig = (severity: DisputeSeverity): SeverityConfig =>
+  SEVERITY_CONFIG[severity];
+
+export const getCulpabilityConfig = (culpability: DisputeCulpability): CulpabilityConfig =>
+  CULPABILITY_CONFIG[culpability];
+
+// Arrays for iterating in UI (forms, selects, etc.)
+export const SEVERITY_OPTIONS = Object.values(SEVERITY_CONFIG);
+export const CULPABILITY_OPTIONS = Object.values(CULPABILITY_CONFIG);
 
 // ============================================================
 // HELPERS
@@ -111,24 +189,6 @@ export function getDisputeId(recordHash: string, disputerId: string): string {
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
-}
-
-/**
- * Get severity value from display name
- */
-export function getSeverityValue(name: DisputeSeverityName): DisputeSeverity {
-  const entry = Object.entries(SEVERITY_MAPPING).find(([_, v]) => v === name);
-  if (!entry) throw new Error(`Invalid severity name: ${name}`);
-  return Number(entry[0]) as DisputeSeverity;
-}
-
-/**
- * Get culpability value from display name
- */
-export function getCulpabilityValue(name: DisputeCulpabilityName): DisputeCulpability {
-  const entry = Object.entries(CULPABILITY_MAPPING).find(([_, v]) => v === name);
-  if (!entry) throw new Error(`Invalid culpability name: ${name}`);
-  return Number(entry[0]) as DisputeCulpability;
 }
 
 /**

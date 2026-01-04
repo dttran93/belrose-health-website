@@ -23,8 +23,8 @@ import {
   type DisputeSeverity,
   type DisputeCulpability,
   type DisputeDocDecrypted,
-  SEVERITY_MAPPING,
-  CULPABILITY_MAPPING,
+  getSeverityConfig,
+  getCulpabilityConfig,
 } from '../services/disputeService';
 import { toast } from 'sonner';
 import { DialogPhase } from '../component/ui/CredibilityActionDialog';
@@ -413,8 +413,8 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
         pendingOperation.disputeNotes
       );
 
-      const severityLabel = SEVERITY_MAPPING[pendingOperation.disputeSeverity];
-      toast.success(`Dispute filed with ${severityLabel} severity`);
+      const severityInfo = getSeverityConfig(pendingOperation.disputeSeverity);
+      toast.success(`Dispute filed with ${severityInfo.name} severity`);
       reset();
       await refetchAll();
       onSuccess?.();
@@ -502,9 +502,11 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
 
       try {
         await modifyDispute(recordHash, disputerId, newSeverity, newCulpability);
-        const severityLabel = SEVERITY_MAPPING[newSeverity];
-        const culpabilityLabel = CULPABILITY_MAPPING[newCulpability];
-        toast.success(`Dispute updated to ${severityLabel} severity, ${culpabilityLabel}`);
+        const severityInfo = getSeverityConfig(newSeverity);
+        const culpabilityInfo = getCulpabilityConfig(newCulpability);
+        toast.success(
+          `Dispute updated to ${severityInfo.name} severity, ${culpabilityInfo.name} culpability`
+        );
         reset();
         await refetchAll();
         onSuccess?.();

@@ -2,7 +2,13 @@ import React from 'react';
 import { cn } from '@/utils/utils';
 import { Button } from '@/components/ui/Button';
 import { AlertTriangle, Circle, CircleDot, CircleDotDashed } from 'lucide-react';
-import { DisputeCulpability, DisputeDoc, DisputeSeverity } from '../../services/disputeService';
+import {
+  CULPABILITY_OPTIONS,
+  DisputeCulpability,
+  DisputeDoc,
+  DisputeSeverity,
+  SEVERITY_OPTIONS,
+} from '../../services/disputeService';
 
 // ============================================================
 // TYPES
@@ -22,53 +28,6 @@ interface DisputeFormProps {
 // CONSTANTS
 // ============================================================
 
-interface SeverityLevelConfig {
-  value: DisputeSeverity;
-  name: string;
-  icon: React.ReactNode;
-  description: string;
-  colorClass: string;
-}
-
-export const SEVERITY_LEVELS: SeverityLevelConfig[] = [
-  {
-    value: 1,
-    name: 'Negligible',
-    icon: <Circle className="w-4 h-4" />,
-    description: "Minor issue that doesn't affect clinical decisions",
-    colorClass: 'text-chart-4',
-  },
-  {
-    value: 2,
-    name: 'Moderate',
-    icon: <CircleDotDashed className="w-4 h-4" />,
-    description: 'Noticeable error that could cause confusion',
-    colorClass: 'text-orange-500',
-  },
-  {
-    value: 3,
-    name: 'Major',
-    icon: <CircleDot className="w-4 h-4" />,
-    description: 'Serious error that could affect patient safety',
-    colorClass: 'text-red-600',
-  },
-];
-
-interface CulpabilityLevelConfig {
-  value: DisputeCulpability;
-  name: string;
-  description: string;
-}
-
-export const CULPABILITY_LEVELS: CulpabilityLevelConfig[] = [
-  { value: 0, name: 'Unknown', description: 'Do not know why the mistake happened' },
-  { value: 1, name: 'No Fault', description: 'Unavoidable mistake, no one to blame' },
-  { value: 2, name: 'Systemic', description: 'Process or system issue, not individual error' },
-  { value: 3, name: 'Preventable', description: 'Could have been caught with normal diligence' },
-  { value: 4, name: 'Reckless', description: 'Serious negligence in documentation' },
-  { value: 5, name: 'Intentional', description: 'Deliberate falsification or manipulation' },
-];
-
 const DisputeForm: React.FC<DisputeFormProps> = ({
   severity,
   culpability,
@@ -79,8 +38,8 @@ const DisputeForm: React.FC<DisputeFormProps> = ({
   existingDispute,
 }) => {
   if (existingDispute) {
-    const severityLevel = SEVERITY_LEVELS.find(l => l.value === existingDispute.severity);
-    const culpabilityLevel = CULPABILITY_LEVELS.find(l => l.value === existingDispute.culpability);
+    const severityLevel = SEVERITY_OPTIONS.find(l => l.value === existingDispute.severity);
+    const culpabilityLevel = CULPABILITY_OPTIONS.find(l => l.value === existingDispute.culpability);
     return (
       <div className="text-center py-10">
         <div className="w-16 h-16 mx-auto mb-5 bg-red-100 text-red-600 rounded-full flex items-center justify-center">
@@ -108,7 +67,7 @@ const DisputeForm: React.FC<DisputeFormProps> = ({
       <div>
         <h3 className="text-base font-semibold text-primary mb-3">How severe is the issue?</h3>
         <div className="grid grid-cols-3 gap-3">
-          {SEVERITY_LEVELS.map(level => (
+          {SEVERITY_OPTIONS.map(level => (
             <button
               key={level.value}
               className={cn(
@@ -119,7 +78,6 @@ const DisputeForm: React.FC<DisputeFormProps> = ({
               )}
               onClick={() => onSelectSeverity(level.value)}
             >
-              <div className={cn('flex justify-center mb-2', level.colorClass)}>{level.icon}</div>
               <span className="block text-sm font-semibold text-primary">{level.name}</span>
               <span className="block text-[10px] text-muted-foreground mt-1 leading-tight">
                 {level.description}
@@ -133,7 +91,7 @@ const DisputeForm: React.FC<DisputeFormProps> = ({
       <div>
         <h3 className="text-base font-semibold text-primary mb-3">What caused this issue?</h3>
         <div className="space-y-2">
-          {CULPABILITY_LEVELS.map(level => (
+          {CULPABILITY_OPTIONS.map(level => (
             <button
               key={level.value}
               className={cn(

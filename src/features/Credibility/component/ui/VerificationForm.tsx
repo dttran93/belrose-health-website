@@ -7,7 +7,8 @@ import { CheckCircle, FileText, Lock, MapPin, Loader2, Undo2, Edit2 } from 'luci
 import {
   VerificationDoc,
   VerificationLevel,
-  LEVEL_NAMES,
+  VERIFICATION_OPTIONS,
+  getVerificationConfig,
 } from '../../services/verificationService';
 
 // ============================================================
@@ -22,46 +23,6 @@ interface VerificationFormProps {
   onRetract?: () => Promise<void>;
   isSubmitting?: boolean;
 }
-
-// ============================================================
-// CONSTANTS
-// ============================================================
-
-interface VerificationLevelConfig {
-  value: VerificationLevel;
-  name: string;
-  icon: React.ReactNode;
-  description: string;
-  examples: string;
-}
-
-const VERIFICATION_LEVELS: VerificationLevelConfig[] = [
-  {
-    value: 3,
-    name: 'Full',
-    icon: <Lock className="w-5 h-5" />,
-    description:
-      'I created this record or am willing to vouch for both the content and provenance of the record',
-    examples:
-      'You directly observed this interaction or are the original provider who created this record.',
-  },
-  {
-    value: 2,
-    name: 'Content',
-    icon: <FileText className="w-5 h-5" />,
-    description: 'I vouch for the medical accuracy of this record',
-    examples:
-      "You reviewed the record and agree with it, even if you weren't the original provider.",
-  },
-  {
-    value: 1,
-    name: 'Provenance',
-    icon: <MapPin className="w-5 h-5" />,
-    description: 'I can verify where this record came from',
-    examples:
-      'You confirmed the origin of the record by viewing a paper trail, reviewed communications, or interacted with the stated provider, etc.',
-  },
-];
 
 // ============================================================
 // SUB-COMPONENTS
@@ -81,9 +42,10 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({
   currentLevel,
 }) => (
   <div className="space-y-3">
-    {VERIFICATION_LEVELS.map(level => {
+    {VERIFICATION_OPTIONS.map(level => {
       const isSelected = selectedLevel === level.value;
       const isCurrent = currentLevel === level.value;
+      const IconComponent = level.icon;
 
       return (
         <button
@@ -111,7 +73,7 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({
                     : 'bg-muted text-muted-foreground'
               )}
             >
-              {level.icon}
+              <IconComponent className="w-5 h-5" />
             </div>
             <span className="flex-1 font-semibold text-primary">
               {level.name}
@@ -125,8 +87,7 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({
               </div>
             )}
           </div>
-          <p className="text-sm text-foreground mb-1">{level.description}</p>
-          <p className="text-xs text-muted-foreground italic">{level.examples}</p>
+          <p className="text-xs text-muted-foreground italic">{level.declarative}</p>
         </button>
       );
     })}
@@ -179,7 +140,8 @@ const VerificationForm: React.FC<VerificationFormProps> = ({
       <div>
         <h3 className="text-base font-semibold text-primary mb-1">Modify Verification Level</h3>
         <p className="text-sm text-foreground mb-5">
-          Current level: <strong>{LEVEL_NAMES[verification.level]}</strong>. Select a new level.
+          Current level: <strong>{getVerificationConfig(verification.level).name}</strong>. Select a
+          new level.
         </p>
 
         <LevelSelector
@@ -231,7 +193,7 @@ const VerificationForm: React.FC<VerificationFormProps> = ({
         </div>
         <h3 className="text-lg font-semibold text-primary mb-2">You've verified this record</h3>
         <p className="text-sm text-foreground mb-1">
-          Level: <strong>{LEVEL_NAMES[verification.level]}</strong>
+          Level: <strong>{getVerificationConfig(verification.level).name}</strong>
         </p>
         <p className="text-xs text-muted-foreground mb-6">Verified on {formattedDate}</p>
 

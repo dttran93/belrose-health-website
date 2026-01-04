@@ -7,19 +7,26 @@ import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import UserCard, { BadgeConfig } from '@/features/Users/components/ui/UserCard';
+import { useAuth } from '@/features/Auth/hooks/useAuth';
 import { buildHashVersionMap } from '../services/verificationService';
 import {
-  CULPABILITY_MAPPING,
+  CULPABILITY_OPTIONS,
   DisputeWithVersion,
+  getCulpabilityConfig,
   getDisputesByRecordId,
-  SEVERITY_MAPPING,
+  getSeverityConfig,
+  SEVERITY_OPTIONS,
 } from '../services/disputeService';
+import DisputeDetailModal from './ui/DisputeDetailModal';
 
 interface DisputeManagementProps {
   record: FileObject;
   onBack?: () => void;
   onAddMode?: () => void;
   isAddMode?: boolean;
+  onModify?: (dispute: DisputeWithVersion) => void;
+  onRetract?: (dispute: DisputeWithVersion) => void;
+  onReact?: (dispute: DisputeWithVersion, support: boolean) => void;
 }
 
 export const DisputeManagement: React.FC<DisputeManagementProps> = ({
@@ -27,11 +34,19 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
   onBack,
   onAddMode,
   isAddMode,
+  onModify,
+  onRetract,
+  onReact,
 }) => {
+  const { user } = useAuth();
   const [loadingDisputes, setLoadingDisputes] = useState(true);
   const [disputes, setDisputes] = useState<DisputeWithVersion[]>([]);
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Modal state
+  const [selectedDispute, setSelectedDispute] = useState<DisputeWithVersion | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Fetch disputes and user profiles
   useEffect(() => {
@@ -85,6 +100,38 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
 
     fetchDisputes();
   }, [record.firestoreId, record.id, record.recordHash, record.previousRecordHash, refreshTrigger]);
+
+  // Handlers
+  const handleCardClick = (dispute: DisputeWithVersion) => {
+    setSelectedDispute(dispute);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedDispute(null);
+  };
+
+  const handleModify = () => {
+    if (selectedDispute && onModify) {
+      handleCloseModal();
+      onModify(selectedDispute);
+    }
+  };
+
+  const handleRetract = () => {
+    if (selectedDispute && onRetract) {
+      handleCloseModal();
+      onRetract(selectedDispute);
+    }
+  };
+
+  const handleReact = (support: boolean) => {
+    if (selectedDispute && onReact) {
+      handleCloseModal();
+      onReact(selectedDispute, support);
+    }
+  };
 
   // Count active disputes
   const activeCount = disputes.filter(d => d.isActive).length;
@@ -169,6 +216,7 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
                     dispute={dispute}
                     userProfile={disputerProfile}
                     isInactive={isInactive}
+                    onClick={() => handleCardClick(dispute)}
                   />
                 );
               })}
@@ -176,11 +224,29 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
           ) : (
             <div className="flex justify-between items-center">
               <p className="text-gray-600">No disputes filed</p>
-              <Button onClick={onAddMode}>File a Dispute</Button>
+              <Button onClick={onAddMode} variant="outline" className="border-red-300 text-red-700">
+                File a Dispute
+              </Button>
             </div>
           )}
         </div>
       </div>
+
+      {/* Detail Modal */}
+      {selectedDispute && (
+        <DisputeDetailModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          dispute={selectedDispute}
+          userProfile={userProfiles.get(selectedDispute.disputerId)}
+          isOwnDispute={user?.uid === selectedDispute.disputerId}
+          onModify={handleModify}
+          onRetract={handleRetract}
+          onReact={handleReact}
+          // TODO: Fetch reaction stats
+          // reactionStats={{ supports: 2, opposes: 1 }}
+        />
+      )}
     </div>
   );
 };
@@ -193,11 +259,16 @@ interface DisputeCardProps {
   dispute: DisputeWithVersion;
   userProfile: BelroseUserProfile | undefined;
   isInactive: boolean;
+  onClick: () => void;
 }
 
-const DisputeCard: React.FC<DisputeCardProps> = ({ dispute, userProfile, isInactive }) => {
-  const severityName = SEVERITY_MAPPING[dispute.severity];
-  const culpabilityName = CULPABILITY_MAPPING[dispute.culpability];
+const DisputeCard: React.FC<DisputeCardProps> = ({ dispute, userProfile, isInactive, onClick }) => {
+  const severityInfo = getSeverityConfig(dispute.severity);
+  const culpabilityInfo = getCulpabilityConfig(dispute.culpability);
+
+  if (!severityInfo || !culpabilityInfo) {
+    throw new Error('Invalid severity or culpability level');
+  }
 
   // Version badge - show "Current" for version 1, otherwise "v2", "v3", etc.
   const versionBadgeText = dispute.versionNumber === 1 ? 'Current' : `v${dispute.versionNumber}`;
@@ -214,14 +285,14 @@ const DisputeCard: React.FC<DisputeCardProps> = ({ dispute, userProfile, isInact
           : `Disputed version ${dispute.versionNumber} of ${dispute.totalVersions}`,
     },
     {
-      text: severityName,
+      text: severityInfo.name,
       color: dispute.severity === 3 ? 'red' : dispute.severity === 2 ? 'yellow' : 'blue',
-      tooltip: `Severity: ${severityName}`,
+      tooltip: `Severity: ${severityInfo.name}`,
     },
     {
-      text: culpabilityName,
+      text: culpabilityInfo.name,
       color: 'purple',
-      tooltip: `Culpability: ${culpabilityName}`,
+      tooltip: `Culpability: ${culpabilityInfo.name}`,
     },
   ];
 
@@ -250,7 +321,10 @@ const DisputeCard: React.FC<DisputeCardProps> = ({ dispute, userProfile, isInact
   }
 
   return (
-    <div className={isInactive ? 'opacity-50' : ''}>
+    <div
+      className={`cursor-pointer hover:bg-gray-50 rounded-lg transition-colors ${isInactive ? 'opacity-50' : ''}`}
+      onClick={onClick}
+    >
       <UserCard
         user={userProfile}
         userId={dispute.disputerId}
@@ -264,14 +338,8 @@ const DisputeCard: React.FC<DisputeCardProps> = ({ dispute, userProfile, isInact
             value: dispute.createdAt.toDate().toLocaleDateString(),
           },
         ]}
+        onCardClick={onClick}
       />
-      {/* Show notes if present */}
-      {dispute.notes && (
-        <div className="ml-14 mt-2 p-3 bg-gray-50 rounded-lg text-sm text-gray-700 border-l-2 border-red-300">
-          <span className="font-medium text-gray-500">Notes: </span>
-          {dispute.notes}
-        </div>
-      )}
     </div>
   );
 };

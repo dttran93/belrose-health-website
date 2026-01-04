@@ -13,8 +13,8 @@ import {
   query,
   getDocs,
 } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { blockchainHealthRecordService } from './blockchainHealthRecordService';
+import { FileText, Lock, LucideIcon, MapPin } from 'lucide-react';
 
 // ============================================================
 // TYPES
@@ -24,10 +24,12 @@ export type VerificationLevel = 1 | 2 | 3;
 
 export type VerificationLevelName = 'Provenance' | 'Content' | 'Full';
 
-export interface VerificationData {
-  recordId: string;
-  recordHash: string;
-  level: VerificationLevel;
+export interface VerificationConfig {
+  value: VerificationLevel;
+  name: VerificationLevelName;
+  icon: LucideIcon;
+  description: string;
+  declarative: string;
 }
 
 export interface VerificationDoc {
@@ -54,19 +56,42 @@ export interface VerificationWithVersion extends VerificationDoc {
 // CONSTANTS
 // ============================================================
 
-/** Convert level number to display name */
-export const LEVEL_NAMES: Record<VerificationLevel, VerificationLevelName> = {
-  1: 'Provenance',
-  2: 'Content',
-  3: 'Full',
+export const VERIFICATION_LEVEL_CONFIG: Record<VerificationLevel, VerificationConfig> = {
+  3: {
+    value: 3,
+    name: 'Full',
+    icon: Lock,
+    declarative:
+      'I created this record or am willing to verify both the content and provenance of the record.',
+    description:
+      'The verifier is vouching for both the content and the provenance of this record. They are either the provider who originally created the record or directly verified that the record is complete and accuate',
+  },
+  2: {
+    value: 2,
+    name: 'Content',
+    icon: FileText,
+    declarative:
+      'I am vouching for the content of the record, but I did not observe the original interaction described.',
+    description:
+      'The verifier is vouching for the content of the record. They may not have originally created the record or directly observed the interaction, however they have certified they agree with its content.',
+  },
+  1: {
+    value: 1,
+    name: 'Provenance',
+    icon: MapPin,
+    declarative:
+      'I am confirming that the origin of the record is correct. I am not verifying the accuracy of its content.',
+    description:
+      'The verifier is confirming the origin of the record is correctly stated. They are not verifying the completeness and accuracy of the content itself.',
+  },
 };
 
-/** Convert display name to level number */
-export const LEVEL_VALUES: Record<VerificationLevelName, VerificationLevel> = {
-  Provenance: 1,
-  Content: 2,
-  Full: 3,
-};
+// Helper functions to access config
+export const getVerificationConfig = (verificationLevel: VerificationLevel): VerificationConfig =>
+  VERIFICATION_LEVEL_CONFIG[verificationLevel];
+
+// Arrays for iterating in UI (forms, selects, etc.)
+export const VERIFICATION_OPTIONS = Object.values(VERIFICATION_LEVEL_CONFIG);
 
 // ============================================================
 // HELPERS

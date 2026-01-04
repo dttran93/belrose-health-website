@@ -34,10 +34,10 @@ import {
 export type CredibilityOperationType =
   | 'verify'
   | 'dispute'
-  | 'retractVerification'
-  | 'retractDispute'
   | 'modifyVerification'
   | 'modifyDispute'
+  | 'retractVerification'
+  | 'retractDispute'
   | 'reactToDispute';
 
 export interface CredibilityPrerequisites {

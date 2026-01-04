@@ -7,19 +7,22 @@ import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import UserCard, { BadgeConfig } from '@/features/Users/components/ui/UserCard';
+import { useAuth } from '@/features/Auth/hooks/useAuth';
 import {
-  VerificationDoc,
   VerificationWithVersion,
   getVerificationsByRecordId,
   buildHashVersionMap,
-  LEVEL_NAMES,
+  getVerificationConfig,
 } from '../services/verificationService';
+import VerificationDetailModal from './ui/VerificationDetailModal';
 
 interface VerificationManagementProps {
   record: FileObject;
   onBack?: () => void;
   onAddMode?: () => void;
   isAddMode?: boolean;
+  onModify?: (verification: VerificationWithVersion) => void;
+  onRetract?: (verification: VerificationWithVersion) => void;
 }
 
 export const VerificationManagement: React.FC<VerificationManagementProps> = ({
@@ -27,11 +30,20 @@ export const VerificationManagement: React.FC<VerificationManagementProps> = ({
   onBack,
   onAddMode,
   isAddMode,
+  onModify,
+  onRetract,
 }) => {
+  const { user } = useAuth();
   const [loadingVerifications, setLoadingVerifications] = useState(true);
   const [verifications, setVerifications] = useState<VerificationWithVersion[]>([]);
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Modal state
+  const [selectedVerification, setSelectedVerification] = useState<VerificationWithVersion | null>(
+    null
+  );
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Fetch verifications and user profiles
   useEffect(() => {
@@ -85,6 +97,31 @@ export const VerificationManagement: React.FC<VerificationManagementProps> = ({
 
     fetchVerifications();
   }, [record.firestoreId, record.id, record.recordHash, record.previousRecordHash, refreshTrigger]);
+
+  // Handlers
+  const handleCardClick = (verification: VerificationWithVersion) => {
+    setSelectedVerification(verification);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedVerification(null);
+  };
+
+  const handleModify = () => {
+    if (selectedVerification && onModify) {
+      handleCloseModal();
+      onModify(selectedVerification);
+    }
+  };
+
+  const handleRetract = () => {
+    if (selectedVerification && onRetract) {
+      handleCloseModal();
+      onRetract(selectedVerification);
+    }
+  };
 
   // Count active verifications
   const activeCount = verifications.filter(v => v.isActive).length;
@@ -169,6 +206,7 @@ export const VerificationManagement: React.FC<VerificationManagementProps> = ({
                     verification={verification}
                     userProfile={verifierProfile}
                     isInactive={isInactive}
+                    onClick={() => handleCardClick(verification)}
                   />
                 );
               })}
@@ -181,6 +219,19 @@ export const VerificationManagement: React.FC<VerificationManagementProps> = ({
           )}
         </div>
       </div>
+
+      {/* Detail Modal */}
+      {selectedVerification && (
+        <VerificationDetailModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          verification={selectedVerification}
+          userProfile={userProfiles.get(selectedVerification.verifierId)}
+          isOwnVerification={user?.uid === selectedVerification.verifierId}
+          onModify={handleModify}
+          onRetract={handleRetract}
+        />
+      )}
     </div>
   );
 };
@@ -193,14 +244,16 @@ interface VerificationCardProps {
   verification: VerificationWithVersion;
   userProfile: BelroseUserProfile | undefined;
   isInactive: boolean;
+  onClick: () => void;
 }
 
 const VerificationCard: React.FC<VerificationCardProps> = ({
   verification,
   userProfile,
   isInactive,
+  onClick,
 }) => {
-  const levelName = LEVEL_NAMES[verification.level];
+  const levelInfo = getVerificationConfig(verification.level);
   const versionBadgeText =
     verification.versionNumber === 1 ? 'Current' : `v${verification.versionNumber}`;
 
@@ -209,12 +262,15 @@ const VerificationCard: React.FC<VerificationCardProps> = ({
     {
       text: versionBadgeText,
       color: verification.versionNumber === 1 ? 'green' : 'yellow',
-      tooltip: `Verified version ${verification.versionNumber} of ${verification.totalVersions}`,
+      tooltip:
+        verification.versionNumber === 1
+          ? 'Verified the current version'
+          : `Verified version ${verification.versionNumber} of ${verification.totalVersions}`,
     },
     {
-      text: levelName,
+      text: levelInfo.name,
       color: 'purple',
-      tooltip: `Verification level: ${levelName}`,
+      tooltip: `Verification level: ${levelInfo.name}`,
     },
   ];
 
@@ -222,7 +278,7 @@ const VerificationCard: React.FC<VerificationCardProps> = ({
   if (isInactive) {
     badges.push({
       text: 'Retracted',
-      color: 'red' as const,
+      color: 'red',
       tooltip: 'This verification has been retracted',
     });
   }
@@ -231,19 +287,22 @@ const VerificationCard: React.FC<VerificationCardProps> = ({
   if (verification.chainStatus === 'pending') {
     badges.push({
       text: 'Pending',
-      color: 'yellow' as const,
+      color: 'yellow',
       tooltip: 'Awaiting blockchain confirmation',
     });
   } else if (verification.chainStatus === 'failed') {
     badges.push({
       text: 'Failed',
-      color: 'red' as const,
+      color: 'red',
       tooltip: 'Blockchain transaction failed',
     });
   }
 
   return (
-    <div className={isInactive ? 'opacity-50' : ''}>
+    <div
+      className={`cursor-pointer hover:bg-gray-50 rounded-lg transition-colors ${isInactive ? 'opacity-50' : ''}`}
+      onClick={onClick}
+    >
       <UserCard
         user={userProfile}
         userId={verification.verifierId}
@@ -257,6 +316,7 @@ const VerificationCard: React.FC<VerificationCardProps> = ({
             value: verification.createdAt.toDate().toLocaleDateString(),
           },
         ]}
+        onCardClick={onClick}
       />
     </div>
   );
