@@ -19,6 +19,7 @@ import { RecordDecryptionService } from '@/features/Encryption/services/recordDe
 import { blockchainHealthRecordService } from './blockchainHealthRecordService';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 import { CircleDashed, CircleDot, CircleDotDashed, LucideIcon } from 'lucide-react';
+import { getVerificationId } from './verificationService';
 
 // ============================================================
 // TYPES
@@ -357,6 +358,15 @@ export async function createDispute(
     }
 
     console.log('Reactivating or retrying failed or pending dispute...');
+  }
+
+  // CHECK 3: You cannot both dispute and verify the same recordHash
+  const verificationId = getVerificationId(recordHash, disputerId);
+  const verificationDocRef = doc(db, 'verifications', verificationId);
+  const verificationExisting = await getDoc(verificationDocRef);
+
+  if (verificationExisting.exists()) {
+    throw new Error('You can not both verify and dispute the same record Hash');
   }
 
   const disputerIdHash = ethers.keccak256(ethers.toUtf8Bytes(disputerId));

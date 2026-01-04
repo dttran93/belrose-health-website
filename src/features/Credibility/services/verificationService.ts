@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { blockchainHealthRecordService } from './blockchainHealthRecordService';
 import { FileText, Lock, LucideIcon, MapPin } from 'lucide-react';
+import { getDisputeId } from './disputeService';
 
 // ============================================================
 // TYPES
@@ -216,9 +217,6 @@ export async function createVerification(
   }
 
   const recordData = recordSnap.data();
-  if (recordData.uploadedBy === verifierId) {
-    throw new Error('Conflict of Interest: You cannot verify a record you created yourself.');
-  }
 
   // CHECK 2: Ensure there isn't already an existing verification
   const verificationId = getVerificationId(recordHash, verifierId);
@@ -234,6 +232,15 @@ export async function createVerification(
     }
 
     console.log('Reactivating or retrying failed or pending verification...');
+  }
+
+  // CHECK 3: You cannot both dispute and verify the same recordHash
+  const disputeId = getDisputeId(recordHash, verifierId);
+  const disputeDocRef = doc(db, 'disputes', disputeId);
+  const disputeExisting = await getDoc(disputeDocRef);
+
+  if (disputeExisting.exists()) {
+    throw new Error('You can not both dispute and verify the same record Hash');
   }
 
   const verifierIdHash = ethers.keccak256(ethers.toUtf8Bytes(verifierId));
