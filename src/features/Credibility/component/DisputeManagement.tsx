@@ -10,16 +10,28 @@ import UserCard, { BadgeConfig } from '@/features/Users/components/ui/UserCard';
 import { useAuth } from '@/features/Auth/hooks/useAuth';
 import { buildHashVersionMap } from '../services/verificationService';
 import {
-  CULPABILITY_OPTIONS,
   DisputeWithVersion,
   getCulpabilityConfig,
   getDisputeReactionStats,
   getDisputesByRecordId,
   getSeverityConfig,
-  ReactionStats,
-  SEVERITY_OPTIONS,
 } from '../services/disputeService';
 import DisputeDetailModal from './ui/DisputeDetailModal';
+import ReactionButtons, { ReactionType } from '@/components/ui/ReactionButtons';
+
+// ============================================================
+// TYPES
+// ============================================================
+
+/**
+ * Extended ReactionStats that includes the current user's reaction.
+ * This is what we store in state for each dispute.
+ */
+export interface ReactionStatsWithUser {
+  supports: number;
+  opposes: number;
+  userReaction: ReactionType; // 'support' | 'oppose' | null
+}
 
 interface DisputeManagementProps {
   record: FileObject;
@@ -45,12 +57,21 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
   const [disputes, setDisputes] = useState<DisputeWithVersion[]>([]);
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [reactionStats, setReactionStats] = useState<Record<string, ReactionStats>>({});
+  const [reactionStats, setReactionStats] = useState<Record<string, ReactionStatsWithUser>>({});
   const [loadingStats, setLoadingStats] = useState(false);
+
+  // Track which disputes are currently having reactions processed
+  const [reactingDisputes, setReactingDisputes] = useState<Set<string>>(new Set());
 
   // Modal state
   const [selectedDispute, setSelectedDispute] = useState<DisputeWithVersion | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const getReactionType = (value: boolean | null | undefined): ReactionType => {
+    if (value === true) return 'support';
+    if (value === false) return 'oppose';
+    return null;
+  };
 
   // Fetch disputes and user profiles
   useEffect(() => {
@@ -92,8 +113,8 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
         // 4. Get unique disputer IDs and fetch their profiles
         const disputerIds = [...new Set(allDisputes.map(d => d.disputerId))];
 
-        //5. Fetch Reaction stats for all disputes
-        const statsMap = new Map<string, ReactionStats>();
+        // 5. Fetch Reaction stats for all disputes (including user's reaction)
+        const statsMap = new Map<string, ReactionStatsWithUser>();
 
         const statsPromises = allDisputes.map(async d => {
           const stats = await getDisputeReactionStats(
@@ -102,7 +123,12 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
             d.disputerId,
             user?.uid
           );
-          statsMap.set(`${d.recordHash}_${d.disputerId}`, stats);
+
+          statsMap.set(`${d.recordHash}_${d.disputerId}`, {
+            supports: stats.supports ?? 0,
+            opposes: stats.opposes ?? 0,
+            userReaction: getReactionType(stats.userReaction) ?? null,
+          });
         });
 
         await Promise.all([
@@ -122,9 +148,19 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
     };
 
     fetchDisputes();
-  }, [record.firestoreId, record.id, record.recordHash, record.previousRecordHash, refreshTrigger]);
+  }, [
+    record.firestoreId,
+    record.id,
+    record.recordHash,
+    record.previousRecordHash,
+    refreshTrigger,
+    user?.uid,
+  ]);
 
-  // Handlers
+  // ============================================================
+  // HANDLERS
+  // ============================================================
+
   const handleCardClick = (dispute: DisputeWithVersion) => {
     setSelectedDispute(dispute);
     setIsModalOpen(true);
@@ -149,10 +185,81 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
     }
   };
 
-  const handleReact = (disputerId: string, support: boolean) => {
+  const handleModalReact = (disputerId: string, support: boolean) => {
     if (selectedDispute && onReact) {
       handleCloseModal();
       onReact(disputerId, support);
+    }
+  };
+
+  /**
+   * Handle reaction from DisputeCard.
+   * This does optimistic UI update then calls the parent handler.
+   */
+  const handleReaction = async (dispute: DisputeWithVersion, support: boolean) => {
+    if (!onReact) return;
+
+    const statsKey = `${dispute.recordHash}_${dispute.disputerId}`;
+    const currentStats = reactionStats[statsKey] || { supports: 0, opposes: 0, userReaction: null };
+
+    // Optimistic update
+    const newStats = { ...currentStats };
+
+    if (currentStats.userReaction === (support ? 'support' : 'oppose')) {
+      // User is clicking the same button - toggle off (retract)
+      if (support) {
+        newStats.supports = Math.max(0, newStats.supports - 1);
+      } else {
+        newStats.opposes = Math.max(0, newStats.opposes - 1);
+      }
+      newStats.userReaction = null;
+    } else if (currentStats.userReaction !== null) {
+      // User is switching their reaction
+      if (support) {
+        newStats.supports += 1;
+        newStats.opposes = Math.max(0, newStats.opposes - 1);
+      } else {
+        newStats.opposes += 1;
+        newStats.supports = Math.max(0, newStats.supports - 1);
+      }
+      newStats.userReaction = support ? 'support' : 'oppose';
+    } else {
+      // User is reacting for the first time
+      if (support) {
+        newStats.supports += 1;
+      } else {
+        newStats.opposes += 1;
+      }
+      newStats.userReaction = support ? 'support' : 'oppose';
+    }
+
+    // Update UI immediately
+    setReactionStats(prev => ({
+      ...prev,
+      [statsKey]: newStats,
+    }));
+
+    // Mark as loading
+    setReactingDisputes(prev => new Set(prev).add(statsKey));
+
+    try {
+      // Call the actual API through parent
+      await onReact(dispute.disputerId, support);
+      // Optionally refresh stats after success
+      setRefreshTrigger(prev => prev + 1);
+    } catch (error) {
+      // Revert on error
+      setReactionStats(prev => ({
+        ...prev,
+        [statsKey]: currentStats,
+      }));
+      console.error('Failed to submit reaction:', error);
+    } finally {
+      setReactingDisputes(prev => {
+        const next = new Set(prev);
+        next.delete(statsKey);
+        return next;
+      });
     }
   };
 
@@ -232,6 +339,14 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
               {disputes.map(dispute => {
                 const disputerProfile = userProfiles.get(dispute.disputerId);
                 const isInactive = !dispute.isActive;
+                const statsKey = `${dispute.recordHash}_${dispute.disputerId}`;
+                const stats = reactionStats[statsKey] || {
+                  supports: 0,
+                  opposes: 0,
+                  userReaction: null,
+                };
+                const isReacting = reactingDisputes.has(statsKey);
+                const isOwnDispute = user?.uid === dispute.disputerId;
 
                 return (
                   <DisputeCard
@@ -240,9 +355,12 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
                     userProfile={disputerProfile}
                     isInactive={isInactive}
                     onViewUser={() => {}}
-                    onViewDetails={() => {
-                      handleCardClick(dispute);
-                    }}
+                    onViewDetails={() => handleCardClick(dispute)}
+                    // NEW: Pass reaction props
+                    reactionStats={stats}
+                    onReact={support => handleReaction(dispute, support)}
+                    isLoadingReaction={isReacting}
+                    isOwnDispute={isOwnDispute}
                   />
                 );
               })}
@@ -268,11 +386,12 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
           isOwnDispute={user?.uid === selectedDispute.disputerId}
           onModify={handleModify}
           onRetract={handleRetract}
-          onReact={handleReact}
+          onReact={handleModalReact}
           reactionStats={
             reactionStats[`${selectedDispute.recordHash}_${selectedDispute.disputerId}`] || {
               supports: 0,
               opposes: 0,
+              userReaction: null,
             }
           }
           isLoadingStats={loadingStats}
@@ -292,7 +411,14 @@ interface DisputeCardProps {
   isInactive: boolean;
   onViewUser: () => void;
   onViewDetails: () => void;
-  onClick?: () => void;
+  reactionStats: {
+    supports: number;
+    opposes: number;
+    userReaction: ReactionType;
+  };
+  onReact: (support: boolean) => void;
+  isLoadingReaction?: boolean;
+  isOwnDispute?: boolean;
 }
 
 const DisputeCard: React.FC<DisputeCardProps> = ({
@@ -301,7 +427,10 @@ const DisputeCard: React.FC<DisputeCardProps> = ({
   isInactive,
   onViewUser,
   onViewDetails,
-  onClick,
+  reactionStats,
+  onReact,
+  isLoadingReaction = false,
+  isOwnDispute = false,
 }) => {
   const severityInfo = getSeverityConfig(dispute.severity);
   const culpabilityInfo = getCulpabilityConfig(dispute.culpability);
@@ -310,7 +439,7 @@ const DisputeCard: React.FC<DisputeCardProps> = ({
     throw new Error('Invalid severity or culpability level');
   }
 
-  // Version badge - show "Current" for version 1, otherwise "v2", "v3", etc.
+  // Version badge
   const versionBadgeText = dispute.versionNumber === 1 ? 'Current' : `v${dispute.versionNumber}`;
   const versionBadgeColor = dispute.versionNumber === 1 ? 'green' : 'yellow';
 
@@ -361,10 +490,7 @@ const DisputeCard: React.FC<DisputeCardProps> = ({
   }
 
   return (
-    <div
-      className={`cursor-pointer hover:bg-gray-50 rounded-lg transition-colors ${isInactive ? 'opacity-50' : ''}`}
-      onClick={onClick}
-    >
+    <div className={isInactive ? 'opacity-50' : ''}>
       <UserCard
         user={userProfile}
         userId={dispute.disputerId}
@@ -372,14 +498,32 @@ const DisputeCard: React.FC<DisputeCardProps> = ({
         color={isInactive ? 'red' : 'yellow'}
         badges={badges}
         onViewUser={onViewUser}
-        onViewDetails={onViewDetails}
+        onCardClick={onViewDetails}
+        clickable
         metadata={[
           {
             label: 'Filed',
             value: dispute.createdAt.toDate().toLocaleDateString(),
           },
         ]}
-        onCardClick={onClick}
+        // Pass ReactionButtons as rightContent (between badges and menu)
+        content={
+          <ReactionButtons
+            supportCount={reactionStats.supports}
+            opposeCount={reactionStats.opposes}
+            userReaction={reactionStats.userReaction}
+            onSupport={() => onReact(true)}
+            onOppose={() => onReact(false)}
+            disabled={isInactive || isOwnDispute}
+            isLoading={isLoadingReaction}
+            supportTooltip={
+              isOwnDispute ? "You can't react to your own dispute" : 'Support this dispute'
+            }
+            opposeTooltip={
+              isOwnDispute ? "You can't react to your own dispute" : 'Oppose this dispute'
+            }
+          />
+        }
       />
     </div>
   );

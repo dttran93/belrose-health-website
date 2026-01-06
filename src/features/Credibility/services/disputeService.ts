@@ -809,6 +809,7 @@ export async function getDisputeReactionStats(
 
   querySnapshot.forEach(doc => {
     const data = doc.data();
+
     if (data.supportsDispute) {
       supports++;
     } else {
@@ -820,6 +821,8 @@ export async function getDisputeReactionStats(
       userReaction = data.supportsDispute;
     }
   });
+
+  console.log('Final stats:', { supports, opposes, userReaction });
 
   return { supports, opposes, userReaction };
 }

@@ -1,3 +1,5 @@
+// src/features/Users/components/ui/UserCard.tsx
+
 import React from 'react';
 import { User, Mail, Hash, X, Check, BadgeCheck, CircleCheck } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
@@ -18,7 +20,7 @@ export interface BadgeConfig {
 
 interface UserCardProps {
   user: BelroseUserProfile | null | undefined;
-  userId?: string; // Fallback if user profile not loaded
+  userId?: string;
   variant?: UserCardVariant;
   color?: UserCardColor;
 
@@ -55,6 +57,7 @@ interface UserCardProps {
   showAffiliations?: boolean;
   clickable?: boolean;
   className?: string;
+  content?: React.ReactNode; // Custom content slot - renders between badges and menu
 }
 
 const colorClasses: Record<
@@ -115,6 +118,7 @@ export const UserCard: React.FC<UserCardProps> = ({
   variant = 'default',
   color = 'primary',
   badges,
+  metadata,
   onViewUser,
   onViewDetails,
   onShare,
@@ -129,6 +133,7 @@ export const UserCard: React.FC<UserCardProps> = ({
   showAffiliations = true,
   clickable = false,
   className = '',
+  content,
 }) => {
   const colors = colorClasses[color];
   const displayName = user?.displayName || 'Unknown User';
@@ -137,7 +142,7 @@ export const UserCard: React.FC<UserCardProps> = ({
   const isClickable = clickable || !!onCardClick;
 
   //==============================================================
-  // HELPER FUNCITONS
+  // HELPER FUNCTIONS
   //==============================================================
 
   const renderBadge = (badgeItem: BadgeConfig, index: number) => {
@@ -252,8 +257,38 @@ export const UserCard: React.FC<UserCardProps> = ({
     if (!badges || badges.length === 0) return null;
 
     return (
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
         {badges.map((b, i) => renderBadge(b, i))}
+      </div>
+    );
+  };
+
+  const renderMetadata = () => {
+    if (!metadata || metadata.length === 0) return null;
+
+    return (
+      <div className="flex items-center gap-3 mt-1">
+        {metadata.map((item, index) => (
+          <div key={index} className="flex items-center gap-1 text-xs text-gray-500">
+            {item.icon}
+            <span className="font-medium">{item.label}:</span>
+            <span>{item.value}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Render content with click isolation
+  const renderContent = () => {
+    if (!content) return null;
+
+    return (
+      <div
+        className="flex-shrink-0"
+        onClick={e => e.stopPropagation()} // Prevent card click when interacting
+      >
+        {content}
       </div>
     );
   };
@@ -276,6 +311,7 @@ export const UserCard: React.FC<UserCardProps> = ({
         </div>
 
         {renderBadges()}
+        {renderContent()}
         {renderMenu()}
         {renderActionButtons()}
       </div>
@@ -291,90 +327,72 @@ export const UserCard: React.FC<UserCardProps> = ({
         onClick={onCardClick}
         className={`
           flex items-center justify-between p-4 ${colors.bg} rounded-lg border ${colors.border}
-          ${isClickable ? 'cursor-pointer hover:shadow-md' : ''}
-          transition-shadow ${className}
+          ${isClickable ? 'cursor-pointer hover:opacity-80' : ''} ${className}
         `}
       >
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          {/* Avatar */}
-          <div
-            className={`w-10 h-10 ${colors.iconBg} rounded-full flex items-center justify-center flex-shrink-0`}
-          >
-            <User className={`w-5 h-5 ${colors.icon}`} />
+        {/* Avatar */}
+        <div
+          className={`w-10 h-10 ${colors.iconBg} rounded-full flex items-center justify-center mr-3 flex-shrink-0`}
+        >
+          <User className={`w-5 h-5 ${colors.icon}`} />
+        </div>
+
+        {/* User Info */}
+        <div className="flex-1 min-w-0 mr-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-gray-900 truncate">{displayName}</span>
+            {renderVerifiedBadge()}
           </div>
 
-          {/* User Info */}
-          <div className="flex-1 min-w-0 text-left">
-            <div className="flex items-center gap-1">
-              <p className="text-base font-semibold text-gray-900 truncate">{displayName}</p>
-              {renderVerifiedBadge()}
+          {showEmail && email && (
+            <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+              <Mail className="w-3 h-3" />
+              <span className="truncate">{email}</span>
             </div>
+          )}
 
-            {showEmail && email && (
-              <Tooltip.Provider>
-                <Tooltip.Root>
-                  <Tooltip.Trigger asChild>
-                    <div
-                      onClick={e => {
-                        e.stopPropagation();
-                        copyToClipboard(email);
-                      }}
-                      className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 cursor-pointer mb-1"
-                    >
-                      <Mail className="w-4 h-4" />
-                      <span className="truncate">{email}</span>
-                    </div>
-                  </Tooltip.Trigger>
-                  <Tooltip.Portal>
-                    <Tooltip.Content
-                      className="bg-gray-900 text-white text-xs rounded px-2 py-1 z-50"
-                      sideOffset={5}
-                    >
-                      Click to copy email
-                      <Tooltip.Arrow className="fill-gray-900" />
-                    </Tooltip.Content>
-                  </Tooltip.Portal>
-                </Tooltip.Root>
-              </Tooltip.Provider>
-            )}
+          {showUserId && uid && (
+            <Tooltip.Provider>
+              <Tooltip.Root>
+                <Tooltip.Trigger asChild>
+                  <div
+                    className="flex items-center gap-1 text-xs text-gray-400 mt-0.5 cursor-pointer hover:text-gray-600"
+                    onClick={e => {
+                      e.stopPropagation();
+                      copyToClipboard(uid);
+                    }}
+                  >
+                    <Hash className="w-3 h-3" />
+                    <span className="truncate font-mono">{uid}</span>
+                  </div>
+                </Tooltip.Trigger>
+                <Tooltip.Portal>
+                  <Tooltip.Content
+                    className="bg-gray-900 text-white text-xs rounded px-2 py-1 z-50"
+                    sideOffset={5}
+                  >
+                    User ID - Click to copy
+                    <Tooltip.Arrow className="fill-gray-900" />
+                  </Tooltip.Content>
+                </Tooltip.Portal>
+              </Tooltip.Root>
+            </Tooltip.Provider>
+          )}
 
-            {showUserId && uid && (
-              <Tooltip.Provider>
-                <Tooltip.Root>
-                  <Tooltip.Trigger asChild>
-                    <div
-                      onClick={e => {
-                        e.stopPropagation();
-                        copyToClipboard(uid);
-                      }}
-                      className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 cursor-pointer"
-                    >
-                      <Hash className="w-3 h-3" />
-                      <span className="truncate font-mono">{uid}</span>
-                    </div>
-                  </Tooltip.Trigger>
-                  <Tooltip.Portal>
-                    <Tooltip.Content
-                      className="bg-gray-900 text-white text-xs rounded px-2 py-1 z-50"
-                      sideOffset={5}
-                    >
-                      User ID - Click to copy
-                      <Tooltip.Arrow className="fill-gray-900" />
-                    </Tooltip.Content>
-                  </Tooltip.Portal>
-                </Tooltip.Root>
-              </Tooltip.Provider>
-            )}
+          {showAffiliations && user?.affiliations && user.affiliations.length > 0 && (
+            <p className="text-xs text-gray-500 truncate mt-1">{user.affiliations.join(', ')}</p>
+          )}
 
-            {showAffiliations && user?.affiliations && user.affiliations.length > 0 && (
-              <p className="text-xs text-gray-500 truncate mt-1">{user.affiliations.join(', ')}</p>
-            )}
-          </div>
+          {/* Metadata row */}
+          {renderMetadata()}
+        </div>
 
-          {/* Badges */}
+        {/* Right side elements: Badges -> RightContent -> Menu/Actions */}
+        <div className="flex items-center gap-3 flex-shrink-0">
           {renderBadges()}
 
-          {/* Menu */}
+          {renderContent()}
+
           {renderMenu()}
 
           {/* Action Buttons */}
