@@ -43,7 +43,7 @@ export interface SeverityConfig {
   value: DisputeSeverity;
   name: DisputeSeverityName;
   description: string;
-  shortDescription: string;
+  declarative: string;
   color: 'blue' | 'yellow' | 'red';
 }
 
@@ -51,7 +51,7 @@ export interface CulpabilityConfig {
   value: DisputeCulpability;
   name: DisputeCulpabilityName;
   description: string;
-  shortDescription: string;
+  declarative: string;
 }
 
 export interface EncryptedField {
@@ -103,7 +103,7 @@ export const SEVERITY_CONFIG: Record<DisputeSeverity, SeverityConfig> = {
     name: 'Negligible',
     description:
       'A minor issue that does not significantly affect the usefulness or accuracy of the record. Unlikely to impact care decisions.',
-    shortDescription: "Minor issue that doesn't affect clinical decisions",
+    declarative: "Minor issue that doesn't affect clinical decisions",
     color: 'blue',
   },
   2: {
@@ -111,7 +111,7 @@ export const SEVERITY_CONFIG: Record<DisputeSeverity, SeverityConfig> = {
     name: 'Moderate',
     description:
       'An issue that could potentially affect care decisions or treatment planning. Should be reviewed and corrected.',
-    shortDescription: 'Noticeable error that could cause confusion',
+    declarative: 'Noticeable error that could cause confusion',
     color: 'yellow',
   },
   3: {
@@ -119,7 +119,7 @@ export const SEVERITY_CONFIG: Record<DisputeSeverity, SeverityConfig> = {
     name: 'Major',
     description:
       'A serious inaccuracy that could lead to incorrect diagnoses or harmful treatment decisions. Requires immediate attention.',
-    shortDescription: 'Serious error that could affect patient safety',
+    declarative: 'Serious error that could affect patient safety',
     color: 'red',
   },
 };
@@ -129,39 +129,39 @@ export const CULPABILITY_CONFIG: Record<DisputeCulpability, CulpabilityConfig> =
     value: 0,
     name: 'Unknown',
     description: 'Unknown why the error occurred.',
-    shortDescription: 'Do not know why the mistake happened',
+    declarative: 'Do not know why the mistake happened',
   },
   1: {
     value: 1,
     name: 'No Fault',
     description:
       'Unavoidable mistake, such as a false positive on a diagnostic test. No individual is responsible for the error.',
-    shortDescription: 'Unavoidable mistake, no one to blame',
+    declarative: 'Unavoidable mistake, no one to blame',
   },
   2: {
     value: 2,
     name: 'Systemic',
     description:
       'An organizational or process failure. The error stems from flawed procedures or systems.',
-    shortDescription: 'Process or system issue, not individual error',
+    declarative: 'Process or system issue, not individual error',
   },
   3: {
     value: 3,
     name: 'Preventable',
     description: 'An error that should have been caught through normal review processes.',
-    shortDescription: 'Could have been caught with normal diligence',
+    declarative: 'Could have been caught with normal diligence',
   },
   4: {
     value: 4,
     name: 'Reckless',
     description: 'Careless disregard for accuracy or proper procedures.',
-    shortDescription: 'Serious negligence in documentation',
+    declarative: 'Serious negligence in documentation',
   },
   5: {
     value: 5,
     name: 'Intentional',
     description: 'Deliberate falsification or manipulation of the record.',
-    shortDescription: 'Deliberate falsification or manipulation',
+    declarative: 'Deliberate falsification or manipulation',
   },
 };
 

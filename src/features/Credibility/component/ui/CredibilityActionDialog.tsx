@@ -54,6 +54,7 @@ interface CredibilityActionDialogProps {
   onConfirmRetract: () => void;
   onConfirmDispute: () => void;
   onConfirmReaction: (supports: boolean) => void;
+  onConfirmModifyDispute: () => void;
 }
 
 // ============================================================================
@@ -76,6 +77,7 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
   onConfirmRetract,
   onConfirmDispute,
   onConfirmReaction,
+  onConfirmModifyDispute,
 }) => {
   if (!isOpen) return null;
 
@@ -100,14 +102,16 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
             <SuccessContent operationType={operationType} onClose={onClose} />
           )}
 
-          {/* Confirming Phase - Verification */}
-          {phase === 'confirming' && operationType === 'verify' && (
-            <ConfirmVerificationContent
-              preSelectedLevel={pendingLevel}
-              onConfirm={onConfirmVerification}
-              onClose={onClose}
-            />
-          )}
+          {/* Confirming Phase - Verification - Creation or Modification */}
+          {phase === 'confirming' &&
+            (operationType === 'verify' || operationType === 'modifyVerification') && (
+              <ConfirmVerificationContent
+                level={pendingLevel}
+                isModify={operationType === 'modifyVerification'}
+                onConfirm={onConfirmVerification}
+                onClose={onClose}
+              />
+            )}
 
           {/* Confirming Phase - Retract Verification */}
           {phase === 'confirming' && operationType === 'retractVerification' && (
@@ -131,16 +135,19 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
             />
           )}
 
-          {/* Confirming Phase - Dispute */}
+          {/* Confirming Phase - Dispute (New or Modify) */}
           {phase === 'confirming' &&
-            operationType === 'dispute' &&
+            (operationType === 'dispute' || operationType === 'modifyDispute') &&
             pendingSeverity !== undefined &&
             pendingCulpability !== undefined && (
               <ConfirmDisputeContent
                 severity={pendingSeverity}
                 culpability={pendingCulpability}
                 notes={pendingNotes}
-                onConfirm={onConfirmDispute}
+                isModify={operationType === 'modifyDispute'}
+                onConfirm={
+                  operationType === 'modifyDispute' ? onConfirmModifyDispute : onConfirmDispute
+                }
                 onClose={onClose}
               />
             )}
@@ -332,72 +339,32 @@ const SuccessContent: React.FC<{
 // ============================================================================
 
 const ConfirmVerificationContent: React.FC<{
-  preSelectedLevel?: VerificationLevel;
+  level?: VerificationLevel;
+  isModify?: boolean;
   onConfirm: (level: VerificationLevel) => void;
   onClose: () => void;
-}> = ({ preSelectedLevel, onConfirm, onClose }) => {
-  const [selectedLevel, setSelectedLevel] = useState<VerificationLevel>(preSelectedLevel || 1);
-  const isPreSelected = preSelectedLevel !== undefined;
-
-  const currentConfig = getVerificationConfig(selectedLevel);
+}> = ({ level, isModify, onConfirm, onClose }) => {
+  const config = getVerificationConfig(level || 1);
+  const Icon = config.icon;
 
   return (
     <>
       <AlertDialog.Title className="text-lg font-bold flex items-center gap-2">
         <ShieldCheck className="w-5 h-5 text-chart-3" />
-        {isPreSelected ? 'Confirm Verification' : 'Verify Record'}
+        {isModify ? 'Modify Verification' : 'Confirm Verification'}
       </AlertDialog.Title>
 
       <AlertDialog.Description className="mt-3 text-sm text-gray-600">
-        {isPreSelected
-          ? 'You are about to submit a verification for this record.'
-          : 'Select the level of verification you are providing for this record.'}
+        Review your selection before it is recorded to the secure network.
       </AlertDialog.Description>
 
-      {/* CONDITIONAL BODY: Confirmation Card OR Selection List */}
-      <div className="my-4">
-        {isPreSelected ? (
-          /* Single Card Mode */
-          <div className="p-4 border rounded-lg bg-chart-3/10 border-chart-3">
-            <div className="flex items-center gap-2 mb-1">
-              <FileCheck className="w-5 h-5 text-chart-3" />
-              <span className="font-semibold text-chart-3">{currentConfig.name} Verification</span>
-            </div>
-            <p className="text-sm text-gray-600">{currentConfig.declarative}</p>
-          </div>
-        ) : (
-          /* Selection List Mode */
-          <div className="space-y-2">
-            {VERIFICATION_OPTIONS.map(config => {
-              const isSelected = selectedLevel === config.value;
-              const IconComponent = config.icon;
-
-              return (
-                <label
-                  key={config.value}
-                  className={`flex items-start gap-3 p-3 border rounded-lg transition-colors cursor-pointer
-                    ${isSelected ? 'border-chart-3 bg-chart-3/10' : 'border-gray-200 hover:border-gray-300'}`}
-                >
-                  <input
-                    type="radio"
-                    name="verificationLevel"
-                    value={config.value}
-                    checked={isSelected}
-                    onChange={() => setSelectedLevel(config.value)}
-                    className="mt-1 w-4 h-4 accent-chart-3"
-                  />
-                  <IconComponent
-                    className={`w-5 h-5 mt-0.5 ${isSelected ? 'text-chart-3' : 'text-gray-400'}`}
-                  />
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">{config.name}</p>
-                    <p className="text-xs text-gray-500">{config.declarative}</p>
-                  </div>
-                </label>
-              );
-            })}
-          </div>
-        )}
+      {/* Confirm Card */}
+      <div className="my-2 p-4 border rounded-lg bg-chart-3/5 border-chart-3/20 flex items-start gap-3">
+        <Icon className="w-6 h-6 text-chart-3 mt-1" />
+        <div>
+          <p className="font-bold text-gray-900">{config.name} Level</p>
+          <p className="text-sm text-gray-600 italic">"{config.declarative}"</p>
+        </div>
       </div>
 
       {/* CONSOLIDATED FOOTER */}
@@ -418,11 +385,8 @@ const ConfirmVerificationContent: React.FC<{
             Cancel
           </Button>
         </AlertDialog.Cancel>
-        <Button
-          onClick={() => onConfirm(selectedLevel)}
-          className="flex-1 bg-chart-3 hover:bg-chart-3/90"
-        >
-          {isPreSelected ? 'Confirm Verification' : 'Verify Record'}
+        <Button onClick={() => onConfirm} className="flex-1 bg-chart-3 hover:bg-chart-3/90">
+          {isModify ? 'Confirm Modification' : 'Submit Verification'}
         </Button>
       </div>
     </>
@@ -477,21 +441,22 @@ const ConfirmDisputeContent: React.FC<{
   severity: DisputeSeverity;
   culpability: DisputeCulpability;
   notes?: string;
+  isModify?: boolean;
   onConfirm: () => void;
   onClose: () => void;
-}> = ({ severity, culpability, notes, onConfirm, onClose }) => {
-  const severityConfig = getSeverityConfig(severity);
-  const culpabilityConfig = getCulpabilityConfig(culpability);
+}> = ({ severity, culpability, notes, isModify, onConfirm, onClose }) => {
+  const severityConfig = getSeverityConfig(severity || 1);
+  const culpabilityConfig = getCulpabilityConfig(culpability || 1);
 
   return (
     <>
       <AlertDialog.Title className="text-lg font-bold flex items-center gap-2">
         <ShieldAlert className="w-5 h-5 text-red-600" />
-        Confirm Dispute
+        {isModify ? 'Confirm Dispute Modification' : 'Confirm Dispute'}
       </AlertDialog.Title>
 
       <AlertDialog.Description className="mt-3 text-sm text-gray-600">
-        You are about to file a dispute against this record.
+        Review your selection before it is recorded to the secure network.
       </AlertDialog.Description>
 
       {/* Dispute Details */}
@@ -499,13 +464,13 @@ const ConfirmDisputeContent: React.FC<{
         <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
           <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Severity</div>
           <div className="font-semibold text-gray-900">{severityConfig.name}</div>
-          <div className="text-xs text-gray-500 mt-1">{severityConfig.shortDescription}</div>
+          <div className="text-xs text-gray-500 mt-1">{severityConfig.declarative}</div>
         </div>
 
         <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
           <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Culpability</div>
           <div className="font-semibold text-gray-900">{culpabilityConfig.name}</div>
-          <div className="text-xs text-gray-500 mt-1">{culpabilityConfig.shortDescription}</div>
+          <div className="text-xs text-gray-500 mt-1">{culpabilityConfig.declarative}</div>
         </div>
 
         {notes && (
@@ -530,7 +495,7 @@ const ConfirmDisputeContent: React.FC<{
           </Button>
         </AlertDialog.Cancel>
         <Button onClick={onConfirm} variant="destructive" className="flex-1">
-          File Dispute
+          {isModify ? 'Modify Dispute' : 'File Dispute'}
         </Button>
       </div>
     </>
@@ -603,6 +568,88 @@ const ConfirmReactionContent: React.FC<{
           className="flex-1 bg-chart-3 hover:bg-chart-3/90"
         >
           Submit Reaction
+        </Button>
+      </div>
+    </>
+  );
+};
+
+// ============================================================================
+// CONFIRM MODIFY VERIFICATION
+// ============================================================================
+
+const ConfirmModifyVerification: React.FC<{
+  previousLevel?: VerificationLevel;
+  onConfirm: (level: VerificationLevel) => void;
+  onClose: () => void;
+}> = ({ previousLevel, onConfirm, onClose }) => {
+  const [selectedLevel, setSelectedLevel] = useState<VerificationLevel>(previousLevel || 1);
+
+  return (
+    <>
+      <AlertDialog.Title className="text-lg font-bold flex items-center gap-2">
+        <ShieldCheck className="w-5 h-5 text-chart-3" />
+        Modify Verification
+      </AlertDialog.Title>
+
+      <AlertDialog.Description className="mt-3 text-sm text-gray-600">
+        Select the level of verification you are changing to for this record.
+      </AlertDialog.Description>
+
+      <div className="space-y-2 my-4">
+        {VERIFICATION_OPTIONS.map(config => {
+          const isSelected = selectedLevel === config.value;
+          const IconComponent = config.icon;
+
+          return (
+            <label
+              key={config.value}
+              className={`flex items-start gap-3 p-3 border rounded-lg transition-colors cursor-pointer
+                    ${isSelected ? 'border-chart-3 bg-chart-3/10' : 'border-gray-200 hover:border-gray-300'}`}
+            >
+              <input
+                type="radio"
+                name="verificationLevel"
+                value={config.value}
+                checked={isSelected}
+                onChange={() => setSelectedLevel(config.value)}
+                className="mt-1 w-4 h-4 accent-chart-3"
+              />
+              <IconComponent
+                className={`w-5 h-5 mt-0.5 ${isSelected ? 'text-chart-3' : 'text-gray-400'}`}
+              />
+              <div className="flex-1">
+                <p className="font-medium text-gray-900">{config.name}</p>
+                <p className="text-xs text-gray-500">{config.declarative}</p>
+              </div>
+            </label>
+          );
+        })}
+      </div>
+
+      {/* CONSOLIDATED FOOTER */}
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+        <p className="text-xs text-amber-800 leading-relaxed">
+          <strong>Note:</strong> By verifying this record, you are staking your personal and
+          professional reputation on its accuracy.{' '}
+          <span className="block mt-2">
+            Belrose will report proven misconduct to the appropriate legal and professional
+            authorities.
+          </span>
+        </p>
+      </div>
+
+      <div className="flex gap-3">
+        <AlertDialog.Cancel asChild>
+          <Button variant="outline" className="flex-1" onClick={onClose}>
+            Cancel
+          </Button>
+        </AlertDialog.Cancel>
+        <Button
+          onClick={() => onConfirm(selectedLevel)}
+          className="flex-1 bg-chart-3 hover:bg-chart-3/90"
+        >
+          Modify Verification
         </Button>
       </div>
     </>

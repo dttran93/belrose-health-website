@@ -323,46 +323,68 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
   }, [pendingOperation, reset, refetchAll, onSuccess]);
 
   /**
-   * Start a modify verification flow
+   * Start a modify verification flow (Phase 1: Setup)
    */
   const initiateModifyVerification = useCallback(
-    async (newLevel: VerificationLevel) => {
+    async (verificationRecordHash: string, newLevel: VerificationLevel) => {
+      // Stage the data for the confirmation dialog
       setPendingOperation({
-        type: 'verify',
+        type: 'modifyVerification',
         recordId,
-        recordHash,
+        recordHash: verificationRecordHash,
         verificationLevel: newLevel,
       });
 
       const auth = getAuth();
-      const verifierId = auth.currentUser?.uid;
-
-      if (!verifierId) {
+      if (!auth.currentUser?.uid) {
         setError('You must be signed in to modify verifications');
         setPhase('error');
         return;
       }
 
+      // Run network/wallet preparation
       const ready = await runPreparation();
-      if (!ready) return;
-
-      setPhase('executing');
-
-      try {
-        await modifyVerificationLevel(recordHash, verifierId, newLevel);
-        toast.success(`Verification updated to ${LEVEL_LABELS[newLevel]} level`);
-        reset();
-        await refetchAll();
-        onSuccess?.();
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to modify verification';
-        setError(message);
-        setPhase('error');
-        toast.error(message);
+      if (ready) {
+        // Transition to confirmation phase in the UI
+        setPhase('confirming');
       }
     },
-    [recordId, recordHash, runPreparation, reset, refetchAll, onSuccess]
+    [recordId, runPreparation]
   );
+
+  /**
+   * Execute the confirmed verification modification (Phase 2: Execution)
+   */
+  const confirmModifyVerification = useCallback(async () => {
+    if (!pendingOperation || pendingOperation.type !== 'modifyVerification') return;
+
+    const { recordHash, verificationLevel } = pendingOperation;
+    const auth = getAuth();
+    const verifierId = auth.currentUser?.uid;
+
+    if (!verifierId || !recordHash || verificationLevel === undefined) {
+      setError('Missing required verification data');
+      setPhase('error');
+      return;
+    }
+
+    setPhase('executing');
+
+    try {
+      await modifyVerificationLevel(recordHash, verifierId, verificationLevel);
+
+      toast.success(`Verification updated to ${LEVEL_LABELS[verificationLevel]} level`);
+
+      setPhase('success');
+      await refetchAll();
+      onSuccess?.();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to modify verification';
+      setError(message);
+      setPhase('error');
+      toast.error(message);
+    }
+  }, [pendingOperation, refetchAll, onSuccess]);
 
   // ==========================================================================
   // DISPUTE FLOW
@@ -502,48 +524,81 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
    * Start a modify dispute flow
    */
   const initiateModifyDispute = useCallback(
-    async (newSeverity: DisputeSeverity, newCulpability: DisputeCulpability) => {
+    async (
+      disputeRecordHash: string,
+      newSeverity?: DisputeSeverity,
+      newCulpability?: DisputeCulpability
+    ) => {
+      // 1. Stage the data
       setPendingOperation({
-        type: 'dispute',
+        type: 'modifyDispute', // Updated type to match dialog logic
         recordId,
-        recordHash,
+        recordHash: disputeRecordHash,
         disputeSeverity: newSeverity,
         disputeCulpability: newCulpability,
       });
 
+      // 2. Auth check before starting prep
       const auth = getAuth();
-      const disputerId = auth.currentUser?.uid;
-
-      if (!disputerId) {
+      if (!auth.currentUser?.uid) {
         setError('You must be signed in to modify disputes');
         setPhase('error');
         return;
       }
 
+      // 3. Run preparation (e.g., blockchain wallet setup)
       const ready = await runPreparation();
-      if (!ready) return;
-
-      setPhase('executing');
-
-      try {
-        await modifyDispute(recordHash, disputerId, newSeverity, newCulpability);
-        const severityInfo = getSeverityConfig(newSeverity);
-        const culpabilityInfo = getCulpabilityConfig(newCulpability);
-        toast.success(
-          `Dispute updated to ${severityInfo.name} severity, ${culpabilityInfo.name} culpability`
-        );
-        reset();
-        await refetchAll();
-        onSuccess?.();
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to modify dispute';
-        setError(message);
-        setPhase('error');
-        toast.error(message);
+      if (ready) {
+        // 4. Move to confirmation UI
+        setPhase('confirming');
       }
     },
-    [recordId, recordHash, runPreparation, reset, refetchAll, onSuccess]
+    [recordId, runPreparation]
   );
+
+  /**
+   * Execute a confirmed dispute modification (Phase 2)
+   */
+  const confirmModifyDispute = useCallback(async () => {
+    // Guard: Ensure we have the right operation pending
+    if (!pendingOperation || pendingOperation.type !== 'modifyDispute') return;
+
+    const { recordHash, disputeSeverity, disputeCulpability } = pendingOperation;
+    const auth = getAuth();
+    const disputerId = auth.currentUser?.uid;
+
+    // Validation
+    if (!recordHash || !disputerId || !disputeSeverity || !disputeCulpability) {
+      setError('Missing required dispute information');
+      setPhase('error');
+      return;
+    }
+
+    setPhase('executing');
+
+    try {
+      await modifyDispute(recordHash, disputerId, disputeSeverity, disputeCulpability);
+
+      const severityInfo = getSeverityConfig(disputeSeverity);
+      // Culpability is optional in some logic, handle accordingly
+      const culpabilityInfo = disputeCulpability
+        ? getCulpabilityConfig(disputeCulpability)
+        : { name: 'unspecified' };
+
+      toast.success(
+        `Dispute updated to ${severityInfo.name} severity and ${culpabilityInfo.name} culpability`
+      );
+
+      setPhase('success');
+      await refetchAll();
+      onSuccess?.();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to modify dispute';
+      setError(message);
+      setPhase('error');
+      toast.error(message);
+    }
+  }, [pendingOperation, refetchAll, onSuccess]);
 
   // ==========================================================================
   // REACT TO DISPUTE FLOW
@@ -633,7 +688,9 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       pendingReaction: pendingOperation?.reactionSupport,
       onClose: reset,
       onConfirmVerification: confirmVerification,
+      onConfirmModifyVerification: confirmModifyVerification,
       onConfirmDispute: confirmDispute,
+      onConfirmModifyDispute: confirmModifyDispute,
       onConfirmReaction: confirmReaction,
       onConfirmRetract:
         pendingOperation?.type === 'retractVerification'

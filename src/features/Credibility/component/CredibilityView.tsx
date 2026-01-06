@@ -25,6 +25,7 @@ interface CredibilityViewProps {
 export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('loading');
   const [reviewPanelInitialTab, setReviewPanelInitialTab] = useState<ReviewTab>('verify');
+  const [initialModifying, setInitialModifying] = useState(false);
   const [verifications, setVerifications] = useState<VerificationDoc[]>([]);
   const { user } = useAuth();
 
@@ -69,6 +70,7 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
     initiateModifyVerification,
     initiateDispute,
     initiateRetractDispute,
+    initiateModifyDispute,
     initiateReaction,
     isLoading,
     refetch,
@@ -121,6 +123,13 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
 
   const handleAddDispute = () => {
     setReviewPanelInitialTab('dispute');
+    setInitialModifying(false);
+    setViewMode('add');
+  };
+
+  const handleModifyDispute = () => {
+    setReviewPanelInitialTab('dispute');
+    setInitialModifying(true);
     setViewMode('add');
   };
 
@@ -190,6 +199,7 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
               initiateReaction(disputeRecordHash, disputerId, support);
             }}
             onRetract={dispute => initiateRetractDispute(dispute.recordHash)}
+            onModify={handleModifyDispute}
           />
         </>
       )}
@@ -209,8 +219,10 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
           initiateRetractVerification={initiateRetractVerification}
           initiateRetractDispute={initiateRetractDispute}
           initiateModifyVerification={initiateModifyVerification}
+          initiateModifyDispute={initiateModifyDispute}
           verification={verification}
           isLoading={isLoading}
+          initialModifying={initialModifying}
         />
       )}
 

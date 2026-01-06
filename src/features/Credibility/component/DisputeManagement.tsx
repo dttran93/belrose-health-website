@@ -356,7 +356,6 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
                     isInactive={isInactive}
                     onViewUser={() => {}}
                     onViewDetails={() => handleCardClick(dispute)}
-                    // NEW: Pass reaction props
                     reactionStats={stats}
                     onReact={support => handleReaction(dispute, support)}
                     isLoadingReaction={isReacting}
@@ -490,42 +489,40 @@ const DisputeCard: React.FC<DisputeCardProps> = ({
   }
 
   return (
-    <div className={isInactive ? 'opacity-50' : ''}>
-      <UserCard
-        user={userProfile}
-        userId={dispute.disputerId}
-        variant="default"
-        color={isInactive ? 'red' : 'yellow'}
-        badges={badges}
-        onViewUser={onViewUser}
-        onCardClick={onViewDetails}
-        clickable
-        metadata={[
-          {
-            label: 'Filed',
-            value: dispute.createdAt.toDate().toLocaleDateString(),
-          },
-        ]}
-        // Pass ReactionButtons as rightContent (between badges and menu)
-        content={
-          <ReactionButtons
-            supportCount={reactionStats.supports}
-            opposeCount={reactionStats.opposes}
-            userReaction={reactionStats.userReaction}
-            onSupport={() => onReact(true)}
-            onOppose={() => onReact(false)}
-            disabled={isInactive || isOwnDispute}
-            isLoading={isLoadingReaction}
-            supportTooltip={
-              isOwnDispute ? "You can't react to your own dispute" : 'Support this dispute'
-            }
-            opposeTooltip={
-              isOwnDispute ? "You can't react to your own dispute" : 'Oppose this dispute'
-            }
-          />
-        }
-      />
-    </div>
+    <UserCard
+      user={userProfile}
+      userId={dispute.disputerId}
+      variant="default"
+      color={isInactive ? 'red' : 'yellow'}
+      badges={badges}
+      onViewUser={onViewUser}
+      onViewDetails={onViewDetails}
+      className={isInactive ? 'opacity-50' : ''}
+      metadata={[
+        {
+          label: 'Filed',
+          value: dispute.createdAt.toDate().toLocaleDateString(),
+        },
+      ]}
+      // Pass ReactionButtons as rightContent (between badges and menu)
+      content={
+        <ReactionButtons
+          supportCount={reactionStats.supports}
+          opposeCount={reactionStats.opposes}
+          userReaction={reactionStats.userReaction}
+          onSupport={() => onReact(true)}
+          onOppose={() => onReact(false)}
+          disabled={isInactive || isOwnDispute}
+          isLoading={isLoadingReaction}
+          supportTooltip={
+            isOwnDispute ? "You can't react to your own dispute" : 'Support this dispute'
+          }
+          opposeTooltip={
+            isOwnDispute ? "You can't react to your own dispute" : 'Oppose this dispute'
+          }
+        />
+      }
+    />
   );
 };
 
