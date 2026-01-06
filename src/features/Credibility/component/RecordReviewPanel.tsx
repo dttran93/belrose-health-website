@@ -184,6 +184,7 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
             onModify={handleModifyLevel}
             onRetract={handleRetract}
             isSubmitting={isLoading}
+            existingDispute={existingDispute}
           />
         ) : (
           <DisputeForm
@@ -198,6 +199,7 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
             initiateModifyDispute={initiateModifyDispute}
             isSubmitting={isLoading}
             initialModifying={initialModifying}
+            existingVerification={verification}
           />
         )}
       </div>

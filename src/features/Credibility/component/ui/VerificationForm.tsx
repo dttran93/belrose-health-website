@@ -3,13 +3,14 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/utils/utils';
-import { CheckCircle, FileText, Lock, MapPin, Loader2, Undo2, Edit2 } from 'lucide-react';
+import { CheckCircle, Loader2, Undo2, Edit2, AlertTriangle } from 'lucide-react';
 import {
   VerificationDoc,
   VerificationLevel,
   VERIFICATION_OPTIONS,
   getVerificationConfig,
 } from '../../services/verificationService';
+import { DisputeDoc } from '../../services/disputeService';
 
 // ============================================================
 // TYPES
@@ -22,6 +23,7 @@ interface VerificationFormProps {
   onModify?: (newLevel: VerificationLevel) => Promise<void>;
   onRetract?: () => Promise<void>;
   isSubmitting?: boolean;
+  existingDispute?: DisputeDoc | null;
 }
 
 // ============================================================
@@ -105,6 +107,7 @@ const VerificationForm: React.FC<VerificationFormProps> = ({
   onModify,
   onRetract,
   isSubmitting = false,
+  existingDispute = null,
 }) => {
   const [isModifying, setIsModifying] = useState(false);
   const [modifyLevel, setModifyLevel] = useState<VerificationLevel | null>(null);
@@ -130,6 +133,27 @@ const VerificationForm: React.FC<VerificationFormProps> = ({
     if (!confirm('Are you sure you want to retract your verification?')) return;
     await onRetract?.();
   };
+
+  // ============================================================
+  // MUTUAL EXCLUSIVITY CHECK
+  // ============================================================
+
+  if (existingDispute?.isActive) {
+    return (
+      <div className="text-center py-10">
+        <div className="w-16 h-16 mx-auto mb-5 bg-red-100 text-red-600 rounded-full flex items-center justify-center">
+          <AlertTriangle className="w-8 h-8" />
+        </div>
+        <h3 className="text-lg font-semibold text-primary mb-2">
+          You've already disputed this record
+        </h3>
+        <p className="text-sm text-muted-foreground mb-4 max-w-sm mx-auto">
+          You cannot verify a record you have disputed. To add a verification, please retract your
+          dispute first from the Dispute tab.
+        </p>
+      </div>
+    );
+  }
 
   // ============================================================
   // MODIFY VIEW
@@ -207,12 +231,7 @@ const VerificationForm: React.FC<VerificationFormProps> = ({
             <Edit2 className="w-4 h-4 mr-2" />
             Modify Level
           </Button>
-          <Button
-            variant="outline"
-            className="border-destructive text-destructive hover:bg-destructive/10"
-            onClick={handleRetract}
-            disabled={isSubmitting}
-          >
+          <Button onClick={handleRetract} disabled={isSubmitting}>
             <Undo2 className="w-4 h-4 mr-2" />
             Retract
           </Button>

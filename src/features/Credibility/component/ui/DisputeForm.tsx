@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { cn } from '@/utils/utils';
 import { Button } from '@/components/ui/Button';
-import { AlertTriangle, Loader2, Undo2, Edit2 } from 'lucide-react';
+import { AlertTriangle, Loader2, Undo2, Edit2, CheckCircle } from 'lucide-react';
 import {
   CULPABILITY_OPTIONS,
   DisputeCulpability,
@@ -9,6 +9,7 @@ import {
   DisputeSeverity,
   SEVERITY_OPTIONS,
 } from '../../services/disputeService';
+import { VerificationDoc } from '../../services/verificationService';
 
 // ============================================================
 // TYPES
@@ -30,6 +31,7 @@ interface DisputeFormProps {
   ) => Promise<void>;
   isSubmitting?: boolean;
   initialModifying?: boolean;
+  existingVerification?: VerificationDoc | null;
 }
 
 // ============================================================
@@ -154,6 +156,7 @@ const DisputeForm: React.FC<DisputeFormProps> = ({
   initiateModifyDispute,
   isSubmitting = false,
   initialModifying = false,
+  existingVerification = null,
 }) => {
   const [isModifying, setIsModifying] = useState(initialModifying);
   const [modifySeverity, setModifySeverity] = useState<DisputeSeverity | null>(null);
@@ -198,6 +201,27 @@ const DisputeForm: React.FC<DisputeFormProps> = ({
 
   const getCulpabilityName = (culp: DisputeCulpability) =>
     CULPABILITY_OPTIONS.find(l => l.value === culp)?.name ?? culp;
+
+  // ============================================================
+  // MUTUAL EXCLUSIVITY CHECK
+  // ============================================================
+
+  if (existingVerification?.isActive) {
+    return (
+      <div className="text-center py-10">
+        <div className="w-16 h-16 mx-auto mb-5 bg-red-100 text-red-600 rounded-full flex items-center justify-center">
+          <CheckCircle className="w-8 h-8" />
+        </div>
+        <h3 className="text-lg font-semibold text-primary mb-2">
+          You've already verified this record
+        </h3>
+        <p className="text-sm text-muted-foreground mb-4 max-w-sm mx-auto">
+          You cannot dispute a record you have verified. To file a dispute, please retract your
+          verification first from the Verify tab.
+        </p>
+      </div>
+    );
+  }
 
   // ============================================================
   // MODIFY VIEW
