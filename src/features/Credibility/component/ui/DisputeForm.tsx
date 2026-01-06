@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '@/utils/utils';
 import { Button } from '@/components/ui/Button';
-import { AlertTriangle, Circle, CircleDot, CircleDotDashed } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import {
   CULPABILITY_OPTIONS,
   DisputeCulpability,
@@ -54,9 +54,12 @@ const DisputeForm: React.FC<DisputeFormProps> = ({
         <p className="text-sm text-foreground mb-6">
           Culpability: <strong>{culpabilityLevel?.name}</strong>
         </p>
-        <Button variant="outline" className="border-red-600 text-red-600 hover:bg-red-50">
-          Modify Dispute
-        </Button>
+        <div className="flex gap-2 justify-center">
+          <Button variant="outline" className="border-red-600 text-red-600 hover:bg-red-50">
+            Modify Dispute
+          </Button>
+          <Button>Retract Dispute</Button>
+        </div>
       </div>
     );
   }

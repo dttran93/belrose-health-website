@@ -61,6 +61,9 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
   const {
     dialogProps,
     verification,
+    isLoadingVerification,
+    dispute,
+    isLoadingDispute,
     initiateVerification,
     initiateRetractVerification,
     initiateModifyVerification,
@@ -199,7 +202,7 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
           onViewRecord={handleBackClick}
           onSuccess={handleOperationSuccess}
           initialTab={reviewPanelInitialTab}
-          existingDispute={null}
+          existingDispute={dispute}
           initiateVerification={initiateVerification}
           initiateDispute={initiateDispute}
           initiateRetractVerification={initiateRetractVerification}
