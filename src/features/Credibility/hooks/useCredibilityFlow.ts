@@ -531,7 +531,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
    * Start a reaction flow (support or oppose a dispute)
    */
   const initiateReaction = useCallback(
-    async (disputerId: string, supports: boolean) => {
+    async (recordHash: string, disputerId: string, supports: boolean) => {
       setPendingOperation({
         type: 'reactToDispute',
         recordId,
@@ -554,8 +554,14 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
   const confirmReaction = useCallback(
     async (supports: boolean) => {
       const disputerId = pendingOperation?.disputerId;
+      const disputeRecordHash = pendingOperation?.recordHash;
 
-      if (!pendingOperation || pendingOperation.type !== 'reactToDispute' || !disputerId) {
+      if (
+        !pendingOperation ||
+        pendingOperation.type !== 'reactToDispute' ||
+        !disputerId ||
+        !disputeRecordHash
+      ) {
         setError('Dispute information missing.');
         return;
       }
@@ -572,7 +578,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       setPhase('executing');
 
       try {
-        await reactToDispute(recordId, recordHash, disputerId, reactorId, supports);
+        await reactToDispute(recordId, disputeRecordHash, disputerId, reactorId, supports);
         toast.success(supports ? 'Supported dispute' : 'Opposed dispute');
         reset();
         onSuccess?.();
@@ -583,7 +589,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
         toast.error(message);
       }
     },
-    [pendingOperation, recordId, recordHash, reset, onSuccess]
+    [pendingOperation, recordId, reset, onSuccess]
   );
 
   // ==========================================================================

@@ -40,7 +40,7 @@ interface DisputeManagementProps {
   isAddMode?: boolean;
   onModify?: (dispute: DisputeWithVersion) => void;
   onRetract?: (dispute: DisputeWithVersion) => void;
-  onReact?: (disputerId: string, support: boolean) => void;
+  onReact?: (recordHash: string, disputerId: string, support: boolean) => void;
 }
 
 export const DisputeManagement: React.FC<DisputeManagementProps> = ({
@@ -188,7 +188,7 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
   const handleModalReact = (disputerId: string, support: boolean) => {
     if (selectedDispute && onReact) {
       handleCloseModal();
-      onReact(disputerId, support);
+      onReact(selectedDispute.recordHash, disputerId, support);
     }
   };
 
@@ -244,7 +244,7 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
 
     try {
       // Call the actual API through parent
-      await onReact(dispute.disputerId, support);
+      await onReact(dispute.recordHash, dispute.disputerId, support);
       // Optionally refresh stats after success
       setRefreshTrigger(prev => prev + 1);
     } catch (error) {

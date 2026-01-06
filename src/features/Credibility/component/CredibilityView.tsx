@@ -183,7 +183,9 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
             onBack={onBack}
             onAddMode={handleAddDispute}
             isAddMode={false}
-            onReact={initiateReaction}
+            onReact={(disputeRecordHash, disputerId, support) => {
+              initiateReaction(disputeRecordHash, disputerId, support);
+            }}
           />
         </>
       )}
