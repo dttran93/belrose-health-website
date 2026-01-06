@@ -267,24 +267,35 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
   /**
    * Start a retract verification flow
    */
-  const initiateRetractVerification = useCallback(async () => {
-    setPendingOperation({
-      type: 'retractDispute',
-      recordId,
-      recordHash,
-    });
+  const initiateRetractVerification = useCallback(
+    async (verificationRecordHash?: string) => {
+      setPendingOperation({
+        type: 'retractVerification',
+        recordId,
+        recordHash: verificationRecordHash || recordHash,
+      });
 
-    const ready = await runPreparation();
-    if (ready) {
-      setPhase('confirming');
-    }
-  }, [recordId, recordHash, runPreparation]);
+      const ready = await runPreparation();
+      if (ready) {
+        setPhase('confirming');
+      }
+    },
+    [recordId, recordHash, runPreparation]
+  );
 
   /**
    * Execute a confirmed retraction
    */
   const confirmRetractVerification = useCallback(async () => {
     if (!pendingOperation || pendingOperation.type !== 'retractVerification') return;
+
+    const verificationRecordHash = pendingOperation.recordHash;
+
+    if (!verificationRecordHash) {
+      setError('Verification hash missing');
+      setPhase('error');
+      return;
+    }
 
     const auth = getAuth();
     const verifierId = auth.currentUser?.uid;
@@ -298,7 +309,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
     setPhase('executing');
 
     try {
-      await retractVerification(recordHash, verifierId);
+      await retractVerification(verificationRecordHash, verifierId);
       toast.success('Verification retracted');
       reset();
       await refetchAll();
@@ -309,7 +320,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       setPhase('error');
       toast.error(message);
     }
-  }, [pendingOperation, recordHash, reset, refetchAll, onSuccess]);
+  }, [pendingOperation, reset, refetchAll, onSuccess]);
 
   /**
    * Start a modify verification flow
@@ -432,24 +443,35 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
   /**
    * Start a retract dispute flow
    */
-  const initiateRetractDispute = useCallback(async () => {
-    setPendingOperation({
-      type: 'retractDispute',
-      recordId,
-      recordHash,
-    });
+  const initiateRetractDispute = useCallback(
+    async (disputeRecordHash?: string) => {
+      setPendingOperation({
+        type: 'retractDispute',
+        recordId,
+        recordHash: disputeRecordHash || recordHash,
+      });
 
-    const ready = await runPreparation();
-    if (ready) {
-      setPhase('confirming');
-    }
-  }, [recordId, recordHash, runPreparation]);
+      const ready = await runPreparation();
+      if (ready) {
+        setPhase('confirming');
+      }
+    },
+    [recordId, recordHash, runPreparation]
+  );
 
   /**
    * Execute a confirmed dispute retraction
    */
   const confirmRetractDispute = useCallback(async () => {
     if (!pendingOperation || pendingOperation.type !== 'retractDispute') return;
+
+    const disputeRecordHash = pendingOperation.recordHash;
+
+    if (!disputeRecordHash) {
+      setError('Dispute hash missing');
+      setPhase('error');
+      return;
+    }
 
     const auth = getAuth();
     const disputerId = auth.currentUser?.uid;
@@ -463,7 +485,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
     setPhase('executing');
 
     try {
-      await retractDispute(recordHash, disputerId);
+      await retractDispute(disputeRecordHash, disputerId);
       toast.success('Dispute retracted');
       reset();
       await refetchAll();
@@ -474,7 +496,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       setPhase('error');
       toast.error(message);
     }
-  }, [pendingOperation, recordHash, reset, refetchAll, onSuccess]);
+  }, [pendingOperation, reset, refetchAll, onSuccess]);
 
   /**
    * Start a modify dispute flow

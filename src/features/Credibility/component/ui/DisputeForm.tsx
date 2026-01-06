@@ -22,6 +22,7 @@ interface DisputeFormProps {
   onSelectCulpability: (culpability: DisputeCulpability) => void;
   onNotesChange: (notes: string) => void;
   existingDispute: DisputeDoc | null;
+  initiateRetractDispute: (recordHash?: string) => Promise<void>;
 }
 
 // ============================================================
@@ -36,6 +37,7 @@ const DisputeForm: React.FC<DisputeFormProps> = ({
   onSelectCulpability,
   onNotesChange,
   existingDispute,
+  initiateRetractDispute,
 }) => {
   if (existingDispute) {
     const severityLevel = SEVERITY_OPTIONS.find(l => l.value === existingDispute.severity);
@@ -58,7 +60,15 @@ const DisputeForm: React.FC<DisputeFormProps> = ({
           <Button variant="outline" className="border-red-600 text-red-600 hover:bg-red-50">
             Modify Dispute
           </Button>
-          <Button>Retract Dispute</Button>
+          <Button
+            onClick={() => {
+              if (existingDispute) {
+                initiateRetractDispute(existingDispute.recordHash);
+              }
+            }}
+          >
+            Retract Dispute
+          </Button>
         </div>
       </div>
     );

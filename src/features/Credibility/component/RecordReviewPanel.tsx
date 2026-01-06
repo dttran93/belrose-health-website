@@ -26,7 +26,8 @@ export interface RecordReviewPanelProps {
   initialTab?: 'verify' | 'dispute';
   initiateVerification: (level: VerificationLevel) => void;
   initiateDispute: (sev: DisputeSeverity, culp: DisputeCulpability, notes?: string) => void;
-  initiateRetractVerification: () => void;
+  initiateRetractVerification: (recordHash?: string) => Promise<void>;
+  initiateRetractDispute: (recordHash?: string) => Promise<void>;
   initiateModifyVerification: (newLevel: VerificationLevel) => void;
   verification: VerificationDoc | null;
   isLoading: boolean;
@@ -46,6 +47,7 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
   initiateVerification,
   initiateDispute,
   initiateRetractVerification,
+  initiateRetractDispute,
   initiateModifyVerification,
   verification,
   isLoading,
@@ -182,6 +184,7 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
             onSelectCulpability={setCulpability}
             onNotesChange={setDisputeNotes}
             existingDispute={existingDispute}
+            initiateRetractDispute={initiateRetractDispute}
           />
         )}
       </div>
