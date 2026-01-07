@@ -1,5 +1,14 @@
 // src/features/Credibility/components/CredibilityView.tsx
 
+/**
+ * Shows all reviews for a recordId, including ones for different hashes
+ * and reviews made by people other than the user vs. RecordReviewPanel
+ * which only shows the current user's reviews
+ *
+ * Includes the Verification/Dispute Management components to allow the user to
+ * view the details related to other reviews on the selected record
+ */
+
 import React, { useState, useEffect } from 'react';
 import { FileObject } from '@/types/core';
 import { RecordHashService } from '@/features/ViewEditRecord/services/generateRecordHash';

@@ -1,14 +1,19 @@
 // src/features/Credibility/components/RecordReviewPanel.tsx
 
+/**
+ * Component for writing verifications or disputes for an individual recordHash
+ * 2 separate tabs, one to create a new verification and another to create a dispute
+ *
+ * If a review already exists, it shows options to retract or modify the existing review
+ */
+
 import React, { useState } from 'react';
 import { cn } from '@/utils/utils';
 import { Button } from '@/components/ui/Button';
 import { CheckCircle, AlertTriangle, ChevronRight, HelpCircle, Loader2 } from 'lucide-react';
 import VerificationForm from './Verifications/VerificationForm';
 import DisputeForm from './Disputes/DisputeForm';
-import CredibilityActionDialog from './ui/CredibilityActionDialog';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { useCredibilityFlow } from '../hooks/useCredibilityFlow';
 import { DisputeCulpability, DisputeDoc, DisputeSeverity } from '../services/disputeService';
 import { VerificationDoc, VerificationLevel } from '../services/verificationService';
 

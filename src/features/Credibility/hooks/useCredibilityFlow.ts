@@ -14,6 +14,7 @@ import {
   getVerification,
   type VerificationLevel,
   type VerificationDoc,
+  getVerificationConfig,
 } from '../services/verificationService';
 import {
   createDispute,
@@ -55,16 +56,6 @@ interface PendingOperation {
   disputeNotes?: string;
   reactionSupport?: boolean;
 }
-
-// ============================================================================
-// CONSTANTS
-// ============================================================================
-
-const LEVEL_LABELS: Record<VerificationLevel, string> = {
-  1: 'Provenance',
-  2: 'Content',
-  3: 'Full',
-};
 
 // ============================================================================
 // HOOK
@@ -250,7 +241,8 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       try {
         await createVerification(recordId, recordHash, verifierId, level);
 
-        toast.success(`Record verified at ${LEVEL_LABELS[level]} level`);
+        const levelInfo = getVerificationConfig(level);
+        toast.success(`Record verified at ${levelInfo.name} level`);
         reset();
         await refetchAll();
         onSuccess?.();
@@ -373,7 +365,8 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
     try {
       await modifyVerificationLevel(recordHash, verifierId, verificationLevel);
 
-      toast.success(`Verification updated to ${LEVEL_LABELS[verificationLevel]} level`);
+      const levelInfo = getVerificationConfig(verificationLevel);
+      toast.success(`Verification updated to ${levelInfo.name} level`);
 
       setPhase('success');
       await refetchAll();
