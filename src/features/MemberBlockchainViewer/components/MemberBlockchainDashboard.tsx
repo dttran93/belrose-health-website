@@ -1,4 +1,4 @@
-// src/pages/admin/MemberDashboard.tsx
+// src/features/MemberBlockchainViewer/components/MemberBlockchainDashboard.tsx
 
 import React from 'react';
 import {

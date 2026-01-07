@@ -24,9 +24,9 @@ import { getVerificationId } from './verificationService';
 // TYPES
 // ============================================================
 
-export type DisputeSeverity = 1 | 2 | 3;
+export type DisputeSeverity = 0 | 1 | 2 | 3;
 
-export type DisputeSeverityName = 'Negligible' | 'Moderate' | 'Major';
+export type DisputeSeverityName = 'None' | 'Negligible' | 'Moderate' | 'Major';
 
 export type DisputeCulpability = 0 | 1 | 2 | 3 | 4 | 5;
 
@@ -43,7 +43,7 @@ export interface SeverityConfig {
   name: DisputeSeverityName;
   description: string;
   declarative: string;
-  color: 'blue' | 'yellow' | 'red';
+  color: 'blue' | 'yellow' | 'red' | 'gray';
 }
 
 export interface CulpabilityConfig {
@@ -134,6 +134,13 @@ export const SEVERITY_CONFIG: Record<DisputeSeverity, SeverityConfig> = {
       'A serious inaccuracy that could lead to incorrect diagnoses or harmful treatment decisions. Requires immediate attention.',
     declarative: 'Serious error that could affect patient safety',
     color: 'red',
+  },
+  0: {
+    value: 0,
+    name: 'None',
+    description: 'Used on Blockchain to return error. Should not be used otherwise',
+    declarative: 'None',
+    color: 'gray',
   },
 };
 

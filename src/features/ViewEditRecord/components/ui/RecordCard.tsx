@@ -3,7 +3,7 @@ import { Calendar, Edit, Eye, User, Hospital, Ellipsis, BriefcaseMedical } from 
 import { Button } from '@/components/ui/Button';
 import { FileObject } from '@/types/core';
 import HealthRecordMenu from '@/features/ViewEditRecord/components/ui/RecordMenu';
-import { CredibilityBadge } from '@/features/Credibility/component/CredibilityBadge';
+import { CredibilityBadge } from '@/features/Credibility/components/ui/CredibilityBadge';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import SubjectBadge from '@/features/Subject/components/SubjectBadge';
 

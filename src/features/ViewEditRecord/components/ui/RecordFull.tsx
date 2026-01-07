@@ -7,7 +7,7 @@ import VersionControlPanel from '../VersionControlPanel';
 import { RecordVersion } from '../../services/versionControlService.types';
 import { CredibilityView } from '@/features/Credibility/components/CredibilityView';
 import HealthRecordMenu from './RecordMenu';
-import { CredibilityBadge } from '@/features/Credibility/component/CredibilityBadge';
+import { CredibilityBadge } from '@/features/Credibility/components/ui/CredibilityBadge';
 import RecordView from './RecordView';
 import { TabType } from './RecordView';
 import { EncryptionAccessView } from '@/features/Sharing/components/EncryptionAccessView';

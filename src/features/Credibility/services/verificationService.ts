@@ -14,16 +14,16 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import { blockchainHealthRecordService } from './blockchainHealthRecordService';
-import { FileText, Lock, LucideIcon, MapPin } from 'lucide-react';
+import { FileText, Lock, LucideIcon, MapPin, X } from 'lucide-react';
 import { getDisputeId } from './disputeService';
 
 // ============================================================
 // TYPES
 // ============================================================
 
-export type VerificationLevel = 1 | 2 | 3;
+export type VerificationLevel = 0 | 1 | 2 | 3;
 
-export type VerificationLevelName = 'Provenance' | 'Content' | 'Full';
+export type VerificationLevelName = 'None' | 'Provenance' | 'Content' | 'Full';
 
 export interface VerificationConfig {
   value: VerificationLevel;
@@ -84,6 +84,13 @@ export const VERIFICATION_LEVEL_CONFIG: Record<VerificationLevel, VerificationCo
       'I am confirming that the origin of the record is correct. I am not verifying the accuracy of its content.',
     description:
       'The verifier is confirming the origin of the record is correctly stated. They are not verifying the completeness and accuracy of the content itself.',
+  },
+  0: {
+    value: 0,
+    name: 'None',
+    icon: X,
+    declarative: '',
+    description: 'No verification',
   },
 };
 
@@ -240,7 +247,7 @@ export async function createVerification(
   const disputeExisting = await getDoc(disputeDocRef);
 
   if (disputeExisting.exists()) {
-    throw new Error('You can not both dispute and verify the same record Hash');
+    throw new Error('You can not both verify and dispute the same record Hash');
   }
 
   const verifierIdHash = ethers.keccak256(ethers.toUtf8Bytes(verifierId));

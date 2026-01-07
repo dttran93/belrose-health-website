@@ -305,3 +305,24 @@ export const hexToArrayBuffer = (hex: string): ArrayBuffer => {
   if (!matches) return new Uint8Array([]).buffer;
   return new Uint8Array(matches.map(h => parseInt(h, 16))).buffer;
 };
+
+//====================================================================
+//Number Formatting
+//====================================================================
+
+/**
+ * Calculate percentage with bounds checking
+ */
+export function calculatePercentage(value: number, total: number): number {
+  if (total === 0) return 0;
+  return Math.round((value / total) * 100);
+}
+
+/**
+ * Format a large number with K/M suffix
+ */
+export function formatLargeNumber(num: number): string {
+  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+  if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+  return num.toString();
+}
