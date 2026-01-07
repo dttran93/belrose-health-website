@@ -7,10 +7,10 @@ import { ArrowLeft, Shield, HeartHandshake } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { RecordReviewPanel } from './RecordReviewPanel';
 import { useAuth } from '@/features/Auth/hooks/useAuth';
-import VerificationManagement from './VerificationManagement';
+import VerificationManagement from './Verifications/VerificationManagement';
 import { getVerificationsByRecordId, VerificationDoc } from '../services/verificationService';
 import { getDisputesByRecordId } from '../services/disputeService';
-import DisputeManagement from './DisputeManagement';
+import DisputeManagement from './Disputes/DisputeManagement';
 import { useCredibilityFlow } from '../hooks/useCredibilityFlow';
 import CredibilityActionDialog from './ui/CredibilityActionDialog';
 

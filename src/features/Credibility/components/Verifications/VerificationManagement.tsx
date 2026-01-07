@@ -1,20 +1,29 @@
 // src/features/Credibility/components/VerificationManagement.tsx
 
+/**
+ * Component for managing all the verifications on a recordId
+ * including verifications across different hashes and made by different users
+ *
+ * This is in contrast to the Verification Form which contains details on the specific
+ * user's review and options to create Verifications.
+ *
+ * Management View includes modal to see further details on each verification.
+ */
+
 import React, { useState, useEffect } from 'react';
 import { HelpCircle, Plus, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import UserCard, { BadgeConfig } from '@/features/Users/components/ui/UserCard';
 import { useAuth } from '@/features/Auth/hooks/useAuth';
 import {
   VerificationWithVersion,
   getVerificationsByRecordId,
   buildHashVersionMap,
-  getVerificationConfig,
-} from '../services/verificationService';
-import VerificationDetailModal from './ui/VerificationDetailModal';
+} from '../../services/verificationService';
+import VerificationDetailModal from './VerificationDetailModal';
+import VerificationUserCard from './VerificationUserCard';
 
 interface VerificationManagementProps {
   record: FileObject;
@@ -201,7 +210,7 @@ export const VerificationManagement: React.FC<VerificationManagementProps> = ({
                 const isInactive = !verification.isActive;
 
                 return (
-                  <VerificationCard
+                  <VerificationUserCard
                     key={verification.id}
                     verification={verification}
                     userProfile={verifierProfile}
@@ -233,82 +242,6 @@ export const VerificationManagement: React.FC<VerificationManagementProps> = ({
           onRetract={handleRetract}
         />
       )}
-    </div>
-  );
-};
-
-// ============================================================
-// VERIFICATION CARD SUBCOMPONENT
-// ============================================================
-
-interface VerificationCardProps {
-  verification: VerificationWithVersion;
-  userProfile: BelroseUserProfile | undefined;
-  isInactive: boolean;
-  onViewUser: () => void;
-  onViewDetails: () => void;
-  onClick?: () => void;
-}
-
-const VerificationCard: React.FC<VerificationCardProps> = ({
-  verification,
-  userProfile,
-  isInactive,
-  onViewUser,
-  onViewDetails,
-  onClick,
-}) => {
-  const levelInfo = getVerificationConfig(verification.level);
-  const versionBadgeText =
-    verification.versionNumber === 1 ? 'Current' : `v${verification.versionNumber}`;
-
-  // Badge configs for the UserCard
-  const badges: BadgeConfig[] = [
-    {
-      text: versionBadgeText,
-      color: verification.versionNumber === 1 ? 'green' : 'yellow',
-      tooltip:
-        verification.versionNumber === 1
-          ? 'Verified the current version'
-          : `Verified version ${verification.versionNumber} of ${verification.totalVersions}`,
-    },
-    {
-      text: levelInfo.name,
-      color: 'purple',
-      tooltip: `Verification level: ${levelInfo.name}`,
-    },
-  ];
-
-  // Add status badge if inactive
-  if (isInactive) {
-    badges.push({
-      text: 'Retracted',
-      color: 'red',
-      tooltip: 'This verification has been retracted',
-    });
-  }
-
-  return (
-    <div
-      className={`cursor-pointer hover:bg-gray-50 rounded-lg transition-colors ${isInactive ? 'opacity-50' : ''}`}
-      onClick={onClick}
-    >
-      <UserCard
-        user={userProfile}
-        userId={verification.verifierId}
-        variant="default"
-        color={isInactive ? 'red' : 'green'}
-        badges={badges}
-        onViewUser={onViewUser}
-        onViewDetails={onViewDetails}
-        metadata={[
-          {
-            label: 'Verified',
-            value: verification.createdAt.toDate().toLocaleDateString(),
-          },
-        ]}
-        onCardClick={onClick}
-      />
     </div>
   );
 };

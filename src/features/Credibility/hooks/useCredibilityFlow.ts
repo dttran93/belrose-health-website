@@ -28,7 +28,7 @@ import {
   reactToDispute,
 } from '../services/disputeService';
 import { toast } from 'sonner';
-import { DialogPhase } from '../component/ui/CredibilityActionDialog';
+import { DialogPhase } from '../components/ui/CredibilityActionDialog';
 
 // ============================================================================
 // TYPES
