@@ -4,8 +4,7 @@ import { useState } from 'react';
 import { getAuth } from 'firebase/auth';
 import { toast } from 'sonner';
 import { FileObject } from '@/types/core';
-import { usePermissions } from '@/features/Permissions/hooks/usePermissions';
-import { SharingService } from '@/features/Sharing/services/sharingService';
+import { PermissionsService } from '@/features/Permissions/services/permissionsService';
 import { SubjectService } from '../services/subjectService';
 
 export type SubjectRole = 'viewer' | 'administrator' | 'owner';
@@ -75,6 +74,7 @@ export const getMinimumAllowedRole = (userId: string, record: FileObject): Subje
  * This hook provides a UI-friendly interface for subject management,
  * handling loading states, error messages, and toast notifications.
  * All Firestore operations are delegated to SubjectService.
+ * Permission operations use PermissionsService directly (no dialog confirmation needed).
  */
 export const useSetSubject = (options: UseSetSubjectOptions = {}): UseSetSubjectReturn => {
   const { onSuccess, onError } = options;
@@ -83,22 +83,19 @@ export const useSetSubject = (options: UseSetSubjectOptions = {}): UseSetSubject
 
   const auth = getAuth();
 
-  // Use the permissions hook for role management
-  const { grantOwner, grantAdmin, grantViewer } = usePermissions();
-
   /**
-   * Grant a role to a user for a record using existing permission services
+   * Grant a role to a user for a record using PermissionsService
    */
   const grantRole = async (recordId: string, userId: string, role: SubjectRole): Promise<void> => {
     switch (role) {
       case 'owner':
-        await grantOwner(recordId, userId);
+        await PermissionsService.grantOwner(recordId, userId);
         break;
       case 'administrator':
-        await grantAdmin(recordId, userId);
+        await PermissionsService.grantAdmin(recordId, userId);
         break;
       case 'viewer':
-        await grantViewer(recordId, userId);
+        await PermissionsService.grantViewer(recordId, userId);
         break;
     }
   };

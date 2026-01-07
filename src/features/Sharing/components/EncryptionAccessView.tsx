@@ -17,7 +17,10 @@ import { FileObject, BelroseUserProfile } from '@/types/core';
 import UserCard, { BadgeConfig } from '@/features/Users/components/ui/UserCard';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { Button } from '@/components/ui/Button';
-import { usePermissions } from '@/features/Permissions/hooks/usePermissions';
+import { usePermissionFlow } from '@/features/Permissions/hooks/usePermissionFlow';
+import { PermissionActionDialog } from '@/features/Permissions/component/ui/PermissionActionDialog';
+import UserSearch from '@/features/Users/components/UserSearch';
+import type { Role } from '@/features/Permissions/services/permissionsService';
 
 interface WrappedKeyInfo {
   userId: string;
@@ -46,17 +49,23 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
   const [accessEntries, setAccessEntries] = useState<AccessEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedEntry, setSelectedEntry] = useState<AccessEntry | null>(null);
-  const [isGrantModalOpen, setIsGrantModalOpen] = useState(false);
 
-  //Import from usePermissions hook
-  //revokeAllAccess takes any userId, determines the role they have and calls the correct permissionService
+  // Use the new permission flow hook
   const {
-    revokeAllAccess,
-    removeAdmin,
-    removeOwner,
+    dialogProps,
+    initiateRevoke,
+    initiateGrant,
     isLoading: isActionLoading,
-  } = usePermissions();
+  } = usePermissionFlow({
+    recordId: record.id,
+    onSuccess: () => {
+      fetchEncryptionAccess();
+    },
+  });
+
+  // State for user search/selection when granting access
+  const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
+  const [selectedUserForGrant, setSelectedUserForGrant] = useState<BelroseUserProfile | null>(null);
 
   const getEntryBadges = (entry: AccessEntry): BadgeConfig[] => {
     const badges: BadgeConfig[] = [];
@@ -105,7 +114,7 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
       },
       revoked: {
         text: 'Revoked',
-        color: 'primary', // primary mapping to gray/default in your card
+        color: 'primary',
         icon: <XCircle className="w-3 h-3" />,
         tooltip: 'Access was previously granted but has been revoked.',
       },
@@ -122,11 +131,11 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
       const db = getFirestore();
 
       // 1. Fetch the LATEST record data to get updated roles
-      const recordDocRef = doc(db, 'records', record.id); // Adjust 'records' to your actual collection name
+      const recordDocRef = doc(db, 'records', record.id);
       const recordSnap = await getDoc(recordDocRef);
       const latestRecord = recordSnap.exists() ? (recordSnap.data() as FileObject) : record;
 
-      // 2. Fetch wrapped keys (Existing logic)
+      // 2. Fetch wrapped keys
       const wrappedKeysRef = collection(db, 'wrappedKeys');
       const q = query(wrappedKeysRef, where('recordId', '==', record.id));
       const querySnapshot = await getDocs(q);
@@ -139,7 +148,7 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
           }) as WrappedKeyInfo
       );
 
-      // 3. Use latestRecord instead of record for calculating allUserIds
+      // 3. Use latestRecord for calculating allUserIds
       const allUserIds = new Set<string>([
         ...wrappedKeys.map(wk => wk.userId),
         ...(latestRecord.owners || []),
@@ -185,29 +194,50 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
   ).length;
   const activeKeyCount = accessEntries.filter(e => e.wrappedKey?.isActive).length;
 
-  const handleRevokeConfirm = async (action: 'full-revoke' | 'demote-admin' | 'demote-viewer') => {
-    if (!selectedEntry) return;
-
-    const { userId, role } = selectedEntry;
-    let success = false;
-
-    if (action === 'full-revoke') {
-      if (role === 'owner') success = await removeOwner(record.id, userId, {});
-      else if (role === 'administrator')
-        success = await removeAdmin(record.id, userId, { demoteToViewer: false });
-      else success = await revokeAllAccess(record.id, userId);
-    } else if (action === 'demote-admin') {
-      success = await removeOwner(record.id, userId, { demoteTo: 'administrator' });
-    } else if (action === 'demote-viewer') {
-      if (role === 'owner') success = await removeOwner(record.id, userId, { demoteTo: 'viewer' });
-      else success = await removeAdmin(record.id, userId, { demoteToViewer: true });
+  /**
+   * Handle delete/revoke button click on a user card
+   * Initiates the revoke flow with the permission dialog
+   */
+  const handleRevokeClick = (entry: AccessEntry) => {
+    // Only initiate revoke if user has a role and a profile
+    if (entry.role === 'none' || !entry.profile) {
+      return;
     }
 
-    if (success) {
-      setSelectedEntry(null);
-      fetchEncryptionAccess(); // Refresh list
-    }
+    // Map AccessEntry role to Role type (excluding 'none')
+    const role = entry.role as Role;
+    initiateRevoke(entry.profile, role);
   };
+
+  /**
+   * Handle user selection from search
+   */
+  const handleUserSelect = (user: BelroseUserProfile) => {
+    setSelectedUserForGrant(user);
+  };
+
+  /**
+   * Handle grant button click - initiates grant with role selection
+   */
+  const handleGrantAccess = () => {
+    if (!selectedUserForGrant) return;
+    // Use 'select-role' variant so user can choose the role in the dialog
+    initiateGrant(selectedUserForGrant, 'viewer', 'select-role');
+    // Clear selection and close search
+    setSelectedUserForGrant(null);
+    setIsUserSearchOpen(false);
+  };
+
+  /**
+   * Cancel adding a user
+   */
+  const handleCancelGrant = () => {
+    setSelectedUserForGrant(null);
+    setIsUserSearchOpen(false);
+  };
+
+  // Get list of user IDs to exclude from search (already have access)
+  const excludeUserIds = accessEntries.map(entry => entry.userId);
 
   return (
     <div className="w-full mx-auto p-8 space-y-6">
@@ -223,6 +253,7 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
           </Button>
         </div>
       </div>
+
       {/* Current Wrapped Keys Section */}
       <div className="mb-4 border border-gray-200 rounded-lg">
         <div className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between rounded-t-lg">
@@ -282,8 +313,8 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
               </Tooltip.Provider>
             </div>
             <button
-              className="rounded-full hover:bg-gray-300"
-              onClick={() => setIsGrantModalOpen(true)}
+              className="rounded-full hover:bg-gray-300 p-1"
+              onClick={() => setIsUserSearchOpen(!isUserSearchOpen)}
             >
               <Plus />
             </button>
@@ -302,16 +333,16 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
           ) : accessEntries.length > 0 ? (
             <div className="space-y-3">
               {accessEntries.map(entry => {
-                // Determine card styling based on status
                 const hasIssue = entry.status === 'missing-key' || entry.status === 'missing-role';
                 const cardColor = hasIssue ? 'red' : 'primary';
+                const canRevoke = entry.role !== 'none' && entry.profile;
 
                 return (
                   <UserCard
                     key={entry.userId}
                     user={entry.profile}
                     userId={entry.userId}
-                    onDelete={() => setSelectedEntry(entry)}
+                    onDelete={canRevoke ? () => handleRevokeClick(entry) : undefined}
                     color={cardColor}
                     variant="default"
                     badges={getEntryBadges(entry)}
@@ -329,6 +360,50 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
           )}
         </div>
       </div>
+
+      {/* User Search for Granting Access */}
+      {isUserSearchOpen && (
+        <div className="mb-4 border border-gray-200 rounded-lg p-4 bg-white">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-semibold text-gray-900">Grant Access</h4>
+            <button onClick={handleCancelGrant} className="text-gray-400 hover:text-gray-600">
+              <XCircle className="w-5 h-5" />
+            </button>
+          </div>
+
+          <UserSearch
+            onUserSelect={handleUserSelect}
+            excludeUserIds={excludeUserIds}
+            placeholder="Search by name, email, or user ID..."
+          />
+
+          {/* Selected User Preview */}
+          {selectedUserForGrant && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <p className="text-sm font-medium text-gray-700 mb-3">Grant access to this user:</p>
+              <UserCard
+                user={selectedUserForGrant}
+                userId={selectedUserForGrant.uid}
+                onViewUser={() => {}}
+                variant="default"
+                color="green"
+                menuType="cancel"
+                onCancel={() => setSelectedUserForGrant(null)}
+              />
+              <Button
+                onClick={handleGrantAccess}
+                disabled={isActionLoading}
+                className="w-full mt-3"
+              >
+                {isActionLoading ? 'Processing...' : 'Select Role & Grant Access'}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Permission Action Dialog - handles preparation, confirmation, and execution */}
+      <PermissionActionDialog {...dialogProps} />
     </div>
   );
 };
