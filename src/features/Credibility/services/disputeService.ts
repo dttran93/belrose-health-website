@@ -18,7 +18,6 @@ import { EncryptionService } from '@/features/Encryption/services/encryptionServ
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 import { blockchainHealthRecordService } from './blockchainHealthRecordService';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
-import { CircleDashed, CircleDot, CircleDotDashed, LucideIcon } from 'lucide-react';
 import { getVerificationId } from './verificationService';
 
 // ============================================================
@@ -69,6 +68,20 @@ export interface DisputeDoc {
   culpability: DisputeCulpability;
   encryptedNotes?: EncryptedField;
   notesHash: string;
+  isActive: boolean;
+  createdAt: Timestamp;
+  lastModified?: Timestamp;
+  chainStatus: 'pending' | 'confirmed' | 'failed';
+  txHash?: string;
+}
+
+export interface ReactionDoc {
+  id: string;
+  recordId: string;
+  recordHash: string;
+  reactorId: string;
+  reactorIdHash: string;
+  supportsDispute: boolean;
   isActive: boolean;
   createdAt: Timestamp;
   lastModified?: Timestamp;
@@ -778,6 +791,90 @@ export async function modifyReaction(
     });
     throw error;
   }
+}
+
+// ============================================================
+// REACTION QUERY FUNCTIONS
+// ============================================================
+
+/**
+ * Fetches all reactions for a specific dispute.
+ * Returns full ReactionDoc objects for displaying user lists.
+ *
+ * @param recordId - The record ID the dispute is for
+ * @param recordHash - The record hash the dispute is for
+ * @param disputerId - The ID of the disputer
+ * @param activeOnly - Whether to only return active reactions (default: true)
+ * @returns Array of ReactionDoc objects
+ */
+export async function getDisputeReactions(
+  recordId: string,
+  recordHash: string,
+  disputerId: string,
+  activeOnly: boolean = true
+): Promise<ReactionDoc[]> {
+  const db = getFirestore();
+  const reactionsRef = collection(db, 'disputeReactions');
+
+  // Build query
+  let q = query(
+    reactionsRef,
+    where('recordId', '==', recordId),
+    where('recordHash', '==', recordHash),
+    where('disputerId', '==', disputerId)
+  );
+
+  // Note: Firestore doesn't allow multiple inequality filters,
+  // so we filter isActive in memory if needed
+  const querySnapshot = await getDocs(q);
+
+  const reactions: ReactionDoc[] = [];
+
+  querySnapshot.forEach(doc => {
+    const data = doc.data();
+
+    // Filter by active status if requested
+    if (activeOnly && !data.isActive) {
+      return;
+    }
+
+    reactions.push({
+      id: doc.id,
+      recordId: data.recordId,
+      recordHash: data.recordHash,
+      reactorId: data.reactorId,
+      reactorIdHash: data.reactorIdHash,
+      supportsDispute: data.supportsDispute,
+      isActive: data.isActive,
+      createdAt: data.createdAt,
+      lastModified: data.lastModified,
+      chainStatus: data.chainStatus,
+      txHash: data.txHash,
+    } as ReactionDoc);
+  });
+
+  // Sort by createdAt (newest first)
+  reactions.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+
+  return reactions;
+}
+
+/**
+ * Fetches reactions filtered by support type.
+ * Convenience wrapper around getDisputeReactions.
+ *
+ * @param recordHash - The record hash the dispute is for
+ * @param disputerId - The ID of the disputer
+ * @param supportsDispute - true for supporters, false for opposers
+ * @returns Array of ReactionDoc objects
+ */
+export async function getDisputeReactionsByType(
+  recordHash: string,
+  disputerId: string,
+  supportsDispute: boolean
+): Promise<ReactionDoc[]> {
+  const reactions = await getDisputeReactions(recordHash, disputerId, 'true');
+  return reactions.filter(r => r.supportsDispute === supportsDispute);
 }
 
 /**
