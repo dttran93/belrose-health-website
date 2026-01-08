@@ -624,9 +624,7 @@ export class SubjectService {
       const subjects: string[] = recordData.subjects || [];
 
       // Check if user is currently a subject
-      const isCurrentSubject = subjects.includes(user.uid);
-
-      if (!isCurrentSubject) {
+      if (!subjects.includes(user.uid)) {
         throw new Error('You are not a subject of this record');
       }
 

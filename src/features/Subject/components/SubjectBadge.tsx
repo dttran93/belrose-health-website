@@ -4,8 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { FileUser, AlertTriangle, Loader2 } from 'lucide-react';
 import { FileObject } from '@/types/core';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
-import SetSubject from './setSubject';
 import * as Tooltip from '@radix-ui/react-tooltip';
+import { useSubjectFlow } from '../hooks/useSubjectFlow';
+import SubjectActionDialog from './ui/SubjectActionDialog';
 
 interface SubjectBadgeProps {
   record: FileObject;
@@ -30,6 +31,13 @@ export const SubjectBadge: React.FC<SubjectBadgeProps> = ({
 
   const subjects = record.subjects || [];
   const hasSubject = subjects.length > 0;
+
+  const { dialogProps } = useSubjectFlow({
+    record,
+    onSuccess: () => {
+      onSuccess?.();
+    },
+  });
 
   // Fetch the first subject's name for display
   useEffect(() => {
@@ -158,14 +166,8 @@ export const SubjectBadge: React.FC<SubjectBadgeProps> = ({
           </Tooltip.Root>
         </Tooltip.Provider>
 
-        {/* SetSubject Modal */}
-        <SetSubject
-          record={record}
-          onSuccess={handleSuccess}
-          asModal={true}
-          isOpen={showSetSubjectModal}
-          onClose={handleModalClose}
-        />
+        {/* Subject Action Modal - can still open from here if needed */}
+        <SubjectActionDialog {...dialogProps} />
       </>
     );
   }
@@ -206,14 +208,8 @@ export const SubjectBadge: React.FC<SubjectBadgeProps> = ({
         </Tooltip.Root>
       </Tooltip.Provider>
 
-      {/* SetSubject Modal - can still open from here if needed */}
-      <SetSubject
-        record={record}
-        onSuccess={handleSuccess}
-        asModal={true}
-        isOpen={showSetSubjectModal}
-        onClose={handleModalClose}
-      />
+      {/* Subject Action Modal - can still open from here if needed */}
+      <SubjectActionDialog {...dialogProps} />
     </>
   );
 };
