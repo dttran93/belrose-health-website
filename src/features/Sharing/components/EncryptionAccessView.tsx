@@ -14,13 +14,14 @@ import {
 import { getFirestore, collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { FileObject, BelroseUserProfile } from '@/types/core';
-import UserCard, { BadgeConfig } from '@/features/Users/components/ui/UserCard';
+import UserCard from '@/features/Users/components/ui/UserCard';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { Button } from '@/components/ui/Button';
 import { usePermissionFlow } from '@/features/Permissions/hooks/usePermissionFlow';
 import { PermissionActionDialog } from '@/features/Permissions/component/ui/PermissionActionDialog';
 import UserSearch from '@/features/Users/components/UserSearch';
 import type { Role } from '@/features/Permissions/services/permissionsService';
+import { UserBadge } from '@/features/Users/components/ui/UserBadge';
 
 interface WrappedKeyInfo {
   userId: string;
@@ -67,31 +68,20 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
   const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
   const [selectedUserForGrant, setSelectedUserForGrant] = useState<BelroseUserProfile | null>(null);
 
-  const getEntryBadges = (entry: AccessEntry): BadgeConfig[] => {
-    const badges: BadgeConfig[] = [];
-
-    // 1. Subject Badge
+  const renderAccessContent = (entry: AccessEntry) => {
     const isSubject = record.subjects?.includes(entry.userId);
-    if (isSubject) {
-      badges.push({ text: 'Subject', color: 'pink' });
-    }
 
-    // 2. Creator Badge
-    if (entry.wrappedKey?.isCreator) {
-      badges.push({ text: 'Creator', color: 'purple' });
-    }
-
-    // 3. Role Badge
-    const roleConfigs: Record<AccessEntry['role'], BadgeConfig> = {
+    const roleConfigs: Record<AccessEntry['role'], { text: string; color: any }> = {
       owner: { text: 'Owner', color: 'red' },
       administrator: { text: 'Admin', color: 'blue' },
       viewer: { text: 'Viewer', color: 'yellow' },
       none: { text: 'No Role', color: 'primary' },
     };
-    badges.push(roleConfigs[entry.role]);
 
-    // 4. Status Badge
-    const statusConfigs: Record<AccessEntry['status'], BadgeConfig> = {
+    const statusConfigs: Record<
+      AccessEntry['status'],
+      { text: string; color: any; icon: any; tooltip: string }
+    > = {
       synced: {
         text: 'Synced',
         color: 'green',
@@ -102,15 +92,13 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
         text: 'Missing Key',
         color: 'red',
         icon: <AlertTriangle className="w-3 h-3" />,
-        tooltip:
-          'User has a role but no wrapped key. They cannot decrypt this record. Re-grant their role to fix.',
+        tooltip: 'User has a role but no wrapped key. They cannot decrypt this record.',
       },
       'missing-role': {
         text: 'Orphaned Key',
         color: 'yellow',
         icon: <AlertTriangle className="w-3 h-3" />,
-        tooltip:
-          'User has a wrapped key but no role. They may be able to decrypt but should not have access.',
+        tooltip: 'User has a wrapped key but no role. Security issue.',
       },
       revoked: {
         text: 'Revoked',
@@ -119,9 +107,23 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
         tooltip: 'Access was previously granted but has been revoked.',
       },
     };
-    badges.push(statusConfigs[entry.status]);
 
-    return badges;
+    const role = roleConfigs[entry.role];
+    const status = statusConfigs[entry.status];
+
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        {isSubject && <UserBadge text="Subject" color="pink" />}
+        {entry.wrappedKey?.isCreator && <UserBadge text="Creator" color="purple" />}
+        <UserBadge text={role.text} color={role.color} />
+        <UserBadge
+          text={status.text}
+          color={status.color}
+          icon={status.icon}
+          tooltip={status.tooltip}
+        />
+      </div>
+    );
   };
 
   const fetchEncryptionAccess = async () => {
@@ -345,7 +347,7 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
                     onDelete={canRevoke ? () => handleRevokeClick(entry) : undefined}
                     color={cardColor}
                     variant="default"
-                    badges={getEntryBadges(entry)}
+                    content={renderAccessContent(entry)}
                     showEmail={true}
                     showUserId={true}
                     onViewUser={() => {}}

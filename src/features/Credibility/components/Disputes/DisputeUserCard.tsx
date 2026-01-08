@@ -1,12 +1,9 @@
-// src/features/Credibility/components/Disputes/DisputeUserCard
+// src/features/Credibility/components/Disputes/DisputeUserCard.tsx
 
-/**
- * UserCard customized for the Dispute Manager
- * Includes badges for dispute details and reaction buttons
- */
-
+import React from 'react';
 import ReactionButtons, { ReactionType } from '@/components/ui/ReactionButtons';
-import UserCard, { BadgeConfig } from '@/features/Users/components/ui/UserCard';
+import UserCard from '@/features/Users/components/ui/UserCard';
+import { UserBadge } from '@/features/Users/components/ui/UserBadge';
 import {
   DisputeWithVersion,
   getCulpabilityConfig,
@@ -48,55 +45,61 @@ const DisputeUserCard: React.FC<DisputeCardProps> = ({
     throw new Error('Invalid severity or culpability level');
   }
 
-  // Version badge
-  const versionBadgeText = dispute.versionNumber === 1 ? 'Current' : `v${dispute.versionNumber}`;
-  const versionBadgeColor = dispute.versionNumber === 1 ? 'green' : 'yellow';
+  const renderDisputeContent = () => {
+    const versionBadgeText = dispute.versionNumber === 1 ? 'Current' : `v${dispute.versionNumber}`;
+    const versionBadgeColor = dispute.versionNumber === 1 ? 'green' : 'yellow';
 
-  // Badge configs for the UserCard
-  const badges: BadgeConfig[] = [
-    {
-      text: versionBadgeText,
-      color: versionBadgeColor,
-      tooltip:
-        dispute.versionNumber === 1
-          ? 'Disputed the current version'
-          : `Disputed version ${dispute.versionNumber} of ${dispute.totalVersions}`,
-    },
-    {
-      text: severityInfo.name,
-      color: dispute.severity === 3 ? 'red' : dispute.severity === 2 ? 'yellow' : 'blue',
-      tooltip: `Severity: ${severityInfo.name}`,
-    },
-    {
-      text: culpabilityInfo.name,
-      color: 'purple',
-      tooltip: `Culpability: ${culpabilityInfo.name}`,
-    },
-  ];
+    return (
+      <div className="flex items-center gap-3">
+        {/* Dispute Badges */}
+        <div className="flex flex-wrap gap-2">
+          <UserBadge
+            text={versionBadgeText}
+            color={versionBadgeColor}
+            tooltip={
+              dispute.versionNumber === 1
+                ? 'Disputed the current version'
+                : `Disputed version ${dispute.versionNumber} of ${dispute.totalVersions}`
+            }
+          />
+          <UserBadge
+            text={severityInfo.name}
+            color={dispute.severity === 3 ? 'red' : dispute.severity === 2 ? 'yellow' : 'blue'}
+            tooltip={`Severity: ${severityInfo.name}`}
+          />
+          <UserBadge
+            text={culpabilityInfo.name}
+            color="purple"
+            tooltip={`Culpability: ${culpabilityInfo.name}`}
+          />
+          {isInactive && (
+            <UserBadge text="Retracted" color="red" tooltip="This dispute has been retracted" />
+          )}
+          {dispute.chainStatus === 'pending' && (
+            <UserBadge text="Pending" color="yellow" tooltip="Awaiting blockchain confirmation" />
+          )}
+          {dispute.chainStatus === 'failed' && (
+            <UserBadge text="Failed" color="red" tooltip="Blockchain transaction failed" />
+          )}
+        </div>
 
-  // Add status badge if inactive
-  if (isInactive) {
-    badges.push({
-      text: 'Retracted',
-      color: 'red',
-      tooltip: 'This dispute has been retracted',
-    });
-  }
-
-  // Chain status badge
-  if (dispute.chainStatus === 'pending') {
-    badges.push({
-      text: 'Pending',
-      color: 'yellow',
-      tooltip: 'Awaiting blockchain confirmation',
-    });
-  } else if (dispute.chainStatus === 'failed') {
-    badges.push({
-      text: 'Failed',
-      color: 'red',
-      tooltip: 'Blockchain transaction failed',
-    });
-  }
+        {/* Reaction Actions */}
+        <div className="border-l pl-3">
+          <ReactionButtons
+            supportCount={reactionStats.supports}
+            opposeCount={reactionStats.opposes}
+            userReaction={reactionStats.userReaction}
+            onSupport={() => onReact(true)}
+            onOppose={() => onReact(false)}
+            disabled={isInactive || isOwnDispute}
+            isLoading={isLoadingReaction}
+            supportTooltip={isOwnDispute ? "You can't react to your own" : 'Support this'}
+            opposeTooltip={isOwnDispute ? "You can't react to your own" : 'Oppose this'}
+          />
+        </div>
+      </div>
+    );
+  };
 
   return (
     <UserCard
@@ -104,34 +107,16 @@ const DisputeUserCard: React.FC<DisputeCardProps> = ({
       userId={dispute.disputerId}
       variant="default"
       color={isInactive ? 'red' : 'yellow'}
-      badges={badges}
+      content={renderDisputeContent()}
       onViewUser={onViewUser}
       onViewDetails={onViewDetails}
-      className={isInactive ? 'opacity-50' : ''}
+      className={isInactive ? 'opacity-60' : ''}
       metadata={[
         {
           label: 'Filed',
           value: dispute.createdAt.toDate().toLocaleDateString(),
         },
       ]}
-      // Pass ReactionButtons as rightContent (between badges and menu)
-      content={
-        <ReactionButtons
-          supportCount={reactionStats.supports}
-          opposeCount={reactionStats.opposes}
-          userReaction={reactionStats.userReaction}
-          onSupport={() => onReact(true)}
-          onOppose={() => onReact(false)}
-          disabled={isInactive || isOwnDispute}
-          isLoading={isLoadingReaction}
-          supportTooltip={
-            isOwnDispute ? "You can't react to your own dispute" : 'Support this dispute'
-          }
-          opposeTooltip={
-            isOwnDispute ? "You can't react to your own dispute" : 'Oppose this dispute'
-          }
-        />
-      }
     />
   );
 };

@@ -8,6 +8,7 @@ import { FileObject, BelroseUserProfile } from '@/types/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import PermissionActionDialog from './ui/PermissionActionDialog';
+import { PermissionUserCard } from './ui/PermissionUserCard';
 
 interface ViewerManagementProps {
   record: FileObject;
@@ -176,12 +177,12 @@ export const ViewerManagement: React.FC<ViewerManagementProps> = ({
               {record.viewers.map(viewerId => {
                 const profile = userProfiles.get(viewerId);
                 return (
-                  <UserCard
+                  <PermissionUserCard
                     key={viewerId}
-                    user={profile}
-                    onViewUser={() => {}}
+                    userId={viewerId}
+                    userProfile={profile}
+                    record={record}
                     onDelete={() => handleDeleteViewer(viewerId)}
-                    variant="default"
                     color="yellow"
                   />
                 );

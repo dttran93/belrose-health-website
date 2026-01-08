@@ -21,6 +21,7 @@ import { SubjectService, SubjectConsentRequest } from '../services/subjectServic
 import { useSubjectFlow } from '../hooks/useSubjectFlow';
 import { SubjectActionDialog } from './ui/SubjectActionDialog';
 import { useAuthContext } from '@/features/Auth/AuthContext';
+import { SubjectCard } from './ui/SubjectCard';
 
 interface SubjectManagerProps {
   record: FileObject;
@@ -271,14 +272,12 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
                   {currentSubjects.map(subjectId => {
                     const subjectProfile = subjectProfiles.get(subjectId);
                     return (
-                      <UserCard
+                      <SubjectCard
                         key={subjectId}
-                        user={subjectProfile}
                         userId={subjectId}
+                        userProfile={subjectProfile}
                         onDelete={() => handleRemoveSubject(subjectId)}
-                        variant="default"
-                        color="red"
-                        onViewUser={() => {}}
+                        record={record}
                       />
                     );
                   })}
@@ -320,14 +319,13 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
                   {pendingRequests.map(request => {
                     const pendingProfile = pendingProfiles.get(request.subjectId);
                     return (
-                      <UserCard
+                      <SubjectCard
                         key={request.subjectId}
-                        user={pendingProfile}
                         userId={request.subjectId}
+                        userProfile={pendingProfile}
+                        record={record}
+                        isPending={true}
                         onDelete={() => handleCancelPendingRequest(request.subjectId)}
-                        variant="default"
-                        color="primary"
-                        onViewUser={() => {}}
                       />
                     );
                   })}

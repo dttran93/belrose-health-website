@@ -8,6 +8,7 @@ import { FileObject, BelroseUserProfile } from '@/types/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import PermissionActionDialog from './ui/PermissionActionDialog';
+import { PermissionUserCard } from './ui/PermissionUserCard';
 
 interface OwnerManagementProps {
   record: FileObject;
@@ -185,12 +186,12 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
               {record.owners.map(ownerId => {
                 const profile = userProfiles.get(ownerId);
                 return (
-                  <UserCard
+                  <PermissionUserCard
                     key={ownerId}
-                    user={profile}
-                    onViewUser={() => {}}
+                    userId={ownerId}
+                    userProfile={profile}
+                    record={record}
                     onDelete={() => handleDeleteOwner(ownerId)}
-                    variant="default"
                     color="red"
                   />
                 );

@@ -10,6 +10,7 @@ import { FileObject, BelroseUserProfile } from '@/types/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import PermissionActionDialog from './ui/PermissionActionDialog';
+import { PermissionUserCard } from './ui/PermissionUserCard';
 
 interface AdminManagementProps {
   record: FileObject;
@@ -191,13 +192,13 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
               {record.administrators.map(admin => {
                 const adminProfile = userProfiles.get(admin);
                 return (
-                  <UserCard
+                  <PermissionUserCard
                     key={admin}
-                    user={adminProfile}
-                    onViewUser={() => {}}
-                    onDelete={() => handleDeleteAdmin(admin)}
-                    variant="default"
+                    userId={admin}
+                    userProfile={adminProfile}
+                    record={record}
                     color="blue"
+                    onDelete={() => handleDeleteAdmin(admin)}
                   />
                 );
               })}
