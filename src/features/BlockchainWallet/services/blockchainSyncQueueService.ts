@@ -29,7 +29,21 @@ type SyncContext =
       recordId: string;
     }
   | { type: 'memberRegistry'; newStatus?: string }
-  | { type: 'recordAnchor'; recordId: string; recordHash: string; subject: string };
+  | { type: 'anchorRecord'; recordId: string; recordHash: string; subjectId: string }
+  | { type: 'unanchorRecord'; recordId: string; subjectId: string }
+  | { type: 'reanchorRecord'; recordId: string; recordHash: string; subjectId: string }
+  | { type: 'addRecordHash'; recordId: string; recordHash: string; subjectId: string }
+  | { type: 'verification'; recordId: string; recordHash: string }
+  | { type: 'verification-retraction'; recordId: string; recordHash: string }
+  | { type: 'verification-modification'; recordId: string; recordHash: string }
+  | { type: 'dispute'; recordId: string; recordHash: string }
+  | { type: 'dispute-retraction'; recordId: string; recordHash: string }
+  | { type: 'dispute-modification'; recordId: string; recordHash: string }
+  | { type: 'reaction'; recordId: string; recordHash: string; disputeId: string }
+  | { type: 'reaction-retraction'; recordId: string; recordHash: string; disputeId: string }
+  | { type: 'reaction-modification'; recordId: string; recordHash: string; disputeId: string }
+  | { type: 'flagUnacceptedUpdate'; recordId: string; recordHash: string; disputeId: string }
+  | { type: 'resolveUnacceptedUpdate'; recordId: string; recordHash: string; disputeId: string };
 
 export interface BlockchainSyncFailure extends BaseSyncFailure {
   context: SyncContext;

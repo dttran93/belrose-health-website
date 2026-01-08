@@ -12,8 +12,10 @@
  * Notifications are handled with functions/notifications/triggers -->
  * automatically send notifications for any updates within the records collections
  *
- * Blockchain integration (signature verification, anchoring) is handled
- * separately in subjectBlockchainService.ts
+ * Blockchain integration:
+ * - Anchoring subjects on-chain when they accept/set themselves as subject
+ * - Unanchoring when subjects remove themselves
+ * - Uses BlockchainSyncQueueService for retry on blockchain failures
  */
 
 import {
@@ -33,6 +35,8 @@ import {
   deleteDoc,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { blockchainHealthRecordService } from '@/features/Credibility/services/blockchainHealthRecordService';
+import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 
 // ============================================================================
 // TYPES
@@ -80,6 +84,7 @@ export interface SetSubjectSelfResult {
   success: boolean;
   recordId: string;
   subjectId: string;
+  blockchainAnchored?: boolean;
 }
 
 export interface RequestSubjectConsentResult {
@@ -94,6 +99,7 @@ export interface AcceptSubjectRequestResult {
   recordId: string;
   accepted: boolean;
   signature?: string;
+  blockchainAnchored?: boolean;
 }
 
 export interface RejectSubjectStatusResult {
@@ -101,6 +107,7 @@ export interface RejectSubjectStatusResult {
   recordId: string;
   rejectionType: SubjectRejectionType;
   pendingCreatorDecision: boolean;
+  blockchainUnanchored?: boolean;
 }
 
 export interface RespondToRejectionResult {
@@ -129,11 +136,102 @@ const getConsentRequestId = (recordId: string, subjectId: string): string => {
 };
 
 export class SubjectService {
+  // ============================================================================
+  // HELPER METHODS
+  // ============================================================================
+
+  /**
+   * Get user's wallet address from Firestore
+   */
+  private static async getUserWalletAddress(userId: string): Promise<string | null> {
+    const db = getFirestore();
+    const userDoc = await getDoc(doc(db, 'users', userId));
+
+    if (!userDoc.exists()) {
+      return null;
+    }
+
+    const userData = userDoc.data();
+    return userData.wallet?.address || null;
+  }
+
+  /**
+   * Anchor a subject to a record on the blockchain
+   * Logs to sync queue if blockchain call fails
+   */
+  private static async anchorSubjectOnChain(
+    recordId: string,
+    recordHash: string,
+    userId: string,
+    userWalletAddress: string
+  ): Promise<boolean> {
+    try {
+      console.log('⛓️ Anchoring subject on blockchain...', { recordId, userId });
+      await blockchainHealthRecordService.anchorRecord(recordId, recordHash);
+      console.log('✅ Subject anchored on blockchain');
+      return true;
+    } catch (blockchainError) {
+      console.error('⚠️ Blockchain anchoring failed:', blockchainError);
+      await BlockchainSyncQueueService.logFailure({
+        contract: 'HealthRecordCore',
+        action: 'anchorRecord',
+        userId: userId,
+        userWalletAddress: userWalletAddress,
+        error: blockchainError as string,
+        context: {
+          type: 'anchorRecord',
+          recordId: recordId,
+          recordHash: recordHash,
+          subjectId: userId,
+        },
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Unanchor a subject from a record on the blockchain
+   * Logs to sync queue if blockchain call fails
+   */
+  private static async unanchorSubjectOnChain(
+    recordId: string,
+    userId: string,
+    userWalletAddress: string
+  ): Promise<boolean> {
+    try {
+      console.log('⛓️ Unanchoring subject on blockchain...', { recordId, userId });
+      await blockchainHealthRecordService.unanchorRecord(recordId);
+      console.log('✅ Subject unanchored on blockchain');
+      return true;
+    } catch (blockchainError) {
+      console.error('⚠️ Blockchain unanchoring failed:', blockchainError);
+      await BlockchainSyncQueueService.logFailure({
+        contract: 'HealthRecordCore',
+        action: 'unanchorRecord',
+        userId: userId,
+        userWalletAddress: userWalletAddress,
+        error: blockchainError as string,
+        context: {
+          type: 'unanchorRecord',
+          recordId: recordId,
+          subjectId: userId,
+        },
+      });
+      return false;
+    }
+  }
+
+  // ============================================================================
+  // SET SUBJECT METHODS
+  // ============================================================================
+
   /**
    * Set the current user as the subject of a record
    *
    * This is immediate - no consent flow needed when you're claiming
    * a record is about yourself.
+   *
+   * Also anchors the subject on the blockchain.
    *
    * @param recordId - The Firestore document ID of the record
    */
@@ -166,26 +264,49 @@ export class SubjectService {
         throw new Error('You do not have permission to modify this record');
       }
 
+      // Check if already a subject
       if (recordData.subjects?.includes(user.uid)) {
         console.log('✓ User is already a subject of this record');
         return {
           success: true,
           recordId,
           subjectId: user.uid,
+          blockchainAnchored: true, // Assume already anchored if already subject
         };
       }
 
+      // Get user's wallet address for blockchain operations
+      const userWalletAddress = await this.getUserWalletAddress(user.uid);
+      if (!userWalletAddress) {
+        throw new Error('You must have a linked wallet to set yourself as a subject');
+      }
+
+      // Get record hash for blockchain anchoring
+      const recordHash = recordData.recordHash;
+      if (!recordHash) {
+        throw new Error('Record does not have a hash for blockchain anchoring');
+      }
+
+      // Step 1: Update Firestore
       await updateDoc(recordRef, {
         subjects: arrayUnion(user.uid),
         lastModified: serverTimestamp(),
       });
+      console.log('✅ Successfully set self as subject in Firestore');
 
-      console.log('✅ Successfully set self as subject');
+      // Step 2: Anchor on blockchain
+      const blockchainAnchored = await this.anchorSubjectOnChain(
+        recordId,
+        recordHash,
+        user.uid,
+        userWalletAddress
+      );
 
       return {
         success: true,
         recordId,
         subjectId: user.uid,
+        blockchainAnchored,
       };
     } catch (error) {
       console.error('❌ Error setting subject as self:', error);
@@ -301,6 +422,8 @@ export class SubjectService {
    * Called by the proposed subject to confirm they are indeed
    * the subject of the record.
    *
+   * Also anchors the subject on the blockchain.
+   *
    * @param recordId - The Firestore document ID of the record
    * @param signature - Optional wallet signature for blockchain verification
    */
@@ -338,6 +461,27 @@ export class SubjectService {
         throw new Error('This request is not for you');
       }
 
+      // Get user's wallet address for blockchain operations
+      const userWalletAddress = await this.getUserWalletAddress(user.uid);
+      if (!userWalletAddress) {
+        throw new Error('You must have a linked wallet to accept subject status');
+      }
+
+      // Get record data for hash
+      const recordRef = doc(db, 'records', recordId);
+      const recordDoc = await getDoc(recordRef);
+
+      if (!recordDoc.exists()) {
+        throw new Error('Record not found');
+      }
+
+      const recordData = recordDoc.data();
+      const recordHash = recordData.recordHash;
+
+      if (!recordHash) {
+        throw new Error('Record does not have a hash for blockchain anchoring');
+      }
+
       // Step 2: Update the consent request status
       await updateDoc(requestRef, {
         status: 'accepted',
@@ -347,7 +491,6 @@ export class SubjectService {
       console.log('✅ Consent request updated to accepted');
 
       // Step 3: Add user to record's subjects array
-      const recordRef = doc(db, 'records', recordId);
       await updateDoc(recordRef, {
         subjects: arrayUnion(user.uid),
         lastModified: serverTimestamp(),
@@ -355,11 +498,20 @@ export class SubjectService {
 
       console.log('✅ User added to record subjects');
 
+      // Step 4: Anchor on blockchain
+      const blockchainAnchored = await this.anchorSubjectOnChain(
+        recordId,
+        recordHash,
+        user.uid,
+        userWalletAddress
+      );
+
       return {
         success: true,
         recordId,
         accepted: true,
         signature,
+        blockchainAnchored,
       };
     } catch (error) {
       console.error('❌ Error accepting subject request:', error);
@@ -438,6 +590,8 @@ export class SubjectService {
    * 2. A SubjectRejection record is created with status 'pending_creator_decision'
    * 3. Creator is notified and must decide whether to publicly list the rejection
    *
+   * Also unanchors the subject on the blockchain.
+   *
    * @param recordId - The Firestore document ID of the record
    * @param options - Optional reason and signature
    */
@@ -476,6 +630,12 @@ export class SubjectService {
         throw new Error('You are not a subject of this record');
       }
 
+      // Get user's wallet address for blockchain operations
+      const userWalletAddress = await this.getUserWalletAddress(user.uid);
+      if (!userWalletAddress) {
+        throw new Error('You must have a linked wallet to remove subject status');
+      }
+
       // Check if there was a consent flow by looking up the consent request
       const requestId = getConsentRequestId(recordId, user.uid);
       const requestRef = doc(db, 'subjectConsentRequests', requestId);
@@ -492,11 +652,19 @@ export class SubjectService {
 
         console.log('✅ Self-removal complete (no consent flow existed)');
 
+        // Unanchor from blockchain
+        const blockchainUnanchored = await this.unanchorSubjectOnChain(
+          recordId,
+          user.uid,
+          userWalletAddress
+        );
+
         return {
           success: true,
           recordId,
           rejectionType: 'self_removal',
           pendingCreatorDecision: false,
+          blockchainUnanchored,
         };
       }
 
@@ -524,11 +692,19 @@ export class SubjectService {
 
       console.log(`✅ Subject status rejected (type: ${rejectionType})`);
 
+      // Unanchor from blockchain
+      const blockchainUnanchored = await this.unanchorSubjectOnChain(
+        recordId,
+        user.uid,
+        userWalletAddress
+      );
+
       return {
         success: true,
         recordId,
         rejectionType,
         pendingCreatorDecision: true,
+        blockchainUnanchored,
       };
     } catch (error) {
       console.error('❌ Error rejecting subject status:', error);
@@ -637,6 +813,8 @@ export class SubjectService {
    * or admin removes someone else as subject, not the subject removing themselves.
    *
    * No rejection flow is triggered since this is an administrative action.
+   * Note: This does NOT unanchor on blockchain - only the subject themselves
+   * can unanchor their own record link.
    *
    * @param recordId - The Firestore document ID of the record
    * @param subjectId - The userId of the subject to remove
@@ -692,7 +870,9 @@ export class SubjectService {
 
       console.log('✅ Subject removed from record by owner/admin');
 
-      // TODO: Optionally notify the removed subject
+      // Note: We do NOT unanchor on blockchain here.
+      // The subject's on-chain anchor remains - only they can unanchor themselves.
+      // This maintains the integrity of the blockchain record.
 
       return { success: true };
     } catch (error) {
@@ -770,6 +950,10 @@ export class SubjectService {
       throw error;
     }
   }
+
+  // ============================================================================
+  // QUERY METHODS
+  // ============================================================================
 
   /**
    * Get all subjects for a record
