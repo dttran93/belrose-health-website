@@ -12,7 +12,6 @@ import { SharingService } from '@/features/Sharing/services/sharingService';
 import { BlockchainRoleManagerService } from './blockchainRoleManagerService';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
 import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
-import { PermissionPreparationService } from './permissionPreparationService';
 
 export type Role = 'owner' | 'administrator' | 'viewer';
 
@@ -127,15 +126,7 @@ export class PermissionsService {
       throw new Error('User is already a viewer');
     }
 
-    // Check 6: Check for Initialization and wallet registration on chain
-    const prereqs = await PermissionPreparationService.verifyPrerequisites(
-      recordId,
-      targetWalletAddress
-    );
-
-    if (!prereqs.ready) {
-      throw new Error(prereqs.reason || 'Blockchain prerequisites not met');
-    }
+    // Note, preparation Service checks are covered in the initiation stage of the usePermissionFlow
 
     console.log('🔄 Granting viewer access:', targetUserId);
 
@@ -234,16 +225,6 @@ export class PermissionsService {
     }
     if (existingRole === 'administrator') {
       throw new Error('User is already an administrator');
-    }
-
-    // Check 6: Check for Initialization and wallet registration on chain
-    const prereqs = await PermissionPreparationService.verifyPrerequisites(
-      recordId,
-      targetWalletAddress
-    );
-
-    if (!prereqs.ready) {
-      throw new Error(prereqs.reason || 'Blockchain prerequisites not met');
     }
 
     console.log('🔄 Granting administrator role:', targetUserId);
@@ -363,16 +344,6 @@ export class PermissionsService {
       throw new Error('User is already an owner');
     }
 
-    // Check 6: Check for Initialization and wallet registration on chain
-    const prereqs = await PermissionPreparationService.verifyPrerequisites(
-      recordId,
-      targetWalletAddress
-    );
-
-    if (!prereqs.ready) {
-      throw new Error(prereqs.reason || 'Blockchain prerequisites not met');
-    }
-
     console.log('🔄 Granting owner access:', targetUserId);
 
     // Step 2: Grant encryption access
@@ -469,16 +440,6 @@ export class PermissionsService {
     // Check 3: Verify user is actually a viewer
     if (!recordData.viewers?.includes(targetUserId)) {
       throw new Error('User is not a viewer of this record');
-    }
-
-    // Check 4: Check for Initialization and wallet registration on chain
-    const prereqs = await PermissionPreparationService.verifyPrerequisites(
-      recordId,
-      targetWalletAddress
-    );
-
-    if (!prereqs.ready) {
-      throw new Error(prereqs.reason || 'Blockchain prerequisites not met');
     }
 
     console.log('🔄 Removing viewer access:', targetUserId);
@@ -581,16 +542,6 @@ export class PermissionsService {
     // Rule 5: Prevent removing yourself if you're the last administrator or owner
     if (!hasOwners && isLastAdmin) {
       throw new Error('Cannot remove the last administrator from a record');
-    }
-
-    // Check 3: Check for Initialization and wallet registration on chain
-    const prereqs = await PermissionPreparationService.verifyPrerequisites(
-      recordId,
-      targetWalletAddress
-    );
-
-    if (!prereqs.ready) {
-      throw new Error(prereqs.reason || 'Blockchain prerequisites not met');
     }
 
     console.log('🔄 Removing administrator access:', targetUserId);
