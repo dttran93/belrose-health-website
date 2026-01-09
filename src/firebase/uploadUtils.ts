@@ -227,6 +227,7 @@ export async function createFirestoreRecord({
     aiProcessingStatus: fileObj.aiProcessingStatus,
     recordHash: fileObj.recordHash,
     originalFileHash: fileObj.originalFileHash,
+    versionNumber: 0,
 
     // TIMESTAMPS
     uploadedAt: fileObj.uploadedAt || Timestamp.now(),
@@ -404,6 +405,7 @@ export const updateFirestoreRecord = async (
       ...fieldsToEncrypt,
       recordHash: newRecordHash,
       lastModified: serverTimestamp(),
+      versionNumber: (currentData.versionNumber || 0) + 1,
     };
 
     console.log('✅ Encrypted fields prepared for update:', Object.keys(fieldsToEncrypt));

@@ -219,6 +219,7 @@ export interface FileObject {
   isVirtual?: boolean; //for virtual files
   downloadURL?: string;
   storagePath?: string;
+  versionNumber?: string;
 
   // === TIMESTAMPS ===
   uploadedAt?: Timestamp;
