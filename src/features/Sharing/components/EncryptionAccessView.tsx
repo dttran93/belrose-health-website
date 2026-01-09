@@ -1,16 +1,7 @@
 // src/features/Sharing/components/EncryptionAccessView.tsx
 
 import React, { useState, useEffect } from 'react';
-import {
-  Key,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  HelpCircle,
-  ArrowLeft,
-  Plus,
-  View,
-} from 'lucide-react';
+import { Key, XCircle, HelpCircle, ArrowLeft, Plus, View } from 'lucide-react';
 import { getFirestore, collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { FileObject, BelroseUserProfile } from '@/types/core';
@@ -21,7 +12,7 @@ import { usePermissionFlow } from '@/features/Permissions/hooks/usePermissionFlo
 import { PermissionActionDialog } from '@/features/Permissions/component/ui/PermissionActionDialog';
 import UserSearch from '@/features/Users/components/UserSearch';
 import type { Role } from '@/features/Permissions/services/permissionsService';
-import { UserBadge } from '@/features/Users/components/ui/UserBadge';
+import AccessUserCard from './ui/AccessUserCard';
 
 interface WrappedKeyInfo {
   userId: string;
@@ -67,64 +58,6 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
   // State for user search/selection when granting access
   const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
   const [selectedUserForGrant, setSelectedUserForGrant] = useState<BelroseUserProfile | null>(null);
-
-  const renderAccessContent = (entry: AccessEntry) => {
-    const isSubject = record.subjects?.includes(entry.userId);
-
-    const roleConfigs: Record<AccessEntry['role'], { text: string; color: any }> = {
-      owner: { text: 'Owner', color: 'red' },
-      administrator: { text: 'Admin', color: 'blue' },
-      viewer: { text: 'Viewer', color: 'yellow' },
-      none: { text: 'No Role', color: 'primary' },
-    };
-
-    const statusConfigs: Record<
-      AccessEntry['status'],
-      { text: string; color: any; icon: any; tooltip: string }
-    > = {
-      synced: {
-        text: 'Synced',
-        color: 'green',
-        icon: <CheckCircle className="w-3 h-3" />,
-        tooltip: 'User has both a role and an active wrapped key. They can decrypt this record.',
-      },
-      'missing-key': {
-        text: 'Missing Key',
-        color: 'red',
-        icon: <AlertTriangle className="w-3 h-3" />,
-        tooltip: 'User has a role but no wrapped key. They cannot decrypt this record.',
-      },
-      'missing-role': {
-        text: 'Orphaned Key',
-        color: 'yellow',
-        icon: <AlertTriangle className="w-3 h-3" />,
-        tooltip: 'User has a wrapped key but no role. Security issue.',
-      },
-      revoked: {
-        text: 'Revoked',
-        color: 'primary',
-        icon: <XCircle className="w-3 h-3" />,
-        tooltip: 'Access was previously granted but has been revoked.',
-      },
-    };
-
-    const role = roleConfigs[entry.role];
-    const status = statusConfigs[entry.status];
-
-    return (
-      <div className="flex flex-wrap items-center gap-2">
-        {isSubject && <UserBadge text="Subject" color="pink" />}
-        {entry.wrappedKey?.isCreator && <UserBadge text="Creator" color="purple" />}
-        <UserBadge text={role.text} color={role.color} />
-        <UserBadge
-          text={status.text}
-          color={status.color}
-          icon={status.icon}
-          tooltip={status.tooltip}
-        />
-      </div>
-    );
-  };
 
   const fetchEncryptionAccess = async () => {
     if (!record.id) return;
@@ -340,17 +273,15 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
                 const canRevoke = entry.role !== 'none' && entry.profile;
 
                 return (
-                  <UserCard
+                  <AccessUserCard
                     key={entry.userId}
-                    user={entry.profile}
-                    userId={entry.userId}
-                    onDelete={canRevoke ? () => handleRevokeClick(entry) : undefined}
-                    color={cardColor}
-                    variant="default"
-                    content={renderAccessContent(entry)}
-                    showEmail={true}
-                    showUserId={true}
-                    onViewUser={() => {}}
+                    entry={entry}
+                    record={record}
+                    onDelete={
+                      entry.role !== 'none' && entry.profile
+                        ? () => handleRevokeClick(entry)
+                        : undefined
+                    }
                   />
                 );
               })}
