@@ -276,16 +276,23 @@ export async function createVerification(
   }
 
   try {
-    // 2. Write to blockchain
+    // 2. Check if hash needs to be added to the blockchain first
+    const isHashOnChain = await blockchainHealthRecordService.doesHashExist(recordHash);
+
+    if (!isHashOnChain) {
+      await blockchainHealthRecordService.addRecordHash(recordId, recordHash);
+    }
+
+    // 3. Write verification to blockchain
     const tx = await blockchainHealthRecordService.verifyRecord(recordId, recordHash, level);
 
-    // 3. Update Firebase with confirmation
+    // 4. Update Firebase with confirmation
     await updateDoc(docRef, {
       chainStatus: 'confirmed',
       txHash: tx.txHash,
     });
 
-    // 4. Recalculate scores
+    // 5. Recalculate scores
     //await recalculateScores(recordHash, recordId, verifierIdHash);
 
     return verificationId;

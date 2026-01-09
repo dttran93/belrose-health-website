@@ -154,7 +154,6 @@ contract HealthRecordCore {
   ) external onlyActiveMember onlyRecordParticipant(recordId) {
     require(bytes(recordId).length > 0, 'Record ID cannot be empty');
     require(bytes(recordHash).length > 0, 'Record hash cannot be empty');
-    require(bytes(recordIdForHash[recordHash]).length == 0, 'Hash already in use');
 
     //Caller is the Subject
     bytes32 subjectIdHash = memberRoleManager.getUserForWallet(msg.sender);
@@ -163,15 +162,25 @@ contract HealthRecordCore {
     // Check not already anchored
     require(!isSubjectOfRecord[recordId][subjectIdHash], 'Record already anchored to this subject');
 
-    //Check if this is the first subject, if yes, initialize hash as well
+    //Check if this is the first subject
     bool isFirstSubject = recordSubjects[recordId].length == 0;
 
     if (isFirstSubject) {
-      require(!isHashActive[recordHash], 'Hash already used');
+      // Check if Hash is already in use
+      string memory existingRecordId = recordIdForHash[recordHash];
 
-      recordIdForHash[recordHash] = recordId;
-      recordVersionHistory[recordId].push(recordHash);
-      isHashActive[recordHash] = true;
+      if (bytes(existingRecordId).length > 0) {
+        require(
+          keccak256(bytes(existingRecordId)) == keccak256(bytes(recordId)),
+          'Hash belongs to different record'
+        );
+      } else {
+        require(!isHashActive[recordHash], 'Hash already used');
+
+        recordIdForHash[recordHash] = recordId;
+        recordVersionHistory[recordId].push(recordHash);
+        isHashActive[recordHash] = true;
+      }
     }
 
     recordSubjects[recordId].push(subjectIdHash);
@@ -220,7 +229,13 @@ contract HealthRecordCore {
   }
 
   /**
-   * @notice Add a new hash version to an existing record
+   * @notice Add a new Record Hash to the blockchain. In the case where a provider creates their verification first
+   * this essentially servers as the provider's "anchoring" of a record onChain. The patient is then notified to
+   * add themselves as a subject to this record that has been verified.
+   *
+   * Also can be used to add a new recordHash to an existing record. In the event a provider verifies a new hash to an
+   * existing record.
+   *
    * @dev Only owner/admin can add new versions
    * @param recordId The record ID
    * @param newHash The new content hash
@@ -231,7 +246,6 @@ contract HealthRecordCore {
   ) external onlyActiveMember onlyOwnerOrAdmin(recordId) {
     require(bytes(recordIdForHash[newHash]).length == 0, 'Hash already bound to a record');
     require(bytes(newHash).length > 0, 'Hash cannot be empty');
-    require(recordSubjects[recordId].length > 0, 'Record not anchored');
 
     bytes32 userIdHash = memberRoleManager.getUserForWallet(msg.sender);
 
