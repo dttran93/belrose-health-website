@@ -365,6 +365,8 @@ export class CombinedRecordProcessingService {
       fhirData: virtualData.fhirData,
       belroseFields: result.belroseFields,
       customData: virtualData.customData,
+      extractedText: null,
+      originalFileHash: null,
     };
 
     try {

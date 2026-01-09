@@ -4,7 +4,7 @@ import {
   getFirestore,
   collection,
   doc,
-  addDoc,
+  setDoc,
   getDoc,
   getDocs,
   deleteDoc,
@@ -22,6 +22,16 @@ import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionK
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
+
+// ==================== VERSION ID UTILITIES ====================
+
+/**
+ * Generates a semantic version ID: {recordId}_v{versionNumber}
+ * Example: "abc123xyz_v0", "abc123xyz_v3"
+ */
+function generateVersionId(recordId: string, versionNumber: number): string {
+  return `${recordId}_v${versionNumber}`;
+}
 
 // ==================== MAIN VERSION CONTROL SERVICE ====================
 
@@ -114,6 +124,9 @@ export class VersionControlService {
     // Step 2: Create Version 0 - snapshot of the ORIGINAL record (before this edit)
     console.log('  📦 Creating Version 0 (original baseline)...');
 
+    // Generate semantic version ID
+    const version0Id = generateVersionId(recordId, 0);
+
     const version0: any = {
       recordId,
       versionNumber: 0,
@@ -122,12 +135,11 @@ export class VersionControlService {
       editedAt: originalRecord.uploadedAt || Timestamp.now(),
       commitMessage: 'Original Upload (auto-created baseline)',
       recordHash: originalRecord.recordHash || '',
-      // No changes in initial version
+      // No changes in initial version (no previous version to diff against)
       encryptedChanges: null,
-      hasEncryptedChanges: false,
     };
 
-    // Store encrypted snapshot
+    // Store encrypted snapshot - includes ALL fields needed for hash regeneration
     version0.recordSnapshot = {
       encryptedFileName: originalRecord.encryptedFileName ?? null,
       encryptedExtractedText: originalRecord.encryptedExtractedText ?? null,
@@ -135,14 +147,18 @@ export class VersionControlService {
       encryptedContextText: originalRecord.encryptedContextText ?? null,
       encryptedFhirData: originalRecord.encryptedFhirData ?? null,
       encryptedBelroseFields: originalRecord.encryptedBelroseFields ?? null,
+      encryptedCustomData: originalRecord.encryptedCustomData ?? null,
+      originalFileHash: originalRecord.originalFileHash ?? null,
       isEncrypted: true,
       fileType: originalRecord.fileType ?? null,
       fileSize: originalRecord.fileSize ?? null,
     };
 
     const cleanedV0 = this.cleanUndefinedValues(version0);
-    await addDoc(collection(this.db, 'recordVersions'), cleanedV0);
-    console.log('🆕 Initial version 0 created');
+
+    // Use setDoc with semantic ID instead of addDoc
+    await setDoc(doc(this.db, 'recordVersions', version0Id), cleanedV0);
+    console.log(`🆕 Initial version 0 created with ID: ${version0Id}`);
     console.log('🆕 Continuing to Version 1...');
 
     //Delegate to createVersion for v1 now that v0 has been created
@@ -188,18 +204,23 @@ export class VersionControlService {
         `📝 Creating version ${versionNumber} (previous: ${latestVersion.versionNumber})`
       );
 
+      // Generate semantic version ID
+      const newVersionId = generateVersionId(recordId, versionNumber);
+
       // Fetch the encrypted key before calculating changes and encrypting changes
       const encryptedRecordKey = await this.fetchEncryptedRecordKey(recordId); // Use fetched key
 
       // Calculate changes from previous version
       const previousSnapshot = await this.decryptVersionSnapshot(latestVersion);
       const currentSnapshot = {
-        fileName: updatedRecord.fileName,
-        fhirData: updatedRecord.fhirData ?? null,
-        belroseFields: updatedRecord.belroseFields ?? null,
-        contextText: updatedRecord.contextText ?? null,
+        fileName: updatedRecord.fileName ?? null,
         extractedText: updatedRecord.extractedText ?? null,
         originalText: updatedRecord.originalText ?? null,
+        contextText: updatedRecord.contextText ?? null,
+        fhirData: updatedRecord.fhirData ?? null,
+        belroseFields: updatedRecord.belroseFields ?? null,
+        customData: updatedRecord.customData ?? null,
+        originalFileHash: updatedRecord.originalFileHash ?? null,
       };
 
       let changes = this.calculateDifferences(previousSnapshot, currentSnapshot);
@@ -214,16 +235,14 @@ export class VersionControlService {
         recordHash: updatedRecord.recordHash || '',
       };
 
-      // Always Encrypt Changes - Zero Knowledge Architecture
+      // Encrypt changes if any exist
       if (changes.length > 0) {
         console.log('  🔐 Encrypting changes array...');
         version.encryptedChanges = await this.encryptChanges(changes, encryptedRecordKey);
-        version.hasEncryptedChanges = true;
         version.commitMessage = commitMessage || this.generateAutoCommitMessage(changes);
         console.log('  ✅ Changes encrypted');
       } else {
         version.encryptedChanges = null;
-        version.hasEncryptedChanges = false;
         version.commitMessage = commitMessage || 'No changes detected';
       }
 
@@ -235,17 +254,18 @@ export class VersionControlService {
         encryptedContextText: updatedRecord.encryptedContextText,
         encryptedFhirData: updatedRecord.encryptedFhirData,
         encryptedBelroseFields: updatedRecord.encryptedBelroseFields,
+        encryptedCustomData: updatedRecord.encryptedCustomData ?? null,
+        originalFileHash: updatedRecord.originalFileHash ?? null,
         isEncrypted: true,
       };
 
-      //recordHash and previousRecordHash are handled in uploadUtils functions don't need them here.
-      version.originalFileHash = latestVersion.originalFileHash;
-
       const cleanedVersion = this.cleanUndefinedValues(version);
-      const versionRef = await addDoc(collection(this.db, 'recordVersions'), cleanedVersion);
 
-      console.log(`✅ Version ${versionNumber} created:`, versionRef.id);
-      return versionRef.id;
+      // Use setDoc with semantic ID instead of addDoc
+      await setDoc(doc(this.db, 'recordVersions', newVersionId), cleanedVersion);
+
+      console.log(`✅ Version ${versionNumber} created with ID: ${newVersionId}`);
+      return newVersionId;
     } catch (error: any) {
       console.error('❌ Failed to create version:', error);
       throw new Error(`Failed to create version: ${error.message}`);
@@ -278,7 +298,7 @@ export class VersionControlService {
     }
 
     try {
-      // 🆕 Query recordVersions collection
+      // Query recordVersions collection
       let q = query(
         collection(this.db, 'recordVersions'),
         where('recordId', '==', recordId),
@@ -334,23 +354,17 @@ export class VersionControlService {
    * Returns the actual Change[] array that can be displayed
    */
   async getVersionChanges(version: RecordVersion): Promise<Change[]> {
-    if (version.hasEncryptedChanges && version.encryptedChanges) {
-      // Type guard: ensure we have an encrypted snapshot
-      if (!version.recordSnapshot.isEncrypted) {
-        throw new Error('Invalid version: Snapshot must be encrypted');
-      }
-
-      if (!version.recordSnapshot.encryptedKey) {
-        throw new Error('Cannot decrypt changes: Missing encryption key');
-      }
-
-      const encryptedRecordKey = await this.fetchEncryptedRecordKey(version.recordId);
-
-      // ✅ TypeScript now knows this is an EncryptedSnapshot
-      return await this.decryptChanges(version.encryptedChanges, encryptedRecordKey);
+    // Simply check if encryptedChanges exists
+    if (!version.encryptedChanges) {
+      return [];
     }
 
-    return [];
+    if (!version.recordSnapshot.isEncrypted) {
+      throw new Error('Invalid version: Snapshot must be encrypted');
+    }
+
+    const encryptedRecordKey = await this.fetchEncryptedRecordKey(version.recordId);
+    return await this.decryptChanges(version.encryptedChanges, encryptedRecordKey);
   }
 
   /**
@@ -389,20 +403,23 @@ export class VersionControlService {
         encryptedContextText: version.recordSnapshot.encryptedContextText,
         encryptedFhirData: version.recordSnapshot.encryptedFhirData,
         encryptedBelroseFields: version.recordSnapshot.encryptedBelroseFields,
+        encryptedCustomData: version.recordSnapshot.encryptedCustomData,
         isEncrypted: true,
       };
 
       const decryptedData = await RecordDecryptionService.decryptRecord(encryptedRecord, keyToUse);
       console.log(`✅ Version ${version.versionNumber} decrypted successfully`);
 
-      // Return in the format expected by diff/display
+      // Return ALL fields needed for hash regeneration
       return {
         fileName: decryptedData.fileName ?? null,
-        fhirData: decryptedData.fhirData ?? null,
-        belroseFields: decryptedData.belroseFields ?? null,
         extractedText: decryptedData.extractedText ?? null,
         originalText: decryptedData.originalText ?? null,
         contextText: decryptedData.contextText ?? null,
+        fhirData: decryptedData.fhirData ?? null,
+        belroseFields: decryptedData.belroseFields ?? null,
+        customData: decryptedData.customData ?? null,
+        originalFileHash: version.recordSnapshot.originalFileHash ?? null,
       };
     } catch (error: any) {
       console.error(`❌ Failed to decrypt version ${version.versionNumber}:`, error);
@@ -457,6 +474,8 @@ export class VersionControlService {
 
       // Decrypt the version snapshot
       const restoredData = await this.decryptVersionSnapshot(version);
+
+      console.log('Restored Data', restoredData);
 
       // Optionally update the main record
       if (updateMainRecord) {
@@ -559,9 +578,10 @@ export class VersionControlService {
     };
   }
 
-  /*=============================================================
-ENCRYPTION/DECRYPTION HELPERS
-===============================================================*/
+  //=============================================================
+  //ENCRYPTION/DECRYPTION HELPERS
+  //===============================================================
+
   /**
    * Encrypt changes array using the record's data encryption key
    */

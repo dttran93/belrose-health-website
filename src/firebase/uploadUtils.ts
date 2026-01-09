@@ -227,7 +227,6 @@ export async function createFirestoreRecord({
     aiProcessingStatus: fileObj.aiProcessingStatus,
     recordHash: fileObj.recordHash,
     originalFileHash: fileObj.originalFileHash,
-    blockchainVerification: fileObj.blockchainVerification,
 
     // TIMESTAMPS
     uploadedAt: fileObj.uploadedAt || Timestamp.now(),
@@ -353,7 +352,24 @@ export const updateFirestoreRecord = async (
     }
     console.log('✓ File key decrypted');
 
-    // Encrypt updated Fields
+    // 2. Hydrate the current state of the record by decrypting existing fields
+    // This is for the hashing process, otherwise, the haser will only see what fields have changed
+    console.log('🔓 Decrypting existing record for hashing context...');
+    const existingPlaintext = await EncryptionService.decryptCompleteRecord(
+      wrappedKeyData.wrappedKey, // Note: decryptCompleteRecord expects base64 string
+      {
+        fileName: currentData.encryptedFileName,
+        fhirData: currentData.encryptedFhirData || null,
+        belroseFields: currentData.encryptedBelroseFields || null,
+        extractedText: currentData.encryptedExtractedText || null,
+        originalText: currentData.encryptedOriginalText || null,
+        contextText: currentData.encryptedContextText || null,
+        customData: currentData.encryptedCustomData || null,
+      },
+      masterKey
+    );
+
+    // 3. Encrypt updated Fields that were actually changed
     const fieldsToEncrypt: any = {};
     for (const key of ['fileName', 'fhirData', 'belroseFields', 'extractedText', 'originalText']) {
       if (updateData[key] !== undefined) {
@@ -368,34 +384,39 @@ export const updateFirestoreRecord = async (
       }
     }
 
-    // FilteredData will be what's ultimately passed to Firestore function
+    //4 . Prepare the FULL object for hashing: New Update --> Existing Plaintext --> or fallback to null
+    const updatedFileObject = {
+      fileName: updateData.fileName ?? existingPlaintext.fileName ?? null,
+      fhirData: updateData.fhirData ?? existingPlaintext.fhirData ?? null,
+      belroseFields: updateData.belroseFields ?? existingPlaintext.belroseFields ?? null,
+      extractedText: updateData.extractedText ?? existingPlaintext.extractedText ?? null,
+      originalText: updateData.originalText ?? existingPlaintext.originalText ?? null,
+      contextText: updateData.contextText ?? existingPlaintext.contextText ?? null,
+      customData: updateData.customData ?? existingPlaintext.customData ?? null,
+      originalFileHash: updateData.originalFileHash ?? currentData.originalFileHash ?? null,
+    };
+
+    // 5. Generate new record hash
+    const newRecordHash = await RecordHashService.generateRecordHash(updatedFileObject);
+
+    // 5. Prepare data that will be passed to Firestore, including encryptedBlobs and new hash
     const filteredData: any = {
       ...fieldsToEncrypt,
+      recordHash: newRecordHash,
       lastModified: serverTimestamp(),
     };
 
     console.log('✅ Encrypted fields prepared for update:', Object.keys(fieldsToEncrypt));
 
-    // Prepare data for version control
-    const updatedFileObject = { ...currentData, ...updateData, id: documentId };
-
-    // Generate new record hash
-    try {
-      const newRecordHash = await RecordHashService.generateRecordHash(updatedFileObject);
-      filteredData.recordHash = newRecordHash;
-      const currentHash = currentData.recordHash; //Hash of the record before this update
-      //Get existing previousRecordHash array from current document data
-      let previousHashes: string[] = currentData.previousRecordHash || [];
-      if (currentHash) {
-        previousHashes.push(currentHash);
-      }
-
-      filteredData.previousRecordHash = previousHashes;
-
-      console.log('🔗 Record hash updated. New history length:', previousHashes.length);
-    } catch (hashError) {
-      console.warn('⚠️ Failed to generate record hash:', hashError);
+    // 6. Add to hash history
+    let previousHashes: string[] = currentData.previousRecordHash || [];
+    if (currentData.recordHash) {
+      previousHashes.push(currentData.recordHash);
     }
+
+    filteredData.previousRecordHash = previousHashes;
+
+    console.log('🔗 Record hash updated. New history length:', previousHashes.length);
 
     // Create version history
     const encryptedUpdatedFileObject = {

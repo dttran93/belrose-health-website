@@ -44,11 +44,12 @@ export interface EncryptedSnapshot {
     encrypted: string;
     iv: string;
   };
+  encryptedCustomData?: {
+    encrypted: string;
+    iv: string;
+  };
+  originalFileHash?: string | null;
 
-  // The encrypted file-level key
-  encryptedKey: string;
-
-  // Flag for type discrimination
   isEncrypted: true;
 }
 

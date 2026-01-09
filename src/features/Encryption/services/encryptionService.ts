@@ -318,121 +318,39 @@ export class EncryptionService {
    */
   static async decryptCompleteRecord(
     encryptedKey: string,
-    encryptedData: {
-      fileName: { encrypted: ArrayBuffer; iv: string };
-      file?: { encrypted: ArrayBuffer; iv: string };
-      extractedText?: { encrypted: ArrayBuffer; iv: string };
-      originalText?: { encrypted: ArrayBuffer; iv: string };
-      contextText?: { encrypted: ArrayBuffer; iv: string };
-      fhirData?: { encrypted: ArrayBuffer; iv: string };
-      belroseFields?: { encrypted: ArrayBuffer; iv: string };
-      customData?: { encrypted: ArrayBuffer; iv: string };
-    },
+    encryptedData: any, // Use any here to handle missing properties safely
     userKey: CryptoKey
-  ): Promise<{
-    fileName: string;
-    file?: ArrayBuffer;
-    extractedText?: string;
-    originalText?: string;
-    contextText?: string;
-    fhirData?: any;
-    belroseFields?: any;
-    customData?: any;
-  }> {
+  ): Promise<any> {
     console.log('🔓 Starting complete record decryption...');
 
-    // Decrypt the file key
+    // 1. Decrypt the file key
     const keyData = base64ToArrayBuffer(encryptedKey);
     const fileKeyData = await this.decryptKeyWithMasterKey(keyData, userKey);
     const fileKey = await this.importKey(fileKeyData);
-    console.log('  ✓ File key decrypted');
 
     const result: any = {};
-    // Decrypt fileName (always exists)
-    console.log('  🔓 Decrypting file name...');
-    result.fileName = await this.decryptText(
-      encryptedData.fileName.encrypted,
-      fileKey,
-      base64ToArrayBuffer(encryptedData.fileName.iv)
-    );
-    console.log(`    ✓ File name decrypted: ${result.fileName}`);
 
-    // Decrypt file if it exists
-    if (encryptedData.file) {
-      console.log('  🔓 Decrypting file...');
-      result.file = await this.decryptFile(
-        encryptedData.file.encrypted,
-        fileKey,
-        base64ToArrayBuffer(encryptedData.file.iv)
-      );
-      console.log(`    ✓ File decrypted (${result.file.byteLength} bytes)`);
-    }
+    // 2. Helper to handle the "Exists + Decrypt" logic
+    const safeDecrypt = async (field: any, type: 'text' | 'json') => {
+      // Check if the field and its inner encrypted data actually exist
+      if (!field || !field.encrypted || !field.iv) return null;
 
-    // Decrypt extracted text
-    if (encryptedData.extractedText) {
-      console.log('  🔓 Decrypting extracted text...');
-      result.extractedText = await this.decryptText(
-        encryptedData.extractedText.encrypted,
-        fileKey,
-        base64ToArrayBuffer(encryptedData.extractedText.iv)
-      );
-      console.log(`    ✓ Extracted text decrypted (${result.extractedText.length} chars)`);
-    }
+      const iv = base64ToArrayBuffer(field.iv);
+      const encrypted = base64ToArrayBuffer(field.encrypted);
 
-    // Decrypt original text if it exists
-    if (encryptedData.originalText) {
-      console.log('  🔓 Decrypting original text...');
-      result.originalText = await this.decryptText(
-        encryptedData.originalText.encrypted,
-        fileKey,
-        base64ToArrayBuffer(encryptedData.originalText.iv)
-      );
-      console.log(`    ✓ Original text decrypted (${result.originalText.length} chars)`);
-    }
+      return type === 'text'
+        ? await this.decryptText(encrypted, fileKey, iv)
+        : await this.decryptJSON(encrypted, fileKey, iv);
+    };
 
-    // Decrypt context text if it exists
-    if (encryptedData.contextText) {
-      console.log('  🔓 Decrypting original text...');
-      result.contextText = await this.decryptText(
-        encryptedData.contextText.encrypted,
-        fileKey,
-        base64ToArrayBuffer(encryptedData.contextText.iv)
-      );
-      console.log(`    ✓ Context text decrypted (${result.contextText.length} chars)`);
-    }
-
-    // Decrypt FHIR data if it exists
-    if (encryptedData.fhirData) {
-      console.log('  🔓 Decrypting FHIR data...');
-      result.fhirData = await this.decryptJSON(
-        encryptedData.fhirData.encrypted,
-        fileKey,
-        base64ToArrayBuffer(encryptedData.fhirData.iv)
-      );
-      console.log('    ✓ FHIR data decrypted');
-    }
-
-    // Decrypt belroseFields if they exist
-    if (encryptedData.belroseFields) {
-      console.log('  🔓 Decrypting Belrose fields...');
-      result.belroseFields = await this.decryptJSON(
-        encryptedData.belroseFields.encrypted,
-        fileKey,
-        base64ToArrayBuffer(encryptedData.belroseFields.iv)
-      );
-      console.log('    ✓ Belrose fields decrypted');
-    }
-
-    // Decrypt customData if it exists
-    if (encryptedData.customData) {
-      console.log('  🔓 Decrypting custom data...');
-      result.customData = await this.decryptJSON(
-        encryptedData.customData.encrypted,
-        fileKey,
-        base64ToArrayBuffer(encryptedData.customData.iv)
-      );
-      console.log('    ✓ Custom data decrypted');
-    }
+    // 3. Decrypt fields safely
+    result.fileName = await safeDecrypt(encryptedData.fileName, 'text');
+    result.extractedText = await safeDecrypt(encryptedData.extractedText, 'text');
+    result.originalText = await safeDecrypt(encryptedData.originalText, 'text');
+    result.contextText = await safeDecrypt(encryptedData.contextText, 'text');
+    result.fhirData = await safeDecrypt(encryptedData.fhirData, 'json');
+    result.belroseFields = await safeDecrypt(encryptedData.belroseFields, 'json');
+    result.customData = await safeDecrypt(encryptedData.customData, 'json');
 
     console.log('✅ Complete record decryption finished');
     return result;

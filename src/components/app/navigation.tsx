@@ -10,6 +10,7 @@ import {
   LucideIcon,
   Share2,
   Link,
+  Hash,
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -24,6 +25,7 @@ export const healthRecords: NavigationItem[] = [
   { title: 'All Records', url: '/dashboard/all-records', icon: Clipboard },
   { title: 'Add Record', url: '/dashboard/add-record', icon: FilePlus2 },
   { title: 'Share Records', url: '/dashboard/share-records', icon: Share2 },
+  { title: 'HashTester', url: '/dashboard/hash-tester', icon: Hash },
 ];
 
 export const healthCategories: NavigationItem[] = [
