@@ -170,15 +170,6 @@ export const RecordFull: React.FC<RecordFullProps> = ({
         ? [...(originalRecord.previousRecordHash ?? []), originalRecord.recordHash]
         : (originalRecord.previousRecordHash ?? null),
       originalFileHash: originalRecord.originalFileHash ?? null,
-
-      versionInfo: {
-        versionId: version.id,
-        versionNumber: version.versionNumber,
-        timestamp: toISOString(version.editedAt),
-        editedBy: version.editedBy,
-        editedByName: version.editedByName,
-        isHistoricalView: true,
-      },
     };
   };
 

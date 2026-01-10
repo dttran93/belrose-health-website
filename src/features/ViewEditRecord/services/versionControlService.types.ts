@@ -1,6 +1,7 @@
 // src/features/ViewEditRecord/services/versionControlService.types.ts
 
 import { Timestamp } from 'firebase/firestore';
+import { CredibilityStats } from '../components/Edit/VersionReviewBadge';
 
 // ==================== MAIN VERSION CONTROL TYPES ====================
 
@@ -142,6 +143,9 @@ export interface VersionHistoryProps {
     textClass: string;
     badgeClass: string;
   } | null;
+  credibilityStats?: Map<string, CredibilityStats>;
+  isLoadingCredibility?: boolean;
+  onOpenCredibilityModal?: (recordHash: string) => void;
 }
 
 export interface VersionDiffViewerProps {

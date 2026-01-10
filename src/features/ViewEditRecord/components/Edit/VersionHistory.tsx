@@ -4,13 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { FileText, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
-import { VersionControlService } from '../services/versionControlService';
+import { VersionControlService } from '../../services/versionControlService';
 import {
   RecordVersion,
   VersionHistoryProps,
   Change,
-} from '../services/versionControlService.types';
-import { VersionHistoryCard } from '../components/ui/VersionHistoryCard';
+} from '../../services/versionControlService.types';
+import { VersionHistoryCard } from './VersionHistoryCard';
 
 export const VersionHistory: React.FC<VersionHistoryProps> = ({
   documentId,
@@ -22,6 +22,9 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
   onVersionsLoaded,
   selectedVersions = [],
   getSelectionInfo,
+  credibilityStatsMap,
+  isLoadingCredibility,
+  onOpenCredibilityModal,
 }) => {
   const [versions, setVersions] = useState<RecordVersion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -204,6 +207,7 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
           const versionId = version.id || '';
           const isCurrent = index === 0;
           const selectionInfo = getSelectionInfo?.(versionId);
+          const versionStats = credibilityStatsMap?.get(version.recordHash);
 
           return (
             <VersionHistoryCard
@@ -216,6 +220,9 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
               isDecrypting={decryptingVersions.has(versionId)}
               displayChanges={getDisplayChanges(version)}
               selectionInfo={selectionInfo}
+              credibilityStats={versionStats}
+              isLoadingCredibility={isLoadingCredibility}
+              onOpenCredibilityModal={onOpenCredibilityModal}
               onToggleExpand={() => handleToggleExpand(versionId, version)}
               onSelect={() => handleSelectVersion(version)}
               onView={() => handleViewVersion(version)}

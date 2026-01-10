@@ -249,16 +249,6 @@ export interface FileObject {
   isEncrypted?: boolean;
   encryptedFileIV?: string; // IV for the file stored in Firebase Storage
 
-  //For versioning purposes
-  versionInfo?: {
-    versionId?: string;
-    versionNumber?: number;
-    timestamp?: string;
-    editedBy?: string;
-    editedByName?: string;
-    isHistoricalView?: true;
-  };
-
   //Used during processing, ArrayBuffers are in memory. But roo-level encrypted Fiels are for retrieval in Firestore
   encryptedData?: {
     encryptedKey: string; // Single key for all encrypted data (Base64)

@@ -1,10 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import {
-  VersionDiff,
-  VersionDiffViewerProps
-} from '../services/versionControlService.types';
+import { VersionDiff, VersionDiffViewerProps } from '../../services/versionControlService.types';
 
 export const VersionDiffViewer: React.FC<VersionDiffViewerProps> = ({ diff, onClose }) => {
   const renderValue = (value: any): string => {
@@ -28,7 +25,10 @@ export const VersionDiffViewer: React.FC<VersionDiffViewerProps> = ({ diff, onCl
       return path.replace('fhirData.', 'FHIR: ');
     }
     if (path.includes('belroseFields')) {
-      return path.replace('belroseFields.', '').replace(/([A-Z])/g, ' $1').toLowerCase();
+      return path
+        .replace('belroseFields.', '')
+        .replace(/([A-Z])/g, ' $1')
+        .toLowerCase();
     }
     if (path === 'extractedText') return 'Extracted Text';
     if (path === 'originalText') return 'Original Text';
@@ -47,9 +47,7 @@ export const VersionDiffViewer: React.FC<VersionDiffViewerProps> = ({ diff, onCl
         <div>
           <h3 className="font-semibold text-lg">Version Comparison</h3>
           <p className="text-sm text-gray-600 mt-1">{diff.summary}</p>
-          <p className="text-xs text-gray-500">
-            {new Date(diff.timestamp).toLocaleString()}
-          </p>
+          <p className="text-xs text-gray-500">{new Date(diff.timestamp).toLocaleString()}</p>
         </div>
         {onClose && (
           <Button variant="ghost" size="sm" onClick={onClose}>
@@ -67,32 +65,36 @@ export const VersionDiffViewer: React.FC<VersionDiffViewerProps> = ({ diff, onCl
         ) : (
           <div className="space-y-4">
             {diff.changes.map((change, index) => (
-              <div 
+              <div
                 key={index}
                 className={`border rounded-lg ${
-                  change.operation === 'create' ? 'border-green-200 bg-green-50' :
-                  change.operation === 'update' ? 'border-blue-200 bg-blue-50' :
-                  'border-red-200 bg-red-50'
+                  change.operation === 'create'
+                    ? 'border-green-200 bg-green-50'
+                    : change.operation === 'update'
+                      ? 'border-blue-200 bg-blue-50'
+                      : 'border-red-200 bg-red-50'
                 }`}
               >
                 <div className="p-3">
                   {/* Change Header */}
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        change.operation === 'create' ? 'bg-green-100 text-green-800' :
-                        change.operation === 'update' ? 'bg-blue-100 text-blue-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-medium ${
+                          change.operation === 'create'
+                            ? 'bg-green-100 text-green-800'
+                            : change.operation === 'update'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-red-100 text-red-800'
+                        }`}
+                      >
                         {change.operation.toUpperCase()}
                       </span>
                       <span className="text-sm font-medium">
                         {getFieldDescription(change.path)}
                       </span>
                     </div>
-                    <span className="text-xs text-gray-500 font-mono">
-                      {change.path}
-                    </span>
+                    <span className="text-xs text-gray-500 font-mono">{change.path}</span>
                   </div>
 
                   {/* Change Content */}

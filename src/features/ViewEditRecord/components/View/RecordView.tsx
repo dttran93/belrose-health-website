@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { ClipboardPlus, Code, FileInput, Computer, Info } from 'lucide-react';
 import { FileObject, BelroseFields } from '@/types/core';
 import { TabNavigation } from '@/features/AddRecord/components/ui/TabNavigation';
-import FHIRRecord from '@/features/ViewEditRecord/components/ui/FHIRRecord';
+import FHIRRecord from '@/features/ViewEditRecord/components/View/FHIRRecord';
 import BelroseRecord from './BelroseRecord';
 import { DecryptedFileViewer } from '@/features/Encryption/components/DecryptedFileViewer';
 

@@ -16,6 +16,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { RecordVersion, Change } from '../../services/versionControlService.types';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
+import VersionReviewBadge, { CredibilityStats } from './VersionReviewBadge';
 
 export interface VersionHistoryCardProps {
   version: RecordVersion;
@@ -32,6 +33,9 @@ export interface VersionHistoryCardProps {
     textClass: string;
     badgeClass: string;
   } | null;
+  credibilityStats?: CredibilityStats | undefined;
+  isLoadingCredibility?: boolean;
+  onOpenCredibilityModal?: (recordHash: string) => void;
   onToggleExpand: () => void;
   onSelect: () => void;
   onView: () => void;
@@ -47,6 +51,9 @@ export const VersionHistoryCard: React.FC<VersionHistoryCardProps> = ({
   isDecrypting,
   displayChanges,
   selectionInfo,
+  credibilityStats,
+  isLoadingCredibility,
+  onOpenCredibilityModal,
   onToggleExpand,
   onSelect,
   onView,
@@ -70,15 +77,6 @@ export const VersionHistoryCard: React.FC<VersionHistoryCardProps> = ({
       <div className="p-4">
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-3">
-            {/* Selection Indicator */}
-            {isSelected && selectionInfo && (
-              <span
-                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${selectionInfo.bgClass} ${selectionInfo.textClass}`}
-              >
-                Selected #{selectionInfo.order}
-              </span>
-            )}
-
             <div className="flex-1">
               {/* Version Number & Status Badges */}
               <div className="flex items-center gap-2 mb-2">
@@ -131,62 +129,72 @@ export const VersionHistoryCard: React.FC<VersionHistoryCardProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-1 ml-4">
-            {/* Select Button */}
-            <Button
-              variant={isSelected ? 'default' : 'outline'}
-              size="sm"
-              onClick={onSelect}
-              className={`px-2 py-1 h-auto ${
-                isSelected && selectionInfo
-                  ? `${selectionInfo.badgeClass} hover:opacity-90 text-white`
-                  : ''
-              }`}
-            >
-              <SquareDashedMousePointer className="w-3 h-3 mr-1" />
-              {isSelected ? `Selected #${selectionInfo?.order}` : 'Select'}
-            </Button>
-
-            {/* View & Rollback (only for non-current versions) */}
-            {!isCurrent && (
-              <>
-                <Button variant="outline" size="sm" onClick={onView} className="px-2 py-1 h-auto">
-                  <Eye className="w-3 h-3 mr-1" />
-                  View
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onRollback}
-                  disabled={isRollingBack}
-                  className="px-2 py-1 h-auto"
-                >
-                  {isRollingBack ? (
-                    <div className="animate-spin rounded-full h-3 w-3 border-2 border-blue-500 border-t-transparent mr-1" />
-                  ) : (
-                    <RotateCcw className="w-3 h-3 mr-1" />
-                  )}
-                  Rollback
-                </Button>
-              </>
-            )}
-
-            {/* Expand/Collapse Button */}
-            {hasChanges && (
+          <div className="flex flex-col items-end">
+            <div className="flex items-center gap-1 ml-4">
+              {/* Select Button */}
               <Button
-                variant="ghost"
+                variant={isSelected ? 'default' : 'outline'}
                 size="sm"
-                onClick={onToggleExpand}
-                className="px-1 py-1 h-auto"
+                onClick={onSelect}
+                className={`px-2 py-1 h-auto ${
+                  isSelected && selectionInfo
+                    ? `${selectionInfo.badgeClass} hover:opacity-90 text-white`
+                    : ''
+                }`}
               >
-                {isExpanded ? (
-                  <ChevronDown className="w-4 h-4" />
-                ) : (
-                  <ChevronRight className="w-4 h-4" />
-                )}
+                <SquareDashedMousePointer className="w-3 h-3 mr-1" />
+                {isSelected ? `Selected #${selectionInfo?.order}` : 'Select'}
               </Button>
-            )}
+
+              {/* View & Rollback (only for non-current versions) */}
+              {!isCurrent && (
+                <>
+                  <Button variant="outline" size="sm" onClick={onView} className="px-2 py-1 h-auto">
+                    <Eye className="w-3 h-3 mr-1" />
+                    View
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onRollback}
+                    disabled={isRollingBack}
+                    className="px-2 py-1 h-auto"
+                  >
+                    {isRollingBack ? (
+                      <div className="animate-spin rounded-full h-3 w-3 border-2 border-blue-500 border-t-transparent mr-1" />
+                    ) : (
+                      <RotateCcw className="w-3 h-3 mr-1" />
+                    )}
+                    Rollback
+                  </Button>
+                </>
+              )}
+
+              {/* Expand/Collapse Button */}
+              {hasChanges && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onToggleExpand}
+                  className="px-1 py-1 h-auto"
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </Button>
+              )}
+            </div>
+            {/* Credibility Badge */}
+            <div className="pt-3">
+              <VersionReviewBadge
+                stats={credibilityStats}
+                isLoading={isLoadingCredibility}
+                onClick={onOpenCredibilityModal}
+              />
+            </div>
           </div>
         </div>
 

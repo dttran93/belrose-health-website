@@ -53,7 +53,7 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
 
     // Edit tracking properties
     editedByUser: data.editedByUser || false,
-    blockchainVerification: data.blockchainVerification || undefined,
+    versionNumber: data.versionNumber,
 
     // Ownership Fields
     uploadedBy: data.uploadedBy,

@@ -1,10 +1,10 @@
 // src/features/ViewEditRecord/components/VersionControlPanel.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
-import { VersionHistory } from './VersionHistory';
-import { VersionDiffViewer } from './VersionDiffViewer';
+import { VersionHistory } from './Edit/VersionHistory';
+import { VersionDiffViewer } from './Edit/VersionDiffViewer';
 import { VersionControlService } from '../services/versionControlService';
 import {
   VersionDiff,
@@ -12,6 +12,8 @@ import {
   RecordVersion,
 } from '../services/versionControlService.types';
 import { ArrowLeft, GitBranch } from 'lucide-react';
+import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
+import { CredibilityStats } from './Edit/VersionReviewBadge';
 
 export const VersionControlPanel: React.FC<VersionControlPanelProps> = ({
   documentId,
@@ -24,7 +26,90 @@ export const VersionControlPanel: React.FC<VersionControlPanelProps> = ({
   const [versions, setVersions] = useState<RecordVersion[]>([]);
   const [isComparing, setIsComparing] = useState(false);
 
+  // Credibility stats state
+  const [credibilityStatsMap, setCredibilityStatsMap] = useState<Map<string, CredibilityStats>>(
+    new Map()
+  );
+  const [isLoadingCredibility, setIsLoadingCredibility] = useState(false);
+
+  // Modal state for credibility details
+  const [credibilityModalHash, setCredibilityModalHash] = useState<string | null>(null);
+
   const versionControl = new VersionControlService();
+
+  // Fetch credibility stats for all versions from Firebase
+  // Query by recordId (which we have permission for), then group by recordHash client-side
+  const fetchCredibilityStats = useCallback(
+    async (loadedVersions: RecordVersion[]) => {
+      if (loadedVersions.length === 0) return;
+
+      setIsLoadingCredibility(true);
+
+      try {
+        const db = getFirestore();
+
+        // Build a set of hashes we care about for quick lookup
+        const recordHashes = new Set(
+          loadedVersions.map(v => v.recordHash).filter((hash): hash is string => !!hash)
+        );
+
+        // Query ALL verifications for this record (by recordId, which we have permission for)
+        const verificationsRef = collection(db, 'verifications');
+        const verificationsQuery = query(verificationsRef, where('recordId', '==', documentId));
+        const verificationsSnapshot = await getDocs(verificationsQuery);
+
+        // Query ALL disputes for this record (by recordId)
+        const disputesRef = collection(db, 'disputes');
+        const disputesQuery = query(disputesRef, where('recordId', '==', documentId));
+        const disputesSnapshot = await getDocs(disputesQuery);
+
+        // Build stats map by grouping results by recordHash
+        const newMap = new Map<string, CredibilityStats>();
+
+        // Initialize all hashes with zero counts
+        recordHashes.forEach(hash => {
+          newMap.set(hash, {
+            verifications: { total: 0, active: 0 },
+            disputes: { total: 0, active: 0 },
+          });
+        });
+
+        // Count verifications per hash
+        verificationsSnapshot.forEach(doc => {
+          const data = doc.data();
+          const hash = data.recordHash;
+          if (hash && newMap.has(hash)) {
+            const stats = newMap.get(hash)!;
+            stats.verifications.total++;
+            if (data.isActive) {
+              stats.verifications.active++;
+            }
+          }
+        });
+
+        // Count disputes per hash
+        disputesSnapshot.forEach(doc => {
+          const data = doc.data();
+          const hash = data.recordHash;
+          if (hash && newMap.has(hash)) {
+            const stats = newMap.get(hash)!;
+            stats.disputes.total++;
+            if (data.isActive) {
+              stats.disputes.active++;
+            }
+          }
+        });
+
+        setCredibilityStatsMap(newMap);
+      } catch (error) {
+        console.error('Failed to fetch credibility stats:', error);
+        // Don't show error toast - stats are supplementary info
+      } finally {
+        setIsLoadingCredibility(false);
+      }
+    },
+    [documentId]
+  );
 
   const handleCompareVersions = async () => {
     if (selectedVersions.length !== 2) {
@@ -74,6 +159,8 @@ export const VersionControlPanel: React.FC<VersionControlPanelProps> = ({
 
   const handleVersionsLoaded = (loadedVersions: RecordVersion[]) => {
     setVersions(loadedVersions);
+    // Fetch credibility stats when versions are loaded
+    fetchCredibilityStats(loadedVersions);
   };
 
   const handleVersionSelect = (version: RecordVersion) => {
@@ -108,6 +195,13 @@ export const VersionControlPanel: React.FC<VersionControlPanelProps> = ({
     return `${date} ${time}`;
   };
 
+  // Handler for opening credibility modal
+  const handleOpenCredibilityModal = (recordHash: string) => {
+    setCredibilityModalHash(recordHash);
+    // TODO: Open actual modal - for now just log
+    console.log('Opening credibility modal for hash:', recordHash);
+  };
+
   console.log('Version Array', versions.length);
   console.log(
     'Fetched versions:',
@@ -139,6 +233,7 @@ export const VersionControlPanel: React.FC<VersionControlPanelProps> = ({
           </Button>
         </div>
       </div>
+
       {/* Version Comparison Tool */}
       {versions.length > 1 && (
         <div className="bg-gray-50 p-4 rounded-lg border">
@@ -226,8 +321,31 @@ export const VersionControlPanel: React.FC<VersionControlPanelProps> = ({
           onVersionsLoaded={handleVersionsLoaded}
           onBack={onBack}
           getSelectionInfo={getSelectionInfo}
+          credibilityStatsMap={credibilityStatsMap}
+          isLoadingCredibility={isLoadingCredibility}
+          onOpenCredibilityModal={handleOpenCredibilityModal}
         />
       </div>
+
+      {/* TODO: Credibility Modal */}
+      {credibilityModalHash && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full">
+            <h3 className="font-semibold text-lg mb-4">Credibility Details</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Record Hash: <code className="bg-gray-100 px-1 rounded">{credibilityModalHash}</code>
+            </p>
+            <p className="text-sm text-gray-500">
+              Detailed verification and dispute information will be shown here.
+            </p>
+            <div className="mt-6 flex justify-end">
+              <Button variant="outline" onClick={() => setCredibilityModalHash(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
