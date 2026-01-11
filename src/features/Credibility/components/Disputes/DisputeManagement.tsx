@@ -7,9 +7,9 @@ import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { useAuth } from '@/features/Auth/hooks/useAuth';
-import { buildHashVersionMap } from '../../services/verificationService';
 import {
-  DisputeWithVersion,
+  DisputeDoc,
+  DisputeDocDecrypted,
   getDisputeReactionStats,
   getDisputesByRecordId,
 } from '../../services/disputeService';
@@ -36,8 +36,8 @@ interface DisputeManagementProps {
   onBack?: () => void;
   onAddMode?: () => void;
   isAddMode?: boolean;
-  onModify?: (dispute: DisputeWithVersion) => void;
-  onRetract?: (dispute: DisputeWithVersion) => void;
+  onModify?: (dispute: DisputeDoc) => void;
+  onRetract?: (dispute: DisputeDoc) => void;
   onReact?: (recordHash: string, disputerId: string, support: boolean) => void;
 }
 
@@ -52,7 +52,7 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
 }) => {
   const { user } = useAuth();
   const [loadingDisputes, setLoadingDisputes] = useState(true);
-  const [disputes, setDisputes] = useState<DisputeWithVersion[]>([]);
+  const [disputes, setDisputes] = useState<DisputeDocDecrypted[]>([]);
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [reactionStats, setReactionStats] = useState<Record<string, ReactionStatsWithUser>>({});
@@ -62,7 +62,7 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
   const [reactingDisputes, setReactingDisputes] = useState<Set<string>>(new Set());
 
   // Modal state
-  const [selectedDispute, setSelectedDispute] = useState<DisputeWithVersion | null>(null);
+  const [selectedDispute, setSelectedDispute] = useState<DisputeDocDecrypted | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const getReactionType = (value: boolean | null | undefined): ReactionType => {
@@ -79,39 +79,27 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
 
       setLoadingDisputes(true);
       try {
-        // 1. Build hash-to-version map from record data
-        const hashVersionMap = buildHashVersionMap(
-          record.recordHash ?? undefined,
-          record.previousRecordHash ?? undefined
-        );
-
-        // 2. Fetch all disputes for this record
+        // 1. Fetch all disputes for this record
         const allDisputes = await getDisputesByRecordId(recordId);
 
-        // 3. Attach version info to each dispute
-        const totalVersions = hashVersionMap.size;
-        const disputesWithVersion: DisputeWithVersion[] = allDisputes.map(d => ({
-          ...d,
-          versionNumber: hashVersionMap.get(d.recordHash) ?? 0,
-          totalVersions,
-        }));
-
-        // Sort: active first, then by version (newest first), then by createdAt
-        disputesWithVersion.sort((a, b) => {
+        // 2. Sort: active first, then current hash first, then by createdAt
+        const sortedDisputes = [...allDisputes].sort((a, b) => {
           // Active disputes first
           if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
-          // Then by version number (lower = newer)
-          if (a.versionNumber !== b.versionNumber) return a.versionNumber - b.versionNumber;
+          // Current hash disputes first
+          const aIsCurrent = a.recordHash === record.recordHash;
+          const bIsCurrent = b.recordHash === record.recordHash;
+          if (aIsCurrent !== bIsCurrent) return aIsCurrent ? -1 : 1;
           // Then by creation date (newest first)
           return b.createdAt.toMillis() - a.createdAt.toMillis();
         });
 
-        setDisputes(disputesWithVersion);
+        setDisputes(sortedDisputes);
 
-        // 4. Get unique disputer IDs and fetch their profiles
+        // 3. Get unique disputer IDs and fetch their profiles
         const disputerIds = [...new Set(allDisputes.map(d => d.disputerId))];
 
-        // 5. Fetch Reaction stats for all disputes (including user's reaction)
+        // 4. Fetch Reaction stats for all disputes
         const statsMap = new Map<string, ReactionStatsWithUser>();
 
         const statsPromises = allDisputes.map(async d => {
@@ -137,7 +125,6 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
         ]);
 
         setReactionStats(Object.fromEntries(statsMap));
-        setDisputes(disputesWithVersion);
       } catch (error) {
         console.error('Error fetching disputes:', error);
       } finally {
@@ -146,20 +133,13 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
     };
 
     fetchDisputes();
-  }, [
-    record.firestoreId,
-    record.id,
-    record.recordHash,
-    record.previousRecordHash,
-    refreshTrigger,
-    user?.uid,
-  ]);
+  }, [record.firestoreId, record.id, record.recordHash, refreshTrigger, user?.uid]);
 
   // ============================================================
   // HANDLERS
   // ============================================================
 
-  const handleCardClick = (dispute: DisputeWithVersion) => {
+  const handleCardClick = (dispute: DisputeDocDecrypted) => {
     setSelectedDispute(dispute);
     setIsModalOpen(true);
   };
@@ -194,7 +174,7 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
    * Handle reaction from DisputeCard.
    * This does optimistic UI update then calls the parent handler.
    */
-  const handleReaction = async (dispute: DisputeWithVersion, support: boolean) => {
+  const handleReaction = async (dispute: DisputeDoc, support: boolean) => {
     if (!onReact) return;
 
     const statsKey = `${dispute.recordHash}_${dispute.disputerId}`;
@@ -352,6 +332,7 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
                     dispute={dispute}
                     userProfile={disputerProfile}
                     isInactive={isInactive}
+                    currentRecordHash={record.recordHash}
                     onViewUser={() => {}}
                     onViewDetails={() => handleCardClick(dispute)}
                     reactionStats={stats}
@@ -376,6 +357,7 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
       {/* Detail Modal */}
       {selectedDispute && (
         <DisputeDetailModal
+          record={record}
           isOpen={isModalOpen}
           onClose={handleCloseModal}
           dispute={selectedDispute}

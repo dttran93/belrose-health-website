@@ -14,12 +14,13 @@ import {
   FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { BelroseUserProfile } from '@/types/core';
+import { BelroseUserProfile, FileObject } from '@/types/core';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import {
-  DisputeWithVersion,
   getSeverityConfig,
   getCulpabilityConfig,
+  DisputeDoc,
+  DisputeDocDecrypted,
 } from '../../services/disputeService';
 import ReactionsView from './ReactionsView';
 
@@ -30,9 +31,10 @@ import ReactionsView from './ReactionsView';
 type ViewMode = 'details' | 'reactions';
 
 interface DisputeDetailModalProps {
+  record: FileObject;
   isOpen: boolean;
   onClose: () => void;
-  dispute: DisputeWithVersion;
+  dispute: DisputeDocDecrypted;
   userProfile?: BelroseUserProfile;
   isOwnDispute?: boolean;
   onModify?: () => void;
@@ -60,6 +62,7 @@ const CHAIN_STATUS_DISPLAY = {
 // ============================================================
 
 export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
+  record,
   isOpen,
   onClose,
   dispute,
@@ -78,10 +81,7 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
   const culpabilityInfo = getCulpabilityConfig(dispute.culpability);
   const chainStatus = CHAIN_STATUS_DISPLAY[dispute.chainStatus];
 
-  const versionText =
-    dispute.versionNumber === 1
-      ? `Current (v1 of ${dispute.totalVersions})`
-      : `v${dispute.versionNumber} of ${dispute.totalVersions} (outdated)`;
+  const isCurrentVersion = dispute.recordHash === record.recordHash;
 
   // Color classes based on severity
   const severityColors = {
@@ -220,9 +220,9 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
                   <div>
                     <h4 className="text-sm font-medium text-gray-500 mb-1">Version</h4>
                     <p
-                      className={`text-sm font-medium ${dispute.versionNumber === 1 ? 'text-green-600' : 'text-yellow-600'}`}
+                      className={`text-sm font-medium ${isCurrentVersion ? 'text-green-600' : 'text-yellow-600'}`}
                     >
-                      {versionText}
+                      {isCurrentVersion ? 'Current Version' : 'Previous Version'}
                     </p>
                   </div>
 

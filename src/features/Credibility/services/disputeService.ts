@@ -28,8 +28,6 @@ export type DisputeSeverity = 0 | 1 | 2 | 3; // 0 used in blockchain for returni
 export type DisputeSeverityOptions = 1 | 2 | 3; //0 is not an option in actual selection
 export type DisputeSeverityOptionNames = 'Negligible' | 'Moderate' | 'Major';
 
-export type DisputeSeverityName = 'None' | 'Negligible' | 'Moderate' | 'Major';
-
 export type DisputeCulpability = 0 | 1 | 2 | 3 | 4 | 5;
 
 export type DisputeCulpabilityName =
@@ -94,12 +92,6 @@ export interface ReactionDoc {
 /** Extended type with decrypted notes for display */
 export interface DisputeDocDecrypted extends Omit<DisputeDoc, 'encryptedNotes'> {
   notes: string;
-}
-
-/** Extended type that includes version info for display */
-export interface DisputeWithVersion extends DisputeDocDecrypted {
-  versionNumber: number;
-  totalVersions: number;
 }
 
 export interface ReactionStats {
@@ -319,7 +311,7 @@ export async function getDisputesByRecordId(
 export async function getDisputesWithVersionInfo(
   recordId: string,
   hashVersionMap: Map<string, number>
-): Promise<DisputeWithVersion[]> {
+): Promise<DisputeDoc[]> {
   const disputes = await getDisputesByRecordId(recordId);
   const totalVersions = hashVersionMap.size;
 

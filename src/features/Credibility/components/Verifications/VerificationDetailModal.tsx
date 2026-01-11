@@ -4,18 +4,19 @@ import React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, CheckCircle, ExternalLink, Edit, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { BelroseUserProfile } from '@/types/core';
+import { BelroseUserProfile, FileObject } from '@/types/core';
 import UserCard from '@/features/Users/components/ui/UserCard';
-import { VerificationWithVersion, getVerificationConfig } from '../../services/verificationService';
+import { getVerificationConfig, VerificationDoc } from '../../services/verificationService';
 
 // ============================================================
 // TYPES
 // ============================================================
 
 interface VerificationDetailModalProps {
+  record: FileObject;
   isOpen: boolean;
   onClose: () => void;
-  verification: VerificationWithVersion;
+  verification: VerificationDoc;
   userProfile?: BelroseUserProfile;
   isOwnVerification?: boolean;
   onModify?: () => void;
@@ -37,6 +38,7 @@ const CHAIN_STATUS_DISPLAY = {
 // ============================================================
 
 export const VerificationDetailModal: React.FC<VerificationDetailModalProps> = ({
+  record,
   isOpen,
   onClose,
   verification,
@@ -50,10 +52,7 @@ export const VerificationDetailModal: React.FC<VerificationDetailModalProps> = (
   const levelName = verificationInfo.name;
   const chainStatus = CHAIN_STATUS_DISPLAY[verification.chainStatus];
 
-  const versionText =
-    verification.versionNumber === 1
-      ? `Current (v1 of ${verification.totalVersions})`
-      : `v${verification.versionNumber} of ${verification.totalVersions} (outdated)`;
+  const isCurrentVersion = verification.recordHash === record.recordHash;
 
   const handleViewOnBlockchain = () => {
     if (verification.txHash) {
@@ -124,9 +123,9 @@ export const VerificationDetailModal: React.FC<VerificationDetailModalProps> = (
                 <div>
                   <h4 className="text-sm font-medium text-gray-500 mb-1">Version</h4>
                   <p
-                    className={`text-sm font-medium ${verification.versionNumber === 1 ? 'text-green-600' : 'text-yellow-600'}`}
+                    className={`text-sm font-medium ${isCurrentVersion ? 'text-green-600' : 'text-yellow-600'}`}
                   >
-                    {versionText}
+                    {isCurrentVersion ? `Current Version` : `Previous Version`}
                   </p>
                 </div>
 

@@ -21,17 +21,17 @@ import { getUserProfiles } from '@/features/Users/services/userProfileService';
 
 // Verification imports
 import {
-  VerificationWithVersion,
   getVerificationsByRecordId,
+  VerificationDoc,
 } from '@/features/Credibility/services/verificationService';
 import VerificationDetailModal from '@/features/Credibility/components/Verifications/VerificationDetailModal';
 import VerificationUserCard from '@/features/Credibility/components/Verifications/VerificationUserCard';
 
 // Dispute imports
 import {
-  DisputeWithVersion,
   getDisputesByRecordId,
   getDisputeReactionStats,
+  DisputeDocDecrypted,
 } from '@/features/Credibility/services/disputeService';
 import DisputeDetailModal from '@/features/Credibility/components/Disputes/DisputeDetailModal';
 import DisputeUserCard from '@/features/Credibility/components/Disputes/DisputeUserCard';
@@ -74,17 +74,15 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
   const recordHash = version.recordHash;
 
   // Verification state
-  const [verifications, setVerifications] = useState<VerificationWithVersion[]>([]);
+  const [verifications, setVerifications] = useState<VerificationDoc[]>([]);
   const [loadingVerifications, setLoadingVerifications] = useState(true);
-  const [selectedVerification, setSelectedVerification] = useState<VerificationWithVersion | null>(
-    null
-  );
+  const [selectedVerification, setSelectedVerification] = useState<VerificationDoc | null>(null);
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
 
   // Dispute state
-  const [disputes, setDisputes] = useState<DisputeWithVersion[]>([]);
+  const [disputes, setDisputes] = useState<DisputeDocDecrypted[]>([]);
   const [loadingDisputes, setLoadingDisputes] = useState(true);
-  const [selectedDispute, setSelectedDispute] = useState<DisputeWithVersion | null>(null);
+  const [selectedDispute, setSelectedDispute] = useState<DisputeDocDecrypted | null>(null);
   const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
   const [reactionStats, setReactionStats] = useState<Record<string, ReactionStatsWithUser>>({});
   const [reactingDisputes, setReactingDisputes] = useState<Set<string>>(new Set());
@@ -136,7 +134,7 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
       const allVerifications = await getVerificationsByRecordId(recordId);
 
       // Filter to only this hash and add version info
-      const filtered: VerificationWithVersion[] = allVerifications
+      const filtered: VerificationDoc[] = allVerifications
         .filter(v => v.recordHash === recordHash)
         .map(v => ({
           ...v,
@@ -171,7 +169,7 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
       const allDisputes = await getDisputesByRecordId(recordId);
 
       // Filter to only this hash and add version info
-      const filtered: DisputeWithVersion[] = allDisputes
+      const filtered: DisputeDocDecrypted[] = allDisputes
         .filter(d => d.recordHash === recordHash)
         .map(d => ({
           ...d,
@@ -238,7 +236,7 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
   // ============================================================
 
   // Verification handlers
-  const handleVerificationClick = (verification: VerificationWithVersion) => {
+  const handleVerificationClick = (verification: VerificationDoc) => {
     setSelectedVerification(verification);
     setIsVerificationModalOpen(true);
   };
@@ -249,7 +247,7 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
   };
 
   // Dispute handlers
-  const handleDisputeClick = (dispute: DisputeWithVersion) => {
+  const handleDisputeClick = (dispute: DisputeDocDecrypted) => {
     setSelectedDispute(dispute);
     setIsDisputeModalOpen(true);
   };
@@ -259,7 +257,7 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
     setSelectedDispute(null);
   };
 
-  const handleReaction = async (dispute: DisputeWithVersion, support: boolean) => {
+  const handleReaction = async (dispute: DisputeDocDecrypted, support: boolean) => {
     const statsKey = `${dispute.recordHash}_${dispute.disputerId}`;
     const currentStats = reactionStats[statsKey] || { supports: 0, opposes: 0, userReaction: null };
 
@@ -390,6 +388,7 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
                     key={verification.id}
                     verification={verification}
                     userProfile={verifierProfile}
+                    currentRecordHash={record.recordHash}
                     isInactive={isInactive}
                     onViewUser={() => {}}
                     onViewDetails={() => handleVerificationClick(verification)}
@@ -439,6 +438,7 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
                     dispute={dispute}
                     userProfile={disputerProfile}
                     isInactive={isInactive}
+                    currentRecordHash={record.recordHash}
                     onViewUser={() => {}}
                     onViewDetails={() => handleDisputeClick(dispute)}
                     reactionStats={stats}
@@ -461,6 +461,7 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
           isOpen={isVerificationModalOpen}
           onClose={handleCloseVerificationModal}
           verification={selectedVerification}
+          record={record}
           userProfile={userProfiles.get(selectedVerification.verifierId)}
           isOwnVerification={user?.uid === selectedVerification.verifierId}
           onModify={() => {
@@ -477,6 +478,7 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
       {/* Dispute Detail Modal */}
       {selectedDispute && (
         <DisputeDetailModal
+          record={record}
           isOpen={isDisputeModalOpen}
           onClose={handleCloseDisputeModal}
           dispute={selectedDispute}

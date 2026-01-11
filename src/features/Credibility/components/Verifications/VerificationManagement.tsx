@@ -17,11 +17,7 @@ import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { useAuth } from '@/features/Auth/hooks/useAuth';
-import {
-  VerificationWithVersion,
-  getVerificationsByRecordId,
-  buildHashVersionMap,
-} from '../../services/verificationService';
+import { getVerificationsByRecordId, VerificationDoc } from '../../services/verificationService';
 import VerificationDetailModal from './VerificationDetailModal';
 import VerificationUserCard from './VerificationUserCard';
 
@@ -30,8 +26,8 @@ interface VerificationManagementProps {
   onBack?: () => void;
   onAddMode?: () => void;
   isAddMode?: boolean;
-  onModify?: (verification: VerificationWithVersion) => void;
-  onRetract?: (verification: VerificationWithVersion) => void;
+  onModify?: (verification: VerificationDoc) => void;
+  onRetract?: (verification: VerificationDoc) => void;
 }
 
 export const VerificationManagement: React.FC<VerificationManagementProps> = ({
@@ -44,14 +40,12 @@ export const VerificationManagement: React.FC<VerificationManagementProps> = ({
 }) => {
   const { user } = useAuth();
   const [loadingVerifications, setLoadingVerifications] = useState(true);
-  const [verifications, setVerifications] = useState<VerificationWithVersion[]>([]);
+  const [verifications, setVerifications] = useState<VerificationDoc[]>([]);
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Modal state
-  const [selectedVerification, setSelectedVerification] = useState<VerificationWithVersion | null>(
-    null
-  );
+  const [selectedVerification, setSelectedVerification] = useState<VerificationDoc | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Fetch verifications and user profiles
@@ -62,36 +56,24 @@ export const VerificationManagement: React.FC<VerificationManagementProps> = ({
 
       setLoadingVerifications(true);
       try {
-        // 1. Build hash-to-version map from record data
-        const hashVersionMap = buildHashVersionMap(
-          record.recordHash ?? undefined,
-          record.previousRecordHash ?? undefined
-        );
-
-        // 2. Fetch all verifications for this record
+        // 1. Fetch all verifications for this record
         const allVerifications = await getVerificationsByRecordId(recordId);
 
-        // 3. Attach version info to each verification
-        const totalVersions = hashVersionMap.size;
-        const verificationsWithVersion: VerificationWithVersion[] = allVerifications.map(v => ({
-          ...v,
-          versionNumber: hashVersionMap.get(v.recordHash) ?? 0,
-          totalVersions,
-        }));
-
-        // Sort: active first, then by version (newest first), then by createdAt
-        verificationsWithVersion.sort((a, b) => {
+        // 2. Sort: active first, then by whether it matches current hash, then by createdAt
+        const sortedVerifications = [...allVerifications].sort((a, b) => {
           // Active verifications first
           if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
-          // Then by version number (lower = newer)
-          if (a.versionNumber !== b.versionNumber) return a.versionNumber - b.versionNumber;
+          // Current hash verifications first
+          const aIsCurrent = a.recordHash === record.recordHash;
+          const bIsCurrent = b.recordHash === record.recordHash;
+          if (aIsCurrent !== bIsCurrent) return aIsCurrent ? -1 : 1;
           // Then by creation date (newest first)
           return b.createdAt.toMillis() - a.createdAt.toMillis();
         });
 
-        setVerifications(verificationsWithVersion);
+        setVerifications(sortedVerifications);
 
-        // 4. Get unique verifier IDs and fetch their profiles
+        // 3. Get unique verifier IDs and fetch their profiles
         const verifierIds = [...new Set(allVerifications.map(v => v.verifierId))];
         if (verifierIds.length > 0) {
           const profiles = await getUserProfiles(verifierIds);
@@ -108,7 +90,7 @@ export const VerificationManagement: React.FC<VerificationManagementProps> = ({
   }, [record.firestoreId, record.id, record.recordHash, record.previousRecordHash, refreshTrigger]);
 
   // Handlers
-  const handleCardClick = (verification: VerificationWithVersion) => {
+  const handleCardClick = (verification: VerificationDoc) => {
     setSelectedVerification(verification);
     setIsModalOpen(true);
   };
@@ -215,6 +197,7 @@ export const VerificationManagement: React.FC<VerificationManagementProps> = ({
                     verification={verification}
                     userProfile={verifierProfile}
                     isInactive={isInactive}
+                    currentRecordHash={record.recordHash}
                     onViewUser={() => {}}
                     onViewDetails={() => handleCardClick(verification)}
                   />
@@ -236,6 +219,7 @@ export const VerificationManagement: React.FC<VerificationManagementProps> = ({
           isOpen={isModalOpen}
           onClose={handleCloseModal}
           verification={selectedVerification}
+          record={record}
           userProfile={userProfiles.get(selectedVerification.verifierId)}
           isOwnVerification={user?.uid === selectedVerification.verifierId}
           onModify={handleModify}

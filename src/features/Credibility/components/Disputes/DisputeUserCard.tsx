@@ -4,17 +4,14 @@ import React from 'react';
 import ReactionButtons, { ReactionType } from '@/components/ui/ReactionButtons';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { UserBadge } from '@/features/Users/components/ui/UserBadge';
-import {
-  DisputeWithVersion,
-  getCulpabilityConfig,
-  getSeverityConfig,
-} from '../../services/disputeService';
+import { DisputeDoc, getCulpabilityConfig, getSeverityConfig } from '../../services/disputeService';
 import { BelroseUserProfile } from '@/types/core';
 
 interface DisputeCardProps {
-  dispute: DisputeWithVersion;
+  dispute: DisputeDoc;
   userProfile: BelroseUserProfile | undefined;
   isInactive: boolean;
+  currentRecordHash: string | null | undefined;
   onViewUser: () => void;
   onViewDetails: () => void;
   reactionStats: {
@@ -31,6 +28,7 @@ const DisputeUserCard: React.FC<DisputeCardProps> = ({
   dispute,
   userProfile,
   isInactive,
+  currentRecordHash,
   onViewUser,
   onViewDetails,
   reactionStats,
@@ -45,21 +43,20 @@ const DisputeUserCard: React.FC<DisputeCardProps> = ({
     throw new Error('Invalid severity or culpability level');
   }
 
-  const renderDisputeContent = () => {
-    const versionBadgeText = dispute.versionNumber === 1 ? 'Current' : `v${dispute.versionNumber}`;
-    const versionBadgeColor = dispute.versionNumber === 1 ? 'green' : 'yellow';
+  const isCurrent = dispute.recordHash === currentRecordHash;
 
+  const renderDisputeContent = () => {
     return (
       <div className="flex items-center gap-3">
         {/* Dispute Badges */}
         <div className="flex flex-wrap gap-2">
           <UserBadge
-            text={versionBadgeText}
-            color={versionBadgeColor}
+            text={isCurrent ? 'Current' : 'Non-current'}
+            color={isCurrent ? 'green' : 'yellow'}
             tooltip={
-              dispute.versionNumber === 1
+              isCurrent
                 ? 'Disputed the current version'
-                : `Disputed version ${dispute.versionNumber} of ${dispute.totalVersions}`
+                : `Disputed a previous version of this record`
             }
           />
           <UserBadge
