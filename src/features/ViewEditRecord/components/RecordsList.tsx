@@ -21,11 +21,13 @@ interface RecordsListProps {
   onAddNewRecord?: () => void;
   autoOpenRecordId?: string | null;
   autoOpenInEditMode?: boolean;
+  onRefreshRecords?: () => void;
 }
 
 export const RecordsList: React.FC<RecordsListProps> = ({
   // Additional props
   onAddNewRecord,
+  onRefreshRecords,
   records,
   loading,
   error,
@@ -337,6 +339,7 @@ export const RecordsList: React.FC<RecordsListProps> = ({
         onSave={handleSaveRecord}
         initialViewMode={initialRecordView}
         comingFromAddRecord={comingFromAddRecord}
+        onRefreshRecord={onRefreshRecords}
       />
     );
   }

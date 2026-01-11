@@ -345,12 +345,8 @@ export const VersionControlPanel: React.FC<VersionControlPanelProps> = ({
               onVersionSelect={handleVersionSelect}
               onViewVersion={onViewVersion}
               onRollback={() => {
-                // Clear selection after rollback
                 setSelectedVersions([]);
-                // Trigger a page refresh or update the parent component
-                window.location.reload();
               }}
-              // Pass additional props for selection styling
               selectedVersions={selectedVersions}
               onVersionsLoaded={handleVersionsLoaded}
               onBack={onBack}

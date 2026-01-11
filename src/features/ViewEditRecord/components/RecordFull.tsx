@@ -41,6 +41,7 @@ interface RecordFullProps {
   onDownload: (record: FileObject) => void;
   onCopy: (record: FileObject) => void;
   onDelete: (record: FileObject) => void;
+  onRefreshRecord?: () => void;
 
   //Navigation Props
   onBack: (record: FileObject) => void; //for returning to the previous screen, could be different so need a prop
@@ -61,6 +62,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   onDownload,
   onCopy,
   onDelete,
+  onRefreshRecord,
   onBack,
   initialViewMode = 'record',
   comingFromAddRecord = false,
@@ -280,12 +282,11 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     }
   };
 
-  // VERSION CONTROL HANDLERS
   const handleVersionControlRollback = () => {
     setHasUnsavedChanges(false);
     setHasFhirChanges(false);
     setViewMode('record');
-    window.location.reload();
+    onRefreshRecord?.();
   };
 
   return (
