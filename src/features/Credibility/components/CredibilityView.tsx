@@ -30,12 +30,14 @@ interface CredibilityViewProps {
   record: FileObject;
   onBack: () => void;
   startModVerifyFromVersions?: boolean;
+  startModDisputeFromVersions?: boolean;
 }
 
 export const CredibilityView: React.FC<CredibilityViewProps> = ({
   record,
   onBack,
   startModVerifyFromVersions = false,
+  startModDisputeFromVersions = false,
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('loading');
   const [reviewPanelInitialTab, setReviewPanelInitialTab] = useState<ReviewTab>('verify');
@@ -138,6 +140,14 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({
       setViewMode('add');
     }
   }, [startModVerifyFromVersions, verification, isLoadingVerification]);
+
+  useEffect(() => {
+    if (startModDisputeFromVersions && dispute) {
+      setReviewPanelInitialTab('dispute');
+      setInitialModifyingDispute(true);
+      setViewMode('add');
+    }
+  }, [startModDisputeFromVersions, dispute, isLoadingDispute]);
 
   const handleAddVerification = () => {
     setReviewPanelInitialTab('verify');

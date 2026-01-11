@@ -162,6 +162,7 @@ export interface VersionControlPanelProps {
   onViewVersion?: (version: RecordVersion) => void;
   record?: FileObject;
   onModifyVerification?: () => void;
+  onModifyDispute?: () => void;
 }
 
 // ==================== SERVICE CONFIGURATION TYPES ====================

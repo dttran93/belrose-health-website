@@ -52,6 +52,7 @@ interface VersionDetailPageProps {
   credibilityStats?: CredibilityStats | null;
   onBack: () => void;
   onModifyVerification?: () => void;
+  onModifyDispute?: () => void;
 }
 
 interface ReactionStatsWithUser {
@@ -70,6 +71,7 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
   credibilityStats,
   onBack,
   onModifyVerification,
+  onModifyDispute,
 }) => {
   const { user } = useAuth();
   const recordId = record.firestoreId || record.id;
@@ -488,7 +490,7 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
           isOwnDispute={user?.uid === selectedDispute.disputerId}
           onModify={() => {
             handleCloseDisputeModal();
-            // Could navigate to modify flow
+            onModifyDispute?.();
           }}
           onRetract={() => {
             handleCloseDisputeModal();

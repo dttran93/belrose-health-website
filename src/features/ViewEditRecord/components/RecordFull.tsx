@@ -107,7 +107,8 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   );
   const [viewingVersion, setViewingVersion] = useState<RecordVersion | null>(null);
   const [decryptedVersionData, setDecryptedVersionData] = useState<any>(null);
-  const [enterCredibilityInModifyMode, setEnterCredibilityinModifyMode] = useState(false);
+  const [enterVerificationInModifyMode, setEnterVerificationinModifyMode] = useState(false);
+  const [enterDisputeInModifyMode, setEnterDisputeinModifyMode] = useState(false);
 
   /**
    * Decrypt a version's snapshot if it's encrypted
@@ -184,7 +185,12 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   // View Mode Handlers
 
   const handleModifyVerificationFromVersions = () => {
-    setEnterCredibilityinModifyMode(true);
+    setEnterVerificationinModifyMode(true);
+    setViewMode('credibility');
+  };
+
+  const handleModifyDisputeFromVersions = () => {
+    setEnterDisputeinModifyMode(true);
     setViewMode('credibility');
   };
 
@@ -199,7 +205,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   };
 
   const handleViewCredibility = () => {
-    setEnterCredibilityinModifyMode(false);
+    setEnterVerificationinModifyMode(false);
     setViewMode('credibility');
   };
 
@@ -433,6 +439,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
           onViewVersion={handleViewVersion}
           record={record}
           onModifyVerification={handleModifyVerificationFromVersions}
+          onModifyDispute={handleModifyDisputeFromVersions}
         />
       )}
 
@@ -519,7 +526,8 @@ export const RecordFull: React.FC<RecordFullProps> = ({
         <CredibilityView
           record={record}
           onBack={handleBackToRecord}
-          startModVerifyFromVersions={enterCredibilityInModifyMode}
+          startModVerifyFromVersions={enterVerificationInModifyMode}
+          startModDisputeFromVersions={enterDisputeInModifyMode}
         />
       )}
     </div>
