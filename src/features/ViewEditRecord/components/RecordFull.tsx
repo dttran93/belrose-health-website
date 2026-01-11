@@ -3,13 +3,13 @@ import { Button } from '@/components/ui/Button';
 import { X, Save, Ellipsis, Info } from 'lucide-react';
 import { FileObject, BelroseFields } from '@/types/core';
 import { LayoutSlot } from '@/components/app/LayoutProvider';
-import VersionControlPanel from '../VersionControlPanel';
-import { RecordVersion } from '../../services/versionControlService.types';
+import VersionControlPanel from './VersionControlPanel';
+import { RecordVersion } from '../services/versionControlService.types';
 import { CredibilityView } from '@/features/Credibility/components/CredibilityView';
-import HealthRecordMenu from './RecordMenu';
+import HealthRecordMenu from './View/RecordMenu';
 import { CredibilityBadge } from '@/features/Credibility/components/ui/CredibilityBadge';
-import RecordView from './RecordView';
-import { TabType } from './RecordView';
+import RecordView from './View/RecordView';
+import { TabType } from './View/RecordView';
 import { EncryptionAccessView } from '@/features/Sharing/components/EncryptionAccessView';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
@@ -19,7 +19,7 @@ import SubjectManager from '@/features/Subject/components/SubjectManager';
 import SubjectBadge from '@/features/Subject/components/SubjectBadge';
 import { PermissionsService } from '@/features/Permissions/services/permissionsService';
 import useAuth from '@/features/Auth/hooks/useAuth';
-import { logRecordView } from '../../services/logRecordViewService';
+import { logRecordView } from '../services/logRecordViewService';
 
 type ViewMode =
   | 'record'
@@ -422,6 +422,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
           onBack={handleBackToRecord}
           onRollback={handleVersionControlRollback}
           onViewVersion={handleViewVersion}
+          record={record}
         />
       )}
 

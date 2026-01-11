@@ -14,17 +14,21 @@ import {
 import { ArrowLeft, GitBranch } from 'lucide-react';
 import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
 import { CredibilityStats } from './Edit/VersionReviewBadge';
+import VersionDetailPage from './Edit/VersionDetailPage';
 
 export const VersionControlPanel: React.FC<VersionControlPanelProps> = ({
   documentId,
   className,
   onBack,
   onViewVersion,
+  record,
 }) => {
   const [showDiff, setShowDiff] = useState<VersionDiff | null>(null);
   const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
   const [versions, setVersions] = useState<RecordVersion[]>([]);
   const [isComparing, setIsComparing] = useState(false);
+
+  console.log('Record Info', record);
 
   // Credibility stats state
   const [credibilityStatsMap, setCredibilityStatsMap] = useState<Map<string, CredibilityStats>>(
@@ -32,8 +36,10 @@ export const VersionControlPanel: React.FC<VersionControlPanelProps> = ({
   );
   const [isLoadingCredibility, setIsLoadingCredibility] = useState(false);
 
-  // Modal state for credibility details
-  const [credibilityModalHash, setCredibilityModalHash] = useState<string | null>(null);
+  // Version detail page state
+  const [selectedVersionForDetail, setSelectedVersionForDetail] = useState<RecordVersion | null>(
+    null
+  );
 
   const versionControl = new VersionControlService();
 
@@ -197,9 +203,24 @@ export const VersionControlPanel: React.FC<VersionControlPanelProps> = ({
 
   // Handler for opening credibility modal
   const handleOpenCredibilityModal = (recordHash: string) => {
-    setCredibilityModalHash(recordHash);
-    // TODO: Open actual modal - for now just log
-    console.log('Opening credibility modal for hash:', recordHash);
+    console.log('handleOpenCredibilityModal called with:', recordHash);
+    console.log(
+      'Available versions:',
+      versions.map(v => ({ id: v.id, recordHash: v.recordHash }))
+    );
+    const version = versions.find(v => v.recordHash === recordHash);
+    console.log('Found version:', version);
+
+    if (version) {
+      setSelectedVersionForDetail(version);
+    }
+  };
+
+  // Handler for closing version detail page
+  const handleCloseDetailPage = () => {
+    setSelectedVersionForDetail(null);
+    // Refresh credibility stats in case something changed
+    fetchCredibilityStats(versions);
   };
 
   console.log('Version Array', versions.length);
@@ -215,136 +236,131 @@ export const VersionControlPanel: React.FC<VersionControlPanelProps> = ({
 
   return (
     <div className={`space-y-4 p-8 ${className}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4 pb-2 border-b">
-        <h3 className="font-semibold text-lg flex items-center gap-2">
-          <GitBranch className="w-5 h-5" />
-          Version History
-        </h3>
-        <div className="flex items-center gap-2">
-          <div className="text-sm text-gray-600">
-            {versions.length} version{versions.length !== 1 ? 's' : ''}
-          </div>
-          {selectedVersions.length > 0 && (
-            <div className="text-xs text-gray-500">({selectedVersions.length} selected)</div>
-          )}
-          <Button onClick={onBack} className="w-8 h-8 border-none bg-transparent hover:bg-gray-200">
-            <ArrowLeft className="text-primary" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Version Comparison Tool */}
-      {versions.length > 1 && (
-        <div className="bg-gray-50 p-4 rounded-lg border">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="font-medium">Compare Versions</h4>
-            <div className="text-sm text-gray-600">
-              Select 2 versions to compare ({selectedVersions.length}/2)
+      {/* Show Version Detail Page when a version is selected */}
+      {selectedVersionForDetail && record ? (
+        <VersionDetailPage
+          record={record}
+          version={selectedVersionForDetail}
+          credibilityStats={credibilityStatsMap.get(selectedVersionForDetail.recordHash)}
+          onBack={handleCloseDetailPage}
+        />
+      ) : (
+        <>
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4 pb-2 border-b">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <GitBranch className="w-5 h-5" />
+              Version History
+            </h3>
+            <div className="flex items-center gap-2">
+              <div className="text-sm text-gray-600">
+                {versions.length} version{versions.length !== 1 ? 's' : ''}
+              </div>
+              {selectedVersions.length > 0 && (
+                <div className="text-xs text-gray-500">({selectedVersions.length} selected)</div>
+              )}
+              <Button
+                onClick={onBack}
+                className="w-8 h-8 border-none bg-transparent hover:bg-gray-200"
+              >
+                <ArrowLeft className="text-primary" />
+              </Button>
             </div>
           </div>
 
-          {selectedVersions.length > 0 && (
-            <div className="mb-3 p-2 bg-white rounded border">
-              <div className="text-sm font-medium mb-2">Selected versions:</div>
-              <div className="space-y-1">
-                {selectedVersions.map(versionId => {
-                  const selectionInfo = getSelectionInfo(versionId);
-                  return (
-                    <div
-                      key={versionId}
-                      className={`text-xs p-2 rounded ${selectionInfo?.bgClass} ${selectionInfo?.textClass}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`w-4 h-4 rounded-full ${selectionInfo?.badgeClass} text-white text-xs font-bold`}
+          {/* Version Comparison Tool */}
+          {versions.length > 1 && (
+            <div className="bg-gray-50 p-4 rounded-lg border">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-medium">Compare Versions</h4>
+                <div className="text-sm text-gray-600">
+                  Select 2 versions to compare ({selectedVersions.length}/2)
+                </div>
+              </div>
+
+              {selectedVersions.length > 0 && (
+                <div className="mb-3 p-2 bg-white rounded border">
+                  <div className="text-sm font-medium mb-2">Selected versions:</div>
+                  <div className="space-y-1">
+                    {selectedVersions.map(versionId => {
+                      const selectionInfo = getSelectionInfo(versionId);
+                      return (
+                        <div
+                          key={versionId}
+                          className={`text-xs p-2 rounded ${selectionInfo?.bgClass} ${selectionInfo?.textClass}`}
                         >
-                          {selectionInfo?.order}
-                        </span>
-                        <span className="font-medium">{getVersionByIdName(versionId)}</span>
-                      </div>
-                    </div>
-                  );
-                })}
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`w-4 h-4 rounded-full ${selectionInfo?.badgeClass} text-white text-xs font-bold`}
+                            >
+                              {selectionInfo?.order}
+                            </span>
+                            <span className="font-medium">{getVersionByIdName(versionId)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                  Click on versions below to select them for comparison
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedVersions([])}
+                    disabled={selectedVersions.length === 0}
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    onClick={handleCompareVersions}
+                    disabled={selectedVersions.length !== 2 || isComparing}
+                    size="sm"
+                  >
+                    {isComparing ? 'Comparing...' : 'Compare'}
+                  </Button>
+                </div>
               </div>
             </div>
           )}
 
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-600">
-              Click on versions below to select them for comparison
+          {/* Diff Viewer Modal */}
+          {showDiff && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="max-w-4xl w-full max-h-full overflow-hidden">
+                <VersionDiffViewer diff={showDiff} onClose={() => setShowDiff(null)} />
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedVersions([])}
-                disabled={selectedVersions.length === 0}
-              >
-                Clear
-              </Button>
-              <Button
-                onClick={handleCompareVersions}
-                disabled={selectedVersions.length !== 2 || isComparing}
-                size="sm"
-              >
-                {isComparing ? 'Comparing...' : 'Compare'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Diff Viewer Modal */}
-      {showDiff && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="max-w-4xl w-full max-h-full overflow-hidden">
-            <VersionDiffViewer diff={showDiff} onClose={() => setShowDiff(null)} />
+          {/* Version History with Selection */}
+          <div>
+            <VersionHistory
+              documentId={documentId}
+              onVersionSelect={handleVersionSelect}
+              onViewVersion={onViewVersion}
+              onRollback={() => {
+                // Clear selection after rollback
+                setSelectedVersions([]);
+                // Trigger a page refresh or update the parent component
+                window.location.reload();
+              }}
+              // Pass additional props for selection styling
+              selectedVersions={selectedVersions}
+              onVersionsLoaded={handleVersionsLoaded}
+              onBack={onBack}
+              getSelectionInfo={getSelectionInfo}
+              credibilityStatsMap={credibilityStatsMap}
+              isLoadingCredibility={isLoadingCredibility}
+              onOpenCredibilityModal={handleOpenCredibilityModal}
+            />
           </div>
-        </div>
-      )}
-
-      {/* Version History with Selection */}
-      <div>
-        <VersionHistory
-          documentId={documentId}
-          onVersionSelect={handleVersionSelect}
-          onViewVersion={onViewVersion}
-          onRollback={() => {
-            // Clear selection after rollback
-            setSelectedVersions([]);
-            // Trigger a page refresh or update the parent component
-            window.location.reload();
-          }}
-          // Pass additional props for selection styling
-          selectedVersions={selectedVersions}
-          onVersionsLoaded={handleVersionsLoaded}
-          onBack={onBack}
-          getSelectionInfo={getSelectionInfo}
-          credibilityStatsMap={credibilityStatsMap}
-          isLoadingCredibility={isLoadingCredibility}
-          onOpenCredibilityModal={handleOpenCredibilityModal}
-        />
-      </div>
-
-      {/* TODO: Credibility Modal */}
-      {credibilityModalHash && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-lg w-full">
-            <h3 className="font-semibold text-lg mb-4">Credibility Details</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Record Hash: <code className="bg-gray-100 px-1 rounded">{credibilityModalHash}</code>
-            </p>
-            <p className="text-sm text-gray-500">
-              Detailed verification and dispute information will be shown here.
-            </p>
-            <div className="mt-6 flex justify-end">
-              <Button variant="outline" onClick={() => setCredibilityModalHash(null)}>
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
+        </>
       )}
     </div>
   );

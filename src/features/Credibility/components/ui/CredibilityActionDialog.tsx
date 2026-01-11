@@ -385,7 +385,11 @@ const ConfirmVerificationContent: React.FC<{
             Cancel
           </Button>
         </AlertDialog.Cancel>
-        <Button onClick={() => onConfirm} className="flex-1 bg-chart-3 hover:bg-chart-3/90">
+        <Button
+          onClick={() => level && onConfirm(level)}
+          className="flex-1 bg-chart-3 hover:bg-chart-3/90"
+          disabled={!level}
+        >
           {isModify ? 'Confirm Modification' : 'Submit Verification'}
         </Button>
       </div>

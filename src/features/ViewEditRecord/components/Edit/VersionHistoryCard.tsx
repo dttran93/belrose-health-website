@@ -192,7 +192,7 @@ export const VersionHistoryCard: React.FC<VersionHistoryCardProps> = ({
               <VersionReviewBadge
                 stats={credibilityStats}
                 isLoading={isLoadingCredibility}
-                onClick={onOpenCredibilityModal}
+                onClick={() => onOpenCredibilityModal?.(version.recordHash)}
               />
             </div>
           </div>

@@ -11,7 +11,7 @@ export interface CredibilityStats {
 export interface VersionReviewProps {
   stats: CredibilityStats | null | undefined;
   isLoading?: boolean;
-  onClick?: (recordHash: string) => void;
+  onClick?: () => void;
 }
 
 export const VersionReviewBadge: React.FC<VersionReviewProps> = ({ stats, isLoading, onClick }) => {
@@ -70,7 +70,7 @@ export const VersionReviewBadge: React.FC<VersionReviewProps> = ({ stats, isLoad
   }
 
   return (
-    <button className={badgeClasses} onClick={() => onClick}>
+    <button className={badgeClasses} onClick={onClick}>
       <Shield className={`w-4 h-4 ${shieldColor}`} />
 
       <div className="flex items-center gap-3 text-xs">

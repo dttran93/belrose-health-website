@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Upload, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { HealthRecordCard } from '@/features/ViewEditRecord/components/View/RecordCard';
-import RecordFull from '@/features/ViewEditRecord/components/View/RecordFull';
+import RecordFull from '@/features/ViewEditRecord/components/RecordFull';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { FileObject } from '@/types/core';
 import useFileManager from '@/features/AddRecord/hooks/useFileManager';
