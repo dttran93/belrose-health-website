@@ -66,10 +66,11 @@ export const VerificationDetailModal: React.FC<VerificationDetailModalProps> = (
     <Dialog.Root open={isOpen} onOpenChange={open => !open && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl z-50 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-          <div className="p-2">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b">
+        {/* Changed: Removed overflow-y-auto, added flex flex-col */}
+        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl z-50 w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="p-2 flex flex-col h-full overflow-hidden">
+            {/* Header: Stays fixed at the top because it's outside the scroll area */}
+            <div className="flex items-center justify-between p-4 border-b bg-white rounded-t-lg">
               <Dialog.Title className="text-lg font-semibold flex items-center gap-2">
                 <CheckCircle className="w-5 h-5 text-green-600" />
                 Verification Details
@@ -82,22 +83,33 @@ export const VerificationDetailModal: React.FC<VerificationDetailModalProps> = (
               </Dialog.Close>
             </div>
 
-            {/* Content */}
-            <div className="p-4 space-y-5">
-              {/* User Card */}
-              <UserCard
-                user={userProfile}
-                userId={verification.verifierId}
-                variant="default"
-                color="green"
-                menuType="none"
-              />
+            {/* Content: Added flex-1 and overflow-y-auto to make ONLY this part scroll */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-5">
+              {/* Record Id/Hash */}
+              <div className="flex flex-col">
+                <h4 className="text-sm font-medium text-gray-500 mb-2">Record Details</h4>
+                <span className="text-xs">ID: {verification.recordId}</span>
+                <span className="text-xs">Hash: {verification.recordHash}</span>
+              </div>
 
               <hr className="border-gray-200" />
+              <h4 className="text-sm font-medium text-gray-500 mb-2">Verification Details</h4>
+
+              {/* User Card */}
+              <div>
+                <h4 className="text-xs font-medium text-gray-500 mb-2">Verifier</h4>
+                <UserCard
+                  user={userProfile}
+                  userId={verification.verifierId}
+                  variant="compact"
+                  color="green"
+                  menuType="none"
+                />
+              </div>
 
               {/* Level Section */}
               <div>
-                <h4 className="text-sm font-medium text-gray-500 mb-2">Verification Level</h4>
+                <h4 className="text-xs font-medium text-gray-500 mb-2">Verification Level</h4>
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <CheckCircle className="w-5 h-5 text-green-600" />
@@ -165,8 +177,8 @@ export const VerificationDetailModal: React.FC<VerificationDetailModalProps> = (
               )}
             </div>
 
-            {/* Footer Actions */}
-            <div className="flex items-center justify-between p-4 border-t bg-gray-50 rounded-b-xl">
+            {/* Footer Actions: Stays fixed at the bottom */}
+            <div className="flex items-center justify-between p-4 border-t bg-gray-50 rounded-b-lg">
               <Button
                 variant="outline"
                 size="sm"

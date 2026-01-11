@@ -126,7 +126,7 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
     <Dialog.Root open={isOpen} onOpenChange={open => !open && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl z-50 w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl z-50 w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col p-2">
           {viewMode === 'reactions' ? (
             // ============================================================
             // REACTIONS VIEW
@@ -161,19 +161,27 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
 
               {/* Scrollable Content */}
               <div className="flex-1 overflow-y-auto p-4 space-y-5">
+                {/* Record Id/Hash */}
+                <div className="flex flex-col">
+                  <h4 className="text-sm font-medium text-gray-500 mb-2">Record Details</h4>
+                  <span className="text-xs">ID: {dispute.recordId}</span>
+                  <span className="text-xs">Hash: {dispute.recordHash}</span>
+                </div>
+
+                <hr className="border-gray-200" />
+                <h4 className="text-sm font-medium text-gray-500 mb-2">Dispute Details</h4>
                 {/* User Card */}
+                <h4 className="text-xs font-medium text-gray-500 mb-2">Disputer</h4>
                 <UserCard
                   user={userProfile}
                   userId={dispute.disputerId}
-                  variant="default"
+                  variant="compact"
                   color="yellow"
                 />
 
-                <hr className="border-gray-200" />
-
                 {/* Severity Section */}
                 <div>
-                  <h4 className="text-sm font-medium text-gray-500 mb-2">Severity</h4>
+                  <h4 className="text-xs font-medium text-gray-500 mb-2">Severity</h4>
                   <div className={`${sevColors.bg} ${sevColors.border} border rounded-lg p-4`}>
                     <div className="flex items-center gap-2 mb-2">
                       <AlertTriangle className={`w-5 h-5 ${sevColors.icon}`} />
@@ -185,7 +193,7 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
 
                 {/* Culpability Section */}
                 <div>
-                  <h4 className="text-sm font-medium text-gray-500 mb-2">Culpability</h4>
+                  <h4 className="text-xs font-medium text-gray-500 mb-2">Culpability</h4>
                   <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="font-semibold text-purple-800">{culpabilityInfo.name}</span>
@@ -206,8 +214,6 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
                     </div>
                   </div>
                 )}
-
-                <hr className="border-gray-200" />
 
                 {/* Metadata Grid */}
                 <div className="grid grid-cols-2 gap-4">
