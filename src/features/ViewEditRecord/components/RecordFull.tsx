@@ -107,6 +107,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   );
   const [viewingVersion, setViewingVersion] = useState<RecordVersion | null>(null);
   const [decryptedVersionData, setDecryptedVersionData] = useState<any>(null);
+  const [enterCredibilityInModifyMode, setEnterCredibilityinModifyMode] = useState(false);
 
   /**
    * Decrypt a version's snapshot if it's encrypted
@@ -181,6 +182,12 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       : record;
 
   // View Mode Handlers
+
+  const handleModifyVerificationFromVersions = () => {
+    setEnterCredibilityinModifyMode(true);
+    setViewMode('credibility');
+  };
+
   const handleEnterEditMode = () => {
     setViewMode('edit');
     setActiveTab('record');
@@ -192,6 +199,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   };
 
   const handleViewCredibility = () => {
+    setEnterCredibilityinModifyMode(false);
     setViewMode('credibility');
   };
 
@@ -424,6 +432,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
           onRollback={handleVersionControlRollback}
           onViewVersion={handleViewVersion}
           record={record}
+          onModifyVerification={handleModifyVerificationFromVersions}
         />
       )}
 
@@ -507,7 +516,11 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       )}
 
       {viewMode === 'credibility' && (
-        <CredibilityView record={record} onBack={handleBackToRecord} />
+        <CredibilityView
+          record={record}
+          onBack={handleBackToRecord}
+          startModVerifyFromVersions={enterCredibilityInModifyMode}
+        />
       )}
     </div>
   );

@@ -22,6 +22,7 @@ export const VersionControlPanel: React.FC<VersionControlPanelProps> = ({
   onBack,
   onViewVersion,
   record,
+  onModifyVerification,
 }) => {
   const [showDiff, setShowDiff] = useState<VersionDiff | null>(null);
   const [selectedVersions, setSelectedVersions] = useState<string[]>([]);
@@ -243,6 +244,7 @@ export const VersionControlPanel: React.FC<VersionControlPanelProps> = ({
           version={selectedVersionForDetail}
           credibilityStats={credibilityStatsMap.get(selectedVersionForDetail.recordHash)}
           onBack={handleCloseDetailPage}
+          onModifyVerification={onModifyVerification}
         />
       ) : (
         <>

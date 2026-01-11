@@ -51,6 +51,7 @@ interface VersionDetailPageProps {
   version: RecordVersion;
   credibilityStats?: CredibilityStats | null;
   onBack: () => void;
+  onModifyVerification?: () => void;
 }
 
 interface ReactionStatsWithUser {
@@ -68,6 +69,7 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
   version,
   credibilityStats,
   onBack,
+  onModifyVerification,
 }) => {
   const { user } = useAuth();
   const recordId = record.firestoreId || record.id;
@@ -466,7 +468,7 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
           isOwnVerification={user?.uid === selectedVerification.verifierId}
           onModify={() => {
             handleCloseVerificationModal();
-            // Could navigate to modify flow
+            onModifyVerification?.();
           }}
           onRetract={() => {
             handleCloseVerificationModal();

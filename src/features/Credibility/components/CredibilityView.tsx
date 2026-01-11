@@ -29,12 +29,18 @@ type ReviewTab = 'verify' | 'dispute';
 interface CredibilityViewProps {
   record: FileObject;
   onBack: () => void;
+  startModVerifyFromVersions?: boolean;
 }
 
-export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack }) => {
+export const CredibilityView: React.FC<CredibilityViewProps> = ({
+  record,
+  onBack,
+  startModVerifyFromVersions = false,
+}) => {
   const [viewMode, setViewMode] = useState<ViewMode>('loading');
   const [reviewPanelInitialTab, setReviewPanelInitialTab] = useState<ReviewTab>('verify');
-  const [initialModifying, setInitialModifying] = useState(false);
+  const [initialModifyingDispute, setInitialModifyingDispute] = useState(false);
+  const [initialModifyingVerification, setInitialModifyingVerification] = useState(false);
   const [verifications, setVerifications] = useState<VerificationDoc[]>([]);
   const { user } = useAuth();
 
@@ -125,20 +131,34 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
     }
   };
 
+  useEffect(() => {
+    if (startModVerifyFromVersions && verification) {
+      setReviewPanelInitialTab('verify');
+      setInitialModifyingVerification(true);
+      setViewMode('add');
+    }
+  }, [startModVerifyFromVersions, verification, isLoadingVerification]);
+
   const handleAddVerification = () => {
     setReviewPanelInitialTab('verify');
     setViewMode('add');
   };
 
+  const handleModifyVerification = () => {
+    setReviewPanelInitialTab('verify');
+    setInitialModifyingVerification(true);
+    setViewMode('add');
+  };
+
   const handleAddDispute = () => {
     setReviewPanelInitialTab('dispute');
-    setInitialModifying(false);
+    setInitialModifyingDispute(false);
     setViewMode('add');
   };
 
   const handleModifyDispute = () => {
     setReviewPanelInitialTab('dispute');
-    setInitialModifying(true);
+    setInitialModifyingDispute(true);
     setViewMode('add');
   };
 
@@ -198,6 +218,8 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
             onBack={onBack}
             onAddMode={handleAddVerification}
             isAddMode={false}
+            onModify={handleModifyVerification}
+            onRetract={verification => initiateRetractVerification(verification.recordHash)}
           />
           <DisputeManagement
             record={record}
@@ -231,7 +253,8 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({ record, onBack
           initiateModifyDispute={initiateModifyDispute}
           verification={verification}
           isLoading={isLoading}
-          initialModifying={initialModifying}
+          initialModifyingDispute={initialModifyingDispute}
+          initialModifyingVerification={initialModifyingVerification}
         />
       )}
 

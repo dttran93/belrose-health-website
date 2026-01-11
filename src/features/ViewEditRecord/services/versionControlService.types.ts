@@ -2,6 +2,7 @@
 
 import { Timestamp } from 'firebase/firestore';
 import { CredibilityStats } from '../components/Edit/VersionReviewBadge';
+import { FileObject } from '@/types/core';
 
 // ==================== MAIN VERSION CONTROL TYPES ====================
 
@@ -143,7 +144,7 @@ export interface VersionHistoryProps {
     textClass: string;
     badgeClass: string;
   } | null;
-  credibilityStats?: Map<string, CredibilityStats>;
+  credibilityStatsMap?: Map<string, CredibilityStats>;
   isLoadingCredibility?: boolean;
   onOpenCredibilityModal?: (recordHash: string) => void;
 }
@@ -159,6 +160,8 @@ export interface VersionControlPanelProps {
   onRollback?: () => void;
   onBack?: () => void;
   onViewVersion?: (version: RecordVersion) => void;
+  record?: FileObject;
+  onModifyVerification?: () => void;
 }
 
 // ==================== SERVICE CONFIGURATION TYPES ====================

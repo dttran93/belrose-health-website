@@ -48,7 +48,8 @@ export interface RecordReviewPanelProps {
   ) => Promise<void>;
   verification: VerificationDoc | null;
   isLoading: boolean;
-  initialModifying: boolean;
+  initialModifyingDispute: boolean;
+  initialModifyingVerification: boolean;
 }
 
 // ============================================================
@@ -70,7 +71,8 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
   initiateModifyDispute,
   verification,
   isLoading,
-  initialModifying = false,
+  initialModifyingDispute = false,
+  initialModifyingVerification = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'verify' | 'dispute'>(initialTab);
 
@@ -197,6 +199,7 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
             onRetract={handleRetract}
             isSubmitting={isLoading}
             existingDispute={existingDispute}
+            initialModifying={initialModifyingVerification}
           />
         ) : (
           <DisputeForm
@@ -210,7 +213,7 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
             initiateRetractDispute={initiateRetractDispute}
             initiateModifyDispute={initiateModifyDispute}
             isSubmitting={isLoading}
-            initialModifying={initialModifying}
+            initialModifying={initialModifyingDispute}
             existingVerification={verification}
           />
         )}

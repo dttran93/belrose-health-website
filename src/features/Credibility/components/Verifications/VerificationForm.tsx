@@ -1,6 +1,6 @@
 // src/features/Credibility/components/ui/VerificationForm.tsx
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/utils/utils';
 import { CheckCircle, Loader2, Undo2, Edit2, AlertTriangle } from 'lucide-react';
@@ -24,6 +24,7 @@ interface VerificationFormProps {
   onRetract?: () => Promise<void>;
   isSubmitting?: boolean;
   existingDispute?: DisputeDoc | null;
+  initialModifying?: boolean;
 }
 
 // ============================================================
@@ -108,9 +109,19 @@ const VerificationForm: React.FC<VerificationFormProps> = ({
   onRetract,
   isSubmitting = false,
   existingDispute = null,
+  initialModifying = false,
 }) => {
   const [isModifying, setIsModifying] = useState(false);
-  const [modifyLevel, setModifyLevel] = useState<VerificationLevelOptions | null>(null);
+  const [modifyLevel, setModifyLevel] = useState<VerificationLevelOptions | null>(
+    initialModifying ? verification?.level || null : null
+  );
+
+  useEffect(() => {
+    setIsModifying(initialModifying);
+    if (initialModifying && verification) {
+      setModifyLevel(verification.level);
+    }
+  }, [initialModifying, verification]);
 
   const handleStartModify = () => {
     setIsModifying(true);

@@ -26,7 +26,7 @@ interface VerificationManagementProps {
   onBack?: () => void;
   onAddMode?: () => void;
   isAddMode?: boolean;
-  onModify?: (verification: VerificationDoc) => void;
+  onModify?: () => void;
   onRetract?: (verification: VerificationDoc) => void;
 }
 
@@ -103,7 +103,7 @@ export const VerificationManagement: React.FC<VerificationManagementProps> = ({
   const handleModify = () => {
     if (selectedVerification && onModify) {
       handleCloseModal();
-      onModify(selectedVerification);
+      onModify();
     }
   };
 
