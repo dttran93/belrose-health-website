@@ -6,9 +6,9 @@ import { cn } from '@/utils/utils';
 import { CheckCircle, Loader2, Undo2, Edit2, AlertTriangle } from 'lucide-react';
 import {
   VerificationDoc,
-  VerificationLevel,
   VERIFICATION_OPTIONS,
   getVerificationConfig,
+  VerificationLevelOptions,
 } from '../../services/verificationService';
 import { DisputeDoc } from '../../services/disputeService';
 
@@ -17,10 +17,10 @@ import { DisputeDoc } from '../../services/disputeService';
 // ============================================================
 
 interface VerificationFormProps {
-  selectedLevel: VerificationLevel | null;
-  onSelectLevel: (level: VerificationLevel) => void;
+  selectedLevel: VerificationLevelOptions | null;
+  onSelectLevel: (level: VerificationLevelOptions) => void;
   verification: VerificationDoc | null;
-  onModify?: (newLevel: VerificationLevel) => Promise<void>;
+  onModify?: (newLevel: VerificationLevelOptions) => Promise<void>;
   onRetract?: () => Promise<void>;
   isSubmitting?: boolean;
   existingDispute?: DisputeDoc | null;
@@ -31,10 +31,10 @@ interface VerificationFormProps {
 // ============================================================
 
 interface LevelSelectorProps {
-  selectedLevel: VerificationLevel | null;
-  onSelectLevel: (level: VerificationLevel) => void;
+  selectedLevel: VerificationLevelOptions | null;
+  onSelectLevel: (level: VerificationLevelOptions) => void;
   disabled?: boolean;
-  currentLevel?: VerificationLevel;
+  currentLevel?: VerificationLevelOptions;
 }
 
 const LevelSelector: React.FC<LevelSelectorProps> = ({
@@ -110,7 +110,7 @@ const VerificationForm: React.FC<VerificationFormProps> = ({
   existingDispute = null,
 }) => {
   const [isModifying, setIsModifying] = useState(false);
-  const [modifyLevel, setModifyLevel] = useState<VerificationLevel | null>(null);
+  const [modifyLevel, setModifyLevel] = useState<VerificationLevelOptions | null>(null);
 
   const handleStartModify = () => {
     setIsModifying(true);

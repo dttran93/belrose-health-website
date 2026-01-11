@@ -15,7 +15,11 @@ import VerificationForm from './Verifications/VerificationForm';
 import DisputeForm from './Disputes/DisputeForm';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { DisputeCulpability, DisputeDoc, DisputeSeverity } from '../services/disputeService';
-import { VerificationDoc, VerificationLevel } from '../services/verificationService';
+import {
+  VerificationDoc,
+  VerificationLevel,
+  VerificationLevelOptions,
+} from '../services/verificationService';
 
 // ============================================================
 // TYPES
@@ -29,11 +33,14 @@ export interface RecordReviewPanelProps {
   onSuccess?: () => void;
   existingDispute?: DisputeDoc | null;
   initialTab?: 'verify' | 'dispute';
-  initiateVerification: (level: VerificationLevel) => void;
+  initiateVerification: (level: VerificationLevelOptions) => void;
   initiateDispute: (sev: DisputeSeverity, culp: DisputeCulpability, notes?: string) => void;
   initiateRetractVerification: (recordHash?: string) => Promise<void>;
   initiateRetractDispute: (recordHash?: string) => Promise<void>;
-  initiateModifyVerification: (recordHash: string, newLevel: VerificationLevel) => Promise<void>;
+  initiateModifyVerification: (
+    recordHash: string,
+    newLevel: VerificationLevelOptions
+  ) => Promise<void>;
   initiateModifyDispute: (
     recordHash: string,
     newSeverity?: DisputeSeverity,
@@ -68,7 +75,7 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
   const [activeTab, setActiveTab] = useState<'verify' | 'dispute'>(initialTab);
 
   // Local form state for selections (before submitting)
-  const [selectedLevel, setSelectedLevel] = useState<VerificationLevel | null>(null);
+  const [selectedLevel, setSelectedLevel] = useState<VerificationLevelOptions | null>(null);
 
   // Dispute form state
   const [severity, setSeverity] = useState<DisputeSeverity | null>(null);
@@ -88,7 +95,7 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
     initiateRetractVerification();
   };
 
-  const handleModifyLevel = async (newLevel: VerificationLevel) => {
+  const handleModifyLevel = async (newLevel: VerificationLevelOptions) => {
     if (verification) {
       initiateModifyVerification(verification.recordHash, newLevel);
     }

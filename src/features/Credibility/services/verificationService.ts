@@ -22,12 +22,12 @@ import { getDisputeId } from './disputeService';
 // ============================================================
 
 export type VerificationLevel = 0 | 1 | 2 | 3;
-
-export type VerificationLevelName = 'None' | 'Provenance' | 'Content' | 'Full';
+export type VerificationLevelOptions = 1 | 2 | 3;
+export type VerificationLevelOptionName = 'Provenance' | 'Content' | 'Full';
 
 export interface VerificationConfig {
-  value: VerificationLevel;
-  name: VerificationLevelName;
+  value: VerificationLevelOptions;
+  name: VerificationLevelOptionName;
   icon: LucideIcon;
   description: string;
   declarative: string;
@@ -57,7 +57,7 @@ export interface VerificationWithVersion extends VerificationDoc {
 // CONSTANTS
 // ============================================================
 
-export const VERIFICATION_LEVEL_CONFIG: Record<VerificationLevel, VerificationConfig> = {
+export const VERIFICATION_LEVEL_CONFIG: Record<VerificationLevelOptions, VerificationConfig> = {
   3: {
     value: 3,
     name: 'Full',
@@ -85,18 +85,12 @@ export const VERIFICATION_LEVEL_CONFIG: Record<VerificationLevel, VerificationCo
     description:
       'The verifier is confirming the origin of the record is correctly stated. They are not verifying the completeness and accuracy of the content itself.',
   },
-  0: {
-    value: 0,
-    name: 'None',
-    icon: X,
-    declarative: '',
-    description: 'No verification',
-  },
 };
 
 // Helper functions to access config
-export const getVerificationConfig = (verificationLevel: VerificationLevel): VerificationConfig =>
-  VERIFICATION_LEVEL_CONFIG[verificationLevel];
+export const getVerificationConfig = (
+  verificationLevel: VerificationLevelOptions
+): VerificationConfig => VERIFICATION_LEVEL_CONFIG[verificationLevel];
 
 // Arrays for iterating in UI (forms, selects, etc.)
 export const VERIFICATION_OPTIONS = Object.values(VERIFICATION_LEVEL_CONFIG);

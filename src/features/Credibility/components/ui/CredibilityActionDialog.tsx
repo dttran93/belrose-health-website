@@ -23,6 +23,7 @@ import {
   VerificationLevel,
   VERIFICATION_OPTIONS,
   getVerificationConfig,
+  VerificationLevelOptions,
 } from '../../services/verificationService';
 import {
   DisputeCulpability,
@@ -44,13 +45,13 @@ interface CredibilityActionDialogProps {
   error?: string | null;
   preparationProgress?: CredibilityPreparationProgress | null;
   // Pre-selected values from the form (if any)
-  pendingLevel?: VerificationLevel;
+  pendingLevel?: VerificationLevelOptions;
   pendingSeverity?: DisputeSeverity;
   pendingCulpability?: DisputeCulpability;
   pendingNotes?: string;
   pendingReaction?: boolean;
   onClose: () => void;
-  onConfirmVerification: (level: VerificationLevel) => void;
+  onConfirmVerification: (level: VerificationLevelOptions) => void;
   onConfirmRetract: () => void;
   onConfirmDispute: () => void;
   onConfirmReaction: (supports: boolean) => void;
@@ -339,9 +340,9 @@ const SuccessContent: React.FC<{
 // ============================================================================
 
 const ConfirmVerificationContent: React.FC<{
-  level?: VerificationLevel;
+  level?: VerificationLevelOptions;
   isModify?: boolean;
-  onConfirm: (level: VerificationLevel) => void;
+  onConfirm: (level: VerificationLevelOptions) => void;
   onClose: () => void;
 }> = ({ level, isModify, onConfirm, onClose }) => {
   const config = getVerificationConfig(level || 1);

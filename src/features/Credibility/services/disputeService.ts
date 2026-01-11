@@ -24,7 +24,9 @@ import { getVerificationId } from './verificationService';
 // TYPES
 // ============================================================
 
-export type DisputeSeverity = 0 | 1 | 2 | 3;
+export type DisputeSeverity = 0 | 1 | 2 | 3; // 0 used in blockchain for returning errors
+export type DisputeSeverityOptions = 1 | 2 | 3; //0 is not an option in actual selection
+export type DisputeSeverityOptionNames = 'Negligible' | 'Moderate' | 'Major';
 
 export type DisputeSeverityName = 'None' | 'Negligible' | 'Moderate' | 'Major';
 
@@ -39,8 +41,8 @@ export type DisputeCulpabilityName =
   | 'Intentional';
 
 export interface SeverityConfig {
-  value: DisputeSeverity;
-  name: DisputeSeverityName;
+  value: DisputeSeverityOptions;
+  name: DisputeSeverityOptionNames;
   description: string;
   declarative: string;
   color: 'blue' | 'yellow' | 'red' | 'gray';
@@ -64,7 +66,7 @@ export interface DisputeDoc {
   recordId: string;
   disputerId: string;
   disputerIdHash: string;
-  severity: DisputeSeverity;
+  severity: DisputeSeverityOptions;
   culpability: DisputeCulpability;
   encryptedNotes?: EncryptedField;
   notesHash: string;
@@ -110,7 +112,7 @@ export interface ReactionStats {
 // CONSTANTS
 // ============================================================
 
-export const SEVERITY_CONFIG: Record<DisputeSeverity, SeverityConfig> = {
+export const SEVERITY_CONFIG: Record<DisputeSeverityOptions, SeverityConfig> = {
   1: {
     value: 1,
     name: 'Negligible',
@@ -134,13 +136,6 @@ export const SEVERITY_CONFIG: Record<DisputeSeverity, SeverityConfig> = {
       'A serious inaccuracy that could lead to incorrect diagnoses or harmful treatment decisions. Requires immediate attention.',
     declarative: 'Serious error that could affect patient safety',
     color: 'red',
-  },
-  0: {
-    value: 0,
-    name: 'None',
-    description: 'Used on Blockchain to return error. Should not be used otherwise',
-    declarative: 'None',
-    color: 'gray',
   },
 };
 
@@ -186,7 +181,7 @@ export const CULPABILITY_CONFIG: Record<DisputeCulpability, CulpabilityConfig> =
 };
 
 // Helper functions to access config
-export const getSeverityConfig = (severity: DisputeSeverity): SeverityConfig =>
+export const getSeverityConfig = (severity: DisputeSeverityOptions): SeverityConfig =>
   SEVERITY_CONFIG[severity];
 
 export const getCulpabilityConfig = (culpability: DisputeCulpability): CulpabilityConfig =>

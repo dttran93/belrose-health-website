@@ -6,6 +6,7 @@ import { Dispute, DisputeSeverity, DisputeCulpability } from '../lib/types';
 import { TableWrapper, StatusBadge, HashDisplay } from './SharedComponents';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import {
+  DisputeSeverityOptions,
   getCulpabilityConfig,
   getSeverityConfig,
 } from '@/features/Credibility/services/disputeService';
@@ -261,7 +262,7 @@ export const DisputesTable: React.FC<DisputesTableProps> = ({ disputes }) => {
 // ===============================================================
 
 interface SeverityBadgeProps {
-  severity: DisputeSeverity;
+  severity: DisputeSeverityOptions;
 }
 
 export const SeverityBadge: React.FC<SeverityBadgeProps> = ({ severity }) => {

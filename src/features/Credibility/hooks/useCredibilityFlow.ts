@@ -15,6 +15,7 @@ import {
   type VerificationLevel,
   type VerificationDoc,
   getVerificationConfig,
+  VerificationLevelOptions,
 } from '../services/verificationService';
 import {
   createDispute,
@@ -35,7 +36,7 @@ import { DialogPhase } from '../components/ui/CredibilityActionDialog';
 // TYPES
 // ============================================================================
 
-export type { CredibilityOperationType, VerificationLevel };
+export type { CredibilityOperationType, VerificationLevelOptions };
 
 export interface UseCredibilityFlowOptions {
   recordId: string;
@@ -49,7 +50,7 @@ interface PendingOperation {
   recordHash: string;
   disputerId?: string;
   // Verification-specific
-  verificationLevel?: VerificationLevel;
+  verificationLevel?: VerificationLevelOptions;
   // Dispute-specific
   disputeSeverity?: DisputeSeverity;
   disputeCulpability?: DisputeCulpability;
@@ -202,7 +203,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
    * @param level - Optional pre-selected verification level
    */
   const initiateVerification = useCallback(
-    async (level?: VerificationLevel) => {
+    async (level?: VerificationLevelOptions) => {
       setPendingOperation({
         type: 'verify',
         recordId,
@@ -222,7 +223,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
    * Execute a confirmed verification
    */
   const confirmVerification = useCallback(
-    async (level: VerificationLevel) => {
+    async (level: VerificationLevelOptions) => {
       if (!pendingOperation || pendingOperation.type !== 'verify') {
         return;
       }
@@ -318,7 +319,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
    * Start a modify verification flow (Phase 1: Setup)
    */
   const initiateModifyVerification = useCallback(
-    async (verificationRecordHash: string, newLevel: VerificationLevel) => {
+    async (verificationRecordHash: string, newLevel: VerificationLevelOptions) => {
       // Stage the data for the confirmation dialog
       setPendingOperation({
         type: 'modifyVerification',
