@@ -22,6 +22,7 @@ import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionK
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
+import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
 
 // ==================== VERSION ID UTILITIES ====================
 
@@ -52,10 +53,11 @@ export class VersionControlService {
 
   /**
    * Helper to fetch the user's wrapped DEK for a given record.
-   * This key is stored in the `wrappedKeys` collection and is encrypted
-   * by the current user's master key.
+   * Returns both the wrapped key and whether user is creator (which affects the unwrapping method)
    */
-  private async fetchEncryptedRecordKey(recordId: string): Promise<string> {
+  private async fetchWrappedKeyData(
+    recordId: string
+  ): Promise<{ wrappedKey: string; isCreator: boolean }> {
     if (!this.userId) throw new Error('User not authenticated');
 
     console.log(`🔑 Fetching wrapped key for record ${recordId}...`);
@@ -88,7 +90,7 @@ export class VersionControlService {
       throw new Error('Wrapped key data is corrupt or missing the "wrappedKey" field.');
     }
 
-    return wrappedKey;
+    return { wrappedKey, isCreator: docData.isCreator === true };
   }
 
   // ==================== CORE VERSION METHODS ====================
@@ -208,10 +210,10 @@ export class VersionControlService {
       const newVersionId = generateVersionId(recordId, versionNumber);
 
       // Fetch the encrypted key before calculating changes and encrypting changes
-      const encryptedRecordKey = await this.fetchEncryptedRecordKey(recordId); // Use fetched key
+      const keyData = await this.fetchWrappedKeyData(recordId); // Use fetched key
 
       // Calculate changes from previous version
-      const previousSnapshot = await this.decryptVersionSnapshot(latestVersion);
+      const previousSnapshot = await this.decryptVersionSnapshot(latestVersion, keyData);
       const currentSnapshot = {
         fileName: updatedRecord.fileName ?? null,
         extractedText: updatedRecord.extractedText ?? null,
@@ -238,7 +240,7 @@ export class VersionControlService {
       // Encrypt changes if any exist
       if (changes.length > 0) {
         console.log('  🔐 Encrypting changes array...');
-        version.encryptedChanges = await this.encryptChanges(changes, encryptedRecordKey);
+        version.encryptedChanges = await this.encryptChanges(changes, keyData);
         version.commitMessage = commitMessage || this.generateAutoCommitMessage(changes);
         console.log('  ✅ Changes encrypted');
       } else {
@@ -354,7 +356,6 @@ export class VersionControlService {
    * Returns the actual Change[] array that can be displayed
    */
   async getVersionChanges(version: RecordVersion): Promise<Change[]> {
-    // Simply check if encryptedChanges exists
     if (!version.encryptedChanges) {
       return [];
     }
@@ -363,8 +364,8 @@ export class VersionControlService {
       throw new Error('Invalid version: Snapshot must be encrypted');
     }
 
-    const encryptedRecordKey = await this.fetchEncryptedRecordKey(version.recordId);
-    return await this.decryptChanges(version.encryptedChanges, encryptedRecordKey);
+    const keyData = await this.fetchWrappedKeyData(version.recordId);
+    return await this.decryptChanges(version.encryptedChanges, keyData);
   }
 
   /**
@@ -373,7 +374,7 @@ export class VersionControlService {
    */
   private async decryptVersionSnapshot(
     version: RecordVersion,
-    encryptedKey?: string
+    keyData?: { wrappedKey: string; isCreator: boolean }
   ): Promise<any> {
     // If the version isn't encrypted, throw error
     if (!version.recordSnapshot.isEncrypted) {
@@ -383,7 +384,7 @@ export class VersionControlService {
     console.log(`🔓 Decrypting version ${version.versionNumber}...`);
 
     //Get the key from caller or fetch
-    const keyToUse = encryptedKey || (await this.fetchEncryptedRecordKey(version.recordId));
+    const { wrappedKey, isCreator } = keyData || (await this.fetchWrappedKeyData(version.recordId));
 
     // Check if encryption session is active
     const masterKey = EncryptionKeyManager.getSessionKey();
@@ -407,7 +408,11 @@ export class VersionControlService {
         isEncrypted: true,
       };
 
-      const decryptedData = await RecordDecryptionService.decryptRecord(encryptedRecord, keyToUse);
+      const decryptedData = await RecordDecryptionService.decryptRecord(
+        encryptedRecord,
+        wrappedKey,
+        isCreator
+      );
       console.log(`✅ Version ${version.versionNumber} decrypted successfully`);
 
       // Return ALL fields needed for hash regeneration
@@ -546,11 +551,11 @@ export class VersionControlService {
     });
 
     // Fetch the key once and pass it to avoid redundant lookups
-    const encryptedRecordKey = await this.fetchEncryptedRecordKey(recordId);
+    const keyData = await this.fetchWrappedKeyData(recordId);
 
-    // Decrypt both versions before comparing
-    const decryptedSnapshot1 = await this.decryptVersionSnapshot(version1, encryptedRecordKey);
-    const decryptedSnapshot2 = await this.decryptVersionSnapshot(version2, encryptedRecordKey);
+    // Decrypt both versions with the same key data before comparing
+    const decryptedSnapshot1 = await this.decryptVersionSnapshot(version1, keyData);
+    const decryptedSnapshot2 = await this.decryptVersionSnapshot(version2, keyData);
 
     console.log('VersionJSON comparison:', {
       v1: decryptedSnapshot1,
@@ -585,7 +590,10 @@ export class VersionControlService {
   /**
    * Encrypt changes array using the record's data encryption key
    */
-  private async encryptChanges(changes: Change[], encryptedRecordKey: string): Promise<string> {
+  private async encryptChanges(
+    changes: Change[],
+    keyData: { wrappedKey: string; isCreator: boolean }
+  ): Promise<string> {
     console.log('🔐 Encrypting changes array...');
 
     // Get master key from session
@@ -594,10 +602,8 @@ export class VersionControlService {
       throw new Error('Cannot encrypt changes: No active encryption session');
     }
 
-    // Unwrap the record's DEK using EncryptionService
-    const keyData = base64ToArrayBuffer(encryptedRecordKey);
-    const recordDEKData = await EncryptionService.decryptKeyWithMasterKey(keyData, masterKey);
-    const recordDEK = await EncryptionService.importKey(recordDEKData);
+    // Unwrap the record's DEK based on user type
+    const recordDEK = await this.unwrapRecordKey(keyData, masterKey);
 
     // Serialize changes to JSON string
     const changesJson = JSON.stringify(changes);
@@ -606,7 +612,6 @@ export class VersionControlService {
     const { encrypted, iv } = await EncryptionService.encryptText(changesJson, recordDEK);
 
     // Combine encrypted data and IV into a single base64 string
-    // Format: [IV][encrypted data] - same pattern you use for other encrypted fields
     const combined = new Uint8Array(iv.byteLength + encrypted.byteLength);
     combined.set(new Uint8Array(iv), 0);
     combined.set(new Uint8Array(encrypted), iv.byteLength);
@@ -622,7 +627,7 @@ export class VersionControlService {
    */
   private async decryptChanges(
     encryptedChanges: string,
-    encryptedRecordKey: string
+    keyData: { wrappedKey: string; isCreator: boolean }
   ): Promise<Change[]> {
     console.log('🔓 Decrypting changes array...');
 
@@ -635,9 +640,7 @@ export class VersionControlService {
     }
 
     // Unwrap the record's DEK
-    const keyData = base64ToArrayBuffer(encryptedRecordKey);
-    const recordDEKData = await EncryptionService.decryptKeyWithMasterKey(keyData, masterKey);
-    const recordDEK = await EncryptionService.importKey(recordDEKData);
+    const recordDEK = await this.unwrapRecordKey(keyData, masterKey);
 
     // Decode the combined base64 string
     const combined = base64ToArrayBuffer(encryptedChanges);
@@ -655,6 +658,61 @@ export class VersionControlService {
 
     console.log(`✅ Decrypted ${changes.length} changes`);
     return changes;
+  }
+
+  /**
+   * Unwrap the record DEK based on whether user is creator or shared user
+   */
+  private async unwrapRecordKey(
+    keyData: { wrappedKey: string; isCreator: boolean },
+    masterKey: CryptoKey
+  ): Promise<CryptoKey> {
+    const { wrappedKey, isCreator } = keyData;
+    if (isCreator) {
+      // Creator: key is AES-encrypted with master key
+      console.log('ℹ️  Decrypting as creator (master key)...');
+      const encryptedKeyData = base64ToArrayBuffer(wrappedKey);
+      const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(
+        encryptedKeyData,
+        masterKey
+      );
+      console.log('✅ Record key decrypted');
+      return await EncryptionService.importKey(fileKeyData);
+    } else {
+      // Shared user needs to decrypt the with RSA private key
+      console.log('ℹ️  Unwrapping as shared user (RSA)...');
+      const rsaPrivateKey = await this.getUserPrivateKey(masterKey);
+      return await SharingKeyManagementService.unwrapKey(wrappedKey, rsaPrivateKey);
+    }
+  }
+
+  /**
+   * Get current user's RSA private key (for shared record access)
+   */
+  private async getUserPrivateKey(masterKey: CryptoKey): Promise<CryptoKey> {
+    const userRef = doc(this.db, 'users', this.userId);
+    const userDoc = await getDoc(userRef);
+
+    if (!userDoc.exists()) {
+      throw new Error('User profile not found');
+    }
+
+    const userData = userDoc.data();
+
+    if (!userData?.encryption?.encryptedPrivateKey) {
+      throw new Error('User does not have an encrypted private key stored');
+    }
+
+    const encryptedPrivateKeyData = base64ToArrayBuffer(userData.encryption.encryptedPrivateKey);
+    const privateKeyIv = base64ToArrayBuffer(userData.encryption.encryptedPrivateKeyIV);
+
+    const privateKeyBytes = await EncryptionService.decryptFile(
+      encryptedPrivateKeyData,
+      masterKey,
+      privateKeyIv
+    );
+
+    return await SharingKeyManagementService.importPrivateKey(arrayBufferToBase64(privateKeyBytes));
   }
 
   // ==================== UTILITY METHODS ====================

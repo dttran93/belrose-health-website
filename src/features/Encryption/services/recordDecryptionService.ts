@@ -38,7 +38,8 @@ export class RecordDecryptionService {
    */
   static async decryptRecord(
     encryptedRecord: EncryptedRecord,
-    encryptedRecordKey?: string //For the cases where the key IS provided within the component, optimized so there aren't multiple firebase reads, see VersionControlService
+    encryptedRecordKey?: string, //For the cases where the key IS provided within the component, optimized so there aren't multiple firebase reads, see VersionControlService
+    isCreator?: boolean
   ): Promise<DecryptedRecord> {
     // If not encrypted, return as-is
     if (!encryptedRecord.isEncrypted) {
@@ -57,15 +58,23 @@ export class RecordDecryptionService {
     let fileKey: CryptoKey;
 
     try {
-      if (encryptedRecordKey) {
+      if (encryptedRecordKey && isCreator !== undefined) {
         // PATH 1: Key is provided (e.g., from VersionControlService for efficiency)
-        console.log('ℹ️ Key provided, unwrapping key locally...');
-        const keyData = base64ToArrayBuffer(encryptedRecordKey);
-        const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(keyData, masterKey);
-        fileKey = await EncryptionService.importKey(fileKeyData);
-        console.log('✓ File key unwrapped successfully');
+        if (isCreator) {
+          console.log('ℹ️ Unwrapping as creator (master key)...');
+          const keyData = base64ToArrayBuffer(encryptedRecordKey);
+          const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(keyData, masterKey);
+          fileKey = await EncryptionService.importKey(fileKeyData);
+          console.log('✓ File key unwrapped successfully');
+        } else {
+          // PATH 2: Shared user: RSA-wrapped key to be fetched
+          console.log('ℹ️ Fetching and decrypting record key with shared user RSA...');
+          const rsaPrivateKey = await this.getUserPrivateKey(getAuth().currentUser!.uid, masterKey);
+          fileKey = await SharingKeyManagementService.unwrapKey(encryptedRecordKey, rsaPrivateKey);
+          console.log('✓ File key fetched and decrypted');
+        }
       } else {
-        // PATH 2: Key is not provided, fetch it from Firestore (original logic)
+        // PATH 3: No key provided, fetch via getRecordKey
         fileKey = await this.getRecordKey(encryptedRecord.id, masterKey);
         console.log('✓ File key fetched and decrypted');
       }
