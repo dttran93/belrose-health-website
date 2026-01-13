@@ -127,8 +127,8 @@ export const onSubjectConsentRequestCreated = onDocumentCreated(
     await createNotification(data.subjectId, {
       type: 'SUBJECT_REQUEST_RECEIVED',
       sourceService: SOURCE,
-      message: `${requesterName} has requested you as the subject of record: ${recordName}. Please review and respond.`,
-      link: `/records/${data.recordId}`,
+      message: `${requesterName} has requested to set you as the subject of record: ${recordName}. Please review and respond.`,
+      link: `/records/${data.recordId}/review-subject-request`,
       payload: {
         recordId: data.recordId,
         requestId,

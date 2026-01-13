@@ -54,6 +54,7 @@ interface RecordFullProps {
     | 'access'
     | 'subject'; //version-detail can never be the initial view, since it only comes from versions
   comingFromAddRecord?: boolean; //so the Save button is activated when coming from the AddRecord screen, otherwise it'd be disabled and the user is stuck
+  readOnly?: boolean;
 }
 
 export const RecordFull: React.FC<RecordFullProps> = ({
@@ -66,6 +67,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   onBack,
   initialViewMode = 'record',
   comingFromAddRecord = false,
+  readOnly = false,
 }) => {
   const { user } = useAuth();
 
@@ -195,6 +197,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   };
 
   const handleEnterEditMode = () => {
+    if (readOnly) return;
     setViewMode('edit');
     setActiveTab('record');
     setEditedBelroseFields(record.belroseFields || undefined);
@@ -363,21 +366,23 @@ export const RecordFull: React.FC<RecordFullProps> = ({
                 onSuccess={() => {}}
               />
               <CredibilityBadge fileObject={record} />
-              <HealthRecordMenu
-                record={record}
-                triggerIcon={Ellipsis}
-                triggerClassName="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
-                showView={false} //Don't need view because we're already on view full record
-                onEdit={viewMode !== 'edit' ? handleEnterEditMode : undefined}
-                onVersion={viewMode !== 'versions' ? handleViewVersionHistory : undefined}
-                onSubject={viewMode !== 'subject' ? handleSubjectPage : undefined}
-                onAccess={viewMode !== 'access' ? handleAccessPage : undefined}
-                onCredibility={viewMode !== 'credibility' ? handleViewCredibility : undefined}
-                onPermissions={viewMode !== 'permissions' ? handlePermissionManager : undefined}
-                onDownload={onDownload}
-                onCopy={onCopy}
-                onDelete={onDelete}
-              />
+              {!readOnly && (
+                <HealthRecordMenu
+                  record={record}
+                  triggerIcon={Ellipsis}
+                  triggerClassName="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
+                  showView={false} //Don't need view because we're already on view full record
+                  onEdit={viewMode !== 'edit' ? handleEnterEditMode : undefined}
+                  onVersion={viewMode !== 'versions' ? handleViewVersionHistory : undefined}
+                  onSubject={viewMode !== 'subject' ? handleSubjectPage : undefined}
+                  onAccess={viewMode !== 'access' ? handleAccessPage : undefined}
+                  onCredibility={viewMode !== 'credibility' ? handleViewCredibility : undefined}
+                  onPermissions={viewMode !== 'permissions' ? handlePermissionManager : undefined}
+                  onDownload={onDownload}
+                  onCopy={onCopy}
+                  onDelete={onDelete}
+                />
+              )}
               <Button
                 variant="default"
                 className="p-2 w-8 h-8 hover:bg-white/20 transition-colors"

@@ -15,6 +15,7 @@ import {
 import { Notification, NotificationType } from '@/features/Notifications/hooks/useNotifications';
 import { formatDistanceToNow } from 'date-fns/formatDistanceToNow';
 import { Timestamp } from 'firebase/firestore';
+import { formatTimestamp } from '@/utils/dataFormattingUtils';
 
 // ============================================================================
 // TYPES
@@ -83,18 +84,6 @@ const getNotificationConfig = (type: NotificationType): NotificationConfig => {
         iconBgColor: 'bg-muted',
         iconColor: 'text-muted-foreground',
       };
-  }
-};
-
-/**
- * Format a Firestore Timestamp to a human-readable relative time.
- */
-const formatTimestamp = (timestamp: Timestamp): string => {
-  try {
-    const date = timestamp.toDate();
-    return formatDistanceToNow(date, { addSuffix: true });
-  } catch {
-    return 'Unknown time';
   }
 };
 
