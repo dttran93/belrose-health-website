@@ -52,8 +52,14 @@ export async function getRecord(recordId: string): Promise<FileObject | null> {
       data.subjects?.includes(user.uid);
 
     if (!hasAccess) {
-      console.warn('User does not have access to record:', recordId);
-      return null;
+      const requestId = `${recordId}_${user.uid}`;
+      const requestRef = doc(db, 'subjectConsentRequests', requestId);
+      const requestSnap = await getDoc(requestRef);
+
+      if (!requestSnap.exists() || requestSnap.data()?.status !== 'pending') {
+        console.warn('User does not have access to record:', recordId);
+        return null;
+      }
     }
 
     // Map to FileObject

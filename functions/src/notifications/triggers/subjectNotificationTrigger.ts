@@ -128,7 +128,7 @@ export const onSubjectConsentRequestCreated = onDocumentCreated(
       type: 'SUBJECT_REQUEST_RECEIVED',
       sourceService: SOURCE,
       message: `${requesterName} has requested to set you as the subject of record: ${recordName}. Please review and respond.`,
-      link: `/records/${data.recordId}/review-subject-request`,
+      link: `/dashboard/records/${data.recordId}/review-subject-request`,
       payload: {
         recordId: data.recordId,
         requestId,
@@ -182,7 +182,7 @@ export const onSubjectConsentRequestUpdated = onDocumentUpdated(
         type: 'SUBJECT_ACCEPTED',
         sourceService: SOURCE,
         message: `${subjectName} has accepted your subject request for the record: ${recordName}.`,
-        link: `/records/${afterData.recordId}`,
+        link: `/dashboard/records/${afterData.recordId}`,
         payload: {
           recordId: afterData.recordId,
           requestId,
@@ -201,7 +201,7 @@ export const onSubjectConsentRequestUpdated = onDocumentUpdated(
         type: 'REJECTION_PENDING_CREATOR_DECISION',
         sourceService: SOURCE,
         message: `${subjectName} has declined to be set as the subject of record: ${recordName}.`,
-        link: `/records/${afterData.recordId}`,
+        link: `/dashboard/records/${afterData.recordId}`,
         payload: {
           recordId: afterData.recordId,
           requestId,
@@ -272,7 +272,7 @@ async function handleNewRejections(
       type: 'REJECTION_PENDING_CREATOR_DECISION',
       sourceService: SOURCE,
       message: `Action Required: ${subjectName} has removed their subject status from record: ${recordName}. Please review and decide whether to publicly list this change.`,
-      link: `/records/${recordId}/review-rejection`,
+      link: `/dashboard/records/${recordId}/review-rejection`,
       payload: {
         recordId,
         subjectId: rejection.subjectId,
@@ -304,7 +304,7 @@ async function handleRespondedRejections(
       type: notificationType,
       sourceService: SOURCE,
       message,
-      link: `/records/${recordId}`,
+      link: `/dashboard/records/${recordId}`,
       payload: {
         recordId,
         subjectId: rejection.subjectId,
