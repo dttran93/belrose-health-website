@@ -29,6 +29,7 @@
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { BlockchainPreparationService } from '@/features/BlockchainWallet/services/blockchainPreparationService';
+import { PermissionPreparationService } from '@/features/Permissions/services/permissionPreparationService';
 
 // ==================== TYPES ====================
 
@@ -86,7 +87,7 @@ export interface SubjectPreparationStatus {
 }
 
 export interface SubjectPreparationProgress {
-  step: 'computing' | 'saving' | 'registering' | 'complete';
+  step: 'computing' | 'saving' | 'registering' | 'initializing_record' | 'complete';
   message: string;
 }
 
@@ -460,14 +461,38 @@ export class SubjectPreparationService {
    * @param onProgress - Optional callback for progress updates
    * @returns The caller's smart account address
    */
-  static async prepare(onProgress?: SubjectProgressCallback): Promise<string> {
+  static async prepare(recordId: string, onProgress?: SubjectProgressCallback): Promise<string> {
     console.log('🔄 SubjectPreparationService: Starting preparation...');
+
+    const auth = getAuth();
+    const userId = auth.currentUser?.uid;
+
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
 
     // Delegate to the generic blockchain preparation
     // Subject operations just need wallet readiness
     const address = await BlockchainPreparationService.ensureReady(progress => {
       onProgress?.(progress as SubjectPreparationProgress);
     });
+
+    // Ensure record is initialized on-chain
+    const permissionStatus = await PermissionPreparationService.getStatus(recordId);
+
+    if (!permissionStatus.isRecordInitialized) {
+      onProgress?.({
+        step: 'initializing_record',
+        message: 'Initializing record on network...',
+      });
+
+      const recordCheck = await this.checkRecordAndPermissions(recordId, userId);
+
+      const initialRole: 'owner' | 'administrator' =
+        recordCheck.role === 'owner' ? 'owner' : 'administrator';
+
+      await PermissionPreparationService.initializeRecordRole(recordId, address, initialRole);
+    }
 
     console.log('✅ SubjectPreparationService: Ready with address:', address);
     return address;

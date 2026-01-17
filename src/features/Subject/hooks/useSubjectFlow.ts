@@ -30,6 +30,7 @@ import {
 import { SubjectService, type IncomingSubjectRequest } from '../services/subjectService';
 import { PermissionsService } from '@/features/Permissions/services/permissionsService';
 import { FileObject, BelroseUserProfile } from '@/types/core';
+import { get } from 'http';
 
 // ============================================================================
 // TYPES
@@ -270,7 +271,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
         // Not ready - check why
         if (!prereqs.checks?.callerReady) {
           // Wallet not set up - prepare it
-          await SubjectPreparationService.prepare(progress => {
+          await SubjectPreparationService.prepare(recordId, progress => {
             setPreparationProgress(progress);
           });
 
@@ -448,7 +449,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
   }, [pendingOperation, recordId, record, reset, refetchAll, onSuccess]);
 
   // ==========================================================================
-  // CONFIRM REQUEST CONSENT (for "other" flow)
+  // CONFIRM REQUEST CONSENT
   // ==========================================================================
 
   const confirmRequestConsent = useCallback(async () => {
@@ -466,10 +467,45 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
     setPhase('executing');
 
     try {
+      // Step 1: Run preparation for wallet readiness and initializing on-chain
+      console.log('🔄 Step 1: Running preparation...');
+      await SubjectPreparationService.prepare(recordId, progress => {
+        setPreparationProgress(progress);
+      });
+      console.log('✅ Step 1 complete');
+
+      // Step 2: Grant the role so the subject can preview the record
+      console.log('🔄 Step 2: Checking/granting role...');
+      const targetRole = pendingOperation.selectedRole || 'viewer';
+      const currentRole = getUserRoleForRecord(selectedUser.uid, record);
+      const targetRoleLevel = ROLE_HIERARCHY[targetRole];
+      const currentRoleLevel = ROLE_HIERARCHY[currentRole || 'none'];
+      console.log('📊 Role check:', {
+        targetRole,
+        currentRole,
+        targetRoleLevel,
+        currentRoleLevel,
+        selectedUserUid: selectedUser.uid,
+      });
+
+      if (!currentRole) {
+        console.log(`🔐 Granting ${targetRole} role to selected user...`);
+        await grantRole(selectedUser.uid, targetRole);
+      } else if (targetRoleLevel > currentRoleLevel) {
+        console.log(`🔐 Upgrading role to ${targetRole} for selected user...`);
+        await grantRole(selectedUser.uid, targetRole);
+      } else {
+        console.log(`ℹ️ User already has ${currentRole} (target: ${targetRole}), skipping grant`);
+      }
+      console.log('✅ Step 2 complete');
+
+      //Step 3: Create the consent request
+      console.log('🔄 Step 3: Creating consent request...');
       await SubjectService.requestSubjectConsent(recordId, selectedUser.uid, {
         role: pendingOperation.selectedRole || 'viewer',
         recordTitle: record.belroseFields?.title || record.fileName,
       });
+      console.log('✅ Step 3 complete');
 
       toast.success('Consent request sent. The user will be notified.');
       reset();

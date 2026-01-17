@@ -8,7 +8,6 @@ import { RecordFull } from '@/features/ViewEditRecord/components/RecordFull';
 import { SubjectActionDialog } from './ui/SubjectActionDialog';
 import { useSubjectFlow } from '../hooks/useSubjectFlow';
 import { SubjectService } from '../services/subjectService';
-
 import { FileObject } from '@/types/core';
 import { Loader2 } from 'lucide-react';
 import { getRecord } from '@/features/ViewEditRecord/services/recordService';
@@ -104,7 +103,7 @@ export const SubjectRequestReview: React.FC = () => {
   return (
     <SubjectRequestReviewContent
       record={record}
-      onComplete={() => navigate(`/records/${recordId}`)}
+      onComplete={() => navigate(`/dashboard/all-records`)}
     />
   );
 };
@@ -117,7 +116,7 @@ const SubjectRequestReviewContent: React.FC<{
   const navigate = useNavigate();
 
   const subjectFlow = useSubjectFlow({
-    record, // Now guaranteed to be non-null
+    record,
     onSuccess: onComplete,
   });
 
