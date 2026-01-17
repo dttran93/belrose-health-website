@@ -194,7 +194,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
           action: 'registerMember',
           userId: registrationData.userId,
           userWalletAddress: walletAddress,
-          error: error as string,
+          error: error instanceof Error ? error.message : String(error),
           context: {
             type: 'memberRegistry',
             newStatus: 'Active',

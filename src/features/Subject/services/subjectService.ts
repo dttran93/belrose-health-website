@@ -16,6 +16,9 @@
  * - Anchoring subjects on-chain when they accept/set themselves as subject
  * - Unanchoring when subjects remove themselves
  * - Uses BlockchainSyncQueueService for retry on blockchain failures
+ *
+ * Access Permissions:
+ * Access
  */
 
 import {
@@ -209,12 +212,15 @@ export class SubjectService {
       return true;
     } catch (blockchainError) {
       console.error('⚠️ Blockchain unanchoring failed:', blockchainError);
+      const errorMessage =
+        blockchainError instanceof Error ? blockchainError.message : String(blockchainError);
+
       await BlockchainSyncQueueService.logFailure({
         contract: 'HealthRecordCore',
         action: 'unanchorRecord',
         userId: userId,
         userWalletAddress: userWalletAddress,
-        error: blockchainError as string,
+        error: errorMessage,
         context: {
           type: 'unanchorRecord',
           recordId: recordId,

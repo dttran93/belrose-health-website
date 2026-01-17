@@ -146,12 +146,16 @@ export class PermissionsService {
       console.log('✅ Blockchain: Viewer role granted');
     } catch (blockchainError) {
       console.error('⚠️ Blockchain update failed:', blockchainError);
+
+      const errorMessage =
+        blockchainError instanceof Error ? blockchainError.message : String(blockchainError);
+
       await BlockchainSyncQueueService.logFailure({
         contract: 'MemberRoleManager',
         action: 'grantRole',
         userId: currentUser.uid,
         userWalletAddress: userWalletAddress,
-        error: blockchainError as string,
+        error: errorMessage,
         context: {
           type: 'permission',
           targetUserId: targetUserId,
@@ -265,12 +269,16 @@ export class PermissionsService {
       console.log('✅ Blockchain: Administrator role set');
     } catch (blockchainError) {
       console.error('⚠️ Blockchain update failed:', blockchainError);
+
+      const errorMessage =
+        blockchainError instanceof Error ? blockchainError.message : String(blockchainError);
+
       await BlockchainSyncQueueService.logFailure({
         contract: 'MemberRoleManager',
         action: hasExistingRole ? 'changeRole' : 'grantRole',
         userId: currentUser.uid,
         userWalletAddress: userWalletAddress,
-        error: blockchainError as string,
+        error: errorMessage,
         context: {
           type: 'permission',
           targetUserId: targetUserId,
@@ -377,12 +385,14 @@ export class PermissionsService {
       console.log('✅ Blockchain: Owner role set');
     } catch (blockchainError) {
       console.error('⚠️ Blockchain update failed:', blockchainError);
+      const errorMessage =
+        blockchainError instanceof Error ? blockchainError.message : String(blockchainError);
       await BlockchainSyncQueueService.logFailure({
         contract: 'MemberRoleManager',
         action: hasExistingRole ? 'changeRole' : 'grantRole',
         userId: currentUser.uid,
         userWalletAddress: userWalletAddress,
-        error: blockchainError as string,
+        error: errorMessage,
         context: {
           type: 'permission',
           targetUserId: targetUserId,
@@ -460,12 +470,16 @@ export class PermissionsService {
       console.log('✅ Blockchain: Role revoked');
     } catch (blockchainError) {
       console.error('⚠️ Blockchain update failed:', blockchainError);
+
+      const errorMessage =
+        blockchainError instanceof Error ? blockchainError.message : String(blockchainError);
+
       await BlockchainSyncQueueService.logFailure({
         contract: 'MemberRoleManager',
         action: 'revokeRole',
         userId: currentUser.uid,
         userWalletAddress: userWalletAddress,
-        error: blockchainError as string,
+        error: errorMessage,
         context: {
           type: 'permission',
           targetUserId: targetUserId,
@@ -578,12 +592,16 @@ export class PermissionsService {
       }
     } catch (blockchainError) {
       console.error('⚠️ Blockchain update failed:', blockchainError);
+
+      const errorMessage =
+        blockchainError instanceof Error ? blockchainError.message : String(blockchainError);
+
       await BlockchainSyncQueueService.logFailure({
         contract: 'MemberRoleManager',
         action: 'revokeRole',
         userId: currentUser.uid,
         userWalletAddress: userWalletAddress,
-        error: blockchainError as string,
+        error: errorMessage,
         context: {
           type: 'permission',
           targetUserId: targetUserId,
@@ -690,12 +708,16 @@ export class PermissionsService {
       console.log('✅ Blockchain: Ownership removed');
     } catch (blockchainError) {
       console.error('⚠️ Blockchain ownership removal failed:', blockchainError);
+
+      const errorMessage =
+        blockchainError instanceof Error ? blockchainError.message : String(blockchainError);
+
       await BlockchainSyncQueueService.logFailure({
         contract: 'MemberRoleManager',
         action: 'voluntarilyLeaveOwnership',
         userId: currentUser.uid,
         userWalletAddress: userWalletAddress,
-        error: blockchainError as string,
+        error: errorMessage,
         context: {
           type: 'permission',
           targetUserId: targetUserId,
@@ -714,12 +736,16 @@ export class PermissionsService {
         console.log(`✅ Blockchain: Demoted to ${demoteTo}`);
       } catch (blockchainError) {
         console.error('⚠️ Blockchain update failed:', blockchainError);
+
+        const errorMessage =
+          blockchainError instanceof Error ? blockchainError.message : String(blockchainError);
+
         await BlockchainSyncQueueService.logFailure({
           contract: 'MemberRoleManager',
           action: 'grantRole',
           userId: currentUser.uid,
           userWalletAddress: userWalletAddress,
-          error: blockchainError as string,
+          error: errorMessage,
           context: {
             type: 'permission',
             targetUserId: targetUserId,
