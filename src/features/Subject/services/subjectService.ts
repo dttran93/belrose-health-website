@@ -37,6 +37,7 @@ import {
 import { getAuth } from 'firebase/auth';
 import { blockchainHealthRecordService } from '@/features/Credibility/services/blockchainHealthRecordService';
 import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
+import { PermissionsService } from '@/features/Permissions/services/permissionsService';
 
 // ============================================================================
 // TYPES
@@ -62,6 +63,7 @@ export interface SubjectConsentRequest {
   createdAt: Timestamp;
   respondedAt?: Timestamp;
   recordTitle?: string;
+  grantedAccessOnSubjectRequest: boolean;
 }
 
 export interface SubjectRejection {
@@ -171,13 +173,16 @@ export class SubjectService {
       console.log('✅ Subject anchored on blockchain');
       return true;
     } catch (blockchainError) {
+      const errorMessage =
+        blockchainError instanceof Error ? blockchainError.message : String(blockchainError);
+
       console.error('⚠️ Blockchain anchoring failed:', blockchainError);
       await BlockchainSyncQueueService.logFailure({
         contract: 'HealthRecordCore',
         action: 'anchorRecord',
         userId: userId,
         userWalletAddress: userWalletAddress,
-        error: blockchainError as string,
+        error: errorMessage,
         context: {
           type: 'anchorRecord',
           recordId: recordId,
@@ -318,6 +323,7 @@ export class SubjectService {
    * Request another user to confirm they are the subject of a record
    *
    * This creates a pending request that the target user must accept.
+   * Also grants the requested role immediately so they can preview the record
    * The record is NOT updated until they accept.
    *
    * @param recordId - The Firestore document ID of the record
@@ -353,8 +359,8 @@ export class SubjectService {
 
     try {
       const recordRef = doc(db, 'records', recordId);
-
       const recordDoc = await getDoc(recordRef);
+
       if (!recordDoc.exists()) {
         throw new Error('Record not found');
       }
@@ -385,6 +391,35 @@ export class SubjectService {
         }
       }
 
+      const role = options?.role || 'viewer';
+
+      // check for existing access
+      const hasExistingAccess =
+        recordData.owners?.includes(subjectId) ||
+        recordData.administrators?.includes(subjectId) ||
+        recordData.viewers?.includes(subjectId);
+
+      //Grant the requested role so they can preview the record
+      if (!hasExistingAccess) {
+        console.log(`🔓 Granting ${role} access for subject preview...`);
+
+        switch (role) {
+          case 'owner':
+            await PermissionsService.grantOwner(recordId, subjectId);
+            break;
+          case 'administrator':
+            await PermissionsService.grantAdmin(recordId, subjectId);
+            break;
+          case 'viewer':
+          default:
+            await PermissionsService.grantViewer(recordId, subjectId);
+            break;
+        }
+        console.log(`✅ ${role} Access granted for subject preview`);
+      } else {
+        console.log('ℹ️ User already has access to this record');
+      }
+
       //Create new consent request document
       const consentRequest: SubjectConsentRequest = {
         recordId,
@@ -398,6 +433,7 @@ export class SubjectService {
           recordData.belroseFields?.title ||
           recordData.fileName ||
           'Untitled Record',
+        grantedAccessOnSubjectRequest: !hasExistingAccess,
       };
 
       await setDoc(requestRef, consentRequest);
@@ -565,6 +601,29 @@ export class SubjectService {
         status: 'rejected',
         respondedAt: Timestamp.now(),
       });
+
+      //Revoke access if it was granted as part of the request
+      if (requestData.grantedAccessOnSubjectRequest) {
+        console.log('🔒 Revoking access granted for subject preview...');
+
+        try {
+          const role = requestData.requestedSubjectRole;
+          switch (role) {
+            case 'owner':
+              await PermissionsService.removeOwner(recordId, user.uid);
+              break;
+            case 'administrator':
+              await PermissionsService.removeAdmin(recordId, user.uid);
+              break;
+            case 'viewer':
+              await PermissionsService.removeViewer(recordId, user.uid);
+              break;
+          }
+          console.log(`✅ ${requestData.requestedSubjectRole} Access revoked`);
+        } catch (revokeError) {
+          console.warn('⚠️ Failed to revoke access:', revokeError);
+        }
+      }
 
       console.log('✅ Subject request rejected');
 
@@ -935,6 +994,34 @@ export class SubjectService {
 
       if (!canCancel) {
         throw new Error('You do not have permission to cancel this request');
+      }
+
+      // Revoke access if it was granted as part of the request
+      if (requestData.grantedAccessOnSubjectRequest) {
+        console.log('🔒 Revoking access granted for subject preview...');
+        try {
+          const role = requestData.requestedSubjectRole;
+          if (role === 'owner') {
+            console.warn(
+              '⚠️ Cannot automatically revoke owner role. ' +
+                'The subject will need to voluntarily remove themselves. ' +
+                'TODO: Implement requestOwnerRemoval flow.'
+            );
+          } else {
+            switch (role) {
+              case 'administrator':
+                await PermissionsService.removeAdmin(recordId, subjectId);
+                break;
+              case 'viewer':
+              default:
+                await PermissionsService.removeViewer(recordId, subjectId);
+                break;
+            }
+            console.log(`✅ ${role} Access revoked`);
+          }
+        } catch (revokeError) {
+          console.warn('⚠️ Failed to revoke access:', revokeError);
+        }
       }
 
       // Delete the request document
