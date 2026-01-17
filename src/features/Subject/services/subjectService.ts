@@ -696,7 +696,6 @@ export class SubjectService {
       // Update record: remove from subjects, add rejection
       await updateDoc(recordRef, {
         subjects: arrayRemove(user.uid),
-        subjectRejections: [...existingRejections, rejection],
         lastModified: serverTimestamp(),
       });
 
@@ -757,7 +756,7 @@ export class SubjectService {
 
       const recordData = recordDoc.data();
 
-      // Verify user is the record creator or owner
+      // Verify user is the record creator or owner or admin
       const canRespond =
         recordData.uploadedBy === user.uid ||
         recordData.owners?.includes(user.uid) ||

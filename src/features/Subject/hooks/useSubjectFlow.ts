@@ -27,10 +27,15 @@ import {
   type SubjectOperationType,
   type SubjectPreparationProgress,
 } from '../services/subjectPreparationService';
-import { SubjectService, type IncomingSubjectRequest } from '../services/subjectService';
+import {
+  SubjectConsentRequest,
+  SubjectService,
+  type IncomingSubjectRequest,
+} from '../services/subjectService';
 import { PermissionsService } from '@/features/Permissions/services/permissionsService';
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import { get } from 'http';
+import { doc, getDoc, getFirestore, updateDoc } from 'firebase/firestore';
 
 // ============================================================================
 // TYPES
@@ -65,6 +70,7 @@ interface PendingOperation {
   selectedUser?: BelroseUserProfile;
   // For remove/reject flows
   reason?: string;
+  revokeAccess?: boolean;
 }
 
 // Role hierarchy for comparison
@@ -129,6 +135,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
   const [subjectChoice, setSubjectChoice] = useState<SubjectChoice>('self');
   const [selectedRole, setSelectedRole] = useState<SubjectRole>('viewer');
   const [selectedUser, setSelectedUser] = useState<BelroseUserProfile | null>(null);
+  const [revokeAccess, setRevokeAccess] = useState<boolean>(true);
 
   // Subject status state
   const [isSubject, setIsSubject] = useState(false);
@@ -215,6 +222,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
     setSubjectChoice('self');
     setSelectedRole('viewer');
     setSelectedUser(null);
+    setRevokeAccess(true);
   }, []);
 
   /**
@@ -302,24 +310,6 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
     },
     [recordId]
   );
-
-  // ==========================================================================
-  // PERMISSION GRANTING HELPER
-  // ==========================================================================
-
-  const grantRole = async (userId: string, role: SubjectRole): Promise<void> => {
-    switch (role) {
-      case 'owner':
-        await PermissionsService.grantOwner(recordId, userId);
-        break;
-      case 'administrator':
-        await PermissionsService.grantAdmin(recordId, userId);
-        break;
-      case 'viewer':
-        await PermissionsService.grantViewer(recordId, userId);
-        break;
-    }
-  };
 
   // ==========================================================================
   // ADD SUBJECT FLOW (unified entry point)
@@ -428,7 +418,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
 
       if (!currentRole || ROLE_HIERARCHY[targetRole] > ROLE_HIERARCHY[currentRole]) {
         console.log(`🔐 Granting ${targetRole} role...`);
-        await grantRole(userId, targetRole);
+        await PermissionsService.grantRole(recordId, userId, targetRole);
       }
 
       if (result.blockchainAnchored) {
@@ -488,12 +478,16 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
         selectedUserUid: selectedUser.uid,
       });
 
-      if (!currentRole) {
-        console.log(`🔐 Granting ${targetRole} role to selected user...`);
-        await grantRole(selectedUser.uid, targetRole);
-      } else if (targetRoleLevel > currentRoleLevel) {
-        console.log(`🔐 Upgrading role to ${targetRole} for selected user...`);
-        await grantRole(selectedUser.uid, targetRole);
+      if (!currentRole || targetRoleLevel > currentRoleLevel) {
+        console.log(`🔐 Granting ${targetRole} for selected user...`);
+        await PermissionsService.grantRole(recordId, selectedUser.uid, targetRole);
+
+        //Track that we granted access with this request
+        const requestId = `${recordId}_${selectedUser.uid}`;
+        const requestRef = doc(getFirestore(), 'subjectConsentRequests', requestId);
+        await updateDoc(requestRef, {
+          grantedAccessOnSubjectRequest: true,
+        });
       } else {
         console.log(`ℹ️ User already has ${currentRole} (target: ${targetRole}), skipping grant`);
       }
@@ -611,7 +605,9 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
       if (!pendingOperation || pendingOperation.type !== 'rejectSubjectRequest') return;
 
       const auth = getAuth();
-      if (!auth.currentUser?.uid) {
+      const userId = auth.currentUser?.uid;
+
+      if (!userId) {
         setError('You must be signed in');
         setPhase('error');
         return;
@@ -620,12 +616,28 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
       setPhase('executing');
 
       try {
+        // Get the request data to check if access was granted
+        const db = getFirestore();
+        const requestId = `${pendingOperation.recordId}_${userId}`;
+        const requestRef = doc(db, 'subjectConsentRequests', requestId);
+        const requestDoc = await getDoc(requestRef);
+        const requestData = requestDoc.data() as SubjectConsentRequest | undefined;
+
+        // Reject the request
         await SubjectService.rejectSubjectRequest(
           pendingOperation.recordId,
           reason || pendingOperation.reason
         );
 
-        toast.success('Subject request declined');
+        // Revoke access if it was granted with the request
+        if (requestData?.grantedAccessOnSubjectRequest) {
+          const role = requestData.requestedSubjectRole;
+          await PermissionsService.removeRole(pendingOperation.recordId, userId, role);
+          toast.success('Subject request declined and access revoked');
+        } else {
+          toast.success('Subject request declined');
+        }
+
         reset();
         await refetchAll();
         onSuccess?.();
@@ -647,11 +659,12 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
    * Start the "remove subject status" flow (self-removal)
    */
   const initiateRemoveSubjectStatus = useCallback(
-    async (reason?: string) => {
+    async (options?: { reason?: string; revokeAccess?: boolean }) => {
       setPendingOperation({
         type: 'rejectSubjectStatus',
         recordId,
-        reason,
+        reason: options?.reason,
+        revokeAccess: options?.revokeAccess,
       });
 
       const ready = await runPreparation('rejectSubjectStatus');
@@ -670,7 +683,8 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
       if (!pendingOperation || pendingOperation.type !== 'rejectSubjectStatus') return;
 
       const auth = getAuth();
-      if (!auth.currentUser?.uid) {
+      const userId = auth.currentUser?.uid;
+      if (!userId) {
         setError('You must be signed in');
         setPhase('error');
         return;
@@ -683,7 +697,26 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
           reason: reason || pendingOperation.reason,
         });
 
-        if (result.blockchainUnanchored) {
+        // Optionally revoke access if user chose to
+        let accessRevoked = false;
+        if (pendingOperation.revokeAccess) {
+          const db = getFirestore();
+          const requestId = `${recordId}_${userId}`;
+          const requestRef = doc(db, 'subjectConsentRequests', requestId);
+          const requestDoc = await getDoc(requestRef);
+          const requestData = requestDoc.data() as SubjectConsentRequest | undefined;
+
+          if (requestData?.grantedAccessOnSubjectRequest) {
+            const role = requestData.requestedSubjectRole;
+            await PermissionsService.removeRole(recordId, userId, role);
+            accessRevoked = true;
+          }
+        }
+
+        // Show appropriate success message
+        if (accessRevoked) {
+          toast.success('You have been removed as a subject and your access has been revoked');
+        } else if (result.blockchainUnanchored) {
           toast.success('You have been removed as a subject');
         } else {
           toast.success('You have been removed as a subject (blockchain sync pending)');
@@ -703,7 +736,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
         toast.error(message);
       }
     },
-    [pendingOperation, recordId, reset, refetchAll, onSuccess]
+    [pendingOperation, recordId, revokeAccess, reset, refetchAll, onSuccess]
   );
 
   // ==========================================================================
@@ -732,6 +765,8 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
       setSelectedRole,
       selectedUser,
       setSelectedUser,
+      revokeAccess,
+      setRevokeAccess,
       // Record info
       record,
       currentSubjects,

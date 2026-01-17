@@ -12,6 +12,7 @@ import { SharingService } from '@/features/Sharing/services/sharingService';
 import { BlockchainRoleManagerService } from './blockchainRoleManagerService';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
 import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
+import { SubjectRole } from '@/features/Subject/hooks/useSubjectFlow';
 
 export type Role = 'owner' | 'administrator' | 'viewer';
 
@@ -19,6 +20,54 @@ export class PermissionsService {
   // ============================================================================
   // HELPER METHODS
   // ============================================================================
+
+  /**
+   * Unified grant role method calls the appropriate grant method based on role
+   *
+   * @param recordId - The record ID
+   * @param targetUserId - The user ID to grant role to
+   * @param role - The role to grant
+   */
+
+  static grantRole = async (recordId: string, userId: string, role: SubjectRole): Promise<void> => {
+    switch (role) {
+      case 'owner':
+        await PermissionsService.grantOwner(recordId, userId);
+        break;
+      case 'administrator':
+        await PermissionsService.grantAdmin(recordId, userId);
+        break;
+      case 'viewer':
+        await PermissionsService.grantViewer(recordId, userId);
+        break;
+    }
+  };
+
+  /**
+   * Remove a role from a user on a record
+   * Unified method that handles both admin-initiated and self-removal
+   *
+   * @param recordId - The record ID
+   * @param targetUserId - The user ID to remove the role from
+   * @param role - The role to remove
+   */
+  static removeRole = async (
+    recordId: string,
+    userId: string,
+    role: SubjectRole
+  ): Promise<void> => {
+    switch (role) {
+      case 'owner':
+        await PermissionsService.removeOwner(recordId, userId);
+        break;
+      case 'administrator':
+        await PermissionsService.removeAdmin(recordId, userId);
+        break;
+      case 'viewer':
+        await PermissionsService.removeViewer(recordId, userId);
+        break;
+    }
+  };
 
   /**
    * Get a user's wallet address from Firestore
@@ -439,11 +488,12 @@ export class PermissionsService {
 
     const recordData = recordDoc.data();
 
-    // Check 2: only admins/owners can remove viewers
+    // Check 2: only admins/owners can remove viewers, or user can remove themselves
     const isAdmin = recordData.administrators?.includes(currentUser.uid);
     const isOwner = recordData.owners?.includes(currentUser.uid);
+    const isSelfRemoval = targetUserId === currentUser.uid;
 
-    if (!isAdmin && !isOwner) {
+    if (!isAdmin && !isOwner && !isSelfRemoval) {
       throw new Error('You do not have permission to remove viewers');
     }
 

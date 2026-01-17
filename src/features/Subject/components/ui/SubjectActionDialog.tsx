@@ -67,6 +67,8 @@ interface SubjectActionDialogProps {
   setSelectedRole: (role: SubjectRole) => void;
   selectedUser: BelroseUserProfile | null;
   setSelectedUser: (user: BelroseUserProfile | null) => void;
+  revokeAccess: boolean;
+  setRevokeAccess: (value: boolean) => void;
   // Record info
   record: FileObject;
   currentSubjects: string[];
@@ -143,6 +145,8 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
   setSelectedRole,
   selectedUser,
   setSelectedUser,
+  revokeAccess,
+  setRevokeAccess,
   record,
   currentSubjects,
   isSubject,
@@ -257,6 +261,8 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
           {phase === 'confirming' && operationType === 'rejectSubjectStatus' && (
             <ConfirmRemoveSubjectStatusContent
               record={record}
+              revokeAccess={revokeAccess}
+              setRevokeAccess={setRevokeAccess}
               onConfirm={onConfirmRemoveSubjectStatus}
               onClose={onClose}
             />
@@ -971,9 +977,11 @@ const ConfirmRejectRequestContent: React.FC<{
 
 const ConfirmRemoveSubjectStatusContent: React.FC<{
   record: FileObject;
+  revokeAccess: boolean;
+  setRevokeAccess: (value: boolean) => void;
   onConfirm: (reason?: string) => void;
   onClose: () => void;
-}> = ({ record, onConfirm, onClose }) => {
+}> = ({ record, revokeAccess, setRevokeAccess, onConfirm, onClose }) => {
   const [reason, setReason] = useState('');
 
   return (
@@ -1005,6 +1013,7 @@ const ConfirmRemoveSubjectStatusContent: React.FC<{
               <li>• Your link to this record will be removed</li>
               <li>• This will be recorded on the blockchain</li>
               <li>• The record creator will be notified</li>
+              {revokeAccess && <li>• Your access to this record will be revoked</li>}
             </ul>
           </div>
         </div>
@@ -1017,9 +1026,30 @@ const ConfirmRemoveSubjectStatusContent: React.FC<{
           value={reason}
           onChange={e => setReason(e.target.value)}
           placeholder="e.g., This record contains inaccurate information about me"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+          className="w-full px-3 py-2 bg-background border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-chart-4 focus:border-transparent"
           rows={3}
         />
+      </div>
+
+      {/* Revoke Access Checkbox */}
+      <div className="mb-4">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={revokeAccess}
+            onChange={e => setRevokeAccess(e.target.checked)}
+            className="mt-0.5 w-4 h-4 text-orange-600 rounded border-gray-300 focus:ring-orange-500"
+          />
+          <div>
+            <p className="text-sm font-medium text-gray-900">
+              Also revoke my access to this record
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Uncheck this if you still need access to this record after removing your subject
+              status (unusual).
+            </p>
+          </div>
+        </label>
       </div>
 
       {/* Additional Warning */}
