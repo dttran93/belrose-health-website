@@ -18,7 +18,7 @@
  * - Uses BlockchainSyncQueueService for retry on blockchain failures
  *
  * Access Permissions:
- * Access
+ * Access is handled in the useSubjectFlow with imports from PermissionService
  */
 
 import {
@@ -46,11 +46,29 @@ import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services
 // ============================================================================
 
 export type SubjectRequestStatus = 'pending' | 'accepted' | 'rejected';
-export type SubjectRejectionType = 'request_rejected' | 'removed_after_acceptance' | 'self_removal';
-export type SubjectRejectionStatus =
-  | 'pending_creator_decision'
-  | 'acknowledged'
-  | 'publicly_listed';
+export type SubjectRejectionType = 'request_rejected' | 'removed_after_acceptance';
+export type CreatorResponseStatus = 'pending_creator_decision' | 'dropped' | 'escalated';
+
+/**
+ * Creator's response to a subject rejection
+ * Nested within SubjectConsentRequest.rejection
+ */
+export interface CreatorResponse {
+  status: CreatorResponseStatus;
+  respondedAt?: Timestamp;
+}
+
+/**
+ * Rejection data - now nested within SubjectConsentRequest
+ * Only populated when a subject removes themselves AFTER accepting
+ */
+export interface SubjectRejectionData {
+  rejectionType: SubjectRejectionType;
+  rejectedAt: Timestamp;
+  reason?: string;
+  rejectionSignature?: string;
+  creatorResponse?: CreatorResponse;
+}
 
 /**
  * Document structure for subjectConsentRequests collection
@@ -66,22 +84,7 @@ export interface SubjectConsentRequest {
   respondedAt?: Timestamp;
   recordTitle?: string;
   grantedAccessOnSubjectRequest: boolean;
-}
-
-export interface SubjectRejection {
-  subjectId: string;
-  rejectionType: SubjectRejectionType;
-  rejectedAt: Timestamp;
-  reason?: string;
-
-  // Creator's response
-  status: SubjectRejectionStatus;
-  creatorRespondedAt?: Timestamp;
-  publiclyListed: boolean;
-
-  // Audit trail
-  originalConsentSignature?: string;
-  rejectionSignature?: string;
+  rejection?: SubjectRejectionData;
 }
 
 export interface SetSubjectSelfResult {
@@ -109,7 +112,7 @@ export interface AcceptSubjectRequestResult {
 export interface RejectSubjectStatusResult {
   success: boolean;
   recordId: string;
-  rejectionType: SubjectRejectionType;
+  rejectionType: SubjectRejectionType | 'self_removal';
   pendingCreatorDecision: boolean;
   blockchainUnanchored?: boolean;
 }
@@ -118,7 +121,7 @@ export interface RespondToRejectionResult {
   success: boolean;
   recordId: string;
   subjectId: string;
-  publiclyListed: boolean;
+  response: CreatorResponseStatus;
 }
 
 export interface IncomingSubjectRequest {
@@ -135,7 +138,7 @@ export interface IncomingSubjectRequest {
  * Generate the document ID for a consent request
  * Format: {recordId}_{targetUserId}
  */
-const getConsentRequestId = (recordId: string, subjectId: string): string => {
+export const getConsentRequestId = (recordId: string, subjectId: string): string => {
   return `${recordId}_${subjectId}`;
 };
 
@@ -384,7 +387,7 @@ export class SubjectService {
         throw new Error('This user is already a subject of this record');
       }
 
-      //Check if a pending request already exists
+      // Check if a pending request already exists
       const requestId = getConsentRequestId(recordId, subjectId);
       const requestRef = doc(db, 'subjectConsentRequests', requestId);
       const existingRequest = await getDoc(requestRef);
@@ -396,7 +399,7 @@ export class SubjectService {
         }
       }
 
-      //Create new consent request document
+      // Create new consent request document
       const consentRequest: SubjectConsentRequest = {
         recordId,
         subjectId,
@@ -454,7 +457,7 @@ export class SubjectService {
     console.log('✅ Accepting subject request for record:', recordId);
 
     try {
-      //Step 1: Find and update the consent request
+      // Step 1: Find and update the consent request
       const requestId = getConsentRequestId(recordId, user.uid);
       const requestRef = doc(db, 'subjectConsentRequests', requestId);
       const requestDoc = await getDoc(requestRef);
@@ -572,10 +575,18 @@ export class SubjectService {
         throw new Error('This request is not for you');
       }
 
-      // Update the consent request status
+      // Update the consent request status with rejection data
       await updateDoc(requestRef, {
         status: 'rejected',
         respondedAt: Timestamp.now(),
+        rejection: {
+          rejectionType: 'request_rejected' as SubjectRejectionType,
+          rejectedAt: Timestamp.now(),
+          reason: reason ?? 'No reason provided',
+          creatorResponse: {
+            status: 'pending_creator_decision' as CreatorResponseStatus,
+          },
+        },
       });
 
       console.log('✅ Subject request rejected');
@@ -599,7 +610,7 @@ export class SubjectService {
    *
    * In consent flow cases:
    * 1. Subject is immediately unlinked from the record
-   * 2. A SubjectRejection record is created with status 'pending_creator_decision'
+   * 2. The SubjectConsentRequest is updated with rejection data
    * 3. Creator is notified and must decide whether to publicly list the rejection
    *
    * Also unanchors the subject on the blockchain.
@@ -653,13 +664,14 @@ export class SubjectService {
 
       const hadConsentFlow = requestDoc.exists() && requestDoc.data()?.status === 'accepted';
 
+      // Remove from subjects array (common to both flows)
+      await updateDoc(recordRef, {
+        subjects: arrayRemove(user.uid),
+        lastModified: serverTimestamp(),
+      });
+
       // FLOW 1: SELF REMOVAL - No consent flow existed
       if (!hadConsentFlow) {
-        await updateDoc(recordRef, {
-          subjects: arrayRemove(user.uid),
-          lastModified: serverTimestamp(),
-        });
-
         console.log('✅ Self-removal complete (no consent flow existed)');
 
         // Unanchor from blockchain
@@ -681,22 +693,18 @@ export class SubjectService {
       // FLOW 2: REJECTION FLOW - Removing after consent was given
       const rejectionType: SubjectRejectionType = 'removed_after_acceptance';
 
-      // Create the rejection record on the record document
-      const existingRejections: SubjectRejection[] = recordData.subjectRejections || [];
-      const rejection: SubjectRejection = {
-        subjectId: user.uid,
+      const rejectionData: SubjectRejectionData = {
         rejectionType,
         rejectedAt: Timestamp.now(),
         reason: options?.reason,
-        status: 'pending_creator_decision',
-        publiclyListed: false,
         rejectionSignature: options?.signature,
+        creatorResponse: {
+          status: 'pending_creator_decision',
+        },
       };
 
-      // Update record: remove from subjects, add rejection
-      await updateDoc(recordRef, {
-        subjects: arrayRemove(user.uid),
-        lastModified: serverTimestamp(),
+      await updateDoc(requestRef, {
+        rejection: rejectionData,
       });
 
       console.log(`✅ Subject status rejected (type: ${rejectionType})`);
@@ -729,12 +737,12 @@ export class SubjectService {
    *
    * @param recordId - The Firestore document ID of the record
    * @param subjectId - The userId of the subject who rejected
-   * @param publiclyList - Whether to add to public list of unaccepted updates
+   * @param response - Requester's response to the rejection
    */
   static async respondToSubjectRejection(
     recordId: string,
     subjectId: string,
-    publiclyList: boolean
+    response: CreatorResponseStatus
   ): Promise<RespondToRejectionResult> {
     const auth = getAuth();
     const db = getFirestore();
@@ -744,7 +752,7 @@ export class SubjectService {
       throw new Error('User not authenticated');
     }
 
-    console.log('📋 Responding to subject rejection:', { recordId, subjectId, publiclyList });
+    console.log('📋 Responding to subject rejection:', { recordId, subjectId, response });
 
     try {
       const recordRef = doc(db, 'records', recordId);
@@ -760,7 +768,7 @@ export class SubjectService {
       const canRespond =
         recordData.uploadedBy === user.uid ||
         recordData.owners?.includes(user.uid) ||
-        recordData.administrators.includes(user.uid);
+        recordData.administrators?.includes(user.uid);
 
       if (!canRespond) {
         throw new Error(
@@ -768,46 +776,43 @@ export class SubjectService {
         );
       }
 
-      const rejections: SubjectRejection[] = recordData.subjectRejections || [];
+      // Find and update the consent request document
+      const requestId = getConsentRequestId(recordId, subjectId);
+      const requestRef = doc(db, 'subjectConsentRequests', requestId);
+      const requestDoc = await getDoc(requestRef);
 
-      // Find the pending rejection for this subject
-      const rejectionIndex = rejections.findIndex(
-        rej => rej.subjectId === subjectId && rej.status === 'pending_creator_decision'
-      );
-
-      if (rejectionIndex === -1) {
-        throw new Error('No pending rejection found for this subject');
+      if (!requestDoc.exists()) {
+        throw new Error('No consent request found for this subject');
       }
 
-      const existingRejection = rejections[rejectionIndex];
+      const requestData = requestDoc.data() as SubjectConsentRequest;
 
-      if (!existingRejection) {
-        throw new Error('Invalid pending rejection data: missing required fields');
+      // Check if there's a pending rejection
+      if (!requestData.rejection) {
+        throw new Error('No rejection found for this subject');
+      }
+
+      if (requestData.rejection.creatorResponse?.status !== 'pending_creator_decision') {
+        throw new Error('This rejection has already been responded to');
       }
 
       // Update the rejection with creator's decision
-      const updatedRejection: SubjectRejection = {
-        ...existingRejection,
-        status: publiclyList ? 'publicly_listed' : 'acknowledged',
-        creatorRespondedAt: Timestamp.now(),
-        publiclyListed: publiclyList,
+      const updatedCreatorResponse: CreatorResponse = {
+        status: response,
+        respondedAt: Timestamp.now(),
       };
 
-      const updatedRejections = [...rejections];
-      updatedRejections[rejectionIndex] = updatedRejection;
-
-      await updateDoc(recordRef, {
-        subjectRejections: updatedRejections,
-        lastModified: serverTimestamp(),
+      await updateDoc(requestRef, {
+        'rejection.creatorResponse': updatedCreatorResponse,
       });
 
-      console.log(`✅ Rejection response recorded (publicly listed: ${publiclyList})`);
+      console.log(`✅ Rejection response recorded: ${response}`);
 
       return {
         success: true,
         recordId,
         subjectId,
-        publiclyListed: publiclyList,
+        response,
       };
     } catch (error) {
       console.error('❌ Error responding to rejection:', error);
@@ -1069,20 +1074,29 @@ export class SubjectService {
    * @param recordId - The Firestore document ID of the record
    * @returns Array of pending rejections
    */
-  static async getPendingRejectionDecisions(recordId: string): Promise<SubjectRejection[]> {
+  static async getPendingRejectionDecisions(recordId: string): Promise<SubjectRejectionData[]> {
     const db = getFirestore();
 
     try {
-      const recordRef = doc(db, 'records', recordId);
-      const recordDoc = await getDoc(recordRef);
+      // Query all consent requests for this record that have rejections
+      const requestsRef = collection(db, 'subjectConsentRequests');
+      const q = query(requestsRef, where('recordId', '==', recordId));
 
-      if (!recordDoc.exists()) {
-        throw new Error('Record not found');
-      }
+      const snapshot = await getDocs(q);
 
-      const rejections: SubjectRejection[] = recordDoc.data().subjectRejections || [];
+      const pendingRejections: SubjectRejectionData[] = [];
 
-      return rejections.filter(rej => rej.status === 'pending_creator_decision');
+      snapshot.docs.forEach(doc => {
+        const data = doc.data() as SubjectConsentRequest;
+        if (
+          data.rejection &&
+          data.rejection.creatorResponse?.status === 'pending_creator_decision'
+        ) {
+          pendingRejections.push(data.rejection);
+        }
+      });
+
+      return pendingRejections;
     } catch (error) {
       console.error('❌ Error getting pending rejection decisions:', error);
       throw error;
@@ -1093,22 +1107,57 @@ export class SubjectService {
    * Get all rejections for a record (for audit purposes)
    *
    * @param recordId - The Firestore document ID of the record
-   * @returns Array of all rejections
+   * @returns Array of all rejections with subject info
    */
-  static async getAllRejections(recordId: string): Promise<SubjectRejection[]> {
+  static async getAllRejections(
+    recordId: string
+  ): Promise<Array<SubjectRejectionData & { subjectId: string }>> {
     const db = getFirestore();
 
     try {
-      const recordRef = doc(db, 'records', recordId);
-      const recordDoc = await getDoc(recordRef);
+      const requestsRef = collection(db, 'subjectConsentRequests');
+      const q = query(requestsRef, where('recordId', '==', recordId));
 
-      if (!recordDoc.exists()) {
-        throw new Error('Record not found');
-      }
+      const snapshot = await getDocs(q);
 
-      return recordDoc.data().subjectRejections || [];
+      const rejections: Array<SubjectRejectionData & { subjectId: string }> = [];
+
+      snapshot.docs.forEach(doc => {
+        const data = doc.data() as SubjectConsentRequest;
+        if (data.rejection) {
+          rejections.push({
+            ...data.rejection,
+            subjectId: data.subjectId,
+          });
+        }
+      });
+
+      return rejections;
     } catch (error) {
       console.error('❌ Error getting rejections:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all consent requests for a record (includes accepted, rejected, pending)
+   *
+   * Useful for viewing the complete consent history of a record.
+   *
+   * @param recordId - The Firestore document ID of the record
+   * @returns Array of all consent requests
+   */
+  static async getAllConsentRequestsForRecord(recordId: string): Promise<SubjectConsentRequest[]> {
+    const db = getFirestore();
+
+    try {
+      const requestsRef = collection(db, 'subjectConsentRequests');
+      const q = query(requestsRef, where('recordId', '==', recordId));
+
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => doc.data() as SubjectConsentRequest);
+    } catch (error) {
+      console.error('❌ Error getting all consent requests for record:', error);
       throw error;
     }
   }

@@ -43,7 +43,6 @@ export {
 export {
   onSubjectConsentRequestCreated,
   onSubjectConsentRequestUpdated,
-  onRecordSubjectChange,
 } from './notifications/triggers/subjectNotificationTrigger';
 
 // ==================== PAYMASTER ====================

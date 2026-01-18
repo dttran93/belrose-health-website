@@ -13,14 +13,14 @@
  * 2. onSubjectConsentRequestUpdated - watches subjectConsentRequests collection
  *    - Accepted requests (notifies requester)
  *    - Rejected requests (notifies requester)
- *
- * 3. onRecordSubjectChange - watches records collection
- *    - Subject rejections/removals (notifies record owners)
- *    - Creator responses to rejections (notifies subject)
+ * - Subject removals after acceptance (notifies record owners/creators)
+ * - Creator responses to rejections (notifies subject)
+
  */
 
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { Timestamp } from 'firebase-admin/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
 import {
   createNotification,
   createNotificationForMultiple,
@@ -29,10 +29,34 @@ import {
   NotificationType,
   SourceService,
 } from '../notificationUtils';
+import { FileObject } from '../../../../src/types/core';
 
 // ============================================================================
 // TYPES
 // ============================================================================
+
+export type SubjectRejectionType = 'request_rejected' | 'removed_after_acceptance';
+type CreatorResponseStatus = 'pending_creator_decision' | 'acknowledged' | 'publicly_listed';
+
+/**
+ * Creator's response to a subject rejection
+ */
+interface CreatorResponse {
+  status: CreatorResponseStatus;
+  respondedAt?: Timestamp;
+  publiclyListed: boolean;
+}
+
+/**
+ * Rejection data - nested within SubjectConsentRequest
+ */
+interface SubjectRejectionData {
+  rejectionType: SubjectRejectionType;
+  rejectedAt: Timestamp;
+  reason?: string;
+  rejectionSignature?: string;
+  creatorResponse?: CreatorResponse;
+}
 
 /**
  * Document structure for subjectConsentRequests collection
@@ -46,27 +70,8 @@ interface SubjectConsentRequest {
   createdAt: Timestamp;
   respondedAt?: Timestamp;
   recordTitle?: string;
-}
-
-interface SubjectRejection {
-  subjectId: string;
-  rejectionType: 'request_rejected' | 'removed_after_acceptance' | 'self_removal';
-  rejectedAt: Timestamp;
-  reason?: string;
-  status: 'pending_creator_decision' | 'acknowledged' | 'publicly_listed';
-  creatorRespondedAt?: Timestamp;
-  publiclyListed: boolean;
-  originalConsentSignature?: string;
-  rejectionSignature?: string;
-}
-
-interface RecordData {
-  fileName?: string;
-  uploadedBy: string;
-  owners?: string[];
-  administrators?: string[];
-  subjects?: string[];
-  subjectRejections?: SubjectRejection[];
+  grantedAccessOnSubjectRequest: boolean;
+  rejection?: SubjectRejectionData;
 }
 
 // ============================================================================
@@ -80,18 +85,59 @@ const SOURCE: SourceService = 'Subject';
 // ============================================================================
 
 /**
+ * Get record data from Firestore
+ */
+async function getRecordData(recordId: string): Promise<FileObject | null> {
+  const db = getFirestore();
+  const recordDoc = await db.collection('records').doc(recordId).get();
+
+  if (!recordDoc.exists) {
+    console.log(`⚠️ Record ${recordId} not found`);
+    return null;
+  }
+
+  return recordDoc.data() as FileObject;
+}
+
+/**
  * Get all users who should be notified about record changes
  * (uploader + owners, deduplicated)
  */
-function getRecordNotificationTargets(recordData: RecordData): string[] {
-  const targets = [recordData.uploadedBy];
+function getRecordNotificationTargets(record: FileObject): string[] {
+  const targets: string[] = [];
 
-  if (recordData.owners) {
-    targets.push(...recordData.owners);
+  if (record.uploadedBy) {
+    targets.push(record.uploadedBy);
   }
 
-  // Deduplicate
+  if (record.owners) {
+    targets.push(...record.owners);
+  }
+
   return [...new Set(targets)];
+}
+
+/**
+ * Check if rejection data was newly added
+ */
+function isNewRejection(before: SubjectConsentRequest, after: SubjectConsentRequest): boolean {
+  return !before.rejection && !!after.rejection;
+}
+
+/**
+ * Check if creator response status changed from pending to resolved
+ */
+function isNewCreatorResponse(
+  before: SubjectConsentRequest,
+  after: SubjectConsentRequest
+): boolean {
+  const beforeStatus = before.rejection?.creatorResponse?.status;
+  const afterStatus = after.rejection?.creatorResponse?.status;
+
+  return (
+    beforeStatus === 'pending_creator_decision' &&
+    (afterStatus === 'acknowledged' || afterStatus === 'publicly_listed')
+  );
 }
 
 // ============================================================================
@@ -143,12 +189,16 @@ export const onSubjectConsentRequestCreated = onDocumentCreated(
 );
 
 // ============================================================================
-// TRIGGER 2: CONSENT REQUEST UPDATED (ACCEPTED/REJECTED)
+// TRIGGER 2: CONSENT REQUEST UPDATED
 // ============================================================================
 
 /**
  * Triggered when a consent request document is updated.
- * Handles status changes from 'pending' to 'accepted' or 'rejected'.
+ *
+ * Handles:
+ * 1. Status changes: pending → accepted/rejected
+ * 2. Rejection data added (subject removed themselves after accepting)
+ * 3. Creator response to rejection
  */
 export const onSubjectConsentRequestUpdated = onDocumentUpdated(
   'subjectConsentRequests/{requestId}',
@@ -162,20 +212,16 @@ export const onSubjectConsentRequestUpdated = onDocumentUpdated(
       return;
     }
 
-    // Only process if status changed
-    if (beforeData.status === afterData.status) {
-      console.log('📭 Status unchanged, skipping');
-      return;
-    }
-
-    console.log(
-      `🔄 Consent request ${requestId} status changed: ${beforeData.status} → ${afterData.status}`
-    );
+    console.log(`🔄 Consent request ${requestId} updated`);
 
     const recordName = afterData.recordTitle || (await getRecordDisplayName(afterData.recordId));
 
-    // Handle acceptance
+    // ========================================================================
+    // CASE 1: Status changed from pending → accepted
+    // ========================================================================
     if (beforeData.status === 'pending' && afterData.status === 'accepted') {
+      console.log(`✅ Request accepted: ${requestId}`);
+
       const subjectName = await getUserDisplayName(afterData.subjectId);
 
       await createNotification(afterData.requestedBy, {
@@ -191,10 +237,15 @@ export const onSubjectConsentRequestUpdated = onDocumentUpdated(
       });
 
       console.log(`✅ Acceptance notification sent to requester: ${afterData.requestedBy}`);
+      return;
     }
 
-    // Handle rejection
+    // ========================================================================
+    // CASE 2: Status changed from pending → rejected (initial rejection)
+    // ========================================================================
     if (beforeData.status === 'pending' && afterData.status === 'rejected') {
+      console.log(`❌ Request rejected: ${requestId}`);
+
       const subjectName = await getUserDisplayName(afterData.subjectId);
 
       await createNotification(afterData.requestedBy, {
@@ -210,143 +261,87 @@ export const onSubjectConsentRequestUpdated = onDocumentUpdated(
       });
 
       console.log(`✅ Rejection notification sent to requester: ${afterData.requestedBy}`);
+      return;
     }
+
+    // ========================================================================
+    // CASE 3: Rejection data added (subject removed after acceptance)
+    // This happens when someone accepted, then later removed themselves
+    // ========================================================================
+    if (isNewRejection(beforeData, afterData)) {
+      console.log(`🚫 Subject removal detected: ${requestId}`);
+
+      const rejection = afterData.rejection!;
+
+      // Only notify for removals after acceptance (not initial rejections)
+      if (rejection.rejectionType === 'removed_after_acceptance') {
+        const recordData = await getRecordData(afterData.recordId);
+
+        if (!recordData) {
+          console.log('⚠️ Could not fetch record data for notifications');
+          return;
+        }
+
+        const targets = getRecordNotificationTargets(recordData);
+        const subjectName = await getUserDisplayName(afterData.subjectId);
+
+        await createNotificationForMultiple(targets, {
+          type: 'REJECTION_PENDING_CREATOR_DECISION',
+          sourceService: SOURCE,
+          message: `Action Required: ${subjectName} has removed their subject status from record: ${recordName}. Please review and decide whether to publicly list this change.`,
+          link: `/dashboard/records/${afterData.recordId}/review-rejection`,
+          payload: {
+            recordId: afterData.recordId,
+            requestId,
+            subjectId: afterData.subjectId,
+            rejectionType: rejection.rejectionType,
+          },
+        });
+
+        console.log(`✅ Removal notification sent to ${targets.length} record owner(s)`);
+      }
+
+      return;
+    }
+
+    // ========================================================================
+    // CASE 4: Creator responded to rejection
+    // ========================================================================
+    if (isNewCreatorResponse(beforeData, afterData)) {
+      console.log(`📋 Creator responded to rejection: ${requestId}`);
+
+      const rejection = afterData.rejection!;
+      const creatorResponse = rejection.creatorResponse!;
+
+      const notificationType: NotificationType =
+        creatorResponse.status === 'publicly_listed'
+          ? 'REJECTION_PUBLICLY_LISTED'
+          : 'REJECTION_ACKNOWLEDGED';
+
+      const message =
+        creatorResponse.status === 'publicly_listed'
+          ? `The record creator has publicly listed your subject status removal for: ${recordName}.`
+          : `The record creator has acknowledged your subject status removal for: ${recordName}.`;
+
+      await createNotification(afterData.subjectId, {
+        type: notificationType,
+        sourceService: SOURCE,
+        message,
+        link: `/dashboard/records/${afterData.recordId}`,
+        payload: {
+          recordId: afterData.recordId,
+          requestId,
+          subjectId: afterData.subjectId,
+          publiclyListed: creatorResponse.publiclyListed,
+        },
+      });
+
+      console.log(
+        `✅ Creator response notification sent to subject: ${afterData.subjectId} (${creatorResponse.status})`
+      );
+      return;
+    }
+
+    console.log('📭 No relevant changes detected');
   }
 );
-
-// ============================================================================
-// TRIGGER 3: RECORD SUBJECT CHANGES (REJECTIONS/REMOVALS)
-// ============================================================================
-
-/**
- * Find rejections that are newly in 'pending_creator_decision' status
- */
-function findNewPendingRejections(before: RecordData, after: RecordData): SubjectRejection[] {
-  const beforeRejections = before.subjectRejections || [];
-  const afterRejections = after.subjectRejections || [];
-
-  return afterRejections.filter(afterRej => {
-    if (afterRej.status !== 'pending_creator_decision') return false;
-
-    const existedBefore = beforeRejections.some(
-      b => b.subjectId === afterRej.subjectId && b.status === 'pending_creator_decision'
-    );
-
-    return !existedBefore;
-  });
-}
-
-/**
- * Find rejections where status changed from 'pending_creator_decision' to resolved
- */
-function findNewlyRespondedRejections(before: RecordData, after: RecordData): SubjectRejection[] {
-  const beforeRejections = before.subjectRejections || [];
-  const afterRejections = after.subjectRejections || [];
-
-  return afterRejections.filter(afterRej => {
-    if (afterRej.status !== 'acknowledged' && afterRej.status !== 'publicly_listed') {
-      return false;
-    }
-
-    const beforeRej = beforeRejections.find(b => b.subjectId === afterRej.subjectId);
-
-    return beforeRej?.status === 'pending_creator_decision';
-  });
-}
-
-/**
- * Handle new rejections - notify record owners
- */
-async function handleNewRejections(
-  rejections: SubjectRejection[],
-  recordId: string,
-  recordName: string,
-  recordData: RecordData
-): Promise<void> {
-  const targets = getRecordNotificationTargets(recordData);
-
-  for (const rejection of rejections) {
-    const subjectName = await getUserDisplayName(rejection.subjectId);
-
-    await createNotificationForMultiple(targets, {
-      type: 'REJECTION_PENDING_CREATOR_DECISION',
-      sourceService: SOURCE,
-      message: `Action Required: ${subjectName} has removed their subject status from record: ${recordName}. Please review and decide whether to publicly list this change.`,
-      link: `/dashboard/records/${recordId}/review-rejection`,
-      payload: {
-        recordId,
-        subjectId: rejection.subjectId,
-      },
-    });
-  }
-}
-
-/**
- * Handle responded rejections - notify the subject of the creator's decision
- */
-async function handleRespondedRejections(
-  rejections: SubjectRejection[],
-  recordId: string,
-  recordName: string
-): Promise<void> {
-  for (const rejection of rejections) {
-    const notificationType: NotificationType =
-      rejection.status === 'publicly_listed'
-        ? 'REJECTION_PUBLICLY_LISTED'
-        : 'REJECTION_ACKNOWLEDGED';
-
-    const message =
-      rejection.status === 'publicly_listed'
-        ? `The record creator has publicly listed your subject status removal for: ${recordName}.`
-        : `The record creator has acknowledged your subject status removal for: ${recordName}.`;
-
-    await createNotification(rejection.subjectId, {
-      type: notificationType,
-      sourceService: SOURCE,
-      message,
-      link: `/dashboard/records/${recordId}`,
-      payload: {
-        recordId,
-        subjectId: rejection.subjectId,
-      },
-    });
-  }
-}
-
-/**
- * Triggered when a record document is updated.
- * Handles subject rejection flows (which still live on the record document).
- */
-export const onRecordSubjectChange = onDocumentUpdated('records/{recordId}', async event => {
-  const recordId = event.params.recordId;
-  const beforeData = event.data?.before.data() as RecordData | undefined;
-  const afterData = event.data?.after.data() as RecordData | undefined;
-
-  if (!beforeData || !afterData) {
-    console.log('⚠️ No data to compare, skipping');
-    return;
-  }
-
-  console.log(`🔍 Checking subject rejection changes for record: ${recordId}`);
-
-  // Detect rejection-related changes only
-  const newRejections = findNewPendingRejections(beforeData, afterData);
-  const respondedRejections = findNewlyRespondedRejections(beforeData, afterData);
-
-  const totalChanges = newRejections.length + respondedRejections.length;
-
-  if (totalChanges === 0) {
-    console.log('📭 No subject rejection changes detected');
-    return;
-  }
-
-  console.log(`📬 Found ${totalChanges} subject rejection change(s) to process`);
-
-  const recordName = await getRecordDisplayName(recordId);
-
-  // Process rejection changes
-  await handleNewRejections(newRejections, recordId, recordName, afterData);
-  await handleRespondedRejections(respondedRejections, recordId, recordName);
-
-  console.log(`✅ Finished processing subject rejection changes for record: ${recordId}`);
-});

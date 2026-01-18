@@ -9,6 +9,7 @@
 
 import * as admin from 'firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
+import { SubjectRejectionType } from '../notifications/triggers/subjectNotificationTrigger';
 
 // ============================================================================
 // TYPES
@@ -64,6 +65,8 @@ export interface NotificationPayload {
   // Messaging (future)
   conversationId?: string;
   senderId?: string;
+  publiclyListed?: boolean;
+  rejectionType?: SubjectRejectionType;
   // Add more as needed...
 }
 
