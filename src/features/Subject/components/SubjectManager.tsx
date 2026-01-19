@@ -7,6 +7,8 @@
  * - Lists current subjects
  * - Lists pending subject requests
  * - Allows adding/removing subjects
+ * - Shows pending request details when clicked (for owners/admins)
+ * - Shows inline SubjectRequestReview when current user is the pending subject
  * - Uses SubjectActionDialog for self-removal with blockchain unanchoring
  */
 
@@ -16,7 +18,6 @@ import { Button } from '@/components/ui/Button';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import UserCard from '@/features/Users/components/ui/UserCard';
 import { SubjectService } from '../services/subjectService';
 import { useSubjectFlow } from '../hooks/useSubjectFlow';
 import { SubjectActionDialog } from './ui/SubjectActionDialog';
@@ -24,7 +25,11 @@ import { useAuthContext } from '@/features/Auth/AuthContext';
 import { SubjectCard } from './ui/SubjectCard';
 import { SubjectConsentRequest } from '../services/subjectConsentService';
 import SubjectQueryService from '../services/subjectQueryService';
-import { SubjectRejectionService } from '../services/subjectRejectionService';
+import { PendingRequestDetails } from './ui/PendingRequestDetails';
+import { SubjectRequestReview } from './SubjectRequestReview';
+
+// View modes for SubjectManager
+type SubjectViewMode = 'list' | 'pending-details' | 'subject-review';
 
 interface SubjectManagerProps {
   record: FileObject;
@@ -41,6 +46,11 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
   isAddMode,
 }) => {
   const { user } = useAuthContext();
+
+  // View mode state
+  const [viewMode, setViewMode] = useState<SubjectViewMode>('list');
+  const [selectedPendingRequest, setSelectedPendingRequest] =
+    useState<SubjectConsentRequest | null>(null);
 
   // Local UI state
   const [loadingSubjects, setLoadingSubjects] = useState(true);
@@ -98,7 +108,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
 
     setLoadingPendingRequests(true);
     try {
-      const requests = await SubjectQueryService.getAllConsentRequestsForRecord(record.id);
+      const requests = await SubjectQueryService.getPendingConsentRequestsForRecord(record.id);
       setPendingRequests(requests);
 
       // Fetch profiles for pending subjects
@@ -128,6 +138,40 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
 
   const handleAddSubjectClick = () => {
     initiateAddSubject();
+  };
+
+  /**
+   * Handle clicking on a pending request
+   * - If the current user IS the pending subject: show inline review
+   * - Otherwise: show PendingRequestDetails
+   */
+  const handlePendingRequestClick = (request: SubjectConsentRequest) => {
+    const isCurrentUserTheSubject = user?.uid === request.subjectId;
+    setSelectedPendingRequest(request);
+
+    if (isCurrentUserTheSubject) {
+      setViewMode('subject-review');
+    } else {
+      setViewMode('pending-details');
+    }
+  };
+
+  /**
+   * Handle going back from any detail view to list view
+   */
+  const handleBackToList = () => {
+    setViewMode('list');
+    setSelectedPendingRequest(null);
+  };
+
+  /**
+   * Handle successful accept/decline of subject request
+   */
+  const handleReviewComplete = () => {
+    fetchSubjectProfiles();
+    fetchPendingRequests();
+    handleBackToList();
+    onSuccess?.();
   };
 
   /**
@@ -164,17 +208,17 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
    * Handle canceling a pending subject request
    */
   const handleCancelPendingRequest = async (subjectId: string) => {
-    const confirmCancel = window.confirm(
-      'Are you sure you want to cancel this pending subject request?'
-    );
-    if (!confirmCancel) return;
-
     try {
       await SubjectService.cancelSubjectConsentRequest(record.id, subjectId);
       fetchPendingRequests();
+      // Return to list view if we were viewing this request's details
+      if (selectedPendingRequest?.subjectId === subjectId) {
+        handleBackToList();
+      }
       onSuccess?.();
     } catch (error) {
       console.error('Error canceling pending request:', error);
+      throw error; // Re-throw so the details component can handle it
     }
   };
 
@@ -184,6 +228,39 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
 
   const currentSubjects = record.subjects || [];
 
+  // Render inline subject review (for when current user is the pending subject)
+  if (viewMode === 'subject-review' && selectedPendingRequest) {
+    return (
+      <SubjectRequestReview
+        record={record}
+        request={selectedPendingRequest}
+        onBack={handleBackToList}
+        onComplete={handleReviewComplete}
+      />
+    );
+  }
+
+  // Render pending request details view (for owners/admins)
+  if (viewMode === 'pending-details' && selectedPendingRequest) {
+    const pendingProfile = pendingProfiles.get(selectedPendingRequest.subjectId);
+
+    return (
+      <div className="w-full mx-auto p-8">
+        <PendingRequestDetails
+          request={selectedPendingRequest}
+          record={record}
+          subjectProfile={pendingProfile}
+          onBack={handleBackToList}
+          onCancelRequest={() => handleCancelPendingRequest(selectedPendingRequest.subjectId)}
+        />
+
+        {/* Subject Action Dialog (for any flows triggered from details) */}
+        <SubjectActionDialog {...dialogProps} />
+      </div>
+    );
+  }
+
+  // Render main list view
   return (
     <div className="w-full mx-auto p-8 space-y-6">
       {/* Header */}
@@ -308,6 +385,28 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
                   </span>
                 )}
               </div>
+
+              {/* Help tooltip for pending section */}
+              <Tooltip.Provider>
+                <Tooltip.Root>
+                  <Tooltip.Trigger asChild>
+                    <button className="inline-flex items-center">
+                      <HelpCircle className="w-4 h-4 text-gray-500" />
+                    </button>
+                  </Tooltip.Trigger>
+                  <Tooltip.Portal>
+                    <Tooltip.Content
+                      className="bg-gray-900 text-white rounded-lg p-3 max-w-xs shadow-xl z-50"
+                      sideOffset={5}
+                    >
+                      <p className="text-xs">
+                        Click on a pending request to view details or cancel it.
+                      </p>
+                      <Tooltip.Arrow className="fill-gray-900" />
+                    </Tooltip.Content>
+                  </Tooltip.Portal>
+                </Tooltip.Root>
+              </Tooltip.Provider>
             </div>
 
             {/* Pending Requests List */}
@@ -321,6 +420,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
                 <div className="space-y-3">
                   {pendingRequests.map(request => {
                     const pendingProfile = pendingProfiles.get(request.subjectId);
+
                     return (
                       <SubjectCard
                         key={request.subjectId}
@@ -329,6 +429,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
                         record={record}
                         isPending={true}
                         onDelete={() => handleCancelPendingRequest(request.subjectId)}
+                        onClick={() => handlePendingRequestClick(request)}
                       />
                     );
                   })}

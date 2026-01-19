@@ -21,7 +21,6 @@ import EmailVerifiedPage from './pages/EmailVerified';
 import NotificationsManager from './features/Notifications/component/NotificationsManager';
 import BlockchainAdminDashboard from './pages/BlockchainAdminDashboard';
 import HashTester from './pages/HashTester';
-import SubjectRequestReview from './features/Subject/components/SubjectRequestReview';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
@@ -59,10 +58,6 @@ const App: React.FC = (): React.JSX.Element => {
                             <Route path="settings" element={<SettingsPage />} />
                             <Route path="notifications" element={<NotificationsManager />} />
                             <Route path="blockchain-admin" element={<BlockchainAdminDashboard />} />
-                            <Route
-                              path="records/:recordId/review-subject-request"
-                              element={<SubjectRequestReview />}
-                            />
                           </Routes>
                         </Layout>
                       </LayoutProvider>

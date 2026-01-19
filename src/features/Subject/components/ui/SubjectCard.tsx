@@ -11,6 +11,7 @@ interface SubjectCardProps {
   record: FileObject;
   isPending?: boolean;
   onDelete: () => void;
+  onClick?: () => void;
 }
 
 export const SubjectCard: React.FC<SubjectCardProps> = ({
@@ -19,6 +20,7 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({
   record,
   isPending = false,
   onDelete,
+  onClick,
 }) => {
   const renderBadges = () => {
     const isOwner = record.owners?.includes(userId);
@@ -27,6 +29,9 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({
 
     return (
       <div className="flex flex-wrap items-center gap-2">
+        {isPending && (
+          <UserBadge text="Pending" color="yellow" tooltip="Awaiting consent response" />
+        )}
         {isCreator && <UserBadge text="Creator" color="purple" />}
         {isOwner && <UserBadge text="Owner" color="red" />}
         {isAdmin && !isOwner && <UserBadge text="Admin" color="blue" />}
@@ -38,11 +43,15 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({
     <UserCard
       user={userProfile}
       userId={userId}
-      color={isPending ? 'primary' : 'red'}
+      color={isPending ? 'yellow' : 'red'}
       content={renderBadges()}
       onDelete={onDelete}
       variant="default"
       onViewUser={() => {}}
+      onCardClick={onClick}
+      clickable={!!onClick}
     />
   );
 };
+
+export default SubjectCard;

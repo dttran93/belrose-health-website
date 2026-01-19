@@ -1,121 +1,35 @@
-// features/Subject/components/SubjectRequestReview.tsx
+// features/Subject/components/SubjectRequestReviewInline.tsx
 
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { UserCheck, AlertTriangle } from 'lucide-react';
+/**
+ * SubjectRequestReviewInline Component
+ *
+ * Component where a user reviews a request from a requester to
+ * confirm they are the subject of a record.
+ *
+ */
+
+import React from 'react';
+import { ArrowLeft, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { RecordFull } from '@/features/ViewEditRecord/components/RecordFull';
 import { SubjectActionDialog } from './ui/SubjectActionDialog';
 import { useSubjectFlow } from '../hooks/useSubjectFlow';
-import { SubjectService } from '../services/subjectService';
 import { FileObject } from '@/types/core';
-import { Loader2 } from 'lucide-react';
-import { getRecord } from '@/features/ViewEditRecord/services/recordService';
-import { LayoutSlot } from '@/components/app/LayoutProvider';
-import SubjectQueryService from '../services/subjectQueryService';
+import { SubjectConsentRequest } from '../services/subjectConsentService';
 
-type ReviewState = 'loading' | 'ready' | 'no-request' | 'error';
-
-export const SubjectRequestReview: React.FC = () => {
-  const { recordId } = useParams<{ recordId: string }>();
-  const navigate = useNavigate();
-
-  const [record, setRecord] = useState<FileObject | null>(null);
-  const [reviewState, setReviewState] = useState<ReviewState>('loading');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Load record first
-  useEffect(() => {
-    const load = async () => {
-      if (!recordId) {
-        setReviewState('error');
-        setErrorMessage('No record ID provided');
-        return;
-      }
-
-      try {
-        // Fetch record
-        const recordData = await getRecord(recordId);
-        if (!recordData) {
-          setReviewState('error');
-          setErrorMessage('Record not found');
-          return;
-        }
-        setRecord(recordData);
-
-        // Verify pending request exists for this user
-        const requests = await SubjectQueryService.getIncomingConsentRequests();
-        const hasRequest = requests.some(r => r.recordId === recordId);
-
-        if (!hasRequest) {
-          setReviewState('no-request');
-          return;
-        }
-
-        setReviewState('ready');
-      } catch (err) {
-        console.error('Failed to load review data:', err);
-        setReviewState('error');
-        setErrorMessage(err instanceof Error ? err.message : 'Failed to load');
-      }
-    };
-
-    load();
-  }, [recordId]);
-
-  // Show loading/error states before we have a record
-  if (reviewState === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-      </div>
-    );
-  }
-
-  if (reviewState === 'error' || !record) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="max-w-md text-center">
-          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h1 className="text-xl font-bold mb-2">Something went wrong</h1>
-          <p className="text-gray-600 mb-6">{errorMessage}</p>
-          <Button onClick={() => navigate(-1)}>Go Back</Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (reviewState === 'no-request') {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="max-w-md text-center">
-          <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-          <h1 className="text-xl font-bold mb-2">No Pending Request</h1>
-          <p className="text-gray-600 mb-6">
-            There's no pending subject request for you on this record.
-          </p>
-          <Button onClick={() => navigate('/records')}>Back to Records</Button>
-        </div>
-      </div>
-    );
-  }
-
-  // Only render the inner component once we have a record
-  return (
-    <SubjectRequestReviewContent
-      record={record}
-      onComplete={() => navigate(`/dashboard/all-records`)}
-    />
-  );
-};
-
-// Separate component that safely uses the hook
-const SubjectRequestReviewContent: React.FC<{
+interface SubjectRequestReviewInlineProps {
   record: FileObject;
+  request: SubjectConsentRequest;
+  onBack: () => void;
   onComplete: () => void;
-}> = ({ record, onComplete }) => {
-  const navigate = useNavigate();
+}
 
+export const SubjectRequestReview: React.FC<SubjectRequestReviewInlineProps> = ({
+  record,
+  request,
+  onBack,
+  onComplete,
+}) => {
   const subjectFlow = useSubjectFlow({
     record,
     onSuccess: onComplete,
@@ -130,29 +44,47 @@ const SubjectRequestReviewContent: React.FC<{
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Sticky Review Banner */}
-      <LayoutSlot slot="header">
-        <div className="p-3 bg-yellow-500/20 border border-yellow-500/30">
-          <div className="flex items-center justify-between">
+    <div className="min-h-full bg-gray-50">
+      {/* Review Header Banner */}
+      <div className="sticky top-0 z-10 bg-white border-b shadow-sm">
+        <div className="p-4 bg-yellow-500/20 border-b border-yellow-500/30">
+          <div className="flex items-center justify-between gap-4">
+            {/* Left side - back button and info */}
             <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2 rounded-lg flex-shrink-0">
-                <UserCheck className="w-6 h-6" />
+              <Button variant="ghost" onClick={onBack} className="p-2 flex-shrink-0">
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <div className="p-2 rounded-lg flex-shrink-0 bg-yellow-500/30">
+                <UserCheck className="w-6 h-6 text-yellow-700" />
               </div>
               <div className="min-w-0 text-left">
                 <p className="font-semibold truncate">Subject Request</p>
-                <p className="text-sm truncate">Please confirm if this record is about you.</p>
+                <p className="text-sm text-gray-600 truncate">
+                  Please confirm if this record is about you.
+                </p>
               </div>
             </div>
+
+            {/* Right side - action buttons */}
             <div className="flex items-center gap-3 flex-shrink-0">
-              <Button variant="outline" onClick={handleDecline}>
+              <Button variant="outline" onClick={handleDecline} disabled={subjectFlow.isLoading}>
                 Decline
               </Button>
-              <Button onClick={handleAccept}>Accept & Link</Button>
+              <Button onClick={handleAccept} disabled={subjectFlow.isLoading}>
+                Accept & Link
+              </Button>
             </div>
           </div>
         </div>
-      </LayoutSlot>
+
+        {/* Info bar */}
+        <div className="px-4 py-2 bg-blue-50 border-b border-blue-100">
+          <p className="text-xs text-blue-700">
+            <strong>Review carefully:</strong> Accepting will link you as a subject of this record
+            and anchor this relationship on the blockchain.
+          </p>
+        </div>
+      </div>
 
       {/* Record Preview */}
       <div className="max-w-7xl mx-auto p-4">
@@ -164,10 +96,28 @@ const SubjectRequestReviewContent: React.FC<{
           onDownload={() => {}}
           onCopy={() => {}}
           onDelete={() => {}}
-          onBack={() => navigate(-1)}
+          onBack={onBack}
         />
       </div>
 
+      {/* Bottom sticky action bar for mobile */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t shadow-lg md:hidden">
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            onClick={handleDecline}
+            disabled={subjectFlow.isLoading}
+            className="flex-1"
+          >
+            Decline
+          </Button>
+          <Button onClick={handleAccept} disabled={subjectFlow.isLoading} className="flex-1">
+            Accept & Link
+          </Button>
+        </div>
+      </div>
+
+      {/* Subject Action Dialog for the accept/decline flows */}
       <SubjectActionDialog {...subjectFlow.dialogProps} />
     </div>
   );
