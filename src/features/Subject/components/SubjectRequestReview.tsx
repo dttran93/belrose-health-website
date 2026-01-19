@@ -12,6 +12,7 @@ import { FileObject } from '@/types/core';
 import { Loader2 } from 'lucide-react';
 import { getRecord } from '@/features/ViewEditRecord/services/recordService';
 import { LayoutSlot } from '@/components/app/LayoutProvider';
+import SubjectQueryService from '../services/subjectQueryService';
 
 type ReviewState = 'loading' | 'ready' | 'no-request' | 'error';
 
@@ -43,7 +44,7 @@ export const SubjectRequestReview: React.FC = () => {
         setRecord(recordData);
 
         // Verify pending request exists for this user
-        const requests = await SubjectService.getIncomingRequests();
+        const requests = await SubjectQueryService.getIncomingConsentRequests();
         const hasRequest = requests.some(r => r.recordId === recordId);
 
         if (!hasRequest) {

@@ -27,15 +27,12 @@ import {
   type SubjectOperationType,
   type SubjectPreparationProgress,
 } from '../services/subjectPreparationService';
-import {
-  SubjectConsentRequest,
-  SubjectService,
-  type IncomingSubjectRequest,
-} from '../services/subjectService';
+import { SubjectService } from '../services/subjectService';
 import { PermissionsService } from '@/features/Permissions/services/permissionsService';
 import { FileObject, BelroseUserProfile } from '@/types/core';
-import { get } from 'http';
 import { doc, getDoc, getFirestore, updateDoc } from 'firebase/firestore';
+import SubjectQueryService, { IncomingSubjectRequest } from '../services/subjectQueryService';
+import { SubjectConsentRequest } from '../services/subjectConsentService';
 
 // ============================================================================
 // TYPES
@@ -164,7 +161,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
 
     setIsLoadingStatus(true);
     try {
-      const subjects = await SubjectService.getRecordSubjects(recordId);
+      const subjects = await SubjectQueryService.getRecordSubjects(recordId);
       setCurrentSubjects(subjects);
       setIsSubject(subjects.includes(userId));
     } catch (err) {
@@ -191,7 +188,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
 
     setIsLoadingRequests(true);
     try {
-      const requests = await SubjectService.getIncomingRequests();
+      const requests = await SubjectQueryService.getIncomingConsentRequests();
       setIncomingRequests(requests);
     } catch (err) {
       console.error('Error fetching incoming requests:', err);
@@ -464,8 +461,15 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
       });
       console.log('✅ Step 1 complete');
 
-      // Step 2: Grant the role so the subject can preview the record
-      console.log('🔄 Step 2: Checking/granting role...');
+      //Step 2: Create the consent request
+      console.log('🔄 Step 2: Creating consent request...');
+      await SubjectService.requestSubjectConsent(recordId, selectedUser.uid, {
+        role: pendingOperation.selectedRole || 'viewer',
+      });
+      console.log('✅ Step 2 complete');
+
+      // Step 3: Grant the role so the subject can preview the record
+      console.log('🔄 Step 3: Checking/granting role...');
       const targetRole = pendingOperation.selectedRole || 'viewer';
       const currentRole = getUserRoleForRecord(selectedUser.uid, record);
       const targetRoleLevel = ROLE_HIERARCHY[targetRole];
@@ -491,14 +495,6 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
       } else {
         console.log(`ℹ️ User already has ${currentRole} (target: ${targetRole}), skipping grant`);
       }
-      console.log('✅ Step 2 complete');
-
-      //Step 3: Create the consent request
-      console.log('🔄 Step 3: Creating consent request...');
-      await SubjectService.requestSubjectConsent(recordId, selectedUser.uid, {
-        role: pendingOperation.selectedRole || 'viewer',
-        recordTitle: record.belroseFields?.title || record.fileName,
-      });
       console.log('✅ Step 3 complete');
 
       toast.success('Consent request sent. The user will be notified.');
@@ -555,10 +551,8 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
     try {
       const result = await SubjectService.acceptSubjectRequest(pendingOperation.recordId);
 
-      if (result.blockchainAnchored) {
+      if (result) {
         toast.success('Subject request accepted');
-      } else {
-        toast.success('Subject request accepted (blockchain sync pending)');
       }
 
       reset();
@@ -716,10 +710,8 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
         // Show appropriate success message
         if (accessRevoked) {
           toast.success('You have been removed as a subject and your access has been revoked');
-        } else if (result.blockchainUnanchored) {
+        } else if (result) {
           toast.success('You have been removed as a subject');
-        } else {
-          toast.success('You have been removed as a subject (blockchain sync pending)');
         }
 
         if (result.pendingCreatorDecision) {

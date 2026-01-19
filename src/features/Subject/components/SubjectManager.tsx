@@ -17,11 +17,14 @@ import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import UserCard from '@/features/Users/components/ui/UserCard';
-import { SubjectService, SubjectConsentRequest } from '../services/subjectService';
+import { SubjectService } from '../services/subjectService';
 import { useSubjectFlow } from '../hooks/useSubjectFlow';
 import { SubjectActionDialog } from './ui/SubjectActionDialog';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { SubjectCard } from './ui/SubjectCard';
+import { SubjectConsentRequest } from '../services/subjectConsentService';
+import SubjectQueryService from '../services/subjectQueryService';
+import { SubjectRejectionService } from '../services/subjectRejectionService';
 
 interface SubjectManagerProps {
   record: FileObject;
@@ -95,7 +98,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
 
     setLoadingPendingRequests(true);
     try {
-      const requests = await SubjectService.getPendingRequestsForRecord(record.id);
+      const requests = await SubjectQueryService.getAllConsentRequestsForRecord(record.id);
       setPendingRequests(requests);
 
       // Fetch profiles for pending subjects
@@ -167,7 +170,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
     if (!confirmCancel) return;
 
     try {
-      await SubjectService.cancelPendingRequest(record.id, subjectId);
+      await SubjectService.cancelSubjectConsentRequest(record.id, subjectId);
       fetchPendingRequests();
       onSuccess?.();
     } catch (error) {
