@@ -29,6 +29,7 @@ import {
 import SubjectMembershipService from './subjectMembershipService';
 import SubjectPermissionService from './subjectPermissionService';
 import { FileObject } from '@/types/core';
+import SubjectRemovalService from './subjectRemovalService';
 
 // ============================================================================
 // TYPES
@@ -407,23 +408,23 @@ export class SubjectService {
   }
 
   /**
-   * Remove a subject from a record (by owner/admin)
+   * Request a subject to remove themselves from a record (by owner/admin)
    *
    * This is different from rejectSubjectStatus - this is when an owner
-   * or admin removes someone else as subject, not the subject removing themselves.
+   * or admin wants to remove someone else as subject, not the subject removing themselves.
    *
-   * No rejection flow is triggered since this is an administrative action.
-   * Note: This does NOT unanchor on blockchain - only the subject themselves
-   * can unanchor their own record link.
+   * Only a subject can unanchor themselves from the blockchain. Therefore, it must be the subject
+   * who removes themselves as a subject. This flow allows an owner or admin to request a subject remove
+   * themselves as subject
    *
    * @param recordId - The Firestore document ID of the record
    * @param subjectId - The userId of the subject to remove
    */
-  static async removeSubjectByOwner(
+  static async requestSubjectRemoval(
     recordId: string,
     subjectId: string
   ): Promise<{ success: boolean }> {
-    const { user, recordData } = await this.getAuthorizedRecord(recordId);
+    const { user } = await this.getAuthorizedRecord(recordId);
 
     // If user is removing themselves, use the rejection flow instead
     if (subjectId === user.uid) {
@@ -431,19 +432,10 @@ export class SubjectService {
       return { success: result.success };
     }
 
-    // 2. Specific removal permission check
-    if (!SubjectPermissionService.canRemoveSubject(recordData, user.uid)) {
-      throw new Error('Insufficient permissions to remove this subject.');
-    }
-
     // Execute removal from subjects array
-    await SubjectMembershipService.removeSubject(recordId, subjectId);
+    await SubjectRemovalService.requestRemoval(recordId, subjectId);
 
-    console.log('✅ Subject removed from record by owner/admin');
-
-    // Note: We do NOT unanchor on blockchain here.
-    // The subject's on-chain anchor remains - only they can unanchor themselves.
-    // This maintains the integrity of the blockchain record.
+    console.log('✅ Subject sent removal request');
 
     return { success: true };
   }

@@ -195,14 +195,13 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
     } else {
       // Owner/admin removing someone else - simple confirm
       const confirmRemove = window.confirm(
-        'Are you sure you want to remove this subject from the record?\n\n' +
-          'Note: This removes them from the record in our system, but their blockchain anchor ' +
-          'will remain until they choose to remove it themselves.'
+        'Are you sure you want to request the subject to remove themselves from the record? \n\n' +
+          'Note: Once added, only the subject can remove themselves from the record. If they do not comply, we recommend disputing the record and recreating it with the correct subject '
       );
       if (!confirmRemove) return;
 
       try {
-        await SubjectService.removeSubjectByOwner(record.id, subjectId);
+        await SubjectService.requestSubjectRemoval(record.id, subjectId);
         fetchSubjectProfiles();
         onSuccess?.();
       } catch (error) {
@@ -224,21 +223,6 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
       onSuccess?.();
     } catch (error) {
       console.error('Error canceling pending request:', error);
-      throw error;
-    }
-  };
-
-  const handleDismissRejectedRequest = async (subjectId: string) => {
-    try {
-      // TODO: Implement in SubjectService if needed
-      //await SubjectService.dismissRejectedRequest(record.id, subjectId);
-      fetchRequests();
-      if (selectedRequest?.subjectId === subjectId) {
-        handleBackToList();
-      }
-      onSuccess?.();
-    } catch (error) {
-      console.error('Error dismissing rejected request:', error);
       throw error;
     }
   };
@@ -276,7 +260,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
           record={record}
           subjectProfile={profile}
           onBack={handleBackToList}
-          onCancelRequest={() => handleDismissRejectedRequest(selectedRequest.subjectId)}
+          onCancelRequest={() => {}}
           isRejected={true}
         />
         <SubjectActionDialog {...dialogProps} />
@@ -499,7 +483,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
                     userProfile={requestProfiles.get(request.subjectId)}
                     record={record}
                     isRejected={true}
-                    onDelete={() => handleDismissRejectedRequest(request.subjectId)}
+                    onDelete={() => {}}
                     onClick={() => handleRejectedRequestClick(request)}
                     subjectRequest={request}
                   />

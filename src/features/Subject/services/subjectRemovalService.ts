@@ -151,7 +151,7 @@ export class SubjectRemovalService {
         recordId,
         subjectId,
         requestedBy: user.uid,
-        reason,
+        reason: reason || '',
         status: 'pending',
         createdAt: Timestamp.now(),
         recordTitle: recordData.belroseFields?.title || recordData.fileName || 'Untitled Record',

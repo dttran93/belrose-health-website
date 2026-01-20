@@ -129,6 +129,8 @@ function isSelfRejectionFlow() {
            request.auth.uid in resource.data.owners) &&
           // MANDATORY: The resulting update MUST leave at least one owner or one administrator
           willHaveManagement() &&
+          // MANDATORY: Cannot directly modify subjects array (must use consent/removal flows)
+          request.resource.data.get('subjects', []) == resource.data.get('subjects', []) &&
           // Owners array modification rules:
           // - If not modifying owners array, allow
           // - If owners array is empty, administrators can add owners
@@ -184,7 +186,7 @@ function isSelfRejectionFlow() {
     // === WRAPPED KEYS ===
     match /wrappedKeys/{wrappedKeyId} {
       // Read: Anyone can read that a key exists
-      allow read: if request.auth != null
+      allow read: if request.auth != null;
       
       // Create: admins/owners can create wrapped keys for their records
       allow create: if request.auth != null &&
@@ -320,6 +322,70 @@ function isSelfRejectionFlow() {
         canManageRecord()
       );
     }
+
+    // === SUBJECT REMOVAL REQUESTS ===
+match /subjectRemovalRequests/{requestId} {
+  // Helper: Check if user is admin/owner of the associated record
+  function canManageRemovalRecord() {
+    let record = get(/databases/$(database)/documents/records/$(resource.data.recordId));
+    return request.auth.uid in record.data.owners ||
+           (record.data.owners.size() == 0 && request.auth.uid in record.data.administrators);
+  }
+
+  function canManageRemovalRecordForCreate() {
+    let record = get(/databases/$(database)/documents/records/$(request.resource.data.recordId));
+    return request.auth.uid in record.data.owners ||
+           (record.data.owners.size() == 0 && request.auth.uid in record.data.administrators);
+  }
+
+  // Helper: Check if target is actually a subject of the record
+  function isSubjectOfRecord() {
+    let record = get(/databases/$(database)/documents/records/$(request.resource.data.recordId));
+    return request.resource.data.subjectId in record.data.subjects;
+  }
+
+  // READ: User can read if they:
+  // 1. Are the subject (receiving the request)
+  // 2. Requested it themselves
+  // 3. Are an owner/admin of the record
+  allow read: if request.auth != null && (
+    !exists(/databases/$(database)/documents/subjectRemovalRequests/$(requestId)) ||
+    resource.data.subjectId == request.auth.uid ||
+    resource.data.requestedBy == request.auth.uid ||
+    canManageRemovalRecord()
+  );
+
+  // CREATE: Must be authenticated AND:
+  // 1. Be an owner (or admin if no owners) of the record
+  // 2. Set themselves as requestedBy
+  // 3. Cannot request removal of themselves
+  // 4. Target must be a current subject
+  // 5. Status must be 'pending'
+  // 6. Required fields present
+  allow create: if request.auth != null &&
+    canManageRemovalRecordForCreate() &&
+    request.resource.data.requestedBy == request.auth.uid &&
+    request.resource.data.subjectId != request.auth.uid &&
+    isSubjectOfRecord() &&
+    request.resource.data.status == 'pending' &&
+    request.resource.data.recordId != null &&
+    request.resource.data.subjectId != null &&
+    request.resource.data.createdAt is timestamp;
+
+  // UPDATE: Only the subject can accept/reject
+allow update: if request.auth != null &&
+  resource.data.subjectId == request.auth.uid &&
+  resource.data.status == 'pending' &&
+  request.resource.data.status in ['accepted', 'rejected'] &&
+  request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'respondedAt', 'subjectResponse']) &&
+  request.resource.data.respondedAt is timestamp;
+
+  // DELETE: Requester or record owners/admins can delete (for cancellation)
+  allow delete: if request.auth != null && (
+    resource.data.requestedBy == request.auth.uid ||
+    canManageRemovalRecord()
+  );
+}
     
     // === BLOCKCHAIN SYNC RETRY QUEUE ===
     match /blockchainSyncQueue/{queueId} {
