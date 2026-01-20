@@ -310,7 +310,7 @@ function isSelfRejectionFlow() {
         // BRANCH 2: Requester updating grantedAccessOnSubjectRequest
         (
           resource.data.requestedBy == request.auth.uid &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['grantedAccessOnSubjectRequest'])
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['grantedAccessOnSubjectRequest', 'rejection','lastModified'])
         )
       );
 

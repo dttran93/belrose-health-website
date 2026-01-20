@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { X, Save, Ellipsis, Info } from 'lucide-react';
+import { X, Save, Ellipsis, Info, UserCheck, AlertCircle } from 'lucide-react';
 import { FileObject, BelroseFields } from '@/types/core';
 import { LayoutSlot } from '@/components/app/LayoutProvider';
 import VersionControlPanel from './VersionControlPanel';
@@ -13,13 +13,16 @@ import { TabType } from './View/RecordView';
 import { EncryptionAccessView } from '@/features/Sharing/components/EncryptionAccessView';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
-import { toISOString, formatTimestamp } from '@/utils/dataFormattingUtils';
+import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import PermissionsManager from '@/features/Permissions/component/PermissionManager';
 import SubjectManager from '@/features/Subject/components/SubjectManager';
 import SubjectBadge from '@/features/Subject/components/SubjectBadge';
 import { PermissionsService } from '@/features/Permissions/services/permissionsService';
 import useAuth from '@/features/Auth/hooks/useAuth';
 import { logRecordView } from '../services/logRecordViewService';
+import SubjectQueryService from '@/features/Subject/services/subjectQueryService';
+import { useSubjectFlow } from '@/features/Subject/hooks/useSubjectFlow';
+import { SubjectActionDialog } from '@/features/Subject/components/ui/SubjectActionDialog';
 
 type ViewMode =
   | 'record'
@@ -70,6 +73,52 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   readOnly = false,
 }) => {
   const { user } = useAuth();
+
+  // Pending subject request state
+  const [hasPendingSubjectRequest, setHasPendingSubjectRequest] = useState(false);
+  const [checkingPendingRequest, setCheckingPendingRequest] = useState(true);
+
+  // Subject flow hook for accept/decline actions
+  const subjectFlow = useSubjectFlow({
+    record,
+    onSuccess: () => {
+      // Clear the pending request banner after successful action
+      setHasPendingSubjectRequest(false);
+      onRefreshRecord?.();
+    },
+  });
+
+  // Check for pending subject request on mount
+  useEffect(() => {
+    const checkPendingRequest = async () => {
+      if (!user?.uid || !record.id) {
+        setCheckingPendingRequest(false);
+        return;
+      }
+
+      try {
+        // Check if current user has a pending subject request for this record
+        const incomingRequests = await SubjectQueryService.getIncomingConsentRequests();
+        const hasRequest = incomingRequests.some(req => req.recordId === record.id);
+        setHasPendingSubjectRequest(hasRequest);
+      } catch (error) {
+        console.error('Error checking pending subject request:', error);
+      } finally {
+        setCheckingPendingRequest(false);
+      }
+    };
+
+    checkPendingRequest();
+  }, [user?.uid, record.id]);
+
+  // Handlers for the subject request banner
+  const handleAcceptSubjectRequest = () => {
+    subjectFlow.initiateAcceptRequest(record.id);
+  };
+
+  const handleDeclineSubjectRequest = () => {
+    subjectFlow.initiateRejectRequest(record.id);
+  };
 
   // Log view on mount
   useEffect(() => {
@@ -310,6 +359,44 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     <div className="max-w-7xl mx-auto bg-background rounded-2xl shadow-xl rounded-lg">
       {/* ===== HEADER SECTION ===== */}
       <div className="bg-primary rounded-lg">
+        {/* Pending Subject Request Banner */}
+        {hasPendingSubjectRequest && !checkingPendingRequest && viewMode !== 'version-detail' && (
+          <LayoutSlot slot="header">
+            <div className="p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 bg-yellow-500/30 rounded-lg flex-shrink-0">
+                    <AlertCircle className="w-5 h-5 text-yellow-700" />
+                  </div>
+                  <div className="text-left min-w-0">
+                    <p className="font-semibold text-sm text-primary">Subject Request</p>
+                    <p className="text-xs text-gray-600 truncate">
+                      You've been invited as the subject of this record. Please review and respond.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDeclineSubjectRequest}
+                    disabled={subjectFlow.isLoading}
+                  >
+                    Decline
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleAcceptSubjectRequest}
+                    disabled={subjectFlow.isLoading}
+                  >
+                    Accept & Link
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </LayoutSlot>
+        )}
+
         {/* Version View Banner - for Viewing Old Versions */}
         {viewMode === 'version-detail' && viewingVersion && (
           <LayoutSlot slot="header">
@@ -535,6 +622,9 @@ export const RecordFull: React.FC<RecordFullProps> = ({
           startModDisputeFromVersions={enterDisputeInModifyMode}
         />
       )}
+
+      {/* Subject Action Dialog for accept/decline flows */}
+      <SubjectActionDialog {...subjectFlow.dialogProps} />
     </div>
   );
 };

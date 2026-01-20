@@ -21,7 +21,7 @@ export type CreatorResponseStatus = 'pending_creator_decision' | 'dropped' | 'es
  */
 export interface CreatorResponse {
   status: CreatorResponseStatus;
-  respondedAt?: Timestamp;
+  lastModified?: Timestamp;
 }
 
 /**
@@ -83,6 +83,7 @@ export class SubjectRejectionService {
 
     return rejectionData;
   }
+
   // ============================================================================
   // CREATOR RESPONSE
   // ============================================================================
@@ -142,7 +143,7 @@ export class SubjectRejectionService {
 
     const creatorResponse: CreatorResponse = {
       status: response,
-      respondedAt: Timestamp.now(),
+      lastModified: Timestamp.now(),
     };
 
     await updateDoc(requestRef, {

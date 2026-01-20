@@ -138,7 +138,6 @@ export class SubjectConsentService {
 
     await updateDoc(requestRef, {
       status: 'rejected',
-      respondedAt: Timestamp.now(),
       rejection: {
         rejectionType: 'request_rejected' as SubjectRejectionType,
         rejectedAt: Timestamp.now(),

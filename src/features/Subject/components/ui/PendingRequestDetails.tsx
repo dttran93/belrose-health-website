@@ -3,10 +3,8 @@
 /**
  * PendingRequestDetails Component
  *
- * Shows detailed information about a pending subject consent request.
- * Two modes:
- * 1. Owner/Admin view: Shows request status, who was invited, when, etc.
- * 2. Subject view: Shows the SubjectRequestReview flow for accepting/declining
+ * Shows detailed information about a pending or rejected subject consent request.
+ * Used by record owners/admins to view request status and take action.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -19,8 +17,9 @@ import {
   ShieldCheck,
   Crown,
   Loader2,
-  AlertTriangle,
   X,
+  UserX,
+  XCircle,
   FileUser,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -30,6 +29,7 @@ import { BelroseUserProfile, FileObject } from '@/types/core';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { SubjectConsentRequest } from '../../services/subjectConsentService';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
+import { RejectionResponseDialog } from './RejectionResponseDialog';
 
 // Role configuration for display
 const ROLE_CONFIG: Record<
@@ -71,7 +71,8 @@ interface PendingRequestDetailsProps {
   subjectProfile?: BelroseUserProfile;
   onBack: () => void;
   onCancelRequest: () => void;
-  isCurrentUserTheSubject?: boolean;
+  onSuccess?: () => void;
+  isRejected?: boolean;
 }
 
 export const PendingRequestDetails: React.FC<PendingRequestDetailsProps> = ({
@@ -80,10 +81,13 @@ export const PendingRequestDetails: React.FC<PendingRequestDetailsProps> = ({
   subjectProfile,
   onBack,
   onCancelRequest,
+  onSuccess,
+  isRejected = false,
 }) => {
   const [requesterProfile, setRequesterProfile] = useState<BelroseUserProfile | null>(null);
   const [loadingRequester, setLoadingRequester] = useState(true);
-  const [isCanceling, setIsCanceling] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showResponseDialog, setShowResponseDialog] = useState(false);
 
   // Fetch the requester's profile
   useEffect(() => {
@@ -105,26 +109,43 @@ export const PendingRequestDetails: React.FC<PendingRequestDetailsProps> = ({
     fetchRequesterProfile();
   }, [request.requestedBy]);
 
-  const handleCancelRequest = async () => {
-    const confirmCancel = window.confirm(
-      'Are you sure you want to cancel this pending subject request?\n\n' +
-        'The invited user will no longer be able to accept.'
+  // Handler for canceling pending request (non-rejected)
+  const handleCancelPending = async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to cancel this pending subject request?\n\nThe invited user will no longer be able to accept.'
     );
-    if (!confirmCancel) return;
+    if (!confirmed) return;
 
-    setIsCanceling(true);
+    setIsProcessing(true);
     try {
       await onCancelRequest();
     } finally {
-      setIsCanceling(false);
+      setIsProcessing(false);
     }
+  };
+
+  // Handler for responding to rejected request
+  const handleRespondToRejection = () => {
+    setShowResponseDialog(true);
+  };
+
+  const handleResponseSuccess = () => {
+    setShowResponseDialog(false);
+    onSuccess?.();
+    onBack();
   };
 
   const roleConfig = ROLE_CONFIG[request.requestedSubjectRole];
   const RoleIcon = roleConfig.icon;
 
-  // Format the request date
   const requestDate = request.createdAt ? formatTimestamp(request.createdAt) : 'Unknown date';
+  const respondedDate = request.respondedAt ? formatTimestamp(request.respondedAt) : null;
+
+  // Check if creator has already responded to rejection
+  const hasCreatorResponded =
+    isRejected &&
+    request.rejection?.creatorResponse?.status &&
+    request.rejection.creatorResponse.status !== 'pending_creator_decision';
 
   return (
     <div className="space-y-6">
@@ -132,41 +153,51 @@ export const PendingRequestDetails: React.FC<PendingRequestDetailsProps> = ({
       <div className="flex items-center justify-between mb-4 pb-2 border-b">
         <h3 className="font-semibold text-lg flex items-center gap-2">
           <FileUser className="w-5 h-5" />
-          Pending Subject Request
+          {isRejected ? 'Declined Request' : 'Pending Subject Request'}
         </h3>
-        <div className="flex items-center gap-2">
-          <Button onClick={onBack} className="w-8 h-8 border-none bg-transparent hover:bg-gray-200">
-            <ArrowLeft className="text-primary" />
-          </Button>
-        </div>
+        <Button onClick={onBack} className="w-8 h-8 border-none bg-transparent hover:bg-gray-200">
+          <ArrowLeft className="text-primary" />
+        </Button>
       </div>
 
       {/* Status Banner */}
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex flex-col items-center gap-2">
-        <p className="font-medium text-amber-900">Awaiting Response</p>
-        <p className="text-sm text-amber-700">
-          This user has been invited to confirm they are the subject of this record. They will need
-          to review the record and accept or decline the request. If the subject declines, the
-          requester has the option to escalate the request.
-        </p>
-      </div>
+      {isRejected ? (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex flex-col gap-1">
+          <p className="font-medium text-red-900">Request Declined</p>
+          <p className="text-sm text-red-700 mt-1">
+            This user has declined to be linked as a subject of this record.
+            {hasCreatorResponded
+              ? ` This request has been ${request.rejection?.creatorResponse?.status}.`
+              : ' You can drop or escalate this request.'}
+          </p>
+        </div>
+      ) : (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex flex-col gap-1">
+          <p className="font-medium text-amber-900">Awaiting Response</p>
+          <p className="text-sm text-amber-700 mt-1">
+            This user has been invited to confirm they are the subject of this record. They will
+            review the record and accept or decline the request.
+          </p>
+        </div>
+      )}
 
       {/* Invited Subject Section */}
       <div className="space-y-3">
         <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-          <User className="w-4 h-4" />
-          Invited Subject
+          {isRejected ? <UserX className="w-4 h-4" /> : <User className="w-4 h-4" />}
+          {isRejected ? 'Declined By' : 'Invited Subject'}
         </h4>
         <UserCard
           user={subjectProfile}
           userId={request.subjectId}
           variant="default"
-          color="yellow"
+          color={isRejected ? 'red' : 'yellow'}
           menuType="none"
           content={
-            <div className="flex items-center gap-2">
-              <UserBadge text="Pending Subject" color="yellow" />
-            </div>
+            <UserBadge
+              text={isRejected ? 'Declined' : 'Pending Subject'}
+              color={isRejected ? 'red' : 'yellow'}
+            />
           }
         />
       </div>
@@ -198,6 +229,17 @@ export const PendingRequestDetails: React.FC<PendingRequestDetailsProps> = ({
           <span className="text-sm">{requestDate}</span>
         </div>
 
+        {/* Response Date (only for rejected) */}
+        {isRejected && respondedDate && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-500 flex items-center gap-1">
+              <XCircle className="w-3 h-3" />
+              Declined Date
+            </span>
+            <span className="text-sm">{respondedDate}</span>
+          </div>
+        )}
+
         {/* Requested Role */}
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-500">Requested Role</span>
@@ -214,6 +256,31 @@ export const PendingRequestDetails: React.FC<PendingRequestDetailsProps> = ({
             {request.recordTitle || record.belroseFields?.title || record.fileName || 'Untitled'}
           </span>
         </div>
+
+        {/* Reason (only for rejected) */}
+        {isRejected && request.rejection?.reason && (
+          <div className="flex flex-col gap-2">
+            <span className="text-sm text-gray-500">Reason for Declining</span>
+            <div className="bg-red-50 border border-red-100 rounded p-2">
+              <span className="text-sm text-red-800 italic">"{request.rejection.reason}"</span>
+            </div>
+          </div>
+        )}
+
+        {/* Creator Response Status (if already responded) */}
+        {hasCreatorResponded && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-500">Response Status</span>
+            <UserBadge
+              text={
+                request.rejection?.creatorResponse?.status === 'dropped' ? 'Dropped' : 'Escalated'
+              }
+              color={
+                request.rejection?.creatorResponse?.status === 'dropped' ? 'primary' : 'yellow'
+              }
+            />
+          </div>
+        )}
       </div>
 
       {/* Actions */}
@@ -221,22 +288,43 @@ export const PendingRequestDetails: React.FC<PendingRequestDetailsProps> = ({
         <Button variant="outline" onClick={onBack} className="flex-1">
           Back
         </Button>
-        <Button
-          variant="destructive"
-          onClick={handleCancelRequest}
-          disabled={isCanceling}
-          className="flex-1"
-        >
-          {isCanceling ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              Canceling...
-            </>
-          ) : (
-            <>Cancel Request</>
-          )}
-        </Button>
+
+        {isRejected ? (
+          // Rejected request - show Respond button (if not already responded)
+          !hasCreatorResponded && (
+            <Button onClick={handleRespondToRejection} disabled={isProcessing} className="flex-1">
+              Respond
+            </Button>
+          )
+        ) : (
+          // Pending request - show Cancel button
+          <Button
+            variant="destructive"
+            onClick={handleCancelPending}
+            disabled={isProcessing}
+            className="flex-1"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Canceling...
+              </>
+            ) : (
+              'Cancel Request'
+            )}
+          </Button>
+        )}
       </div>
+
+      {/* Rejection Response Dialog */}
+      <RejectionResponseDialog
+        isOpen={showResponseDialog}
+        onClose={() => setShowResponseDialog(false)}
+        request={request}
+        record={record}
+        subjectProfile={subjectProfile}
+        onSuccess={handleResponseSuccess}
+      />
     </div>
   );
 };

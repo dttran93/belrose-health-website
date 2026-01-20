@@ -119,6 +119,24 @@ export class SubjectQueryService {
   }
 
   /**
+   * Get rejected consent requests for a specific record
+   * Excludes requests that have been dropped
+   */
+  static async getRejectedConsentRequestsForRecord(
+    recordId: string
+  ): Promise<SubjectConsentRequest[]> {
+    const q = query(
+      collection(this.db, 'subjectConsentRequests').withConverter(consentRequestConverter),
+      where('recordId', '==', recordId),
+      where('status', '==', 'rejected')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+      .map(doc => doc.data())
+      .filter(req => req.rejection?.creatorResponse?.status !== 'dropped');
+  }
+
+  /**
    * Get incoming consent requests for the current user
    */
   static async getIncomingConsentRequests(): Promise<IncomingSubjectRequest[]> {
