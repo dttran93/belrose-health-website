@@ -1,5 +1,6 @@
 // src/features/HealthRecordViewer/lib/types.ts
 
+import { DisputeSeverityOptions } from '@/features/Credibility/services/disputeService';
 import { ethers } from 'ethers';
 
 /**
@@ -136,7 +137,6 @@ interface UnacceptedUpdateFlagStruct {
 // ===============================================================
 
 export enum VerificationLevel {
-  None = 0,
   Provenance = 1, // Vouches for source/origin
   Content = 2, // Vouches for content accuracy
   Full = 3, // Full verification (source + content)
@@ -218,7 +218,7 @@ export interface Dispute {
   disputerIdHash: string;
   recordId: string;
   recordHash: string;
-  severity: DisputeSeverity;
+  severity: DisputeSeverityOptions;
   culpability: DisputeCulpability;
   notes: string; // IPFS hash or reference
   createdAt: number;

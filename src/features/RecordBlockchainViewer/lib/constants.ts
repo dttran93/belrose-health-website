@@ -4,10 +4,8 @@
  * HealthRecordCore Contract Configuration
  */
 
-// TODO: Update with your deployed contract address
 export const HEALTH_RECORD_CORE_ADDRESS = '0xDC79F803594232421f49a29D9EcEbe78015d48e1';
-
-export const SEPOLIA_RPC_URL = 'https://1rpc.io/sepolia';
+export const SEPOLIA_RPC_URL = 'https://ethereum-sepolia.publicnode.com';
 export const ETHERSCAN_BASE_URL = 'https://sepolia.etherscan.io';
 export const DEPLOYMENT_BLOCK = 9967778;
 

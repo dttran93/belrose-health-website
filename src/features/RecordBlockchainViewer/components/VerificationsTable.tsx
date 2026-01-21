@@ -2,9 +2,12 @@
 
 import React from 'react';
 import { User } from 'lucide-react';
-import { Verification, VerificationLevel } from '../lib/types';
+import { Verification } from '../lib/types';
 import { TableWrapper, StatusBadge, HashDisplay } from './SharedComponents';
-import { getVerificationConfig } from '@/features/Credibility/services/verificationService';
+import {
+  getVerificationConfig,
+  VerificationLevelOptions,
+} from '@/features/Credibility/services/verificationService';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 
 interface VerificationsTableProps {
@@ -121,7 +124,7 @@ export const VerificationsTable: React.FC<VerificationsTableProps> = ({ verifica
 // ===============================================================
 
 interface VerificationLevelBadgeProps {
-  level: VerificationLevel;
+  level: VerificationLevelOptions;
   showDescription?: boolean;
 }
 

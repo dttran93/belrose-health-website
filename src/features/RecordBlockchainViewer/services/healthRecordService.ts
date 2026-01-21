@@ -14,8 +14,6 @@ import {
   Verification,
   Dispute,
   UnacceptedUpdateFlag,
-  VerificationLevel,
-  DisputeSeverity,
   DisputeCulpability,
   ResolutionType,
   SubjectLink,
@@ -32,6 +30,8 @@ import {
   getProfilesByUserIdHashes,
   transformToUserProfile,
 } from '@/features/MemberBlockchainViewer/services/userProfileService';
+import { DisputeSeverityOptions } from '@/features/Credibility/services/disputeService';
+import { VerificationLevelOptions } from '@/features/Credibility/services/verificationService';
 
 // ===============================================================
 // SINGLETON INSTANCES
@@ -139,6 +139,10 @@ export async function getHealthRecordStats(): Promise<HealthRecordStats> {
  */
 export async function getAnchoredRecords(): Promise<AnchoredRecord[]> {
   const contract = getContract();
+
+  // Debug: Check if contract has any records
+  const totalRecords = await contract.getTotalAnchoredRecords();
+  console.log(`📊 Contract reports ${totalRecords} total anchored records`);
 
   try {
     // 1. Query RecordAnchored events to get unique subjectIdHashes
@@ -355,11 +359,19 @@ export async function getAllVerifications(): Promise<Verification[]> {
           );
 
           if (exists) {
+            // Parse and validate level
+            const parsedLevel = parseVerificationLevel(Number(level));
+
+            if (!parsedLevel) {
+              console.warn(`Skipping verification with invalid level: ${recordHash}`);
+              continue;
+            }
+
             verifications.push({
               verifierIdHash,
               recordId,
               recordHash,
-              level: parseVerificationLevel(Number(level)),
+              level: parsedLevel,
               createdAt: Number(createdAt),
               isActive,
             });
@@ -399,14 +411,20 @@ export async function getVerificationsForHash(recordHash: string): Promise<Verif
 
     const verifications: Verification[] = rawVerifications
       .filter((v: any) => v.verifierIdHash !== ethers.ZeroHash)
-      .map((v: any) => ({
-        verifierIdHash: v.verifierIdHash,
-        recordId: v.recordId,
-        recordHash,
-        level: parseVerificationLevel(Number(v.level)),
-        createdAt: Number(v.createdAt),
-        isActive: v.isActive,
-      }));
+      .map((v: any) => {
+        const level = parseVerificationLevel(Number(v.level));
+        if (!level) return null;
+
+        return {
+          verifierIdHash: v.verifierIdHash,
+          recordId: v.recordId,
+          recordHash,
+          level,
+          createdAt: Number(v.createdAt),
+          isActive: v.isActive,
+        };
+      })
+      .filter((v): v is Verification => v !== null);
 
     // Enrich with profiles
     const verifierHashes = verifications.map(v => v.verifierIdHash);
@@ -477,6 +495,16 @@ export async function getAllDisputes(): Promise<Dispute[]> {
             await contract.getUserDispute(recordHash, disputerIdHash);
 
           if (exists) {
+            // Parse and validate severity/culpability
+            const parsedSeverity = parseDisputeSeverity(Number(severity));
+            const parsedCulpability = parseDisputeCulpability(Number(culpability));
+
+            // Skip disputes with invalid severity (0 means error/none from blockchain)
+            if (!parsedSeverity) {
+              console.warn(`Skipping dispute with invalid severity: ${recordHash}`);
+              continue;
+            }
+
             // Get reaction stats
             const [, activeSupports, activeOpposes] = await contract.getReactionStats(
               recordHash,
@@ -487,8 +515,8 @@ export async function getAllDisputes(): Promise<Dispute[]> {
               disputerIdHash,
               recordId,
               recordHash,
-              severity: parseDisputeSeverity(Number(severity)),
-              culpability: parseDisputeCulpability(Number(culpability)),
+              severity: parsedSeverity,
+              culpability: parsedCulpability,
               notes,
               createdAt: Number(createdAt),
               isActive,
@@ -532,16 +560,22 @@ export async function getDisputesForHash(recordHash: string): Promise<Dispute[]>
 
     const disputes: Dispute[] = rawDisputes
       .filter((d: any) => d.disputerIdHash !== ethers.ZeroHash)
-      .map((d: any) => ({
-        disputerIdHash: d.disputerIdHash,
-        recordId: d.recordId,
-        recordHash,
-        severity: parseDisputeSeverity(Number(d.severity)),
-        culpability: parseDisputeCulpability(Number(d.culpability)),
-        notes: d.notes,
-        createdAt: Number(d.createdAt),
-        isActive: d.isActive,
-      }));
+      .map((d: any) => {
+        const severity = parseDisputeSeverity(Number(d.severity));
+        if (!severity) return null;
+
+        return {
+          disputerIdHash: d.disputerIdHash,
+          recordId: d.recordId,
+          recordHash,
+          severity,
+          culpability: parseDisputeCulpability(Number(d.culpability)),
+          notes: d.notes,
+          createdAt: Number(d.createdAt),
+          isActive: d.isActive,
+        };
+      })
+      .filter((d): d is Dispute => d !== null);
 
     // Get reaction stats and profiles
     const disputerHashes = disputes.map(d => d.disputerIdHash);
@@ -696,17 +730,17 @@ export async function getFlagsForSubject(subjectIdHash: string): Promise<Unaccep
 /**
  * Parse verification level from contract value
  */
-function parseVerificationLevel(value: number): VerificationLevel {
-  if (value >= 1 && value <= 3) return value as VerificationLevel;
-  return VerificationLevel.None;
+function parseVerificationLevel(value: number): VerificationLevelOptions | null {
+  if (value >= 1 && value <= 3) return value as VerificationLevelOptions;
+  return null;
 }
 
 /**
  * Parse dispute severity from contract value
  */
-function parseDisputeSeverity(value: number): DisputeSeverity {
-  if (value >= 1 && value <= 3) return value as DisputeSeverity;
-  return DisputeSeverity.None;
+function parseDisputeSeverity(value: number): DisputeSeverityOptions | null {
+  if (value >= 1 && value <= 3) return value as DisputeSeverityOptions;
+  return null;
 }
 
 /**
