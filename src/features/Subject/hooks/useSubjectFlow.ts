@@ -388,6 +388,14 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
     setPhase('selecting');
   }, []);
 
+  /**
+   * Go back from confirmation to searching
+   */
+  const goBackToSearching = useCallback(() => {
+    setSelectedUser(null);
+    setPhase('searching');
+  }, []);
+
   // ==========================================================================
   // CONFIRM SET SELF AS SUBJECT
   // ==========================================================================
@@ -775,6 +783,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
       onProceedFromSelection: proceedFromSelection,
       onSelectUser: selectUserAndProceed,
       onGoBackToSelection: goBackToSelection,
+      onGoBackToSearching: goBackToSearching,
       onConfirmSetSubjectAsSelf: confirmSetSubjectAsSelf,
       onConfirmRequestConsent: confirmRequestConsent,
       onConfirmAcceptRequest: confirmAcceptRequest,

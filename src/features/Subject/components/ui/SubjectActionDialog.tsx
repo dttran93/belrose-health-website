@@ -79,6 +79,7 @@ interface SubjectActionDialogProps {
   onProceedFromSelection: () => void;
   onSelectUser: (user: BelroseUserProfile) => void;
   onGoBackToSelection: () => void;
+  onGoBackToSearching: () => void;
   onConfirmSetSubjectAsSelf: () => void;
   onConfirmRequestConsent: () => void;
   onConfirmAcceptRequest: () => void;
@@ -155,6 +156,7 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
   onProceedFromSelection,
   onSelectUser,
   onGoBackToSelection,
+  onGoBackToSearching,
   onConfirmSetSubjectAsSelf,
   onConfirmRequestConsent,
   onConfirmAcceptRequest,
@@ -198,7 +200,6 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
               record={record}
               currentSubjects={currentSubjects}
               selectedRole={selectedRole}
-              selectedUser={selectedUser}
               onSelectUser={onSelectUser}
               onGoBack={onGoBackToSelection}
               onClose={onClose}
@@ -236,6 +237,7 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
               selectedUser={selectedUser}
               selectedRole={selectedRole}
               onConfirm={onConfirmRequestConsent}
+              onGoBack={onGoBackToSearching}
               onClose={onClose}
             />
           )}
@@ -471,24 +473,14 @@ const SearchingContent: React.FC<{
   record: FileObject;
   currentSubjects: string[];
   selectedRole: SubjectRole;
-  selectedUser: BelroseUserProfile | null;
   onSelectUser: (user: BelroseUserProfile) => void;
   onGoBack: () => void;
   onClose: () => void;
-}> = ({ record, currentSubjects, selectedRole, selectedUser, onSelectUser, onGoBack, onClose }) => {
+}> = ({ record, currentSubjects, selectedRole, onSelectUser, onGoBack, onClose }) => {
   const { user } = useAuthContext();
-  const [localSelectedUser, setLocalSelectedUser] = useState<BelroseUserProfile | null>(
-    selectedUser
-  );
 
   const handleUserSelect = (user: BelroseUserProfile) => {
-    setLocalSelectedUser(user);
-  };
-
-  const handleProceed = () => {
-    if (localSelectedUser) {
-      onSelectUser(localSelectedUser);
-    }
+    onSelectUser(user);
   };
 
   return (
@@ -523,21 +515,6 @@ const SearchingContent: React.FC<{
         />
       </div>
 
-      {/* Selected User Preview */}
-      {localSelectedUser && (
-        <div className="mb-4">
-          <p className="text-sm font-medium text-gray-700 mb-2">Selected User:</p>
-          <UserCard
-            user={localSelectedUser}
-            variant="default"
-            color="yellow"
-            menuType="cancel"
-            onViewUser={() => {}}
-            onCancel={() => setLocalSelectedUser(null)}
-          />
-        </div>
-      )}
-
       {/* Role Badge */}
       <div className="mb-4 p-3 bg-gray-50 rounded-lg">
         <p className="text-xs text-gray-500 mb-1">Access Level</p>
@@ -571,7 +548,7 @@ const SearchingContent: React.FC<{
         <Button variant="outline" className="flex-1" onClick={onGoBack}>
           Back
         </Button>
-        <Button onClick={handleProceed} disabled={!localSelectedUser} className="flex-1">
+        <Button disabled className="flex-1">
           Send Request
         </Button>
       </div>
@@ -801,16 +778,22 @@ const ConfirmRequestConsentContent: React.FC<{
   selectedUser: BelroseUserProfile;
   selectedRole: SubjectRole;
   onConfirm: () => void;
+  onGoBack: () => void;
   onClose: () => void;
-}> = ({ record, selectedUser, selectedRole, onConfirm, onClose }) => {
+}> = ({ record, selectedUser, selectedRole, onConfirm, onGoBack, onClose }) => {
   const roleConfig = ROLE_CONFIG[selectedRole];
   const RoleIcon = roleConfig.icon;
 
   return (
     <div className="p-6">
-      <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
-        <Users className="w-5 h-5 text-blue-500" />
-        Send Subject Request
+      <AlertDialog.Title className="text-lg font-bold flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <Users className="w-5 h-5 text-blue-500" />
+          Send Subject Request
+        </div>
+        <button onClick={onClose} className="p-1 rounded hover:bg-gray-100">
+          <X className="w-5 h-5 text-gray-500" />
+        </button>
       </AlertDialog.Title>
 
       <AlertDialog.Description className="text-sm text-gray-600 mb-4">
@@ -849,11 +832,9 @@ const ConfirmRequestConsentContent: React.FC<{
       </div>
 
       <div className="flex gap-3">
-        <AlertDialog.Cancel asChild>
-          <Button variant="outline" className="flex-1" onClick={onClose}>
-            Cancel
-          </Button>
-        </AlertDialog.Cancel>
+        <Button variant="outline" className="flex-1" onClick={onGoBack}>
+          Back
+        </Button>
         <Button onClick={onConfirm} className="flex-1">
           Send Request
         </Button>
