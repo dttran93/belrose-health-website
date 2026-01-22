@@ -23,6 +23,14 @@ import { logRecordView } from '../services/logRecordViewService';
 import SubjectQueryService from '@/features/Subject/services/subjectQueryService';
 import { useSubjectFlow } from '@/features/Subject/hooks/useSubjectFlow';
 import { SubjectActionDialog } from '@/features/Subject/components/ui/SubjectActionDialog';
+import {
+  PendingSubjectRequestAlert,
+  RejectionResponseAlert,
+  RemovalRequestAlert,
+} from '@/features/Subject/components/SubjectAlertBanners';
+import { useSubjectAlerts } from '@/features/Subject/hooks/useSubjectAlerts';
+import SubjectService from '@/features/Subject/services/subjectService';
+import SubjectRemovalService from '@/features/Subject/services/subjectRemovalService';
 
 type ViewMode =
   | 'record'
@@ -74,51 +82,18 @@ export const RecordFull: React.FC<RecordFullProps> = ({
 }) => {
   const { user } = useAuth();
 
-  // Pending subject request state
-  const [hasPendingSubjectRequest, setHasPendingSubjectRequest] = useState(false);
-  const [checkingPendingRequest, setCheckingPendingRequest] = useState(true);
+  // Subject Alerts hook
+  const subjectAlerts = useSubjectAlerts({ recordId: record.id });
 
   // Subject flow hook for accept/decline actions
   const subjectFlow = useSubjectFlow({
     record,
     onSuccess: () => {
       // Clear the pending request banner after successful action
-      setHasPendingSubjectRequest(false);
+      subjectAlerts.refetch();
       onRefreshRecord?.();
     },
   });
-
-  // Check for pending subject request on mount
-  useEffect(() => {
-    const checkPendingRequest = async () => {
-      if (!user?.uid || !record.id) {
-        setCheckingPendingRequest(false);
-        return;
-      }
-
-      try {
-        // Check if current user has a pending subject request for this record
-        const incomingRequests = await SubjectQueryService.getIncomingConsentRequests();
-        const hasRequest = incomingRequests.some(req => req.recordId === record.id);
-        setHasPendingSubjectRequest(hasRequest);
-      } catch (error) {
-        console.error('Error checking pending subject request:', error);
-      } finally {
-        setCheckingPendingRequest(false);
-      }
-    };
-
-    checkPendingRequest();
-  }, [user?.uid, record.id]);
-
-  // Handlers for the subject request banner
-  const handleAcceptSubjectRequest = () => {
-    subjectFlow.initiateAcceptRequest(record.id);
-  };
-
-  const handleDeclineSubjectRequest = () => {
-    subjectFlow.initiateRejectRequest(record.id);
-  };
 
   // Log view on mount
   useEffect(() => {
@@ -355,44 +330,80 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     onRefreshRecord?.();
   };
 
+  const handleDropRejection = async (subjectId: string) => {
+    try {
+      await SubjectService.respondToSubjectRejection(record.id, subjectId, 'dropped');
+      subjectAlerts.refetch();
+      onRefreshRecord?.();
+    } catch (error) {
+      console.error('Error dropping rejection:', error);
+    }
+  };
+
+  const handleEscalateRejection = async (subjectId: string) => {
+    try {
+      await SubjectService.respondToSubjectRejection(record.id, subjectId, 'escalated');
+      subjectAlerts.refetch();
+      onRefreshRecord?.();
+    } catch (error) {
+      console.error('Error escalating rejection:', error);
+    }
+  };
+
+  const handleRemoveSelf = () => {
+    subjectFlow.initiateRemoveSubjectStatus();
+  };
+
+  const handleDisputeRemoval = async () => {
+    try {
+      await SubjectRemovalService.rejectRemoval(record.id);
+      subjectAlerts.refetch();
+      onRefreshRecord?.();
+    } catch (error) {
+      console.error('Error escalating rejection:', error);
+    }
+  };
+
+  console.log('removal request status:', subjectAlerts.hasRemovalRequest);
+  console.log('removal request status:', subjectAlerts.removalRequest);
+
   return (
     <div className="max-w-7xl mx-auto bg-background rounded-2xl shadow-xl rounded-lg">
       {/* ===== HEADER SECTION ===== */}
       <div className="bg-primary rounded-lg">
         {/* Pending Subject Request Banner */}
-        {hasPendingSubjectRequest && !checkingPendingRequest && viewMode !== 'version-detail' && (
+        {/* Subject-related Alert Banners */}
+        {!subjectAlerts.isLoading && viewMode !== 'version-detail' && (
           <LayoutSlot slot="header">
-            <div className="p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="p-2 bg-yellow-500/30 rounded-lg flex-shrink-0">
-                    <AlertCircle className="w-5 h-5 text-yellow-700" />
-                  </div>
-                  <div className="text-left min-w-0">
-                    <p className="font-semibold text-sm text-primary">Subject Request</p>
-                    <p className="text-xs text-gray-600 truncate">
-                      You've been invited as the subject of this record. Please review and respond.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDeclineSubjectRequest}
-                    disabled={subjectFlow.isLoading}
-                  >
-                    Decline
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleAcceptSubjectRequest}
-                    disabled={subjectFlow.isLoading}
-                  >
-                    Accept & Link
-                  </Button>
-                </div>
-              </div>
+            <div className="space-y-2">
+              {/* Pending subject request - someone invited you to be a subject */}
+              {subjectAlerts.hasSubjectRequest && (
+                <PendingSubjectRequestAlert
+                  onAccept={() => subjectFlow.initiateAcceptRequest(record.id)}
+                  onDecline={() => subjectFlow.initiateRejectRequest(record.id)}
+                  isLoading={subjectFlow.isLoading}
+                />
+              )}
+
+              {/* Rejection responses needed - subjects who removed themselves */}
+              {subjectAlerts.pendingRejectionResponses.map(rejection => (
+                <RejectionResponseAlert
+                  key={rejection.subjectId}
+                  subjectName={rejection.subjectName}
+                  onDrop={() => handleDropRejection(rejection.subjectId)}
+                  onEscalate={() => handleEscalateRejection(rejection.subjectId)}
+                  isLoading={subjectFlow.isLoading}
+                />
+              ))}
+
+              {/* Removal request - owner asked you to remove yourself */}
+              {subjectAlerts.hasRemovalRequest && subjectAlerts.removalRequest && (
+                <RemovalRequestAlert
+                  onRemove={handleRemoveSelf}
+                  onDispute={handleDisputeRemoval}
+                  isLoading={subjectFlow.isLoading}
+                />
+              )}
             </div>
           </LayoutSlot>
         )}

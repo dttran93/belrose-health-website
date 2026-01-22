@@ -27,8 +27,12 @@ import {
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { SubjectConsentRequest, SubjectRequestStatus } from './subjectConsentService';
-import { SubjectRejectionData } from './subjectRejectionService';
-import { SubjectRemovalRequest, RemovalRequestStatus } from './subjectRemovalService';
+import { RejectionReasons, SubjectRejectionData } from './subjectRejectionService';
+import {
+  SubjectRemovalRequest,
+  RemovalRequestStatus,
+  getRemovalRequestId,
+} from './subjectRemovalService';
 
 // ============================================================================
 // TYPES
@@ -52,6 +56,23 @@ export interface IncomingRemovalRequest {
   reason?: string;
   requestedAt: Timestamp;
   status: RemovalRequestStatus;
+}
+
+export interface PendingRejectionResponse {
+  recordId: string;
+  subjectId: string;
+  subjectName?: string;
+  rejectedAt: Timestamp;
+  reason: RejectionReasons;
+  recordTitle?: string;
+}
+
+export interface PendingRemovalRequest {
+  recordId: string;
+  requestedAt: Timestamp;
+  requestedBy: string;
+  reason?: string;
+  recordTitle?: string;
 }
 
 // ============================================================================
@@ -105,17 +126,44 @@ export class SubjectQueryService {
 
   /**
    * Get pending consent requests for a specific record
+   * Queries as both subject and requester to cover both permission paths
    */
   static async getPendingConsentRequestsForRecord(
     recordId: string
   ): Promise<SubjectConsentRequest[]> {
-    const q = query(
-      collection(this.db, 'subjectConsentRequests').withConverter(consentRequestConverter),
-      where('recordId', '==', recordId),
-      where('status', '==', 'pending')
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => doc.data());
+    const user = getAuth().currentUser;
+    if (!user) throw new Error('User not authenticated');
+
+    // Run two queries that each satisfy a security rule branch
+    const [asSubject, asRequester] = await Promise.all([
+      getDocs(
+        query(
+          collection(this.db, 'subjectConsentRequests').withConverter(consentRequestConverter),
+          where('recordId', '==', recordId),
+          where('status', '==', 'pending'),
+          where('subjectId', '==', user.uid)
+        )
+      ),
+      getDocs(
+        query(
+          collection(this.db, 'subjectConsentRequests').withConverter(consentRequestConverter),
+          where('recordId', '==', recordId),
+          where('status', '==', 'pending'),
+          where('requestedBy', '==', user.uid)
+        )
+      ),
+    ]);
+
+    // Dedupe results
+    const seen = new Set<string>();
+    const results: SubjectConsentRequest[] = [];
+    for (const doc of [...asSubject.docs, ...asRequester.docs]) {
+      if (!seen.has(doc.id)) {
+        seen.add(doc.id);
+        results.push(doc.data());
+      }
+    }
+    return results;
   }
 
   /**
@@ -203,11 +251,13 @@ export class SubjectQueryService {
    * Used by owners/admins to see what removal requests are outstanding.
    */
   static async getPendingRemovalRequestsForRecord(
-    recordId: string
+    recordId: string,
+    subjectId: string
   ): Promise<SubjectRemovalRequest[]> {
     const q = query(
       collection(this.db, 'subjectRemovalRequests').withConverter(removalRequestConverter),
       where('recordId', '==', recordId),
+      where('subjectId', '==', subjectId),
       where('status', '==', 'pending')
     );
     const snapshot = await getDocs(q);
@@ -298,18 +348,31 @@ export class SubjectQueryService {
 
   /**
    * Get rejections awaiting creator decision
+   * Only queries requests where current user was the requester (creator)
    */
-  static async getPendingRejectionDecisions(recordId: string): Promise<SubjectRejectionData[]> {
+  static async getPendingRejectionResponses(recordId: string): Promise<PendingRejectionResponse[]> {
+    const user = getAuth().currentUser;
+    if (!user) throw new Error('User not authenticated');
+
+    // Query only requests made by this user (they're the "creator" checking rejections)
     const q = query(
       collection(this.db, 'subjectConsentRequests').withConverter(consentRequestConverter),
-      where('recordId', '==', recordId)
+      where('recordId', '==', recordId),
+      where('requestedBy', '==', user.uid) // Satisfies security rule
     );
 
     const snapshot = await getDocs(q);
+
     return snapshot.docs
       .map(doc => doc.data())
       .filter(data => data.rejection?.creatorResponse?.status === 'pending_creator_decision')
-      .map(data => data.rejection!);
+      .map(data => ({
+        recordId: data.recordId,
+        subjectId: data.subjectId,
+        rejectedAt: data.rejection!.rejectedAt,
+        reason: data.rejection!.reason,
+        recordTitle: data.recordTitle,
+      }));
   }
 
   // ==========================================================================
@@ -334,20 +397,97 @@ export class SubjectQueryService {
   }
 
   /**
-   * Get all pending requests for a record (both consent and removal)
+   * Get all pending requests and alerts for a record
    *
-   * Useful for showing owners/admins all outstanding requests.
+   * Used by both:
+   * - Owners/admins to see outstanding requests
+   * - Alert banners to show what needs attention
    */
-  static async getAllPendingRequestsForRecord(recordId: string): Promise<{
-    consentRequests: SubjectConsentRequest[];
-    removalRequests: SubjectRemovalRequest[];
-  }> {
-    const [consentRequests, removalRequests] = await Promise.all([
-      this.getPendingConsentRequestsForRecord(recordId),
-      this.getPendingRemovalRequestsForRecord(recordId),
-    ]);
+  static async getRecordAlerts(recordId: string): Promise<{
+    // For the current user
+    hasPendingRequest: boolean;
+    hasRemovalRequest: boolean;
+    removalRequest: IncomingRemovalRequest | null;
 
-    return { consentRequests, removalRequests };
+    // For owners/admins (record-wide)
+    pendingConsentRequests: SubjectConsentRequest[];
+    pendingRemovalRequests: SubjectRemovalRequest[];
+    pendingRejectionResponses: PendingRejectionResponse[];
+  }> {
+    const user = getAuth().currentUser;
+
+    if (!user) {
+      return {
+        hasPendingRequest: false,
+        hasRemovalRequest: false,
+        removalRequest: null,
+        pendingConsentRequests: [],
+        pendingRemovalRequests: [],
+        pendingRejectionResponses: [],
+      };
+    }
+
+    // Debug each query separately to find the failing one
+    let consentRequest: SubjectConsentRequest | null = null;
+    let pendingConsentRequests: SubjectConsentRequest[] = [];
+    let pendingRemovalRequests: SubjectRemovalRequest[] = [];
+    let pendingRejectionResponses: PendingRejectionResponse[] = [];
+
+    try {
+      consentRequest = await this.getConsentRequest(recordId, user.uid);
+      console.log('✓ getConsentRequest succeeded:', consentRequest);
+    } catch (e) {
+      console.error('✗ getConsentRequest failed:', e);
+    }
+
+    try {
+      pendingConsentRequests = await this.getPendingConsentRequestsForRecord(recordId);
+      console.log('✓ getPendingConsentRequestsForRecord succeeded:', pendingConsentRequests);
+    } catch (e) {
+      console.error('✗ getPendingConsentRequestsForRecord failed:', e);
+    }
+
+    try {
+      pendingRemovalRequests = await this.getPendingRemovalRequestsForRecord(recordId, user.uid);
+      console.log('✓ getPendingRemovalRequestsForRecord succeeded:', pendingRemovalRequests);
+    } catch (e) {
+      console.error('✗ getPendingRemovalRequestsForRecord failed:', e);
+    }
+
+    try {
+      pendingRejectionResponses = await this.getPendingRejectionResponses(recordId);
+      console.log('✓ getPendingRejectionResponses succeeded:', pendingRejectionResponses);
+    } catch (e) {
+      console.error('✗ getPendingRejectionResponses failed:', e);
+    }
+
+    // Check if current user has a removal request for this record
+    const userRemovalRequest = pendingRemovalRequests.find(r => r.subjectId === user.uid);
+
+    console.log('Current User UID:', user.uid);
+    console.log('All Pending Removal Requests for this Record:', pendingRemovalRequests);
+
+    return {
+      // Current user alerts
+      hasPendingRequest: consentRequest?.status === 'pending',
+      hasRemovalRequest: !!userRemovalRequest,
+      removalRequest: userRemovalRequest
+        ? {
+            id: getRemovalRequestId(userRemovalRequest.recordId, userRemovalRequest.subjectId),
+            recordId: userRemovalRequest.recordId,
+            recordTitle: userRemovalRequest.recordTitle,
+            requestedBy: userRemovalRequest.requestedBy,
+            reason: userRemovalRequest.reason,
+            requestedAt: userRemovalRequest.createdAt,
+            status: userRemovalRequest.status,
+          }
+        : null,
+
+      // Record-wide data for owners/admins
+      pendingConsentRequests,
+      pendingRemovalRequests,
+      pendingRejectionResponses,
+    };
   }
 }
 

@@ -352,6 +352,7 @@ match /subjectRemovalRequests/{requestId} {
     !exists(/databases/$(database)/documents/subjectRemovalRequests/$(requestId)) ||
     resource.data.subjectId == request.auth.uid ||
     resource.data.requestedBy == request.auth.uid ||
+    request.auth.uid in get(/databases/$(database)/documents/records/$(resource.data.recordId)).data.subjects ||
     canManageRemovalRecord()
   );
 

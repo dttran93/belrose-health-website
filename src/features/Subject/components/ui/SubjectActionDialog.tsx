@@ -82,8 +82,8 @@ interface SubjectActionDialogProps {
   onConfirmSetSubjectAsSelf: () => void;
   onConfirmRequestConsent: () => void;
   onConfirmAcceptRequest: () => void;
-  onConfirmRejectRequest: (reason?: string) => void;
-  onConfirmRemoveSubjectStatus: (reason?: string) => void;
+  onConfirmRejectRequest: (reason: RejectionReasons) => void;
+  onConfirmRemoveSubjectStatus: (reason: RejectionReasons) => void;
 }
 
 // Role configuration for display
@@ -253,7 +253,7 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
           {phase === 'confirming' && operationType === 'rejectSubjectRequest' && (
             <ConfirmRejectRequestContent
               record={record}
-              onConfirm={onConfirmRejectRequest}
+              onConfirm={(reason: RejectionReasons) => onConfirmRejectRequest(reason)}
               onClose={onClose}
             />
           )}
@@ -264,7 +264,7 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
               record={record}
               revokeAccess={revokeAccess}
               setRevokeAccess={setRevokeAccess}
-              onConfirm={onConfirmRemoveSubjectStatus}
+              onConfirm={(reason: RejectionReasons) => onConfirmRemoveSubjectStatus(reason)}
               onClose={onClose}
             />
           )}
@@ -915,10 +915,10 @@ const ConfirmAcceptRequestContent: React.FC<{
 
 const ConfirmRejectRequestContent: React.FC<{
   record: FileObject;
-  onConfirm: (reason?: string) => void;
+  onConfirm: (reason: RejectionReasons) => void;
   onClose: () => void;
 }> = ({ record, onConfirm, onClose }) => {
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState<RejectionReasons | ''>('');
 
   return (
     <div className="p-6">
@@ -973,7 +973,7 @@ const ConfirmRejectRequestContent: React.FC<{
           </Button>
         </AlertDialog.Cancel>
         <Button
-          onClick={() => onConfirm(reason || undefined)}
+          onClick={() => reason && onConfirm(reason)}
           className="flex-1 bg-red-600 hover:bg-red-700"
         >
           Decline Request
@@ -987,10 +987,10 @@ const ConfirmRemoveSubjectStatusContent: React.FC<{
   record: FileObject;
   revokeAccess: boolean;
   setRevokeAccess: (value: boolean) => void;
-  onConfirm: (reason?: string) => void;
+  onConfirm: (reason: RejectionReasons) => void;
   onClose: () => void;
 }> = ({ record, revokeAccess, setRevokeAccess, onConfirm, onClose }) => {
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState<RejectionReasons | ''>('');
 
   return (
     <div className="p-6">
@@ -1082,7 +1082,7 @@ const ConfirmRemoveSubjectStatusContent: React.FC<{
           </Button>
         </AlertDialog.Cancel>
         <Button
-          onClick={() => onConfirm(reason || undefined)}
+          onClick={() => reason && onConfirm(reason)}
           className="flex-1 bg-orange-600 hover:bg-orange-700"
         >
           Remove Status
