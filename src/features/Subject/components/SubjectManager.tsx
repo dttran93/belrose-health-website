@@ -21,6 +21,7 @@ import {
   Plus,
   Loader2,
   UserX,
+  UserMinus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
@@ -34,6 +35,7 @@ import { SubjectCard } from './ui/SubjectCard';
 import { SubjectConsentRequest } from '../services/subjectConsentService';
 import SubjectQueryService from '../services/subjectQueryService';
 import { PendingRequestDetails } from './ui/PendingRequestDetails';
+import SubjectRemovalService, { SubjectRemovalRequest } from '../services/subjectRemovalService';
 
 // View modes for SubjectManager
 type SubjectViewMode = 'list' | 'pending-details' | 'rejected-details';
@@ -66,6 +68,8 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
   );
   const [pendingRequests, setPendingRequests] = useState<SubjectConsentRequest[]>([]);
   const [rejectedRequests, setRejectedRequests] = useState<SubjectConsentRequest[]>([]);
+  const [removalRequests, setRemovalRequests] = useState<SubjectRemovalRequest[]>([]);
+
   // Combined profiles for both pending and rejected requests
   const [requestProfiles, setRequestProfiles] = useState<Map<string, BelroseUserProfile>>(
     new Map()
@@ -117,18 +121,25 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
     setLoadingRequests(true);
     try {
       // Fetch both pending and rejected requests in parallel
-      const [pending, rejected] = await Promise.all([
+      const [pending, rejected, removals] = await Promise.all([
         SubjectQueryService.getPendingConsentRequestsForRecord(record.id),
         SubjectQueryService.getRejectedConsentRequestsForRecord(record.id),
+        SubjectQueryService.getOutgoingRemovalRequests(),
       ]);
 
       setPendingRequests(pending);
       setRejectedRequests(rejected);
 
+      const recordRemovalRequests = removals.filter(
+        r => r.recordId === record.id && r.status === 'pending'
+      );
+      setRemovalRequests(recordRemovalRequests);
+
       // Combine all subject IDs and fetch profiles in one call
       const allSubjectIds = [
         ...pending.map(req => req.subjectId),
         ...rejected.map(req => req.subjectId),
+        ...recordRemovalRequests.map(req => req.subjectId),
       ];
 
       // Deduplicate IDs
@@ -152,6 +163,8 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
     fetchSubjectProfiles();
     fetchRequests();
   }, [fetchSubjectProfiles, fetchRequests]);
+
+  console.log('Removal Requests', removalRequests);
 
   // ==========================================================================
   // HANDLERS
@@ -223,6 +236,20 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
       onSuccess?.();
     } catch (error) {
       console.error('Error canceling pending request:', error);
+      throw error;
+    }
+  };
+
+  /**
+   * Handle canceling a pending removal request
+   */
+  const handleCancelRemovalRequest = async (subjectId: string) => {
+    try {
+      await SubjectRemovalService.cancelRequest(record.id, subjectId);
+      fetchRequests();
+      onSuccess?.();
+    } catch (error) {
+      console.error('Error canceling removal request:', error);
       throw error;
     }
   };
@@ -383,7 +410,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
                 <PersonStanding className="w-5 h-5" />
                 <span className="font-semibold text-foreground">Pending Requests</span>
                 {pendingRequests.length > 0 && (
-                  <span className="text-xs border border-gray-600 bg-gray-200 text-yellow-800 px-2 py-1 rounded-full">
+                  <span className="text-xs border border-gray-600 bg-gray-200 text-gray-800 px-2 py-1 rounded-full">
                     {pendingRequests.length}
                   </span>
                 )}
@@ -488,6 +515,67 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
                     subjectRequest={request}
                   />
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Pending Removal Requests Section */}
+          {removalRequests.length > 0 && (
+            <div className="mb-4 border border-gray-300 rounded-lg">
+              <div className="w-full px-4 py-3 bg-gray-300 flex items-center justify-between rounded-t-lg">
+                <div className="flex items-center gap-2">
+                  <UserMinus className="w-5 h-5" />
+                  <span className="font-semibold text-foreground">Pending Removal Requests</span>
+                  <span className="text-xs border border-gray-900 bg-gray-200 text-gray-800 px-2 py-1 rounded-full">
+                    {removalRequests.length}
+                  </span>
+                </div>
+
+                {/* Help tooltip */}
+                <Tooltip.Provider>
+                  <Tooltip.Root>
+                    <Tooltip.Trigger asChild>
+                      <button className="inline-flex items-center">
+                        <HelpCircle className="w-4 h-4 text-gray-600" />
+                      </button>
+                    </Tooltip.Trigger>
+                    <Tooltip.Portal>
+                      <Tooltip.Content
+                        className="bg-gray-900 text-white rounded-lg p-3 max-w-xs shadow-xl z-50"
+                        sideOffset={5}
+                      >
+                        <p className="text-xs">
+                          Requests you've sent asking subjects to remove themselves from this
+                          record. Only the subject can complete the removal.
+                        </p>
+                        <Tooltip.Arrow className="fill-gray-900" />
+                      </Tooltip.Content>
+                    </Tooltip.Portal>
+                  </Tooltip.Root>
+                </Tooltip.Provider>
+              </div>
+
+              <div className="p-4 bg-gray-50 space-y-2 rounded-b-lg">
+                {loadingRequests ? (
+                  <div className="flex justify-center items-center py-8">
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    <p className="text-gray-500">Loading removal requests...</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {removalRequests.map(request => (
+                      <SubjectCard
+                        key={request.subjectId}
+                        userId={request.subjectId}
+                        userProfile={requestProfiles.get(request.subjectId)}
+                        record={record}
+                        isPending={true}
+                        onDelete={() => handleCancelRemovalRequest(request.subjectId)}
+                        subjectRequest={{} as any}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
