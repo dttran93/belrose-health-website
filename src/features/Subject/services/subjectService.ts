@@ -183,6 +183,59 @@ export class SubjectService {
       throw new Error('This user is already a subject of this record');
     }
 
+    // Check if a consent request already exists for this user/record pair
+    const requestId = getConsentRequestId(recordId, subjectId);
+    const existingRequestRef = doc(db, 'subjectConsentRequests', requestId);
+    const existingRequest = await getDoc(existingRequestRef);
+
+    if (existingRequest.exists()) {
+      const data = existingRequest.data();
+
+      // First check if there's a rejection, then check pending or accepted status
+      if (data.rejection) {
+        const rejectionType = data.rejection.rejectionType;
+        const creatorResponseStatus = data.rejection.creatorResponse?.status;
+
+        if (creatorResponseStatus === 'dropped') {
+          throw new Error(
+            'This subject request was previously dropped. ' +
+              'Only the user themselves can now add themselves to this record.'
+          );
+        } else if (rejectionType === 'request_rejected') {
+          throw new Error(
+            'This user has previously declined a subject request for this record. ' +
+              'Please review the rejection reason and escalate if needed.'
+          );
+        } else if (rejectionType === 'removed_after_acceptance') {
+          throw new Error(
+            'This user was previously a subject but removed themselves from this record. ' +
+              'Please review the rejection reason and escalate if needed.'
+          );
+        } else if (rejectionType === 'self_removal') {
+          throw new Error(
+            'This user previously removed themselves as a subject of this record. ' +
+              'Please review the rejection reason and escalate if needed.'
+          );
+        }
+      } else {
+        // No rejection - check the status
+        if (data.status === 'pending') {
+          throw new Error('A pending subject request already exists for this user');
+        }
+
+        if (data.status === 'accepted') {
+          throw new Error('This user is already a subject of this record');
+        }
+
+        if (data.status === 'rejected') {
+          throw new Error(
+            'This user has previously declined a subject request for this record. ' +
+              'Please review the rejection reason and escalate if needed.'
+          );
+        }
+      }
+    }
+
     // Delegate to SubjectConsentService for creating the request
     const recordTitle = options?.recordTitle || `Record ${recordId.slice(0, 8)}...`;
 
