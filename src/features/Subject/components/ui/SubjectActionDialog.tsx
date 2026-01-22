@@ -49,6 +49,7 @@ import { FileObject, BelroseUserProfile } from '@/types/core';
 import UserSearch from '@/features/Users/components/UserSearch';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { useAuthContext } from '@/features/Auth/AuthContext';
+import { REJECTION_REASON_OPTIONS, RejectionReasons } from '../../services/subjectRejectionService';
 
 // ============================================================================
 // TYPES
@@ -938,16 +939,23 @@ const ConfirmRejectRequestContent: React.FC<{
         </p>
       </div>
 
-      {/* Reason Input */}
+      {/* Reason Dropdown */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Reason (optional)</label>
-        <textarea
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Reason for declining <span className="text-red-500">*</span>
+        </label>
+        <select
           value={reason}
-          onChange={e => setReason(e.target.value)}
-          placeholder="e.g., This record is not about me"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-          rows={3}
-        />
+          onChange={e => setReason(e.target.value as RejectionReasons | '')}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white"
+        >
+          <option value="">Select a reason...</option>
+          {REJECTION_REASON_OPTIONS.map(option => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Info */}
@@ -1019,16 +1027,23 @@ const ConfirmRemoveSubjectStatusContent: React.FC<{
         </div>
       </div>
 
-      {/* Reason Input */}
+      {/* Reason Dropdown */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Reason (optional)</label>
-        <textarea
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Reason for removing <span className="text-red-500">*</span>
+        </label>
+        <select
           value={reason}
-          onChange={e => setReason(e.target.value)}
-          placeholder="e.g., This record contains inaccurate information about me"
-          className="w-full px-3 py-2 bg-background border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-chart-4 focus:border-transparent"
-          rows={3}
-        />
+          onChange={e => setReason(e.target.value as RejectionReasons | '')}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white"
+        >
+          <option value="">Select a reason...</option>
+          {REJECTION_REASON_OPTIONS.map(option => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Revoke Access Checkbox */}

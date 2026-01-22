@@ -20,7 +20,11 @@
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import SubjectBlockchainService from './subjectBlockchainService';
-import { CreatorResponseStatus, SubjectRejectionService } from './subjectRejectionService';
+import {
+  CreatorResponseStatus,
+  RejectionReasons,
+  SubjectRejectionService,
+} from './subjectRejectionService';
 import {
   getConsentRequestId,
   SubjectConsentRequest,
@@ -315,10 +319,7 @@ export class SubjectService {
    */
   static async rejectSubjectStatus(
     recordId: string,
-    options?: {
-      reason?: string;
-      signature?: string;
-    }
+    reason: RejectionReasons
   ): Promise<RejectSubjectStatusResult> {
     const auth = getAuth();
     const db = getFirestore();
@@ -367,8 +368,7 @@ export class SubjectService {
         const rejectionData = await SubjectRejectionService.rejectAfterAcceptance({
           recordId,
           subjectId: user.uid,
-          reason: options?.reason,
-          signature: options?.signature,
+          reason,
         });
 
         pendingCreatorDecision =
@@ -422,13 +422,14 @@ export class SubjectService {
    */
   static async requestSubjectRemoval(
     recordId: string,
-    subjectId: string
+    subjectId: string,
+    reason: RejectionReasons
   ): Promise<{ success: boolean }> {
     const { user } = await this.getAuthorizedRecord(recordId);
 
     // If user is removing themselves, use the rejection flow instead
     if (subjectId === user.uid) {
-      const result = await this.rejectSubjectStatus(recordId);
+      const result = await this.rejectSubjectStatus(recordId, reason);
       return { success: result.success };
     }
 

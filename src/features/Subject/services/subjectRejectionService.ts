@@ -1,4 +1,4 @@
-//src/features/Subject/services/subjectBlockchainService.ts
+//src/features/Subject/services/subjectRejectionService.ts
 
 /*
  * This service manages the subject Rejection lifecycle including responses from the requestor
@@ -15,6 +15,24 @@ export type SubjectRejectionType = 'request_rejected' | 'removed_after_acceptanc
 
 export type CreatorResponseStatus = 'pending_creator_decision' | 'dropped' | 'escalated';
 
+export type RejectionReasons =
+  | 'identity_mismatch'
+  | 'content_dispute'
+  | 'privacy'
+  | 'duplicate'
+  | 'other';
+
+export const REJECTION_REASON_OPTIONS: { value: RejectionReasons; label: string }[] = [
+  { value: 'identity_mismatch', label: 'I am not the person listed as the subject' },
+  { value: 'content_dispute', label: "I am this person, but I don't recognize this content" },
+  {
+    value: 'privacy',
+    label: 'I recognize this content, but prefer not to be listed for privacy reasons',
+  },
+  { value: 'duplicate', label: 'This is a duplicate request' },
+  { value: 'other', label: 'Other reason' },
+];
+
 /**
  * Creator's response to a subject rejection
  * Nested within SubjectConsentRequest.rejection
@@ -25,14 +43,13 @@ export interface CreatorResponse {
 }
 
 /**
- * Rejection data - now nested within SubjectConsentRequest
+ * Rejection data - nested within SubjectConsentRequest
  * Only populated when a subject removes themselves AFTER accepting
  */
 export interface SubjectRejectionData {
   rejectionType: SubjectRejectionType;
   rejectedAt: Timestamp;
-  reason?: string;
-  rejectionSignature?: string;
+  reason: RejectionReasons;
   creatorResponse?: CreatorResponse;
 }
 
@@ -47,7 +64,7 @@ export class SubjectRejectionService {
   static async rejectAfterAcceptance(params: {
     recordId: string;
     subjectId: string;
-    reason?: string;
+    reason: RejectionReasons;
     signature?: string;
   }): Promise<SubjectRejectionData> {
     const { recordId, subjectId, reason, signature } = params;
@@ -71,7 +88,6 @@ export class SubjectRejectionService {
       rejectionType: 'removed_after_acceptance' as SubjectRejectionType,
       rejectedAt: Timestamp.now(),
       reason,
-      rejectionSignature: signature,
       creatorResponse: {
         status: 'pending_creator_decision',
       },

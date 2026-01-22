@@ -33,6 +33,7 @@ import { FileObject, BelroseUserProfile } from '@/types/core';
 import { doc, getDoc, getFirestore, updateDoc } from 'firebase/firestore';
 import SubjectQueryService, { IncomingSubjectRequest } from '../services/subjectQueryService';
 import { SubjectConsentRequest } from '../services/subjectConsentService';
+import { RejectionReasons } from '../services/subjectRejectionService';
 
 // ============================================================================
 // TYPES
@@ -673,8 +674,14 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
    * Execute the confirmed "remove subject status" operation
    */
   const confirmRemoveSubjectStatus = useCallback(
-    async (reason?: string) => {
+    async (reason: RejectionReasons) => {
       if (!pendingOperation || pendingOperation.type !== 'rejectSubjectStatus') return;
+
+      if (!reason) {
+        setError('Please select a reason for removal');
+        setPhase('error');
+        return;
+      }
 
       const auth = getAuth();
       const userId = auth.currentUser?.uid;
@@ -687,9 +694,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
       setPhase('executing');
 
       try {
-        const result = await SubjectService.rejectSubjectStatus(recordId, {
-          reason: reason || pendingOperation.reason,
-        });
+        const result = await SubjectService.rejectSubjectStatus(recordId, reason);
 
         // Optionally revoke access if user chose to
         let accessRevoked = false;
