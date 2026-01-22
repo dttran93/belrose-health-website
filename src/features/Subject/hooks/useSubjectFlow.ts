@@ -464,8 +464,10 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
 
       //Step 2: Create the consent request
       console.log('🔄 Step 2: Creating consent request...');
+      const recordTitle = record.belroseFields?.title || record.fileName;
       await SubjectService.requestSubjectConsent(recordId, selectedUser.uid, {
         role: pendingOperation.selectedRole || 'viewer',
+        recordTitle,
       });
       console.log('✅ Step 2 complete');
 

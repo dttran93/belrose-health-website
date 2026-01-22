@@ -91,7 +91,8 @@ export class SubjectRemovalService {
   static async requestRemoval(
     recordId: string,
     subjectId: string,
-    reason?: string
+    reason?: string,
+    recordTitle?: string
   ): Promise<RequestRemovalResult> {
     const auth = getAuth();
     const db = getFirestore();
@@ -154,7 +155,7 @@ export class SubjectRemovalService {
         reason: reason || '',
         status: 'pending',
         createdAt: Timestamp.now(),
-        recordTitle: recordData.belroseFields?.title || recordData.fileName || 'Untitled Record',
+        recordTitle: recordTitle || `Record ${recordId.slice(0, 8)}...`,
       };
 
       await setDoc(requestRef, removalRequest);

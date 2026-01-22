@@ -36,6 +36,7 @@ import { SubjectConsentRequest } from '../services/subjectConsentService';
 import SubjectQueryService from '../services/subjectQueryService';
 import { PendingRequestDetails } from './ui/PendingRequestDetails';
 import SubjectRemovalService, { SubjectRemovalRequest } from '../services/subjectRemovalService';
+import { toast } from 'sonner';
 
 // View modes for SubjectManager
 type SubjectViewMode = 'list' | 'pending-details' | 'rejected-details';
@@ -214,9 +215,11 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
       if (!confirmRemove) return;
 
       try {
-        await SubjectService.requestSubjectRemoval(record.id, subjectId);
+        const title = record.belroseFields?.title || record.fileName;
+        await SubjectService.requestSubjectRemoval(record.id, subjectId, undefined, title);
         fetchSubjectProfiles();
         onSuccess?.();
+        toast.success('Subject Removal Request Sent!');
       } catch (error) {
         console.error('Error removing subject:', error);
       }
@@ -248,6 +251,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
       await SubjectRemovalService.cancelRequest(record.id, subjectId);
       fetchRequests();
       onSuccess?.();
+      toast.success('Subject Removal Request Canceled');
     } catch (error) {
       console.error('Error canceling removal request:', error);
       throw error;

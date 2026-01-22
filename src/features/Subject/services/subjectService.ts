@@ -153,6 +153,7 @@ export class SubjectService {
     subjectId: string,
     options?: {
       role?: 'viewer' | 'administrator' | 'owner';
+      recordTitle?: string;
     }
   ): Promise<{ success: true }> {
     const auth = getAuth();
@@ -183,7 +184,7 @@ export class SubjectService {
     }
 
     // Delegate to SubjectConsentService for creating the request
-    const recordTitle = recordData.belroseFields?.title || recordData.fileName || 'Untitled Record';
+    const recordTitle = options?.recordTitle || `Record ${recordId.slice(0, 8)}...`;
 
     await SubjectConsentService.requestConsent({
       recordId,
@@ -423,18 +424,13 @@ export class SubjectService {
   static async requestSubjectRemoval(
     recordId: string,
     subjectId: string,
-    reason: RejectionReasons
+    reason?: string,
+    recordTitle?: string
   ): Promise<{ success: boolean }> {
     const { user } = await this.getAuthorizedRecord(recordId);
 
-    // If user is removing themselves, use the rejection flow instead
-    if (subjectId === user.uid) {
-      const result = await this.rejectSubjectStatus(recordId, reason);
-      return { success: result.success };
-    }
-
     // Execute removal from subjects array
-    await SubjectRemovalService.requestRemoval(recordId, subjectId);
+    await SubjectRemovalService.requestRemoval(recordId, subjectId, reason, recordTitle);
 
     console.log('✅ Subject sent removal request');
 
