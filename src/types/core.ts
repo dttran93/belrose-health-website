@@ -35,6 +35,7 @@ export interface BelroseUserProfile extends User {
   emailVerifiedAt?: any;
   identityVerified: boolean;
   identityVerifiedAt?: any;
+  credibility?: CredibilityScore;
 
   onChainIdentity?: {
     userIdHash: string; // The keccak256 hash of the UID
@@ -128,13 +129,9 @@ export interface RoleInitialization {
   syncedFromChain: boolean; //For when an intialization had to be self-healed. Indicates there was an issue with updating firebase previously for future debugging/auditing
 }
 
-export interface RecordInitialization {
-  blockchainTxId: string; //Transaction ID on the blockchain
-  providerSignature?: string; //Digital signature (for provider records)
-  signerId?: string; //ID of who signed it
-  blockchainNetwork: string; //blockchain network, e.g. ethereum, solana
-  timestamp: number; //when it was recorded
-  isVerified: boolean; //whether blockchain verification passed. May change this to a credit system of sorts in the future
+export interface CredibilityScore {
+  score: number; //0-1000
+  lastUpdated: Timestamp;
 }
 
 export type AIProcessingStatus =
@@ -194,12 +191,6 @@ export interface FileObject {
   administrators: string[]; //Array of userIDs with administrative access to records, can't remove others
   viewers?: string[]; // Array of user IDs with view access to record
   subjects?: string[]; //The subject of this record. Made it an array for edge cases where there are multiple subjects (couples therapy, mother/newborn, family history, genetic testing)
-  pendingSubjectRequests?: {
-    userId: string;
-    requestedBy: string;
-    requestedAt: Timestamp;
-    status: 'pending' | 'accepted' | 'rejected';
-  }[]; //If you set a subject in a record as someone else, that person must accept it for it to show up in their record.
 
   // === PROCESSING STATUS ===
   status: FileStatus; //Processing property. Initially set as pending. Then pending/processing... see below
@@ -213,6 +204,7 @@ export interface FileObject {
   recordHash?: string | null; //hash of the record content
   previousRecordHash?: string[] | null; //to establish chain of records in case they are edited
   blockchainRoleInitialization?: RoleInitialization;
+  credibility?: CredibilityScore;
 
   // === METADATA ===
   sourceType?: SourceType;

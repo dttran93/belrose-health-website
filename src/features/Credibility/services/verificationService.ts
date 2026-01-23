@@ -16,6 +16,11 @@ import {
 import { blockchainHealthRecordService } from './blockchainHealthRecordService';
 import { FileText, Lock, LucideIcon, MapPin, X } from 'lucide-react';
 import { getDisputeId } from './disputeService';
+import {
+  onVerificationCreated,
+  onVerificationModified,
+  onVerificationRevoked,
+} from './credibilityScoreService';
 
 // ============================================================
 // TYPES
@@ -239,14 +244,13 @@ export async function createVerification(
     // 3. Write verification to blockchain
     const tx = await blockchainHealthRecordService.verifyRecord(recordId, recordHash, level);
 
-    // 4. Update Firebase with confirmation
     await updateDoc(docRef, {
       chainStatus: 'confirmed',
       txHash: tx.txHash,
     });
 
-    // 5. Recalculate scores
-    //await recalculateScores(recordHash, recordId, verifierIdHash);
+    // 4. Update Credibility Score
+    await onVerificationCreated(recordId, recordHash, level, tx.txHash);
 
     return verificationId;
   } catch (error) {
@@ -300,8 +304,8 @@ export async function retractVerification(recordHash: string, verifierId: string
       txHash: tx.txHash,
     });
 
-    // 4. Recalculate scores
-    //await recalculateScores(recordHash, verification.recordId, verifierIdHash);
+    // 4. Recalculate credibility score
+    await onVerificationRevoked(data.recordId, data.recordHash, data.level, tx.txHash);
   } catch (error) {
     // Rollback Firebase
     await updateDoc(docRef, {
@@ -361,7 +365,8 @@ export async function modifyVerificationLevel(
       txHash: tx.txHash,
     });
 
-    //await recalculateScores(recordHash, snapshot.docs[0].data().recordId, verifierIdHash);
+    //Recalculate credibility score
+    await onVerificationModified(data.recordId, recordHash, oldLevel, newLevel, tx.txHash);
   } catch (error) {
     await updateDoc(docRef, {
       level: oldLevel,

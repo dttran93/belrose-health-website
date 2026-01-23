@@ -152,9 +152,18 @@ function isSelfRejectionFlow() {
         ||
         //BRANCH 3: Subject rejection flow (Removing self)
         (
-      request.auth.uid in resource.data.subjects &&
-      isSelfRejectionFlow()
-    )
+          request.auth.uid in resource.data.subjects &&
+          isSelfRejectionFlow()
+        )
+        ||
+        //Branch 4: Credibility score update
+        (
+          (request.auth.uid in resource.data.owners ||
+          request.auth.uid in resource.data.administrators ||
+          request.auth.uid in resource.data.viewers ||
+          request.auth.uid in resource.data.subjects) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['credibility'])
+        )
       );
 
       // DELETE: 
@@ -518,7 +527,50 @@ match /disputeReactions/{reactionId} {
 
   // DELETE: Not allowed - use isActive flag instead
   allow delete: if false;
-}
+  }
+
+  // === SCORE EVENTS (Credibility Audit Trail) ===
+  // Add this to your firestore.rules inside the match /databases/{database}/documents block
+
+  match /scoreEvents/{eventId} {
+    
+    // READ: Allow if user has a role on the associated record
+    // This allows users to see the credibility history for records they can access
+    allow read: if request.auth != null && (
+      !exists(/databases/$(database)/documents/scoreEvents/$(eventId)) ||
+      hasRoleOnRecord(resource.data.recordId)
+    );
+
+    // CREATE: User must:
+    // 1. Have a role on the record
+    // 2. Be the one creating the event (createdBy matches auth uid)
+    // 3. Document ID must start with recordId (format: recordId_timestamp)
+    // 4. Include required fields
+    allow create: if request.auth != null &&
+      hasRoleOnRecord(request.resource.data.recordId) &&
+      request.resource.data.createdBy == request.auth.uid &&
+      // Enforce document ID starts with recordId_
+      eventId.matches(request.resource.data.recordId + '_[0-9]+') &&
+      // Required fields validation
+      request.resource.data.recordId != null &&
+      request.resource.data.recordHash != null &&
+      request.resource.data.eventType in [
+        'verification', 
+        'verification_revoked', 
+        'verification_modified',
+        'dispute',
+        'dispute_revoked',
+        'dispute_modified'
+      ] &&
+      request.resource.data.scoreDelta is number &&
+      request.resource.data.createdAt is timestamp;
+
+    // UPDATE: Score events are immutable (audit trail)
+    allow update: if false;
+
+    // DELETE: Score events cannot be deleted (audit trail)
+    allow delete: if false;
+  }
     
     // === AUDIT LOGS ===
     match /audit/{auditId} {

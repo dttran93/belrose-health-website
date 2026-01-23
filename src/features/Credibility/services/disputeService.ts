@@ -19,6 +19,7 @@ import { RecordDecryptionService } from '@/features/Encryption/services/recordDe
 import { blockchainHealthRecordService } from './blockchainHealthRecordService';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 import { getVerificationId } from './verificationService';
+import { onDisputeCreated, onDisputeModified, onDisputeRevoked } from './credibilityScoreService';
 
 // ============================================================
 // TYPES
@@ -434,6 +435,9 @@ export async function createDispute(
       txHash: tx.txHash,
     });
 
+    // 4. Update Credibility Score
+    await onDisputeCreated(recordId, recordHash, severity, culpability, tx.txHash);
+
     return disputeId;
   } catch (error) {
     // Mark as failed
@@ -484,6 +488,9 @@ export async function retractDispute(recordHash: string, disputerId: string): Pr
       chainStatus: 'confirmed',
       txHash: tx.txHash,
     });
+
+    //4. Update Credibility Score
+    await onDisputeRevoked(data.recordId, recordHash, data.severity, data.culpability, tx.txHash);
   } catch (error) {
     // Rollback Firebase
     await updateDoc(docRef, {
@@ -549,6 +556,16 @@ export async function modifyDispute(
       chainStatus: 'confirmed',
       txHash: tx.txHash,
     });
+
+    await onDisputeModified(
+      data.recordId,
+      recordHash,
+      oldSeverity,
+      oldCulpability,
+      newSeverity,
+      newCulpability,
+      tx.txHash
+    );
   } catch (error) {
     await updateDoc(docRef, {
       severity: oldSeverity,

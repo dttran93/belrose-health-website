@@ -2,7 +2,7 @@
 
 import { Timestamp } from 'firebase/firestore';
 import { CredibilityStats } from '../components/Edit/VersionReviewBadge';
-import { FileObject } from '@/types/core';
+import { CredibilityScore, FileObject } from '@/types/core';
 
 // ==================== MAIN VERSION CONTROL TYPES ====================
 
@@ -88,6 +88,7 @@ export interface RecordVersion {
   previousRecordHash?: string | undefined;
   recordHash: string;
   originalFileHash?: string | null;
+  credibility?: CredibilityScore;
 
   // Snapshot - can be either encrypted or plain
   recordSnapshot: EncryptedSnapshot | PlainSnapshot;

@@ -1,332 +1,389 @@
-//src/features/Credibility/services/credibilityService.ts
-
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { VerificationDoc } from './verificationService';
-import { DisputeDoc } from './disputeService';
-import { RecordViewDoc } from '@/features/ViewEditRecord/services/logRecordViewService';
+// src/features/Credibility/services/credibilityScoreService.ts
 
 /**
- * This is the service that calculates the credibility scores based on record reviews and users
- * Scores range from 1-100 and are meant to represent the percentage chance a future user of the
- * record can rely on the record to be complete and accurate
+ * CredibilityScoreService (MVP)
  *
- * Record Credibility =
- * Base Score
- * + Verifications
- * + Implicit Review Bonus
- * - Disputes
+ * Manages credibility scores for records.
+ * Creates ScoreEvents for audit trail and updates the cached score on records.
  *
- * User Credibility =
- * Average Credibility Score of records in which they are an Admin or Owner or Subject
- * + Verification Accuracy
- * + Dispute Accuracy
- * + Identity Verification Bonus
- * + Verified Healthcare Provider Bonus
- * - Flag Penalties
+ * MVP Scope:
+ * - Verifications and disputes affect the record's score
+ * - ScoreEvents provide audit trail
+ * - Record.credibility is the cached score shown to users
  *
+ * Score Range: 0-1000
+ * - 0-299: Poor
+ * - 300-499: Fair
+ * - 500-699: Good
+ * - 700-849: Very Good
+ * - 850-1000: Excellent
+ *
+ * Note: RecordVersion credibility snapshots are handled by versionControlService
+ * when new versions are created.
  */
+
+import {
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  updateDoc,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  Timestamp,
+} from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import type { VerificationLevel } from './verificationService';
+import type { DisputeSeverity, DisputeCulpability } from './disputeService';
 
 // ==================== TYPES ====================
 
-// Collection: userScores/{odysId}
-export interface UserScoreDoc {
-  userId: string;
+export type ScoreEventType =
+  | 'verification'
+  | 'verification_revoked'
+  | 'verification_modified'
+  | 'dispute'
+  | 'dispute_revoked'
+  | 'dispute_modified';
 
-  // Current stats (for quick display)
-  //Average Record Score of Records in Which the User is an Admin, Owner, or Subject
-  averageRecordScore: number;
-  recordCount: number;
+export interface ScoreEvent {
+  id?: string;
+  recordId: string;
+  recordHash: string;
 
-  //Verification accuracy
-  totalVerificationsGiven: number;
-  totalVerificationsDisputed: number;
+  eventType: ScoreEventType;
+  scoreDelta: number;
 
-  //Dispute Accuracy
-  totalDisputesFiled: number;
-  totalDisputesSupported: number;
-  totalUnacceptedFlags: number;
+  createdBy: string;
+  createdAt: Timestamp;
 
-  credibilityScore: number;
-
-  lastCalculatedAt: Timestamp;
-  calculationVersion: number;
+  metadata?: ScoreEventMetadata;
 }
 
-// Subcollection: userScores/{odysId}/history/{autoId}
-export interface ScoreHistoryDoc {
-  // Snapshot of scores at this point
-  credibilityScore: number;
+export interface ScoreEventMetadata {
+  // Verification context
+  verificationLevel?: VerificationLevel;
+  previousVerificationLevel?: VerificationLevel;
 
-  // Stats at time of calculation
-  //Average Record Score of Records in Which the User is an Admin, Owner, or Subject
-  averageRecordScore: number;
-  recordCount: number;
+  // Dispute context
+  disputeSeverity?: DisputeSeverity;
+  disputeCulpability?: DisputeCulpability;
+  previousDisputeSeverity?: DisputeSeverity;
+  previousDisputeCulpability?: DisputeCulpability;
 
-  //Verification accuracy
-  totalVerificationsGiven: number;
-  totalVerificationsDisputed: number;
-
-  //Dispute Accuracy
-  totalDisputesFiled: number;
-  totalDisputesSupported: number;
-  totalUnacceptedFlags: number;
-
-  // Metadata
-  calculatedAt: Timestamp;
-  calculationVersion: number;
-
-  // Optional: what triggered this recalc
-  trigger?: 'scheduled' | 'verification' | 'dispute' | 'dispute-reaction' | 'manual';
+  // Blockchain reference
+  txHash?: string;
 }
 
 // ==================== CONSTANTS ====================
 
-const VERIFICATION_WEIGHTS = {
-  Provenance: 10,
-  Content: 15,
-  Full: 25,
+export const VERIFICATION_DELTAS: Record<VerificationLevel, number> = {
+  0: 0, // None
+  1: 50, // Provenance
+  2: 75, // Content
+  3: 100, // Full
 };
 
-const SEVERITY_WEIGHTS = {
-  Negligible: 5,
-  Moderate: 15,
-  Major: 30,
+export const DISPUTE_SEVERITY_PENALTIES: Record<DisputeSeverity, number> = {
+  0: 0, // None
+  1: -25, // Negligible
+  2: -75, // Moderate
+  3: -150, // Major
 };
 
-const CULPABILITY_MULTIPLIERS = {
-  NoFault: 0.5,
-  Systemic: 0.75,
-  Preventable: 1.0,
-  Reckless: 1.5,
-  Intentional: 2.0,
+export const CULPABILITY_MULTIPLIERS: Record<DisputeCulpability, number> = {
+  0: 1.0, // None/Unknown
+  1: 0.5, // No Fault
+  2: 0.75, // Systemic
+  3: 1.0, // Preventable
+  4: 1.5, // Reckless
+  5: 2.0, // Intentional
 };
 
-const BASE_SCORE = 50;
-const MAX_VERIFICATION_BONUS = 50;
-const MAX_IMPLICIT_BONUS = 20;
+export const INITIAL_SCORE = 500;
 
-export async function recalculateScores(
-  recordHash: string,
-  recordId: string,
-  triggerUserIdHash: string
-): Promise<void> {
-  await recalculateHashScore(recordHash);
-  await recalculateRecordScore(recordId);
-  await recalculateUserScore(triggerUserIdHash);
+export const SCORE_BOUNDS = {
+  MIN: 0,
+  MAX: 1000,
+} as const;
+
+// ==================== HELPER FUNCTIONS ====================
+
+function clampScore(score: number): number {
+  return Math.max(SCORE_BOUNDS.MIN, Math.min(SCORE_BOUNDS.MAX, Math.round(score)));
 }
 
-export async function recalculateHashScore(recordHash: string): Promise<number> {
-  // Fetch all data from Firebase (fast!)
-  const db = getFirestore();
-  const [verificationsSnap, disputesSnap, viewsSnap] = await Promise.all([
-    db.collection('verifications').where('recordHash', '==', recordHash).get(),
-    db.collection('disputes').where('recordHash', '==', recordHash).get(),
-    db.collection('recordViews').where('recordHash', '==', recordHash).get(),
-  ]);
+function getVerificationDelta(level: VerificationLevel): number {
+  return VERIFICATION_DELTAS[level] ?? 0;
+}
 
-  const verifications = verificationsSnap.docs.map(d => d.data() as VerificationDoc);
-  const disputes = disputesSnap.docs.map(d => d.data() as DisputeDoc);
-  const views = viewsSnap.docs.map(d => d.data() as RecordViewDoc);
+function getDisputeDelta(severity: DisputeSeverity, culpability: DisputeCulpability): number {
+  const basePenalty = DISPUTE_SEVERITY_PENALTIES[severity] ?? 0;
+  const multiplier = CULPABILITY_MULTIPLIERS[culpability] ?? 1;
+  return Math.round(basePenalty * multiplier);
+}
 
-  // Get all unique user IDs for provider scores
-  const allUserIds = new Set<string>();
-  verifications.forEach(v => allUserIds.add(v.verifierId));
-  disputes.forEach(d => allUserIds.add(d.disputerId));
-  views.forEach(v => allUserIds.add(v.viewerId));
+function getCurrentUser(): { userId: string; displayName: string } {
+  const auth = getAuth();
+  const user = auth.currentUser;
 
-  // Fetch provider scores
-  const providerScores = new Map<string, number>();
-  const userScoresSnap = await db
-    .collection('userScores')
-    .where('odysIdHash', 'in', Array.from(allUserIds).slice(0, 10)) // Firestore limit
-    .get();
-
-  userScoresSnap.docs.forEach(doc => {
-    const data = doc.data() as UserScoreDoc;
-    providerScores.set(data.odysIdHash, data.providerScore);
-  });
-
-  // Fetch reactions for disputes
-  const reactions = new Map<string, ReactionDoc[]>();
-  for (const dispute of disputes) {
-    const reactionsSnap = await db
-      .collection('reactions')
-      .where('disputeId', '==', dispute.id)
-      .get();
-    reactions.set(
-      dispute.disputerIdHash,
-      reactionsSnap.docs.map(d => d.data() as ReactionDoc)
-    );
+  if (!user) {
+    throw new Error('User not authenticated');
   }
 
-  // Calculate verification bonus
-  let verificationBonus = 0;
-  let provenanceCount = 0;
-  let contentCount = 0;
-  let fullCount = 0;
+  return {
+    userId: user.uid,
+    displayName: user.displayName || user.email || 'Unknown User',
+  };
+}
 
-  for (const v of verifications) {
-    if (!v.isActive) continue;
+function calculateScoreDelta(eventType: ScoreEventType, metadata?: ScoreEventMetadata): number {
+  switch (eventType) {
+    case 'verification':
+      return getVerificationDelta(metadata?.verificationLevel ?? 0);
 
-    const baseWeight = VERIFICATION_WEIGHTS[v.level] || 0;
-    const providerScore = providerScores.get(v.verifierIdHash) ?? 50;
-    const multiplier = getProviderMultiplier(providerScore);
+    case 'verification_revoked':
+      return -getVerificationDelta(metadata?.previousVerificationLevel ?? 0);
 
-    verificationBonus += baseWeight * multiplier;
-
-    if (v.level === 'Provenance') provenanceCount++;
-    else if (v.level === 'Content') contentCount++;
-    else if (v.level === 'Full') fullCount++;
-  }
-  verificationBonus = Math.min(verificationBonus, MAX_VERIFICATION_BONUS);
-
-  // Calculate implicit review bonus
-  const verifierIds = new Set(verifications.filter(v => v.isActive).map(v => v.verifierIdHash));
-  const disputerIds = new Set(disputes.filter(d => d.isActive).map(d => d.disputerIdHash));
-  const now = Date.now();
-  let implicitBonus = 0;
-  let implicitCount = 0;
-
-  for (const view of views) {
-    if (verifierIds.has(view.viewerIdHash) || disputerIds.has(view.viewerIdHash)) continue;
-
-    const daysSinceView = (now - view.viewedAt.toMillis()) / (1000 * 60 * 60 * 24);
-    if (daysSinceView < 7) continue;
-
-    implicitCount++;
-
-    let timeWeight: number;
-    if (daysSinceView < 30) timeWeight = 1.0;
-    else if (daysSinceView < 90) timeWeight = 1.5;
-    else timeWeight = 2.0;
-
-    const providerScore = providerScores.get(view.viewerIdHash) ?? 50;
-    const multiplier = getProviderMultiplier(providerScore);
-
-    implicitBonus += 3 * timeWeight * multiplier;
-  }
-  implicitBonus = Math.min(implicitBonus, MAX_IMPLICIT_BONUS);
-
-  // Calculate dispute penalty
-  let disputePenalty = 0;
-  let activeDisputeCount = 0;
-
-  for (const d of disputes) {
-    if (!d.isActive) continue;
-    activeDisputeCount++;
-
-    const severityWeight = SEVERITY_WEIGHTS[d.severity] || 0;
-    const culpabilityMultiplier = CULPABILITY_MULTIPLIERS[d.culpability] || 1;
-
-    const disputerScore = providerScores.get(d.disputerIdHash) ?? 50;
-    const disputerMultiplier = getProviderMultiplier(disputerScore);
-
-    const disputeReactions = reactions.get(d.disputerIdHash) || [];
-    let weightedSupports = 0;
-    let weightedOpposes = 0;
-
-    for (const r of disputeReactions) {
-      if (!r.isActive) continue;
-
-      const reactorScore = providerScores.get(r.reactorIdHash) ?? 50;
-      const reactorMultiplier = getProviderMultiplier(reactorScore);
-
-      if (r.supportsDispute) {
-        weightedSupports += reactorMultiplier;
-      } else {
-        weightedOpposes += reactorMultiplier;
-      }
+    case 'verification_modified': {
+      const oldDelta = getVerificationDelta(metadata?.previousVerificationLevel ?? 0);
+      const newDelta = getVerificationDelta(metadata?.verificationLevel ?? 0);
+      return newDelta - oldDelta;
     }
 
-    const reactionAdjustment = (weightedSupports + 1) / (weightedSupports + weightedOpposes + 1);
+    case 'dispute':
+      return getDisputeDelta(metadata?.disputeSeverity ?? 0, metadata?.disputeCulpability ?? 0);
 
-    disputePenalty +=
-      severityWeight * culpabilityMultiplier * disputerMultiplier * reactionAdjustment;
+    case 'dispute_revoked':
+      return -getDisputeDelta(
+        metadata?.previousDisputeSeverity ?? 0,
+        metadata?.previousDisputeCulpability ?? 0
+      );
+
+    case 'dispute_modified': {
+      const oldPenalty = getDisputeDelta(
+        metadata?.previousDisputeSeverity ?? 0,
+        metadata?.previousDisputeCulpability ?? 0
+      );
+      const newPenalty = getDisputeDelta(
+        metadata?.disputeSeverity ?? 0,
+        metadata?.disputeCulpability ?? 0
+      );
+      return newPenalty - oldPenalty;
+    }
+
+    default:
+      return 0;
   }
+}
 
-  // Final score
-  const score = Math.max(
-    0,
-    Math.min(100, BASE_SCORE + verificationBonus + implicitBonus - disputePenalty)
-  );
+// ==================== CORE FUNCTIONS ====================
 
-  const roundedScore = Math.round(score);
+/**
+ * Create a score event and update the record's cached score
+ */
+async function createScoreEvent(
+  recordId: string,
+  recordHash: string,
+  eventType: ScoreEventType,
+  metadata?: ScoreEventMetadata
+): Promise<string> {
+  const db = getFirestore();
+  const { userId, displayName } = getCurrentUser();
 
-  // Cache the score
-  const recordId = verifications[0]?.recordId || disputes[0]?.recordId || '';
+  const scoreDelta = calculateScoreDelta(eventType, metadata);
+  const timestamp = Timestamp.now();
 
-  await db
-    .collection('hashScores')
-    .doc(recordHash)
-    .set({
-      recordHash,
-      recordId,
-      score: roundedScore,
-      breakdown: {
-        baseScore: BASE_SCORE,
-        verificationBonus: Math.round(verificationBonus),
-        implicitReviewBonus: Math.round(implicitBonus),
-        disputePenalty: Math.round(disputePenalty),
-      },
-      stats: {
-        activeVerifications: verifications.filter(v => v.isActive).length,
-        provenanceCount,
-        contentCount,
-        fullCount,
-        activeDisputes: activeDisputeCount,
-        implicitReviews: implicitCount,
-      },
-      lastCalculated: Timestamp.now(),
-    });
+  // Generate deterministic document ID: recordId_timestamp
+  const eventId = `${recordId}_${timestamp.toMillis()}`;
 
-  return roundedScore;
+  const scoreEvent: Omit<ScoreEvent, 'id'> = {
+    recordId,
+    recordHash,
+    eventType,
+    scoreDelta,
+    createdBy: userId,
+    createdAt: timestamp,
+    metadata,
+  };
+
+  // Use setDoc with explicit ID instead of addDoc
+  const eventRef = doc(db, 'scoreEvents', eventId);
+  await setDoc(eventRef, scoreEvent);
+
+  console.log(`📊 Score event created: ${eventType} (${scoreDelta > 0 ? '+' : ''}${scoreDelta})`);
+
+  // Update the record's cached score
+  await updateRecordScore(recordId);
+
+  return eventId;
 }
 
 /**
- *
- * @param recordId
- * @returns
+ * Recalculate and update a record's credibility score
+ * Based on all score events for the current hash
  */
-export async function recalculateRecordScore(recordId: string): Promise<number> {
-  // Get all hash scores for this record
-  const hashScoresSnap = await db.collection('hashScores').where('recordId', '==', recordId).get();
+async function updateRecordScore(recordId: string): Promise<number> {
+  const db = getFirestore();
 
-  if (hashScoresSnap.empty) {
-    return BASE_SCORE;
-  }
+  // Get all score events for this record
+  const eventsQuery = query(
+    collection(db, 'scoreEvents'),
+    where('recordId', '==', recordId),
+    orderBy('createdAt', 'asc')
+  );
+  const eventsSnap = await getDocs(eventsQuery);
 
-  const hashScores = hashScoresSnap.docs.map(d => d.data() as HashScoreDoc);
-  const now = Date.now();
-
-  // Weight by recency
-  let weightedSum = 0;
-  let totalWeight = 0;
-
-  for (const hash of hashScores) {
-    const daysSince = (now - hash.lastCalculated.toMillis()) / (1000 * 60 * 60 * 24);
-    const recencyWeight = 1 / (1 + daysSince / 365);
-
-    weightedSum += hash.score * recencyWeight;
-    totalWeight += recencyWeight;
-  }
-
-  const score = Math.round(weightedSum / totalWeight);
-
-  // Get subject count
-  const subjectsSnap = await db
-    .collection('recordSubjects')
-    .where('recordId', '==', recordId)
-    .get();
-
-  const activeSubjects = subjectsSnap.docs.filter(d => d.data().isActive).length;
-
-  await db.collection('recordScores').doc(recordId).set({
-    recordId,
-    score,
-    hashCount: hashScores.length,
-    activeSubjects,
-    lastCalculated: Timestamp.now(),
+  // Sum all deltas starting from initial score
+  let score = INITIAL_SCORE;
+  eventsSnap.docs.forEach(eventDoc => {
+    const event = eventDoc.data() as ScoreEvent;
+    score += event.scoreDelta;
   });
 
+  score = clampScore(score);
+
+  // Update the record document
+  await updateDoc(doc(db, 'records', recordId), {
+    credibility: {
+      score,
+      lastUpdated: Timestamp.now(),
+    },
+  });
+
+  console.log(`📊 Updated record ${recordId} score: ${score}`);
+
   return score;
+}
+
+// ==================== PUBLIC API - VERIFICATION EVENTS ====================
+
+export async function onVerificationCreated(
+  recordId: string,
+  recordHash: string,
+  level: VerificationLevel,
+  txHash?: string
+): Promise<void> {
+  await createScoreEvent(recordId, recordHash, 'verification', {
+    verificationLevel: level,
+    txHash,
+  });
+}
+
+export async function onVerificationRevoked(
+  recordId: string,
+  recordHash: string,
+  previousLevel: VerificationLevel,
+  txHash?: string
+): Promise<void> {
+  await createScoreEvent(recordId, recordHash, 'verification_revoked', {
+    previousVerificationLevel: previousLevel,
+    txHash,
+  });
+}
+
+export async function onVerificationModified(
+  recordId: string,
+  recordHash: string,
+  previousLevel: VerificationLevel,
+  newLevel: VerificationLevel,
+  txHash?: string
+): Promise<void> {
+  await createScoreEvent(recordId, recordHash, 'verification_modified', {
+    previousVerificationLevel: previousLevel,
+    verificationLevel: newLevel,
+    txHash,
+  });
+}
+
+// ==================== PUBLIC API - DISPUTE EVENTS ====================
+
+export async function onDisputeCreated(
+  recordId: string,
+  recordHash: string,
+  severity: DisputeSeverity,
+  culpability: DisputeCulpability,
+  txHash?: string
+): Promise<void> {
+  await createScoreEvent(recordId, recordHash, 'dispute', {
+    disputeSeverity: severity,
+    disputeCulpability: culpability,
+    txHash,
+  });
+}
+
+export async function onDisputeRevoked(
+  recordId: string,
+  recordHash: string,
+  previousSeverity: DisputeSeverity,
+  previousCulpability: DisputeCulpability,
+  txHash?: string
+): Promise<void> {
+  await createScoreEvent(recordId, recordHash, 'dispute_revoked', {
+    previousDisputeSeverity: previousSeverity,
+    previousDisputeCulpability: previousCulpability,
+    txHash,
+  });
+}
+
+export async function onDisputeModified(
+  recordId: string,
+  recordHash: string,
+  previousSeverity: DisputeSeverity,
+  previousCulpability: DisputeCulpability,
+  newSeverity: DisputeSeverity,
+  newCulpability: DisputeCulpability,
+  txHash?: string
+): Promise<void> {
+  await createScoreEvent(recordId, recordHash, 'dispute_modified', {
+    previousDisputeSeverity: previousSeverity,
+    previousDisputeCulpability: previousCulpability,
+    disputeSeverity: newSeverity,
+    disputeCulpability: newCulpability,
+    txHash,
+  });
+}
+
+// ==================== QUERY FUNCTIONS ====================
+
+/**
+ * Get all score events for a record
+ */
+export async function getScoreEventsForRecord(recordId: string): Promise<ScoreEvent[]> {
+  const db = getFirestore();
+
+  const eventsQuery = query(
+    collection(db, 'scoreEvents'),
+    where('recordId', '==', recordId),
+    orderBy('createdAt', 'desc')
+  );
+
+  const snapshot = await getDocs(eventsQuery);
+
+  return snapshot.docs.map(eventDoc => ({
+    id: eventDoc.id,
+    ...eventDoc.data(),
+  })) as ScoreEvent[];
+}
+
+/**
+ * Get score events for a specific hash (useful for viewing history)
+ */
+export async function getScoreEventsForHash(recordHash: string): Promise<ScoreEvent[]> {
+  const db = getFirestore();
+
+  const eventsQuery = query(
+    collection(db, 'scoreEvents'),
+    where('recordHash', '==', recordHash),
+    orderBy('createdAt', 'desc')
+  );
+
+  const snapshot = await getDocs(eventsQuery);
+
+  return snapshot.docs.map(eventDoc => ({
+    id: eventDoc.id,
+    ...eventDoc.data(),
+  })) as ScoreEvent[];
 }
