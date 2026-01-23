@@ -39,6 +39,7 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
     originalFileHash: data.originalFileHash,
     recordHash: data.recordHash,
     previousRecordHash: data.previousRecordHash,
+    credibility: data.credibility,
 
     // FHIR properties (plaintext for unencrypted, will be populated by decryption)
     fhirData: data.fhirData,
@@ -61,7 +62,6 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
     administrators: data.administrators,
     viewers: data.viewers || [],
     subjects: data.subjects || [],
-    pendingSubjectRequests: data.pendingSubjectRequests,
 
     //Blockchain Verification
     blockchainRoleInitialization: data.blockchainRoleInitialization,

@@ -463,7 +463,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
                 onOpenManager={handleSubjectPage}
                 onSuccess={() => {}}
               />
-              <CredibilityBadge fileObject={record} />
+              <CredibilityBadge score={record.credibility?.score} />
               {!readOnly && (
                 <HealthRecordMenu
                   record={record}

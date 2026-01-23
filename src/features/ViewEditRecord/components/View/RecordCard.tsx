@@ -72,7 +72,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
               onSuccess={() => {}}
             />
             <div className="flex items-center">
-              <CredibilityBadge fileObject={record} />
+              <CredibilityBadge score={record.credibility?.score} />
             </div>
             <HealthRecordMenu
               record={record}
