@@ -8,5 +8,5 @@
   "bracketSpacing": true,
   "arrowParens": "avoid",
   "endOfLine": "lf",
-  "plugins": ["prettier-plugin-solidity", "prettier-plugin-firestore-rules"]
+  "plugins": ["prettier-plugin-solidity"]
 }

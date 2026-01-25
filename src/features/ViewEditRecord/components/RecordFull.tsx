@@ -17,10 +17,7 @@ import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import PermissionsManager from '@/features/Permissions/component/PermissionManager';
 import SubjectManager from '@/features/Subject/components/SubjectManager';
 import SubjectBadge from '@/features/Subject/components/SubjectBadge';
-import { PermissionsService } from '@/features/Permissions/services/permissionsService';
 import useAuth from '@/features/Auth/hooks/useAuth';
-import { logRecordView } from '../services/logRecordViewService';
-import SubjectQueryService from '@/features/Subject/services/subjectQueryService';
 import { useSubjectFlow } from '@/features/Subject/hooks/useSubjectFlow';
 import { SubjectActionDialog } from '@/features/Subject/components/ui/SubjectActionDialog';
 import {
@@ -94,30 +91,6 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       onRefreshRecord?.();
     },
   });
-
-  // Log view on mount
-  useEffect(() => {
-    const logView = async () => {
-      if (!user || !record.id || !record.recordHash) return;
-
-      try {
-        const viewerRole =
-          (await PermissionsService.getUserRole(record, user.uid)) || 'Investigate Unknown Role';
-
-        await logRecordView(
-          record.id,
-          record.recordHash,
-          user.uid, // or however you get the hashed user ID
-          viewerRole
-        );
-      } catch (error) {
-        // Silent fail - don't block the UI for logging
-        console.error('Failed to log record view:', error);
-      }
-    };
-
-    logView();
-  }, [record.id]); // Only run when record changes
 
   const getInitialViewMode = (): ViewMode => {
     return initialViewMode as ViewMode;
