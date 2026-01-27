@@ -52,6 +52,7 @@ interface CredibilityActionDialogProps {
   pendingReaction?: boolean;
   onClose: () => void;
   onConfirmVerification: (level: VerificationLevelOptions) => void;
+  onConfirmModifyVerification: (level: VerificationLevelOptions) => void;
   onConfirmRetract: () => void;
   onConfirmDispute: () => void;
   onConfirmReaction: (supports: boolean) => void;
@@ -75,6 +76,7 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
   pendingReaction,
   onClose,
   onConfirmVerification,
+  onConfirmModifyVerification,
   onConfirmRetract,
   onConfirmDispute,
   onConfirmReaction,
@@ -109,7 +111,11 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
               <ConfirmVerificationContent
                 level={pendingLevel}
                 isModify={operationType === 'modifyVerification'}
-                onConfirm={onConfirmVerification}
+                onConfirm={
+                  operationType === 'modifyVerification'
+                    ? onConfirmModifyVerification
+                    : onConfirmVerification
+                }
                 onClose={onClose}
               />
             )}

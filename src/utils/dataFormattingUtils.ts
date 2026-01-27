@@ -40,6 +40,11 @@ export const toDate = (timestamp: any): Date | null => {
 
   // Number (Unix timestamp in milliseconds)
   if (typeof timestamp === 'number') {
+    // Timestamps < 10 billion are likely in seconds (dates before ~2286 in seconds, but before ~1970 April in ms)
+    // This threshold safely distinguishes: year 2001+ in ms is > 1 trillion
+    if (timestamp < 10_000_000_000) {
+      return new Date(timestamp * 1000);
+    }
     return new Date(timestamp);
   }
 
@@ -307,7 +312,7 @@ export const hexToArrayBuffer = (hex: string): ArrayBuffer => {
 };
 
 //====================================================================
-//Number Formatting
+//NUMBER FORMATTING
 //====================================================================
 
 /**

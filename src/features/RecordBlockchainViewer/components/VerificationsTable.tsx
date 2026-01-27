@@ -120,7 +120,7 @@ export const VerificationsTable: React.FC<VerificationsTableProps> = ({ verifica
 };
 
 // ===============================================================
-// VERIFICATION LEVEL BADGE (for use elsewhere)
+// VERIFICATION LEVEL BADGE
 // ===============================================================
 
 interface VerificationLevelBadgeProps {
