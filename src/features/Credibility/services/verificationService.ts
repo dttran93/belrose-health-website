@@ -21,6 +21,7 @@ import {
   onVerificationModified,
   onVerificationRevoked,
 } from './credibilityScoreService';
+import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 
 // ============================================================
 // TYPES
@@ -170,7 +171,7 @@ export async function createVerification(
   recordId: string,
   recordHash: string,
   verifierId: string,
-  level: VerificationLevel
+  level: VerificationLevelOptions
 ): Promise<string> {
   const db = getFirestore();
   // CHECK 1: Ensure user is not verifying their own record
@@ -208,9 +209,9 @@ export async function createVerification(
     throw new Error('You can not both verify and dispute the same record Hash');
   }
 
-  const verifierIdHash = ethers.keccak256(ethers.toUtf8Bytes(verifierId));
-
   // 1. Write to Firebase first. Update existing if reactiviating or retrying failed blockchain write
+
+  const verifierIdHash = ethers.keccak256(ethers.toUtf8Bytes(verifierId));
   if (existing.exists()) {
     await updateDoc(docRef, {
       level,
@@ -233,15 +234,37 @@ export async function createVerification(
     });
   }
 
+  let hashOperationFailed = false;
   try {
-    // 2. Check if hash needs to be added to the blockchain first
     const isHashOnChain = await blockchainHealthRecordService.doesHashExist(recordHash);
 
     if (!isHashOnChain) {
-      await blockchainHealthRecordService.addRecordHash(recordId, recordHash);
+      try {
+        await blockchainHealthRecordService.addRecordHash(recordId, recordHash);
+      } catch (hashError) {
+        hashOperationFailed = true;
+
+        await updateDoc(docRef, {
+          chainStatus: 'failed',
+          error: getErrorMessage(hashError),
+        });
+
+        await BlockchainSyncQueueService.logFailure({
+          contract: 'HealthRecordCore',
+          action: 'addRecordHash',
+          userId: verifierId,
+          error: getErrorMessage(hashError),
+          context: {
+            type: 'addRecordHash',
+            recordId,
+            recordHash,
+          },
+        });
+
+        throw hashError;
+      }
     }
 
-    // 3. Write verification to blockchain
     const tx = await blockchainHealthRecordService.verifyRecord(recordId, recordHash, level);
 
     await updateDoc(docRef, {
@@ -249,16 +272,30 @@ export async function createVerification(
       txHash: tx.txHash,
     });
 
-    // 4. Update Credibility Score
     await onVerificationCreated(recordId, recordHash, level, tx.txHash);
 
     return verificationId;
   } catch (error) {
-    // Mark as failed
-    await updateDoc(docRef, {
-      chainStatus: 'failed',
-      error: getErrorMessage(error),
-    });
+    // Only log if this wasn't already handled in inner catch
+    if (!hashOperationFailed) {
+      await updateDoc(docRef, {
+        chainStatus: 'failed',
+        error: getErrorMessage(error),
+      });
+
+      await BlockchainSyncQueueService.logFailure({
+        contract: 'HealthRecordCore',
+        action: 'verifyRecord',
+        userId: verifierId,
+        error: getErrorMessage(error),
+        context: {
+          type: 'verification',
+          recordId,
+          recordHash,
+          level,
+        },
+      });
+    }
     throw error;
   }
 }
@@ -307,13 +344,26 @@ export async function retractVerification(recordHash: string, verifierId: string
     // 4. Recalculate credibility score
     await onVerificationRevoked(data.recordId, data.recordHash, data.level, tx.txHash);
   } catch (error) {
-    // Rollback Firebase
+    // Update Firebase with
     await updateDoc(docRef, {
       isActive: true,
       lastModified: null,
       chainStatus: 'failed',
       error: getErrorMessage(error),
     });
+
+    await BlockchainSyncQueueService.logFailure({
+      contract: 'HealthRecordCore',
+      action: 'retractVerification',
+      userId: verifierId,
+      error: getErrorMessage(error),
+      context: {
+        type: 'verification-retraction',
+        recordId: data.recordId,
+        recordHash: recordHash,
+      },
+    });
+
     throw error;
   }
 }
@@ -321,7 +371,7 @@ export async function retractVerification(recordHash: string, verifierId: string
 export async function modifyVerificationLevel(
   recordHash: string,
   verifierId: string,
-  newLevel: VerificationLevel
+  newLevel: VerificationLevelOptions
 ): Promise<void> {
   const verifierIdHash = ethers.keccak256(ethers.toUtf8Bytes(verifierId));
 
@@ -372,6 +422,20 @@ export async function modifyVerificationLevel(
       level: oldLevel,
       chainStatus: 'failed',
       error: getErrorMessage(error),
+    });
+
+    await BlockchainSyncQueueService.logFailure({
+      contract: 'HealthRecordCore',
+      action: 'modifyVerificationLevel',
+      userId: verifierId,
+      error: getErrorMessage(error),
+      context: {
+        type: 'verification-modification',
+        recordId: data.recordId,
+        recordHash: recordHash,
+        oldLevel: oldLevel,
+        newLevel: newLevel,
+      },
     });
     throw error;
   }

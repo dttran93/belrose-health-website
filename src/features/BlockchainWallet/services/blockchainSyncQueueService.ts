@@ -5,6 +5,11 @@
  * custom data based on context
  */
 
+import {
+  DisputeCulpability,
+  DisputeSeverityOptions,
+} from '@/features/Credibility/services/disputeService';
+import { VerificationLevelOptions } from '@/features/Credibility/services/verificationService';
 import { collection, addDoc, serverTimestamp, getFirestore } from 'firebase/firestore';
 
 // The contract being written to
@@ -15,7 +20,7 @@ interface BaseSyncFailure {
   contract: BlockchainContract;
   action: string; // e.g., 'grantRole', 'anchorRecord', 'addMember'
   userId: string;
-  userWalletAddress: string;
+  userWalletAddress?: string;
   error: string;
 }
 
@@ -32,16 +37,47 @@ type SyncContext =
   | { type: 'anchorRecord'; recordId: string; recordHash: string; subjectId: string }
   | { type: 'unanchorRecord'; recordId: string; subjectId: string }
   | { type: 'reanchorRecord'; recordId: string; recordHash: string; subjectId: string }
-  | { type: 'addRecordHash'; recordId: string; recordHash: string; subjectId: string }
-  | { type: 'verification'; recordId: string; recordHash: string }
+  | { type: 'addRecordHash'; recordId: string; recordHash: string }
+  | { type: 'verification'; recordId: string; recordHash: string; level: VerificationLevelOptions }
   | { type: 'verification-retraction'; recordId: string; recordHash: string }
-  | { type: 'verification-modification'; recordId: string; recordHash: string }
-  | { type: 'dispute'; recordId: string; recordHash: string }
-  | { type: 'dispute-retraction'; recordId: string; recordHash: string }
-  | { type: 'dispute-modification'; recordId: string; recordHash: string }
-  | { type: 'reaction'; recordId: string; recordHash: string; disputeId: string }
-  | { type: 'reaction-retraction'; recordId: string; recordHash: string; disputeId: string }
-  | { type: 'reaction-modification'; recordId: string; recordHash: string; disputeId: string }
+  | {
+      type: 'verification-modification';
+      recordId: string;
+      recordHash: string;
+      oldLevel: VerificationLevelOptions;
+      newLevel: VerificationLevelOptions;
+    }
+  | {
+      type: 'dispute';
+      recordId: string;
+      recordHash: string;
+      severity: DisputeSeverityOptions;
+      culpability: DisputeCulpability;
+    }
+  | { type: 'dispute-retraction'; recordHash: string }
+  | {
+      type: 'dispute-modification';
+      recordHash: string;
+      oldSeverity: DisputeSeverityOptions;
+      oldCulpability: DisputeCulpability;
+      newSeverity: DisputeSeverityOptions;
+      newCulpability: DisputeCulpability;
+    }
+  | {
+      type: 'reaction';
+      recordId: string;
+      recordHash: string;
+      disputeId: string;
+      supportsDispute: boolean;
+    }
+  | { type: 'reaction-retraction'; recordHash: string; reactionId: string }
+  | {
+      type: 'reaction-modification';
+      recordHash: string;
+      reactionId: string;
+      oldSupport: boolean;
+      newSupport: boolean;
+    }
   | { type: 'flagUnacceptedUpdate'; recordId: string; recordHash: string; disputeId: string }
   | { type: 'resolveUnacceptedUpdate'; recordId: string; recordHash: string; disputeId: string };
 

@@ -20,6 +20,7 @@ import { blockchainHealthRecordService } from './blockchainHealthRecordService';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 import { getVerificationId } from './verificationService';
 import { onDisputeCreated, onDisputeModified, onDisputeRevoked } from './credibilityScoreService';
+import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 
 // ============================================================
 // TYPES
@@ -334,7 +335,7 @@ export async function createDispute(
   recordId: string,
   recordHash: string,
   disputerId: string,
-  severity: DisputeSeverity,
+  severity: DisputeSeverityOptions,
   culpability: DisputeCulpability,
   notes?: string
 ): Promise<string> {
@@ -445,6 +446,22 @@ export async function createDispute(
       chainStatus: 'failed',
       error: getErrorMessage(error),
     });
+
+    // Log blockchain sync failure
+    await BlockchainSyncQueueService.logFailure({
+      contract: 'HealthRecordCore',
+      action: 'createDispute',
+      userId: disputerId,
+      error: getErrorMessage(error),
+      context: {
+        type: 'dispute',
+        recordId,
+        recordHash,
+        severity,
+        culpability,
+      },
+    });
+
     throw error;
   }
 }
@@ -499,6 +516,17 @@ export async function retractDispute(recordHash: string, disputerId: string): Pr
       chainStatus: 'failed',
       error: getErrorMessage(error),
     });
+    // Log blockchain sync failure
+    await BlockchainSyncQueueService.logFailure({
+      contract: 'HealthRecordCore',
+      action: 'retractDispute',
+      userId: disputerId,
+      error: getErrorMessage(error),
+      context: {
+        type: 'dispute-retraction',
+        recordHash,
+      },
+    });
     throw error;
   }
 }
@@ -510,7 +538,7 @@ export async function retractDispute(recordHash: string, disputerId: string): Pr
 export async function modifyDispute(
   recordHash: string,
   disputerId: string,
-  newSeverity: DisputeSeverity,
+  newSeverity: DisputeSeverityOptions,
   newCulpability: DisputeCulpability
 ): Promise<void> {
   const disputeId = getDisputeId(recordHash, disputerId);
@@ -572,6 +600,21 @@ export async function modifyDispute(
       culpability: oldCulpability,
       chainStatus: 'failed',
       error: getErrorMessage(error),
+    });
+    // Log blockchain sync failure
+    await BlockchainSyncQueueService.logFailure({
+      contract: 'HealthRecordCore',
+      action: 'modifyDispute',
+      userId: disputerId,
+      error: getErrorMessage(error),
+      context: {
+        type: 'dispute-modification',
+        recordHash,
+        oldSeverity,
+        oldCulpability,
+        newSeverity,
+        newCulpability,
+      },
     });
     throw error;
   }
@@ -691,6 +734,22 @@ export async function reactToDispute(
       chainStatus: 'failed',
       error: getErrorMessage(error),
     });
+
+    // Log blockchain sync failure
+    await BlockchainSyncQueueService.logFailure({
+      contract: 'HealthRecordCore',
+      action: 'reactToDispute',
+      userId: reactorId,
+      error: getErrorMessage(error),
+      context: {
+        type: 'reaction',
+        recordId,
+        recordHash,
+        disputeId: getDisputeId(recordHash, disputerId),
+        supportsDispute,
+      },
+    });
+
     throw error;
   }
 }
@@ -740,6 +799,19 @@ export async function retractReaction(
       lastModified: null,
       chainStatus: 'failed',
       error: getErrorMessage(error),
+    });
+
+    // Log blockchain sync failure
+    await BlockchainSyncQueueService.logFailure({
+      contract: 'HealthRecordCore',
+      action: 'retractReaction',
+      userId: reactorId,
+      error: getErrorMessage(error),
+      context: {
+        type: 'reaction-retraction',
+        recordHash,
+        reactionId,
+      },
     });
     throw error;
   }
@@ -799,6 +871,20 @@ export async function modifyReaction(
       supportsDispute: oldSupport,
       chainStatus: 'failed',
       error: getErrorMessage(error),
+    });
+
+    await BlockchainSyncQueueService.logFailure({
+      contract: 'HealthRecordCore',
+      action: 'modifyReaction',
+      userId: reactorId,
+      error: getErrorMessage(error),
+      context: {
+        type: 'reaction-modification',
+        recordHash,
+        reactionId,
+        oldSupport,
+        newSupport,
+      },
     });
     throw error;
   }
