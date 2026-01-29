@@ -375,7 +375,10 @@ export async function createDispute(
   const verificationExisting = await getDoc(verificationDocRef);
 
   if (verificationExisting.exists()) {
-    throw new Error('You can not both verify and dispute the same record Hash');
+    const verificationData = verificationExisting.data();
+    if (verificationData?.isActive) {
+      throw new Error('You can not both verify and dispute the same record hash');
+    }
   }
 
   const disputerIdHash = ethers.keccak256(ethers.toUtf8Bytes(disputerId));

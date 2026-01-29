@@ -28,6 +28,7 @@ import {
   BlockchainPreparationService,
   type ProgressCallback,
 } from '@/features/BlockchainWallet/services/blockchainPreparationService';
+import { blockchainHealthRecordService } from './blockchainHealthRecordService';
 
 // ==================== TYPES ====================
 
@@ -64,7 +65,7 @@ export interface CredibilityPreparationStatus {
 }
 
 export interface CredibilityPreparationProgress {
-  step: 'computing' | 'saving' | 'registering' | 'complete';
+  step: 'computing' | 'saving' | 'registering' | 'verifying_hash' | 'adding_hash' | 'complete';
   message: string;
 }
 
@@ -198,20 +199,47 @@ export class CredibilityPreparationService {
    * Unlike PermissionPreparationService, this does NOT initialize the record
    * on-chain (that's handled by anchoring).
    *
+   * @param recordId - record ID the hash will be associated with
+   * @param recordHash - The record hash to ensure exists on-chain
    * @param onProgress - Optional callback for progress updates
    * @returns The caller's smart account address
    */
-  static async prepare(onProgress?: CredibilityProgressCallback): Promise<string> {
+  static async prepare(
+    recordId: string,
+    recordHash: string,
+    onProgress?: CredibilityProgressCallback
+  ): Promise<string> {
     console.log('🔄 CredibilityPreparationService: Starting preparation...');
 
-    // Just delegate to the generic blockchain preparation
-    // Credibility operations don't need any additional setup beyond wallet readiness
+    // Step 1: Ensure wallet is ready
     const address = await BlockchainPreparationService.ensureReady(progress => {
       onProgress?.(progress as CredibilityPreparationProgress);
     });
 
     console.log('✅ CredibilityPreparationService: Ready with address:', address);
-    return address;
+
+    //Step2: Ensure record hash exists on blockchain
+    try {
+      onProgress?.({ step: 'verifying_hash', message: 'Verifying record on blockchain...' });
+
+      const isHashOnChain = await blockchainHealthRecordService.doesHashExist(recordHash);
+
+      if (!isHashOnChain) {
+        onProgress?.({ step: 'adding_hash', message: 'Adding record to blockchain...' });
+
+        await blockchainHealthRecordService.addRecordHash(recordId, recordHash);
+        console.log('✅ Record hash added to blockchain');
+      } else {
+        console.log('✅ Record hash already exists on blockchain');
+      }
+
+      onProgress?.({ step: 'complete', message: 'Preparation complete' });
+
+      return address;
+    } catch (error) {
+      console.error('❌ Failed to prepare record hash:', error);
+      throw new Error(`Failed to prepare blockchain: ${(error as Error).message}`);
+    }
   }
 
   // ============================================================================

@@ -195,37 +195,37 @@ const PreparingContent: React.FC<{ progress?: CredibilityPreparationProgress | n
     <div className="w-full mt-2 space-y-2">
       <ProgressStep
         label="Computing wallet address"
-        status={
-          progress?.step === 'computing'
-            ? 'active'
-            : progress?.step && ['saving', 'registering', 'complete'].includes(progress.step)
-              ? 'complete'
-              : 'pending'
-        }
+        status={getStepStatus(progress?.step, ['computing'])}
       />
-      <ProgressStep
-        label="Saving to profile"
-        status={
-          progress?.step === 'saving'
-            ? 'active'
-            : progress?.step && ['registering', 'complete'].includes(progress.step)
-              ? 'complete'
-              : 'pending'
-        }
-      />
+      <ProgressStep label="Saving to profile" status={getStepStatus(progress?.step, ['saving'])} />
       <ProgressStep
         label="Registering on blockchain"
-        status={
-          progress?.step === 'registering'
-            ? 'active'
-            : progress?.step === 'complete'
-              ? 'complete'
-              : 'pending'
-        }
+        status={getStepStatus(progress?.step, ['registering'])}
+      />
+      <ProgressStep
+        label="Verifying record on chain"
+        status={getStepStatus(progress?.step, ['verifying_hash', 'adding_hash'])}
       />
     </div>
   </div>
 );
+
+function getStepStatus(
+  currentStep: string | undefined,
+  stepNames: string[]
+): 'pending' | 'active' | 'complete' {
+  if (!currentStep) return 'pending';
+
+  const steps = ['computing', 'saving', 'registering', 'verifying_hash', 'adding_hash', 'complete'];
+  const currentIndex = steps.indexOf(currentStep);
+  const stepIndices = stepNames.map(s => steps.indexOf(s));
+  const maxStepIndex = Math.max(...stepIndices);
+
+  if (stepNames.includes(currentStep)) return 'active';
+  if (currentIndex > maxStepIndex) return 'complete';
+
+  return 'pending';
+}
 
 const ProgressStep: React.FC<{
   label: string;

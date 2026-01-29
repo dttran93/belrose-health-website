@@ -12,7 +12,6 @@ import {
   retractVerification,
   modifyVerificationLevel,
   getVerification,
-  type VerificationLevel,
   type VerificationDoc,
   getVerificationConfig,
   VerificationLevelOptions,
@@ -161,38 +160,24 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       // First check if already ready
       const prereqs = await CredibilityPreparationService.verifyPrerequisites(recordId);
 
-      if (prereqs.ready) {
-        // Already ready, no preparation needed
-        return true;
-      }
-
-      // Not ready - check why
-      if (!prereqs.checks?.callerReady) {
-        // Wallet not set up - prepare it
-        await CredibilityPreparationService.prepare(progress => {
-          setPreparationProgress(progress);
-        });
-
-        // Verify again after preparation
-        const finalCheck = await CredibilityPreparationService.verifyPrerequisites(recordId);
-        if (!finalCheck.ready) {
-          // Still not ready after wallet setup - must be a different issue
-          throw new Error(finalCheck.reason || 'Preparation failed');
-        }
-
-        // Wallet setup successful, we're ready!
-        return true;
-      } else {
-        // Wallet is ready but failed for another reason (no role access, etc.)
+      // Wallet is ready but something else failed (e.g., no role access)
+      // This can't be fixed by prepare(), so fail now
+      if (!prereqs.ready && prereqs.checks?.callerReady) {
         throw new Error(prereqs.reason || 'Prerequisites not met');
       }
+
+      await CredibilityPreparationService.prepare(recordId, recordHash, progress => {
+        setPreparationProgress(progress);
+      });
+
+      return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Preparation failed';
       setError(message);
       setPhase('error');
       return false;
     }
-  }, [recordId]);
+  }, [recordId, recordHash]);
 
   // ==========================================================================
   // VERIFICATION FLOW

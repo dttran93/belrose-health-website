@@ -243,7 +243,7 @@ contract HealthRecordCore {
   function addRecordHash(
     string memory recordId,
     string memory newHash
-  ) external onlyActiveMember onlyOwnerOrAdmin(recordId) {
+  ) external onlyActiveMember onlyRecordParticipant(recordId) {
     require(bytes(recordIdForHash[newHash]).length == 0, 'Hash already bound to a record');
     require(bytes(newHash).length > 0, 'Hash cannot be empty');
 

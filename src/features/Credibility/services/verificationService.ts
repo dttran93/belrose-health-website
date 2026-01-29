@@ -206,7 +206,10 @@ export async function createVerification(
   const disputeExisting = await getDoc(disputeDocRef);
 
   if (disputeExisting.exists()) {
-    throw new Error('You can not both verify and dispute the same record Hash');
+    const disputeData = disputeExisting.data();
+    if (disputeData?.isActive) {
+      throw new Error('You can not both verify and dispute the same record Hash');
+    }
   }
 
   // 1. Write to Firebase first. Update existing if reactiviating or retrying failed blockchain write
@@ -234,37 +237,7 @@ export async function createVerification(
     });
   }
 
-  let hashOperationFailed = false;
   try {
-    const isHashOnChain = await blockchainHealthRecordService.doesHashExist(recordHash);
-
-    if (!isHashOnChain) {
-      try {
-        await blockchainHealthRecordService.addRecordHash(recordId, recordHash);
-      } catch (hashError) {
-        hashOperationFailed = true;
-
-        await updateDoc(docRef, {
-          chainStatus: 'failed',
-          error: getErrorMessage(hashError),
-        });
-
-        await BlockchainSyncQueueService.logFailure({
-          contract: 'HealthRecordCore',
-          action: 'addRecordHash',
-          userId: verifierId,
-          error: getErrorMessage(hashError),
-          context: {
-            type: 'addRecordHash',
-            recordId,
-            recordHash,
-          },
-        });
-
-        throw hashError;
-      }
-    }
-
     const tx = await blockchainHealthRecordService.verifyRecord(recordId, recordHash, level);
 
     await updateDoc(docRef, {
@@ -276,26 +249,23 @@ export async function createVerification(
 
     return verificationId;
   } catch (error) {
-    // Only log if this wasn't already handled in inner catch
-    if (!hashOperationFailed) {
-      await updateDoc(docRef, {
-        chainStatus: 'failed',
-        error: getErrorMessage(error),
-      });
+    await updateDoc(docRef, {
+      chainStatus: 'failed',
+      error: getErrorMessage(error),
+    });
 
-      await BlockchainSyncQueueService.logFailure({
-        contract: 'HealthRecordCore',
-        action: 'verifyRecord',
-        userId: verifierId,
-        error: getErrorMessage(error),
-        context: {
-          type: 'verification',
-          recordId,
-          recordHash,
-          level,
-        },
-      });
-    }
+    await BlockchainSyncQueueService.logFailure({
+      contract: 'HealthRecordCore',
+      action: 'verifyRecord',
+      userId: verifierId,
+      error: getErrorMessage(error),
+      context: {
+        type: 'verification',
+        recordId,
+        recordHash,
+        level,
+      },
+    });
     throw error;
   }
 }
