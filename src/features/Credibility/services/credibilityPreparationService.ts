@@ -29,6 +29,8 @@ import {
   type ProgressCallback,
 } from '@/features/BlockchainWallet/services/blockchainPreparationService';
 import { blockchainHealthRecordService } from './blockchainHealthRecordService';
+import { PermissionPreparationService } from '@/features/Permissions/services/permissionPreparationService';
+import { BlockchainRoleManagerService } from '@/features/Permissions/services/blockchainRoleManagerService';
 
 // ==================== TYPES ====================
 
@@ -65,7 +67,14 @@ export interface CredibilityPreparationStatus {
 }
 
 export interface CredibilityPreparationProgress {
-  step: 'computing' | 'saving' | 'registering' | 'verifying_hash' | 'adding_hash' | 'complete';
+  step:
+    | 'computing'
+    | 'saving'
+    | 'registering'
+    | 'initializing_record'
+    | 'verifying_hash'
+    | 'adding_hash'
+    | 'complete';
   message: string;
 }
 
@@ -196,8 +205,7 @@ export class CredibilityPreparationService {
    * Prepare for credibility operations.
    *
    * This ensures the caller's smart account is set up and registered.
-   * Unlike PermissionPreparationService, this does NOT initialize the record
-   * on-chain (that's handled by anchoring).
+   * Also initializes the record on-chain if needed and ensures the record hash exists.
    *
    * @param recordId - record ID the hash will be associated with
    * @param recordHash - The record hash to ensure exists on-chain
@@ -211,6 +219,10 @@ export class CredibilityPreparationService {
   ): Promise<string> {
     console.log('🔄 CredibilityPreparationService: Starting preparation...');
 
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
+
     // Step 1: Ensure wallet is ready
     const address = await BlockchainPreparationService.ensureReady(progress => {
       onProgress?.(progress as CredibilityPreparationProgress);
@@ -218,7 +230,28 @@ export class CredibilityPreparationService {
 
     console.log('✅ CredibilityPreparationService: Ready with address:', address);
 
-    //Step2: Ensure record hash exists on blockchain
+    // Step 2: Check if record role needs initialization
+    const roleStats = await BlockchainRoleManagerService.getRecordRoleStats(recordId);
+    const isRecordInitialized = roleStats.ownerCount > 0 || roleStats.adminCount > 0;
+
+    if (!isRecordInitialized) {
+      onProgress?.({ step: 'initializing_record', message: 'Initializing record...' });
+
+      //Get user's Firestore role to determine initialization role
+      const roleCheck = await this.checkCallerRecordRole(recordId, user.uid);
+
+      if (!roleCheck.hasRole) {
+        throw new Error('You do not have access to this record');
+      }
+
+      const initialRole: 'owner' | 'administrator' =
+        roleCheck.role === 'owner' ? 'owner' : 'administrator';
+
+      await PermissionPreparationService.initializeRecordRole(recordId, address, initialRole);
+      console.log(`✅ Record initialized with role: ${initialRole}`);
+    }
+
+    // Step 3: Ensure record hash exists on blockchain
     try {
       onProgress?.({ step: 'verifying_hash', message: 'Verifying record on blockchain...' });
 

@@ -14,21 +14,24 @@ const Values: React.FC = () => {
     {
       icon: <Shield size={32} />,
       title: "We Don't Want Your Data",
-      description: "With our data storage protocol, even Belrose employees cannot see your records. And you can store your records literally anywhere you want. We are the only health tech company that does not want your data.",
-      link: "#"
+      description:
+        'With our data storage protocol, you can store your records anywhere you want. If stored with us, even Belrose employees cannot see them. We are the only health tech company that does not want your data.',
+      link: '#',
     },
     {
       icon: <Users size={32} />,
-      title: "Power to the Patients",
-      description: "The average person lacks vital information about themselves. Data on blood type, vaccinations, medications and more is scattered or inaccessible. We believe patients should have sovereignty over this information.",
-      link: "#"
+      title: 'Data Sovereignty',
+      description:
+        "Our protocol is not just about privacy or access, it's about sovereignty. We want to create a future in which the economic, medical, and social value of your data is controled by you.",
+      link: '#',
     },
     {
       icon: <Handshake size={32} />,
-      title: "Helping the Helpers",
-      description: "Our goal is to give providers a complete view of their patient's health while reducing the workload from documentation. We integrate seamlessly into existing workflows, no forcing new solutions on providers.",
-      link: "#"
-    }
+      title: 'A Healthier, more Equitable World',
+      description:
+        'We believe equity is the only path to truly unlock the potential of technology in healthcare. With Belrose, your wellbeing—not your data—becomes the product.',
+      link: '#',
+    },
   ];
 
   return (
@@ -37,20 +40,21 @@ const Values: React.FC = () => {
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Our Core Values</h2>
           <p className="text-xl text-white max-w-3xl mx-auto">
-            These principles guide everything we do and shape how we build technology that truly serves patients and healthcare providers.
+            These principles guide everything we do and shape how we build technology that truly
+            serves patients and healthcare providers.
           </p>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
           {values.map((value: ValueItem, index: number) => (
-              <ValuesCard 
-                key={index}
-                icon={value.icon} 
-                title={value.title} 
-                description={value.description}
-                link={value.link} 
-              />
-            ))}
+            <ValuesCard
+              key={index}
+              icon={value.icon}
+              title={value.title}
+              description={value.description}
+              link={value.link}
+            />
+          ))}
         </div>
       </div>
     </section>

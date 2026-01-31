@@ -10,6 +10,8 @@ interface MemberRoleManagerInterface {
 
   function isVerifiedMember(address wallet) external view returns (bool);
 
+  function isVerifiedProvider(address wallet) external view returns (bool);
+
   function hasActiveRole(string memory recordId, address wallet) external view returns (bool);
 
   function hasRole(
@@ -19,6 +21,8 @@ interface MemberRoleManagerInterface {
   ) external view returns (bool);
 
   function isOwnerOrAdmin(string memory recordId, address wallet) external view returns (bool);
+
+  function getUserForWallet(address wallet) external view returns (bytes32);
 }
 
 /**
@@ -55,6 +59,11 @@ contract MemberRoleManager is MemberRoleManagerInterface {
     _;
   }
 
+  modifier onlyVerifiedProvider() {
+    require(_isVerifiedProvider(msg.sender), 'Not a verified provider');
+    _;
+  }
+
   constructor() {
     admin = msg.sender;
   }
@@ -75,7 +84,8 @@ contract MemberRoleManager is MemberRoleManagerInterface {
     NotRegistered, // 0 - Default/uninitialized
     Inactive, // 1 - Cannot transact (banned/removed)
     Active, // 2 - Default for new members
-    Verified // 3 - User has verified their identity and email
+    Verified, // 3 - User has verified their identity and email
+    VerifiedProvider // 4 - User is a verified healthcare provider
   }
 
   // =================== MEMBER REGISTRY - EVENTS ===================
@@ -213,6 +223,20 @@ contract MemberRoleManager is MemberRoleManagerInterface {
     if (userIdHash == bytes32(0) || !wallets[wallet].isWalletActive) return false;
 
     return userStatus[userIdHash] == MemberStatus.Verified;
+  }
+
+  /**
+   * @notice Check if wallet belongs to a verified healthcare provider
+   */
+  function isVerifiedProvider(address wallet) external view override returns (bool) {
+    return _isVerifiedProvider(wallet);
+  }
+
+  function _isVerifiedProvider(address wallet) internal view returns (bool) {
+    bytes32 userIdHash = wallets[wallet].userIdHash;
+    if (userIdHash == bytes32(0) || !wallets[wallet].isWalletActive) return false;
+
+    return userStatus[userIdHash] == MemberStatus.VerifiedProvider;
   }
 
   /**
