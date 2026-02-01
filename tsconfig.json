@@ -24,7 +24,9 @@
   },
   "include": [
     "src/**/*",
-    "vite.config.ts"
+    "vite.config.ts",
+    "scripts/**/*",
+    "test/**/*"
   ],
   "exclude": [
     "node_modules",

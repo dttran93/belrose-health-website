@@ -300,10 +300,41 @@ contract HealthRecordCore {
   }
 
   /**
-   * @notice Get all records where an address is the subject
+   * @notice Get all records where a user is the subject (includes records that may be unanchored)
    */
   function getSubjectMedicalHistory(bytes32 userIdHash) external view returns (string[] memory) {
     return subjectMedicalHistory[userIdHash];
+  }
+
+  /**
+   * @notice Get only ACTIVE records where a user is the subject
+   * @param userIdHash The user's identity hash
+   */
+  function getActiveSubjectMedicalHistory(
+    bytes32 userIdHash
+  ) external view returns (string[] memory) {
+    string[] memory allRecords = subjectMedicalHistory[userIdHash];
+
+    // Count active records first
+    uint256 activeCount = 0;
+    for (uint256 i = 0; i < allRecords.length; i++) {
+      if (isSubjectActive[allRecords[i]][userIdHash]) {
+        activeCount++;
+      }
+    }
+
+    // Build result array
+    string[] memory activeRecords = new string[](activeCount);
+    uint256 idx = 0;
+
+    for (uint256 i = 0; i < allRecords.length; i++) {
+      if (isSubjectActive[allRecords[i]][userIdHash]) {
+        activeRecords[idx] = allRecords[i];
+        idx++;
+      }
+    }
+
+    return activeRecords;
   }
 
   /**

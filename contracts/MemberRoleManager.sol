@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+
 /**
  * @title MemberRoleManagerInterface
  * @dev Interface for HealthRecordCore to reference
@@ -28,6 +31,7 @@ interface MemberRoleManagerInterface {
 /**
  * @title MemberRoleManager
  * @dev Manages multi-wallet member registration and role-based access control.
+ * @dev Upgradeable version using uups proxy pattern
  *
  * KEY ARCHITECTURE:
  * - Members are registered by WALLET ADDRESS
@@ -36,7 +40,7 @@ interface MemberRoleManagerInterface {
  * - Roles are assigned to IDENTITIES, not wallets
  * - Any wallet linked to an identity can exercise that identity's roles
  */
-contract MemberRoleManager is MemberRoleManagerInterface {
+contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerInterface {
   // ===============================================================
   // ADMIN MANAGEMENT
   // ===============================================================
@@ -64,9 +68,25 @@ contract MemberRoleManager is MemberRoleManagerInterface {
     _;
   }
 
+  /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
+    _disableInitializers();
+  }
+
+  /**
+   * @notice Initialize the contract (replaces constructor)
+   * @dev Can only be called once during proxy deployment
+   */
+  function initialize() public initializer {
+    __UUPSUpgradeable_init();
     admin = msg.sender;
   }
+
+  /**
+   * @notice Authorize contract upgrades
+   * @dev Only admin can upgrade the contract
+   */
+  function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {}
 
   function transferAdmin(address newAdmin) external onlyAdmin {
     require(newAdmin != address(0), 'Invalid address');

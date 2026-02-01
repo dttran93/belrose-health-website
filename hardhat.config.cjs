@@ -1,14 +1,15 @@
-import '@nomicfoundation/hardhat-toolbox';
-import 'dotenv/config';
+require('@nomicfoundation/hardhat-toolbox');
+require('@openzeppelin/hardhat-upgrades');
+require('dotenv/config');
 
-/** @type {import('hardhat/config').HardhatUserConfig} */
-export default {
+/** @type import('hardhat/config').HardhatUserConfig */
+module.exports = {
   solidity: {
     version: '0.8.23',
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200,
+        runs: 1000,
       },
       viaIR: true,
       evmVersion: 'paris',
@@ -17,6 +18,9 @@ export default {
   networks: {
     hardhat: {
       chainId: 31337,
+    },
+    localhost: {
+      url: 'http://127.0.0.1:8545',
     },
     mumbai: {
       url: 'https://polygon-mumbai-bor.publicnode.com',
@@ -30,7 +34,6 @@ export default {
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY,
   },
-
   sourcify: {
     enabled: false,
   },
