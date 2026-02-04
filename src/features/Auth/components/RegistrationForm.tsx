@@ -1,20 +1,20 @@
 // /features/Auth/components/RegistrationForm.tsx
 
 import React, { useState } from 'react';
-import { Check, Wallet, ShieldCheck, ArrowRight, ArrowLeft, RotateCcwKey } from 'lucide-react';
+import { Check, ShieldCheck, ArrowRight, ArrowLeft, RotateCcwKey } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import BelroseAccountForm from './BelroseAccountForm';
 import { RecoveryKeyDisplay } from './RecoveryKeyDisplay';
-import WalletSetup from './WalletSetup';
 import { getFirestore, doc, updateDoc } from 'firebase/firestore';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { MemberRegistryBlockchain } from '../services/memberRegistryBlockchain';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
-import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
+import { WalletGenerationService } from '../services/walletGenerationService';
+import { SmartAccountService } from '@/features/BlockchainWallet/services/smartAccountService';
 
 interface StepConfig {
   number: number;
@@ -45,6 +45,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     recoveryKey: '',
     recoveryKeyHash: '',
     acknowledgedRecoveryKey: false,
+    walletGenerationComplete: false,
     encryptedMasterKey: '',
     masterKeyIV: '',
     masterKeySalt: '',
@@ -62,14 +63,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     },
     {
       number: 2,
-      title: 'Blockchain Connection',
-      subtitle: 'Connect to the blockchain',
-      icon: Wallet,
-    },
-    {
-      number: 3,
       title: 'Recovery Key',
-      subtitle: 'Save your recovery key for your encryption and blockchain wallet',
+      subtitle: 'Save your recovery key for your encryption and network access',
       icon: RotateCcwKey,
     },
   ];
@@ -78,11 +73,12 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     switch (stepNumber) {
       case 1:
         //Step 1 is done if we have a userId and email
-        return !!(registrationData.userId && registrationData.email);
+        return !!(
+          registrationData.userId &&
+          registrationData.email &&
+          registrationData.walletGenerationComplete
+        );
       case 2:
-        // Step 2 is complete if wallet address and type are set
-        return !!(registrationData.walletAddress && registrationData.walletType);
-      case 3:
         // Step 3 is completed if a recovery Key has been created/saved and acknowledged Recovery Key.
         return !!registrationData.acknowledgedRecoveryKey;
       default:
@@ -90,12 +86,12 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     }
   };
 
-  const canCompleteRegistration = (): Boolean => {
-    return isStepCompleted(1) && isStepCompleted(2) && isStepCompleted(3);
+  const canCompleteRegistration = (): boolean => {
+    return isStepCompleted(1) && isStepCompleted(2);
   };
 
   const handleStepComplete = async (stepNumber: number, data: any) => {
-    // If completing step 1, generate and encrypt the master key
+    // If completing step 1, generate and encrypt the master key and wallet
     if (stepNumber === 1 && data.password) {
       try {
         console.log('🔐 Setting up encryption...');
@@ -131,7 +127,15 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         // 6. Store master key in session for registration process
         EncryptionKeyManager.setSessionKey(masterKey);
 
-        // 7. Update registration data with all encryption info
+        // 7. Generate blockchain wallet
+        console.log('💼 Generating blockchain wallet...');
+        const walletData = await WalletGenerationService.generateWallet({
+          userId: data.userId,
+          masterKey,
+        });
+        console.log('✓ Wallet created:', walletData.walletAddress);
+
+        // 8. Update registration data with all encryption info
         setRegistrationData(prev => ({
           ...prev,
           ...data,
@@ -143,6 +147,9 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
           publicKey: publicKey,
           encryptedPrivateKey: encryptedPrivateKey,
           encryptedPrivateKeyIV: encryptedPrivateKeyIV,
+          walletAddress: walletData.walletAddress,
+          walletType: 'generated',
+          walletGenerationComplete: true,
         }));
 
         toast.success('Account and encryption setup complete!', {
@@ -171,41 +178,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     }
   };
 
-  /**
-   * Register member on blockchain
-   * Non-blocking - logs failure for retry but doesn't fail registration
-   */
-  const registerMemberOnBlockchain = async (walletAddress: string): Promise<void> => {
-    try {
-      console.log('🔗 Registering member on blockchain...');
-      const result = await MemberRegistryBlockchain.registerMemberWallet(walletAddress);
-
-      if (result.txHash) {
-        console.log('✅ Blockchain registration complete:', result.txHash);
-      } else {
-        console.log('ℹ️ Member already registered or registration skipped');
-      }
-    } catch (error: any) {
-      console.error('⚠️ Blockchain registration failed (non-blocking):', error);
-      try {
-        const db = getFirestore();
-        await BlockchainSyncQueueService.logFailure({
-          contract: 'MemberRoleManager',
-          action: 'registerMember',
-          userId: registrationData.userId,
-          userWalletAddress: walletAddress,
-          error: error instanceof Error ? error.message : String(error),
-          context: {
-            type: 'memberRegistry',
-            newStatus: 'Active',
-          },
-        });
-      } catch (logError) {
-        console.error('Failed to log blockchain error:', logError);
-      }
-    }
-  };
-
   const handleCompleteRegistration = async () => {
     if (!canCompleteRegistration()) {
       toast.error('Please complete all steps before continuing');
@@ -217,7 +189,26 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     setIsSubmitting(true);
 
     try {
-      // 1. Save core account data to Firestore
+      console.log('🔄 Completing registration...');
+
+      // 1. Register EOA wallet on blockchain (creates userId identity)
+      console.log('🔗 Registering EOA wallet on blockchain...');
+      const eoaResult = await MemberRegistryBlockchain.registerMemberWallet(
+        registrationData.walletAddress
+      );
+
+      if (!eoaResult.txHash && eoaResult.message !== 'Already registered') {
+        throw new Error('EOA blockchain registration failed - no transaction hash received');
+      }
+
+      console.log('✅ EOA wallet registered:', eoaResult.txHash || 'already registered');
+
+      // 2. Compute and register smart account (adds to existing userId)
+      console.log('💼 Computing and registering smart account...');
+      const smartAccountAddress = await SmartAccountService.ensureFullyInitialized();
+      console.log('✅ Smart account ready:', smartAccountAddress);
+
+      // 3. Save core account data to Firestore (only after blockchain succeeds)
       const db = getFirestore();
       const userDocRef = doc(db, 'users', registrationData.userId);
 
@@ -237,6 +228,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
           recoveryKeyHash: registrationData.recoveryKeyHash,
           setupAt: new Date().toISOString(),
         },
+
         // Verification fields will be updated later in the verification flow
         emailVerified: false,
         identityVerified: false,
@@ -249,11 +241,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         duration: 3000,
       });
 
-      //2. Register member on blockchain (non-blocking, can run in background)
-      //Registers both EOA wallet and smartAccountAddress
-      registerMemberOnBlockchain(registrationData.walletAddress);
-
-      // Navigate to verification hub instead of dashboard
+      // Navigate to verification hub
       navigate('/verification', {
         replace: true,
         state: {
@@ -263,9 +251,15 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         },
       });
     } catch (error) {
-      console.error('Error completing registration:', error);
-      toast.error('Failed to complete registration', {
-        description: 'Please try again or contact support',
+      console.error('❌ Registration failed:', error);
+
+      // Provide specific error message
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      toast.error('Registration failed', {
+        description: errorMessage.includes('blockchain')
+          ? 'Blockchain registration failed. Please try again.'
+          : 'Please try again or contact support if the issue persists.',
         duration: 5000,
       });
     } finally {
@@ -350,28 +344,19 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
                 onComplete={data => handleStepComplete(1, data)}
                 initialData={registrationData}
                 isCompleted={isStepCompleted(1)}
+                onLoadingChange={(isLoading, message) => {
+                  if (message) {
+                    console.log('Loading:', message);
+                  }
+                }}
               />
             )}
             {currentStep === 2 && (
-              <WalletSetup
-                userId={registrationData.userId}
-                initialWalletData={{
-                  walletAddress: registrationData.walletAddress,
-                  walletType: registrationData.walletType,
-                  smartAccountAddress: registrationData.smartAccountAddress,
-                }}
-                onComplete={data => handleStepComplete(2, data)}
-                isCompleted={isStepCompleted(2)}
-                isActivated={isStepCompleted(1)}
-              />
-            )}
-
-            {currentStep === 3 && (
               <RecoveryKeyDisplay
                 recoveryKey={registrationData.recoveryKey}
                 onAcknowledge={handleRecoveryKeyAcknowledged}
                 onComplete={handleCompleteRegistration}
-                isCompleted={isStepCompleted(3)}
+                isCompleted={isStepCompleted(2)}
                 isActivated={isStepCompleted(1)}
               />
             )}
@@ -419,8 +404,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <Button
-              onClick={() => setCurrentStep(Math.min(currentStep + 1, 4))}
-              disabled={currentStep === 3}
+              onClick={() => setCurrentStep(Math.min(currentStep + 1, 2))}
+              disabled={currentStep === 2}
               className="px-4 py-2 rounded-lg hover:bg-secondary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <ArrowRight className="w-5 h-5" />

@@ -1,27 +1,13 @@
 // /features/Auth/components/BelroseAccountForm.tsx
 
 import React, { useState, useEffect } from 'react';
-import {
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  ArrowRight,
-  User,
-  Edit2,
-  CheckCircle,
-  UserPen,
-} from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, User, Edit2, CheckCircle, UserPen, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import { authService } from '@/features/Auth/services/authServices';
 import { useAuthForm } from '../hooks/useAuthForm';
-import { SocialAuthButtons } from './ui/SocialAuthButtons';
 import { PasswordStrengthIndicator } from '@/features/Auth/components/ui/PasswordStrengthIndicator';
-import {
-  validatePassword,
-  validatePasswordConfirmation,
-} from '@/features/Auth/utils/PasswordStrength';
+import { validatePassword } from '@/features/Auth/utils/PasswordStrength';
 import InputField from './ui/InputField';
 
 interface BelroseAccountFormData {
@@ -46,12 +32,14 @@ interface BelroseAccountFormProps {
   }) => void;
   initialData: any;
   isCompleted?: boolean;
+  onLoadingChange?: (isLoading: boolean, message?: string) => void;
 }
 
 const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
   onComplete,
   initialData,
   isCompleted = false,
+  onLoadingChange,
 }) => {
   const { formData, errors, isLoading, setErrors, setIsLoading, handleInputChange, setFormData } =
     useAuthForm<BelroseAccountFormData>({
@@ -64,6 +52,7 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
 
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState(!isCompleted);
+  const [loadingMessage, setLoadingMessage] = useState<string>('');
 
   useEffect(() => {
     if (initialData.email || initialData.firstName || initialData.lastName) {
@@ -209,6 +198,8 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
 
     // Normal Sign-up Flow
     setIsLoading(true);
+    setLoadingMessage('Creating your account...');
+    onLoadingChange?.(true, 'Creating your account');
     const trimmedEmail = formData.email.trim();
 
     try {
@@ -226,6 +217,8 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
         lastName: formData.lastName.trim(),
         password: formData.password,
       });
+      setLoadingMessage('Setting up encryption and network account');
+      onLoadingChange?.(true, 'Setting up encryption and wallet...');
     } catch (error) {
       console.error('Auth error:', error);
       const firebaseError = error as FirebaseError;
@@ -254,6 +247,8 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
       });
     } finally {
       setIsLoading(false);
+      setLoadingMessage('');
+      onLoadingChange?.(false);
     }
   };
 
@@ -430,7 +425,14 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
 
         {/* Submit button */}
         <Button type="submit" disabled={isLoading} size="lg" className="w-full rounded-xl">
-          Submit
+          {isLoading ? (
+            <div className="flex items-center justify-center space-x-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>{loadingMessage || 'Processing...'}</span>
+            </div>
+          ) : (
+            'Continue'
+          )}
         </Button>
 
         {/* Cancel button when editing */}
@@ -455,9 +457,6 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
           </Button>
         )}
       </form>
-
-      {/* Social login*/}
-      {!isCompleted && <SocialAuthButtons disabled={isLoading} />}
     </>
   );
 };
