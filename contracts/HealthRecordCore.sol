@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+
 /**
  * @title MemberRoleManagerInterface
  * @dev Interface for HealthRecordCore to reference
@@ -28,7 +31,7 @@ interface MemberRoleManagerInterface {
  * @dev Handles record anchoring and record reviews
  * References MemberRoleManager for membership and role checks
  */
-contract HealthRecordCore {
+contract HealthRecordCore is Initializable, UUPSUpgradeable {
   // ===============================================================
   // CONTRACT SETUP
   // ===============================================================
@@ -69,11 +72,28 @@ contract HealthRecordCore {
     _;
   }
 
-  constructor(address _memberRoleManager) {
+  /// @custom:oz-upgrades-unsafe-allow constructor
+  constructor() {
+    _disableInitializers();
+  }
+
+  /**
+   * @notice Initialize the contract (replaces constructor)
+   * @dev Can only be called once during proxy development
+   * @param _memberRoleManager Address of the MemberRoleManager proxy
+   */
+  function initialize(address _memberRoleManager) public initializer {
+    __UUPSUpgradeable_init();
     require(_memberRoleManager != address(0), 'Invalid MemberRoleManager address');
     memberRoleManager = MemberRoleManagerInterface(_memberRoleManager);
     admin = msg.sender;
   }
+
+  /**
+   * @notice Authorize contract upgrades
+   * @dev Only admin can upgrade the contract
+   */
+  function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {}
 
   function transferAdmin(address newAdmin) external onlyAdmin {
     require(newAdmin != address(0), 'Invalid address');
@@ -304,37 +324,6 @@ contract HealthRecordCore {
    */
   function getSubjectMedicalHistory(bytes32 userIdHash) external view returns (string[] memory) {
     return subjectMedicalHistory[userIdHash];
-  }
-
-  /**
-   * @notice Get only ACTIVE records where a user is the subject
-   * @param userIdHash The user's identity hash
-   */
-  function getActiveSubjectMedicalHistory(
-    bytes32 userIdHash
-  ) external view returns (string[] memory) {
-    string[] memory allRecords = subjectMedicalHistory[userIdHash];
-
-    // Count active records first
-    uint256 activeCount = 0;
-    for (uint256 i = 0; i < allRecords.length; i++) {
-      if (isSubjectActive[allRecords[i]][userIdHash]) {
-        activeCount++;
-      }
-    }
-
-    // Build result array
-    string[] memory activeRecords = new string[](activeCount);
-    uint256 idx = 0;
-
-    for (uint256 i = 0; i < allRecords.length; i++) {
-      if (isSubjectActive[allRecords[i]][userIdHash]) {
-        activeRecords[idx] = allRecords[i];
-        idx++;
-      }
-    }
-
-    return activeRecords;
   }
 
   /**
@@ -1070,42 +1059,6 @@ contract HealthRecordCore {
   }
 
   /**
-   * @notice Get verification stats by level for a record hash
-   */
-  function getVerificationStatsByLevel(
-    string memory recordHash
-  )
-    external
-    view
-    returns (
-      uint256 total,
-      uint256 active,
-      uint256 provenanceCount,
-      uint256 contentCount,
-      uint256 fullCount
-    )
-  {
-    Verification[] memory vers = verifications[recordHash];
-    total = vers.length;
-
-    for (uint256 i = 0; i < vers.length; i++) {
-      if (vers[i].isActive) {
-        active++;
-
-        if (vers[i].level == VerificationLevel.Provenance) {
-          provenanceCount++;
-        } else if (vers[i].level == VerificationLevel.Content) {
-          contentCount++;
-        } else if (vers[i].level == VerificationLevel.Full) {
-          fullCount++;
-        }
-      }
-    }
-
-    return (total, active, provenanceCount, contentCount, fullCount);
-  }
-
-  /**
    * @notice Get all hashes a user has verified
    */
   function getUserVerifications(bytes32 userIdHash) external view returns (string[] memory) {
@@ -1176,42 +1129,6 @@ contract HealthRecordCore {
     }
 
     return (total, active);
-  }
-
-  /**
-   * @notice Get dispute stats by severity for a record hash
-   */
-  function getDisputeStatsBySeverity(
-    string memory recordHash
-  )
-    external
-    view
-    returns (
-      uint256 total,
-      uint256 active,
-      uint256 negligibleCount,
-      uint256 moderateCount,
-      uint256 majorCount
-    )
-  {
-    Dispute[] memory disps = disputes[recordHash];
-    total = disps.length;
-
-    for (uint256 i = 0; i < disps.length; i++) {
-      if (disps[i].isActive) {
-        active++;
-
-        if (disps[i].severity == DisputeSeverity.Negligible) {
-          negligibleCount++;
-        } else if (disps[i].severity == DisputeSeverity.Moderate) {
-          moderateCount++;
-        } else if (disps[i].severity == DisputeSeverity.Major) {
-          majorCount++;
-        }
-      }
-    }
-
-    return (total, active, negligibleCount, moderateCount, majorCount);
   }
 
   /**
@@ -1339,70 +1256,5 @@ contract HealthRecordCore {
    */
   function hasActiveUnacceptedFlags(bytes32 subjectIdHash) external view returns (bool) {
     return activeUnacceptedFlagCount[subjectIdHash] > 0;
-  }
-
-  /**
-   * @notice Get total flag stats
-   */
-  function getTotalUnacceptedFlagStats() external view returns (uint256) {
-    return totalUnacceptedFlags;
-  }
-
-  // ------------------- COMBINED / SUMMARY VIEWS -------------------
-
-  /**
-   * @notice Get complete review summary for a record hash
-   */
-  function getRecordHashReviewSummary(
-    string memory recordHash
-  )
-    external
-    view
-    returns (
-      uint256 activeVerifications,
-      uint256 activeDisputes,
-      uint256 verificationCount,
-      uint256 disputeCount
-    )
-  {
-    Verification[] memory vers = verifications[recordHash];
-    Dispute[] memory disps = disputes[recordHash];
-
-    verificationCount = vers.length;
-    disputeCount = disps.length;
-
-    for (uint256 i = 0; i < vers.length; i++) {
-      if (vers[i].isActive) {
-        activeVerifications++;
-      }
-    }
-
-    for (uint256 i = 0; i < disps.length; i++) {
-      if (disps[i].isActive) {
-        activeDisputes++;
-      }
-    }
-
-    return (activeVerifications, activeDisputes, verificationCount, disputeCount);
-  }
-
-  /**
-   * @notice Get a user's complete review history
-   */
-  function getUserReviewHistory(
-    bytes32 userIdHash
-  ) external view returns (uint256 userVerifications, uint256 userDisputes) {
-    return (verificationsByUser[userIdHash].length, disputesByUser[userIdHash].length);
-  }
-
-  /**
-   * @notice Get total review counts across all records
-   */
-  function getTotalReviewStats()
-    external
-    view
-    returns (uint256 verificationCount, uint256 disputeCount)
-  {
-    return (totalVerifications, totalDisputes);
   }
 }
