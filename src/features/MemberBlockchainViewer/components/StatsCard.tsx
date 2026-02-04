@@ -23,7 +23,7 @@ interface StatsCardProps {
  * ```
  */
 export const StatsCard: React.FC<StatsCardProps> = ({ title, value, icon, color }) => (
-  <div className={`rounded-xl p-5 ${color} border shadow-sm`}>
+  <div className={`rounded-xl p-5 ${color} border shadow-sm h-full`}>
     <div className="flex items-center justify-between">
       <div>
         <p className="text-sm font-medium opacity-80">{title}</p>

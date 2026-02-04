@@ -14,13 +14,6 @@
  * VerificationPreparationService, etc.) should call this service first,
  * then perform their own feature-specific checks.
  *
- * Usage:
- *   // Quick check - is user ready?
- *   const status = await BlockchainPreparationService.getStatus();
- *   if (!status.ready) { ... show setup UI ... }
- *
- *   // Auto-fix everything and get smart account address
- *   const address = await BlockchainPreparationService.ensureReady();
  */
 
 import { createPublicClient, http, type Address } from 'viem';
@@ -29,7 +22,7 @@ import { SmartAccountService } from './smartAccountService';
 
 // ==================== SMART CONTRACT CONFIG ====================
 
-const MEMBER_ROLE_MANAGER_ADDRESS = '0x0FdDcE7EdebD73C6d1A11983bb6a759132543aaD' as const;
+const MEMBER_ROLE_MANAGER_ADDRESS = '0xC31477f563dC8f7529Ba6AE7E410ABdB84C27d7C' as const;
 
 const MEMBER_ROLE_MANAGER_ABI = [
   {

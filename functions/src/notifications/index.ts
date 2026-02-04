@@ -32,4 +32,7 @@ export {
 } from './notificationUtils';
 
 // Export triggers (for Firebase Functions deployment)
-export { onRecordSubjectChange } from './triggers/subjectNotificationTrigger';
+export {
+  onSubjectConsentRequestCreated,
+  onSubjectConsentRequestUpdated,
+} from './triggers/subjectNotificationTrigger';

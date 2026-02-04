@@ -271,7 +271,7 @@ const MemberDashboard: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <button
             onClick={() => setCurrentView('users')}
-            className="text-left transition-transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-xl"
+            className="h-full text-left transition-transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-xl"
           >
             <StatsCard
               title="Total Users (Identities)"
@@ -283,13 +283,13 @@ const MemberDashboard: React.FC = () => {
 
           <button
             onClick={() => setCurrentView('verified')}
-            className="text-left transition-transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-xl"
+            className="text-left transition-transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 rounded-xl"
           >
             <StatsCard
               title="Verified Users"
               value={statusCounts[UserStatus.Verified]}
               icon={<CheckCircle className="w-6 h-6 text-emerald-600" />}
-              color="bg-emerald-50 border-emerald-200 text-emerald-900"
+              color={`${currentView === 'verified' ? 'ring-2 ring-emerald-500' : ''} bg-emerald-50 border-emerald-200 text-emerald-900`}
             />
           </button>
 

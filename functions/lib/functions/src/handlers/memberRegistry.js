@@ -6,7 +6,7 @@ exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deacti
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const ethers_1 = require("ethers");
-const MEMBER_ROLE_MANAGER_ADDRESS = '0x0FdDcE7EdebD73C6d1A11983bb6a759132543aaD';
+const MEMBER_ROLE_MANAGER_ADDRESS = '0xC31477f563dC8f7529Ba6AE7E410ABdB84C27d7C';
 const MEMBER_ROLE_MANAGER_ABI = [
     // Admin Functions
     'function addMember(address wallet, bytes32 userIdHash) external',

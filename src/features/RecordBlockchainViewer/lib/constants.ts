@@ -4,10 +4,10 @@
  * HealthRecordCore Contract Configuration
  */
 
-export const HEALTH_RECORD_CORE_ADDRESS = '0xDC79F803594232421f49a29D9EcEbe78015d48e1';
+export const HEALTH_RECORD_CORE_ADDRESS = '0x97F9eD2af3f9a30Eac958D0994a0F131Eda11A57';
 export const SEPOLIA_RPC_URL = 'https://ethereum-sepolia.publicnode.com';
 export const ETHERSCAN_BASE_URL = 'https://sepolia.etherscan.io';
-export const DEPLOYMENT_BLOCK = 9967778;
+export const DEPLOYMENT_BLOCK = 10190796;
 
 /**
  * Contract ABI - View functions and events needed for the admin dashboard
@@ -535,43 +535,6 @@ export const HEALTH_RECORD_CORE_ABI = [
     inputs: [{ internalType: 'bytes32', name: 'subjectIdHash', type: 'bytes32' }],
     name: 'hasActiveUnacceptedFlags',
     outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-
-  // ===============================================================
-  // VIEW FUNCTIONS - SUMMARY
-  // ===============================================================
-
-  {
-    inputs: [{ internalType: 'string', name: 'recordHash', type: 'string' }],
-    name: 'getRecordHashReviewSummary',
-    outputs: [
-      { internalType: 'uint256', name: 'activeVerifications', type: 'uint256' },
-      { internalType: 'uint256', name: 'activeDisputes', type: 'uint256' },
-      { internalType: 'uint256', name: 'verificationCount', type: 'uint256' },
-      { internalType: 'uint256', name: 'disputeCount', type: 'uint256' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' }],
-    name: 'getUserReviewHistory',
-    outputs: [
-      { internalType: 'uint256', name: 'userVerifications', type: 'uint256' },
-      { internalType: 'uint256', name: 'userDisputes', type: 'uint256' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'getTotalReviewStats',
-    outputs: [
-      { internalType: 'uint256', name: 'verificationCount', type: 'uint256' },
-      { internalType: 'uint256', name: 'disputeCount', type: 'uint256' },
-    ],
     stateMutability: 'view',
     type: 'function',
   },

@@ -20,7 +20,7 @@ import { PaymasterService } from '@/features/BlockchainWallet/services/paymaster
 // CONFIG
 // ============================================================================
 
-const HEALTH_RECORD_CORE_ADDRESS = '0xDC79F803594232421f49a29D9EcEbe78015d48e1';
+const HEALTH_RECORD_CORE_ADDRESS = '0x97F9eD2af3f9a30Eac958D0994a0F131Eda11A57';
 const RPC_URL = 'https://1rpc.io/sepolia';
 
 // ============================================================================
@@ -239,19 +239,6 @@ const HEALTH_RECORD_CORE_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ name: 'recordHash', type: 'string' }],
-    name: 'getVerificationStatsByLevel',
-    outputs: [
-      { name: 'total', type: 'uint256' },
-      { name: 'active', type: 'uint256' },
-      { name: 'provenanceCount', type: 'uint256' },
-      { name: 'contentCount', type: 'uint256' },
-      { name: 'fullCount', type: 'uint256' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
     inputs: [{ name: 'userIdHash', type: 'bytes32' }],
     name: 'getUserVerifications',
     outputs: [{ name: '', type: 'string[]' }],
@@ -348,19 +335,6 @@ const HEALTH_RECORD_CORE_ABI = [
     outputs: [
       { name: 'total', type: 'uint256' },
       { name: 'active', type: 'uint256' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'recordHash', type: 'string' }],
-    name: 'getDisputeStatsBySeverity',
-    outputs: [
-      { name: 'total', type: 'uint256' },
-      { name: 'active', type: 'uint256' },
-      { name: 'negligibleCount', type: 'uint256' },
-      { name: 'moderateCount', type: 'uint256' },
-      { name: 'majorCount', type: 'uint256' },
     ],
     stateMutability: 'view',
     type: 'function',
@@ -506,47 +480,6 @@ const HEALTH_RECORD_CORE_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
-  {
-    inputs: [],
-    name: 'getTotalUnacceptedFlagStats',
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-
-  // ==================== SUMMARY VIEW FUNCTIONS ====================
-  {
-    inputs: [{ name: 'recordHash', type: 'string' }],
-    name: 'getRecordHashReviewSummary',
-    outputs: [
-      { name: 'activeVerifications', type: 'uint256' },
-      { name: 'activeDisputes', type: 'uint256' },
-      { name: 'verificationCount', type: 'uint256' },
-      { name: 'disputeCount', type: 'uint256' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'userIdHash', type: 'bytes32' }],
-    name: 'getUserReviewHistory',
-    outputs: [
-      { name: 'userVerifications', type: 'uint256' },
-      { name: 'userDisputes', type: 'uint256' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'getTotalReviewStats',
-    outputs: [
-      { name: 'verificationCount', type: 'uint256' },
-      { name: 'disputeCount', type: 'uint256' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
 ];
 
 // ============================================================================
@@ -632,44 +565,15 @@ export interface VerificationStats {
   active: number;
 }
 
-export interface VerificationStatsByLevel extends VerificationStats {
-  provenanceCount: number;
-  contentCount: number;
-  fullCount: number;
-}
-
 export interface DisputeStats {
   total: number;
   active: number;
-}
-
-export interface DisputeStatsBySeverity extends DisputeStats {
-  negligibleCount: number;
-  moderateCount: number;
-  majorCount: number;
 }
 
 export interface ReactionStats {
   totalReactions: number;
   activeSupports: number;
   activeOpposes: number;
-}
-
-export interface RecordReviewSummary {
-  activeVerifications: number;
-  activeDisputes: number;
-  verificationCount: number;
-  disputeCount: number;
-}
-
-export interface UserReviewHistory {
-  userVerifications: number;
-  userDisputes: number;
-}
-
-export interface TotalReviewStats {
-  verificationCount: number;
-  disputeCount: number;
 }
 
 export interface TransactionResult {
@@ -1022,26 +926,6 @@ export class blockchainHealthRecordService {
     }
   }
 
-  /** Get verification stats by level for a record hash */
-  static async getVerificationStatsByLevel(recordHash: string): Promise<VerificationStatsByLevel> {
-    try {
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getVerificationStatsByLevel');
-      const result = await fn(recordHash);
-
-      return {
-        total: Number(result[0]),
-        active: Number(result[1]),
-        provenanceCount: Number(result[2]),
-        contentCount: Number(result[3]),
-        fullCount: Number(result[4]),
-      };
-    } catch (error) {
-      console.error('Error getting verification stats by level:', error);
-      return { total: 0, active: 0, provenanceCount: 0, contentCount: 0, fullCount: 0 };
-    }
-  }
-
   /** Get all hashes a user has verified */
   static async getUserVerifications(userIdHash: string): Promise<string[]> {
     try {
@@ -1194,26 +1078,6 @@ export class blockchainHealthRecordService {
     } catch (error) {
       console.error('Error getting dispute stats:', error);
       return { total: 0, active: 0 };
-    }
-  }
-
-  /** Get dispute stats by severity for a record hash */
-  static async getDisputeStatsBySeverity(recordHash: string): Promise<DisputeStatsBySeverity> {
-    try {
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getDisputeStatsBySeverity');
-      const result = await fn(recordHash);
-
-      return {
-        total: Number(result[0]),
-        active: Number(result[1]),
-        negligibleCount: Number(result[2]),
-        moderateCount: Number(result[3]),
-        majorCount: Number(result[4]),
-      };
-    } catch (error) {
-      console.error('Error getting dispute stats by severity:', error);
-      return { total: 0, active: 0, negligibleCount: 0, moderateCount: 0, majorCount: 0 };
     }
   }
 
@@ -1416,76 +1280,6 @@ export class blockchainHealthRecordService {
     } catch (error) {
       console.error('Error checking if has active unaccepted flags:', error);
       return false;
-    }
-  }
-
-  /** Get total flag stats */
-  static async getTotalUnacceptedFlagStats(): Promise<number> {
-    try {
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getTotalUnacceptedFlagStats');
-      const total = await fn();
-      return Number(total);
-    } catch (error) {
-      console.error('Error getting total unaccepted flag stats:', error);
-      return 0;
-    }
-  }
-
-  // ==========================================================================
-  // SUMMARY VIEW FUNCTIONS
-  // ==========================================================================
-
-  /** Get complete review summary for a record hash */
-  static async getRecordHashReviewSummary(recordHash: string): Promise<RecordReviewSummary> {
-    try {
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getRecordHashReviewSummary');
-      const result = await fn(recordHash);
-
-      return {
-        activeVerifications: Number(result[0]),
-        activeDisputes: Number(result[1]),
-        verificationCount: Number(result[2]),
-        disputeCount: Number(result[3]),
-      };
-    } catch (error) {
-      console.error('Error getting record hash review summary:', error);
-      return { activeVerifications: 0, activeDisputes: 0, verificationCount: 0, disputeCount: 0 };
-    }
-  }
-
-  /** Get a user's complete review history */
-  static async getUserReviewHistory(userIdHash: string): Promise<UserReviewHistory> {
-    try {
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getUserReviewHistory');
-      const result = await fn(userIdHash);
-
-      return {
-        userVerifications: Number(result[0]),
-        userDisputes: Number(result[1]),
-      };
-    } catch (error) {
-      console.error('Error getting user review history:', error);
-      return { userVerifications: 0, userDisputes: 0 };
-    }
-  }
-
-  /** Get total review counts across all records */
-  static async getTotalReviewStats(): Promise<TotalReviewStats> {
-    try {
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getTotalReviewStats');
-      const result = await fn();
-
-      return {
-        verificationCount: Number(result[0]),
-        disputeCount: Number(result[1]),
-      };
-    } catch (error) {
-      console.error('Error getting total review stats:', error);
-      return { verificationCount: 0, disputeCount: 0 };
     }
   }
 

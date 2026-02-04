@@ -4,11 +4,11 @@
  * MemberRoleManager Contract Configuration
  */
 
-export const MEMBER_ROLE_MANAGER_ADDRESS = '0x0FdDcE7EdebD73C6d1A11983bb6a759132543aaD';
+export const MEMBER_ROLE_MANAGER_ADDRESS = '0xC31477f563dC8f7529Ba6AE7E410ABdB84C27d7C';
 
 export const SEPOLIA_RPC_URL = 'https://1rpc.io/sepolia';
 export const ETHERSCAN_BASE_URL = 'https://sepolia.etherscan.io';
-export const DEPLOYMENT_BLOCK = 9921851;
+export const DEPLOYMENT_BLOCK = 10190794;
 
 /**
  * Contract ABI - Only the view functions needed for the admin dashboard

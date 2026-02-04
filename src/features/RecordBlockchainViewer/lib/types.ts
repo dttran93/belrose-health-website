@@ -1,6 +1,7 @@
 // src/features/HealthRecordViewer/lib/types.ts
 
 import { DisputeSeverityOptions } from '@/features/Credibility/services/disputeService';
+import { VerificationLevelOptions } from '@/features/Credibility/services/verificationService';
 import { ethers } from 'ethers';
 
 /**
@@ -63,11 +64,6 @@ export interface HealthRecordCoreContract {
     flagIndex: number
   ): Promise<[string, string, bigint, number, bigint, boolean]>;
   hasActiveUnacceptedFlags(subjectIdHash: string): Promise<boolean>;
-
-  // Summary
-  getRecordHashReviewSummary(recordHash: string): Promise<[bigint, bigint, bigint, bigint]>;
-  getUserReviewHistory(userIdHash: string): Promise<[bigint, bigint]>;
-  getTotalReviewStats(): Promise<[bigint, bigint]>;
 
   // Event filters
   filters: {
@@ -137,6 +133,7 @@ interface UnacceptedUpdateFlagStruct {
 // ===============================================================
 
 export enum VerificationLevel {
+  None = 0,
   Provenance = 1, // Vouches for source/origin
   Content = 2, // Vouches for content accuracy
   Full = 3, // Full verification (source + content)
@@ -204,7 +201,7 @@ export interface Verification {
   verifierIdHash: string;
   recordId: string;
   recordHash: string;
-  level: VerificationLevel;
+  level: VerificationLevelOptions;
   createdAt: number;
   isActive: boolean;
   // Enriched from Firebase
