@@ -8,7 +8,7 @@ import { authService } from '@/features/Auth/services/authServices';
 import { useAuthForm } from '../hooks/useAuthForm';
 import { PasswordStrengthIndicator } from '@/features/Auth/components/ui/PasswordStrengthIndicator';
 import { validatePassword } from '@/features/Auth/utils/PasswordStrength';
-import InputField from './ui/InputField';
+import InputField from '../../../components/ui/InputField';
 
 interface BelroseAccountFormData {
   email: string;
@@ -32,6 +32,7 @@ interface BelroseAccountFormProps {
   }) => void;
   initialData: any;
   isCompleted?: boolean;
+  isExternallyLoading?: boolean;
   onLoadingChange?: (isLoading: boolean, message?: string) => void;
 }
 
@@ -39,6 +40,7 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
   onComplete,
   initialData,
   isCompleted = false,
+  isExternallyLoading = false,
   onLoadingChange,
 }) => {
   const { formData, errors, isLoading, setErrors, setIsLoading, handleInputChange, setFormData } =
@@ -53,6 +55,7 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState(!isCompleted);
   const [loadingMessage, setLoadingMessage] = useState<string>('');
+  const isButtonDisabled = isLoading || isExternallyLoading;
 
   useEffect(() => {
     if (initialData.email || initialData.firstName || initialData.lastName) {
@@ -424,14 +427,14 @@ const BelroseAccountForm: React.FC<BelroseAccountFormProps> = ({
         )}
 
         {/* Submit button */}
-        <Button type="submit" disabled={isLoading} size="lg" className="w-full rounded-xl">
-          {isLoading ? (
+        <Button type="submit" disabled={isButtonDisabled} size="lg" className="w-full rounded-xl">
+          {isButtonDisabled ? (
             <div className="flex items-center justify-center space-x-2">
               <Loader2 className="h-5 w-5 animate-spin" />
               <span>{loadingMessage || 'Processing...'}</span>
             </div>
           ) : (
-            'Continue'
+            'Create Account'
           )}
         </Button>
 

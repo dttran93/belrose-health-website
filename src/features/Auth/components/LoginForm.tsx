@@ -7,10 +7,9 @@ import { toast } from 'sonner';
 import { authService } from '@/features/Auth/services/authServices';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthForm } from '../hooks/useAuthForm';
-import { SocialAuthButtons } from './ui/SocialAuthButtons';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
-import InputField from './ui/InputField';
+import InputField from '@/components/ui/InputField';
 
 interface LoginFormData {
   email: string;
@@ -311,9 +310,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onForgotPassw
               </button>
             </p>
           </div>
-
-          {/* Social login */}
-          <SocialAuthButtons disabled={isLoading} />
         </div>
       </div>
     </div>

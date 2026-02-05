@@ -15,6 +15,10 @@ import { MemberRegistryBlockchain } from '../services/memberRegistryBlockchain';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 import { WalletGenerationService } from '../services/walletGenerationService';
 import { SmartAccountService } from '@/features/BlockchainWallet/services/smartAccountService';
+import RegistrationProgressDialog, {
+  RegistrationPhase,
+  RegistrationProgress,
+} from './ui/RegistrationProgressDialog';
 
 interface StepConfig {
   number: number;
@@ -31,6 +35,12 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [dialogPhase, setDialogPhase] = useState<RegistrationPhase>('idle');
+  const [registrationProgress, setRegistrationProgress] = useState<RegistrationProgress | null>(
+    null
+  );
+  const [dialogError, setDialogError] = useState<string | null>(null);
+  const [isStep1Loading, setIsStep1Loading] = useState(false);
 
   // Store data from all steps
   const [registrationData, setRegistrationData] = useState({
@@ -93,6 +103,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
   const handleStepComplete = async (stepNumber: number, data: any) => {
     // If completing step 1, generate and encrypt the master key and wallet
     if (stepNumber === 1 && data.password) {
+      setIsStep1Loading(true);
       try {
         console.log('🔐 Setting up encryption...');
 
@@ -159,6 +170,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         console.error('❌ Error setting up encryption:', error);
         toast.error('Failed to set up encryption');
         return; // Don't proceed if encryption setup fails
+      } finally {
+        setIsStep1Loading(false);
       }
     } else {
       // For other steps, just update data normally
@@ -187,12 +200,17 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     // Prevent double-clicks
     if (isSubmitting) return;
     setIsSubmitting(true);
+    setDialogPhase('registering');
+    setDialogError(null);
 
     try {
       console.log('🔄 Completing registration...');
 
       // 1. Register EOA wallet on blockchain (creates userId identity)
-      console.log('🔗 Registering EOA wallet on blockchain...');
+      setRegistrationProgress({
+        step: 'eoa_registration',
+        message: 'Registering your account on the secure network',
+      });
       const eoaResult = await MemberRegistryBlockchain.registerMemberWallet(
         registrationData.walletAddress
       );
@@ -201,14 +219,18 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         throw new Error('EOA blockchain registration failed - no transaction hash received');
       }
 
-      console.log('✅ EOA wallet registered:', eoaResult.txHash || 'already registered');
-
       // 2. Compute and register smart account (adds to existing userId)
-      console.log('💼 Computing and registering smart account...');
+      setRegistrationProgress({
+        step: 'smart_account_registration',
+        message: 'Computing your smart account for network automation...',
+      });
       const smartAccountAddress = await SmartAccountService.ensureFullyInitialized();
-      console.log('✅ Smart account ready:', smartAccountAddress);
 
-      // 3. Save core account data to Firestore (only after blockchain succeeds)
+      // 3. Save core account data to Firestore
+      setRegistrationProgress({
+        step: 'firestore_update',
+        message: 'Finalizing your account...',
+      });
       const db = getFirestore();
       const userDocRef = doc(db, 'users', registrationData.userId);
 
@@ -236,12 +258,28 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         updatedAt: new Date(),
       });
 
-      toast.success('Account created successfully!', {
-        description: "Now let's verify your account",
-        duration: 3000,
+      setRegistrationProgress({
+        step: 'complete',
+        message: 'Registration complete!',
       });
 
-      // Navigate to verification hub
+      setDialogPhase('success');
+    } catch (error) {
+      console.error('❌ Registration failed:', error);
+
+      // Provide specific error message
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+      setDialogError(errorMessage);
+      setDialogPhase('error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDialogClose = () => {
+    if (dialogPhase === 'success') {
+      // Navigate on success
       navigate('/verification', {
         replace: true,
         state: {
@@ -250,21 +288,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
           fromRegistration: true,
         },
       });
-    } catch (error) {
-      console.error('❌ Registration failed:', error);
-
-      // Provide specific error message
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-
-      toast.error('Registration failed', {
-        description: errorMessage.includes('blockchain')
-          ? 'Blockchain registration failed. Please try again.'
-          : 'Please try again or contact support if the issue persists.',
-        duration: 5000,
-      });
-    } finally {
-      setIsSubmitting(false);
     }
+    setDialogPhase('idle');
   };
 
   const handleRecoveryKeyAcknowledged = (acknowledged: boolean) => {
@@ -344,6 +369,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
                 onComplete={data => handleStepComplete(1, data)}
                 initialData={registrationData}
                 isCompleted={isStepCompleted(1)}
+                isExternallyLoading={isStep1Loading}
                 onLoadingChange={(isLoading, message) => {
                   if (message) {
                     console.log('Loading:', message);
@@ -422,6 +448,16 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
           </div>
         </div>
       </footer>
+
+      {/*Registration Progress Dialog for Loading State/Blockchain Update */}
+      <RegistrationProgressDialog
+        isOpen={dialogPhase !== 'idle'}
+        phase={dialogPhase}
+        progress={registrationProgress}
+        error={dialogError}
+        onClose={handleDialogClose}
+        onRetry={handleCompleteRegistration}
+      />
     </div>
   );
 };

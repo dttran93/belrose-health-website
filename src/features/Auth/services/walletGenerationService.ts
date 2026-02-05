@@ -82,9 +82,7 @@ export class WalletGenerationService {
     masterKeyHex: string,
     token: string
   ): Promise<GenerateWalletResult> {
-    const endpoint = import.meta.env.DEV
-      ? 'http://127.0.0.1:5001/belrose-757fe/us-central1/createWallet'
-      : 'https://us-central1-belrose-757fe.cloudfunctions.net/createWallet';
+    const endpoint = 'https://us-central1-belrose-757fe.cloudfunctions.net/createWallet';
 
     const response = await fetch(endpoint, {
       method: 'POST',
