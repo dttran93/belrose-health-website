@@ -36,7 +36,7 @@ export const EncryptionGate: React.FC<EncryptionGateProps> = ({ children }) => {
 
     try {
       // Check if encryption session is active
-      const hasActiveSession = EncryptionKeyManager.hasActiveSession();
+      const hasActiveSession = await EncryptionKeyManager.hasActiveSession();
 
       if (!hasActiveSession) {
         console.log('⚠️ No active encryption session detected');

@@ -228,6 +228,8 @@ export class EncryptionKeyManager {
     );
     this.lastActivityTime = Date.now();
 
+    this.persistSessionToStorage();
+
     console.log('🔑 Encryption session initialized from password');
   }
 
@@ -238,6 +240,7 @@ export class EncryptionKeyManager {
   static async initializeSessionWithRecoveryKey(recoveryKey: string): Promise<void> {
     this.sessionKey = await this.recoverMasterKeyFromRecoveryKey(recoveryKey);
     this.lastActivityTime = Date.now();
+    this.persistSessionToStorage();
 
     console.log('🔑 Encryption session initialized from recovery key');
   }
@@ -248,26 +251,35 @@ export class EncryptionKeyManager {
   static setSessionKey(key: CryptoKey): void {
     this.sessionKey = key;
     this.lastActivityTime = Date.now();
+    this.persistSessionToStorage();
     console.log('🔑 Encryption session key set');
   }
 
   /**
    * Get the current session key (returns null if not initialized or expired)
    */
-  static getSessionKey(): CryptoKey | null {
-    // Check if session has expired
-    if (this.sessionKey && this.isSessionExpired()) {
-      console.log('⏰ Encryption session expired');
-      this.clearSession();
-      return null;
-    }
-
-    // Update activity time when key is accessed
-    if (this.sessionKey) {
+  static async getSessionKey(): Promise<CryptoKey | null> {
+    //If we have the key in memory and its not expired, use that key
+    if (this.sessionKey && !this.isSessionExpired()) {
       this.lastActivityTime = Date.now();
+      return this.sessionKey;
     }
 
-    return this.sessionKey;
+    // Try to restore from sessionStorage (happens if there's a page refresh)
+    if (!this.sessionKey) {
+      await this.restoreSessionFromStorage();
+    }
+
+    // Check for key after restoration attempt
+    if (this.sessionKey && !this.isSessionExpired()) {
+      this.lastActivityTime = Date.now();
+      return this.sessionKey;
+    }
+
+    //Session expired or doesn't exist
+    console.log('⏰ Encryption session expired or not found');
+    this.clearSession();
+    return null;
   }
 
   /**
@@ -276,14 +288,21 @@ export class EncryptionKeyManager {
   static clearSession(): void {
     this.sessionKey = null;
     this.lastActivityTime = 0;
+
+    // Clear from sessionStorage
+    sessionStorage.removeItem('encryptionKey');
+    sessionStorage.removeItem('sessionExpiry');
+    sessionStorage.removeItem('lastActivity');
+
     console.log('🔒 Encryption session cleared');
   }
 
   /**
    * Check if user has an active encryption session
    */
-  static hasActiveSession(): boolean {
-    return this.sessionKey !== null && !this.isSessionExpired();
+  static async hasActiveSession(): Promise<boolean> {
+    const key = await this.getSessionKey();
+    return key !== null;
   }
 
   /**
@@ -349,5 +368,70 @@ export class EncryptionKeyManager {
     );
 
     this.lastActivityTime = Date.now();
+  }
+
+  /**
+   * Persist current session to sessionStorage
+   * Called whenever session is initialized or updated
+   */
+  private static async persistSessionToStorage(): Promise<void> {
+    if (!this.sessionKey) return;
+
+    try {
+      const keyData = await crypto.subtle.exportKey('raw', this.sessionKey);
+      const exported = arrayBufferToBase64(keyData);
+
+      sessionStorage.setItem('encryptionKey', exported);
+      sessionStorage.setItem('sessionExpiry', (Date.now() + this.SESSION_TIMEOUT_MS).toString());
+      sessionStorage.setItem('lastActivity', this.lastActivityTime.toString());
+
+      console.log('💾 Session persisted to sessionStorage');
+    } catch (error) {
+      console.error('Failed to persist session:', error);
+    }
+  }
+
+  /**
+   * Restore session from sessionStorage after page refresh
+   */
+  private static async restoreSessionFromStorage(): Promise<void> {
+    try {
+      const stored = sessionStorage.getItem('encryptionKey');
+      const expiry = sessionStorage.getItem('sessionExpiry');
+      const lastActivity = sessionStorage.getItem('lastActivity');
+
+      if (!stored || !expiry) {
+        console.log('📭 No stored session found');
+        return;
+      }
+
+      // Check if session expired
+      if (Date.now() >= parseInt(expiry)) {
+        console.log('⏰ Stored session expired');
+        this.clearSession();
+        return;
+      }
+
+      // Restore the key
+      try {
+        const keyData = base64ToArrayBuffer(stored);
+        this.sessionKey = await crypto.subtle.importKey(
+          'raw',
+          keyData,
+          { name: 'AES-GCM', length: 256 },
+          true,
+          ['encrypt', 'decrypt']
+        );
+
+        this.lastActivityTime = lastActivity ? parseInt(lastActivity) : Date.now();
+        console.log('✅ Session restored from sessionStorage');
+      } catch (error) {
+        console.error('Failed to restore session:', error);
+        this.clearSession();
+      }
+    } catch (error) {
+      console.error('Error restoring session:', error);
+      this.clearSession();
+    }
   }
 }

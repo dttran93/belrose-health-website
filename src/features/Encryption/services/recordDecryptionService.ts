@@ -50,7 +50,7 @@ export class RecordDecryptionService {
     console.log('🔓 Decrypting record:', encryptedRecord.id);
 
     // Get the master key from session
-    const masterKey = EncryptionKeyManager.getSessionKey();
+    const masterKey = await EncryptionKeyManager.getSessionKey();
     if (!masterKey) {
       throw new Error('Encryption session not active. Please unlock your encryption.');
     }
