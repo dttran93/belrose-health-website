@@ -67,7 +67,7 @@ export async function getRecord(recordId: string): Promise<FileObject | null> {
 
     // Handle decryption if needed
     if (record.isEncrypted) {
-      const masterKey = EncryptionKeyManager.getSessionKey();
+      const masterKey = await EncryptionKeyManager.getSessionKey();
 
       if (!masterKey) {
         console.warn('Record is encrypted but no encryption session active');

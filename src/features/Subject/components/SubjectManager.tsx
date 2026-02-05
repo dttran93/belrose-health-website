@@ -473,12 +473,12 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
 
           {/* Rejected Requests Section */}
           {rejectedRequests.length > 0 && (
-            <div className="mb-4 border border-chart-4 rounded-lg">
-              <div className="w-full px-4 py-3 bg-chart-4/50 flex items-center justify-between rounded-t-lg">
+            <div className="mb-4 border border-complement-4 rounded-lg">
+              <div className="w-full px-4 py-3 bg-complement-4/50 flex items-center justify-between rounded-t-lg">
                 <div className="flex items-center gap-2">
                   <UserX className="w-5 h-5 text-primary" />
                   <span className="font-semibold text-primary">Declined Requests</span>
-                  <span className="text-xs border border-chart-4 text-primary px-2 py-1 rounded-full">
+                  <span className="text-xs border border-complement-4 text-primary px-2 py-1 rounded-full">
                     {rejectedRequests.length}
                   </span>
                 </div>
@@ -506,7 +506,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
                 </Tooltip.Provider>
               </div>
 
-              <div className="p-4 bg-chart-4/10 space-y-2 rounded-b-lg">
+              <div className="p-4 bg-complement-4/10 space-y-2 rounded-b-lg">
                 {rejectedRequests.map(request => (
                   <SubjectCard
                     key={request.subjectId}

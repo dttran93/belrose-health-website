@@ -387,7 +387,7 @@ export class VersionControlService {
     const { wrappedKey, isCreator } = keyData || (await this.fetchWrappedKeyData(version.recordId));
 
     // Check if encryption session is active
-    const masterKey = EncryptionKeyManager.getSessionKey();
+    const masterKey = await EncryptionKeyManager.getSessionKey();
     if (!masterKey) {
       throw new Error(
         'Cannot decrypt version: No active encryption session. Please unlock your encryption.'
@@ -597,7 +597,7 @@ export class VersionControlService {
     console.log('🔐 Encrypting changes array...');
 
     // Get master key from session
-    const masterKey = EncryptionKeyManager.getSessionKey();
+    const masterKey = await EncryptionKeyManager.getSessionKey();
     if (!masterKey) {
       throw new Error('Cannot encrypt changes: No active encryption session');
     }
@@ -632,7 +632,7 @@ export class VersionControlService {
     console.log('🔓 Decrypting changes array...');
 
     // Get master key from session
-    const masterKey = EncryptionKeyManager.getSessionKey();
+    const masterKey = await EncryptionKeyManager.getSessionKey();
     if (!masterKey) {
       throw new Error(
         'Cannot decrypt changes: No active encryption session. Please unlock your encryption.'

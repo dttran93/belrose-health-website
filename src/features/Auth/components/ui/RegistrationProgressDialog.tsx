@@ -131,13 +131,13 @@ const ProgressStep: React.FC<{
   status: 'pending' | 'active' | 'complete';
 }> = ({ label, icon: Icon, status }) => (
   <div className="flex items-center gap-3">
-    {status === 'complete' && <CheckCircle2 className="w-5 h-5 text-chart-3" />}
+    {status === 'complete' && <CheckCircle2 className="w-5 h-5 text-complement-3" />}
     {status === 'active' && <Loader2 className="w-5 h-5 text-primary animate-spin" />}
     {status === 'pending' && <Icon className="w-5 h-5 text-gray-300" />}
     <span
       className={`text-sm ${
         status === 'complete'
-          ? 'text-chart-3'
+          ? 'text-complement-3'
           : status === 'active'
             ? 'text-primary font-medium'
             : 'text-gray-400'
@@ -150,14 +150,14 @@ const ProgressStep: React.FC<{
 
 const SuccessContent: React.FC<{ onClose: () => void }> = ({ onClose }) => (
   <div className="flex flex-col items-center gap-4 py-4">
-    <CheckCircle2 className="w-10 h-10 text-chart-3" />
-    <AlertDialog.Title className="text-lg font-bold text-center text-chart-3">
+    <CheckCircle2 className="w-10 h-10 text-complement-3" />
+    <AlertDialog.Title className="text-lg font-bold text-center text-complement-3">
       Account Created Successfully!
     </AlertDialog.Title>
     <AlertDialog.Description className="text-sm text-gray-600 text-center">
       Your network account has been secured. You're now ready to verify your account.
     </AlertDialog.Description>
-    <Button onClick={onClose} className="mt-2 bg-chart-3 hover:bg-chart-3/90">
+    <Button onClick={onClose} className="mt-2 bg-complement-3 hover:bg-complement-3/90">
       Continue to Verification
     </Button>
   </div>

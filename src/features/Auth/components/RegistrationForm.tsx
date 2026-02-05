@@ -321,7 +321,11 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
                   {/* Step Circle */}
                   <div
                     className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
-                      isCompleted ? 'bg-chart-3' : isCurrent ? 'bg-chart-4' : 'bg-secondary'
+                      isCompleted
+                        ? 'bg-complement-3'
+                        : isCurrent
+                          ? 'bg-complement-4'
+                          : 'bg-secondary'
                     }`}
                   >
                     {isCompleted ? (
@@ -336,9 +340,9 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
                     <div
                       className={`font-semibold transition-all duration-300 ${
                         isCompleted
-                          ? `text-chart-3`
+                          ? `text-complement-3`
                           : isCurrent
-                            ? 'text-chart-4 text-lg'
+                            ? 'text-complement-4 text-lg'
                             : 'text-secondary text-base'
                       }`}
                     >
@@ -346,7 +350,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
                     </div>
                     {isCurrent && (
                       <p
-                        className={`text-sm mt-1 ${isCompleted ? `text-chart-3` : `text-chart-4`}`}
+                        className={`text-sm mt-1 ${isCompleted ? `text-complement-3` : `text-complement-4`}`}
                       >
                         {step.subtitle}
                       </p>
@@ -402,9 +406,9 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
               </span>
             </div>
 
-            <div className="w-full bg-chart-4 rounded-full h-2 mx-3">
+            <div className="w-full bg-complement-4 rounded-full h-2 mx-3">
               <div
-                className="bg-chart-3 h-2 rounded-full transition-all duration-500"
+                className="bg-complement-3 h-2 rounded-full transition-all duration-500"
                 style={{ width: `${(currentStep / steps.length) * 100}%` }}
               />
             </div>

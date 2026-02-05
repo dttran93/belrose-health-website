@@ -211,7 +211,7 @@ export class CombinedRecordProcessingService {
         console.log(`🔒 Step 5: Encrypting file: ${fileObj.fileName}`);
         onStageUpdate?.('Encrypting record data...');
 
-        const userKey = EncryptionKeyManager.getSessionKey();
+        const userKey = await EncryptionKeyManager.getSessionKey();
         if (!userKey) {
           throw new Error('No encryption session active');
         }
@@ -394,7 +394,7 @@ export class CombinedRecordProcessingService {
       logEncryption('Encrypting virtual file', { fileName });
       onStageUpdate?.('Encrypting record data...');
 
-      const userKey = EncryptionKeyManager.getSessionKey();
+      const userKey = await EncryptionKeyManager.getSessionKey();
       if (!userKey) {
         throw new Error('No encryption session active');
       }

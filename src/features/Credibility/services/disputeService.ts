@@ -207,7 +207,7 @@ function getErrorMessage(error: unknown): string {
  * Encrypts notes using the record's encryption key
  */
 async function encryptNotes(notes: string, recordId: string): Promise<EncryptedField> {
-  const masterKey = EncryptionKeyManager.getSessionKey();
+  const masterKey = await EncryptionKeyManager.getSessionKey();
   if (!masterKey) {
     throw new Error('Encryption session not active. Please unlock your encryption.');
   }
@@ -225,7 +225,7 @@ async function encryptNotes(notes: string, recordId: string): Promise<EncryptedF
  * Decrypts notes using the record's encryption key
  */
 async function decryptNotes(encryptedNotes: EncryptedField, recordId: string): Promise<string> {
-  const masterKey = EncryptionKeyManager.getSessionKey();
+  const masterKey = await EncryptionKeyManager.getSessionKey();
   if (!masterKey) {
     throw new Error('Encryption session not active. Please unlock your encryption.');
   }

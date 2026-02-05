@@ -90,10 +90,10 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({
         </div>
 
         {/* Warning */}
-        <div className="bg-chart-4/10 border border-chart-4/30 rounded-lg p-3 mb-6 flex gap-3">
-          <AlertTriangle className="w-5 h-5 text-chart-4 shrink-0 mt-0.5" />
+        <div className="bg-complement-4/10 border border-complement-4/30 rounded-lg p-3 mb-6 flex gap-3">
+          <AlertTriangle className="w-5 h-5 text-complement-4 shrink-0 mt-0.5" />
           <div className="text-sm">
-            <p className="font-medium text-chart-4">Email verification required</p>
+            <p className="font-medium text-complement-4">Email verification required</p>
             <p className="text-muted-foreground mt-1">
               We'll send a verification link to your new email address. Your email will only change
               ater you click that link.
@@ -124,7 +124,7 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({
                 type="email"
                 value={newEmail}
                 onChange={e => setNewEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-chart-1 focus:border-transparent"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-complement-1 focus:border-transparent"
                 placeholder="Enter new email address"
                 disabled={isLoading}
               />
@@ -139,7 +139,7 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({
                 type="email"
                 value={confirmEmail}
                 onChange={e => setConfirmEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-chart-1 focus:border-transparent"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-complement-1 focus:border-transparent"
                 placeholder="Confirm new email address"
                 disabled={isLoading}
               />
@@ -156,7 +156,7 @@ export const ChangeEmailModal: React.FC<ChangeEmailModalProps> = ({
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="w-full px-3 py-2 pr-10 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-chart-1 focus:border-transparent"
+                  className="w-full px-3 py-2 pr-10 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-complement-1 focus:border-transparent"
                   placeholder="Enter your password"
                   disabled={isLoading}
                 />

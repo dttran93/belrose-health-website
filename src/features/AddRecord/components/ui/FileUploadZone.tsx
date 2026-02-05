@@ -55,7 +55,7 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
 
   return (
     <div
-      className={`border-2 border-dashed border-gray-300 rounded-lg text-center hover:border-chart-1 transition-colors cursor-pointer ${
+      className={`border-2 border-dashed border-gray-300 rounded-lg text-center hover:border-complement-1 transition-colors cursor-pointer ${
         compact ? 'p-4' : 'p-8'
       }`}
       onDragEnter={handleDrag}

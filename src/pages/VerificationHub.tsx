@@ -267,7 +267,7 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
                 <div
                   className={`border-2 rounded-xl p-6 transition-all ${
                     emailVerified
-                      ? 'border-chart-3 bg-chart-3/5'
+                      ? 'border-complement-3 bg-complement-3/5'
                       : 'border-destructive bg-destructive/5'
                   }`}
                 >
@@ -275,7 +275,7 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
                     <div className="flex items-start space-x-4 flex-1">
                       <div
                         className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
-                          emailVerified ? 'bg-chart-3' : 'bg-destructive'
+                          emailVerified ? 'bg-complement-3' : 'bg-destructive'
                         }`}
                       >
                         {emailVerified ? (
@@ -294,7 +294,9 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
                             </span>
                           )}
                           {emailVerified && (
-                            <span className="text-sm text-chart-3 font-medium">✓ Verified</span>
+                            <span className="text-sm text-complement-3 font-medium">
+                              ✓ Verified
+                            </span>
                           )}
                         </div>
 
@@ -383,9 +385,9 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
                 <div
                   className={`border-2 rounded-xl p-6 transition-all ${
                     identityVerified
-                      ? 'border-chart-3 bg-chart-3/5'
+                      ? 'border-complement-3 bg-complement-3/5'
                       : emailVerified
-                        ? 'border-gray-200 hover:border-chart-4'
+                        ? 'border-gray-200 hover:border-complement-4'
                         : 'border-gray-200 opacity-60'
                   }`}
                 >
@@ -394,9 +396,9 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
                       <div
                         className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
                           identityVerified
-                            ? 'bg-chart-3'
+                            ? 'bg-complement-3'
                             : emailVerified
-                              ? 'bg-chart-4'
+                              ? 'bg-complement-4'
                               : 'bg-gray-300'
                         }`}
                       >
@@ -413,12 +415,14 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
                             Identity Verification
                           </h3>
                           {!identityVerified && (
-                            <span className="px-2 py-0.5 text-xs font-medium bg-chart-4/20 text-chart-4 rounded">
+                            <span className="px-2 py-0.5 text-xs font-medium bg-complement-4/20 text-complement-4 rounded">
                               RECOMMENDED
                             </span>
                           )}
                           {identityVerified && (
-                            <span className="text-sm text-chart-3 font-medium">✓ Verified</span>
+                            <span className="text-sm text-complement-3 font-medium">
+                              ✓ Verified
+                            </span>
                           )}
                         </div>
 
@@ -435,19 +439,19 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
                               <>
                                 <div className="space-y-2 mb-4">
                                   <div className="flex items-center text-sm text-muted-foreground">
-                                    <FileText className="w-4 h-4 mr-2 text-chart-4" />
+                                    <FileText className="w-4 h-4 mr-2 text-complement-4" />
                                     <span>Request medical records on your behalf</span>
                                   </div>
                                   <div className="flex items-center text-sm text-muted-foreground">
-                                    <Sparkles className="w-4 h-4 mr-2 text-chart-4" />
+                                    <Sparkles className="w-4 h-4 mr-2 text-complement-4" />
                                     <span>Verified trust status</span>
                                   </div>
                                   <div className="flex items-center text-sm text-muted-foreground">
-                                    <Shield className="w-4 h-4 mr-2 text-chart-4" />
+                                    <Shield className="w-4 h-4 mr-2 text-complement-4" />
                                     <span>Make attestations and dispute records</span>
                                   </div>
                                   <div className="flex items-center text-sm text-muted-foreground">
-                                    <Users className="w-4 h-4 mr-2 text-chart-4" />
+                                    <Users className="w-4 h-4 mr-2 text-complement-4" />
                                     <span>Higher credibility when sharing with providers</span>
                                   </div>
                                 </div>
@@ -473,7 +477,7 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
                                 {verifiedData.firstName} {verifiedData.lastName}
                               </span>
                             </p>
-                            <div className="flex items-center text-sm text-chart-3">
+                            <div className="flex items-center text-sm text-complement-3">
                               <Shield className="w-4 h-4 mr-1" />
                               <span>Blockchain status: Verified Member</span>
                             </div>

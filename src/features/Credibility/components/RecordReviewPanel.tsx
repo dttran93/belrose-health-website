@@ -162,7 +162,7 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
           className={cn(
             'flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-semibold rounded-xl transition-all',
             activeTab === 'verify'
-              ? 'bg-chart-3 text-white'
+              ? 'bg-complement-3 text-white'
               : 'bg-muted text-muted-foreground hover:bg-muted/80'
           )}
           onClick={() => setActiveTab('verify')}
@@ -225,7 +225,7 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
           className={cn(
             'w-full py-3 text-sm font-semibold',
             activeTab === 'verify'
-              ? 'bg-chart-3 hover:bg-chart-3/90'
+              ? 'bg-complement-3 hover:bg-complement-3/90'
               : 'bg-red-600 hover:bg-red-700'
           )}
           disabled={

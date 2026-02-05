@@ -147,7 +147,7 @@ export const RecoveryKeyForm: React.FC<RecoveryKeyFormProps> = ({ onBackToLogin 
       }
 
       // Get the Master Key from the active session
-      const masterKey = EncryptionKeyManager.getSessionKey();
+      const masterKey = await EncryptionKeyManager.getSessionKey();
       if (!masterKey) {
         throw new Error('No active encryption session. Please verify recovery key again.');
       }

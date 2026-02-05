@@ -466,7 +466,7 @@ export class WalletService {
     }
 
     // Get master key from session
-    const masterKey = EncryptionKeyManager.getSessionKey();
+    const masterKey = await EncryptionKeyManager.getSessionKey();
     if (!masterKey) {
       throw new Error('Session expired. Please log in again to sign transactions.');
     }
@@ -511,7 +511,7 @@ export class WalletService {
 
     // Check based on wallet type
     if (wallet.origin === 'generated') {
-      const masterKey = EncryptionKeyManager.getSessionKey();
+      const masterKey = await EncryptionKeyManager.getSessionKey();
       if (!masterKey) {
         return {
           canSign: false,

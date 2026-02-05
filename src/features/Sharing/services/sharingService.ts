@@ -51,7 +51,7 @@ export class SharingService {
       throw new Error('User not authenticated');
     }
 
-    const masterKey = EncryptionKeyManager.getSessionKey();
+    const masterKey = await EncryptionKeyManager.getSessionKey();
     if (!masterKey) {
       throw new Error('Encryption session not active. Please unlock your encryption.');
     }

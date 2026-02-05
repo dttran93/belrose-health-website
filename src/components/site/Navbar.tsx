@@ -60,7 +60,7 @@ const Navbar: React.FC = () => {
           title: 'Patients',
           description: 'Get incentivized to compile, manage, and own your health data.',
           link: '#',
-          color: 'chart-2',
+          color: 'complement-2',
         },
         {
           icon: <Hospital size={32} />,
@@ -68,7 +68,7 @@ const Navbar: React.FC = () => {
           description:
             'Finally have complete patient records without implementation or privacy issues.',
           link: '#',
-          color: 'chart-3',
+          color: 'complement-3',
         },
         {
           icon: <Microscope size={32} />,
@@ -76,7 +76,7 @@ const Navbar: React.FC = () => {
           description:
             'Need health data for research, policy, or anything else? Get it directly from patients.',
           link: '#',
-          color: 'chart-4',
+          color: 'complement-4',
         },
       ],
     },

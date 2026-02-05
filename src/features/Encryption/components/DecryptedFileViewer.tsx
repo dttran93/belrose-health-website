@@ -45,7 +45,7 @@ export function DecryptedFileViewer({
         console.log('🔓 Decrypting file for display...');
 
         // 1. Get the user's master key from session
-        const masterKey = EncryptionKeyManager.getSessionKey();
+        const masterKey = await EncryptionKeyManager.getSessionKey();
         if (!masterKey) {
           throw new Error('Encryption session not active. Please unlock your encryption.');
         }

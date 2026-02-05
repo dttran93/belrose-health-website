@@ -155,10 +155,13 @@ export const VersionControlPanel: React.FC<VersionControlPanelProps> = ({
 
     const info = {
       order: index + 1,
-      colorClass: index === 0 ? 'chart-2' : 'chart-4',
-      bgClass: index === 0 ? 'bg-chart-2/10 border-chart-3/75' : 'bg-chart-4/10 border-chart-4/75',
-      textClass: index === 0 ? 'text-chart-2' : 'text-chart-4',
-      badgeClass: index === 0 ? 'bg-chart-2' : 'bg-chart-4',
+      colorClass: index === 0 ? 'complement-2' : 'complement-4',
+      bgClass:
+        index === 0
+          ? 'bg-complement-2/10 border-complement-3/75'
+          : 'bg-complement-4/10 border-complement-4/75',
+      textClass: index === 0 ? 'text-complement-2' : 'text-complement-4',
+      badgeClass: index === 0 ? 'bg-complement-2' : 'bg-complement-4',
     };
 
     console.log('getSelectionInfo returning:', info);

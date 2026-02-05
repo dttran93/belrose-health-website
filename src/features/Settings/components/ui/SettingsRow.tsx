@@ -31,7 +31,7 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
             href={linkHref}
             target="_blank"
             rel="noopener noreferrer"
-            className={`text-sm text-left text-chart-1 hover:underline inline-flex items-center gap-1',
+            className={`text-sm text-left text-complement-1 hover:underline inline-flex items-center gap-1',
             ${mono ? 'font-mono' : ''}`}
           >
             {value}

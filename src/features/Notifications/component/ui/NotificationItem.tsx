@@ -45,20 +45,20 @@ const getNotificationConfig = (type: NotificationType): NotificationConfig => {
     case 'SUBJECT_REQUEST_RECEIVED':
       return {
         icon: <UserPlus className="w-5 h-5" />,
-        iconBgColor: 'bg-chart-1/10',
-        iconColor: 'text-chart-1',
+        iconBgColor: 'bg-complement-1/10',
+        iconColor: 'text-complement-1',
       };
     case 'SUBJECT_ACCEPTED':
       return {
         icon: <UserCheck className="w-5 h-5" />,
-        iconBgColor: 'bg-chart-3/10',
-        iconColor: 'text-chart-3',
+        iconBgColor: 'bg-complement-3/10',
+        iconColor: 'text-complement-3',
       };
     case 'REJECTION_PENDING_CREATOR_DECISION':
       return {
         icon: <AlertTriangle className="w-5 h-5" />,
-        iconBgColor: 'bg-chart-4/10',
-        iconColor: 'text-chart-4',
+        iconBgColor: 'bg-complement-4/10',
+        iconColor: 'text-complement-4',
       };
     case 'REJECTION_ACKNOWLEDGED':
       return {
@@ -69,14 +69,14 @@ const getNotificationConfig = (type: NotificationType): NotificationConfig => {
     case 'REJECTION_PUBLICLY_LISTED':
       return {
         icon: <Globe className="w-5 h-5" />,
-        iconBgColor: 'bg-chart-2/10',
-        iconColor: 'text-chart-2',
+        iconBgColor: 'bg-complement-2/10',
+        iconColor: 'text-complement-2',
       };
     case 'NEW_MESSAGE':
       return {
         icon: <MessageSquare className="w-5 h-5" />,
-        iconBgColor: 'bg-chart-5/10',
-        iconColor: 'text-chart-5',
+        iconBgColor: 'bg-complement-5/10',
+        iconColor: 'text-complement-5',
       };
     default:
       return {
@@ -129,7 +129,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
       {/* Unread indicator dot */}
       {!notification.read && (
         <div className="absolute left-2 top-1/2 -translate-y-1/2">
-          <Circle className="w-2 h-2 fill-chart-1 text-chart-1" />
+          <Circle className="w-2 h-2 fill-complement-1 text-complement-1" />
         </div>
       )}
 

@@ -125,7 +125,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     }
 
     // Check if encryption session is active
-    const masterKey = EncryptionKeyManager.getSessionKey();
+    const masterKey = await EncryptionKeyManager.getSessionKey();
     if (!masterKey) {
       throw new Error('Please unlock your encryption to view this version.');
     }

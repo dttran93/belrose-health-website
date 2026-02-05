@@ -95,7 +95,7 @@ export function useEncryption(): UseEncryptionReturn {
       }
 
       // Get session key
-      const userKey = EncryptionKeyManager.getSessionKey();
+      const userKey = await EncryptionKeyManager.getSessionKey();
       if (!userKey) {
         throw new Error('No active encryption session. Please unlock encryption first.');
       }
@@ -141,7 +141,7 @@ export function useEncryption(): UseEncryptionReturn {
       }
 
       // Get session key
-      const userKey = EncryptionKeyManager.getSessionKey();
+      const userKey = await EncryptionKeyManager.getSessionKey();
       if (!userKey) {
         throw new Error('No active encryption session. Please unlock encryption first.');
       }

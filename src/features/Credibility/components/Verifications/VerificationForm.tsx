@@ -58,10 +58,10 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({
             'w-full p-4 text-left border-2 rounded-xl transition-all',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             isSelected
-              ? 'border-chart-3 bg-chart-3/5'
+              ? 'border-complement-3 bg-complement-3/5'
               : isCurrent
                 ? 'border-blue-500 bg-blue-50'
-                : 'border-border hover:border-chart-3/50 bg-background'
+                : 'border-border hover:border-complement-3/50 bg-background'
           )}
           onClick={() => onSelectLevel(level.value)}
         >
@@ -70,7 +70,7 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({
               className={cn(
                 'w-9 h-9 rounded-lg flex items-center justify-center',
                 isSelected
-                  ? 'bg-chart-3/20 text-chart-3'
+                  ? 'bg-complement-3/20 text-complement-3'
                   : isCurrent
                     ? 'bg-blue-100 text-blue-600'
                     : 'bg-muted text-muted-foreground'
@@ -85,7 +85,7 @@ const LevelSelector: React.FC<LevelSelectorProps> = ({
               )}
             </span>
             {isSelected && (
-              <div className="w-6 h-6 bg-chart-3 text-white rounded-full flex items-center justify-center">
+              <div className="w-6 h-6 bg-complement-3 text-white rounded-full flex items-center justify-center">
                 <CheckCircle className="w-4 h-4" />
               </div>
             )}
@@ -198,7 +198,7 @@ const VerificationForm: React.FC<VerificationFormProps> = ({
           <Button
             onClick={handleConfirmModify}
             disabled={isSubmitting || !modifyLevel || modifyLevel === verification.level}
-            className="flex-1 bg-chart-3 hover:bg-chart-3/90"
+            className="flex-1 bg-complement-3 hover:bg-complement-3/90"
           >
             {isSubmitting ? (
               <>
@@ -223,7 +223,7 @@ const VerificationForm: React.FC<VerificationFormProps> = ({
 
     return (
       <div className="text-center py-10">
-        <div className="w-16 h-16 mx-auto mb-5 bg-chart-3/10 text-chart-3 rounded-full flex items-center justify-center">
+        <div className="w-16 h-16 mx-auto mb-5 bg-complement-3/10 text-complement-3 rounded-full flex items-center justify-center">
           <CheckCircle className="w-8 h-8" />
         </div>
         <h3 className="text-lg font-semibold text-primary mb-2">You've verified this record</h3>
@@ -235,7 +235,7 @@ const VerificationForm: React.FC<VerificationFormProps> = ({
         <div className="flex gap-3 justify-center">
           <Button
             variant="outline"
-            className="border-chart-3 text-chart-3 hover:bg-chart-3/10"
+            className="border-complement-3 text-complement-3 hover:bg-complement-3/10"
             onClick={handleStartModify}
             disabled={isSubmitting}
           >

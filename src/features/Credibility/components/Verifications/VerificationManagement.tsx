@@ -126,7 +126,7 @@ export const VerificationManagement: React.FC<VerificationManagementProps> = ({
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-gray-700" />
             <span className="font-semibold text-gray-900">Verifications</span>
-            <span className="text-xs border border-chart-3 bg-chart-3/20 text-chart-3 px-2 py-1 rounded-full">
+            <span className="text-xs border border-complement-3 bg-complement-3/20 text-complement-3 px-2 py-1 rounded-full">
               {activeCount} active
             </span>
           </div>
@@ -136,9 +136,9 @@ export const VerificationManagement: React.FC<VerificationManagementProps> = ({
               <Tooltip.Provider>
                 <Tooltip.Root>
                   <Tooltip.Trigger asChild>
-                    <div className="bg-chart-3/30 border border-chart-3 text-chart-3 rounded-full text-xs p-1 gap-1">
+                    <div className="bg-complement-3/30 border border-complement-3 text-complement-3 rounded-full text-xs p-1 gap-1">
                       <button className="inline-flex items-center ml-1">
-                        Verifications <HelpCircle className="w-4 h-4 ml-1 text-chart-3" />
+                        Verifications <HelpCircle className="w-4 h-4 ml-1 text-complement-3" />
                       </button>
                     </div>
                   </Tooltip.Trigger>

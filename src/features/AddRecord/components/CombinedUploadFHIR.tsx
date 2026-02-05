@@ -470,7 +470,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
 
 • "This file is from Dr. Smith and contains my X-ray after my right leg injury"
 • "This is my vaccination record from childhood"`}
-                  className="w-full bg-background min-h-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-none focus:ring-1 focus:ring-chart-1 resize-none"
+                  className="w-full bg-background min-h-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-none focus:ring-1 focus:ring-complement-1 resize-none"
                 />
               </div>
             )}
@@ -565,7 +565,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   • "Visited urgent care for sore throat. Prescribed amoxicillin 500mg, take twice daily for 10 days."
   • "Follow-up appointment for diabetes. HbA1c improved to 7.2%. Continue current medication."
   • "Annual physical exam completed. All vitals within normal range. Recommended yearly mammogram."`}
-                      className="w-full bg-background min-h-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-none focus:ring-1 focus:ring-chart-1 resize-none"
+                      className="w-full bg-background min-h-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-none focus:ring-1 focus:ring-complement-1 resize-none"
                       disabled={submittingText}
                     />
                   </div>
@@ -623,7 +623,7 @@ Example:
   }
 ]
 }`}
-                      className="w-full h-64 px-3 py-2 bg-background border border-gray-300 rounded-md focus:outline-none focus:border-none focus:ring-1 focus:ring-chart-1 font-mono text-sm"
+                      className="w-full h-64 px-3 py-2 bg-background border border-gray-300 rounded-md focus:outline-none focus:border-none focus:ring-1 focus:ring-complement-1 font-mono text-sm"
                       disabled={submitting}
                     />
                   </div>

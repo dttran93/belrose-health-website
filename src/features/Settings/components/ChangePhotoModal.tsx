@@ -143,7 +143,7 @@ export const ChangePhotoModal: React.FC<ChangePhotoModalProps> = ({
         {/* Photo Preview */}
         <div className="flex flex-col items-center mb-6">
           <div
-            className="w-32 h-32 rounded-full flex items-center justify-center text-4xl font-semibold text-white mb-4 bg-gradient-to-br from-chart-1 to-chart-5 overflow-hidden"
+            className="w-32 h-32 rounded-full flex items-center justify-center text-4xl font-semibold text-white mb-4 bg-gradient-to-br from-complement-1 to-complement-5 overflow-hidden"
             style={
               previewURL
                 ? {

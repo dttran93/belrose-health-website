@@ -295,7 +295,7 @@ export const updateFirestoreRecord = async (
 
     console.log('🔐 Processing encrypted record update...');
     // Get the user's master key from session
-    const masterKey = EncryptionKeyManager.getSessionKey();
+    const masterKey = await EncryptionKeyManager.getSessionKey();
     if (!masterKey) {
       throw new Error('Please unlock your encryption to save changes.');
     }

@@ -78,7 +78,7 @@ export const ChangeNameModal: React.FC<ChangeNameModalProps> = ({
                 type="text"
                 value={firstName}
                 onChange={e => setFirstName(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-chart-1 focus:border-transparent"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-complement-1 focus:border-transparent"
                 placeholder="Enter first name"
                 disabled={isLoading}
               />
@@ -90,7 +90,7 @@ export const ChangeNameModal: React.FC<ChangeNameModalProps> = ({
                 type="text"
                 value={lastName}
                 onChange={e => setLastName(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-chart-1 focus:border-transparent"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-complement-1 focus:border-transparent"
                 placeholder="Enter last name"
                 disabled={isLoading}
               />

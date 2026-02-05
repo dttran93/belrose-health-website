@@ -247,8 +247,8 @@ const SettingsPage = () => {
                 onClick={() => setActiveSection(section.id)}
                 className={`w-full flex items-center px-3 py-2 text-left rounded-lg mb-1 transition-colors ${
                   activeSection === section.id
-                    ? 'bg-chart-1/10 text-primary'
-                    : 'text-foreground hover:bg-chart-1/5'
+                    ? 'bg-complement-1/10 text-primary'
+                    : 'text-foreground hover:bg-complement-1/5'
                 }`}
               >
                 <section.icon className="mr-4 w-5 h-5" />

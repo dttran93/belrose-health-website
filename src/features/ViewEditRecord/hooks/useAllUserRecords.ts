@@ -117,7 +117,7 @@ export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
             console.log('🔓 Decrypting encrypted records...');
 
             // Check if encryption session is active
-            const masterKey = EncryptionKeyManager.getSessionKey();
+            const masterKey = await EncryptionKeyManager.getSessionKey();
             if (!masterKey) {
               console.warn('⚠️ Encrypted records found but no encryption session active');
               toast.warning(

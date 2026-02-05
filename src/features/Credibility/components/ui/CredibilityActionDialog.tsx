@@ -183,7 +183,7 @@ const PreparingContent: React.FC<{ progress?: CredibilityPreparationProgress | n
   progress,
 }) => (
   <div className="flex flex-col items-center gap-4 py-4">
-    <Loader2 className="w-10 h-10 text-chart-3 animate-spin" />
+    <Loader2 className="w-10 h-10 text-complement-3 animate-spin" />
     <AlertDialog.Title className="text-lg font-bold text-center">
       Preparing Secure Network
     </AlertDialog.Title>
@@ -232,11 +232,11 @@ const ProgressStep: React.FC<{
   status: 'pending' | 'active' | 'complete';
 }> = ({ label, status }) => (
   <div className="flex items-center gap-3">
-    {status === 'complete' && <CheckCircle2 className="w-5 h-5 text-chart-3" />}
-    {status === 'active' && <Loader2 className="w-5 h-5 text-chart-3 animate-spin" />}
+    {status === 'complete' && <CheckCircle2 className="w-5 h-5 text-complement-3" />}
+    {status === 'active' && <Loader2 className="w-5 h-5 text-complement-3 animate-spin" />}
     {status === 'pending' && <div className="w-5 h-5 rounded-full border-2 border-gray-300" />}
     <span
-      className={`text-sm ${status === 'complete' ? 'text-chart-3' : status === 'active' ? 'text-chart-3' : 'text-gray-400'}`}
+      className={`text-sm ${status === 'complete' ? 'text-complement-3' : status === 'active' ? 'text-complement-3' : 'text-gray-400'}`}
     >
       {label}
     </span>
@@ -284,7 +284,7 @@ const ExecutingContent: React.FC<{ operationType: CredibilityOperationType }> = 
 
   return (
     <div className="flex flex-col items-center gap-4 py-4">
-      <Loader2 className="w-10 h-10 text-chart-3 animate-spin" />
+      <Loader2 className="w-10 h-10 text-complement-3 animate-spin" />
       <AlertDialog.Title className="text-lg font-bold text-center">{title}</AlertDialog.Title>
       <AlertDialog.Description className="text-sm text-gray-600 text-center">
         {description}
@@ -327,14 +327,14 @@ const SuccessContent: React.FC<{
 
   return (
     <div className="flex flex-col items-center gap-4 py-4">
-      <CheckCircle2 className="w-10 h-10 text-chart-3" />
-      <AlertDialog.Title className="text-lg font-bold text-center text-chart-3">
+      <CheckCircle2 className="w-10 h-10 text-complement-3" />
+      <AlertDialog.Title className="text-lg font-bold text-center text-complement-3">
         Success
       </AlertDialog.Title>
       <AlertDialog.Description className="text-sm text-gray-600 text-center">
         {messages[operationType] || 'Operation completed successfully!'}
       </AlertDialog.Description>
-      <Button onClick={onClose} className="mt-2 bg-chart-3 hover:bg-chart-3/90">
+      <Button onClick={onClose} className="mt-2 bg-complement-3 hover:bg-complement-3/90">
         Done
       </Button>
     </div>
@@ -357,7 +357,7 @@ const ConfirmVerificationContent: React.FC<{
   return (
     <>
       <AlertDialog.Title className="text-lg font-bold flex items-center gap-2">
-        <ShieldCheck className="w-5 h-5 text-chart-3" />
+        <ShieldCheck className="w-5 h-5 text-complement-3" />
         {isModify ? 'Modify Verification' : 'Confirm Verification'}
       </AlertDialog.Title>
 
@@ -366,8 +366,8 @@ const ConfirmVerificationContent: React.FC<{
       </AlertDialog.Description>
 
       {/* Confirm Card */}
-      <div className="my-2 p-4 border rounded-lg bg-chart-3/5 border-chart-3/20 flex items-start gap-3">
-        <Icon className="w-6 h-6 text-chart-3 mt-1" />
+      <div className="my-2 p-4 border rounded-lg bg-complement-3/5 border-complement-3/20 flex items-start gap-3">
+        <Icon className="w-6 h-6 text-complement-3 mt-1" />
         <div>
           <p className="font-bold text-gray-900">{config.name} Level</p>
           <p className="text-sm text-gray-600 italic">"{config.declarative}"</p>
@@ -394,7 +394,7 @@ const ConfirmVerificationContent: React.FC<{
         </AlertDialog.Cancel>
         <Button
           onClick={() => level && onConfirm(level)}
-          className="flex-1 bg-chart-3 hover:bg-chart-3/90"
+          className="flex-1 bg-complement-3 hover:bg-complement-3/90"
           disabled={!level}
         >
           {isModify ? 'Confirm Modification' : 'Submit Verification'}
@@ -540,11 +540,15 @@ const ConfirmReactionContent: React.FC<{
           onClick={() => setSupports(true)}
           className={`
             flex-1 flex flex-col items-center gap-2 p-4 border rounded-lg transition-colors
-            ${supports === true ? 'border-chart-3 bg-chart-3/10' : 'border-gray-200 hover:border-gray-300'}
+            ${supports === true ? 'border-complement-3 bg-complement-3/10' : 'border-gray-200 hover:border-gray-300'}
           `}
         >
-          <ThumbsUp className={`w-8 h-8 ${supports === true ? 'text-chart-3' : 'text-gray-400'}`} />
-          <span className={`font-medium ${supports === true ? 'text-chart-3' : 'text-gray-600'}`}>
+          <ThumbsUp
+            className={`w-8 h-8 ${supports === true ? 'text-complement-3' : 'text-gray-400'}`}
+          />
+          <span
+            className={`font-medium ${supports === true ? 'text-complement-3' : 'text-gray-600'}`}
+          >
             Support
           </span>
           <span className="text-xs text-gray-500">I agree with this dispute</span>
@@ -576,7 +580,7 @@ const ConfirmReactionContent: React.FC<{
         <Button
           onClick={() => supports !== null && onConfirm(supports)}
           disabled={supports === null}
-          className="flex-1 bg-chart-3 hover:bg-chart-3/90"
+          className="flex-1 bg-complement-3 hover:bg-complement-3/90"
         >
           Submit Reaction
         </Button>
@@ -599,7 +603,7 @@ const ConfirmModifyVerification: React.FC<{
   return (
     <>
       <AlertDialog.Title className="text-lg font-bold flex items-center gap-2">
-        <ShieldCheck className="w-5 h-5 text-chart-3" />
+        <ShieldCheck className="w-5 h-5 text-complement-3" />
         Modify Verification
       </AlertDialog.Title>
 
@@ -616,7 +620,7 @@ const ConfirmModifyVerification: React.FC<{
             <label
               key={config.value}
               className={`flex items-start gap-3 p-3 border rounded-lg transition-colors cursor-pointer
-                    ${isSelected ? 'border-chart-3 bg-chart-3/10' : 'border-gray-200 hover:border-gray-300'}`}
+                    ${isSelected ? 'border-complement-3 bg-complement-3/10' : 'border-gray-200 hover:border-gray-300'}`}
             >
               <input
                 type="radio"
@@ -624,10 +628,10 @@ const ConfirmModifyVerification: React.FC<{
                 value={config.value}
                 checked={isSelected}
                 onChange={() => setSelectedLevel(config.value)}
-                className="mt-1 w-4 h-4 accent-chart-3"
+                className="mt-1 w-4 h-4 accent-complement-3"
               />
               <IconComponent
-                className={`w-5 h-5 mt-0.5 ${isSelected ? 'text-chart-3' : 'text-gray-400'}`}
+                className={`w-5 h-5 mt-0.5 ${isSelected ? 'text-complement-3' : 'text-gray-400'}`}
               />
               <div className="flex-1">
                 <p className="font-medium text-gray-900">{config.name}</p>
@@ -658,7 +662,7 @@ const ConfirmModifyVerification: React.FC<{
         </AlertDialog.Cancel>
         <Button
           onClick={() => onConfirm(selectedLevel)}
-          className="flex-1 bg-chart-3 hover:bg-chart-3/90"
+          className="flex-1 bg-complement-3 hover:bg-complement-3/90"
         >
           Modify Verification
         </Button>

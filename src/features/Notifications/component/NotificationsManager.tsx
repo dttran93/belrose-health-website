@@ -55,7 +55,7 @@ const FilterButton: React.FC<FilterButtonProps> = ({
         <span
           className={`
             ml-2 px-1.5 py-0.5 text-xs rounded-full
-            ${isActive ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-chart-1/10 text-chart-1'}
+            ${isActive ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-complement-1/10 text-complement-1'}
           `}
         >
           {count}
