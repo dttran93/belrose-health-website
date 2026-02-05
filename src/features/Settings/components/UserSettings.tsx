@@ -3,13 +3,14 @@ import { AlertTriangle, CheckCircle, RefreshCw, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import { SectionHeader, SettingsRow } from './ui/SettingsRow';
-import { BelroseUserProfile } from '@/types/core';
+import { BelroseUserProfile, LinkedWalletRecord } from '@/types/core';
 import {
   BlockchainRoleManagerService,
   MemberStatus,
   MemberInfo,
 } from '@/features/Permissions/services/blockchainRoleManagerService';
 import { ethers } from 'ethers';
+import { formatTimestamp } from '@/utils/dataFormattingUtils';
 
 interface UserSettingsProps {
   user: BelroseUserProfile;
@@ -19,21 +20,6 @@ interface UserSettingsProps {
   onStartVerification?: () => void;
   className?: string;
 }
-
-// Helper to truncate hashes
-const truncateHash = (hash: string, startChars = 10, endChars = 8): string => {
-  if (hash.length <= startChars + endChars) return hash;
-  return `${hash.slice(0, startChars)}...${hash.slice(-endChars)}`;
-};
-
-// Helper to format dates
-const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-};
 
 // Copy to clipboard helper with toast notification
 const copyToClipboard = async (text: string, label: string = 'Text'): Promise<void> => {
@@ -73,7 +59,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({
     setOnChainError(null);
 
     try {
-      const memberData = await BlockchainRoleManagerService.getMember(user.wallet.address);
+      const memberData = await BlockchainRoleManagerService.getMemberInfo(user.wallet.address);
       setOnChainData(memberData);
     } catch (error) {
       console.error('Error fetching on-chain data:', error);
@@ -92,11 +78,11 @@ const UserSettings: React.FC<UserSettingsProps> = ({
   const formatOnChainStatus = (status: MemberStatus) => {
     switch (status) {
       case MemberStatus.Verified:
-        return { label: 'Verified', color: 'text-chart-3', bg: 'bg-chart-3' };
+        return { label: 'Verified', color: 'text-complement-3', bg: 'bg-complement-3' };
       case MemberStatus.Active:
-        return { label: 'Active', color: 'text-chart-1', bg: 'bg-chart-1' };
+        return { label: 'Active', color: 'text-complement-1', bg: 'bg-complement-1' };
       case MemberStatus.Inactive:
-        return { label: 'Inactive', color: 'text-chart-4', bg: 'bg-chart-4' };
+        return { label: 'Inactive', color: 'text-complement-4', bg: 'bg-complement-4' };
       default:
         return { label: 'Unknown', color: 'text-muted-foreground', bg: 'bg-foreground' };
     }
@@ -108,13 +94,31 @@ const UserSettings: React.FC<UserSettingsProps> = ({
       ? computedUserIdHash.toLowerCase() === onChainData.userIdHash.toLowerCase()
       : false;
 
+  //Helper to  get Current wallets
+  const getCurrentWalletRecord = (
+    linkedWallets: LinkedWalletRecord[] | undefined,
+    currentAddress: string
+  ): LinkedWalletRecord | null => {
+    if (!linkedWallets || !currentAddress) return null;
+    return (
+      linkedWallets.find(wallet => wallet.address.toLowerCase() === currentAddress.toLowerCase()) ||
+      null
+    );
+  };
+
+  // Then in your component, after the initials definition:
+  const currentWalletRecord = getCurrentWalletRecord(
+    user.onChainIdentity?.linkedWallets,
+    user.wallet?.address
+  );
+
   return (
     <div className={`max-w-2xl mx-auto py-8 px-6 ${className || ''}`}>
       {/* Profile Photo / Avatar */}
       <div className="flex flex-col items-center mb-8">
         <div
           className={
-            'w-24 h-24 rounded-full flex items-center justify-center text-3xl font-semibold text-white mb-3 bg-gradient-to-br from-chart-1 to-chart-5'
+            'w-24 h-24 rounded-full flex items-center justify-center text-3xl font-semibold text-white mb-3 bg-gradient-to-br from-complement-1 to-complement-5'
           }
           style={
             user.photoURL
@@ -141,11 +145,11 @@ const UserSettings: React.FC<UserSettingsProps> = ({
 
       {/* Identity Verification Warning Banner */}
       {!user.identityVerified && (
-        <div className="bg-chart-4/10 border border-chart-4/30 rounded-xl p-4 mb-6 flex justify-between items-center gap-4">
+        <div className="bg-complement-4/10 border border-complement-4/30 rounded-xl p-4 mb-6 flex justify-between items-center gap-4">
           <div className="flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 text-chart-4 shrink-0" />
+            <AlertTriangle className="w-5 h-5 text-complement-4 shrink-0" />
             <div>
-              <div className="text-sm font-medium text-chart-4">Identity not verified</div>
+              <div className="text-sm font-medium text-complement-4">Identity not verified</div>
               <div className="text-xs text-muted-foreground mt-0.5">
                 Complete verification to unlock all platform features
               </div>
@@ -154,7 +158,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({
           <Button
             size="sm"
             onClick={onStartVerification}
-            className="bg-chart-4 hover:bg-chart-4/90 text-primary-foreground shrink-0"
+            className="bg-complement-4 hover:bg-complement-4/90 text-primary-foreground shrink-0"
           >
             Start verification
           </Button>
@@ -204,73 +208,54 @@ const UserSettings: React.FC<UserSettingsProps> = ({
       {/* Blockchain Member Registry Section */}
       <SectionHeader title="Blockchain Member Registry" />
 
-      <SettingsRow
-        label="Block Number"
-        value={`#${user.blockchainMember?.blockNumber.toLocaleString()}`}
-        mono
-      />
-
-      <SettingsRow
-        label="Transaction Hash"
-        value={user.blockchainMember?.txHash ? user.blockchainMember.txHash : 'Not registered'}
-        isLink={!!user.blockchainMember?.txHash}
-        linkHref={`https://etherscan.io/tx/${user.blockchainMember?.txHash}`}
-        mono
-      />
-
-      {!user.wallet?.address ? (
-        <div className="text-sm text-muted-foreground py-3">
-          No wallet connected. Connect a wallet to view on-chain data.
-        </div>
-      ) : isLoadingOnChain ? (
-        <div className="text-sm text-muted-foreground py-3 flex items-center gap-2">
-          <RefreshCw className="w-4 h-4 animate-spin" />
-          Querying blockchain...
-        </div>
-      ) : onChainError ? (
-        <div className="text-sm text-destructive py-3">{onChainError}</div>
-      ) : onChainData ? (
+      {currentWalletRecord ? (
         <>
           <SettingsRow
-            label="On-Chain Status"
-            value={(() => {
-              const { label, color, bg } = formatOnChainStatus(onChainData.status);
-              return (
-                <span className={`inline-flex items-center gap-1 ${color}`}>
-                  <span className={`w-2 h-2 rounded-full ${bg}`} />
-                  {label}
-                </span>
-              );
-            })()}
+            label="Wallet Type"
+            value={currentWalletRecord.type === 'eoa' ? 'EOA (Externally Owned)' : 'Smart Account'}
           />
 
           <SettingsRow
-            label="User ID Hash (on-chain)"
+            label="Wallet Status"
             value={
-              <div className="flex items-center gap -2">
-                <span className="font-mono text-sm break-all">{onChainData.userIdHash}</span>
-                {hashesMatch ? (
-                  <span className="inline-flex items-center text-chart-3 gap-1">
-                    <span className="w-2 h-2 rounded-full bg-chart-3 ml-2" /> <span>Verified</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-destructive">
-                    <span className="w-2 h-2 rounded-full bg-foreground mx-1" />{' '}
-                    <span className="text-xs">Mismatch</span>
-                  </span>
-                )}
-              </div>
+              currentWalletRecord.isWalletActive ? (
+                <span className="inline-flex items-center gap-1 text-complement-3">
+                  <span className="w-2 h-2 rounded-full bg-complement-3" />
+                  Active
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-muted-foreground">
+                  <span className="w-2 h-2 rounded-full bg-muted-foreground" />
+                  Inactive
+                </span>
+              )
             }
           />
 
           <SettingsRow
-            label="Joined At (on-chain)"
-            value={onChainData.joinedAt ? onChainData.joinedAt.toLocaleString() : 'Not registered'}
+            label="Block Number"
+            value={`#${currentWalletRecord.blockNumber.toLocaleString()}`}
+            mono
+          />
+
+          <SettingsRow
+            label="Transaction Hash"
+            value={currentWalletRecord.txHash}
+            isLink
+            linkHref={`https://etherscan.io/tx/${currentWalletRecord.txHash}`}
+            mono
+          />
+
+          <SettingsRow
+            label="Linked At"
+            value={formatTimestamp(
+              currentWalletRecord.linkedAt.toDate?.() || currentWalletRecord.linkedAt
+            )}
           />
         </>
       ) : (
         <div className="text-sm text-muted-foreground py-3">
-          No on-chain member data found for this wallet address.
+          This wallet is not registered on-chain.
         </div>
       )}
     </div>

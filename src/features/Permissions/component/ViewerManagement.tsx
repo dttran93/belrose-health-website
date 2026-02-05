@@ -101,7 +101,7 @@ export const ViewerManagement: React.FC<ViewerManagementProps> = ({
           </div>
 
           {/* Info */}
-          <div className="bg-chart-4/20 border border-chart-4 rounded-lg p-4 mb-6">
+          <div className="bg-complement-4/20 border border-complement-4 rounded-lg p-4 mb-6">
             <p className="font-semibold mb-2 text-sm">
               Viewers can view, verify, and dispute records.
             </p>

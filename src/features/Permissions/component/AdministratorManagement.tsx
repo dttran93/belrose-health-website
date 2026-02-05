@@ -105,7 +105,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
           </div>
 
           {/* Info */}
-          <div className="bg-chart-2/20 border border-chart-2 rounded-lg p-4 mb-6">
+          <div className="bg-complement-2/20 border border-complement-2 rounded-lg p-4 mb-6">
             <p className="font-semibold mb-2 text-sm">
               Administrators have full access to view, edit, share, verify, and dispute records
             </p>
@@ -128,7 +128,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-gray-700" />
             <span className="font-semibold text-gray-900">Administrators</span>
-            <span className="text-xs border border-chart-2 bg-chart-2/20 text-chart-2 px-2 py-1 rounded-full">
+            <span className="text-xs border border-complement-2 bg-complement-2/20 text-complement-2 px-2 py-1 rounded-full">
               {record.administrators.length}{' '}
             </span>
           </div>
@@ -138,7 +138,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
                 <Tooltip.Root>
                   <Tooltip.Trigger asChild>
                     <button className="inline-flex items-center ml-1 text-blue-700 hover:text-red-800">
-                      <span className="text-xs border border-chart-2 bg-chart-2/20 text-chart-2 px-2 py-1 rounded-full flex items-center">
+                      <span className="text-xs border border-complement-2 bg-complement-2/20 text-complement-2 px-2 py-1 rounded-full flex items-center">
                         Administrative Access
                         <HelpCircle className="w-4 h-4 ml-1" />
                       </span>

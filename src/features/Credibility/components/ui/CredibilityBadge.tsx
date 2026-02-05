@@ -70,9 +70,9 @@ interface StatusStyle {
 
 const statusStyles: Record<CredibilityStatus, StatusStyle> = {
   verified: {
-    bg: 'bg-chart-3/20',
-    text: 'text-chart-3',
-    border: 'border-chart-3',
+    bg: 'bg-complement-3/20',
+    text: 'text-complement-3',
+    border: 'border-complement-3',
     icon: <ShieldCheck className="w-4 h-4" />,
   },
   disputed: {

@@ -23,11 +23,11 @@
     --border: 220 13% 46%; /*Gray-600*/ 
     --input: 0 0% 100%; /*White*/
     --ring: 217 33% 17%; /*Dark Navy*/
-    --chart-1: 244 55% 41%; /*Light Navy*/
-    --chart-2: 192 91% 36%; /*Cyan Accent*/
-    --chart-3: 160 84% 39%; /*Emerald Accent*/
-    --chart-4: 38 92% 50%; /*Golden Accent*/
-    --chart-5: 258 90% 60%; /*Violet Accent*/
+    --complement-1: 244 55% 41%; /*Light Navy*/
+    --complement-2: 192 91% 36%; /*Cyan Accent*/
+    --complement-3: 160 84% 39%; /*Emerald Accent*/
+    --complement-4: 38 92% 50%; /*Golden Accent*/
+    --complement-5: 258 90% 60%; /*Violet Accent*/
     --supplement-1: 48 100% 96%; /*Warm Cream*/
     --supplement-2: 270 100% 98%; /*Lavender*/
     --supplement-3: 204 100% 97%; /*Sky*/
@@ -63,11 +63,11 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --complement-1: 220 70% 50%;
+    --complement-2: 160 60% 45%;
+    --complement-3: 30 80% 55%;
+    --complement-4: 280 65% 60%;
+    --complement-5: 340 75% 55%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;

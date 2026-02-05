@@ -14,9 +14,9 @@ export const badgeColorClasses: Record<BadgeColor, { bg: string; text: string; b
   pink: { bg: 'bg-secondary', text: 'text-destructive', border: 'border-destructive' },
   green: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-700' },
   red: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-700' },
-  blue: { bg: 'bg-chart-2/30', text: 'text-chart-2', border: 'border-chart-2' },
-  purple: { bg: 'bg-chart-5/20', text: 'text-chart-5', border: 'border-chart-5' },
-  yellow: { bg: 'bg-yellow-200', text: 'text-yellow-800', border: 'border-chart-4' },
+  blue: { bg: 'bg-complement-2/30', text: 'text-complement-2', border: 'border-complement-2' },
+  purple: { bg: 'bg-complement-5/20', text: 'text-complement-5', border: 'border-complement-5' },
+  yellow: { bg: 'bg-yellow-200', text: 'text-yellow-800', border: 'border-complement-4' },
 };
 
 interface UserBadgeProps {
