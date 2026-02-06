@@ -765,7 +765,7 @@ const ConfirmSetSubjectAsSelfContent: React.FC<{
             Cancel
           </Button>
         </AlertDialog.Cancel>
-        <Button onClick={onConfirm} className="flex-1 bg-blue-600 hover:bg-blue-700">
+        <Button onClick={onConfirm} className="flex-1">
           Confirm
         </Button>
       </div>

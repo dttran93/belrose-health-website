@@ -1,7 +1,6 @@
 import { AIProcessingStatus, FileObject, FileStatus, VirtualFileInput } from '@/types/core';
 import { UploadResult } from '../services/shared.types';
 import { VirtualFileResult } from '../components/CombinedUploadFHIR.type';
-import { BlockchainVerification } from '@/types/core';
 
 // ==================== INTERFACE DEFINITIONS ====================
 
@@ -64,9 +63,7 @@ export interface UseFileManagerTypes {
   savingCount: number;
 
   // Virtual file support
-  addVirtualFile: (
-    virtualData: VirtualFileInput
-  ) => Promise<{ fileId: string; blockchainVerification?: BlockchainVerification }>;
+  addVirtualFile: (virtualData: VirtualFileInput) => Promise<{ fileId: string }>;
   addFhirAsVirtualFile: (fhirData: any, options?: VirtualFileInput) => Promise<VirtualFileResult>;
 
   // Reset function

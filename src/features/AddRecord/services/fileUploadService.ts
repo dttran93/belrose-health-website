@@ -44,7 +44,11 @@ export interface IFileUploadService {
 
 // ==================== ERROR TYPES ====================
 export class FileUploadError extends Error {
-  constructor(message: string, public code: UploadErrorCode, public fileId?: string) {
+  constructor(
+    message: string,
+    public code: UploadErrorCode,
+    public fileId?: string
+  ) {
     super(message);
     this.name = 'FileUploadError';
   }
@@ -100,13 +104,6 @@ export class FileUploadService implements IFileUploadService {
    */
   private async handleVirtualFileUpload(fileObj: FileObject): Promise<UploadResult> {
     console.log('🎯 Processing virtual file upload:', fileObj.fileName);
-
-    //DEBUG
-    console.log('🔍 FileUploadService received virtual file:', {
-      hasBlockchainVerification: !!fileObj.blockchainVerification,
-      blockchainData: fileObj.blockchainVerification,
-      allKeys: Object.keys(fileObj),
-    });
 
     // For virtual files, we only save metadata to Firestore. Different than uploadFileComplete which requires File
     const firestoreDoc = await createFirestoreRecord({

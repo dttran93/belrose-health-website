@@ -51,6 +51,7 @@ export const AllRecords: React.FC = () => {
         error={error}
         autoOpenRecordId={autoOpenRecordId}
         autoOpenInEditMode={autoOpenInEditMode}
+        onRefreshRecords={refetchRecords}
       />
     </div>
   );
