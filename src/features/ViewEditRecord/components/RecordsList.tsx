@@ -7,6 +7,8 @@ import { FileObject } from '@/types/core';
 import useFileManager from '@/features/AddRecord/hooks/useFileManager';
 import { toast } from 'sonner';
 import { toDate } from '@/utils/dataFormattingUtils';
+import RecordDeletionDialog from './RecordDeletionDialog';
+import { useRecordDeletion } from '../hooks/useRecordDeletion';
 
 interface RecordsListProps {
   records: FileObject[];
@@ -51,6 +53,7 @@ export const RecordsList: React.FC<RecordsListProps> = ({
     'record' | 'edit' | 'versions' | 'credibility' | 'permissions' | 'access' | 'subject'
   >('record');
   const [comingFromAddRecord, setComingFromAddRecord] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<FileObject | null>(null);
 
   // ================== VIEW HANDLERS ==========================
 
@@ -202,40 +205,41 @@ export const RecordsList: React.FC<RecordsListProps> = ({
     }
   };
 
+  // ================== DELETE HANDLERS ==========================
+
+  // Initialite the deletion hook
+  const deletion = useRecordDeletion(recordToDelete || ({} as FileObject), () => {
+    const deletedRecordId = recordToDelete?.id;
+    setRecordToDelete(null);
+    onRefreshRecords?.();
+
+    // If we're currently viewing the deleted record, go back
+    if (selectedRecord?.id === deletedRecordId && viewMode === 'detailed') {
+      setSelectedRecord(null);
+      setViewMode('summary');
+    }
+  });
+
   /**
    * Deletes a record after confirmation
    */
-  const handleDeleteRecord = async (record: FileObject) => {
-    // Ask for confirmation before deleting
-    if (
-      !confirm(
-        `Are you sure you want to delete "${record.belroseFields?.title}"? This cannot be undone.`
-      )
-    ) {
-      return;
+  const handleDeleteRecord = (record: FileObject) => {
+    console.log('🗑️ Initiating deletion for:', record.id);
+    setRecordToDelete(record); //Triggers Dialog opening
+  };
+
+  // Call initiateDeletion when recordToDelete changes
+  useEffect(() => {
+    if (recordToDelete) {
+      console.log('▶️ Triggering deletion flow for:', recordToDelete.id);
+      deletion.initiateDeletion();
     }
+  }, [recordToDelete?.id]);
 
-    try {
-      if (!record.id) {
-        throw new Error('Cannot delete record - no document ID found');
-      }
-
-      await deleteFileFromFirebase(record.id);
-      console.log('Record deleted successfully');
-      toast.success(`Deleted ${record.belroseFields?.title}`, {
-        description: 'Entry deleted from record',
-        duration: 4000,
-      });
-
-      // Return to summary view after deletion
-      handleBackToSummary();
-    } catch (error) {
-      console.error('Failed to delete record: ', error);
-      toast.error(`Failed to delete ${record.belroseFields?.title}`, {
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
-        duration: 4000,
-      });
-    }
+  const handleCloseDialog = () => {
+    console.log('🚪 Closing and clearing recordToDelete');
+    setRecordToDelete(null);
+    deletion.dialogProps.closeDialog();
   };
 
   // Keep selectedRecord in sync with records updates
@@ -330,17 +334,24 @@ export const RecordsList: React.FC<RecordsListProps> = ({
   // If we're in detailed view, show the full record component
   if (viewMode === 'detailed' && selectedRecord) {
     return (
-      <RecordFull
-        record={selectedRecord}
-        onDownload={handleDownloadRecord}
-        onCopy={handleCopyRecord}
-        onDelete={handleDeleteRecord}
-        onBack={handleBackToSummary}
-        onSave={handleSaveRecord}
-        initialViewMode={initialRecordView}
-        comingFromAddRecord={comingFromAddRecord}
-        onRefreshRecord={onRefreshRecords}
-      />
+      <>
+        <RecordFull
+          record={selectedRecord}
+          onDownload={handleDownloadRecord}
+          onCopy={handleCopyRecord}
+          onDelete={handleDeleteRecord}
+          onBack={handleBackToSummary}
+          onSave={handleSaveRecord}
+          initialViewMode={initialRecordView}
+          comingFromAddRecord={comingFromAddRecord}
+          onRefreshRecord={onRefreshRecords}
+        />
+
+        {/*Deletion Dialog */}
+        {recordToDelete && (
+          <RecordDeletionDialog {...deletion.dialogProps} closeDialog={handleCloseDialog} />
+        )}
+      </>
     );
   }
 
@@ -435,6 +446,11 @@ export const RecordsList: React.FC<RecordsListProps> = ({
           </div>
         )}
       </div>
+
+      {/*Deletion Dialog */}
+      {recordToDelete && (
+        <RecordDeletionDialog {...deletion.dialogProps} closeDialog={handleCloseDialog} />
+      )}
     </div>
   );
 };

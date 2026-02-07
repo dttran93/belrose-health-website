@@ -21,6 +21,7 @@ service cloud.firestore {
     function hasRoleOnRecord(recordId) {
       let record = get(/databases/$(database)/documents/records/$(recordId));
       return record != null && (
+        record.data.uploadedBy == request.auth.uid ||
         request.auth.uid in record.data.owners ||
         request.auth.uid in record.data.administrators ||
         request.auth.uid in record.data.viewers ||
@@ -103,7 +104,7 @@ service cloud.firestore {
     }
     
     // ============================================
-    // RECORDS (Core collection)
+    // RECORDS
     // ============================================
 
     match /records/{recordId} {
@@ -161,39 +162,21 @@ service cloud.firestore {
     }
        
     // ============================================
-    // RECORD VERSIONS (Immutable history)
+    // RECORD VERSIONS
     // ============================================
 
     match /recordVersions/{versionId} {
-      function hasVersionAccess() {
-        let recordId = resource.data.recordId;
-        let record = get(/databases/$(database)/documents/records/$(recordId));
-        return request.auth.uid in record.data.owners ||
-               request.auth.uid in record.data.administrators;
-      }
-
-      function hasVersionAccessForCreate() {
-        let recordId = request.resource.data.recordId;
-        let record = get(/databases/$(database)/documents/records/$(recordId));
-        return request.auth.uid in record.data.owners ||
-               request.auth.uid in record.data.administrators;
-      }
-
-      function canDeleteVersion() {
-        let recordId = resource.data.recordId;
-        let record = get(/databases/$(database)/documents/records/$(recordId));
-        return request.auth.uid in record.data.owners;
-      }
-
-      allow read: if request.auth != null && hasVersionAccess();
+      allow read: if request.auth != null && hasRoleOnRecord(resource.data.recordId);
 
       allow create: if request.auth != null && 
-        hasVersionAccessForCreate() &&
+        isAdminOrOwnerOfRecord(request.resource.data.recordId) &&
         request.resource.data.editedBy == request.auth.uid;
 
       allow update: if false; // Versions are immutable
 
-      allow delete: if request.auth != null && canDeleteVersion();
+      allow delete: if request.auth != null &&     
+      exists(/databases/$(database)/documents/records/$(resource.data.recordId)) &&
+      isAdminOrOwnerOfRecord(resource.data.recordId);
     }
     
     // ============================================
@@ -201,19 +184,6 @@ service cloud.firestore {
     // ============================================
 
     match /subjectConsentRequests/{requestId} {
-      // Helper: Check if user is admin/owner of the associated record
-      function canManageRecord() {
-        let record = get(/databases/$(database)/documents/records/$(resource.data.recordId));
-        return request.auth.uid in record.data.owners ||
-               request.auth.uid in record.data.administrators;
-      }
-
-      function canManageConsentRecordForCreate() {
-        let record = get(/databases/$(database)/documents/records/$(request.resource.data.recordId));
-        return request.auth.uid in record.data.owners ||
-               request.auth.uid in record.data.administrators;
-      }
-
       // READ: User can read if they:
       // 1. Are the target user (receiving the request)
       // 2. Requested it themselves
@@ -232,7 +202,7 @@ service cloud.firestore {
       // 3. Include required fields
       // 4. Status must be 'pending'
       allow create: if request.auth != null &&
-        canManageConsentRecordForCreate() &&
+        isAdminOrOwnerOfRecord(request.resource.data.recordId) &&
         request.resource.data.requestedBy == request.auth.uid &&
         request.resource.data.status == 'pending' &&
         request.resource.data.recordId != null &&
@@ -264,7 +234,7 @@ service cloud.firestore {
       // DELETE: Only the requester or record admins/owners can delete
       allow delete: if request.auth != null && (
         resource.data.requestedBy == request.auth.uid ||
-        canManageRecord()
+        isAdminOrOwnerOfRecord(resource.data.recordId)
       );
     }
 
@@ -273,19 +243,6 @@ service cloud.firestore {
     // ============================================
 
     match /subjectRemovalRequests/{requestId} {
-      // Helper: Check if user is admin/owner of the associated record
-      function canManageRemovalRecord() {
-        let record = get(/databases/$(database)/documents/records/$(resource.data.recordId));
-        return request.auth.uid in record.data.owners ||
-              (record.data.owners.size() == 0 && request.auth.uid in record.data.administrators);
-      }
-
-      function canManageRemovalRecordForCreate() {
-        let record = get(/databases/$(database)/documents/records/$(request.resource.data.recordId));
-        return request.auth.uid in record.data.owners ||
-              (record.data.owners.size() == 0 && request.auth.uid in record.data.administrators);
-      }
-
       // Helper: Check if target is actually a subject of the record
       function isSubjectOfRecord() {
         let record = get(/databases/$(database)/documents/records/$(request.resource.data.recordId));
@@ -301,7 +258,7 @@ service cloud.firestore {
         resource.data.subjectId == request.auth.uid ||
         resource.data.requestedBy == request.auth.uid ||
         request.auth.uid in get(/databases/$(database)/documents/records/$(resource.data.recordId)).data.subjects ||
-        canManageRemovalRecord()
+        isAdminOrOwnerOfRecord(resource.data.recordId)
       );
 
       // CREATE: Must be authenticated AND:
@@ -312,7 +269,7 @@ service cloud.firestore {
       // 5. Status must be 'pending'
       // 6. Required fields present
       allow create: if request.auth != null &&
-        canManageRemovalRecordForCreate() &&
+        isAdminOrOwnerOfRecord(request.resource.data.recordId) &&
         request.resource.data.requestedBy == request.auth.uid &&
         request.resource.data.subjectId != request.auth.uid &&
         isSubjectOfRecord() &&
@@ -332,7 +289,7 @@ service cloud.firestore {
       // DELETE: Requester or record owners/admins can delete (for cancellation)
       allow delete: if request.auth != null && (
         resource.data.requestedBy == request.auth.uid ||
-        canManageRemovalRecord()
+        isAdminOrOwnerOfRecord(resource.data.recordId)
       );
     }
     
@@ -498,6 +455,40 @@ service cloud.firestore {
     }
 
     // ============================================
+    // RECORD DELETION EVENTS
+    // ============================================
+
+    match /recordDeletionEvents/{recordId} {
+      // READ: Only affected users can read (for audit trail)
+      allow read: if request.auth != null && (
+        resource.data.deletedBy == request.auth.uid ||
+        request.auth.uid in resource.data.affectedUsers.owners ||
+        request.auth.uid in resource.data.affectedUsers.administrators ||
+        request.auth.uid in resource.data.affectedUsers.viewers ||
+        request.auth.uid in resource.data.affectedUsers.subjects
+      );
+
+      // CREATE: Only owners (or admins if no owners) can create deletion events
+      // Must verify they can delete the record BEFORE creating the event
+      allow create: if request.auth != null &&
+        exists(/databases/$(database)/documents/records/$(recordId)) &&
+        (request.auth.uid in get(/databases/$(database)/documents/records/$(recordId)).data.owners ||
+        (get(/databases/$(database)/documents/records/$(recordId)).data.owners.size() == 0 && 
+          request.auth.uid in get(/databases/$(database)/documents/records/$(recordId)).data.administrators)) &&
+        request.resource.data.deletedBy == request.auth.uid &&
+        request.resource.data.deletionComplete == false;
+
+      // UPDATE: Only the deleter can mark as complete
+      allow update: if request.auth != null &&
+        resource.data.deletedBy == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletionComplete']) &&
+        request.resource.data.deletionComplete == true;
+
+      // DELETE: Only server
+      allow delete: if isServerWrite();
+    }
+
+    // ============================================
     // ENCRYPTION & SECURITY
     // ============================================
 
@@ -514,7 +505,9 @@ service cloud.firestore {
       allow update: if request.auth != null &&
         isAdminOrOwnerOfRecord(resource.data.recordId);
 
-      allow delete: if false; // No hard deletes
+      allow delete: if request.auth != null &&
+        exists(/databases/$(database)/documents/records/$(resource.data.recordId)) && 
+        isAdminOrOwnerOfRecord(resource.data.recordId);
     }
 
     // ============================================

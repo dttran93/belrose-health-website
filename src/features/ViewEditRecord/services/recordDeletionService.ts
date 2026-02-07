@@ -2,16 +2,15 @@
 
 /**
  * Service to delete records. Requires checking permissions, determining blockchain options
- * and clearing verisonHistories and wrappedKeys
+ * and clearing versionHistories and wrappedKeys
  */
 
 import { PermissionsService } from '@/features/Permissions/services/permissionsService';
 import SubjectQueryService from '@/features/Subject/services/subjectQueryService';
-import { RejectionReasons } from '@/features/Subject/services/subjectRejectionService';
 import SubjectRemovalService from '@/features/Subject/services/subjectRemovalService';
-import SubjectService from '@/features/Subject/services/subjectService';
 import { deleteFileComplete } from '@/firebase/uploadUtils';
 import { FileObject } from '@/types/core';
+import { getFirestore, doc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
 
 export interface DeletionCheckResult {
   canDelete: boolean;
@@ -26,6 +25,20 @@ export interface DeletionCheckResult {
   otherAdmins?: string[];
   otherViewers?: string[];
   otherSubjects?: string[];
+}
+
+interface RecordDeletionEvent {
+  recordId: string;
+  recordTitle: string;
+  deletedBy: string;
+  deletedAt: Timestamp;
+  affectedUsers: {
+    owners: string[];
+    administrators: string[];
+    viewers: string[];
+    subjects: string[];
+  };
+  deletionComplete: boolean;
 }
 
 class RecordDeletionService {
@@ -118,7 +131,7 @@ class RecordDeletionService {
     const warnings: string[] = [];
 
     // Warn about other admins/viewers being affected
-    if (otherAdmins.length > 0 || otherViewers.length > 0) {
+    if (otherAdmins.length > 0 || otherViewers.length > 0 || otherSubjects.length > 0) {
       const userBreakdown: string[] = [];
 
       if (otherAdmins.length > 0) {
@@ -128,15 +141,18 @@ class RecordDeletionService {
         userBreakdown.push(`${otherViewers.length} viewer${otherViewers.length > 1 ? 's' : ''}`);
       }
       if (otherSubjects.length > 0) {
-        userBreakdown.push(`${otherSubjects.length} viewer${otherSubjects.length > 1 ? 's' : ''}`);
+        userBreakdown.push(`${otherSubjects.length} subject${otherSubjects.length > 1 ? 's' : ''}`);
       }
 
+      const totalAffected = otherAdmins.length + otherViewers.length;
       warnings.push(
-        `This will delete the record for ${otherAdmins.length + otherViewers.length} other user${
-          otherAdmins.length + otherViewers.length > 1 ? 's' : ''
+        `This will delete the record for ${totalAffected} other user${
+          totalAffected > 1 ? 's' : ''
         } (${userBreakdown.join(', ')}). The users will be notified that you deleted the record.`
       );
     }
+
+    warnings.push('This action cannot be undone');
 
     return {
       canDelete: true,
@@ -155,12 +171,11 @@ class RecordDeletionService {
 
   /**
    * Step 2: Actually delete (called after user confirms)
+   *
+   * NOTE: If the deleting user is a subject, they should have already
+   * unanchored themselves via SubjectActionDialog before calling this.
    */
-  static async deleteRecord(
-    record: FileObject,
-    userId: string,
-    reason?: RejectionReasons
-  ): Promise<void> {
+  static async deleteRecord(record: FileObject, userId: string): Promise<void> {
     // Final permission check (in case state changed)
     const check = await this.checkDeletionPermissions(record, userId);
     if (!check.canDelete) {
@@ -170,101 +185,144 @@ class RecordDeletionService {
     try {
       console.log('🗑️ Starting complete record deletion for:', record.id);
 
-      // Step 1: Notify Affected Users
-      if (check.affectsOtherUsers && check.otherUserCount! > 0) {
+      // Step 1: Create deletion event (triggers notifications via Cloud Function)
+      await this.createDeletionEvent(record, userId, check);
+
+      // Step 2: Handle OTHER subjects (not the deleting user - they already unanchored)
+      if (check.hasSubjects && check.otherSubjects && check.otherSubjects.length > 0) {
+        await this.handleOtherSubjectsCleanup(record, check);
       }
 
-      // Step 2: Handle subject removal and blockchain unanchoring
-      if (check.hasSubjects) {
-        await this.handleSubjectCleanup(record, userId, reason, check);
-      }
-
-      // 1. Delete from Firebase
+      // Step 3: Delete from Firebase (storage + Firestore + versions + wrapped keys)
       await deleteFileComplete(record.id);
-      console.log('Record deleted successfully');
+      console.log('✅ Record deleted from Firebase');
 
-      // 2. Subject removal and unanchoring from blockchain
+      // Step 4: Mark deletion event as complete
+      await this.markDeletionComplete(record.id);
+
+      console.log('✅ Complete record deletion finished:', record.id);
     } catch (error) {
+      console.error('❌ Record deletion failed:', error);
       throw error;
     }
   }
 
   /**
-   * Handle subject cleanup and blockchain unanchoring
+   * Create a deletion event that triggers notifications and serve as audit trail
    */
-  private static async handleSubjectCleanup(
+  private static async createDeletionEvent(
     record: FileObject,
     userId: string,
-    reason: RejectionReasons | undefined,
     checkResult: DeletionCheckResult
   ): Promise<void> {
-    console.log('🔗 Handling subject cleanup and blockchain unanchoring...');
+    try {
+      const db = getFirestore();
+
+      const deletionEvent: RecordDeletionEvent = {
+        recordId: record.id,
+        recordTitle: record.belroseFields?.title || record.fileName,
+        deletedBy: userId,
+        deletedAt: Timestamp.now(),
+        affectedUsers: {
+          owners: checkResult.otherOwners || [],
+          administrators: checkResult.otherAdmins || [],
+          viewers: checkResult.otherViewers || [],
+          subjects: checkResult.otherSubjects || [],
+        },
+        deletionComplete: false,
+      };
+
+      const eventRef = doc(db, 'recordDeletionEvents', record.id);
+      await setDoc(eventRef, deletionEvent);
+
+      console.log('✅ Deletion event created:', record.id);
+    } catch (error) {
+      console.error('❌ Failed to create deletion event:', error);
+      console.warn('⚠️ Continuing with deletion despite event creation failure');
+    }
+  }
+
+  /**
+   * Mark deletion as complete
+   */
+  private static async markDeletionComplete(recordId: string): Promise<void> {
+    try {
+      const db = getFirestore();
+      const eventRef = doc(db, 'recordDeletionEvents', recordId);
+
+      await updateDoc(eventRef, {
+        deletionComplete: true,
+      });
+
+      console.log('✅ Deletion marked complete:', recordId);
+    } catch (error) {
+      console.error('❌ Failed to mark deletion complete:', error);
+      console.warn('⚠️ Deletion event not marked complete, but record was deleted');
+    }
+  }
+
+  /**
+   * Handle OTHER subjects cleanup (not the deleting user)
+   *
+   * Creates removal requests for all other subjects so they can unanchor themselves.
+   */
+  private static async handleOtherSubjectsCleanup(
+    record: FileObject,
+    checkResult: DeletionCheckResult
+  ): Promise<void> {
+    console.log('🔗 Creating removal requests for other subjects...');
 
     try {
-      // Step 1: If the deleting user is a subject, remove them immediately
-      if (reason && record.subjects?.includes(userId)) {
-        await SubjectService.rejectSubjectStatus(record.id, reason);
-        console.log('✅ User subject status rejected and unanchored');
-      }
-
-      // Step 2: Create removal request sfor all other subjects
+      // Create removal requests for all other subjects (Unanchoring by the current user is covered by subject service in Record Deletion Dialog)
       const otherSubjects = checkResult.otherSubjects || [];
 
-      if (otherSubjects.length > 0) {
-        console.log(`📨 Creating removal requests for ${otherSubjects.length} other subject(s)...`);
+      if (otherSubjects.length === 0) {
+        return;
+      }
 
-        const removalPromises = otherSubjects.map(async subjectId => {
-          try {
-            await SubjectRemovalService.requestRemoval(
-              record.id,
-              subjectId,
-              `Record "${record.belroseFields?.title || record.fileName}" is being deleted by the owner/administrator. Please unanchor yourself from this record.`,
-              record.belroseFields?.title || record.fileName
-            );
-            console.log(`✅ Removal request created for subject: ${subjectId}`);
-            return { success: true, subjectId };
-          } catch (error) {
-            console.error(`❌ Failed to create removal request for ${subjectId}:`, error);
-            return { success: false, subjectId, error };
-          }
-        });
+      console.log(`📨 Creating removal requests for ${otherSubjects.length} other subject(s)...`);
 
-        const results = await Promise.allSettled(removalPromises);
-        const successful = results.filter(r => r.status === 'fulfilled').length;
-        const failed = results.filter(r => r.status === 'rejected').length;
-
-        console.log(`📊 Removal requests: ${successful} successful, ${failed} failed`);
-
-        if (successful > 0) {
-          console.log(`✅ Created ${successful} subject removal request(s)`);
+      const removalPromises = otherSubjects.map(async subjectId => {
+        try {
+          await SubjectRemovalService.requestRemoval(
+            record.id,
+            subjectId,
+            `Record "${record.belroseFields?.title || record.fileName}" is being deleted by the owner/administrator. Please unanchor yourself from this record.`,
+            record.belroseFields?.title || record.fileName
+          );
+          console.log(`✅ Removal request created for subject: ${subjectId}`);
+          return { success: true, subjectId };
+        } catch (error) {
+          console.error(`❌ Failed to create removal request for ${subjectId}:`, error);
+          return { success: false, subjectId, error };
         }
+      });
 
-        if (failed > 0) {
-          console.warn(`⚠️ Failed to create ${failed} removal request(s), continuing...`);
-        }
+      const results = await Promise.allSettled(removalPromises);
+      const successful = results.filter(r => r.status === 'fulfilled').length;
+      const failed = results.filter(r => r.status === 'rejected').length;
+
+      console.log(`📊 Removal requests: ${successful} successful, ${failed} failed`);
+
+      if (failed > 0) {
+        console.warn(`⚠️ Failed to create ${failed} removal request(s), continuing...`);
       }
     } catch (error) {
-      console.error('⚠️ Subject cleanup failed:', error);
+      console.error('⚠️ Other subjects cleanup failed:', error);
       // Don't throw - let deletion continue
     }
   }
 
   /**
-   * Alternative: Remove self from record (don't delete)
-   * Remove subject status and permissions
+   * Remove self from record (don't delete for everyone)
+   *
+   * NOTE: If user is a subject, they should unanchor via SubjectActionDialog first.
+   * This method only removes permissions.
    */
-  async removeUserFromRecord(
-    record: FileObject,
-    userId: string,
-    reason?: RejectionReasons
-  ): Promise<void> {
+  async removeUserFromRecord(record: FileObject, userId: string): Promise<void> {
     console.log('👤 Removing user from record:', userId);
 
     try {
-      if (reason && record.subjects?.includes(userId)) {
-        await SubjectService.rejectSubjectStatus(record.id, reason);
-      }
-
       const role = PermissionsService.getUserRole(record, userId);
       if (!role) {
         throw new Error('User does not have a role on this record');

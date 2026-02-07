@@ -31,7 +31,7 @@ import {
 
 // ==================== SMART CONTRACT CONFIG ====================
 
-const ROLE_MANAGER_ADDRESS = '0x0FdDcE7EdebD73C6d1A11983bb6a759132543aaD' as const;
+const ROLE_MANAGER_ADDRESS = '0xC31477f563dC8f7529Ba6AE7E410ABdB84C27d7C' as const;
 
 const ROLE_MANAGER_ABI = [
   {
@@ -373,13 +373,12 @@ export class PermissionPreparationService {
       console.log('✅ Record initialized:', result.data.txHash);
       return result.data;
     } catch (error: any) {
-      console.error('❌ Record initialization failed:', error);
-
       // Handle "already exists" gracefully - not really an error
       if (
         error.code === 'already-exists' ||
         error.code === 'functions/already-exists' ||
-        error.message?.includes('already initialized')
+        error.message?.includes('already initialized') ||
+        error.message?.includes('Conflict')
       ) {
         console.log('ℹ️ Record already initialized on blockchain');
         return {
@@ -390,6 +389,7 @@ export class PermissionPreparationService {
         };
       }
 
+      console.error('❌ Record initialization failed:', error);
       throw new Error(error.message || 'Failed to initialize record on blockchain');
     }
   }
