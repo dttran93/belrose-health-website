@@ -464,9 +464,6 @@ export class SubjectQueryService {
     // Check if current user has a removal request for this record
     const userRemovalRequest = pendingRemovalRequests.find(r => r.subjectId === user.uid);
 
-    console.log('Current User UID:', user.uid);
-    console.log('All Pending Removal Requests for this Record:', pendingRemovalRequests);
-
     return {
       // Current user alerts
       hasPendingRequest: consentRequest?.status === 'pending',

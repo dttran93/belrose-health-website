@@ -337,9 +337,6 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     }
   };
 
-  console.log('removal request status:', subjectAlerts.hasRemovalRequest);
-  console.log('removal request status:', subjectAlerts.removalRequest);
-
   return (
     <div className="max-w-7xl mx-auto bg-background rounded-2xl shadow-xl rounded-lg">
       {/* ===== HEADER SECTION ===== */}

@@ -20,7 +20,7 @@ import { ethers, Contract } from 'ethers';
 import { PaymasterService } from '@/features/BlockchainWallet/services/paymasterService';
 
 // Contract address
-const MEMBER_ROLE_MANAGER_ADDRESS = '0x0FdDcE7EdebD73C6d1A11983bb6a759132543aaD';
+const MEMBER_ROLE_MANAGER_ADDRESS = '0xC31477f563dC8f7529Ba6AE7E410ABdB84C27d7C';
 
 // RPC for read-only operations
 const RPC_URL = 'https://1rpc.io/sepolia';

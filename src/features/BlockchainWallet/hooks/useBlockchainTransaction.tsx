@@ -6,7 +6,6 @@ import React, { useState, useCallback, createContext, useContext, ReactNode } fr
 import {
   BlockchainConfirmationDialog,
   TransactionDetails,
-  TransactionType,
 } from '../component/blockchainConfirmationDialog';
 import { WalletService } from '../services/walletService';
 import { WalletOrigin } from '@/types/core';

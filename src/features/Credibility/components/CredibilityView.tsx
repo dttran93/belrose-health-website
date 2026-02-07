@@ -44,7 +44,10 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({
   const [initialModifyingDispute, setInitialModifyingDispute] = useState(false);
   const [initialModifyingVerification, setInitialModifyingVerification] = useState(false);
   const [verifications, setVerifications] = useState<VerificationDoc[]>([]);
+  const [disputes, setDisputes] = useState<any[]>([]);
   const { user } = useAuth();
+
+  console.log('Current View', viewMode);
 
   // Generate and retrieve the record hash
   const recordHash = (record.recordHash || RecordHashService.generateRecordHash(record)) as string;
@@ -63,7 +66,7 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({
       ]);
 
       setVerifications(fetchedVerifications);
-      // setDisputes(fetchedDisputes); // If you add a state for this
+      setDisputes(fetchedDisputes);
 
       // 3. Navigation logic
       if (viewMode === 'add') {
@@ -99,18 +102,23 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({
 
   // Fetch verifications on mount and when record changes
   useEffect(() => {
-    const fetchVerifications = async () => {
+    const fetchCredibilityData = async () => {
       if (!recordId) {
         setViewMode('empty');
         return;
       }
 
       try {
-        const fetchedVerifications = await getVerificationsByRecordId(recordId);
+        const [fetchedVerifications, fetchedDisputes] = await Promise.all([
+          getVerificationsByRecordId(recordId),
+          getDisputesByRecordId(recordId),
+        ]);
+
         setVerifications(fetchedVerifications);
+        setDisputes(fetchedDisputes);
 
         // Determine initial view mode based on whether verifications exist
-        if (fetchedVerifications.length > 0) {
+        if (fetchedVerifications.length > 0 || fetchedDisputes.length > 0) {
           setViewMode('list');
         } else {
           setViewMode('empty');
@@ -121,7 +129,7 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({
       }
     };
 
-    fetchVerifications();
+    fetchCredibilityData();
   }, [recordId]);
 
   const handleBackClick = () => {

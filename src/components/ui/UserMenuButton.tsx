@@ -63,9 +63,6 @@ const UserMenuButton: React.FC<UserMenuButtonProps> = ({
       case 'help':
         onHelp?.();
         break;
-      case 'help':
-        onHelp?.();
-        break;
       default:
         console.log(`${action} clicked`);
     }

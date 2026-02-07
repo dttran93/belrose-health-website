@@ -4,11 +4,16 @@ import React from 'react';
 import ReactionButtons, { ReactionType } from '@/components/ui/ReactionButtons';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { UserBadge } from '@/features/Users/components/ui/UserBadge';
-import { DisputeDoc, getCulpabilityConfig, getSeverityConfig } from '../../services/disputeService';
+import {
+  DisputeDoc,
+  DisputeDocDecrypted,
+  getCulpabilityConfig,
+  getSeverityConfig,
+} from '../../services/disputeService';
 import { BelroseUserProfile } from '@/types/core';
 
 interface DisputeCardProps {
-  dispute: DisputeDoc;
+  dispute: DisputeDocDecrypted;
   userProfile: BelroseUserProfile | undefined;
   isInactive: boolean;
   currentRecordHash: string | null | undefined;

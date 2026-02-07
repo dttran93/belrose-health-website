@@ -50,7 +50,7 @@ export const RejectionResponseAlert: React.FC<RejectionResponseAlertProps> = ({
     icon={UserX}
     title="Subject Removal"
     description={`${subjectName} has removed themselves as a subject. How would you like to respond?`}
-    variant="error"
+    variant="warning"
     actions={[
       { label: 'Drop It', onClick: onDrop, variant: 'outline', disabled: isLoading },
       { label: 'Escalate', onClick: onEscalate, disabled: isLoading },

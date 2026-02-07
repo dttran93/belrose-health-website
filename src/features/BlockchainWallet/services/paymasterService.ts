@@ -152,9 +152,6 @@ export class PaymasterService {
       throw new Error(`Cannot use sponsored transactions: ${sponsorCheck.reason}`);
     }
 
-    // Ensure smart account is registered on-chain before first tx
-    await this.ensureSmartAccountRegistered();
-
     // Create the smart account client with paymaster
     const client = await this.createSmartAccountClient();
 
@@ -167,77 +164,6 @@ export class PaymasterService {
 
     console.log('✅ PaymasterService: Transaction submitted:', txHash);
     return txHash;
-  }
-
-  /**
-   * Ensure the user's Smart Account is registered on-chain as a member.
-   * This is lazy - only happens on first sponsored transaction.
-   *
-   * Smart Accounts have a deterministic address based on the EOA owner,
-   * so we can compute it without deploying the contract.
-   */
-  private static async ensureSmartAccountRegistered(): Promise<void> {
-    const wallet = await WalletService.getCurrentUserWallet();
-
-    // Already registered? Skip
-    if (wallet?.smartAccountAddress) {
-      console.log('✅ PaymasterService: Smart account already registered');
-      return;
-    }
-
-    console.log('🔐 PaymasterService: Registering smart account on-chain...');
-
-    // Compute the deterministic smart account address
-    const smartAccountAddress = await this.computeSmartAccountAddress();
-    console.log('📱 PaymasterService: Computed smart account:', smartAccountAddress);
-
-    // Register on-chain via Cloud Function
-    // This will call addMember(smartAccountAddress, userIdHash) and update Firestore
-    const functions = getFunctions();
-    const registerFn = httpsCallable<
-      { smartAccountAddress: string },
-      { success: boolean; txHash: string }
-    >(functions, 'registerSmartAccount');
-
-    const result = await registerFn({ smartAccountAddress });
-
-    if (!result.data.success) {
-      throw new Error('Failed to register smart account on-chain');
-    }
-
-    console.log('✅ PaymasterService: Smart account registered:', result.data.txHash);
-  }
-
-  /**
-   * Compute the deterministic Smart Account address for the current user.
-   *
-   * The address is derived from:
-   * - The EOA owner address
-   * - The EntryPoint address
-   * - The SimpleAccount factory
-   *
-   * This is the same address every time for the same EOA.
-   */
-  private static async computeSmartAccountAddress(): Promise<string> {
-    const { signer } = await WalletService.getSigner();
-    const privateKey = (signer as any).privateKey as Hex;
-    const viemAccount = privateKeyToAccount(privateKey);
-
-    const publicClient = createPublicClient({
-      chain: CHAIN,
-      transport: http(),
-    });
-
-    const simpleAccount = await toSimpleSmartAccount({
-      client: publicClient,
-      owner: viemAccount,
-      entryPoint: {
-        address: entryPoint07Address,
-        version: '0.7',
-      },
-    });
-
-    return simpleAccount.address;
   }
 
   /**

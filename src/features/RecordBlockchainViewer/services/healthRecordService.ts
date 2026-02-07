@@ -140,10 +140,6 @@ export async function getHealthRecordStats(): Promise<HealthRecordStats> {
 export async function getAnchoredRecords(): Promise<AnchoredRecord[]> {
   const contract = getContract();
 
-  // Debug: Check if contract has any records
-  const totalRecords = await contract.getTotalAnchoredRecords();
-  console.log(`📊 Contract reports ${totalRecords} total anchored records`);
-
   try {
     // 1. Query RecordAnchored events to get unique subjectIdHashes
     // Since recordId is an indexed string, we only get its hash - not useful directly

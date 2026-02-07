@@ -10,6 +10,7 @@ export enum MemberStatus {
   Inactive = 1,
   Active = 2,
   Verified = 3,
+  VerifiedProvider = 4,
 }
 
 interface RegisterMemberResult {
