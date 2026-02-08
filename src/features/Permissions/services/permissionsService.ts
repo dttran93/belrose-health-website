@@ -502,6 +502,13 @@ export class PermissionsService {
       throw new Error('User is not a viewer of this record');
     }
 
+    // Check 4: Can't remove a subject's permissions (must go through subject removal route first)
+    const isTargetSubject = recordData.subjects?.includes(targetUserId);
+
+    if (isTargetSubject) {
+      throw new Error("Cannot remove a subject's access. Please remove them as subject first.");
+    }
+
     console.log('🔄 Removing viewer access:', targetUserId);
 
     // Step 1: Revoke encryption access
@@ -606,6 +613,15 @@ export class PermissionsService {
     // Rule 5: Prevent removing yourself if you're the last administrator or owner
     if (!hasOwners && isLastAdmin) {
       throw new Error('Cannot remove the last administrator from a record');
+    }
+
+    // Rule 6: Can't remove a subject's permissions (must go through subject removal route first)
+    const isTargetSubject = recordData.subjects?.includes(targetUserId);
+
+    if (isTargetSubject && !options?.demoteToViewer) {
+      throw new Error(
+        "Cannot remove a subject's access. Please remove them as subject first or demote to a different role."
+      );
     }
 
     console.log('🔄 Removing administrator access:', targetUserId);
@@ -722,6 +738,15 @@ export class PermissionsService {
 
     if (isLastOwner && !hasAdmins) {
       throw new Error('Cannot remove the last owner when no administrators exist');
+    }
+
+    // Rule 5: Can't remove a subject's permissions (must go through subject removal route first)
+    const isTargetSubject = recordData.subjects?.includes(targetUserId);
+
+    if (isTargetSubject && !options) {
+      throw new Error(
+        "Cannot remove a subject's access. Please remove them as subject first or demote to a different role."
+      );
     }
 
     console.log('🔄 Removing owner access:', targetUserId);
