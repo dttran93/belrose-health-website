@@ -7,7 +7,15 @@
 export interface FHIRBundle {
   resourceType: 'Bundle';
   id: string;
-  type: 'document' | 'collection' | 'searchset' | 'history' | 'transaction' | 'transaction-response' | 'batch' | 'batch-response';
+  type:
+    | 'document'
+    | 'collection'
+    | 'searchset'
+    | 'history'
+    | 'transaction'
+    | 'transaction-response'
+    | 'batch'
+    | 'batch-response';
   timestamp?: string;
   total?: number;
   entry: FHIREntry[];
@@ -23,12 +31,19 @@ export interface FHIREntry {
 }
 
 // Union type of all FHIR resources you'll use
-export type FHIRResource = 
-  | PatientResource 
-  | ObservationResource 
+export type FHIRResource =
+  | PatientResource
+  | ObservationResource
   | DocumentReferenceResource
   | PractitionerResource
-  | OrganizationResource;
+  | OrganizationResource
+  | ConditionResource
+  | ProcedureResource
+  | MedicationRequestResource
+  | MedicationStatementResource
+  | DiagnosticReportResource
+  | AllergyIntoleranceResource
+  | ImmunizationResource;
 
 // ============================================================================
 // SHARED/COMMON FHIR TYPES
@@ -83,7 +98,7 @@ export interface Address {
 
 export interface Period {
   start?: string; // DateTime
-  end?: string;   // DateTime
+  end?: string; // DateTime
 }
 
 export interface HumanName {
@@ -130,7 +145,7 @@ export interface PatientResource {
   contained?: FHIRResource[];
   extension?: Extension[];
   modifierExtension?: Extension[];
-  
+
   // Patient-specific fields
   identifier?: Identifier[];
   active?: boolean;
@@ -186,12 +201,20 @@ export interface ObservationResource {
   contained?: FHIRResource[];
   extension?: Extension[];
   modifierExtension?: Extension[];
-  
+
   // Observation-specific fields
   identifier?: Identifier[];
   basedOn?: Reference[];
   partOf?: Reference[];
-  status: 'registered' | 'preliminary' | 'final' | 'amended' | 'corrected' | 'cancelled' | 'entered-in-error' | 'unknown';
+  status:
+    | 'registered'
+    | 'preliminary'
+    | 'final'
+    | 'amended'
+    | 'corrected'
+    | 'cancelled'
+    | 'entered-in-error'
+    | 'unknown';
   category?: CodeableConcept[];
   code: CodeableConcept;
   subject?: Reference;
@@ -269,7 +292,7 @@ export interface DocumentReferenceResource {
   contained?: FHIRResource[];
   extension?: Extension[];
   modifierExtension?: Extension[];
-  
+
   // DocumentReference-specific fields
   masterIdentifier?: Identifier;
   identifier?: Identifier[];
@@ -323,7 +346,7 @@ export interface PractitionerResource {
   contained?: FHIRResource[];
   extension?: Extension[];
   modifierExtension?: Extension[];
-  
+
   // Practitioner-specific fields
   identifier?: Identifier[];
   active?: boolean;
@@ -358,7 +381,7 @@ export interface OrganizationResource {
   contained?: FHIRResource[];
   extension?: Extension[];
   modifierExtension?: Extension[];
-  
+
   // Organization-specific fields
   identifier?: Identifier[];
   active?: boolean;
@@ -377,6 +400,436 @@ export interface OrganizationContact {
   name?: HumanName;
   telecom?: ContactPoint[];
   address?: Address;
+}
+
+// ============================================================================
+// CONDITION RESOURCE (Diagnoses, Problems)
+// ============================================================================
+
+export interface ConditionResource {
+  resourceType: 'Condition';
+  id: string;
+  meta?: Meta;
+  implicitRules?: string;
+  language?: string;
+  text?: Narrative;
+  contained?: FHIRResource[];
+  extension?: Extension[];
+  modifierExtension?: Extension[];
+
+  // Condition-specific fields
+  identifier?: Identifier[];
+  clinicalStatus?: CodeableConcept;
+  verificationStatus?: CodeableConcept;
+  category?: CodeableConcept[];
+  severity?: CodeableConcept;
+  code?: CodeableConcept;
+  bodySite?: CodeableConcept[];
+  subject: Reference;
+  encounter?: Reference;
+  onsetDateTime?: string;
+  onsetAge?: Age;
+  onsetPeriod?: Period;
+  onsetRange?: Range;
+  onsetString?: string;
+  abatementDateTime?: string;
+  abatementAge?: Age;
+  abatementPeriod?: Period;
+  abatementRange?: Range;
+  abatementString?: string;
+  recordedDate?: string;
+  recorder?: Reference;
+  asserter?: Reference;
+  stage?: ConditionStage[];
+  evidence?: ConditionEvidence[];
+  note?: Annotation[];
+}
+
+export interface ConditionStage {
+  summary?: CodeableConcept;
+  assessment?: Reference[];
+  type?: CodeableConcept;
+}
+
+export interface ConditionEvidence {
+  code?: CodeableConcept[];
+  detail?: Reference[];
+}
+
+// ============================================================================
+// PROCEDURE RESOURCE (Surgeries, Treatments)
+// ============================================================================
+
+export interface ProcedureResource {
+  resourceType: 'Procedure';
+  id: string;
+  meta?: Meta;
+  implicitRules?: string;
+  language?: string;
+  text?: Narrative;
+  contained?: FHIRResource[];
+  extension?: Extension[];
+  modifierExtension?: Extension[];
+
+  // Procedure-specific fields
+  identifier?: Identifier[];
+  instantiatesCanonical?: string[];
+  instantiatesUri?: string[];
+  basedOn?: Reference[];
+  partOf?: Reference[];
+  status:
+    | 'preparation'
+    | 'in-progress'
+    | 'not-done'
+    | 'on-hold'
+    | 'stopped'
+    | 'completed'
+    | 'entered-in-error'
+    | 'unknown';
+  statusReason?: CodeableConcept;
+  category?: CodeableConcept;
+  code?: CodeableConcept;
+  subject: Reference;
+  encounter?: Reference;
+  performedDateTime?: string;
+  performedPeriod?: Period;
+  performedString?: string;
+  performedAge?: Age;
+  performedRange?: Range;
+  recorder?: Reference;
+  asserter?: Reference;
+  performer?: ProcedurePerformer[];
+  location?: Reference;
+  reasonCode?: CodeableConcept[];
+  reasonReference?: Reference[];
+  bodySite?: CodeableConcept[];
+  outcome?: CodeableConcept;
+  report?: Reference[];
+  complication?: CodeableConcept[];
+  complicationDetail?: Reference[];
+  followUp?: CodeableConcept[];
+  note?: Annotation[];
+  focalDevice?: ProcedureFocalDevice[];
+  usedReference?: Reference[];
+  usedCode?: CodeableConcept[];
+}
+
+export interface ProcedurePerformer {
+  function?: CodeableConcept;
+  actor: Reference;
+  onBehalfOf?: Reference;
+}
+
+export interface ProcedureFocalDevice {
+  action?: CodeableConcept;
+  manipulated: Reference;
+}
+
+// ============================================================================
+// MEDICATION REQUEST RESOURCE (Prescriptions)
+// ============================================================================
+
+export interface MedicationRequestResource {
+  resourceType: 'MedicationRequest';
+  id: string;
+  meta?: Meta;
+  implicitRules?: string;
+  language?: string;
+  text?: Narrative;
+  contained?: FHIRResource[];
+  extension?: Extension[];
+  modifierExtension?: Extension[];
+
+  // MedicationRequest-specific fields
+  identifier?: Identifier[];
+  status:
+    | 'active'
+    | 'on-hold'
+    | 'cancelled'
+    | 'completed'
+    | 'entered-in-error'
+    | 'stopped'
+    | 'draft'
+    | 'unknown';
+  statusReason?: CodeableConcept;
+  intent:
+    | 'proposal'
+    | 'plan'
+    | 'order'
+    | 'original-order'
+    | 'reflex-order'
+    | 'filler-order'
+    | 'instance-order'
+    | 'option';
+  category?: CodeableConcept[];
+  priority?: 'routine' | 'urgent' | 'asap' | 'stat';
+  doNotPerform?: boolean;
+  reportedBoolean?: boolean;
+  reportedReference?: Reference;
+  medicationCodeableConcept?: CodeableConcept;
+  medicationReference?: Reference;
+  subject: Reference;
+  encounter?: Reference;
+  supportingInformation?: Reference[];
+  authoredOn?: string;
+  requester?: Reference;
+  performer?: Reference;
+  performerType?: CodeableConcept;
+  recorder?: Reference;
+  reasonCode?: CodeableConcept[];
+  reasonReference?: Reference[];
+  instantiatesCanonical?: string[];
+  instantiatesUri?: string[];
+  basedOn?: Reference[];
+  groupIdentifier?: Identifier;
+  courseOfTherapyType?: CodeableConcept;
+  insurance?: Reference[];
+  note?: Annotation[];
+  dosageInstruction?: Dosage[];
+  dispenseRequest?: MedicationRequestDispenseRequest;
+  substitution?: MedicationRequestSubstitution;
+  priorPrescription?: Reference;
+  detectedIssue?: Reference[];
+  eventHistory?: Reference[];
+}
+
+export interface MedicationRequestDispenseRequest {
+  initialFill?: {
+    quantity?: Quantity;
+    duration?: Duration;
+  };
+  dispenseInterval?: Duration;
+  validityPeriod?: Period;
+  numberOfRepeatsAllowed?: number;
+  quantity?: Quantity;
+  expectedSupplyDuration?: Duration;
+  performer?: Reference;
+}
+
+export interface MedicationRequestSubstitution {
+  allowedBoolean?: boolean;
+  allowedCodeableConcept?: CodeableConcept;
+  reason?: CodeableConcept;
+}
+
+// ============================================================================
+// MEDICATION STATEMENT RESOURCE (What patient is taking)
+// ============================================================================
+
+export interface MedicationStatementResource {
+  resourceType: 'MedicationStatement';
+  id: string;
+  meta?: Meta;
+  implicitRules?: string;
+  language?: string;
+  text?: Narrative;
+  contained?: FHIRResource[];
+  extension?: Extension[];
+  modifierExtension?: Extension[];
+
+  // MedicationStatement-specific fields
+  identifier?: Identifier[];
+  basedOn?: Reference[];
+  partOf?: Reference[];
+  status:
+    | 'active'
+    | 'completed'
+    | 'entered-in-error'
+    | 'intended'
+    | 'stopped'
+    | 'on-hold'
+    | 'unknown'
+    | 'not-taken';
+  statusReason?: CodeableConcept[];
+  category?: CodeableConcept;
+  medicationCodeableConcept?: CodeableConcept;
+  medicationReference?: Reference;
+  subject: Reference;
+  context?: Reference;
+  effectiveDateTime?: string;
+  effectivePeriod?: Period;
+  dateAsserted?: string;
+  informationSource?: Reference;
+  derivedFrom?: Reference[];
+  reasonCode?: CodeableConcept[];
+  reasonReference?: Reference[];
+  note?: Annotation[];
+  dosage?: Dosage[];
+}
+
+// ============================================================================
+// DIAGNOSTIC REPORT RESOURCE (Lab/Imaging Reports)
+// ============================================================================
+
+export interface DiagnosticReportResource {
+  resourceType: 'DiagnosticReport';
+  id: string;
+  meta?: Meta;
+  implicitRules?: string;
+  language?: string;
+  text?: Narrative;
+  contained?: FHIRResource[];
+  extension?: Extension[];
+  modifierExtension?: Extension[];
+
+  // DiagnosticReport-specific fields
+  identifier?: Identifier[];
+  basedOn?: Reference[];
+  status:
+    | 'registered'
+    | 'partial'
+    | 'preliminary'
+    | 'final'
+    | 'amended'
+    | 'corrected'
+    | 'appended'
+    | 'cancelled'
+    | 'entered-in-error'
+    | 'unknown';
+  category?: CodeableConcept[];
+  code: CodeableConcept;
+  subject?: Reference;
+  encounter?: Reference;
+  effectiveDateTime?: string;
+  effectivePeriod?: Period;
+  issued?: string;
+  performer?: Reference[];
+  resultsInterpreter?: Reference[];
+  specimen?: Reference[];
+  result?: Reference[]; // References to Observations
+  imagingStudy?: Reference[];
+  media?: DiagnosticReportMedia[];
+  conclusion?: string;
+  conclusionCode?: CodeableConcept[];
+  presentedForm?: Attachment[];
+}
+
+export interface DiagnosticReportMedia {
+  comment?: string;
+  link: Reference;
+}
+
+// ============================================================================
+// ALLERGY INTOLERANCE RESOURCE
+// ============================================================================
+
+export interface AllergyIntoleranceResource {
+  resourceType: 'AllergyIntolerance';
+  id: string;
+  meta?: Meta;
+  implicitRules?: string;
+  language?: string;
+  text?: Narrative;
+  contained?: FHIRResource[];
+  extension?: Extension[];
+  modifierExtension?: Extension[];
+
+  // AllergyIntolerance-specific fields
+  identifier?: Identifier[];
+  clinicalStatus?: CodeableConcept;
+  verificationStatus?: CodeableConcept;
+  type?: 'allergy' | 'intolerance';
+  category?: ('food' | 'medication' | 'environment' | 'biologic')[];
+  criticality?: 'low' | 'high' | 'unable-to-assess';
+  code?: CodeableConcept;
+  patient: Reference;
+  encounter?: Reference;
+  onsetDateTime?: string;
+  onsetAge?: Age;
+  onsetPeriod?: Period;
+  onsetRange?: Range;
+  onsetString?: string;
+  recordedDate?: string;
+  recorder?: Reference;
+  asserter?: Reference;
+  lastOccurrence?: string;
+  note?: Annotation[];
+  reaction?: AllergyIntoleranceReaction[];
+}
+
+export interface AllergyIntoleranceReaction {
+  substance?: CodeableConcept;
+  manifestation: CodeableConcept[];
+  description?: string;
+  onset?: string;
+  severity?: 'mild' | 'moderate' | 'severe';
+  exposureRoute?: CodeableConcept;
+  note?: Annotation[];
+}
+
+// ============================================================================
+// IMMUNIZATION RESOURCE (Vaccines)
+// ============================================================================
+
+export interface ImmunizationResource {
+  resourceType: 'Immunization';
+  id: string;
+  meta?: Meta;
+  implicitRules?: string;
+  language?: string;
+  text?: Narrative;
+  contained?: FHIRResource[];
+  extension?: Extension[];
+  modifierExtension?: Extension[];
+
+  // Immunization-specific fields
+  identifier?: Identifier[];
+  status: 'completed' | 'entered-in-error' | 'not-done';
+  statusReason?: CodeableConcept;
+  vaccineCode: CodeableConcept;
+  patient: Reference;
+  encounter?: Reference;
+  occurrenceDateTime?: string;
+  occurrenceString?: string;
+  recorded?: string;
+  primarySource?: boolean;
+  reportOrigin?: CodeableConcept;
+  location?: Reference;
+  manufacturer?: Reference;
+  lotNumber?: string;
+  expirationDate?: string;
+  site?: CodeableConcept;
+  route?: CodeableConcept;
+  doseQuantity?: Quantity;
+  performer?: ImmunizationPerformer[];
+  note?: Annotation[];
+  reasonCode?: CodeableConcept[];
+  reasonReference?: Reference[];
+  isSubpotent?: boolean;
+  subpotentReason?: CodeableConcept[];
+  education?: ImmunizationEducation[];
+  programEligibility?: CodeableConcept[];
+  fundingSource?: CodeableConcept;
+  reaction?: ImmunizationReaction[];
+  protocolApplied?: ImmunizationProtocolApplied[];
+}
+
+export interface ImmunizationPerformer {
+  function?: CodeableConcept;
+  actor: Reference;
+}
+
+export interface ImmunizationEducation {
+  documentType?: string;
+  reference?: string;
+  publicationDate?: string;
+  presentationDate?: string;
+}
+
+export interface ImmunizationReaction {
+  date?: string;
+  detail?: Reference;
+  reported?: boolean;
+}
+
+export interface ImmunizationProtocolApplied {
+  series?: string;
+  authority?: Reference;
+  targetDisease?: CodeableConcept[];
+  doseNumberPositiveInt?: number;
+  doseNumberString?: string;
+  seriesDosesPositiveInt?: number;
+  seriesDosesString?: string;
 }
 
 // ============================================================================
@@ -500,7 +953,34 @@ export interface TimingRepeat {
   periodUnit?: 's' | 'min' | 'h' | 'd' | 'wk' | 'mo' | 'a';
   dayOfWeek?: ('mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun')[];
   timeOfDay?: string[];
-  when?: ('MORN' | 'MORN.early' | 'MORN.late' | 'NOON' | 'AFT' | 'AFT.early' | 'AFT.late' | 'EVE' | 'EVE.early' | 'EVE.late' | 'NIGHT' | 'PHS' | 'HS' | 'WAKE' | 'C' | 'CM' | 'CD' | 'CV' | 'AC' | 'ACM' | 'ACD' | 'ACV' | 'PC' | 'PCM' | 'PCD' | 'PCV')[];
+  when?: (
+    | 'MORN'
+    | 'MORN.early'
+    | 'MORN.late'
+    | 'NOON'
+    | 'AFT'
+    | 'AFT.early'
+    | 'AFT.late'
+    | 'EVE'
+    | 'EVE.early'
+    | 'EVE.late'
+    | 'NIGHT'
+    | 'PHS'
+    | 'HS'
+    | 'WAKE'
+    | 'C'
+    | 'CM'
+    | 'CD'
+    | 'CV'
+    | 'AC'
+    | 'ACM'
+    | 'ACD'
+    | 'ACV'
+    | 'PC'
+    | 'PCM'
+    | 'PCD'
+    | 'PCV'
+  )[];
   offset?: number;
 }
 
@@ -585,7 +1065,15 @@ export interface ParameterDefinition {
 }
 
 export interface RelatedArtifact {
-  type: 'documentation' | 'justification' | 'citation' | 'predecessor' | 'successor' | 'derived-from' | 'depends-on' | 'composed-of';
+  type:
+    | 'documentation'
+    | 'justification'
+    | 'citation'
+    | 'predecessor'
+    | 'successor'
+    | 'derived-from'
+    | 'depends-on'
+    | 'composed-of';
   label?: string;
   display?: string;
   citation?: string;
@@ -595,7 +1083,15 @@ export interface RelatedArtifact {
 }
 
 export interface TriggerDefinition {
-  type: 'named-event' | 'periodic' | 'data-changed' | 'data-added' | 'data-modified' | 'data-removed' | 'data-accessed' | 'data-access-ended';
+  type:
+    | 'named-event'
+    | 'periodic'
+    | 'data-changed'
+    | 'data-added'
+    | 'data-modified'
+    | 'data-removed'
+    | 'data-accessed'
+    | 'data-access-ended';
   name?: string;
   timingTiming?: Timing;
   timingReference?: Reference;
@@ -663,7 +1159,9 @@ export function isObservationResource(resource: FHIRResource): resource is Obser
   return resource.resourceType === 'Observation';
 }
 
-export function isDocumentReferenceResource(resource: FHIRResource): resource is DocumentReferenceResource {
+export function isDocumentReferenceResource(
+  resource: FHIRResource
+): resource is DocumentReferenceResource {
   return resource.resourceType === 'DocumentReference';
 }
 
@@ -673,4 +1171,40 @@ export function isPractitionerResource(resource: FHIRResource): resource is Prac
 
 export function isOrganizationResource(resource: FHIRResource): resource is OrganizationResource {
   return resource.resourceType === 'Organization';
+}
+
+export function isConditionResource(resource: FHIRResource): resource is ConditionResource {
+  return resource.resourceType === 'Condition';
+}
+
+export function isProcedureResource(resource: FHIRResource): resource is ProcedureResource {
+  return resource.resourceType === 'Procedure';
+}
+
+export function isMedicationRequestResource(
+  resource: FHIRResource
+): resource is MedicationRequestResource {
+  return resource.resourceType === 'MedicationRequest';
+}
+
+export function isMedicationStatementResource(
+  resource: FHIRResource
+): resource is MedicationStatementResource {
+  return resource.resourceType === 'MedicationStatement';
+}
+
+export function isDiagnosticReportResource(
+  resource: FHIRResource
+): resource is DiagnosticReportResource {
+  return resource.resourceType === 'DiagnosticReport';
+}
+
+export function isAllergyIntoleranceResource(
+  resource: FHIRResource
+): resource is AllergyIntoleranceResource {
+  return resource.resourceType === 'AllergyIntolerance';
+}
+
+export function isImmunizationResource(resource: FHIRResource): resource is ImmunizationResource {
+  return resource.resourceType === 'Immunization';
 }

@@ -1,218 +1,335 @@
-import React from 'react';
-import { User } from '@/types/core';
+// src/pages/AIHealthAssistant.tsx
 
-// Interface for component props
-interface DashboardProps {
-  user?: User | null;
-}
+import React, { useState, useEffect } from 'react';
+import { MessageSquare, Sparkles, Shield, X, Loader2 } from 'lucide-react';
+import { AIChat } from '@/features/Ai/components/AIChat';
+import { useAuthContext } from '@/features/Auth/AuthContext';
+import { FHIRBundle, FHIREntry } from '@/types/fhir';
+import { FileObject } from '@/types/core';
+import { SubjectInfo } from '@/features/Ai/components/ui/SubjectList';
+import { ContextBadge, ContextSelection } from '@/features/Ai/components/ui/ContextBadge';
+import {
+  getAccessibleRecords,
+  getAvailableSubjects,
+} from '@/features/Ai/service/recordContextService';
+import { ContextSelector } from '@/features/Ai/components/ui/ContextSelector';
 
-// Interface for health statistics
-interface HealthStats {
-  lastCheckup: string;
-  upcomingAppointments: number;
-  activeMedications: number;
-  pendingLabResults: number;
-}
+const MOCK_MESSAGES_ENABLED = true; // Toggle this to test with/without messages
 
-// Interface for activity items
-interface ActivityItem {
-  type: 'appointment' | 'lab' | 'medication';
-  description: string;
-  date: string;
-}
+export default function AIHealthAssistant() {
+  const { user, loading: authLoading } = useAuthContext();
 
-// Interface for vital signs
-interface Vitals {
-  bloodPressure: string;
-  heartRate: string;
-  weight: string;
-  temperature: string;
-}
+  // Data state
+  const [allRecords, setAllRecords] = useState<FileObject[]>([]);
+  const [availableSubjects, setAvailableSubjects] = useState<SubjectInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [hasMessages, setHasMessages] = useState(MOCK_MESSAGES_ENABLED);
 
-const Dashboard: React.FC<DashboardProps> = ({ user = null }) => {
-  // Sample data - in real app, this would come from your API
-  const healthStats: HealthStats = {
-    lastCheckup: '2024-05-15',
-    upcomingAppointments: 2,
-    activeMedications: 3,
-    pendingLabResults: 1,
-  };
+  // Context state
+  const [selectedContext, setSelectedContext] = useState<ContextSelection>({
+    type: 'my-records',
+    subjectId: null,
+    recordCount: 0,
+    description: 'Your health records',
+  });
 
-  const recentActivity: ActivityItem[] = [
-    { type: 'appointment', description: 'Annual Physical Exam', date: '2024-05-15' },
-    { type: 'lab', description: 'Blood work completed', date: '2024-05-10' },
-    { type: 'medication', description: 'Prescription refilled', date: '2024-05-08' },
-  ];
+  // FHIR bundle for AI
+  const [fhirBundle, setFhirBundle] = useState<FHIRBundle | null>(null);
 
-  const vitals: Vitals = {
-    bloodPressure: '120/80',
-    heartRate: '72 bpm',
-    weight: '165 lbs',
-    temperature: '98.6°F',
-  };
-
-  const getActivityIcon = (type: ActivityItem['type']): string => {
-    switch (type) {
-      case 'appointment':
-        return '👨‍⚕️';
-      case 'lab':
-        return '🧪';
-      case 'medication':
-        return '💊';
-      default:
-        return '📋';
+  // Fetch all accessible records and subjects
+  useEffect(() => {
+    if (!user) {
+      setAllRecords([]);
+      setAvailableSubjects([]);
+      setLoading(false);
+      return;
     }
+
+    async function fetchData() {
+      try {
+        if (!user) {
+          throw new Error('User Missing');
+        }
+
+        setLoading(true);
+
+        // Fetch all records user has access to
+        const records = await getAccessibleRecords(user.uid);
+        setAllRecords(records);
+
+        // Get available subjects from those records
+        const subjects = await getAvailableSubjects(records, user.uid);
+        setAvailableSubjects(subjects);
+
+        // Set initial context to user's own records
+        const myRecords = records.filter(r => r.subjects?.includes(user.uid));
+        setSelectedContext({
+          type: 'my-records',
+          subjectId: user.uid,
+          recordCount: myRecords.length,
+          description: `Your ${myRecords.length} health records`,
+        });
+
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching records:', err);
+        setError(err instanceof Error ? err : new Error('Failed to load health records'));
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [user]);
+
+  // Update FHIR bundle when context changes
+  useEffect(() => {
+    if (!user || allRecords.length === 0) {
+      setFhirBundle(null);
+      return;
+    }
+
+    // Filter records based on selected context
+    let contextRecords: FileObject[] = [];
+
+    if (selectedContext.type === 'my-records') {
+      // Filter where subjects array includes current user's ID
+      contextRecords = allRecords.filter(r => r.subjects?.includes(user.uid));
+    } else if (selectedContext.type === 'subject' && selectedContext.subjectId) {
+      const targetId = selectedContext.subjectId;
+
+      // Filter where subjects array includes the selected subject's ID
+      contextRecords = allRecords.filter(r => r.subjects?.includes(targetId));
+    } else if (selectedContext.type === 'all-accessible') {
+      contextRecords = allRecords;
+    } else if (selectedContext.type === 'specific-records' && selectedContext.recordIds) {
+      contextRecords = allRecords.filter(r => selectedContext.recordIds?.includes(r.id));
+    }
+
+    // Aggregate FHIR entries from selected records
+    const allEntries: FHIREntry[] = [];
+    contextRecords.forEach(record => {
+      if (record.fhirData?.entry) {
+        allEntries.push(...record.fhirData.entry);
+      }
+    });
+
+    // Create FHIR bundle
+    const bundle: FHIRBundle = {
+      resourceType: 'Bundle',
+      id: `context-${selectedContext.type}-${Date.now()}`,
+      type: 'collection',
+      timestamp: new Date().toISOString(),
+      total: allEntries.length,
+      entry: allEntries,
+    };
+
+    setFhirBundle(bundle);
+  }, [selectedContext, allRecords, user]);
+
+  // Handle context change
+  const handleContextChange = (newContext: ContextSelection) => {
+    setSelectedContext(newContext);
   };
 
+  // Get subject name for badge
+  const getSubjectName = () => {
+    if (selectedContext.type === 'subject' && selectedContext.subjectId) {
+      const subject = availableSubjects.find(s => s.id === selectedContext.subjectId);
+      return subject?.firstName || 'Unknown';
+    }
+    return undefined;
+  };
+
+  // Loading state
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-16 h-16 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading your health records...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not authenticated
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <Shield className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Authentication Required</h2>
+          <p className="text-gray-600 mb-6">Please sign in to access your AI Health Assistant.</p>
+          <a
+            href="/auth"
+            className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Sign In
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <X className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Records</h2>
+          <p className="text-gray-600 mb-6">{error.message}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // No records state
+  if (allRecords.length === 0) {
+    return (
+      <div className="min-h-screen">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="rounded-xl shadow-sm border p-12 text-center">
+            <div className="max-w-md mx-auto">
+              <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Health Records Yet</h3>
+              <p className="text-gray-600 mb-6">
+                Upload your first health record to start chatting with your AI assistant.
+              </p>
+
+              <a
+                href="/add-record"
+                className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Add Your First Record
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If chat has started (has messages), show full-screen chat
+  if (hasMessages) {
+    return (
+      <div className="h-screen flex flex-col">
+        <AIChat
+          fhirBundle={fhirBundle}
+          className="flex-1"
+          contextInfo={{
+            type: selectedContext.type,
+            subjectName: getSubjectName(),
+          }}
+          leftFooterContent={
+            <div className="flex items-center gap-3">
+              <ContextSelector
+                currentUserId={user.uid}
+                availableSubjects={availableSubjects}
+                allRecords={allRecords}
+                selectedContext={selectedContext}
+                onContextChange={handleContextChange}
+              />
+            </div>
+          }
+          onMessagesChange={messageCount => setHasMessages(messageCount > 0)}
+        />
+      </div>
+    );
+  }
+
+  // Default: Show welcome page with info cards
   return (
-    <div className="space-y-6">
-      {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white">
-        <h2 className="text-2xl font-bold mb-2">
-          Welcome back, {user?.displayName || 'User'}!
-        </h2>
-        <p className="text-blue-100">
-          Here's your health overview for today
-        </p>
-      </div>
-
-      {/* Quick Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Last Checkup</p>
-              <p className="text-2xl font-bold text-gray-900">{healthStats.lastCheckup}</p>
-            </div>
-            <div className="bg-green-100 p-3 rounded-full">
-              <span className="text-green-600 text-xl">✓</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Upcoming Appointments</p>
-              <p className="text-2xl font-bold text-gray-900">{healthStats.upcomingAppointments}</p>
-            </div>
-            <div className="bg-blue-100 p-3 rounded-full">
-              <span className="text-blue-600 text-xl">📅</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Active Medications</p>
-              <p className="text-2xl font-bold text-gray-900">{healthStats.activeMedications}</p>
-            </div>
-            <div className="bg-purple-100 p-3 rounded-full">
-              <span className="text-purple-600 text-xl">💊</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Pending Lab Results</p>
-              <p className="text-2xl font-bold text-gray-900">{healthStats.pendingLabResults}</p>
-            </div>
-            <div className="bg-yellow-100 p-3 rounded-full">
-              <span className="text-yellow-600 text-xl">🧪</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Activity */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
-          </div>
-          <div className="p-6">
-            <div className="space-y-4">
-              {recentActivity.map((activity: ActivityItem, index: number) => (
-                <div key={index} className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                    <span className="text-sm">
-                      {getActivityIcon(activity.type)}
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">
-                      {activity.description}
-                    </p>
-                    <p className="text-xs text-gray-500">{activity.date}</p>
-                  </div>
+    <div className="min-h-screen">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* AI Chat with Empty State */}
+        <div className="rounded-xl">
+          <AIChat
+            fhirBundle={fhirBundle}
+            className=""
+            contextInfo={{
+              type: selectedContext.type,
+              subjectName: getSubjectName(),
+            }}
+            leftFooterContent={
+              <div className="flex items-center gap-3">
+                <ContextSelector
+                  currentUserId={user.uid}
+                  availableSubjects={availableSubjects}
+                  allRecords={allRecords}
+                  selectedContext={selectedContext}
+                  onContextChange={handleContextChange}
+                />
+              </div>
+            }
+            emptyStateContent={
+              <div className="w-full max-w-3xl py-12">
+                {/* Welcome Header */}
+                <div className="text-center mb-12">
+                  <h1 className="text-4xl font-bold text-gray-900 mb-3">
+                    Welcome back, {user.displayName || 'there'}
+                  </h1>
+                  <p className="text-lg text-gray-600">Ask me anything about your health records</p>
                 </div>
-              ))}
-            </div>
-            <button className="mt-4 text-blue-600 text-sm font-medium hover:text-blue-700">
-              View all activity →
-            </button>
-          </div>
+              </div>
+            }
+            onMessagesChange={messageCount => setHasMessages(messageCount > 0)}
+          />
         </div>
 
-        {/* Latest Vitals */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Latest Vitals</h3>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center">
-                <p className="text-sm text-gray-600">Blood Pressure</p>
-                <p className="text-lg font-semibold text-gray-900">{vitals.bloodPressure}</p>
+        {/* Info Cards - Only visible when no messages */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white border rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Shield className="w-5 h-5 text-blue-600" />
               </div>
-              <div className="text-center">
-                <p className="text-sm text-gray-600">Heart Rate</p>
-                <p className="text-lg font-semibold text-gray-900">{vitals.heartRate}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm text-gray-600">Weight</p>
-                <p className="text-lg font-semibold text-gray-900">{vitals.weight}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm text-gray-600">Temperature</p>
-                <p className="text-lg font-semibold text-gray-900">{vitals.temperature}</p>
+              <div>
+                <h4 className="font-medium text-gray-900 text-sm">Private & Secure</h4>
+                <p className="text-xs text-gray-600 mt-1">
+                  Your health data is encrypted and never used for AI training
+                </p>
               </div>
             </div>
-            <button className="mt-4 w-full bg-blue-600 text-white py-2 px-4 rounded-md text-sm font-medium hover:bg-blue-700">
-              Update Vitals
-            </button>
           </div>
-        </div>
-      </div>
 
-      {/* Quick Actions */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <button className="p-4 border border-gray-200 rounded-md hover:bg-gray-50 text-center">
-            <div className="text-2xl mb-2">📅</div>
-            <p className="text-sm font-medium">Schedule Appointment</p>
-          </button>
-          <button className="p-4 border border-gray-200 rounded-md hover:bg-gray-50 text-center">
-            <div className="text-2xl mb-2">💊</div>
-            <p className="text-sm font-medium">Refill Prescription</p>
-          </button>
-          <button className="p-4 border border-gray-200 rounded-md hover:bg-gray-50 text-center">
-            <div className="text-2xl mb-2">📋</div>
-            <p className="text-sm font-medium">View Records</p>
-          </button>
-          <button className="p-4 border border-gray-200 rounded-md hover:bg-gray-50 text-center">
-            <div className="text-2xl mb-2">💬</div>
-            <p className="text-sm font-medium">Message Provider</p>
-          </button>
+          <div className="bg-white border rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Sparkles className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-900 text-sm">Context-Aware</h4>
+                <p className="text-xs text-gray-600 mt-1">
+                  Switch between different record contexts for precise answers
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <MessageSquare className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-900 text-sm">Natural Language</h4>
+                <p className="text-xs text-gray-600 mt-1">
+                  Ask questions in plain English, just like talking to a doctor
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
-};
-
-export default Dashboard;
+}

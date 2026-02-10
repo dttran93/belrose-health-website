@@ -6,7 +6,7 @@
 
 export const MEMBER_ROLE_MANAGER_ADDRESS = '0xC31477f563dC8f7529Ba6AE7E410ABdB84C27d7C';
 
-export const SEPOLIA_RPC_URL = 'https://1rpc.io/sepolia';
+export const SEPOLIA_RPC_URL = 'https://ethereum-sepolia.publicnode.com';
 export const ETHERSCAN_BASE_URL = 'https://sepolia.etherscan.io';
 export const DEPLOYMENT_BLOCK = 10190794;
 
