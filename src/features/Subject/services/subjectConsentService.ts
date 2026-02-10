@@ -1,4 +1,4 @@
-//src/features/Subject/services/subjectBlockchainService.ts
+//src/features/Subject/services/subjectConsentService.ts
 
 /**
  * This service owns all of the consent state management including:

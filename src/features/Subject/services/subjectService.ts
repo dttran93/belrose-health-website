@@ -116,6 +116,7 @@ export class SubjectService {
     console.log('👤 Setting subject as self for record:', recordId);
 
     try {
+      // Check if already a subject
       if (recordData.subjects?.includes(user.uid)) {
         return { success: true, recordId, subjectId: user.uid, blockchainAnchored: true };
       }
@@ -124,13 +125,20 @@ export class SubjectService {
         throw new Error('Record does not have a hash for blockchain anchoring');
       }
 
-      await SubjectMembershipService.addSubject(recordId, user.uid);
+      // Step 1: Anchor on blockchain (requires wallet signature)
+      console.log('🔗 Anchoring subject on blockchain...');
       const blockchainAnchored = await SubjectBlockchainService.anchorSubject(
         recordId,
         recordData.recordHash,
         user.uid
       );
+      console.log('✅ Blockchain: Subject anchored');
 
+      // Step 2: Update Firestore
+      await SubjectMembershipService.addSubject(recordId, user.uid);
+      console.log('✅ Firestore: Subject added');
+
+      console.log('✅ Subject set as self successfully');
       return { success: true, recordId, subjectId: user.uid, blockchainAnchored };
     } catch (error) {
       console.error('❌ Error setting subject as self:', error);
@@ -272,7 +280,7 @@ export class SubjectService {
 
     console.log('✅ Accepting subject request for record:', recordId);
 
-    // Check 1: Find and update the consent request
+    // Check 1: Find the consent request
     const requestId = getConsentRequestId(recordId, user.uid);
     const requestRef = doc(db, 'subjectConsentRequests', requestId);
     const requestDoc = await getDoc(requestRef);
@@ -287,7 +295,7 @@ export class SubjectService {
       throw new Error('No pending subject request found for you');
     }
 
-    // Check 2: Load record for permission array and blockchain updates
+    // Check 2: Load record for blockchain anchoring
     const recordRef = doc(db, 'records', recordId);
     const recordDoc = await getDoc(recordRef);
 
@@ -302,14 +310,20 @@ export class SubjectService {
       throw new Error('Record does not have a hash for blockchain anchoring');
     }
 
-    // Step 1: Transition consent request to accepted
+    // Step 1: Anchor on blockchain
+    console.log('🔗 Anchoring subject on blockchain...');
+    await SubjectBlockchainService.anchorSubject(recordId, recordHash, user.uid);
+    console.log('✅ Blockchain: Subject anchored');
+
+    // Step 2: Update Firestore Subject Consent
     await SubjectConsentService.acceptConsent(recordId, user.uid);
+    console.log('✅ Firestore: Consent accepted');
 
-    // Step 2: Update record's subject array
+    // Step 3: Update record's subject array
     await SubjectMembershipService.addSubject(recordId, user.uid);
+    console.log('✅ Firestore: Subject added to record');
 
-    // Step 3: Anchor on Blockchain
-    await SubjectBlockchainService.anchorSubject(recordId, recordData.recordHash, user.uid);
+    console.log('✅ Subject request accepted successfully');
     return { success: true };
   }
 
@@ -366,10 +380,10 @@ export class SubjectService {
    * 2. The SubjectConsentRequest is updated with rejection data
    * 3. Creator is notified and must decide whether to escalate
    *
-   * Also unanchors the subject on the blockchain.
+   * Atomic operation: blockchain first, then Firestore.
    *
    * @param recordId - The Firestore document ID of the record
-   * @param options - Optional reason and signature
+   * @param reason - Reason for rejection
    */
   static async rejectSubjectStatus(
     recordId: string,
@@ -408,17 +422,22 @@ export class SubjectService {
 
       const hadConsentFlow = requestDoc.exists() && requestDoc.data()?.status === 'accepted';
 
-      // Remove from subjects array (common to both flows)
-      await SubjectMembershipService.removeSubject(recordId, user.uid);
+      // Step 1: Unanchor from blockchain
+      console.log('🔗 Unanchoring subject from blockchain...');
+      await SubjectBlockchainService.unanchorSubject(recordId, user.uid);
+      console.log('✅ Blockchain: Subject unanchored');
 
-      // FLOW 1: SELF REMOVAL - No consent flow existed
+      // Step 2: Update Firestore (only if blockchain succeeded)
+      await SubjectMembershipService.removeSubject(recordId, user.uid);
+      console.log('✅ Firestore: Subject removed from record');
 
       let pendingCreatorDecision = false;
 
+      // FLOW 1: SELF REMOVAL - No consent flow existed
       if (!hadConsentFlow) {
         console.log('✅ Self-removal complete (no consent flow existed)');
       } else {
-        //Flow 2: Consent flow existed, capture the rejection data returned from the sub-service
+        // FLOW 2: Consent flow existed, capture the rejection data
         const rejectionData = await SubjectRejectionService.rejectAfterAcceptance({
           recordId,
           subjectId: user.uid,
@@ -430,9 +449,7 @@ export class SubjectService {
         console.log('✅ Subject status rejected after acceptance');
       }
 
-      // Unanchor from blockchain
-      await SubjectBlockchainService.unanchorSubject(recordId, user.uid);
-
+      console.log('✅ Subject status rejection complete');
       return {
         success: true,
         pendingCreatorDecision,
