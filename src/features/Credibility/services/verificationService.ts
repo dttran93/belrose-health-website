@@ -167,6 +167,15 @@ export async function getVerificationsWithVersionInfo(
 // VERIFICATION FUNCTIONS
 // ============================================================
 
+/**
+ * Create a new verification for a record.
+ *
+ * @param recordId - The record ID
+ * @param recordHash - The content hash being verified
+ * @param verifierId - The user creating the verification
+ * @param level - The verification level (1, 2, or 3)
+ * @returns The verification document ID
+ */
 export async function createVerification(
   recordId: string,
   recordHash: string,
@@ -174,7 +183,8 @@ export async function createVerification(
   level: VerificationLevelOptions
 ): Promise<string> {
   const db = getFirestore();
-  // CHECK 1: Ensure user is not verifying their own record
+
+  // CHECK 1: Ensure record exists
   const recordRef = doc(db, 'records', recordId);
   const recordSnap = await getDoc(recordRef);
 
@@ -182,9 +192,7 @@ export async function createVerification(
     throw new Error('Record not found.');
   }
 
-  const recordData = recordSnap.data();
-
-  // CHECK 2: Ensure there isn't already an existing verification
+  // CHECK 2: Check for existing verification
   const verificationId = getVerificationId(recordHash, verifierId);
   const docRef = doc(db, 'verifications', verificationId);
   const existing = await getDoc(docRef);
@@ -197,7 +205,7 @@ export async function createVerification(
       throw new Error('You have already verified this record. Use modify to update.');
     }
 
-    console.log('Reactivating or retrying failed or pending verification...');
+    console.log('Retrying failed or pending verification...');
   }
 
   // CHECK 3: You cannot both dispute and verify the same recordHash
@@ -208,52 +216,55 @@ export async function createVerification(
   if (disputeExisting.exists()) {
     const disputeData = disputeExisting.data();
     if (disputeData?.isActive) {
-      throw new Error('You can not both verify and dispute the same record Hash');
+      throw new Error('You cannot both verify and dispute the same record hash');
     }
   }
 
-  // 1. Write to Firebase first. Update existing if reactiviating or retrying failed blockchain write
+  console.log('🔄 Creating verification:', { recordId, recordHash, level });
 
-  const verifierIdHash = ethers.keccak256(ethers.toUtf8Bytes(verifierId));
-  if (existing.exists()) {
-    await updateDoc(docRef, {
-      level,
-      isActive: true,
-      chainStatus: 'pending',
-      txHash: null,
-      error: null,
-      lastModified: Timestamp.now(),
-    });
-  } else {
-    await setDoc(docRef, {
-      recordHash,
-      recordId,
-      verifierId,
-      verifierIdHash,
-      level,
-      isActive: true,
-      createdAt: Timestamp.now(),
-      chainStatus: 'pending',
-    });
-  }
-
+  // Step 1: Write to blockchain
   try {
+    console.log('🔗 Writing verification to blockchain...');
     const tx = await blockchainHealthRecordService.verifyRecord(recordId, recordHash, level);
+    console.log('✅ Blockchain: Verification recorded');
 
-    await updateDoc(docRef, {
-      chainStatus: 'confirmed',
-      txHash: tx.txHash,
-    });
+    // Step 2: Write to Firestore
+    const verifierIdHash = ethers.keccak256(ethers.toUtf8Bytes(verifierId));
 
+    if (existing.exists()) {
+      await updateDoc(docRef, {
+        level,
+        isActive: true,
+        chainStatus: 'confirmed',
+        txHash: tx.txHash,
+        error: null,
+        lastModified: Timestamp.now(),
+      });
+      console.log('✅ Firestore: Verification reactivated');
+    } else {
+      await setDoc(docRef, {
+        recordHash,
+        recordId,
+        verifierId,
+        verifierIdHash,
+        level,
+        isActive: true,
+        createdAt: Timestamp.now(),
+        chainStatus: 'confirmed',
+        txHash: tx.txHash,
+      });
+      console.log('✅ Firestore: Verification created');
+    }
+
+    // Step 3: Update credibility score
     await onVerificationCreated(recordId, recordHash, level, tx.txHash);
 
+    console.log('✅ Verification created successfully');
     return verificationId;
   } catch (error) {
-    await updateDoc(docRef, {
-      chainStatus: 'failed',
-      error: getErrorMessage(error),
-    });
+    console.error('❌ Blockchain verification failed:', error);
 
+    // Log failure for diagnostics, but DON'T write to Firestore
     await BlockchainSyncQueueService.logFailure({
       contract: 'HealthRecordCore',
       action: 'verifyRecord',
@@ -266,14 +277,21 @@ export async function createVerification(
         level,
       },
     });
+
+    // Re-throw to prevent any further operations
     throw error;
   }
 }
 
+/**
+ * Retract an existing verification.
+ * Atomic operation: blockchain first, then Firestore.
+ *
+ * @param recordHash - The content hash of the verification to retract
+ * @param verifierId - The user retracting the verification
+ */
 export async function retractVerification(recordHash: string, verifierId: string): Promise<void> {
-  const verifierIdHash = ethers.keccak256(ethers.toUtf8Bytes(verifierId));
-
-  // CHECK 1. Find the verification make sure it is active
+  // CHECK 1: Find the verification and make sure it is active
   const verificationId = getVerificationId(recordHash, verifierId);
 
   const db = getFirestore();
@@ -289,39 +307,36 @@ export async function retractVerification(recordHash: string, verifierId: string
     throw new Error('Verification is already inactive');
   }
 
-  // CHECK 2. You can only retract your own verification
+  // CHECK 2: You can only retract your own verification
   if (data.verifierId !== verifierId) {
     throw new Error('You can only retract your own verifications');
   }
 
-  // 1. Update Firebase
-  await updateDoc(docRef, {
-    isActive: false,
-    lastModified: Timestamp.now(),
-    chainStatus: 'pending',
-  });
+  console.log('🔄 Retracting verification:', { recordHash, verifierId });
 
+  // Step 1: Write to blockchain
   try {
-    // 2. Write to blockchain
+    console.log('🔗 Retracting verification on blockchain...');
     const tx = await blockchainHealthRecordService.retractVerification(recordHash);
+    console.log('✅ Blockchain: Verification retracted');
 
-    // 3. Confirm
+    // Step 2: Update Firestore (only if blockchain succeeded)
     await updateDoc(docRef, {
+      isActive: false,
+      lastModified: Timestamp.now(),
       chainStatus: 'confirmed',
       txHash: tx.txHash,
     });
+    console.log('✅ Firestore: Verification marked inactive');
 
-    // 4. Recalculate credibility score
+    // Step 3: Update credibility score
     await onVerificationRevoked(data.recordId, data.recordHash, data.level, tx.txHash);
-  } catch (error) {
-    // Update Firebase with
-    await updateDoc(docRef, {
-      isActive: true,
-      lastModified: null,
-      chainStatus: 'failed',
-      error: getErrorMessage(error),
-    });
 
+    console.log('✅ Verification retracted successfully');
+  } catch (error) {
+    console.error('❌ Blockchain retraction failed:', error);
+
+    // Log failure for diagnostics, DON'T update Firestore
     await BlockchainSyncQueueService.logFailure({
       contract: 'HealthRecordCore',
       action: 'retractVerification',
@@ -334,17 +349,24 @@ export async function retractVerification(recordHash: string, verifierId: string
       },
     });
 
+    // Re-throw to prevent any further operations
     throw error;
   }
 }
 
+/**
+ * Modify the level of an existing verification.
+ * Atomic operation: blockchain first, then Firestore.
+ *
+ * @param recordHash - The content hash of the verification to modify
+ * @param verifierId - The user modifying the verification
+ * @param newLevel - The new verification level
+ */
 export async function modifyVerificationLevel(
   recordHash: string,
   verifierId: string,
   newLevel: VerificationLevelOptions
 ): Promise<void> {
-  const verifierIdHash = ethers.keccak256(ethers.toUtf8Bytes(verifierId));
-
   // CHECK 1: Make sure that the verification exists and is active
   const verificationId = getVerificationId(recordHash, verifierId);
   const db = getFirestore();
@@ -360,7 +382,7 @@ export async function modifyVerificationLevel(
     throw new Error('Cannot modify an inactive verification');
   }
 
-  // CHECK 2: Make sure that the verification level is different
+  // CHECK 2: Ensure user owns this verification
   if (data.verifierId !== verifierId) {
     throw new Error('You can only modify your own verification');
   }
@@ -371,29 +393,31 @@ export async function modifyVerificationLevel(
     throw new Error('New level is the same as current level');
   }
 
-  await updateDoc(docRef, {
-    level: newLevel,
-    lastModified: Timestamp.now(),
-    chainStatus: 'pending',
-  });
+  console.log('🔄 Modifying verification level:', { recordHash, oldLevel, newLevel });
 
+  // Step 1: Write to blockchain
   try {
+    console.log('🔗 Modifying verification level on blockchain...');
     const tx = await blockchainHealthRecordService.modifyVerificationLevel(recordHash, newLevel);
+    console.log('✅ Blockchain: Verification level updated');
 
+    // Step 2: Update Firestore
     await updateDoc(docRef, {
+      level: newLevel,
+      lastModified: Timestamp.now(),
       chainStatus: 'confirmed',
       txHash: tx.txHash,
     });
+    console.log('✅ Firestore: Verification level updated');
 
-    //Recalculate credibility score
+    // Step 3: Update credibility score
     await onVerificationModified(data.recordId, recordHash, oldLevel, newLevel, tx.txHash);
-  } catch (error) {
-    await updateDoc(docRef, {
-      level: oldLevel,
-      chainStatus: 'failed',
-      error: getErrorMessage(error),
-    });
 
+    console.log('✅ Verification level modified successfully');
+  } catch (error) {
+    console.error('❌ Blockchain modification failed:', error);
+
+    // Log failure for diagnostics, DON'T update Firestore
     await BlockchainSyncQueueService.logFailure({
       contract: 'HealthRecordCore',
       action: 'modifyVerificationLevel',
@@ -407,10 +431,19 @@ export async function modifyVerificationLevel(
         newLevel: newLevel,
       },
     });
+
+    // Re-throw to prevent any further operations
     throw error;
   }
 }
 
+/**
+ * Get a specific verification by record hash and verifier ID.
+ *
+ * @param recordHash - The content hash
+ * @param verifierId - The verifier's user ID
+ * @returns The verification document or null if not found
+ */
 export async function getVerification(
   recordHash: string,
   verifierId: string

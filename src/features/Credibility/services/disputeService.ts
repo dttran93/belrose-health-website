@@ -330,6 +330,14 @@ export async function getDisputesWithVersionInfo(
 
 /**
  * Creates a new dispute for a record hash.
+ *
+ * @param recordId - The record ID
+ * @param recordHash - The content hash being disputed
+ * @param disputerId - The user creating the dispute
+ * @param severity - Dispute severity level (1-3)
+ * @param culpability - Culpability level (0-5)
+ * @param notes - Optional encrypted notes
+ * @returns The dispute document ID
  */
 export async function createDispute(
   recordId: string,
@@ -366,7 +374,7 @@ export async function createDispute(
       throw new Error('You have already disputed this record. Use modify to update.');
     }
 
-    console.log('Reactivating or retrying failed or pending dispute...');
+    console.log('Retrying failed or pending dispute...');
   }
 
   // CHECK 3: You cannot both dispute and verify the same recordHash
@@ -377,7 +385,7 @@ export async function createDispute(
   if (verificationExisting.exists()) {
     const verificationData = verificationExisting.data();
     if (verificationData?.isActive) {
-      throw new Error('You can not both verify and dispute the same record hash');
+      throw new Error('You cannot both verify and dispute the same record hash');
     }
   }
 
@@ -392,39 +400,11 @@ export async function createDispute(
     notesHash = ethers.keccak256(ethers.toUtf8Bytes(notes));
   }
 
-  console.log('Dispute Creation Inputs:', disputeId, severity, culpability);
+  console.log('🔄 Creating dispute:', { recordId, recordHash, severity, culpability });
 
-  // 1. Write to Firebase first
-  if (existing.exists()) {
-    await updateDoc(docRef, {
-      severity,
-      culpability,
-      encryptedNotes,
-      notesHash,
-      isActive: true,
-      chainStatus: 'pending',
-      txHash: null,
-      error: null,
-      lastModified: Timestamp.now(),
-    });
-  } else {
-    await setDoc(docRef, {
-      recordHash,
-      recordId,
-      disputerId,
-      disputerIdHash,
-      severity,
-      culpability,
-      encryptedNotes,
-      notesHash,
-      isActive: true,
-      createdAt: Timestamp.now(),
-      chainStatus: 'pending',
-    });
-  }
-
+  // Step 1: Write to blockchain FIRST
   try {
-    // 2. Write to blockchain (notes hash only, not the actual notes)
+    console.log('🔗 Writing dispute to blockchain...');
     const tx = await blockchainHealthRecordService.disputeRecord(
       recordId,
       recordHash,
@@ -432,25 +412,49 @@ export async function createDispute(
       culpability,
       notesHash
     );
+    console.log('✅ Blockchain: Dispute recorded');
 
-    // 3. Update Firebase with confirmation
-    await updateDoc(docRef, {
-      chainStatus: 'confirmed',
-      txHash: tx.txHash,
-    });
+    // Step 2: Write to Firestore
+    if (existing.exists()) {
+      await updateDoc(docRef, {
+        severity,
+        culpability,
+        encryptedNotes,
+        notesHash,
+        isActive: true,
+        chainStatus: 'confirmed',
+        txHash: tx.txHash,
+        error: null,
+        lastModified: Timestamp.now(),
+      });
+      console.log('✅ Firestore: Dispute reactivated');
+    } else {
+      await setDoc(docRef, {
+        recordHash,
+        recordId,
+        disputerId,
+        disputerIdHash,
+        severity,
+        culpability,
+        encryptedNotes,
+        notesHash,
+        isActive: true,
+        createdAt: Timestamp.now(),
+        chainStatus: 'confirmed',
+        txHash: tx.txHash,
+      });
+      console.log('✅ Firestore: Dispute created');
+    }
 
-    // 4. Update Credibility Score
+    // Step 3: Update credibility score
     await onDisputeCreated(recordId, recordHash, severity, culpability, tx.txHash);
 
+    console.log('✅ Dispute created successfully');
     return disputeId;
   } catch (error) {
-    // Mark as failed
-    await updateDoc(docRef, {
-      chainStatus: 'failed',
-      error: getErrorMessage(error),
-    });
+    console.error('❌ Blockchain dispute creation failed:', error);
 
-    // Log blockchain sync failure
+    // Log failure for diagnostics, DON'T write to Firestore
     await BlockchainSyncQueueService.logFailure({
       contract: 'HealthRecordCore',
       action: 'createDispute',
@@ -465,12 +469,16 @@ export async function createDispute(
       },
     });
 
+    // Re-throw to prevent any further operations
     throw error;
   }
 }
 
 /**
  * Retracts (deactivates) a dispute.
+ *
+ * @param recordHash - The content hash of the dispute to retract
+ * @param disputerId - The user retracting the dispute
  */
 export async function retractDispute(recordHash: string, disputerId: string): Promise<void> {
   const disputeId = getDisputeId(recordHash, disputerId);
@@ -492,34 +500,31 @@ export async function retractDispute(recordHash: string, disputerId: string): Pr
     throw new Error('You can only retract your own disputes');
   }
 
-  // 1. Update Firebase
-  await updateDoc(docRef, {
-    isActive: false,
-    lastModified: Timestamp.now(),
-    chainStatus: 'pending',
-  });
+  console.log('🔄 Retracting dispute:', { recordHash, disputerId });
 
+  // Step 1: Write to blockchain
   try {
-    // 2. Write to blockchain
+    console.log('🔗 Retracting dispute on blockchain...');
     const tx = await blockchainHealthRecordService.retractDispute(recordHash);
+    console.log('✅ Blockchain: Dispute retracted');
 
-    // 3. Confirm
+    // Step 2: Update Firestore (only if blockchain succeeded)
     await updateDoc(docRef, {
+      isActive: false,
+      lastModified: Timestamp.now(),
       chainStatus: 'confirmed',
       txHash: tx.txHash,
     });
+    console.log('✅ Firestore: Dispute marked inactive');
 
-    //4. Update Credibility Score
+    // Step 3: Update credibility score
     await onDisputeRevoked(data.recordId, recordHash, data.severity, data.culpability, tx.txHash);
+
+    console.log('✅ Dispute retracted successfully');
   } catch (error) {
-    // Rollback Firebase
-    await updateDoc(docRef, {
-      isActive: true,
-      lastModified: null,
-      chainStatus: 'failed',
-      error: getErrorMessage(error),
-    });
-    // Log blockchain sync failure
+    console.error('❌ Blockchain retraction failed:', error);
+
+    // Log failure for diagnostics, DON'T update Firestore
     await BlockchainSyncQueueService.logFailure({
       contract: 'HealthRecordCore',
       action: 'retractDispute',
@@ -527,16 +532,25 @@ export async function retractDispute(recordHash: string, disputerId: string): Pr
       error: getErrorMessage(error),
       context: {
         type: 'dispute-retraction',
+        recordId: data.recordId,
         recordHash,
       },
     });
+
+    // Re-throw to prevent any further operations
     throw error;
   }
 }
 
 /**
  * Modifies a dispute's severity and culpability.
+ * Atomic operation: blockchain first, then Firestore.
  * Note: Notes cannot be modified after creation (hash is on-chain).
+ *
+ * @param recordHash - The content hash of the dispute to modify
+ * @param disputerId - The user modifying the dispute
+ * @param newSeverity - New severity level
+ * @param newCulpability - New culpability level
  */
 export async function modifyDispute(
   recordHash: string,
@@ -569,25 +583,35 @@ export async function modifyDispute(
     throw new Error('New values are the same as current values');
   }
 
-  await updateDoc(docRef, {
-    severity: newSeverity,
-    culpability: newCulpability,
-    lastModified: Timestamp.now(),
-    chainStatus: 'pending',
+  console.log('🔄 Modifying dispute:', {
+    recordHash,
+    oldSeverity,
+    newSeverity,
+    oldCulpability,
+    newCulpability,
   });
 
+  // Step 1: Write to blockchain
   try {
+    console.log('🔗 Modifying dispute on blockchain...');
     const tx = await blockchainHealthRecordService.modifyDispute(
       recordHash,
       newSeverity,
       newCulpability
     );
+    console.log('✅ Blockchain: Dispute modified');
 
+    // Step 2: Update Firestore
     await updateDoc(docRef, {
+      severity: newSeverity,
+      culpability: newCulpability,
+      lastModified: Timestamp.now(),
       chainStatus: 'confirmed',
       txHash: tx.txHash,
     });
+    console.log('✅ Firestore: Dispute updated');
 
+    // Step 3: Update credibility score
     await onDisputeModified(
       data.recordId,
       recordHash,
@@ -597,14 +621,12 @@ export async function modifyDispute(
       newCulpability,
       tx.txHash
     );
+
+    console.log('✅ Dispute modified successfully');
   } catch (error) {
-    await updateDoc(docRef, {
-      severity: oldSeverity,
-      culpability: oldCulpability,
-      chainStatus: 'failed',
-      error: getErrorMessage(error),
-    });
-    // Log blockchain sync failure
+    console.error('❌ Blockchain modification failed:', error);
+
+    // Log failure for diagnostics, DON'T update Firestore
     await BlockchainSyncQueueService.logFailure({
       contract: 'HealthRecordCore',
       action: 'modifyDispute',
@@ -612,6 +634,7 @@ export async function modifyDispute(
       error: getErrorMessage(error),
       context: {
         type: 'dispute-modification',
+        recordId: data.recordId,
         recordHash,
         oldSeverity,
         oldCulpability,
@@ -619,6 +642,8 @@ export async function modifyDispute(
         newCulpability,
       },
     });
+
+    // Re-throw to prevent any further operations
     throw error;
   }
 }
@@ -626,6 +651,11 @@ export async function modifyDispute(
 /**
  * Gets a single dispute by recordHash and disputerId.
  * Returns null if not found or on permission error.
+ *
+ * @param recordHash - The content hash
+ * @param disputerId - The disputer's user ID
+ * @param decrypt - Whether to decrypt notes
+ * @returns The dispute document or null if not found
  */
 export async function getDispute(
   recordHash: string,
@@ -668,6 +698,7 @@ export async function getDispute(
  * @param disputerId - The ID of the disputer
  * @param reactorId - The ID of the user reacting
  * @param supportsDispute - true to support, false to oppose
+ * @returns The reaction document ID
  */
 export async function reactToDispute(
   recordId: string,
@@ -693,52 +724,51 @@ export async function reactToDispute(
     }
   }
 
-  // 1. Write to Firebase
-  if (existing.exists()) {
-    await updateDoc(docRef, {
-      supportsDispute,
-      isActive: true,
-      chainStatus: 'pending',
-      txHash: null,
-      error: null,
-      lastModified: Timestamp.now(),
-    });
-  } else {
-    await setDoc(docRef, {
-      recordId,
-      recordHash,
-      disputerId,
-      reactorId,
-      reactorIdHash,
-      supportsDispute,
-      isActive: true,
-      createdAt: Timestamp.now(),
-      chainStatus: 'pending',
-    });
-  }
+  console.log('🔄 Creating reaction:', { recordHash, disputerId, reactorId, supportsDispute });
 
+  // Step 1: Write to blockchain
   try {
-    // 2. Write to blockchain
+    console.log('🔗 Writing reaction to blockchain...');
     const tx = await blockchainHealthRecordService.reactToDispute(
       recordHash,
       disputerIdHash,
       supportsDispute
     );
+    console.log('✅ Blockchain: Reaction recorded');
 
-    // 3. Confirm
-    await updateDoc(docRef, {
-      chainStatus: 'confirmed',
-      txHash: tx.txHash,
-    });
+    // Step 2: Write to Firestore (only if blockchain succeeded)
+    if (existing.exists()) {
+      await updateDoc(docRef, {
+        supportsDispute,
+        isActive: true,
+        chainStatus: 'confirmed',
+        txHash: tx.txHash,
+        error: null,
+        lastModified: Timestamp.now(),
+      });
+      console.log('✅ Firestore: Reaction reactivated');
+    } else {
+      await setDoc(docRef, {
+        recordId,
+        recordHash,
+        disputerId,
+        reactorId,
+        reactorIdHash,
+        supportsDispute,
+        isActive: true,
+        createdAt: Timestamp.now(),
+        chainStatus: 'confirmed',
+        txHash: tx.txHash,
+      });
+      console.log('✅ Firestore: Reaction created');
+    }
 
+    console.log('✅ Reaction created successfully');
     return reactionId;
   } catch (error) {
-    await updateDoc(docRef, {
-      chainStatus: 'failed',
-      error: getErrorMessage(error),
-    });
+    console.error('❌ Blockchain reaction failed:', error);
 
-    // Log blockchain sync failure
+    // Log failure for diagnostics, DON'T write to Firestore
     await BlockchainSyncQueueService.logFailure({
       contract: 'HealthRecordCore',
       action: 'reactToDispute',
@@ -753,12 +783,17 @@ export async function reactToDispute(
       },
     });
 
+    // Re-throw to prevent any further operations
     throw error;
   }
 }
 
 /**
  * Retract a reaction to a dispute.
+ *
+ * @param recordHash - The content hash
+ * @param disputerIdHash - The hashed disputer ID
+ * @param reactorId - The user retracting the reaction
  */
 export async function retractReaction(
   recordHash: string,
@@ -783,28 +818,28 @@ export async function retractReaction(
     throw new Error('You can only retract your own reactions');
   }
 
-  await updateDoc(docRef, {
-    isActive: false,
-    lastModified: Timestamp.now(),
-    chainStatus: 'pending',
-  });
+  console.log('🔄 Retracting reaction:', { recordHash, reactorId });
 
+  // Step 1: Write to blockchain FIRST
   try {
+    console.log('🔗 Retracting reaction on blockchain...');
     const tx = await blockchainHealthRecordService.retractReaction(recordHash, disputerIdHash);
+    console.log('✅ Blockchain: Reaction retracted');
 
+    // Step 2: Update Firestore (only if blockchain succeeded)
     await updateDoc(docRef, {
+      isActive: false,
+      lastModified: Timestamp.now(),
       chainStatus: 'confirmed',
       txHash: tx.txHash,
     });
-  } catch (error) {
-    await updateDoc(docRef, {
-      isActive: true,
-      lastModified: null,
-      chainStatus: 'failed',
-      error: getErrorMessage(error),
-    });
+    console.log('✅ Firestore: Reaction marked inactive');
 
-    // Log blockchain sync failure
+    console.log('✅ Reaction retracted successfully');
+  } catch (error) {
+    console.error('❌ Blockchain retraction failed:', error);
+
+    // Log failure for diagnostics, DON'T update Firestore
     await BlockchainSyncQueueService.logFailure({
       contract: 'HealthRecordCore',
       action: 'retractReaction',
@@ -816,12 +851,19 @@ export async function retractReaction(
         reactionId,
       },
     });
+
+    // Re-throw to prevent any further operations
     throw error;
   }
 }
 
 /**
  * Modify a reaction to a dispute.
+ *
+ * @param recordHash - The content hash
+ * @param disputerIdHash - The hashed disputer ID
+ * @param reactorId - The user modifying the reaction
+ * @param newSupport - New support value
  */
 export async function modifyReaction(
   recordHash: string,
@@ -852,30 +894,32 @@ export async function modifyReaction(
     throw new Error('New support value is the same as current');
   }
 
-  await updateDoc(docRef, {
-    supportsDispute: newSupport,
-    lastModified: Timestamp.now(),
-    chainStatus: 'pending',
-  });
+  console.log('🔄 Modifying reaction:', { recordHash, reactorId, oldSupport, newSupport });
 
+  // Step 1: Write to blockchain
   try {
+    console.log('🔗 Modifying reaction on blockchain...');
     const tx = await blockchainHealthRecordService.modifyReaction(
       recordHash,
       disputerIdHash,
       newSupport
     );
+    console.log('✅ Blockchain: Reaction modified');
 
+    // Step 2: Update Firestore
     await updateDoc(docRef, {
+      supportsDispute: newSupport,
+      lastModified: Timestamp.now(),
       chainStatus: 'confirmed',
       txHash: tx.txHash,
     });
-  } catch (error) {
-    await updateDoc(docRef, {
-      supportsDispute: oldSupport,
-      chainStatus: 'failed',
-      error: getErrorMessage(error),
-    });
+    console.log('✅ Firestore: Reaction updated');
 
+    console.log('✅ Reaction modified successfully');
+  } catch (error) {
+    console.error('❌ Blockchain modification failed:', error);
+
+    // Log failure for diagnostics, DON'T update Firestore
     await BlockchainSyncQueueService.logFailure({
       contract: 'HealthRecordCore',
       action: 'modifyReaction',
@@ -889,6 +933,8 @@ export async function modifyReaction(
         newSupport,
       },
     });
+
+    // Re-throw to prevent any further operations
     throw error;
   }
 }
@@ -963,22 +1009,30 @@ export async function getDisputeReactions(
  * Fetches reactions filtered by support type.
  * Convenience wrapper around getDisputeReactions.
  *
+ * @param recordId - The record ID the dispute is for
  * @param recordHash - The record hash the dispute is for
  * @param disputerId - The ID of the disputer
  * @param supportsDispute - true for supporters, false for opposers
  * @returns Array of ReactionDoc objects
  */
 export async function getDisputeReactionsByType(
+  recordId: string,
   recordHash: string,
   disputerId: string,
   supportsDispute: boolean
 ): Promise<ReactionDoc[]> {
-  const reactions = await getDisputeReactions(recordHash, disputerId, 'true');
+  const reactions = await getDisputeReactions(recordId, recordHash, disputerId, true);
   return reactions.filter(r => r.supportsDispute === supportsDispute);
 }
 
 /**
  * Fetches reaction counts for a specific dispute
+ *
+ * @param recordId - The record ID
+ * @param recordHash - The record hash
+ * @param disputerId - The disputer's user ID
+ * @param currentUserId - Optional current user ID to check their reaction
+ * @returns Statistics about reactions to this dispute
  */
 export async function getDisputeReactionStats(
   recordId: string,

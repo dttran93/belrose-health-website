@@ -54,9 +54,10 @@ type SyncContext =
       severity: DisputeSeverityOptions;
       culpability: DisputeCulpability;
     }
-  | { type: 'dispute-retraction'; recordHash: string }
+  | { type: 'dispute-retraction'; recordId: string; recordHash: string }
   | {
       type: 'dispute-modification';
+      recordId: string;
       recordHash: string;
       oldSeverity: DisputeSeverityOptions;
       oldCulpability: DisputeCulpability;
