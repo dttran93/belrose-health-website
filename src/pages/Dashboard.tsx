@@ -221,28 +221,26 @@ export default function AIHealthAssistant() {
   // If chat has started (has messages), show full-screen chat
   if (hasMessages) {
     return (
-      <div className="h-screen flex flex-col">
-        <AIChat
-          fhirBundle={fhirBundle}
-          className="flex-1"
-          contextInfo={{
-            type: selectedContext.type,
-            subjectName: getSubjectName(),
-          }}
-          leftFooterContent={
-            <div className="flex items-center gap-3">
-              <ContextSelector
-                currentUserId={user.uid}
-                availableSubjects={availableSubjects}
-                allRecords={allRecords}
-                selectedContext={selectedContext}
-                onContextChange={handleContextChange}
-              />
-            </div>
-          }
-          onMessagesChange={messageCount => setHasMessages(messageCount > 0)}
-        />
-      </div>
+      <AIChat
+        fhirBundle={fhirBundle}
+        className="h-full max-w-4xl mx-auto"
+        contextInfo={{
+          type: selectedContext.type,
+          subjectName: getSubjectName(),
+        }}
+        leftFooterContent={
+          <div className="flex items-center gap-3">
+            <ContextSelector
+              currentUserId={user.uid}
+              availableSubjects={availableSubjects}
+              allRecords={allRecords}
+              selectedContext={selectedContext}
+              onContextChange={handleContextChange}
+            />
+          </div>
+        }
+        onMessagesChange={messageCount => setHasMessages(messageCount > 0)}
+      />
     );
   }
 

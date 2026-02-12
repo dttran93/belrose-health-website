@@ -92,11 +92,11 @@ function AppLayout({ children }: AppLayoutProps) {
         {/* Main Content Area */}
         <div className="flex flex-col flex-1 overflow-hidden">
           {/* Conditional Header */}
-          {header && <div className="border-b border-gray-200 bg-white shadow-sm">{header}</div>}
+          {header && <div className="bg-white shadow-sm">{header}</div>}
 
           {/* Content and AI Panel */}
           <div className="flex flex-1 overflow-hidden">
-            <main className="flex-1 p-6 overflow-auto bg-gray-50">{children}</main>
+            <main className="flex-1 overflow-auto">{children}</main>
 
             {/* Resize Handle */}
             {isAIOpen && !isAIFullscreen && <ResizeHandle onResize={handleAIPanelResize} />}
