@@ -29,6 +29,8 @@ interface AIChatProps {
   leftFooterContent?: React.ReactNode;
   emptyStateContent?: React.ReactNode;
   onMessagesChange?: (messageCount: number) => void;
+  pendingFiles?: File[];
+  onPendingFilesClear?: () => void;
 }
 
 export const AVAILABLE_MODELS: AIModel[] = [
@@ -61,11 +63,14 @@ export function AIChat({
   leftFooterContent,
   emptyStateContent,
   onMessagesChange,
+  pendingFiles = [],
+  onPendingFilesClear,
 }: AIChatProps) {
   const [inputValue, setInputValue] = useState('');
   const [showHeaderShadow, setShowHeaderShadow] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
 
   // Default to first model if none selected
   const currentModel = selectedModel || availableModels[0];
@@ -80,6 +85,15 @@ export function AIChat({
   useEffect(() => {
     onMessagesChange?.(messages.length);
   }, [messages.length, onMessagesChange]);
+
+  // When files are dropped, add them to attachments
+  useEffect(() => {
+    if (pendingFiles.length > 0) {
+      setAttachedFiles(prev => [...prev, ...pendingFiles]);
+      onPendingFilesClear?.();
+      inputRef.current?.focus();
+    }
+  }, [pendingFiles, onPendingFilesClear]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -160,6 +174,9 @@ export function AIChat({
           availableModels={availableModels}
           onModelChange={handleModelChange}
           leftFooterContent={leftFooterContent}
+          attachedFiles={attachedFiles}
+          onFilesChange={setAttachedFiles}
+          maxFiles={5}
         />
       </div>
     );
@@ -236,6 +253,8 @@ export function AIChat({
             availableModels={availableModels}
             onModelChange={handleModelChange}
             leftFooterContent={leftFooterContent}
+            attachedFiles={attachedFiles}
+            onFilesChange={setAttachedFiles}
           />
         </div>
       </div>
