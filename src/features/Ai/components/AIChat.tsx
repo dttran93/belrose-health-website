@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { ChatMessage } from './ui/ChatMessage';
-import { FHIRBundle } from '@/types/fhir';
 import { ContextType } from './ui/ContextBadge';
 import { ChatInput } from './ui/ChatInput';
 import { LayoutSlot } from '@/components/app/LayoutProvider';
@@ -10,7 +9,7 @@ import { Message } from '../service/chatService';
 import { AIModel } from './ui/ModelSelector';
 
 interface AIChatProps {
-  fhirBundle: FHIRBundle | null;
+  healthContext: string | null;
   className?: string;
   contextInfo?: {
     type: ContextType;
@@ -32,23 +31,23 @@ interface AIChatProps {
   onMessagesChange?: (messageCount: number) => void;
 }
 
-export const DEFAULT_MODELS: AIModel[] = [
+export const AVAILABLE_MODELS: AIModel[] = [
   {
-    id: 'claude-sonnet-4-20250514',
-    name: 'Claude Sonnet 4',
+    id: 'claude-sonnet-4-5-20250929',
+    name: 'Claude Sonnet 4.5',
     provider: 'anthropic',
-    description: 'Fast and capable',
+    description: "Anthropic's best combination of speed and intelligence",
   },
   {
-    id: 'gemini-1.5-flash',
-    name: 'Gemini 1.5 Flash',
+    id: 'gemini-2.5-flash',
+    name: 'Gemini 2.5 Flash',
     provider: 'google',
     description: 'Fast and affordable',
   },
 ];
 
 export function AIChat({
-  fhirBundle,
+  healthContext,
   className = '',
   contextInfo,
   messages = [],
@@ -57,7 +56,7 @@ export function AIChat({
   onSendMessage,
   onClearChat,
   selectedModel,
-  availableModels = DEFAULT_MODELS,
+  availableModels = AVAILABLE_MODELS,
   onModelChange,
   leftFooterContent,
   emptyStateContent,

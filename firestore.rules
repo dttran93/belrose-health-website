@@ -118,7 +118,6 @@ service cloud.firestore {
           request.resource.data.createdAt is timestamp &&
           request.resource.data.updatedAt is timestamp &&
           request.resource.data.messageCount == 0 &&
-          request.resource.data.contextType in ['my-records', 'subject', 'all-accessible', 'specific-records'] &&
           request.resource.data.recordCount >= 0 &&
           // Title must be encrypted (placeholder only)
           request.resource.data.title is string;

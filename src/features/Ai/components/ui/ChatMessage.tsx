@@ -68,7 +68,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
             </span>
           </div>
 
-          <div className="text-gray-800 whitespace-pre-wrap break-words">{message.content}</div>
+          <div className="text-left text-gray-800 whitespace-pre-wrap break-words">
+            {message.content}
+          </div>
         </div>
       </div>
     </div>

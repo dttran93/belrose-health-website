@@ -6,7 +6,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuthContext } from '@/features/Auth/AuthContext';
-import { FHIRBundle, FHIREntry } from '@/types/fhir';
 import { FileObject } from '@/types/core';
 import { SubjectInfo } from '@/features/Ai/components/ui/SubjectList';
 import { ContextSelection } from '@/features/Ai/components/ui/ContextBadge';
@@ -36,7 +35,11 @@ import {
   ErrorView,
   NoRecordsView,
 } from '@/features/Ai/components/AIAssistantView';
-import { DEFAULT_MODELS } from '@/features/Ai/components/AIChat';
+import { AVAILABLE_MODELS } from '@/features/Ai/components/AIChat';
+import { ContextBuilder } from '@/features/Ai/service/contextBuilder';
+import { ContextFormatter, MediaPart } from '@/features/Ai/service/contextFormatter';
+import { fileToBase64 } from '@/utils/dataFormattingUtils';
+import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 
 export default function AppPortal() {
   const { user, loading: authLoading } = useAuthContext();
@@ -59,14 +62,15 @@ export default function AppPortal() {
   const [chatError, setChatError] = useState<Error | null>(null);
 
   // AI Model selection
-  const [selectedModel, setSelectedModel] = useState<AIModel>({
-    id: 'claude-sonnet-4',
-    name: 'Claude Sonnet 4',
+  const availableModels: AIModel[] = AVAILABLE_MODELS;
+  const DEFAULT_MODEL: AIModel = AVAILABLE_MODELS[0] ?? {
+    id: 'claude-sonnet-4-20250514',
+    name: 'Fallback Model',
     provider: 'anthropic',
-    description: 'Fast and capable',
-  });
+    description: "Claude's best combination of speed and intelligence",
+  };
 
-  const availableModels: AIModel[] = DEFAULT_MODELS;
+  const [selectedModel, setSelectedModel] = useState<AIModel>(DEFAULT_MODEL);
 
   // Context state
   const [selectedContext, setSelectedContext] = useState<ContextSelection>({
@@ -75,9 +79,6 @@ export default function AppPortal() {
     recordCount: 0,
     description: 'Your health records',
   });
-
-  // FHIR bundle for AI
-  const [fhirBundle, setFhirBundle] = useState<FHIRBundle | null>(null);
 
   // ============================================================================
   // DATA FETCHING
@@ -102,10 +103,16 @@ export default function AppPortal() {
 
         // Fetch all records user has access to
         const records = await getAccessibleRecords(user.uid);
-        setAllRecords(records);
 
-        // Get available subjects from those records
-        const subjects = await getAvailableSubjects(records, user.uid);
+        // Decrypt Records
+        console.log('🔓 Decrypting records...');
+        const decryptedRecords = await RecordDecryptionService.decryptRecords(records);
+        console.log('✅ Records decrypted:', decryptedRecords.length);
+
+        setAllRecords(decryptedRecords);
+
+        // Get available subjects from decrypted records
+        const subjects = await getAvailableSubjects(decryptedRecords, user.uid);
         setAvailableSubjects(subjects);
 
         // Set initial context to user's own records
@@ -130,51 +137,6 @@ export default function AppPortal() {
     fetchData();
   }, [user]);
 
-  // Update FHIR bundle when context changes
-  useEffect(() => {
-    if (!user || allRecords.length === 0) {
-      setFhirBundle(null);
-      return;
-    }
-
-    // Filter records based on selected context
-    let contextRecords: FileObject[] = [];
-
-    if (selectedContext.type === 'my-records') {
-      // Filter where subjects array includes current user's ID
-      contextRecords = allRecords.filter(r => r.subjects?.includes(user.uid));
-    } else if (selectedContext.type === 'subject' && selectedContext.subjectId) {
-      const targetId = selectedContext.subjectId;
-
-      // Filter where subjects array includes the selected subject's ID
-      contextRecords = allRecords.filter(r => r.subjects?.includes(targetId));
-    } else if (selectedContext.type === 'all-accessible') {
-      contextRecords = allRecords;
-    } else if (selectedContext.type === 'specific-records' && selectedContext.recordIds) {
-      contextRecords = allRecords.filter(r => selectedContext.recordIds?.includes(r.id));
-    }
-
-    // Aggregate FHIR entries from selected records
-    const allEntries: FHIREntry[] = [];
-    contextRecords.forEach(record => {
-      if (record.fhirData?.entry) {
-        allEntries.push(...record.fhirData.entry);
-      }
-    });
-
-    // Create FHIR bundle
-    const bundle: FHIRBundle = {
-      resourceType: 'Bundle',
-      id: `context-${selectedContext.type}-${Date.now()}`,
-      type: 'collection',
-      timestamp: new Date().toISOString(),
-      total: allEntries.length,
-      entry: allEntries,
-    };
-
-    setFhirBundle(bundle);
-  }, [selectedContext, allRecords, user]);
-
   // Handle context change
   const handleContextChange = (newContext: ContextSelection) => {
     setSelectedContext(newContext);
@@ -185,44 +147,83 @@ export default function AppPortal() {
   // ============================================================================
 
   /**
-   * Handle user sending a message
-   * FLOW:
-   * 1. If no chat exists, create new encrypted chat with auto-generated title
-   * 2. Add encrypted user message
-   * 3. Call AI backend to get response
-   * 4. Add encrypted assistant message
-   * 5. If this is the first exchange, optionally update title with better one
+   * Handle user sending a message with optional attachments
    */
-  const handleSendMessage = async (messageContent: string) => {
+  const handleSendMessage = async (messageContent: string, files?: File[]) => {
     if (!user || !messageContent.trim()) return;
 
     setIsSendingMessage(true);
     setChatError(null);
 
     try {
-      // Get FHIR references from current context
-      const recordReferences = selectedContext.recordIds || [];
-      let activeChatId = currentChatId; // Track the active chat ID
+      let activeChatId = currentChatId;
 
-      // STEP 1: Create chat if it doesn't exist
+      // ========================================================================
+      // STEP 1: Handle long pasted text
+      // ========================================================================
+      const PASTED_TEXT_THRESHOLD = 2500;
+      let finalMessage = messageContent;
+      let extractedPastedText: string | null = null;
+
+      if (messageContent.length > PASTED_TEXT_THRESHOLD) {
+        extractedPastedText = messageContent;
+        finalMessage =
+          'I have attached a long note/document for you to analyze. Please see the "Pasted Text" section in my health context.';
+      }
+
+      // ========================================================================
+      // STEP 2: Build context (records + attachments + pasted text)
+      // ========================================================================
+      const builder = new ContextBuilder();
+      const targetRecords = allRecords.filter(r => selectedContext.recordIds?.includes(r.id));
+      builder.addHealthRecords(targetRecords);
+
+      // Add pasted text if extracted
+      if (extractedPastedText) {
+        builder.addPastedText(extractedPastedText, 'Large User Note');
+      }
+
+      // Add file attachments if any
+      if (files && files.length > 0) {
+        console.log(`📎 Processing ${files.length} file(s)...`);
+
+        for (const file of files) {
+          const base64 = await fileToBase64(file);
+
+          if (file.type.startsWith('image/')) {
+            builder.addImageAttachment(file.name, {
+              url: base64,
+              mimeType: file.type,
+              visualDescription: 'User uploaded image',
+            });
+          } else if (file.type.startsWith('video/')) {
+            builder.addVideoAttachment(base64, 0, { mimeType: file.type });
+          } else {
+            builder.addFileAttachment(file.name, { mimeType: file.type, size: file.size });
+          }
+        }
+      }
+
+      // Format context for AI
+      const collection = builder.build();
+      const formatted = ContextFormatter.formatForAI(collection);
+
+      // ========================================================================
+      // STEP 3: Create or update chat
+      // ========================================================================
       if (!activeChatId) {
         console.log('📝 Creating new chat...');
-
-        // Generate initial title from first message (first 50 chars)
-        const initialTitle = generateChatTitle(messageContent, 50);
 
         if (!selectedContext.subjectId) {
           throw new Error('Subject ID is required to create a chat');
         }
 
-        // Build chat input, only including defined fields (otherwise Firestore will reject)
         const chatInput: CreateChatInput = {
-          title: initialTitle,
-          subjectId: selectedContext.subjectId,
+          title: generateChatTitle(finalMessage, 50),
+          userId: selectedContext.subjectId,
           recordCount: selectedContext.recordCount,
         };
 
-        // Only add optional fields if they're defined (Firestore doesn't allow undefined)
         if (selectedContext.recordIds) {
           chatInput.recordIds = selectedContext.recordIds;
         }
@@ -230,48 +231,63 @@ export default function AppPortal() {
         const { chatId, messageId } = await createEncryptedChatWithMessage(
           user.uid,
           chatInput,
-          messageContent
+          finalMessage
         );
 
         console.log('✅ Chat created:', chatId);
-        activeChatId = chatId; // Use local variable
-        setCurrentChatId(chatId); // Also update state for future messages
+        activeChatId = chatId;
+        setCurrentChatId(chatId);
 
-        // Add to local messages state
         setMessages([
           {
             id: messageId,
             role: 'user',
-            content: messageContent,
+            content: finalMessage,
             timestamp: Timestamp.now(),
           },
         ]);
       } else {
-        // STEP 2: Add message to existing chat
         console.log('💬 Adding message to existing chat...');
 
         const messageId = await addEncryptedMessage(user.uid, activeChatId, {
           role: 'user',
-          content: messageContent,
+          content: finalMessage,
         });
 
-        // Add to local state
         setMessages(prev => [
           ...prev,
           {
             id: messageId,
             role: 'user',
-            content: messageContent,
+            content: finalMessage,
             timestamp: Timestamp.now(),
-            recordReferences,
           },
         ]);
       }
 
-      // STEP 3: Call AI backend to get response
-      const aiResponse = await callAIBackend(messageContent, fhirBundle, selectedModel);
+      // ========================================================================
+      // STEP 4: Call AI backend
+      // ========================================================================
+      console.log('🤖 Calling AI with context...');
+      console.log('  - Health records:', targetRecords.length);
+      console.log('  - Files attached:', files?.length || 0);
+      console.log('  - Media parts:', formatted.mediaParts?.length || 0);
 
-      // STEP 4: Add AI response to chat (use activeChatId, not state!)
+      const aiResponse = await callAIBackend(
+        finalMessage,
+        formatted.text,
+        selectedModel,
+        formatted.mediaParts
+      );
+
+      // ========================================================================
+      // STEP 5: Store AI response
+      // ========================================================================
+
+      if (!activeChatId) {
+        throw new Error('Chat ID is missing');
+      }
+
       const assistantMessageId = await addEncryptedMessage(user.uid, activeChatId, {
         role: 'assistant',
         content: aiResponse,
@@ -287,14 +303,7 @@ export default function AppPortal() {
         },
       ]);
 
-      // STEP 5: Optionally update title after first exchange
-      if (messages.length === 0) {
-        // This was the first message - could improve title with AI
-        // For now, we'll keep the auto-generated one
-        // Uncomment below to update with AI-generated title:
-        // const betterTitle = await generateAITitle(messageContent, aiResponse);
-        // await updateEncryptedChatTitle(user.uid, activeChatId, betterTitle);
-      }
+      console.log('✅ Message exchange complete');
     } catch (error) {
       console.error('❌ Failed to send message:', error);
       setChatError(error instanceof Error ? error : new Error('Failed to send message'));
@@ -333,126 +342,6 @@ export default function AppPortal() {
   };
 
   /**
-   * Handle user sending a message with optional attachments
-   */
-  const handleSendMessageWithAttachments = async (messageContent: string, files?: File[]) => {
-    if (!user || !messageContent.trim()) return;
-
-    setIsSendingMessage(true);
-    setChatError(null);
-
-    try {
-      let activeChatId = currentChatId;
-
-      // STEP 1: Create chat if it doesn't exist
-      if (!activeChatId) {
-        console.log('📝 Creating new chat...');
-
-        const initialTitle = generateChatTitle(messageContent, 50);
-
-        if (!selectedContext.subjectId) {
-          throw new Error('Subject ID is required to create a chat');
-        }
-
-        const chatInput: CreateChatInput = {
-          title: initialTitle,
-          subjectId: selectedContext.subjectId,
-          recordCount: selectedContext.recordCount,
-        };
-
-        if (selectedContext.recordIds) {
-          chatInput.recordIds = selectedContext.recordIds;
-        }
-
-        const { chatId, messageId } = await createEncryptedChatWithMessage(
-          user.uid,
-          chatInput,
-          messageContent,
-          {
-            recordReferences: selectedContext.recordIds || [],
-          }
-        );
-
-        console.log('✅ Chat created:', chatId);
-        activeChatId = chatId;
-        setCurrentChatId(chatId);
-
-        setMessages([
-          {
-            id: messageId,
-            role: 'user',
-            content: messageContent,
-            timestamp: Timestamp.now(),
-            context: {
-              recordReferences: selectedContext.recordIds || [],
-            },
-          },
-        ]);
-      } else {
-        // STEP 2: Add message to existing chat
-        console.log('💬 Adding message to existing chat...');
-
-        // Upload attachments if any
-        let attachments: ContextAttachment[] = [];
-        if (files && files.length > 0) {
-          console.log(`📎 Uploading ${files.length} attachments...`);
-          attachments = await Promise.all(
-            files.map(file => uploadEncryptedAttachment(user.uid, activeChatId!, file, 'document'))
-          );
-          console.log('✅ Attachments uploaded');
-        }
-
-        const messageId = await addEncryptedMessage(user.uid, activeChatId, {
-          role: 'user',
-          content: messageContent,
-          context: {
-            recordReferences: selectedContext.recordIds || [],
-            attachments: attachments.length > 0 ? attachments : undefined,
-          },
-        });
-
-        setMessages(prev => [
-          ...prev,
-          {
-            id: messageId,
-            role: 'user',
-            content: messageContent,
-            timestamp: Timestamp.now(),
-            context: {
-              recordReferences: selectedContext.recordIds || [],
-              attachments: attachments.length > 0 ? attachments : undefined,
-            },
-          },
-        ]);
-      }
-
-      // STEP 3: Call AI backend to get response
-      const aiResponse = await callAIBackend(messageContent, fhirBundle, selectedModel);
-
-      // STEP 4: Add AI response to chat
-      const assistantMessageId = await addEncryptedMessage(user.uid, activeChatId, {
-        role: 'assistant',
-        content: aiResponse,
-      });
-
-      setMessages(prev => [
-        ...prev,
-        {
-          id: assistantMessageId,
-          role: 'assistant',
-          content: aiResponse,
-          timestamp: Timestamp.now(),
-        },
-      ]);
-    } catch (error) {
-      console.error('❌ Failed to send message:', error);
-      setChatError(error instanceof Error ? error : new Error('Failed to send message'));
-    } finally {
-      setIsSendingMessage(false);
-    }
-  };
-
-  /**
    * Handle downloading an attachment
    */
   const handleDownloadAttachment = async (attachment: ContextAttachment) => {
@@ -488,57 +377,58 @@ export default function AppPortal() {
 
   /**
    * Call AI backend via Firebase Cloud Function
+   *
+   * @param userMessage The user's message content
+   * @param healthContext XML string generated by ContextFormatter.
+   * @param model Selected AI model configuration.
+   * @param mediaParts Optional array of images/videos for multimodal analysis
    */
   async function callAIBackend(
     userMessage: string,
-    fhirBundle: FHIRBundle | null,
-    model: AIModel
+    healthContext: string | null,
+    model: AIModel,
+    mediaParts?: MediaPart[]
   ): Promise<string> {
-    console.log('🤖 Calling AI backend...');
-    console.log('  User message:', userMessage);
-    console.log('  Model:', model.id);
-    console.log('  FHIR bundle entries:', fhirBundle?.total || 0);
+    console.log(`🤖 Calling AI: ${model.name} (${model.provider})`);
 
     try {
-      // Get conversation history (last 10 messages for context)
+      // Step 1: Prepare conversation history (last 10 messages for context)
       const conversationHistory = messages.slice(-10).map(msg => ({
         role: msg.role,
         content: msg.content,
       }));
 
-      // Call Firebase Cloud Function
-      const response = await fetch(
-        'https://us-central1-belrose-757fe.cloudfunctions.net/aiChat', // ← UPDATE THIS URL
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            message: userMessage,
-            healthContext: JSON.stringify(fhirBundle, null, 2),
-            model: model.id,
-            provider: model.provider,
-            conversationHistory,
-          }),
-        }
-      );
+      // Step 2: Call Firebase Cloud Function
+      const response = await fetch('https://us-central1-belrose-757fe.cloudfunctions.net/aiChat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: userMessage,
+          healthContext: healthContext,
+          model: model.id,
+          provider: model.provider,
+          mediaParts: mediaParts,
+          conversationHistory,
+        }),
+      });
 
+      // Step 3: Error Handling
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to get AI response');
       }
 
       const data = await response.json();
+
+      // Step 4: Return AI's response text
       return data.response;
     } catch (error) {
-      console.error('❌ AI backend error:', error);
-
-      // Show user-friendly error
-      if (error instanceof Error) {
-        throw new Error(`AI Error: ${error.message}`);
-      }
-      throw new Error('Failed to connect to AI service');
+      console.error('❌ AI Backend Error:', error);
+      throw error instanceof Error
+        ? error
+        : new Error('An unexpected error occurred while connecting to the AI service.');
     }
   }
 
@@ -607,7 +497,7 @@ export default function AppPortal() {
       selectedModel={selectedModel}
       availableModels={availableModels}
       onModelChange={setSelectedModel}
-      fhirBundle={fhirBundle}
+      healthContext={`${selectedContext.recordCount} records selected`}
       selectedContext={selectedContext}
       onContextChange={handleContextChange}
       availableSubjects={availableSubjects}

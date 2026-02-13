@@ -10,7 +10,6 @@ import React from 'react';
 import { MessageSquare, Sparkles, Shield, X, Loader2 } from 'lucide-react';
 import { AIChat } from '@/features/Ai/components/AIChat';
 import { AIModel } from '@/features/Ai/components/ui/ModelSelector';
-import { FHIRBundle } from '@/types/fhir';
 import { FileObject } from '@/types/core';
 import { SubjectInfo } from '@/features/Ai/components/ui/SubjectList';
 import { ContextSelection } from '@/features/Ai/components/ui/ContextBadge';
@@ -119,7 +118,7 @@ interface AIHealthAssistantViewProps {
   selectedModel: AIModel;
   availableModels: AIModel[];
   onModelChange: (model: AIModel) => void;
-  fhirBundle: FHIRBundle | null;
+  healthContext: string | null;
   selectedContext: ContextSelection;
   onContextChange: (context: ContextSelection) => void;
   availableSubjects: SubjectInfo[];
@@ -141,7 +140,7 @@ export function AIHealthAssistantView({
   selectedModel,
   availableModels,
   onModelChange,
-  fhirBundle,
+  healthContext,
   selectedContext,
   onContextChange,
   availableSubjects,
@@ -153,7 +152,7 @@ export function AIHealthAssistantView({
       {/* AI Chat Component */}
       <div className="rounded-xl">
         <AIChat
-          fhirBundle={fhirBundle}
+          healthContext={healthContext}
           className=""
           messages={messages}
           isLoading={isLoading}

@@ -6,45 +6,21 @@ import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormatting
 import { getAuth } from 'firebase/auth';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
-
-export interface EncryptedRecord {
-  id: string;
-  isEncrypted: boolean;
-  fileName?: string;
-  encryptedFileName?: { encrypted: string; iv: string };
-  encryptedExtractedText?: { encrypted: string; iv: string };
-  encryptedOriginalText?: { encrypted: string; iv: string };
-  encryptedContextText?: { encrypted: string; iv: string };
-  encryptedFhirData?: { encrypted: string; iv: string };
-  encryptedBelroseFields?: { encrypted: string; iv: string };
-  // ... plus all the regular fields
-  [key: string]: any;
-}
-
-export interface DecryptedRecord {
-  fileName?: string;
-  contextText?: string;
-  extractedText?: string;
-  originalText?: string;
-  fhirData?: any;
-  belroseFields?: any;
-  // ... all other fields pass through
-  [key: string]: any;
-}
+import { FileObject } from '@/types/core';
 
 export class RecordDecryptionService {
   /**
    * Decrypt a record fetched from Firestore
    */
   static async decryptRecord(
-    encryptedRecord: EncryptedRecord,
+    encryptedRecord: FileObject,
     encryptedRecordKey?: string, //For the cases where the key IS provided within the component, optimized so there aren't multiple firebase reads, see VersionControlService
     isCreator?: boolean
-  ): Promise<DecryptedRecord> {
+  ): Promise<FileObject> {
     // If not encrypted, return as-is
     if (!encryptedRecord.isEncrypted) {
       console.log('📄 Record is not encrypted, returning as-is');
-      return encryptedRecord as DecryptedRecord;
+      return encryptedRecord;
     }
 
     console.log('🔓 Decrypting record:', encryptedRecord.id);
@@ -80,7 +56,7 @@ export class RecordDecryptionService {
       }
 
       // 2. Decrypt all the fields
-      const decryptedData: DecryptedRecord = {
+      const decryptedData: FileObject = {
         ...encryptedRecord, // Start with all fields
       };
 
@@ -157,7 +133,7 @@ export class RecordDecryptionService {
   /**
    * Decrypt multiple records
    */
-  static async decryptRecords(encryptedRecords: EncryptedRecord[]): Promise<DecryptedRecord[]> {
+  static async decryptRecords(encryptedRecords: FileObject[]): Promise<FileObject[]> {
     console.log(`🔓 Decrypting ${encryptedRecords.length} records...`);
 
     const decryptedRecords = await Promise.all(

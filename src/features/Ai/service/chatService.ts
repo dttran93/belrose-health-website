@@ -73,7 +73,7 @@ export interface ContextAttachment {
 export interface CreateChatInput {
   title: string;
   titleIv?: string;
-  subjectId?: string;
+  userId?: string;
   recordIds?: string[];
   recordCount: number;
 }

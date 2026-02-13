@@ -10,9 +10,16 @@ const corsHandler = cors({ origin: true });
 const anthropicApiKey = defineSecret('ANTHROPIC_KEY');
 const geminiApiKey = defineSecret('GEMINI_API_KEY');
 
+interface MediaPart {
+  type: 'image' | 'video';
+  url: string;
+  mimeType: string;
+}
+
 interface ChatRequest {
   message: string;
   healthContext: string;
+  mediaParts?: MediaPart[];
   model: string;
   provider: 'anthropic' | 'google';
   conversationHistory: Array<{
@@ -58,8 +65,14 @@ export const aiChat = onRequest(
       }
 
       try {
-        const { message, healthContext, model, provider, conversationHistory }: ChatRequest =
-          req.body;
+        const {
+          message,
+          healthContext,
+          model,
+          provider,
+          conversationHistory,
+          mediaParts = [],
+        }: ChatRequest = req.body;
 
         if (!message || !provider) {
           res.status(400).json({ error: 'Missing required fields' });
@@ -70,10 +83,22 @@ export const aiChat = onRequest(
 
         switch (provider) {
           case 'anthropic':
-            response = await callClaudeAPI(message, healthContext, model, conversationHistory);
+            response = await callClaudeAPI(
+              message,
+              healthContext,
+              model,
+              conversationHistory,
+              mediaParts
+            );
             break;
           case 'google':
-            response = await callGeminiAPI(message, healthContext, model, conversationHistory);
+            response = await callGeminiAPI(
+              message,
+              healthContext,
+              model,
+              conversationHistory,
+              mediaParts
+            );
             break;
           default:
             throw new Error(`Unsupported provider: ${provider}`);
@@ -91,13 +116,46 @@ export const aiChat = onRequest(
 );
 
 /**
+ * MASTER SYSTEM PROMPT
+ * Defines the personality, constraints, and data-handling rules for Belrose's AI Assistant.
+ */
+const generateSystemPrompt = (healthContext: string): string => {
+  return `You are Belrose's AI Health Assistant, a specialized assistant for analyzing patient health data.
+You have access to structured health data wrapped in XML tags (<HEALTH_RECORD>, <FILE_ATTACHMENT>, etc.).
+
+### 1. GROUNDING & ACCURACY
+- ONLY answer based on the provided records and visual media.
+- If information is not present, explicitly state: "I don't see that information in your records."
+- DO NOT infer, assume, or hallucinate medical details. 
+- When citing information, include record titles, IDs, and dates (e.g., "According to your blood test record from reocrdID: abc123 dated 2025-05-10...").
+
+### 2. DATA HANDLING & CITATION
+- Use the [CONTEXT_MANIFEST] at the top of the context to understand the inventory.
+- Reference specific records by their ID or Title (e.g., "In your 'Complete Blood Count' (recordID: abc123) from 2025-05-10...").
+- If visual media (images/videos) are provided, analyze them in conjunction with the metadata provided in the XML.
+
+### 3. TONE & STYLE
+- Use a professional, empathetic, and clear tone.
+- Explain medical terminology using plain language.
+- Provide structured summaries (bullet points) for complex data.
+
+### 4. SAFETY & DISCLAIMERS
+- You are an assistant, not a doctor. 
+- ALWAYS conclude with a recommendation to consult a qualified healthcare provider for medical decisions.
+
+### HEALTH RECORDS CONTEXT:
+${healthContext}`;
+};
+
+/**
  * Call Anthropic's Claude API
  */
 async function callClaudeAPI(
   message: string,
   healthContext: string,
   model: string,
-  history: Array<{ role: string; content: string }>
+  history: Array<{ role: string; content: string }>,
+  mediaParts: MediaPart[] = []
 ): Promise<string> {
   const apiKey = anthropicApiKey.value();
 
@@ -106,21 +164,26 @@ async function callClaudeAPI(
   }
 
   // Build system prompt with health context
-  const systemPrompt = `You are a helpful medical AI assistant analyzing health records for a patient. You have access to their FHIR-formatted health data.
+  const systemPrompt = generateSystemPrompt(healthContext);
 
-CRITICAL INSTRUCTIONS:
-- Only answer based on the provided FHIR health records
-- If information is not in the records, clearly state "I don't see that information in your records"
-- Do not make up, infer, or assume medical information
-- Provide clear, accurate summaries with specific dates and values when available
-- Use plain language alongside medical terms
-- Always recommend consulting healthcare providers for medical decisions
-- When citing specific values, include the date of the observation
+  // 2. Format the current message content
+  const userContent: any[] = [{ type: 'text', text: message }];
 
-HEALTH RECORDS:
-${healthContext}
+  // Filter out videos since Claude doesn't support them
+  const supportedMedia = mediaParts.filter(part => part.type === 'image');
 
-Remember: You are analyzing real patient data. Be precise and only reference what's explicitly in the records.`;
+  if (mediaParts.length > supportedMedia.length) {
+    console.warn(
+      `⚠️ Filtering out ${mediaParts.length - supportedMedia.length} video(s) - Claude doesn't support video`
+    );
+  }
+
+  supportedMedia.forEach(part => {
+    userContent.push({
+      type: 'image',
+      source: { type: 'base64', media_type: part.mimeType, data: part.url.split(',')[1] },
+    });
+  });
 
   // Build conversation messages
   const messages = [
@@ -130,7 +193,7 @@ Remember: You are analyzing real patient data. Be precise and only reference wha
     })),
     {
       role: 'user',
-      content: message,
+      content: userContent,
     },
   ];
 
@@ -173,7 +236,8 @@ async function callGeminiAPI(
   message: string,
   healthContext: string,
   model: string,
-  history: Array<{ role: string; content: string }>
+  history: Array<{ role: string; content: string }>,
+  mediaParts: MediaPart[] = []
 ): Promise<string> {
   const apiKey = geminiApiKey.value();
 
@@ -181,21 +245,7 @@ async function callGeminiAPI(
     throw new Error('Gemini API key not configured');
   }
 
-  const systemPrompt = `You are a helpful medical AI assistant analyzing health records for a patient. You have access to their FHIR-formatted health data.
-
-CRITICAL INSTRUCTIONS:
-- Only answer based on the provided FHIR health records
-- If information is not in the records, clearly state "I don't see that information in your records"
-- Do not make up, infer, or assume medical information
-- Provide clear, accurate summaries with specific dates and values when available
-- Use plain language alongside medical terms
-- Always recommend consulting healthcare providers for medical decisions
-- When citing specific values, include the date of the observation
-
-HEALTH RECORDS:
-${healthContext}
-
-Remember: You are analyzing real patient data. Be precise and only reference what's explicitly in the records.`;
+  const systemPrompt = generateSystemPrompt(healthContext);
 
   // Gemini uses 'user' and 'model' as roles
   const contents = [
@@ -205,11 +255,16 @@ Remember: You are analyzing real patient data. Be precise and only reference wha
     })),
     {
       role: 'user',
-      parts: [{ text: message }],
+      parts: [
+        { text: message },
+        ...mediaParts.map(part => ({
+          inline_data: { mime_type: part.mimeType, data: part.url.split(',')[1] },
+        })),
+      ],
     },
   ];
 
-  const modelName = model || 'gemini-1.5-flash';
+  const modelName = model || 'gemini-2.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
   const response = await fetch(url, {
@@ -224,7 +279,7 @@ Remember: You are analyzing real patient data. Be precise and only reference wha
       },
       generationConfig: {
         maxOutputTokens: 4096,
-        temperature: 0.2, // Lower temperature for medical precision
+        temperature: 0.1,
       },
     }),
   });

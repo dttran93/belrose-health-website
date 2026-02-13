@@ -311,6 +311,33 @@ export const hexToArrayBuffer = (hex: string): ArrayBuffer => {
   return new Uint8Array(matches.map(h => parseInt(h, 16))).buffer;
 };
 
+/**
+ * Converts a File or Blob object to a base64-encoded string.
+ * This is the standard way to prepare attachments (images/PDFs)
+ * for the AI multimodal payload.
+ * * @param file - The File object from an input or drop zone
+ * @returns Promise<string> - The base64 string (including data URL prefix)
+ */
+export const fileToBase64 = (file: File | Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    // Set up the event handlers
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Failed to convert file to base64 string'));
+      }
+    };
+
+    reader.onerror = error => reject(error);
+
+    // Start reading the file
+    reader.readAsDataURL(file);
+  });
+};
+
 //====================================================================
 //NUMBER FORMATTING
 //====================================================================
