@@ -106,13 +106,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onForgotPassw
         console.warn('⚠️ User does not have encryption set up');
       }
 
-      // 5. Success! Navigate to dashboard
+      // 5. Success! Navigate to App
       toast.success('Login successful!', {
         description: 'Welcome back!',
         duration: 3000,
       });
 
-      const from = location.state?.from?.pathname || '/dashboard';
+      const from = location.state?.from?.pathname || '/app';
       navigate(from, { replace: true });
     } catch (error) {
       console.error('❌ Login error:', error);
@@ -170,7 +170,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onForgotPassw
                   </h3>
                   <p className="text-green-700 text-sm">
                     {verificationMessage ||
-                      'Your email has been verified. Sign in to continue to your dashboard.'}
+                      'Your email has been verified. Sign in to continue to the app.'}
                   </p>
                 </div>
               </div>

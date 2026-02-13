@@ -1,63 +1,94 @@
-import * as functions from 'firebase-functions';
-import * as cors from 'cors';
+// functions/src/aiChat.ts
+
+import { defineSecret } from 'firebase-functions/params';
+import cors from 'cors';
+import { onRequest } from 'firebase-functions/https';
 
 const corsHandler = cors({ origin: true });
+
+// Define secrets
+const anthropicApiKey = defineSecret('ANTHROPIC_KEY');
+const geminiApiKey = defineSecret('GEMINI_API_KEY');
 
 interface ChatRequest {
   message: string;
   healthContext: string;
   model: string;
-  provider: 'claude' | 'openai' | 'deepseek';
+  provider: 'anthropic' | 'google';
   conversationHistory: Array<{
     role: 'user' | 'assistant';
     content: string;
   }>;
 }
 
-export const aiChat = functions.https.onRequest((req, res) => {
-  corsHandler(req, res, async () => {
-    // Only allow POST
-    if (req.method !== 'POST') {
-      res.status(405).json({ error: 'Method not allowed' });
-      return;
-    }
+interface GeminiResponse {
+  candidates?: Array<{
+    content: {
+      parts: Array<{ text: string }>;
+      role: string;
+    };
+    finishReason?: string;
+  }>;
+  error?: {
+    message: string;
+    code: number;
+  };
+}
 
-    try {
-      const { message, healthContext, model, provider, conversationHistory }: ChatRequest =
-        req.body;
+interface ClaudeAPIResponse {
+  content: Array<{ text: string; type: string }>;
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+  };
+  stop_reason?: string;
+}
 
-      // Validate inputs
-      if (!message || !provider) {
-        res.status(400).json({ error: 'Missing required fields' });
+export const aiChat = onRequest(
+  {
+    timeoutSeconds: 540,
+    memory: '1GiB',
+    secrets: [anthropicApiKey, geminiApiKey],
+  },
+  (req, res) => {
+    corsHandler(req, res, async () => {
+      if (req.method !== 'POST') {
+        res.status(405).json({ error: 'Method not allowed' });
         return;
       }
 
-      // Route to appropriate provider
-      let response: string;
+      try {
+        const { message, healthContext, model, provider, conversationHistory }: ChatRequest =
+          req.body;
 
-      switch (provider) {
-        case 'claude':
-          response = await callClaudeAPI(message, healthContext, model, conversationHistory);
-          break;
-        case 'openai':
-          response = await callOpenAIAPI(message, healthContext, model, conversationHistory);
-          break;
-        case 'deepseek':
-          response = await callDeepSeekAPI(message, healthContext, model, conversationHistory);
-          break;
-        default:
-          throw new Error(`Unsupported provider: ${provider}`);
+        if (!message || !provider) {
+          res.status(400).json({ error: 'Missing required fields' });
+          return;
+        }
+
+        let response: string;
+
+        switch (provider) {
+          case 'anthropic':
+            response = await callClaudeAPI(message, healthContext, model, conversationHistory);
+            break;
+          case 'google':
+            response = await callGeminiAPI(message, healthContext, model, conversationHistory);
+            break;
+          default:
+            throw new Error(`Unsupported provider: ${provider}`);
+        }
+
+        res.json({ response });
+      } catch (error) {
+        console.error('AI Chat error:', error);
+        res.status(500).json({
+          error: error instanceof Error ? error.message : 'Internal server error',
+        });
       }
-
-      res.json({ response });
-    } catch (error) {
-      console.error('AI Chat error:', error);
-      res.status(500).json({
-        error: error instanceof Error ? error.message : 'Internal server error',
-      });
-    }
-  });
-});
+    });
+  }
+);
 
 /**
  * Call Anthropic's Claude API
@@ -68,24 +99,28 @@ async function callClaudeAPI(
   model: string,
   history: Array<{ role: string; content: string }>
 ): Promise<string> {
-  const apiKey = functions.config().anthropic?.api_key;
+  const apiKey = anthropicApiKey.value();
 
   if (!apiKey) {
     throw new Error('Anthropic API key not configured');
   }
 
   // Build system prompt with health context
-  const systemPrompt = `You are a helpful medical AI assistant. You have access to the user's health records to answer their questions.
+  const systemPrompt = `You are a helpful medical AI assistant analyzing health records for a patient. You have access to their FHIR-formatted health data.
 
-IMPORTANT INSTRUCTIONS:
-- Only answer based on the provided health records
-- If information is not in the records, say so clearly
-- Do not make up or infer medical information
-- Provide clear, accurate summaries
+CRITICAL INSTRUCTIONS:
+- Only answer based on the provided FHIR health records
+- If information is not in the records, clearly state "I don't see that information in your records"
+- Do not make up, infer, or assume medical information
+- Provide clear, accurate summaries with specific dates and values when available
 - Use plain language alongside medical terms
-- Suggest consulting healthcare providers for medical decisions
+- Always recommend consulting healthcare providers for medical decisions
+- When citing specific values, include the date of the observation
 
-${healthContext}`;
+HEALTH RECORDS:
+${healthContext}
+
+Remember: You are analyzing real patient data. Be precise and only reference what's explicitly in the records.`;
 
   // Build conversation messages
   const messages = [
@@ -107,8 +142,9 @@ ${healthContext}`;
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: model || 'claude-sonnet-4-5-20250929',
-      max_tokens: 2048,
+      model: model || 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      temperature: 0.2,
       system: systemPrompt,
       messages,
     }),
@@ -119,104 +155,90 @@ ${healthContext}`;
     throw new Error(`Claude API error: ${response.status} - ${error}`);
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as ClaudeAPIResponse;
+
+  console.log('✅ Claude API response:', {
+    inputTokens: data.usage?.input_tokens,
+    outputTokens: data.usage?.output_tokens,
+    stopReason: data.stop_reason,
+  });
+
   return data.content[0].text;
 }
 
 /**
- * Call OpenAI's API
+ * Call Google's Gemini API
  */
-async function callOpenAIAPI(
+async function callGeminiAPI(
   message: string,
   healthContext: string,
   model: string,
   history: Array<{ role: string; content: string }>
 ): Promise<string> {
-  const apiKey = functions.config().openai?.api_key;
+  const apiKey = geminiApiKey.value();
 
   if (!apiKey) {
-    throw new Error('OpenAI API key not configured');
+    throw new Error('Gemini API key not configured');
   }
 
-  const systemPrompt = `You are a helpful medical AI assistant with access to the user's health records.
+  const systemPrompt = `You are a helpful medical AI assistant analyzing health records for a patient. You have access to their FHIR-formatted health data.
 
-IMPORTANT: Only answer based on provided health records. Do not make up information.
+CRITICAL INSTRUCTIONS:
+- Only answer based on the provided FHIR health records
+- If information is not in the records, clearly state "I don't see that information in your records"
+- Do not make up, infer, or assume medical information
+- Provide clear, accurate summaries with specific dates and values when available
+- Use plain language alongside medical terms
+- Always recommend consulting healthcare providers for medical decisions
+- When citing specific values, include the date of the observation
 
-${healthContext}`;
+HEALTH RECORDS:
+${healthContext}
 
-  const messages = [
-    { role: 'system', content: systemPrompt },
-    ...history,
-    { role: 'user', content: message },
+Remember: You are analyzing real patient data. Be precise and only reference what's explicitly in the records.`;
+
+  // Gemini uses 'user' and 'model' as roles
+  const contents = [
+    ...history.map(msg => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }],
+    })),
+    {
+      role: 'user',
+      parts: [{ text: message }],
+    },
   ];
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const modelName = model || 'gemini-1.5-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: model || 'gpt-4o',
-      messages,
-      max_tokens: 2048,
+      contents,
+      system_instruction: {
+        parts: [{ text: systemPrompt }],
+      },
+      generationConfig: {
+        maxOutputTokens: 4096,
+        temperature: 0.2, // Lower temperature for medical precision
+      },
     }),
   });
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} - ${error}`);
+    throw new Error(`Gemini API error: ${response.status} - ${error}`);
   }
 
-  const data = await response.json();
-  return data.choices[0].message.content;
-}
+  const data = (await response.json()) as GeminiResponse;
 
-/**
- * Call DeepSeek's API
- */
-async function callDeepSeekAPI(
-  message: string,
-  healthContext: string,
-  model: string,
-  history: Array<{ role: string; content: string }>
-): Promise<string> {
-  const apiKey = functions.config().deepseek?.api_key;
-
-  if (!apiKey) {
-    throw new Error('DeepSeek API key not configured');
+  if (!data.candidates || data.candidates.length === 0) {
+    throw new Error('Gemini returned no response candidates');
   }
 
-  const systemPrompt = `You are a helpful medical AI assistant with access to the user's health records.
-
-IMPORTANT: Only answer based on provided health records. Do not make up information.
-
-${healthContext}`;
-
-  const messages = [
-    { role: 'system', content: systemPrompt },
-    ...history,
-    { role: 'user', content: message },
-  ];
-
-  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: model || 'deepseek-chat',
-      messages,
-      max_tokens: 2048,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`DeepSeek API error: ${response.status} - ${error}`);
-  }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
+  return data.candidates[0].content.parts[0].text;
 }

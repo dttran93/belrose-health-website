@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/Button';
  * EmailVerifiedPage Component
  *
  * This page is shown after a user successfully verifies their email.
- * It confirms verification, updates Firestore, and guides them to the dashboard.
+ * It confirms verification, updates Firestore, and guides them to the app.
  *
  * Key Concepts:
  * - useEffect: Runs code when component loads (like checking verification status)
@@ -102,10 +102,10 @@ const EmailVerifiedPage: React.FC = () => {
   }, []); // Empty array means this only runs once when component mounts
 
   /**
-   * Handle navigation to dashboard
+   * Handle navigation to app
    */
   const handleContinue = () => {
-    navigate('/dashboard');
+    navigate('/app');
   };
 
   /**
@@ -221,7 +221,7 @@ const EmailVerifiedPage: React.FC = () => {
 
         {/* Call to Action Button */}
         <Button onClick={handleContinue} className="w-full">
-          Go to Dashboard
+          Go to App
         </Button>
 
         {/* Secondary Link */}

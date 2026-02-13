@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSponsorshipStatus = exports.signSponsorship = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.sendShareInvitationEmail = exports.personaWebhook = exports.checkVerificationStatus = exports.createVerificationSession = exports.getEncryptedWallet = exports.createWallet = exports.createDetailedNarrative = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = void 0;
+exports.aiChat = exports.getSponsorshipStatus = exports.signSponsorship = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.sendShareInvitationEmail = exports.personaWebhook = exports.checkVerificationStatus = exports.createVerificationSession = exports.getEncryptedWallet = exports.createWallet = exports.createDetailedNarrative = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = void 0;
 // functions/src/index.ts
 const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin
@@ -81,4 +81,7 @@ Object.defineProperty(exports, "onSubjectConsentRequestUpdated", { enumerable: t
 var paymaster_1 = require("./handlers/paymaster");
 Object.defineProperty(exports, "signSponsorship", { enumerable: true, get: function () { return paymaster_1.signSponsorship; } });
 Object.defineProperty(exports, "getSponsorshipStatus", { enumerable: true, get: function () { return paymaster_1.getSponsorshipStatus; } });
+// ==================== AI CHAT FUNCTIONS ====================
+var aiChat_1 = require("./handlers/aiChat");
+Object.defineProperty(exports, "aiChat", { enumerable: true, get: function () { return aiChat_1.aiChat; } });
 //# sourceMappingURL=index.js.map

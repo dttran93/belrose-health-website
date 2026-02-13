@@ -7,7 +7,7 @@ import Index from './pages/index';
 import NotFound from './pages/NotFound';
 import Auth from './pages/Auth';
 import Layout from './components/app/Layout';
-import Dashboard from './pages/Dashboard';
+import AppPortal from './pages/AppPortal';
 import AllRecords from './pages/AllRecords';
 import ProtectedRoute from './features/Auth/ProtectedRoute';
 import AddRecord from './pages/AddRecord';
@@ -44,14 +44,14 @@ const App: React.FC = (): React.JSX.Element => {
               <Route path="/verification" element={<VerificationHub />} />
               <Route path="/verify-email" element={<EmailVerifiedPage />} />
               <Route
-                path="/dashboard/*"
+                path="/app/*"
                 element={
                   <ProtectedRoute>
                     <EncryptionGate>
                       <LayoutProvider>
                         <Layout>
                           <Routes>
-                            <Route index element={<Dashboard />} />
+                            <Route index element={<AppPortal />} />
                             <Route path="all-records" element={<AllRecords />} />
                             <Route path="add-record" element={<AddRecord />} />
                             <Route path="hash-tester" element={<HashTester />} />

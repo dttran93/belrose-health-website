@@ -174,7 +174,7 @@ export const onSubjectConsentRequestCreated = onDocumentCreated(
       type: 'SUBJECT_REQUEST_RECEIVED',
       sourceService: SOURCE,
       message: `${requesterName} has requested to set you as the subject of record: ${recordName}. Please review and respond.`,
-      link: `/dashboard/records/${data.recordId}/review-subject-request`,
+      link: `/app/records/${data.recordId}/review-subject-request`,
       payload: {
         recordId: data.recordId,
         requestId,
@@ -228,7 +228,7 @@ export const onSubjectConsentRequestUpdated = onDocumentUpdated(
         type: 'SUBJECT_ACCEPTED',
         sourceService: SOURCE,
         message: `${subjectName} has accepted your subject request for the record: ${recordName}.`,
-        link: `/dashboard/records/${afterData.recordId}`,
+        link: `/app/records/${afterData.recordId}`,
         payload: {
           recordId: afterData.recordId,
           requestId,
@@ -252,7 +252,7 @@ export const onSubjectConsentRequestUpdated = onDocumentUpdated(
         type: 'REJECTION_PENDING_CREATOR_DECISION',
         sourceService: SOURCE,
         message: `${subjectName} has declined to be set as the subject of record: ${recordName}.`,
-        link: `/dashboard/records/${afterData.recordId}`,
+        link: `/app/records/${afterData.recordId}`,
         payload: {
           recordId: afterData.recordId,
           requestId,
@@ -289,7 +289,7 @@ export const onSubjectConsentRequestUpdated = onDocumentUpdated(
           type: 'REJECTION_PENDING_CREATOR_DECISION',
           sourceService: SOURCE,
           message: `Action Required: ${subjectName} has removed their subject status from record: ${recordName}. Please review and decide whether to publicly list this change.`,
-          link: `/dashboard/records/${afterData.recordId}/review-rejection`,
+          link: `/app/records/${afterData.recordId}/review-rejection`,
           payload: {
             recordId: afterData.recordId,
             requestId,
@@ -327,7 +327,7 @@ export const onSubjectConsentRequestUpdated = onDocumentUpdated(
         type: notificationType,
         sourceService: SOURCE,
         message,
-        link: `/dashboard/records/${afterData.recordId}`,
+        link: `/app/records/${afterData.recordId}`,
         payload: {
           recordId: afterData.recordId,
           requestId,

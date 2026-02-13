@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { User, Bot } from 'lucide-react';
+import { Timestamp } from 'firebase/firestore';
 
 export interface ChatMessageProps {
   message: ChatMessage;
@@ -11,7 +12,7 @@ export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  timestamp: Date;
+  timestamp: Timestamp;
   model?: string;
 }
 
@@ -28,7 +29,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               <div className="text-gray-900 whitespace-pre-wrap break-words">{message.content}</div>
             </div>
             <div className="text-xs text-gray-500 mt-1 text-right">
-              {message.timestamp.toLocaleTimeString([], {
+              {message.timestamp.toDate().toLocaleTimeString([], {
                 hour: '2-digit',
                 minute: '2-digit',
               })}
@@ -60,7 +61,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               {message.model || 'Assistant'}
             </span>
             <span className="text-xs text-gray-500">
-              {message.timestamp.toLocaleTimeString([], {
+              {message.timestamp.toDate().toLocaleTimeString([], {
                 hour: '2-digit',
                 minute: '2-digit',
               })}

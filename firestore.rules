@@ -71,7 +71,7 @@ service cloud.firestore {
     }
 
     // ============================================
-    // USER PROFILES
+    // USER PROFILES/NOTIFICATIONS/CHATS
     // ============================================
 
     match /users/{userId} {
@@ -101,6 +101,99 @@ service cloud.firestore {
         // Deletion is restricted to the server (for cleanup jobs)
         allow delete: if request.auth.uid == userId && isServerWrite();
       }
+
+      // -- CHATS COLLECTION ---
+      match /chats/{chatId} {
+        // Helper: Check if user owns this chat
+        function isOwner() {
+          return request.auth != null && request.auth.uid == userId;
+        }
+
+        // READ: Only the chat owner can read their chats
+        allow read: if isOwner();
+
+        // CREATE: User can create chats in their own collection
+        // Encrypted fields (title, titleIv) stored directly in document
+        allow create: if isOwner() &&
+          request.resource.data.createdAt is timestamp &&
+          request.resource.data.updatedAt is timestamp &&
+          request.resource.data.messageCount == 0 &&
+          request.resource.data.contextType in ['my-records', 'subject', 'all-accessible', 'specific-records'] &&
+          request.resource.data.recordCount >= 0 &&
+          // Title must be encrypted (placeholder only)
+          request.resource.data.title is string;
+
+        // UPDATE: User can update their own chats
+        // - Can update encrypted title, context info, message count, preview
+        // - Cannot modify createdAt
+        // - Must update updatedAt
+        allow update: if isOwner() &&
+          request.resource.data.createdAt == resource.data.createdAt &&
+          request.resource.data.updatedAt is timestamp;
+
+        // DELETE: User can delete their own chats
+        allow delete: if isOwner();
+
+        // --- MESSAGES SUBCOLLECTION ---
+        match /messages/{messageId} {
+          // READ: Only chat owner can read messages
+          allow read: if request.auth != null && request.auth.uid == userId;
+
+          // CREATE: Only chat owner can add messages
+          // Encrypted content stored directly in message document
+          allow create: if request.auth != null &&
+            request.auth.uid == userId &&
+            request.resource.data.role in ['user', 'assistant'] &&
+            request.resource.data.timestamp is timestamp &&
+            // Content must be encrypted (placeholder only)
+            request.resource.data.content is string;
+
+          // UPDATE: Not allowed - messages are immutable
+          allow update: if false;
+
+          // DELETE: Only chat owner can delete messages
+          allow delete: if request.auth != null && request.auth.uid == userId;
+        }
+      }
+    }
+
+    // ============================================
+    // WRAPPED CHAT KEYS
+    // ============================================
+    
+    match /wrappedChatKeys/{wrappedKeyId} {
+      // wrappedKeyId format: {chatId}_{userId}
+      
+      // Helper: Extract userId from document ID
+      function extractUserId() {
+        return wrappedKeyId.split('_')[1];
+      }
+
+      // READ: Only the key owner can read
+      allow read: if request.auth != null &&
+        request.auth.uid == extractUserId();
+
+      // CREATE: User can create wrapped keys for their own chats
+      // Must match the document ID format and include required fields
+      allow create: if request.auth != null &&
+        request.auth.uid == extractUserId() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.chatId is string &&
+        request.resource.data.wrappedKey is string &&
+        request.resource.data.isActive == true &&
+        request.resource.data.createdAt is timestamp;
+
+      // UPDATE: User can deactivate their own keys
+      allow update: if request.auth != null &&
+        request.auth.uid == extractUserId() &&
+        resource.data.userId == request.auth.uid &&
+        // Only allow toggling isActive
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isActive']);
+
+      // DELETE: User can delete their own wrapped keys
+      allow delete: if request.auth != null &&
+        request.auth.uid == extractUserId() &&
+        resource.data.userId == request.auth.uid;
     }
     
     // ============================================

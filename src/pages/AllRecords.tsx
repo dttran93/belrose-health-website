@@ -24,7 +24,7 @@ export const AllRecords: React.FC = () => {
   const recordActions = useRecordFileActions();
 
   const handleAddNewRecord = () => {
-    navigate('/dashboard/addrecord');
+    navigate('/app/addrecord');
   };
 
   // Check for navigation state on mount and when records load

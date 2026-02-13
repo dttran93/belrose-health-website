@@ -50,9 +50,12 @@ export function ContextSelector({
     const records = allRecords.filter(r => r.subjects?.includes(subjectId));
     const subject = availableSubjects.find(s => s.id === subjectId);
 
+    const recordIds = records.map(r => r.id);
+
     onContextChange({
       type: isMyRecords ? 'my-records' : 'subject',
       subjectId,
+      recordIds,
       recordCount: records.length,
       description: isMyRecords
         ? `Your ${records.length} health records`
@@ -62,8 +65,11 @@ export function ContextSelector({
   };
 
   const handleSelectAllAccessible = () => {
+    const recordIds = allRecords.map(r => r.id);
+
     onContextChange({
       type: 'all-accessible',
+      recordIds,
       recordCount: allRecords.length,
       description: `All ${allRecords.length} accessible records`,
     });

@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Trash2, AlertCircle } from 'lucide-react';
-import { useAIChat } from '../hooks/useAIChat';
+import { AlertCircle } from 'lucide-react';
 import { ChatMessage } from './ui/ChatMessage';
 import { FHIRBundle } from '@/types/fhir';
 import { ContextType } from './ui/ContextBadge';
 import { ChatInput } from './ui/ChatInput';
 import { LayoutSlot } from '@/components/app/LayoutProvider';
 import { Button } from '@/components/ui/Button';
+import { Message } from '../service/chatService';
+import { AIModel } from './ui/ModelSelector';
 
 interface AIChatProps {
   fhirBundle: FHIRBundle | null;
@@ -15,15 +16,49 @@ interface AIChatProps {
     type: ContextType;
     subjectName?: string;
   };
+  // Controlled component props
+  messages?: Message[];
+  isLoading?: boolean;
+  error?: Error | null;
+  onSendMessage?: (content: string) => Promise<void>;
+  onClearChat?: () => void;
+  // Model selection
+  selectedModel?: AIModel;
+  availableModels?: AIModel[];
+  onModelChange?: (model: AIModel) => void;
+  // Footer and empty state customization
   leftFooterContent?: React.ReactNode;
   emptyStateContent?: React.ReactNode;
   onMessagesChange?: (messageCount: number) => void;
 }
 
+export const DEFAULT_MODELS: AIModel[] = [
+  {
+    id: 'claude-sonnet-4-20250514',
+    name: 'Claude Sonnet 4',
+    provider: 'anthropic',
+    description: 'Fast and capable',
+  },
+  {
+    id: 'gemini-1.5-flash',
+    name: 'Gemini 1.5 Flash',
+    provider: 'google',
+    description: 'Fast and affordable',
+  },
+];
+
 export function AIChat({
   fhirBundle,
   className = '',
   contextInfo,
+  messages = [],
+  isLoading = false,
+  error = null,
+  onSendMessage,
+  onClearChat,
+  selectedModel,
+  availableModels = DEFAULT_MODELS,
+  onModelChange,
   leftFooterContent,
   emptyStateContent,
   onMessagesChange,
@@ -33,16 +68,12 @@ export function AIChat({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const {
-    messages,
-    isLoading,
-    error,
-    selectedModel,
-    availableModels,
-    sendMessage,
-    setSelectedModel,
-    clearChat,
-  } = useAIChat({ fhirBundle });
+  // Default to first model if none selected
+  const currentModel = selectedModel || availableModels[0];
+
+  if (!currentModel) {
+    throw new Error('No AI models available');
+  }
 
   const hasMessages = messages.length > 0;
 
@@ -60,9 +91,24 @@ export function AIChat({
     e.preventDefault();
     if (!inputValue.trim() || isLoading) return;
 
-    await sendMessage(inputValue);
-    setInputValue('');
-    inputRef.current?.focus();
+    // Call parent's send message handler
+    if (onSendMessage) {
+      await onSendMessage(inputValue);
+      setInputValue('');
+      inputRef.current?.focus();
+    }
+  };
+
+  const handleClearChat = () => {
+    if (onClearChat) {
+      onClearChat();
+    }
+  };
+
+  const handleModelChange = (model: AIModel) => {
+    if (onModelChange) {
+      onModelChange(model);
+    }
   };
 
   const getPlaceholder = () => {
@@ -111,9 +157,9 @@ export function AIChat({
           onSubmit={handleSubmit}
           placeholder={getPlaceholder()}
           disabled={isLoading}
-          selectedModel={selectedModel}
+          selectedModel={currentModel}
           availableModels={availableModels}
-          onModelChange={setSelectedModel}
+          onModelChange={handleModelChange}
           leftFooterContent={leftFooterContent}
         />
       </div>
@@ -126,7 +172,7 @@ export function AIChat({
       <LayoutSlot slot="header">
         <div className="flex justify-between items-center p-3 rounded-lg">
           <div className="flex gap-3">
-            <Button onClick={clearChat}>Clear Chat</Button>
+            <Button onClick={handleClearChat}>Clear Chat</Button>
           </div>
         </div>
       </LayoutSlot>
@@ -151,10 +197,18 @@ export function AIChat({
         </div>
 
         {/* Scrollable messages area*/}
-        <div className="flex-1">
+        <div className="flex-1 overflow-auto">
           <div>
             {messages.map(message => (
-              <ChatMessage key={message.id} message={message} />
+              <ChatMessage
+                key={message.id}
+                message={{
+                  id: message.id,
+                  role: message.role,
+                  content: message.content,
+                  timestamp: message.timestamp,
+                }}
+              />
             ))}
             {isLoading && (
               <div className="flex gap-3 p-4">
@@ -162,7 +216,7 @@ export function AIChat({
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 </div>
                 <div className="flex-1">
-                  <span className="font-semibold text-sm text-gray-900">{selectedModel.name}</span>
+                  <span className="font-semibold text-sm text-gray-900">{currentModel.name}</span>
                   <p className="text-gray-600 text-sm mt-1">Thinking...</p>
                 </div>
               </div>
@@ -179,9 +233,9 @@ export function AIChat({
             onSubmit={handleSubmit}
             placeholder={getPlaceholder()}
             disabled={isLoading}
-            selectedModel={selectedModel}
+            selectedModel={currentModel}
             availableModels={availableModels}
-            onModelChange={setSelectedModel}
+            onModelChange={handleModelChange}
             leftFooterContent={leftFooterContent}
           />
         </div>

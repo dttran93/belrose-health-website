@@ -5,7 +5,6 @@ import DesktopSidebar from '@/components/app/DesktopSidebar';
 import MobileSidebar from '@/components/app/MobileSidebar';
 import MobileHeader from '@/components/app/MobileHeader';
 import ResizeHandle from '@/components/ui/ResizeHandle';
-import AIChatPanel from '@/features/Ai/components/AIChatPanel';
 import useMediaQuery from '@/hooks/useMediaQuery';
 import { healthRecords, healthCategories } from '@/components/app/navigation';
 import { useAuthContext } from '@/features/Auth/AuthContext';
@@ -92,28 +91,15 @@ function AppLayout({ children }: AppLayoutProps) {
         {/* Main Content Area */}
         <div className="flex flex-col flex-1 overflow-hidden">
           {/* Conditional Header */}
-          {header && <div className="bg-white shadow-sm">{header}</div>}
+          {header && <div>{header}</div>}
 
           {/* Content and AI Panel */}
           <div className="flex flex-1 overflow-hidden">
             <main className="flex-1 overflow-auto">{children}</main>
-
-            {/* Resize Handle */}
-            {isAIOpen && !isAIFullscreen && <ResizeHandle onResize={handleAIPanelResize} />}
-
-            {/* AI Panel */}
-            <AIChatPanel
-              isOpen={isAIOpen}
-              onToggle={() => setIsAIOpen(!isAIOpen)}
-              width={aiPanelWidth}
-              onWidthChange={setAIPanelWidth}
-              isFullscreen={isAIFullscreen}
-              onFullscreenToggle={() => setIsAIFullscreen(!isAIFullscreen)}
-            />
           </div>
 
           {/* Conditional Footer */}
-          {footer && <div className="border-t border-gray-200 bg-white shadow-sm">{footer}</div>}
+          {footer && <div>{footer}</div>}
         </div>
       </div>
     );
@@ -153,14 +139,6 @@ function AppLayout({ children }: AppLayoutProps) {
         ) : (
           <>
             <main className="flex-1 p-6 overflow-auto lg:block hidden">{children}</main>
-            <AIChatPanel
-              isOpen={isAIOpen}
-              onToggle={() => setIsAIOpen(!isAIOpen)}
-              width={aiPanelWidth}
-              onWidthChange={setAIPanelWidth}
-              isFullscreen={true} // Always fullscreen on mobile
-              onFullscreenToggle={() => setIsAIFullscreen(!isAIFullscreen)}
-            />
           </>
         )}
       </div>

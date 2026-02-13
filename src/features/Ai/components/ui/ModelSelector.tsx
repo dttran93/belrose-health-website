@@ -10,10 +10,11 @@ interface ModelSelectorProps {
 export interface AIModel {
   id: string;
   name: string;
+  description: string;
   provider: AIProvider;
 }
 
-export type AIProvider = 'claude' | 'openai' | 'gemini' | 'deepseek';
+export type AIProvider = 'anthropic' | 'openai' | 'google' | 'deepseek';
 
 export function ModelSelector({
   selectedModel,

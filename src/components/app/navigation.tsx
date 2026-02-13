@@ -19,17 +19,17 @@ export interface NavigationItem {
 }
 
 export const healthRecords: NavigationItem[] = [
-  { title: 'Admin Dashboard', url: '/dashboard/blockchain-admin', icon: Link },
-  { title: 'Overview', url: '/dashboard', icon: Activity },
-  { title: 'All Records', url: '/dashboard/all-records', icon: Clipboard },
-  { title: 'Add Record', url: '/dashboard/add-record', icon: FilePlus2 },
-  { title: 'HashTester', url: '/dashboard/hash-tester', icon: Hash },
+  { title: 'Admin Dashboard', url: '/app/blockchain-admin', icon: Link },
+  { title: 'Home', url: '/app', icon: Activity },
+  { title: 'All Records', url: '/app/all-records', icon: Clipboard },
+  { title: 'Add Record', url: '/app/add-record', icon: FilePlus2 },
+  { title: 'HashTester', url: '/app/hash-tester', icon: Hash },
 ];
 
 export const healthCategories: NavigationItem[] = [
-  { title: 'Exercise', url: '/dashboard/exercise', icon: Flame },
-  { title: 'Heart', url: '/dashboard/heart', icon: Heart },
-  { title: 'Body Measurements', url: '/dashboard/bodymeasurements', icon: PersonStanding },
-  { title: 'Mental Health', url: '/dashboard/mentalhealth', icon: Smile },
-  { title: 'Other Data', url: '/dashboard/otherdata', icon: CircleEllipsisIcon },
+  { title: 'Exercise', url: '/app/exercise', icon: Flame },
+  { title: 'Heart', url: '/app/heart', icon: Heart },
+  { title: 'Body Measurements', url: '/app/bodymeasurements', icon: PersonStanding },
+  { title: 'Mental Health', url: '/app/mentalhealth', icon: Smile },
+  { title: 'Other Data', url: '/app/otherdata', icon: CircleEllipsisIcon },
 ];
