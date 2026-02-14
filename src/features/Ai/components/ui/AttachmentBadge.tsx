@@ -1,6 +1,7 @@
 // src/features/Ai/components/ui/AttachmentBadge.tsx
 
-import { File, FileText, ImageIcon, Video, X } from 'lucide-react';
+import { File, X } from 'lucide-react';
+import { useState } from 'react';
 
 interface AttachmentBadgeProps {
   file: File;
@@ -8,81 +9,77 @@ interface AttachmentBadgeProps {
 }
 
 const AttachmentBadge = ({ file, onRemove }: AttachmentBadgeProps) => {
-  const { icon, label, bgColor, textColor } = getFileDisplay(file);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/');
+  const mimeLabel = getMimeTypeLabel(file.type);
+
+  // Generate thumbnail for images/videos
+  if (isMedia && !thumbnailUrl) {
+    const url = URL.createObjectURL(file);
+    setThumbnailUrl(url);
+  }
 
   return (
-    <div
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${bgColor} ${textColor} text-xs font-medium`}
-    >
-      {icon}
-      <span className="max-w-[120px] truncate">{label}</span>
+    <div className="relative inline-flex flex-col w-32 rounded-lg border border-gray-200 bg-white overflow-hidden group">
+      {/* Remove button - shows on hover */}
       <button
         type="button"
         onClick={onRemove}
-        className="hover:opacity-70 transition-opacity"
+        className="absolute top-1 right-1 z-10 p-1 rounded-full bg-gray-900/70 text-white opacity-0 group-hover:opacity-100 transition-opacity"
         aria-label="Remove attachment"
       >
-        <X className="w-3.5 h-3.5" />
+        <X className="w-3 h-3" />
       </button>
+
+      {isMedia ? (
+        // Image/Video thumbnail
+        <>
+          {file.type.startsWith('image/') ? (
+            <img src={thumbnailUrl || ''} alt={file.name} className="w-full h-24 object-cover" />
+          ) : (
+            <video src={thumbnailUrl || ''} className="w-full h-24 object-cover" />
+          )}
+          <div className="px-2 py-1.5 text-xs text-gray-600 border-t border-gray-200">
+            {mimeLabel}
+          </div>
+        </>
+      ) : (
+        // Document/text-based files
+        <div className="flex flex-col h-full">
+          <div className="flex-1 flex items-center justify-center p-3 bg-gray-50">
+            <File className="w-8 h-8 text-gray-400" />
+          </div>
+          <div className="px-2 py-1.5 border-t border-gray-200">
+            <div className="text-xs font-medium text-gray-900 truncate" title={file.name}>
+              {file.name}
+            </div>
+            <div className="text-xs text-gray-500 mt-0.5">{mimeLabel}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-// Helper to determine icon and styling based on file type
-function getFileDisplay(file: File) {
-  const extension = file.name.split('.').pop()?.toUpperCase() || 'FILE';
-
-  if (file.type.startsWith('image/')) {
-    return {
-      icon: <ImageIcon className="w-3.5 h-3.5" />,
-      label: extension,
-      bgColor: 'bg-blue-100',
-      textColor: 'text-blue-700',
-    };
-  }
-
-  if (file.type.startsWith('video/')) {
-    return {
-      icon: <Video className="w-3.5 h-3.5" />,
-      label: extension,
-      bgColor: 'bg-purple-100',
-      textColor: 'text-purple-700',
-    };
-  }
-
-  if (file.type.includes('pdf')) {
-    return {
-      icon: <FileText className="w-3.5 h-3.5" />,
-      label: 'PDF',
-      bgColor: 'bg-red-100',
-      textColor: 'text-red-700',
-    };
-  }
-
-  if (file.type.includes('word') || extension === 'DOCX' || extension === 'DOC') {
-    return {
-      icon: <FileText className="w-3.5 h-3.5" />,
-      label: 'DOCX',
-      bgColor: 'bg-blue-100',
-      textColor: 'text-blue-700',
-    };
-  }
-
-  if (extension === 'TXT') {
-    return {
-      icon: <FileText className="w-3.5 h-3.5" />,
-      label: 'TXT',
-      bgColor: 'bg-gray-100',
-      textColor: 'text-gray-700',
-    };
-  }
-
-  return {
-    icon: <File className="w-3.5 h-3.5" />,
-    label: extension,
-    bgColor: 'bg-gray-100',
-    textColor: 'text-gray-700',
+// Convert MIME type to readable label
+function getMimeTypeLabel(mimeType: string): string {
+  const mimeMap: Record<string, string> = {
+    'application/pdf': 'PDF',
+    'application/msword': 'DOC',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
+    'application/vnd.ms-excel': 'XLS',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'XLSX',
+    'application/vnd.ms-powerpoint': 'PPT',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PPTX',
+    'text/plain': 'TXT',
+    'image/jpeg': 'JPEG',
+    'image/png': 'PNG',
+    'image/gif': 'GIF',
+    'video/mp4': 'MP4',
+    'video/quicktime': 'MOV',
   };
+
+  return mimeMap[mimeType] || mimeType.split('/')[1]?.toUpperCase() || 'FILE';
 }
 
 export default AttachmentBadge;
