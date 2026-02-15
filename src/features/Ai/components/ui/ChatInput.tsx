@@ -1,7 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Send, Plus } from 'lucide-react';
+import React, { ClipboardEvent, useEffect, useRef } from 'react';
+import { Send, Plus, CornerDownLeft } from 'lucide-react';
 import { AIModel, ModelSelector } from './ModelSelector';
-import AttachmentBadge from './AttachmentBadge';
+import AttachmentBadge, {
+  ChatAttachment,
+  createPastedTextAttachment,
+  isPastedText,
+} from './AttachmentBadge';
 
 interface ChatInputProps {
   value: string;
@@ -13,16 +17,11 @@ interface ChatInputProps {
   availableModels: AIModel[];
   onModelChange: (model: AIModel) => void;
   leftFooterContent?: React.ReactNode;
-  onFilesAttached?: (files: File[]) => void;
+  attachments: ChatAttachment[];
+  onAttachmentsChange: (attachments: ChatAttachment[]) => void;
   maxFiles?: number;
   acceptedFileTypes?: string;
-  attachedFiles: File[];
-  onFilesChange: (files: File[]) => void;
-}
-
-interface AttachedFile {
-  file: File;
-  id: string;
+  pastedTextThreshold?: number;
 }
 
 export function ChatInput({
@@ -35,16 +34,18 @@ export function ChatInput({
   availableModels,
   onModelChange,
   leftFooterContent,
-  onFilesAttached,
+  attachments,
+  onAttachmentsChange,
   maxFiles = 5,
   acceptedFileTypes = 'image/*,video/*,.pdf,.doc,.docx,.txt',
-  attachedFiles,
-  onFilesChange,
+  pastedTextThreshold = 2500,
 }: ChatInputProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-resize textarea based on content
+  // ============================================================================
+  // AUTO-RESIZE TEXTAREA
+  // ============================================================================
   useEffect(() => {
     const textarea = inputRef.current;
     if (!textarea) return;
@@ -54,6 +55,51 @@ export function ChatInput({
     textarea.style.height = `${newHeight}px`;
   }, [value]);
 
+  // ============================================================================
+  // AUTOMATIC PASTE DETECTION
+  // ============================================================================
+  const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const pastedText = e.clipboardData.getData('text');
+
+    if (pastedText.length > pastedTextThreshold) {
+      e.preventDefault();
+
+      // Create pasted text attachment
+      const pastedAttachment = createPastedTextAttachment(pastedText);
+      onAttachmentsChange([...attachments, pastedAttachment]);
+
+      // Add note to message
+      const prefix = value.trim() ? value + '\n\n' : '';
+      onChange(prefix + '[Pasted text attached]');
+    }
+  };
+
+  // ============================================================================
+  // PASTE INLINE HANDLER
+  // ============================================================================
+  const handlePasteInline = (attachmentId: string) => {
+    const attachment = attachments.find(a => isPastedText(a) && a.id === attachmentId);
+
+    if (!attachment || !isPastedText(attachment)) return;
+
+    // Move content back to textarea
+    const prefix = value.replace('[Pasted text attached]', '').trim();
+    const newValue = prefix ? prefix + '\n\n' + attachment.content : attachment.content;
+    onChange(newValue);
+
+    // Remove the attachment
+    const newAttachments = attachments.filter(a =>
+      isPastedText(a) ? a.id !== attachmentId : true
+    );
+    onAttachmentsChange(newAttachments);
+
+    // Focus textarea
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  // ============================================================================
+  // KEYBOARD HANDLING
+  // ============================================================================
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -61,6 +107,9 @@ export function ChatInput({
     }
   };
 
+  // ============================================================================
+  // FILE ATTACHMENT HANDLING
+  // ============================================================================
   const handleAttachClick = () => {
     fileInputRef.current?.click();
   };
@@ -68,50 +117,84 @@ export function ChatInput({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
 
-    if (attachedFiles.length + files.length > maxFiles) {
+    // Count only file attachments (not pasted text)
+    const fileAttachments = attachments.filter(a => !isPastedText(a));
+
+    if (fileAttachments.length + files.length > maxFiles) {
       alert(`You can only attach up to ${maxFiles} files`);
       return;
     }
 
-    onFilesChange([...attachedFiles, ...files]);
+    // Add files to attachments
+    onAttachmentsChange([...attachments, ...files]);
 
+    // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const handleRemoveFile = (index: number) => {
-    onFilesChange(attachedFiles.filter((_, i) => i !== index));
+  // ============================================================================
+  // REMOVE ATTACHMENT
+  // ============================================================================
+  const handleRemoveAttachment = (attachmentId: string) => {
+    const newAttachments = attachments.filter(a => {
+      if (isPastedText(a)) {
+        return a.id !== attachmentId;
+      } else {
+        return (a as File).name !== attachmentId;
+      }
+    });
+    onAttachmentsChange(newAttachments);
   };
 
+  // ============================================================================
+  // FORM SUBMIT
+  // ============================================================================
   const handleFormSubmit = (e: React.FormEvent) => {
     onSubmit(e);
-    // Parent will clear attachedFiles after successful send
   };
 
+  // ============================================================================
+  // COMPUTED VALUES
+  // ============================================================================
+  const fileAttachmentCount = attachments.filter(a => !isPastedText(a)).length;
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
   return (
     <div className="w-full bg-transparent">
       <div className="mx-auto px-6 py-4">
         <form onSubmit={handleFormSubmit} className="relative">
           <div className="border border-gray-300 rounded-2xl shadow-sm hover:shadow-md focus-within:shadow-md transition-shadow bg-white">
-            {/* Attached Files Display */}
-            {attachedFiles.length > 0 && (
+            {/* Attached Files & Pasted Text Display */}
+            {attachments.length > 0 && (
               <div className="px-4 pt-3 pb-2 flex flex-wrap gap-2">
-                {attachedFiles.map((file, index) => (
-                  <AttachmentBadge
-                    key={`${file.name}-${index}`}
-                    file={file}
-                    onRemove={() => handleRemoveFile(index)}
-                  />
-                ))}
+                {attachments.map((attachment, index) => {
+                  const id = isPastedText(attachment) ? attachment.id : (attachment as File).name;
+
+                  return (
+                    <AttachmentBadge
+                      key={`${id}-${index}`}
+                      attachment={attachment}
+                      onRemove={() => handleRemoveAttachment(id)}
+                      onPasteInline={
+                        isPastedText(attachment) ? () => handlePasteInline(id) : undefined
+                      }
+                    />
+                  );
+                })}
               </div>
             )}
 
+            {/* Textarea with paste detection */}
             <textarea
               ref={inputRef}
               value={value}
               onChange={e => onChange(e.target.value)}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               placeholder={placeholder}
               disabled={disabled}
               className="w-full px-4 pt-4 text-sm bg-transparent resize-none focus:outline-none disabled:bg-gray-50 disabled:cursor-not-allowed rounded-t-2xl overflow-y-auto"
@@ -124,7 +207,7 @@ export function ChatInput({
                 <button
                   type="button"
                   onClick={handleAttachClick}
-                  disabled={disabled || attachedFiles.length >= maxFiles}
+                  disabled={disabled || fileAttachmentCount >= maxFiles}
                   className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Attach files"
                 >

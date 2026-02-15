@@ -7,6 +7,7 @@ import { LayoutSlot } from '@/components/app/LayoutProvider';
 import { Button } from '@/components/ui/Button';
 import { Message } from '../service/chatService';
 import { AIModel } from './ui/ModelSelector';
+import { ChatAttachment } from './ui/AttachmentBadge';
 
 interface AIChatProps {
   healthContext: string | null;
@@ -19,7 +20,7 @@ interface AIChatProps {
   messages?: Message[];
   isLoading?: boolean;
   error?: Error | null;
-  onSendMessage?: (content: string, files?: File[]) => Promise<void>;
+  onSendMessage?: (content: string, attachments?: ChatAttachment[]) => Promise<void>;
   onClearChat?: () => void;
   // Model selection
   selectedModel?: AIModel;
@@ -29,8 +30,8 @@ interface AIChatProps {
   leftFooterContent?: React.ReactNode;
   emptyStateContent?: React.ReactNode;
   onMessagesChange?: (messageCount: number) => void;
-  pendingFiles?: File[];
-  onPendingFilesClear?: () => void;
+  pendingAttachments?: ChatAttachment[];
+  onPendingAttachmentsClear?: () => void;
 }
 
 export const AVAILABLE_MODELS: AIModel[] = [
@@ -62,14 +63,14 @@ export function AIChat({
   leftFooterContent,
   emptyStateContent,
   onMessagesChange,
-  pendingFiles = [],
-  onPendingFilesClear,
+  pendingAttachments = [],
+  onPendingAttachmentsClear,
 }: AIChatProps) {
   const [inputValue, setInputValue] = useState('');
   const [showHeaderShadow, setShowHeaderShadow] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
 
   // Default to first model if none selected
   const currentModel = selectedModel || availableModels[0];
@@ -85,14 +86,14 @@ export function AIChat({
     onMessagesChange?.(messages.length);
   }, [messages.length, onMessagesChange]);
 
-  // When files are dropped, add them to attachments
+  //  When attachments are dropped/pasted, add them
   useEffect(() => {
-    if (pendingFiles.length > 0) {
-      setAttachedFiles(prev => [...prev, ...pendingFiles]);
-      onPendingFilesClear?.();
+    if (pendingAttachments.length > 0) {
+      setAttachments(prev => [...prev, ...pendingAttachments]);
+      onPendingAttachmentsClear?.();
       inputRef.current?.focus();
     }
-  }, [pendingFiles, onPendingFilesClear]);
+  }, [pendingAttachments, onPendingAttachmentsClear]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -105,9 +106,9 @@ export function AIChat({
 
     // Call parent's send message handler
     if (onSendMessage) {
-      await onSendMessage(inputValue, attachedFiles);
+      await onSendMessage(inputValue, attachments);
       setInputValue('');
-      setAttachedFiles([]);
+      setAttachments([]);
       inputRef.current?.focus();
     }
   };
@@ -174,8 +175,8 @@ export function AIChat({
           availableModels={availableModels}
           onModelChange={handleModelChange}
           leftFooterContent={leftFooterContent}
-          attachedFiles={attachedFiles}
-          onFilesChange={setAttachedFiles}
+          attachments={attachments}
+          onAttachmentsChange={setAttachments}
           maxFiles={5}
         />
       </div>
@@ -253,8 +254,8 @@ export function AIChat({
             availableModels={availableModels}
             onModelChange={handleModelChange}
             leftFooterContent={leftFooterContent}
-            attachedFiles={attachedFiles}
-            onFilesChange={setAttachedFiles}
+            attachments={attachments}
+            onAttachmentsChange={setAttachments}
           />
         </div>
       </div>

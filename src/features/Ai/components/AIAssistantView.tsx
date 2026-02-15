@@ -15,6 +15,7 @@ import { SubjectInfo } from '@/features/Ai/components/ui/SubjectList';
 import { ContextSelection } from '@/features/Ai/components/ui/ContextBadge';
 import { ContextSelector } from '@/features/Ai/components/ui/ContextSelector';
 import { Message } from '../service/chatService';
+import { ChatAttachment } from './ui/AttachmentBadge';
 
 // ============================================================================
 // VIEW COMPONENTS
@@ -113,7 +114,7 @@ interface AIHealthAssistantViewProps {
   messages: Message[];
   isLoading: boolean;
   error: Error | null;
-  onSendMessage: (content: string, files?: File[]) => Promise<void>;
+  onSendMessage: (content: string, attachments?: ChatAttachment[]) => Promise<void>;
   onClearChat: () => void;
   selectedModel: AIModel;
   availableModels: AIModel[];
@@ -124,8 +125,8 @@ interface AIHealthAssistantViewProps {
   availableSubjects: SubjectInfo[];
   allRecords: FileObject[];
   getSubjectName: () => string | undefined;
-  pendingFiles?: File[];
-  onPendingFilesClear?: () => void;
+  pendingAttachments?: ChatAttachment[];
+  onPendingAttachmentsClear?: () => void;
 }
 
 /**
@@ -148,8 +149,8 @@ export function AIHealthAssistantView({
   availableSubjects,
   allRecords,
   getSubjectName,
-  pendingFiles,
-  onPendingFilesClear,
+  pendingAttachments,
+  onPendingAttachmentsClear,
 }: AIHealthAssistantViewProps) {
   return (
     <div className="min-h-screen max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -166,8 +167,8 @@ export function AIHealthAssistantView({
           selectedModel={selectedModel}
           availableModels={availableModels}
           onModelChange={onModelChange}
-          pendingFiles={pendingFiles}
-          onPendingFilesClear={onPendingFilesClear}
+          pendingAttachments={pendingAttachments}
+          onPendingAttachmentsClear={onPendingAttachmentsClear}
           contextInfo={{
             type: selectedContext.type,
             subjectName: getSubjectName(),
