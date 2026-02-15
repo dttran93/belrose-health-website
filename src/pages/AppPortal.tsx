@@ -40,6 +40,8 @@ import { ContextBuilder } from '@/features/Ai/service/contextBuilder';
 import { ContextFormatter, MediaPart } from '@/features/Ai/service/contextFormatter';
 import { fileToBase64 } from '@/utils/dataFormattingUtils';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
+import visionExtractionService from '@/features/AddRecord/services/visionExtractionService';
+import textExtractionService from '@/features/AddRecord/services/textExtractionService';
 
 export default function AppPortal() {
   const { user, loading: authLoading } = useAuthContext();
@@ -247,30 +249,154 @@ export default function AppPortal() {
         builder.addPastedText(extractedPastedText, 'Large User Note');
       }
 
-      // Add file attachments if any
+      // Process file attachments with text/vision extraction
       if (files && files.length > 0) {
         console.log(`📎 Processing ${files.length} file(s)...`);
 
         for (const file of files) {
-          const base64 = await fileToBase64(file);
+          console.log(`🔍 Processing: ${file.name} (${file.type})`);
 
-          if (file.type.startsWith('image/')) {
-            builder.addImageAttachment(file.name, {
-              url: base64,
+          try {
+            if (file.type.startsWith('image/')) {
+              // ✅ Use AI Vision for images
+              console.log(`👁️ Extracting text from image using AI Vision...`);
+
+              try {
+                const visionResult = await visionExtractionService.extractImageText(file);
+                const base64 = await fileToBase64(file);
+
+                builder.addImageAttachment(file.name, {
+                  url: base64,
+                  mimeType: file.type,
+                  visualDescription: 'User uploaded image',
+                  extractedText: visionResult.text, // ✅ Include OCR/Vision text
+                  size: file.size,
+                });
+
+                console.log(
+                  `✅ Image processed: ${visionResult.text.length} chars extracted via ${visionResult.method}`
+                );
+              } catch (visionError) {
+                console.warn(
+                  `Vision extraction failed for ${file.name}, adding image without text:`,
+                  visionError
+                );
+
+                // Still add the image for visual analysis, just without text
+                const base64 = await fileToBase64(file);
+                builder.addImageAttachment(file.name, {
+                  url: base64,
+                  mimeType: file.type,
+                  visualDescription: 'User uploaded image (text extraction failed)',
+                  size: file.size,
+                });
+              }
+            } else if (file.type.startsWith('video/')) {
+              // Videos - convert to base64 (Gemini supports, Claude doesn't)
+              console.log(`🎥 Processing video: ${file.name}`);
+              const base64 = await fileToBase64(file);
+
+              builder.addVideoAttachment(base64, 0, {
+                mimeType: file.type,
+                hasAudio: true, // Assume yes, we don't check
+              });
+
+              console.log(
+                `✅ Video processed (note: Claude doesn't support videos, but Gemini does)`
+              );
+            } else {
+              // ✅ Use text extraction service for documents (PDF, DOCX, TXT, etc.)
+              console.log(`📄 Extracting text from document: ${file.name}`);
+
+              try {
+                const extractedText = await textExtractionService.extractText(file);
+
+                let finalText = 'text_extraction';
+                let extractionMethod = 'text_extraction';
+
+                if (
+                  file.type === 'application/pdf' &&
+                  (!extractedText || extractedText.trim().length < 50)
+                ) {
+                  console.log(
+                    `⚠️ PDF has little/no text (${extractedText?.length || 0} chars). Attempting OCR...`
+                  );
+
+                  try {
+                    const ocrText = await extractTextFromPDFViaOCR(file);
+
+                    if (ocrText && ocrText.length > extractedText.length) {
+                      finalText = ocrText;
+                      extractionMethod = 'ocr_fallback';
+                      console.log(
+                        `✅ OCR extracted ${ocrText.length} chars (better than ${extractedText.length})`
+                      );
+                    }
+                  } catch (ocrError) {
+                    console.warn('OCR fallback failed:', ocrError);
+                  }
+                }
+
+                builder.addFileAttachment(file.name, {
+                  mimeType: file.type,
+                  size: file.size,
+                  extractedText: finalText || '[No text could be extracted from this document]',
+                });
+
+                console.log(`✅ Document processed: ${extractedText.length} chars extracted`);
+              } catch (extractionError) {
+                console.error(`Text extraction failed for ${file.name}:`, extractionError);
+
+                // Still add the file with metadata, include error message
+                builder.addFileAttachment(file.name, {
+                  mimeType: file.type,
+                  size: file.size,
+                  extractedText: `[Text extraction failed: ${extractionError instanceof Error ? extractionError.message : 'Unknown error'}. File metadata available but content could not be read.]`,
+                });
+              }
+            }
+          } catch (fileError) {
+            console.error(`Failed to process file ${file.name}:`, fileError);
+
+            // Add a generic error entry for this file
+            builder.addFileAttachment(file.name, {
               mimeType: file.type,
-              visualDescription: 'User uploaded image',
+              size: file.size,
+              extractedText: `[File processing failed: ${fileError instanceof Error ? fileError.message : 'Unknown error'}]`,
             });
-          } else if (file.type.startsWith('video/')) {
-            builder.addVideoAttachment(base64, 0, { mimeType: file.type });
-          } else {
-            builder.addFileAttachment(file.name, { mimeType: file.type, size: file.size });
           }
         }
       }
 
       // Format context for AI
       const collection = builder.build();
+
+      // Debug: Check what we built
+      console.log('📦 Built collection:', {
+        totalItems: collection.totalItems,
+        items: collection.items.map(item => ({
+          type: item.type,
+          id: item.id,
+          hasUrl: 'url' in item ? !!(item as any).url : false,
+          hasExtractedText: 'extractedText' in item ? !!(item as any).extractedText : false,
+          extractedTextLength: 'extractedText' in item ? (item as any).extractedText?.length : 0,
+        })),
+      });
+
       const formatted = ContextFormatter.formatForAI(collection);
+
+      console.log('📊 Formatted context:', {
+        textLength: formatted.text?.length || 0,
+        mediaPartsCount: formatted.mediaParts?.length || 0,
+        firstMediaPart: formatted.mediaParts?.[0]
+          ? {
+              type: formatted.mediaParts[0].type,
+              mimeType: formatted.mediaParts[0].mimeType,
+              hasUrl: !!formatted.mediaParts[0].url,
+              urlLength: formatted.mediaParts[0].url?.length || 0,
+            }
+          : null,
+      });
 
       // ========================================================================
       // STEP 3: Create or update chat
@@ -336,6 +462,19 @@ export default function AppPortal() {
       console.log('  - Health records:', targetRecords.length);
       console.log('  - Files attached:', files?.length || 0);
       console.log('  - Media parts:', formatted.mediaParts?.length || 0);
+      console.log('📊 Context being sent:', {
+        textLength: formatted.text?.length || 0,
+        mediaPartsCount: formatted.mediaParts?.length || 0,
+        firstMediaPart: formatted.mediaParts?.[0]
+          ? {
+              type: formatted.mediaParts[0].type,
+              mimeType: formatted.mediaParts[0].mimeType,
+              hasUrl: !!formatted.mediaParts[0].url,
+              urlLength: formatted.mediaParts[0].url?.length || 0,
+              urlPreview: formatted.mediaParts[0].url?.substring(0, 50),
+            }
+          : null,
+      });
 
       const aiResponse = await callAIBackend(
         finalMessage,
@@ -375,6 +514,81 @@ export default function AppPortal() {
       setIsSendingMessage(false);
     }
   };
+
+  /**
+   * Extract text from scanned PDFs using OCR
+   * Converts PDF pages to images and runs vision/OCR on them
+   */
+  async function extractTextFromPDFViaOCR(file: File): Promise<string> {
+    console.log('🔍 Starting OCR extraction for PDF:', file.name);
+
+    // Load PDF
+    const pdfjsLib = await import('pdfjs-dist');
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    let allText = '';
+    const maxPagesToOCR = 10; // Limit to avoid long processing times
+    const pagesToProcess = Math.min(pdf.numPages, maxPagesToOCR);
+
+    console.log(`📄 OCR processing ${pagesToProcess} of ${pdf.numPages} pages...`);
+
+    for (let pageNum = 1; pageNum <= pagesToProcess; pageNum++) {
+      try {
+        // Get the page
+        const page = await pdf.getPage(pageNum);
+
+        // Render page to canvas
+        const viewport = page.getViewport({ scale: 2.0 }); // Higher scale = better OCR
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+
+        if (!context) {
+          console.warn(`Failed to get canvas context for page ${pageNum}`);
+          continue;
+        }
+
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        await page.render({
+          canvasContext: context,
+          viewport: viewport,
+        }).promise;
+
+        // Convert canvas to blob
+        const blob = await new Promise<Blob>((resolve, reject) => {
+          canvas.toBlob(blob => {
+            if (blob) resolve(blob);
+            else reject(new Error('Canvas to blob conversion failed'));
+          }, 'image/png');
+        });
+
+        // Create File from blob for vision service
+        const imageFile = new File([blob], `page-${pageNum}.png`, { type: 'image/png' });
+
+        // Extract text using vision service
+        console.log(`👁️ Running OCR on page ${pageNum}...`);
+        const visionResult = await visionExtractionService.extractImageText(imageFile);
+
+        if (visionResult.text && visionResult.text.trim().length > 0) {
+          allText += `\n[Page ${pageNum}]\n${visionResult.text}\n`;
+          console.log(`✅ Page ${pageNum}: extracted ${visionResult.text.length} chars`);
+        } else {
+          console.log(`⚠️ Page ${pageNum}: no text found`);
+        }
+      } catch (pageError) {
+        console.error(`Failed to OCR page ${pageNum}:`, pageError);
+        allText += `\n[Page ${pageNum}: OCR failed]\n`;
+      }
+    }
+
+    if (pdf.numPages > maxPagesToOCR) {
+      allText += `\n[Note: Only first ${maxPagesToOCR} of ${pdf.numPages} pages were processed]\n`;
+    }
+
+    return allText.trim();
+  }
 
   /**
    * Load an existing chat's messages

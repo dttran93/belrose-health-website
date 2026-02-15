@@ -19,7 +19,7 @@ interface AIChatProps {
   messages?: Message[];
   isLoading?: boolean;
   error?: Error | null;
-  onSendMessage?: (content: string) => Promise<void>;
+  onSendMessage?: (content: string, files?: File[]) => Promise<void>;
   onClearChat?: () => void;
   // Model selection
   selectedModel?: AIModel;
@@ -49,7 +49,6 @@ export const AVAILABLE_MODELS: AIModel[] = [
 ];
 
 export function AIChat({
-  healthContext,
   className = '',
   contextInfo,
   messages = [],
@@ -106,8 +105,9 @@ export function AIChat({
 
     // Call parent's send message handler
     if (onSendMessage) {
-      await onSendMessage(inputValue);
+      await onSendMessage(inputValue, attachedFiles);
       setInputValue('');
+      setAttachedFiles([]);
       inputRef.current?.focus();
     }
   };

@@ -36,6 +36,18 @@ export class ContextFormatter {
     collection: ContextCollection,
     includeMetadata: boolean = false
   ): FormattedContext {
+    console.log('🔍 ContextFormatter received:', {
+      totalItems: collection.items.length,
+      itemTypes: collection.items.map(i => i.type),
+      images: collection.items
+        .filter(i => i.type === 'image')
+        .map(img => ({
+          id: img.id,
+          hasUrl: !!(img as any).url,
+          urlPreview: (img as any).url?.substring(0, 50),
+        })),
+    });
+
     if (!collection || collection.items.length === 0) {
       return { text: '', mediaParts: [] };
     }

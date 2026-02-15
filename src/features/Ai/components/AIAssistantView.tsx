@@ -113,7 +113,7 @@ interface AIHealthAssistantViewProps {
   messages: Message[];
   isLoading: boolean;
   error: Error | null;
-  onSendMessage: (content: string) => Promise<void>;
+  onSendMessage: (content: string, files?: File[]) => Promise<void>;
   onClearChat: () => void;
   selectedModel: AIModel;
   availableModels: AIModel[];
