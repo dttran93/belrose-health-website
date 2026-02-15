@@ -1,5 +1,6 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useRef } from 'react';
 import { Upload } from 'lucide-react';
+import { useFileDrop } from '@/hooks/useFileDrop';
 
 interface FileUploadZoneProps {
   onFilesSelected: (files: FileList) => void;
@@ -22,6 +23,25 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ✅ Use the hook in bounded mode
+  const { isDragging, dragHandlers } = useFileDrop({
+    onDrop: files => {
+      // Convert File[] to FileList-like object
+      const fileList = {
+        length: files.length,
+        item: (index: number) => files[index] || null,
+        [Symbol.iterator]: function* () {
+          for (let i = 0; i < files.length; i++) {
+            yield files[i];
+          }
+        },
+      } as FileList;
+
+      onFilesSelected(fileList);
+    },
+    global: false, // Bounded to this component only
+  });
+
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -29,23 +49,6 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
-
-  const handleDrag = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        onFilesSelected(e.dataTransfer.files);
-      }
-    },
-    [onFilesSelected]
-  );
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -55,13 +58,14 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
 
   return (
     <div
-      className={`border-2 border-dashed border-gray-300 rounded-lg text-center hover:border-complement-1 transition-colors cursor-pointer ${
+      {...dragHandlers} // ✅ Spread drag handlers
+      className={`border-2 border-dashed rounded-lg text-center transition-colors cursor-pointer ${
         compact ? 'p-4' : 'p-8'
+      } ${
+        isDragging
+          ? 'border-blue-500 bg-blue-50' // ✅ Visual feedback when dragging
+          : 'border-gray-300 hover:border-complement-1'
       }`}
-      onDragEnter={handleDrag}
-      onDragLeave={handleDrag}
-      onDragOver={handleDrag}
-      onDrop={handleDrop}
       onClick={() => fileInputRef.current?.click()}
     >
       <input
@@ -73,7 +77,11 @@ const FileUploadZone: React.FC<FileUploadZoneProps> = ({
         className="hidden"
       />
 
-      <Upload className={`mx-auto text-gray-400 mb-4 ${compact ? 'h-8 w-8' : 'h-12 w-12'}`} />
+      <Upload
+        className={`mx-auto mb-4 ${compact ? 'h-8 w-8' : 'h-12 w-12'} ${
+          isDragging ? 'text-blue-500' : 'text-gray-400'
+        }`}
+      />
 
       <h3 className={`font-medium text-gray-900 mb-2 ${compact ? 'text-base' : 'text-lg'}`}>
         {title}

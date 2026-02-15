@@ -42,6 +42,8 @@ import { fileToBase64 } from '@/utils/dataFormattingUtils';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 import visionExtractionService from '@/features/AddRecord/services/visionExtractionService';
 import textExtractionService from '@/features/AddRecord/services/textExtractionService';
+import { useFileDrop } from '@/hooks/useFileDrop';
+import { FileDragOverlay } from '@/components/ui/FileDragOverlay';
 
 export default function AppPortal() {
   const { user, loading: authLoading } = useAuthContext();
@@ -83,68 +85,12 @@ export default function AppPortal() {
   });
 
   // Drag and Drop state
-  const [isDragging, setIsDragging] = useState(false);
-  const dragCounterRef = useRef(0);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
-  // ============================================================================
-  // DRAG AND DROP HANDLERS
-  // ============================================================================
-
-  useEffect(() => {
-    const handleDragEnter = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      dragCounterRef.current++;
-
-      if (e.dataTransfer?.types.includes('Files')) {
-        setIsDragging(true);
-      }
-    };
-
-    const handleDragLeave = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      dragCounterRef.current--;
-
-      if (dragCounterRef.current === 0) {
-        setIsDragging(false);
-      }
-    };
-
-    const handleDragOver = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-    };
-
-    const handleDrop = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      setIsDragging(false);
-      dragCounterRef.current = 0;
-
-      const files = Array.from(e.dataTransfer?.files || []);
-      if (files.length > 0) {
-        setPendingFiles(files);
-      }
-    };
-
-    // Add listeners to window for global drag detection
-    window.addEventListener('dragenter', handleDragEnter);
-    window.addEventListener('dragleave', handleDragLeave);
-    window.addEventListener('dragover', handleDragOver);
-    window.addEventListener('drop', handleDrop);
-
-    return () => {
-      window.removeEventListener('dragenter', handleDragEnter);
-      window.removeEventListener('dragleave', handleDragLeave);
-      window.removeEventListener('dragover', handleDragOver);
-      window.removeEventListener('drop', handleDrop);
-    };
-  }, []);
+  const { isDragging } = useFileDrop({
+    onDrop: setPendingFiles,
+    global: true,
+  });
 
   // ============================================================================
   // DATA FETCHING
@@ -767,35 +713,7 @@ export default function AppPortal() {
   return (
     <div className="relative h-full">
       {/* Drag & Drop Overlay */}
-      {isDragging && (
-        <div className="fixed inset-0 z-50 bg-blue-500/10 backdrop-blur-sm flex items-center justify-center pointer-events-none">
-          <div className="bg-white rounded-2xl shadow-2xl p-12 border-2 border-blue-500 border-dashed">
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center">
-                <svg
-                  className="w-10 h-10 text-blue-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                  />
-                </svg>
-              </div>
-              <div className="text-center">
-                <h3 className="text-xl font-semibold text-gray-900 mb-1">Drop files to attach</h3>
-                <p className="text-sm text-gray-600">
-                  Images, videos, PDFs, and documents supported
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <FileDragOverlay isDragging={isDragging} />
 
       <AIHealthAssistantView
         user={user}
