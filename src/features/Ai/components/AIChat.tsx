@@ -6,7 +6,7 @@ import { ChatInput } from './ui/ChatInput';
 import { LayoutSlot } from '@/components/app/LayoutProvider';
 import { Button } from '@/components/ui/Button';
 import { Message } from '../service/chatService';
-import { AIModel } from './ui/ModelSelector';
+import { AIModel, AVAILABLE_MODELS } from './ui/ModelSelector';
 import { ChatAttachment } from './ui/AttachmentBadge';
 
 interface AIChatProps {
@@ -32,22 +32,8 @@ interface AIChatProps {
   onMessagesChange?: (messageCount: number) => void;
   pendingAttachments?: ChatAttachment[];
   onPendingAttachmentsClear?: () => void;
+  onStop?: () => void; // New prop for stopping generation
 }
-
-export const AVAILABLE_MODELS: AIModel[] = [
-  {
-    id: 'claude-sonnet-4-5-20250929',
-    name: 'Claude Sonnet 4.5',
-    provider: 'anthropic',
-    description: "Anthropic's best combination of speed and intelligence",
-  },
-  {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash',
-    provider: 'google',
-    description: 'Fast and affordable',
-  },
-];
 
 export function AIChat({
   className = '',
@@ -65,6 +51,7 @@ export function AIChat({
   onMessagesChange,
   pendingAttachments = [],
   onPendingAttachmentsClear,
+  onStop,
 }: AIChatProps) {
   const [inputValue, setInputValue] = useState('');
   const [showHeaderShadow, setShowHeaderShadow] = useState(false);
@@ -178,6 +165,8 @@ export function AIChat({
           attachments={attachments}
           onAttachmentsChange={setAttachments}
           maxFiles={5}
+          isLoading={isLoading}
+          onStop={onStop}
         />
       </div>
     );
@@ -256,6 +245,8 @@ export function AIChat({
             leftFooterContent={leftFooterContent}
             attachments={attachments}
             onAttachmentsChange={setAttachments}
+            isLoading={isLoading}
+            onStop={onStop}
           />
         </div>
       </div>

@@ -21,11 +21,12 @@ import {
   ErrorView,
   NoRecordsView,
 } from '@/features/Ai/components/AIAssistantView';
-import { AVAILABLE_MODELS } from '@/features/Ai/components/AIChat';
+import { AVAILABLE_MODELS } from '@/features/Ai/components/ui/ModelSelector';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 import { useAIChat } from '@/features/Ai/hooks/useAIChat';
 import { useFileDrop } from '@/hooks/useFileDrop';
 import { FileDragOverlay } from '@/components/ui/FileDragOverlay';
+import { ChatAttachment } from '@/features/Ai/components/ui/AttachmentBadge';
 
 export default function AppPortal() {
   const { user, loading: authLoading } = useAuthContext();
@@ -62,8 +63,8 @@ export default function AppPortal() {
     description: 'Your health records',
   });
 
-  // Pending files from drag & drop
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  // ✅ Updated: Use VirtualAttachment[] instead of File[]
+  const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
 
   // ============================================================================
   // HOOKS
@@ -71,7 +72,9 @@ export default function AppPortal() {
 
   // Drag and drop
   const { isDragging } = useFileDrop({
-    onDrop: setPendingFiles,
+    onDrop: (files: File[]) => {
+      setPendingAttachments(files as ChatAttachment[]);
+    },
     global: true,
   });
 
@@ -202,8 +205,9 @@ export default function AppPortal() {
         availableSubjects={availableSubjects}
         allRecords={allRecords}
         getSubjectName={getSubjectName}
-        pendingFiles={pendingFiles}
-        onPendingFilesClear={() => setPendingFiles([])}
+        pendingAttachments={pendingAttachments}
+        onPendingAttachmentsClear={() => setPendingAttachments([])}
+        onStop={chat.handleStopGeneration}
       />
     </div>
   );

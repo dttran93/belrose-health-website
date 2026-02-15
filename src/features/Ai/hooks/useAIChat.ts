@@ -12,7 +12,7 @@
  * - AI backend communication
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Timestamp } from 'firebase/firestore';
 import { BelroseUserProfile, FileObject } from '@/types/core';
 import { ContextSelection } from '@/features/Ai/components/ui/ContextBadge';
@@ -49,6 +49,7 @@ interface UseAIChatReturn {
   handleSendMessage: (messageContent: string, attachments?: ChatAttachment[]) => Promise<void>;
   handleLoadChat: (chatId: string) => Promise<void>;
   handleNewChat: () => void;
+  handleStopGeneration: () => void;
 }
 
 export function useAIChat({
@@ -66,6 +67,7 @@ export function useAIChat({
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [chatError, setChatError] = useState<Error | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // ============================================================================
   // HELPER: OCR FOR SCANNED PDFs
@@ -185,6 +187,7 @@ export function useAIChat({
               mediaParts: mediaParts,
               conversationHistory,
             }),
+            signal: abortControllerRef.current?.signal,
           }
         );
 
@@ -199,6 +202,11 @@ export function useAIChat({
         // Step 4: Return AI's response text
         return data.response;
       } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.log('🛑 AI request cancelled by user');
+          throw new Error('Request cancelled');
+        }
+
         console.error('❌ AI Backend Error:', error);
         throw error instanceof Error
           ? error
@@ -218,6 +226,8 @@ export function useAIChat({
   const handleSendMessage = useCallback(
     async (messageContent: string, attachments?: ChatAttachment[]) => {
       if (!user || !messageContent.trim()) return;
+
+      abortControllerRef.current = new AbortController();
 
       setIsSendingMessage(true);
       setChatError(null);
@@ -480,10 +490,14 @@ export function useAIChat({
 
         console.log('✅ Message exchange complete');
       } catch (error) {
-        console.error('❌ Failed to send message:', error);
-        setChatError(error instanceof Error ? error : new Error('Failed to send message'));
+        // ✅ Only show error if not cancelled
+        if (error instanceof Error && error.message !== 'Request cancelled') {
+          console.error('❌ Failed to send message:', error);
+          setChatError(error instanceof Error ? error : new Error('Failed to send message'));
+        }
       } finally {
         setIsSendingMessage(false);
+        abortControllerRef.current = null;
       }
     },
     [
@@ -538,6 +552,21 @@ export function useAIChat({
   }, []);
 
   // ============================================================================
+  // ACTION: STOP AI RESPONSE GENERATION
+  // ============================================================================
+
+  /**
+   * Stop the current AI response generation
+   */
+  const handleStopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      console.log('🛑 Stopping AI generation...');
+      abortControllerRef.current.abort();
+      setIsSendingMessage(false);
+    }
+  }, []);
+
+  // ============================================================================
   // RETURN
   // ============================================================================
 
@@ -553,5 +582,6 @@ export function useAIChat({
     handleSendMessage,
     handleLoadChat,
     handleNewChat,
+    handleStopGeneration,
   };
 }

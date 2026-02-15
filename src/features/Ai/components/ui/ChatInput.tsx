@@ -1,5 +1,5 @@
 import React, { ClipboardEvent, useEffect, useRef } from 'react';
-import { Send, Plus, CornerDownLeft } from 'lucide-react';
+import { Send, Plus, CircleStop } from 'lucide-react';
 import { AIModel, ModelSelector } from './ModelSelector';
 import AttachmentBadge, {
   ChatAttachment,
@@ -22,6 +22,8 @@ interface ChatInputProps {
   maxFiles?: number;
   acceptedFileTypes?: string;
   pastedTextThreshold?: number;
+  isLoading: boolean;
+  onStop?: () => void;
 }
 
 export function ChatInput({
@@ -39,6 +41,8 @@ export function ChatInput({
   maxFiles = 5,
   acceptedFileTypes = 'image/*,video/*,.pdf,.doc,.docx,.txt',
   pastedTextThreshold = 2500,
+  isLoading,
+  onStop,
 }: ChatInputProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -104,6 +108,13 @@ export function ChatInput({
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       onSubmit(e);
+    }
+
+    // ✅ Escape key stops generation
+    if (e.key === 'Escape' && isLoading && onStop) {
+      e.preventDefault();
+      onStop();
+      return;
     }
   };
 
@@ -207,7 +218,7 @@ export function ChatInput({
                 <button
                   type="button"
                   onClick={handleAttachClick}
-                  disabled={disabled || fileAttachmentCount >= maxFiles}
+                  disabled={disabled || fileAttachmentCount >= maxFiles || isLoading}
                   className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Attach files"
                 >
@@ -222,15 +233,24 @@ export function ChatInput({
                   selectedModel={selectedModel}
                   availableModels={availableModels}
                   onModelChange={onModelChange}
-                  disabled={disabled}
+                  disabled={disabled || isLoading}
                 />
-                <button
-                  type="submit"
-                  disabled={!value.trim() || disabled}
-                  className="p-2 bg-destructive text-white rounded-lg hover:bg-destructive/50 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors active:scale-95"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
+                {isLoading ? (
+                  <button
+                    onClick={onStop}
+                    className="p-2 bg-destructive text-white rounded-lg hover:bg-destructive/50 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors active:scale-95"
+                  >
+                    <CircleStop className="w-5 h-5" />
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={!value.trim() || disabled}
+                    className="p-2 bg-destructive text-white rounded-lg hover:bg-destructive/50 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors active:scale-95"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                )}
               </div>
             </div>
           </div>

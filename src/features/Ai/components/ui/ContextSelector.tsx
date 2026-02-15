@@ -1,6 +1,6 @@
 // src/features/AIChat/components/ContextSelector.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, FileText, Users, FolderOpen, Settings } from 'lucide-react';
 import { SubjectInfo, SubjectList } from './SubjectList';
 import { RecordPicker } from './RecordPicker';
@@ -26,6 +26,21 @@ export function ContextSelector({
 }: ContextSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showRecordPicker, setShowRecordPicker] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // ✅ Determine if dropdown should open upward or downward
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const buttonRect = buttonRef.current.getBoundingClientRect();
+      const dropdownHeight = 400; // Approximate max height of dropdown
+      const spaceBelow = window.innerHeight - buttonRect.bottom;
+      const spaceAbove = buttonRect.top;
+
+      // Open upward if more space above or insufficient space below
+      setOpenUpward(spaceBelow < dropdownHeight && spaceAbove > spaceBelow);
+    }
+  }, [isOpen]);
 
   const getContextLabel = () => {
     const count = selectedContext.recordCount;
@@ -94,8 +109,11 @@ export function ContextSelector({
     <>
       <div className={`relative ${className}`}>
         <button
+          ref={buttonRef}
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+          className={`flex items-center gap-2 px-2 py-2 rounded-lg transition-colors ${
+            isOpen ? 'bg-gray-100' : 'hover:bg-gray-50'
+          }`}
         >
           <FileText className="w-4 h-4 text-gray-600" />
           <span className="text-sm font-medium text-gray-700">{getContextLabel()}</span>
@@ -109,8 +127,12 @@ export function ContextSelector({
             {/* Backdrop */}
             <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
 
-            {/* Dropdown Menu */}
-            <div className="absolute top-full left-0 mt-2 w-96 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
+            {/* Dropdown Menu - positioned based on available space */}
+            <div
+              className={`absolute left-0 w-96 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden ${
+                openUpward ? 'bottom-full mb-2' : 'top-full mt-2'
+              }`}
+            >
               <div className="p-3 border-b bg-gray-50">
                 <h3 className="text-sm font-semibold text-gray-900">Select Records Context</h3>
                 <p className="text-xs text-gray-600 mt-0.5">
@@ -120,7 +142,7 @@ export function ContextSelector({
 
               <div className="max-h-96 overflow-y-auto">
                 {/* Subject List */}
-                <div className="p-3">
+                <div className="p-1">
                   <SubjectList
                     subjects={availableSubjects}
                     selectedSubjectId={
@@ -134,10 +156,10 @@ export function ContextSelector({
                 </div>
 
                 {/* Divider */}
-                <div className="border-t border-gray-200 my-2" />
+                <div className="border-t border-gray-200 m-1" />
 
                 {/* All Accessible Records */}
-                <div className="px-3 pb-3">
+                <div className="px-1 pb-1">
                   <button
                     onClick={handleSelectAllAccessible}
                     className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors ${
@@ -173,10 +195,10 @@ export function ContextSelector({
                 </div>
 
                 {/* Divider */}
-                <div className="border-t border-gray-200 my-2" />
+                <div className="border-t border-gray-200 m-1" />
 
                 {/* Specific Records Picker */}
-                <div className="px-3 pb-3">
+                <div className="px-1 pb-1">
                   <button
                     onClick={handleOpenRecordPicker}
                     className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors ${

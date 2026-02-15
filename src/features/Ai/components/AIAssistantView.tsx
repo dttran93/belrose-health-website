@@ -127,6 +127,7 @@ interface AIHealthAssistantViewProps {
   getSubjectName: () => string | undefined;
   pendingAttachments?: ChatAttachment[];
   onPendingAttachmentsClear?: () => void;
+  onStop: () => void;
 }
 
 /**
@@ -151,6 +152,7 @@ export function AIHealthAssistantView({
   getSubjectName,
   pendingAttachments,
   onPendingAttachmentsClear,
+  onStop,
 }: AIHealthAssistantViewProps) {
   return (
     <div className="min-h-screen max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -201,6 +203,7 @@ export function AIHealthAssistantView({
             // Could track analytics here
             console.log('Message count changed:', messageCount);
           }}
+          onStop={onStop}
         />
       </div>
 
