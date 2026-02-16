@@ -1,42 +1,41 @@
-// src/features/ViewEditRecord/hooks/useAllUserRecords.ts
+// src/features/ViewEditRecord/hooks/useUserRecords.ts
 
-import { useState, useEffect } from 'react';
-import {
-  getFirestore,
-  collection,
-  query,
-  orderBy,
-  onSnapshot,
-  QuerySnapshot,
-  DocumentData,
-  where,
-  or,
-} from 'firebase/firestore';
 import { FileObject } from '@/types/core';
-import mapFirestoreToFileObject from '@/features/ViewEditRecord/utils/firestoreMapping';
-import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
+import {
+  collection,
+  DocumentData,
+  getFirestore,
+  onSnapshot,
+  or,
+  orderBy,
+  query,
+  QuerySnapshot,
+  where,
+} from 'firebase/firestore';
+import { useEffect, useState } from 'react';
+import mapFirestoreToFileObject from '../utils/firestoreMapping';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { toast } from 'sonner';
+import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 
-interface UseAllUserRecordsReturn {
+export type RecordFilterType = 'all' | 'subject' | 'owner' | 'uploaded';
+
+interface RecordFilters {
+  filterType: RecordFilterType;
+  subjectId?: string; // Optional specific subject to filter by
+}
+
+interface UseUserRecordsReturn {
   records: FileObject[];
   loading: boolean;
   error: Error | null;
   refetchRecords: () => void;
 }
 
-/**
- * Hook to fetch all records accessible to the current user
- *
- * This includes:
- * - Records uploaded by the user (uploadedBy === userId)
- * - Records where the user is in the owners array
- * - Records where the user is the administrators array
- *
- * Now queries from the GLOBAL 'records' collection instead of user-specific subcollections
- * Also handles decryption of encrypted records
- */
-export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
+export const useUserRecords = (
+  userId?: string,
+  filters: RecordFilters = { filterType: 'all' }
+): UseUserRecordsReturn => {
   const [records, setRecords] = useState<FileObject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -53,88 +52,113 @@ export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
       return;
     }
 
-    console.log('🔍 Setting up real-time listener for records accessible to user:', userId);
+    const { filterType, subjectId } = filters;
+
+    console.log(
+      `🔍 Fetching ${filterType} records for user:`,
+      userId,
+      subjectId ? `(subject: ${subjectId})` : ''
+    );
     setLoading(true);
     setError(null);
 
     const db = getFirestore();
-
-    // Query the GLOBAL records collection
     const recordsRef = collection(db, 'records');
 
-    const q = query(
-      recordsRef,
-      or(
-        where('uploadedBy', '==', userId),
-        where('owners', 'array-contains', userId),
-        where('administrators', 'array-contains', userId),
-        where('viewers', 'array-contains', userId),
-        where('subjects', 'array-contains', userId)
-      ),
-      orderBy('uploadedAt', 'desc')
-    );
+    let q;
 
-    console.log('📡 Query created for global records collection with composite ownership filter');
+    switch (filterType) {
+      case 'subject':
+        // If subjectId is provided, filter by that specific subject
+        // Otherwise, filter by current user as subject
+        const targetSubjectId = subjectId || userId;
+        q = query(
+          recordsRef,
+          where('subjects', 'array-contains', targetSubjectId),
+          orderBy('uploadedAt', 'desc')
+        );
+        break;
 
-    // Set up real-time listener
+      case 'owner':
+        q = query(
+          recordsRef,
+          where('owners', 'array-contains', userId),
+          orderBy('uploadedAt', 'desc')
+        );
+        break;
+
+      case 'uploaded':
+        q = query(recordsRef, where('uploadedBy', '==', userId), orderBy('uploadedAt', 'desc'));
+        break;
+
+      case 'all':
+      default:
+        q = query(
+          recordsRef,
+          or(
+            where('uploadedBy', '==', userId),
+            where('owners', 'array-contains', userId),
+            where('administrators', 'array-contains', userId),
+            where('viewers', 'array-contains', userId),
+            where('subjects', 'array-contains', userId)
+          ),
+          orderBy('uploadedAt', 'desc')
+        );
+    }
+
     const unsubscribe = onSnapshot(
       q,
       async (snapshot: QuerySnapshot<DocumentData>) => {
-        console.log(`📦 Received ${snapshot.docs.length} records from global collection`);
+        console.log(`📦 Received ${snapshot.docs.length} records`);
 
         try {
           const accessibleRecords: FileObject[] = snapshot.docs.map(doc => {
             const data = doc.data();
-
-            // Use shared mapping function
-            const mapped = mapFirestoreToFileObject(doc.id, data);
-
-            return mapped;
+            return mapFirestoreToFileObject(doc.id, data);
           });
 
-          // Additional filtering in memory
+          // When filtering by subject, ensure user still has access to these records
           const filteredRecords = accessibleRecords.filter(record => {
-            const hasAccess =
-              record.uploadedBy === userId ||
-              record.owners?.includes(userId) ||
-              record.administrators.includes(userId) ||
-              record.viewers?.includes(userId) ||
-              record.subjects?.includes(userId);
+            // If filtering by a specific subject (not current user),
+            // verify current user has permission to view
+            if (subjectId && subjectId !== userId) {
+              const hasAccess =
+                record.uploadedBy === userId ||
+                record.owners?.includes(userId) ||
+                record.administrators?.includes(userId) ||
+                record.viewers?.includes(userId);
 
-            if (!hasAccess) {
-              console.warn('⚠️ Record slipped through query filter:', record.id);
+              if (!hasAccess) {
+                console.warn('⚠️ User lacks permission for record:', record.id);
+                return false;
+              }
             }
-
-            return hasAccess;
+            return true;
           });
 
           console.log(`✅ Processed ${filteredRecords.length} accessible records`);
 
-          // ✨ NEW: Decrypt encrypted records
+          // Decrypt encrypted records (your existing logic)
           const hasEncryptedRecords = filteredRecords.some((record: any) => record.isEncrypted);
 
           if (hasEncryptedRecords) {
             console.log('🔓 Decrypting encrypted records...');
-
-            // Check if encryption session is active
             const masterKey = await EncryptionKeyManager.getSessionKey();
+
             if (!masterKey) {
               console.warn('⚠️ Encrypted records found but no encryption session active');
               toast.warning(
                 'Some records are encrypted. Please unlock your encryption to view them.'
               );
-              // Still show the records, but they'll have encrypted data
               setRecords(filteredRecords);
               setLoading(false);
               return;
             }
 
             try {
-              // Decrypt all records (will skip unencrypted ones automatically)
               const decryptedRecords = await RecordDecryptionService.decryptRecords(
                 filteredRecords as any
               );
-
               console.log(`✅ Successfully decrypted ${decryptedRecords.length} records`);
               setRecords(decryptedRecords as FileObject[]);
             } catch (decryptError) {
@@ -142,8 +166,6 @@ export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
               toast.error(
                 'Failed to decrypt some records. Please try unlocking your encryption again.'
               );
-
-              // Still show the records even if decryption fails
               setRecords(filteredRecords);
             }
           } else {
@@ -159,18 +181,17 @@ export const useAllUserRecords = (userId?: string): UseAllUserRecordsReturn => {
         }
       },
       err => {
-        console.error('❌ Error fetching records from global collection:', err);
+        console.error('❌ Error fetching records:', err);
         setError(err as Error);
         setLoading(false);
       }
     );
 
-    // Cleanup subscription on unmount
     return () => {
       console.log('🧹 Cleaning up records listener');
       unsubscribe();
     };
-  }, [userId, refreshTrigger]);
+  }, [userId, filters.filterType, filters.subjectId, refreshTrigger]);
 
   return { records, loading, error, refetchRecords };
 };

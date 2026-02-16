@@ -129,7 +129,7 @@ export function ContextSelector({
 
             {/* Dropdown Menu - positioned based on available space */}
             <div
-              className={`absolute left-0 w-96 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden ${
+              className={`absolute left-0 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden ${
                 openUpward ? 'bottom-full mb-2' : 'top-full mt-2'
               }`}
             >
@@ -156,7 +156,7 @@ export function ContextSelector({
                 </div>
 
                 {/* Divider */}
-                <div className="border-t border-gray-200 m-1" />
+                <div className="border-t border-gray-200" />
 
                 {/* All Accessible Records */}
                 <div className="px-1 pb-1">
@@ -195,7 +195,7 @@ export function ContextSelector({
                 </div>
 
                 {/* Divider */}
-                <div className="border-t border-gray-200 m-1" />
+                <div className="border-t border-gray-200" />
 
                 {/* Specific Records Picker */}
                 <div className="px-1 pb-1">

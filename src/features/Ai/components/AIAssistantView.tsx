@@ -6,7 +6,6 @@
  * Also toggles between no message view and chat view based on whether there are messages in the current chat.
  */
 
-import React from 'react';
 import { MessageSquare, Sparkles, Shield, X, Loader2 } from 'lucide-react';
 import { AIChat } from '@/features/Ai/components/AIChat';
 import { AIModel } from '@/features/Ai/components/ui/ModelSelector';
@@ -127,7 +126,7 @@ interface AIHealthAssistantViewProps {
   getSubjectName: () => string | undefined;
   pendingAttachments?: ChatAttachment[];
   onPendingAttachmentsClear?: () => void;
-  onStop: () => void;
+  onStop?: () => void;
 }
 
 /**
@@ -176,15 +175,13 @@ export function AIHealthAssistantView({
             subjectName: getSubjectName(),
           }}
           leftFooterContent={
-            <div className="flex items-center gap-3">
-              <ContextSelector
-                currentUserId={user.uid}
-                availableSubjects={availableSubjects}
-                allRecords={allRecords}
-                selectedContext={selectedContext}
-                onContextChange={onContextChange}
-              />
-            </div>
+            <ContextSelector
+              currentUserId={user.uid}
+              availableSubjects={availableSubjects}
+              allRecords={allRecords}
+              selectedContext={selectedContext}
+              onContextChange={onContextChange}
+            />
           }
           emptyStateContent={
             messages.length === 0 ? (
