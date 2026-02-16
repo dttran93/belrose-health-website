@@ -70,6 +70,33 @@ service cloud.firestore {
       return isRightKeys && removedSelf;
     }
 
+    // Check if user is a subject WITH an active role (viewer/admin/owner)
+    function isSubjectWithRole(recordId) {
+      let record = get(/databases/$(database)/documents/records/$(recordId)).data;
+      return record != null && 
+        request.auth.uid in record.subjects &&
+        (request.auth.uid in record.owners ||
+        request.auth.uid in record.administrators ||
+        request.auth.uid in record.viewers);
+    }
+
+    // Check if subject is only editing viewers they have permission to modify
+    function isSubjectEditingViewers() {
+      let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
+      // Only viewers and lastModified can change
+      let isRightKeys = affectedKeys.hasOnly(['viewers', 'lastModified']);
+      
+      // Viewers array must have changed (either adding or removing)
+      let viewersChanged = request.resource.data.viewers != resource.data.viewers;
+      
+      // All other arrays must be unchanged
+      let ownersUnchanged = request.resource.data.owners == resource.data.owners;
+      let adminsUnchanged = request.resource.data.administrators == resource.data.administrators;
+      let subjectsUnchanged = request.resource.data.subjects == resource.data.subjects;
+      
+      return isRightKeys && viewersChanged && ownersUnchanged && adminsUnchanged && subjectsUnchanged;
+    }
+
     // ============================================
     // USER PROFILES/NOTIFICATIONS/CHATS
     // ============================================
@@ -243,6 +270,11 @@ service cloud.firestore {
           request.auth.uid in resource.data.viewers ||
           request.auth.uid in resource.data.subjects) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['credibility'])
+        ) ||
+        // BRANCH 5: Subject editing viewers
+        (
+          isSubjectWithRole(recordId) &&
+          isSubjectEditingViewers()
         )
       );
 
@@ -591,15 +623,21 @@ service cloud.firestore {
     match /wrappedKeys/{wrappedKeyId} {
       allow read: if request.auth != null;
 
-      allow create: if request.auth != null &&
-        isAdminOrOwnerOfRecord(request.resource.data.recordId);
+      allow create: if request.auth != null && (
+        isAdminOrOwnerOfRecord(request.resource.data.recordId) ||
+        isSubjectWithRole(request.resource.data.recordId)
+      );
 
-      allow update: if request.auth != null &&
-        isAdminOrOwnerOfRecord(resource.data.recordId);
+      allow update: if request.auth != null && (
+        isAdminOrOwnerOfRecord(resource.data.recordId) ||
+        isSubjectWithRole(resource.data.recordId)
+      );
 
       allow delete: if request.auth != null &&
-        exists(/databases/$(database)/documents/records/$(resource.data.recordId)) && 
-        isAdminOrOwnerOfRecord(resource.data.recordId);
+        exists(/databases/$(database)/documents/records/$(resource.data.recordId)) && (
+          isAdminOrOwnerOfRecord(resource.data.recordId) ||
+          (isSubjectWithRole(resource.data.recordId) && resource.data.grantedBy == request.auth.uid)
+      );
     }
 
     // ============================================

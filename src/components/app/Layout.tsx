@@ -41,11 +41,11 @@ function AppLayout({ children }: AppLayoutProps) {
   };
 
   const handleSettings = () => {
-    navigate('/dashboard/settings');
+    navigate('/app/settings');
   };
 
   const handleNotifications = () => {
-    navigate('/dashboard/notifications');
+    navigate('/app/notifications');
   };
 
   const handleHelp = () => {

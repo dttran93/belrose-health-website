@@ -314,7 +314,9 @@ export class EncryptionService {
   }
 
   /**
-   * Decrypt ALL record data
+   * Decrypt ALL record data using a wrappedKey
+   * Unwraps the key using the user's master key (AES encryption)
+   * Used by record creators whose keys are encrypted with their master key
    */
   static async decryptCompleteRecord(
     encryptedKey: string,
@@ -344,6 +346,43 @@ export class EncryptionService {
     };
 
     // 3. Decrypt fields safely
+    result.fileName = await safeDecrypt(encryptedData.fileName, 'text');
+    result.extractedText = await safeDecrypt(encryptedData.extractedText, 'text');
+    result.originalText = await safeDecrypt(encryptedData.originalText, 'text');
+    result.contextText = await safeDecrypt(encryptedData.contextText, 'text');
+    result.fhirData = await safeDecrypt(encryptedData.fhirData, 'json');
+    result.belroseFields = await safeDecrypt(encryptedData.belroseFields, 'json');
+    result.customData = await safeDecrypt(encryptedData.customData, 'json');
+
+    console.log('✅ Complete record decryption finished');
+    return result;
+  }
+
+  /**
+   * Decrypt ALL record data using an already-unwrapped file key
+   * Use this when the file key has been unwrapped separately:
+   * - Shared users (RSA-unwrapped keys)
+   * - When you already have the wrapped key in memory
+   * - update operations where key is wrapped once and reused
+   */
+  static async decryptRecordWithKey(fileKey: CryptoKey, encryptedData: any): Promise<any> {
+    console.log('🔓 Starting complete record decryption with unwrapped key...');
+
+    const result: any = {};
+
+    // Helper to safely decrypt fields
+    const safeDecrypt = async (field: any, type: 'text' | 'json') => {
+      if (!field || !field.encrypted || !field.iv) return null;
+
+      const iv = base64ToArrayBuffer(field.iv);
+      const encrypted = base64ToArrayBuffer(field.encrypted);
+
+      return type === 'text'
+        ? await this.decryptText(encrypted, fileKey, iv)
+        : await this.decryptJSON(encrypted, fileKey, iv);
+    };
+
+    // Decrypt all fields
     result.fileName = await safeDecrypt(encryptedData.fileName, 'text');
     result.extractedText = await safeDecrypt(encryptedData.extractedText, 'text');
     result.originalText = await safeDecrypt(encryptedData.originalText, 'text');

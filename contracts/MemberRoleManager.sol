@@ -29,6 +29,14 @@ interface MemberRoleManagerInterface {
 }
 
 /**
+ * @title HealthRecordCoreInterface
+ * @dev Interface for MemberRoleManager to check subject status
+ */
+interface HealthRecordCoreInterface {
+  function isActiveSubject(string memory recordId, bytes32 userIdHash) external view returns (bool);
+}
+
+/**
  * @title MemberRoleManager
  * @dev Manages multi-wallet member registration and role-based access control.
  * @dev Upgradeable version using uups proxy pattern
@@ -92,6 +100,17 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     require(newAdmin != address(0), 'Invalid address');
     emit AdminTransferred(admin, newAdmin, block.timestamp);
     admin = newAdmin;
+  }
+
+  /**
+   * @notice Update the HealthRecordCore reference
+   * @dev Only admin can update this
+   * @param _healthRecordCore Address of the HealthRecordCore contract
+   */
+  function setHealthRecordCore(address _healthRecordCore) external onlyAdmin {
+    require(_healthRecordCore != address(0), 'Invalid address');
+    healthRecordCore = HealthRecordCoreInterface(_healthRecordCore);
+    emit HealthRecordCoreUpdated(_healthRecordCore, block.timestamp);
   }
 
   // ===============================================================
@@ -331,6 +350,8 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     uint256 timestamp
   );
 
+  event HealthRecordCoreUpdated(address indexed newAddress, uint256 timestamp);
+
   // =================== ROLE MANAGEMENT - STRUCTURE ===================
 
   struct RecordRole {
@@ -352,6 +373,9 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   mapping(bytes32 => string[]) public recordsByUser;
 
   uint256 public totalRoles;
+
+  HealthRecordCoreInterface public healthRecordCore;
+  mapping(bytes32 => bytes32) public roleGrantedBy;
 
   // =================== ROLE MANAGEMENT - INTERNAL HELPERS ===================
 
@@ -393,6 +417,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     bool isCurrentlyActive = currentEntry.isActive;
 
     recordRoles[roleKey] = RecordRole({ role: role, isActive: true });
+    roleGrantedBy[roleKey] = userIdHash;
 
     if (!isCurrentlyActive) {
       _addToRoleArray(recordId, targetIdHash, role);
@@ -475,6 +500,30 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
       _hasRole(recordId, userIdHash, 'owner') || _hasRole(recordId, userIdHash, 'administrator');
   }
 
+  /**
+   * @dev Check if user is an active subject via HealthRecordCore
+   * @dev Returns false if healthRecordCore is not set
+   */
+  function _isActiveSubject(
+    string memory recordId,
+    bytes32 userIdHash
+  ) internal view returns (bool) {
+    if (address(healthRecordCore) == address(0)) return false;
+    return healthRecordCore.isActiveSubject(recordId, userIdHash);
+  }
+
+  /**
+   * @dev Get user's current role (returns empty string if no role)
+   */
+  function _getUserRole(
+    string memory recordId,
+    bytes32 userIdHash
+  ) internal view returns (string memory) {
+    bytes32 roleKey = _getRoleKey(recordId, userIdHash);
+    RecordRole memory r = recordRoles[roleKey];
+    return r.isActive ? r.role : '';
+  }
+
   // =================== ROLE MANAGEMENT - EXTERNAL FUNCTIONS ===================
 
   /**
@@ -532,6 +581,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     bool ownerExists = ownersByRecord[recordId].length > 0;
     bool userIsOwner = _hasRole(recordId, userIdHash, 'owner');
     bool userIsAdmin = _hasRole(recordId, userIdHash, 'administrator');
+    bool userIsSubject = _isActiveSubject(recordId, userIdHash);
 
     if (roleHash == keccak256(bytes('owner'))) {
       if (ownerExists) {
@@ -545,7 +595,18 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
         'Only owners and administrators can grant administrator role'
       );
     } else if (roleHash == keccak256(bytes('viewer'))) {
-      require(userIsOwner || userIsAdmin, 'Only owners and administrators can grant viewer role');
+      require(
+        userIsOwner || userIsAdmin || userIsSubject,
+        'Only owners, administrators, or subjects can grant viewer role'
+      );
+
+      if (userIsSubject && !userIsOwner && !userIsAdmin) {
+        string memory userRole = _getUserRole(recordId, userIdHash);
+        require(
+          bytes(userRole).length > 0,
+          'Subject must have an active role to grant viewer permissions'
+        );
+      }
     }
 
     require(
@@ -651,6 +712,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     _removeFromRoleArray(recordId, userIdHash, 'owner');
 
     recordRoles[roleKey].isActive = false;
+    delete roleGrantedBy[roleKey];
 
     emit OwnershipVoluntarilyLeft(recordId, userIdHash, block.timestamp);
   }
@@ -682,19 +744,26 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     bool isSelfRevoke = userIdHash == targetIdHash;
 
     if (!isSelfRevoke) {
-      require(
-        _isOwnerOrAdmin(recordId, userIdHash),
-        'Only owners and administrators can revoke roles'
-      );
-
       bool userIsOwner = _hasRole(recordId, userIdHash, 'owner');
+      bool userIsAdmin = _hasRole(recordId, userIdHash, 'administrator');
+      bytes32 grantedBy = roleGrantedBy[targetRoleKey];
+      bool userGrantedThisRole = (grantedBy == userIdHash);
 
-      if (!userIsOwner) {
-        bool targetIsAdmin = roleHash == keccak256(bytes('administrator'));
+      if (roleHash == keccak256(bytes('viewer'))) {
+        require(
+          userIsOwner || userIsAdmin || userGrantedThisRole,
+          'Only owners, administrators, or the granter can revoke viewers'
+        );
+      } else {
+        require(userIsOwner || userIsAdmin, 'Only owners and administrators can revoke roles');
 
-        if (targetIsAdmin) {
-          bool ownerExists = ownersByRecord[recordId].length > 0;
-          require(!ownerExists, 'Only owners can revoke administrators');
+        if (!userIsOwner) {
+          bool targetIsAdmin = roleHash == keccak256(bytes('administrator'));
+
+          if (targetIsAdmin) {
+            bool ownerExists = ownersByRecord[recordId].length > 0;
+            require(!ownerExists, 'Only owners can revoke administrators');
+          }
         }
       }
     }
@@ -710,8 +779,8 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     }
 
     _removeFromRoleArray(recordId, targetIdHash, role);
-
     recordRoles[targetRoleKey].isActive = false;
+    delete roleGrantedBy[targetRoleKey];
 
     emit RoleRevoked(recordId, targetIdHash, role, userIdHash, block.timestamp);
   }
@@ -829,5 +898,34 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
    */
   function getTotalRoles() external view returns (uint256) {
     return totalRoles;
+  }
+
+  /**
+   * @notice Check if a user is an active subject of a record
+   * @dev This is a convenience function that calls HealthRecordCore
+   */
+  function isActiveSubject(
+    string memory recordId,
+    bytes32 userIdHash
+  ) external view returns (bool) {
+    return _isActiveSubject(recordId, userIdHash);
+  }
+
+  /**
+   * @notice Get the HealthRecordCore address
+   */
+  function getHealthRecordCore() external view returns (address) {
+    return address(healthRecordCore);
+  }
+
+  /**
+   * @notice Get who granted a specific role
+   */
+  function getRoleGranter(
+    string memory recordId,
+    bytes32 userIdHash
+  ) external view returns (bytes32) {
+    bytes32 roleKey = _getRoleKey(recordId, userIdHash);
+    return roleGrantedBy[roleKey];
   }
 }

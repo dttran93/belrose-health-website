@@ -135,22 +135,31 @@ export class PermissionsService {
 
     const recordData = recordDoc.data();
 
-    // Check 2: Permission check - only admins/owners can grant viewer
+    // Check 2: Permission check - only admins/owners/subjects can grant viewer
     const isCurrentUserAdmin = recordData.administrators?.includes(currentUser.uid);
     const isCurrentUserOwner = recordData.owners?.includes(currentUser.uid);
+    const isCurrentUserSubject = recordData.subjects?.includes(currentUser.uid);
 
-    if (!isCurrentUserAdmin && !isCurrentUserOwner) {
+    if (!isCurrentUserAdmin && !isCurrentUserOwner && !isCurrentUserSubject) {
       throw new Error('You do not have permission to share this record');
     }
 
-    // Check 3: Find and make sure targetUserId exists
+    // Check 3: If user is a subject, but not admin/owner, verify they have an active role
+    if (isCurrentUserSubject && !isCurrentUserAdmin && !isCurrentUserOwner) {
+      const currentUserRole = this.getUserRole(recordData, currentUser.uid);
+      if (!currentUserRole) {
+        throw new Error('Subject must have an active role to share this record');
+      }
+    }
+
+    // Check 4: Find and make sure targetUserId exists
     const targetProfile = await getUserProfile(targetUserId);
 
     if (!targetProfile) {
       throw new Error('Target user does not exist or has no profile');
     }
 
-    // Check 4: Ensure the user and target have wallet addresses for the blockchain transaction
+    // Check 5: Ensure the user and target have wallet addresses for the blockchain transaction
     const userWalletAddress = await this.getUserWalletAddress(currentUser.uid);
     const targetWalletAddress = targetProfile.wallet?.address;
 
@@ -162,7 +171,7 @@ export class PermissionsService {
       throw new Error('Target user does not have a linked blockchain wallet');
     }
 
-    // Check 5: Check existing role - don't demote owners/admins
+    // Check 6: Check existing role - don't demote owners/admins
     const existingRole = this.getUserRole(recordData, targetUserId);
 
     if (existingRole === 'owner') {
@@ -248,19 +257,28 @@ export class PermissionsService {
     // Check 2: Permission check - only admins/owners can grant admin
     const isCurrentUserAdmin = recordData.administrators?.includes(currentUser.uid);
     const isCurrentUserOwner = recordData.owners?.includes(currentUser.uid);
+    const isCurrentUserSubject = recordData.subjects?.includes(currentUser.uid);
 
-    if (!isCurrentUserAdmin && !isCurrentUserOwner) {
-      throw new Error('Only administrators or owners can add other administrators');
+    if (!isCurrentUserAdmin && !isCurrentUserOwner && !isCurrentUserSubject) {
+      throw new Error('Only administrators, owners, or subjects can add administrators');
     }
 
-    // Check 3: Find and make sure targetUserId exists
+    // Check 3: If user is a subject (but not admin/owner), verify they have admin or owner role
+    if (isCurrentUserSubject && !isCurrentUserAdmin && !isCurrentUserOwner) {
+      const currentUserRole = this.getUserRole(recordData, currentUser.uid);
+      if (currentUserRole !== 'administrator' && currentUserRole !== 'owner') {
+        throw new Error('Subjects with viewer permissions cannot grant administrator access');
+      }
+    }
+
+    // Check 4: Find and make sure targetUserId exists
     const targetProfile = await getUserProfile(targetUserId);
 
     if (!targetProfile) {
       throw new Error('Target user does not exist or has no profile');
     }
 
-    // Check 4: Ensure the user and target have wallet addresses for the blockchain transaction
+    // Check 5: Ensure the user and target have wallet addresses for the blockchain transaction
     const userWalletAddress = await this.getUserWalletAddress(currentUser.uid);
     const targetWalletAddress = targetProfile.wallet?.address;
 
@@ -272,7 +290,7 @@ export class PermissionsService {
       throw new Error('Target user does not have a linked blockchain wallet');
     }
 
-    // Check 5: Check existing roles - can't demote owners
+    // Check 6: Check existing roles - can't demote owners
     const existingRole = this.getUserRole(recordData, targetUserId);
 
     if (existingRole === 'owner') {
@@ -371,12 +389,23 @@ export class PermissionsService {
     // Check 2: Permission check - only owners can add owners (or admins if no owners exist)
     const owners = recordData.owners || [];
     const admins = recordData.administrators || [];
+    const isCurrentUserSubject = recordData.subjects?.includes(currentUser.uid);
 
     const canGrantOwner =
-      owners.length > 0 ? owners.includes(currentUser.uid) : admins.includes(currentUser.uid);
+      owners.length > 0
+        ? owners.includes(currentUser.uid)
+        : admins.includes(currentUser.uid) || isCurrentUserSubject;
 
     if (!canGrantOwner) {
       throw new Error('You do not have permission to add owners');
+    }
+
+    // Check 3:  If user is a subject (and no existing owners), verify they have admin or owner role
+    if (isCurrentUserSubject && owners.length === 0 && !admins.includes(currentUser.uid)) {
+      const currentUserRole = this.getUserRole(recordData, currentUser.uid);
+      if (currentUserRole !== 'administrator' && currentUserRole !== 'owner') {
+        throw new Error('Subjects with viewer permissions cannot grant owner access');
+      }
     }
 
     // Check 3: Find and make sure targetUserId exists
@@ -498,17 +527,36 @@ export class PermissionsService {
     const isAdmin = recordData.administrators?.includes(currentUser.uid);
     const isOwner = recordData.owners?.includes(currentUser.uid);
     const isSelfRemoval = targetUserId === currentUser.uid;
+    const isCurrentUserSubject = recordData.subjects?.includes(currentUser.uid);
 
-    if (!isAdmin && !isOwner && !isSelfRemoval) {
+    if (!isAdmin && !isOwner && !isSelfRemoval && !isCurrentUserSubject) {
       throw new Error('You do not have permission to remove viewers');
     }
 
-    // Check 3: Verify user is actually a viewer
+    // Check 3: Subjects with viewer permissions can only remove access that they granted
+    let isSubjectWhoGranted = false;
+    if (isCurrentUserSubject && !isAdmin && !isOwner && !isSelfRemoval) {
+      try {
+        const wrappedKeyDoc = await getDoc(doc(db, 'wrappedKeys', `${recordId}_${targetUserId}`));
+        if (wrappedKeyDoc.exists()) {
+          const grantedBy = wrappedKeyDoc.data()?.grantedBy;
+          isSubjectWhoGranted = grantedBy === currentUser.uid;
+        }
+      } catch (error) {
+        console.error('Error checking wrapped key:', error);
+      }
+    }
+
+    if (isCurrentUserSubject && !isAdmin && !isOwner && !isSelfRemoval && !isSubjectWhoGranted) {
+      throw new Error('Subjects with viewer permissions can only remove permissions they granted');
+    }
+
+    // Check 4: Verify user is actually a viewer
     if (!recordData.viewers?.includes(targetUserId)) {
       throw new Error('User is not a viewer of this record');
     }
 
-    // Check 4: Can't remove a subject's permissions (must go through subject removal route first)
+    // Check 5: Can't remove a subject's permissions (must go through subject removal route first)
     const isTargetSubject = recordData.subjects?.includes(targetUserId);
 
     if (isTargetSubject) {
@@ -831,7 +879,7 @@ export class PermissionsService {
   // ============================================================================
 
   /**
-   * Check if current user can manage a specific role on a record
+   * Check if current user can manage permissions a specific role on a record
    */
   static async canManageRole(recordId: string, role: Role): Promise<boolean> {
     try {
@@ -848,6 +896,8 @@ export class PermissionsService {
       const recordData = recordDoc.data();
       const isOwner = recordData.owners?.includes(currentUser.uid);
       const isAdmin = recordData.administrators?.includes(currentUser.uid);
+      const isSubject = recordData.subjects?.includes(currentUser.uid);
+      const userRole = this.getUserRole(recordData, currentUser.uid);
 
       switch (role) {
         case 'owner':
@@ -856,7 +906,7 @@ export class PermissionsService {
         case 'administrator':
           return isOwner || isAdmin;
         case 'viewer':
-          return isOwner || isAdmin;
+          return isOwner || isAdmin || (isSubject && userRole !== null);
         default:
           return false;
       }

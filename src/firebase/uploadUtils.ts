@@ -354,21 +354,20 @@ export const updateFirestoreRecord = async (
     console.log('✓ File key decrypted');
 
     // 2. Hydrate the current state of the record by decrypting existing fields
-    // This is for the hashing process, otherwise, the haser will only see what fields have changed
+    // This is for the hashing process, otherwise, the hasher will only see what fields have changed
     console.log('🔓 Decrypting existing record for hashing context...');
-    const existingPlaintext = await EncryptionService.decryptCompleteRecord(
-      wrappedKeyData.wrappedKey, // Note: decryptCompleteRecord expects base64 string
-      {
-        fileName: currentData.encryptedFileName,
-        fhirData: currentData.encryptedFhirData || null,
-        belroseFields: currentData.encryptedBelroseFields || null,
-        extractedText: currentData.encryptedExtractedText || null,
-        originalText: currentData.encryptedOriginalText || null,
-        contextText: currentData.encryptedContextText || null,
-        customData: currentData.encryptedCustomData || null,
-      },
-      masterKey
-    );
+
+    const existingPlaintext = await EncryptionService.decryptRecordWithKey(fileKey, {
+      fileName: currentData.encryptedFileName,
+      fhirData: currentData.encryptedFhirData || null,
+      belroseFields: currentData.encryptedBelroseFields || null,
+      extractedText: currentData.encryptedExtractedText || null,
+      originalText: currentData.encryptedOriginalText || null,
+      contextText: currentData.encryptedContextText || null,
+      customData: currentData.encryptedCustomData || null,
+    });
+
+    console.log('✅ Existing record decrypted for hashing');
 
     // 3. Encrypt updated Fields that were actually changed
     const fieldsToEncrypt: any = {};
@@ -400,7 +399,7 @@ export const updateFirestoreRecord = async (
     // 5. Generate new record hash
     const newRecordHash = await RecordHashService.generateRecordHash(updatedFileObject);
 
-    // 5. Prepare data that will be passed to Firestore, including encryptedBlobs and new hash
+    // 6. Prepare data that will be passed to Firestore, including encryptedBlobs and new hash
     const filteredData: any = {
       ...fieldsToEncrypt,
       recordHash: newRecordHash,
@@ -410,7 +409,7 @@ export const updateFirestoreRecord = async (
 
     console.log('✅ Encrypted fields prepared for update:', Object.keys(fieldsToEncrypt));
 
-    // 6. Add to hash history
+    // 7. Add to hash history
     let previousHashes: string[] = currentData.previousRecordHash || [];
     if (currentData.recordHash) {
       previousHashes.push(currentData.recordHash);
@@ -420,7 +419,7 @@ export const updateFirestoreRecord = async (
 
     console.log('🔗 Record hash updated. New history length:', previousHashes.length);
 
-    // Create version history
+    // 8. Create version history
     const encryptedUpdatedFileObject = {
       ...currentData,
       ...filteredData,
@@ -438,7 +437,7 @@ export const updateFirestoreRecord = async (
       console.warn('⚠️ Failed to create version history:', versionError);
     }
 
-    // Update Firestore
+    // 9. Update Firestore
     console.log('🔍 FINAL DATA BEING SENT TO FIRESTORE:', removeUndefinedValues(filteredData));
     await updateDoc(docRef, removeUndefinedValues(filteredData));
     console.log('✅ Firestore record updated successfully');

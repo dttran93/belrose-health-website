@@ -1029,8 +1029,8 @@
       ]
     },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\contracts\\MemberRoleManager.sol": {
-      "lastModificationDate": 1769970728137,
-      "contentHash": "964b0509e4ab9595e55e90334a3f3384",
+      "lastModificationDate": 1771260711058,
+      "contentHash": "778cf003b72cdff5452e23e8760deae9",
       "sourceName": "contracts/MemberRoleManager.sol",
       "solcConfig": {
         "version": "0.8.23",
@@ -1066,6 +1066,7 @@
         "^0.8.19"
       ],
       "artifacts": [
+        "HealthRecordCoreInterface",
         "MemberRoleManager",
         "MemberRoleManagerInterface"
       ]
