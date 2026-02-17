@@ -131,8 +131,8 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     }
 
     // Decrypt the version
-    const encryptedRecord = {
-      id: record.id,
+    const encryptedRecord: FileObject = {
+      ...record,
       encryptedFileName: version.recordSnapshot.encryptedFileName,
       encryptedExtractedText: version.recordSnapshot.encryptedExtractedText,
       encryptedOriginalText: version.recordSnapshot.encryptedOriginalText,
@@ -349,8 +349,8 @@ export const RecordFull: React.FC<RecordFullProps> = ({
               {/* Pending subject request - someone invited you to be a subject */}
               {subjectAlerts.hasSubjectRequest && (
                 <PendingSubjectRequestAlert
-                  onAccept={() => subjectFlow.initiateAcceptRequest(record.id)}
-                  onDecline={() => subjectFlow.initiateRejectRequest(record.id)}
+                  onAccept={() => subjectFlow.initiateAcceptRequest()}
+                  onDecline={() => subjectFlow.initiateRejectRequest()}
                   isLoading={subjectFlow.isLoading}
                 />
               )}

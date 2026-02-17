@@ -55,6 +55,7 @@ export interface SubjectPrerequisites {
     callerReady: boolean;
     hasRecordPermission: boolean;
     hasRecordHash: boolean;
+    recordInitialized: boolean;
   };
 
   /** Record information */
@@ -125,6 +126,7 @@ export class SubjectPreparationService {
           callerReady: false,
           hasRecordPermission: false,
           hasRecordHash: false,
+          recordInitialized: false,
         },
       };
     }
@@ -143,6 +145,7 @@ export class SubjectPreparationService {
             callerReady: false,
             hasRecordPermission: false,
             hasRecordHash: false,
+            recordInitialized: false,
           },
         };
       }
@@ -159,6 +162,7 @@ export class SubjectPreparationService {
             callerReady: true,
             hasRecordPermission: false,
             hasRecordHash: false,
+            recordInitialized: false,
           },
         };
       }
@@ -173,11 +177,31 @@ export class SubjectPreparationService {
             callerReady: true,
             hasRecordPermission: false,
             hasRecordHash: recordCheck.hasRecordHash,
+            recordInitialized: false,
           },
           recordInfo: recordCheck.recordInfo,
         };
       }
 
+      // Step 3: Check record is Initialized on-chain
+      const permissionStatus = await PermissionPreparationService.getStatus(recordId);
+      if (!permissionStatus.isRecordInitialized) {
+        return {
+          ready: false,
+          reason:
+            'This record has not been initialized on the blockchain yet. Please complete the preparation step first.',
+          callerSmartAccountAddress: callerStatus.smartAccountAddress || undefined,
+          checks: {
+            callerReady: true,
+            hasRecordPermission: true,
+            hasRecordHash: recordCheck.hasRecordHash,
+            recordInitialized: false,
+          },
+          recordInfo: recordCheck.recordInfo,
+        };
+      }
+
+      // Step 4: Check record hash
       if (!recordCheck.hasRecordHash) {
         return {
           ready: false,
@@ -188,11 +212,13 @@ export class SubjectPreparationService {
             callerReady: true,
             hasRecordPermission: true,
             hasRecordHash: false,
+            recordInitialized: true,
           },
           recordInfo: recordCheck.recordInfo,
         };
       }
 
+      // Step 5: Check not already a subject
       if (recordCheck.recordInfo?.isCallerAlreadySubject) {
         return {
           ready: false,
@@ -202,6 +228,7 @@ export class SubjectPreparationService {
             callerReady: true,
             hasRecordPermission: true,
             hasRecordHash: true,
+            recordInitialized: true,
           },
           recordInfo: recordCheck.recordInfo,
         };
@@ -215,6 +242,7 @@ export class SubjectPreparationService {
           callerReady: true,
           hasRecordPermission: true,
           hasRecordHash: true,
+          recordInitialized: true,
         },
         recordInfo: recordCheck.recordInfo,
       };
@@ -248,6 +276,7 @@ export class SubjectPreparationService {
           callerReady: false,
           hasRecordPermission: true, // Not checked for accept
           hasRecordHash: false,
+          recordInitialized: false,
         },
       };
     }
@@ -266,6 +295,7 @@ export class SubjectPreparationService {
             callerReady: false,
             hasRecordPermission: true,
             hasRecordHash: false,
+            recordInitialized: false,
           },
         };
       }
@@ -282,7 +312,26 @@ export class SubjectPreparationService {
             callerReady: true,
             hasRecordPermission: true,
             hasRecordHash: false,
+            recordInitialized: false,
           },
+        };
+      }
+
+      // Step 3: Check record is Initialized on-chain
+      const permissionStatus = await PermissionPreparationService.getStatus(recordId);
+      if (!permissionStatus.isRecordInitialized) {
+        return {
+          ready: false,
+          reason:
+            'This record has not been initialized on the blockchain yet. Please complete the preparation step first.',
+          callerSmartAccountAddress: callerStatus.smartAccountAddress || undefined,
+          checks: {
+            callerReady: true,
+            hasRecordPermission: true,
+            hasRecordHash: recordCheck.hasRecordHash,
+            recordInitialized: false,
+          },
+          recordInfo: recordCheck.recordInfo,
         };
       }
 
@@ -296,6 +345,7 @@ export class SubjectPreparationService {
             callerReady: true,
             hasRecordPermission: true,
             hasRecordHash: false,
+            recordInitialized: true,
           },
           recordInfo: recordCheck.recordInfo,
         };
@@ -309,6 +359,7 @@ export class SubjectPreparationService {
           callerReady: true,
           hasRecordPermission: true,
           hasRecordHash: true,
+          recordInitialized: true,
         },
         recordInfo: recordCheck.recordInfo,
       };
@@ -342,6 +393,7 @@ export class SubjectPreparationService {
           callerReady: false,
           hasRecordPermission: false,
           hasRecordHash: false,
+          recordInitialized: false,
         },
       };
     }
@@ -359,6 +411,7 @@ export class SubjectPreparationService {
             callerReady: false,
             hasRecordPermission: false,
             hasRecordHash: false,
+            recordInitialized: false,
           },
         };
       }
@@ -375,6 +428,7 @@ export class SubjectPreparationService {
             callerReady: true,
             hasRecordPermission: false,
             hasRecordHash: false,
+            recordInitialized: false,
           },
         };
       }
@@ -388,6 +442,7 @@ export class SubjectPreparationService {
             callerReady: true,
             hasRecordPermission: false,
             hasRecordHash: recordCheck.hasRecordHash,
+            recordInitialized: false,
           },
           recordInfo: recordCheck.recordInfo,
         };
@@ -401,6 +456,7 @@ export class SubjectPreparationService {
           callerReady: true,
           hasRecordPermission: true,
           hasRecordHash: recordCheck.hasRecordHash,
+          recordInitialized: true,
         },
         recordInfo: recordCheck.recordInfo,
       };
@@ -455,8 +511,8 @@ export class SubjectPreparationService {
    * Prepare for subject operations.
    *
    * This ensures the caller's smart account is set up and registered.
-   * Subject operations don't need record initialization (unlike permissions)
-   * because anchoring IS the initialization for subjects.
+   * Subject operations also require record initialization (like permissions)
+   * So that the user has onchain permission to update information related to record
    *
    * @param onProgress - Optional callback for progress updates
    * @returns The caller's smart account address
@@ -487,6 +543,10 @@ export class SubjectPreparationService {
       });
 
       const recordCheck = await this.checkRecordAndPermissions(recordId, userId);
+
+      if (!recordCheck.hasPermission) {
+        throw new Error('You do not have permission to initialize this record');
+      }
 
       const initialRole: 'owner' | 'administrator' =
         recordCheck.role === 'owner' ? 'owner' : 'administrator';

@@ -275,8 +275,11 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
         }
 
         // Not ready - check why
-        if (!prereqs.checks?.callerReady) {
-          // Wallet not set up - prepare it
+        const walletNotReady = !prereqs.checks?.callerReady;
+        const recordNotInitialized = !prereqs.checks?.recordInitialized;
+
+        if (walletNotReady || recordNotInitialized) {
+          // Either wallet needs setup OR record needs initialization — prepare() handles both
           await SubjectPreparationService.prepare(recordId, progress => {
             setPreparationProgress(progress);
           });
@@ -296,7 +299,8 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
 
           return true;
         } else {
-          // Wallet is ready but failed for another reason
+          // Wallet ready + record initialized, but failed for a reason prepare() can't fix
+          // (e.g., no permission, no record hash, already a subject)
           throw new Error(prereqs.reason || 'Prerequisites not met');
         }
       } catch (err) {
@@ -527,22 +531,17 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
   /**
    * Start the "accept subject request" flow
    */
-  const initiateAcceptRequest = useCallback(
-    async (requestRecordId?: string) => {
-      const targetRecordId = requestRecordId || recordId;
+  const initiateAcceptRequest = useCallback(async () => {
+    setPendingOperation({
+      type: 'acceptSubjectRequest',
+      recordId,
+    });
 
-      setPendingOperation({
-        type: 'acceptSubjectRequest',
-        recordId: targetRecordId,
-      });
-
-      const ready = await runPreparation('acceptSubjectRequest');
-      if (ready) {
-        setPhase('confirming');
-      }
-    },
-    [recordId, runPreparation]
-  );
+    const ready = await runPreparation('acceptSubjectRequest');
+    if (ready) {
+      setPhase('confirming');
+    }
+  }, [recordId, runPreparation]);
 
   /**
    * Execute the confirmed "accept subject request" operation
@@ -586,12 +585,10 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
    * Note: This is for rejecting an incoming request, not removing existing subject status
    */
   const initiateRejectRequest = useCallback(
-    (requestRecordId?: string, reason?: string) => {
-      const targetRecordId = requestRecordId || recordId;
-
+    (reason?: string) => {
       setPendingOperation({
         type: 'rejectSubjectRequest',
-        recordId: targetRecordId,
+        recordId,
         reason,
       });
 
