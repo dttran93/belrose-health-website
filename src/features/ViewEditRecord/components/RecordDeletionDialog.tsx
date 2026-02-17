@@ -121,7 +121,7 @@ export const RecordDeletionDialog: React.FC<RecordDeletionDialogProps> = ({
       </AlertDialog.Root>
 
       {/* Subject Unanchoring Dialog */}
-      <SubjectActionDialog {...dialogProps} />
+      <SubjectActionDialog {...dialogProps} zIndex={{ overlay: 160, content: 161 }} />
     </>
   );
 };

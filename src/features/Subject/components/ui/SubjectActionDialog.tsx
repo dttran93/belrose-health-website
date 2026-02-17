@@ -85,6 +85,7 @@ interface SubjectActionDialogProps {
   onConfirmAcceptRequest: () => void;
   onConfirmRejectRequest: (reason: RejectionReasons) => void;
   onConfirmRemoveSubjectStatus: (reason: RejectionReasons) => void;
+  zIndex?: { overlay: number; content: number };
 }
 
 // Role configuration for display
@@ -162,6 +163,7 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
   onConfirmAcceptRequest,
   onConfirmRejectRequest,
   onConfirmRemoveSubjectStatus,
+  zIndex = { overlay: 100, content: 101 },
 }) => {
   const { user } = useAuthContext();
 
@@ -177,8 +179,14 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
   return (
     <AlertDialog.Root open={isOpen} onOpenChange={open => !open && canClose && onClose()}>
       <AlertDialog.Portal>
-        <AlertDialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" />
-        <AlertDialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl z-[101] w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <AlertDialog.Overlay
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+          style={{ zIndex: zIndex.overlay }}
+        />
+        <AlertDialog.Content
+          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+          style={{ zIndex: zIndex.content }}
+        >
           {/* Selecting Phase */}
           {phase === 'selecting' && (
             <SelectingContent
