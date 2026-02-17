@@ -72,11 +72,29 @@ export const useUserRecords = (
         // If subjectId is provided, filter by that specific subject
         // Otherwise, filter by current user as subject
         const targetSubjectId = subjectId || userId;
-        q = query(
-          recordsRef,
-          where('subjects', 'array-contains', targetSubjectId),
-          orderBy('uploadedAt', 'desc')
-        );
+
+        if (targetSubjectId === userId) {
+          q = query(
+            recordsRef,
+            where('subjects', 'array-contains', targetSubjectId),
+            orderBy('uploadedAt', 'desc')
+          );
+        } else {
+          // Querying another person's records - must scope to what YOU can access
+          // Then filter by subject client-side
+
+          q = query(
+            recordsRef,
+            or(
+              where('uploadedBy', '==', userId),
+              where('owners', 'array-contains', userId),
+              where('administrators', 'array-contains', userId),
+              where('viewers', 'array-contains', userId),
+              where('subjects', 'array-contains', userId)
+            ),
+            orderBy('uploadedAt', 'desc')
+          );
+        }
         break;
 
       case 'owner':
@@ -132,6 +150,10 @@ export const useUserRecords = (
                 console.warn('⚠️ User lacks permission for record:', record.id);
                 return false;
               }
+            }
+            // If filtering by another user as subject, apply client-side subject filter
+            if (filterType === 'subject' && subjectId && subjectId !== userId) {
+              return record.subjects?.includes(subjectId);
             }
             return true;
           });
