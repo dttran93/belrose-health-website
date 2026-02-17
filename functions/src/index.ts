@@ -45,6 +45,11 @@ export {
   onSubjectConsentRequestUpdated,
 } from './notifications/triggers/subjectNotificationTrigger';
 
+export {
+  onRecordDeletionEventCreated,
+  onRecordDeletionEventUpdated,
+} from './notifications/triggers/deleteRecordNotificationTrigger';
+
 // ==================== PAYMASTER ====================
 export { signSponsorship, getSponsorshipStatus } from './handlers/paymaster';
 

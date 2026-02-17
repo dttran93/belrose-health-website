@@ -1,7 +1,7 @@
 "use strict";
 // functions/src/notifications/index.ts
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.deleteOldNotifications = exports.markAllNotificationsAsRead = exports.markNotificationAsRead = exports.getRecordDisplayName = exports.getUserDisplayName = exports.createNotificationForMultiple = exports.createNotification = void 0;
+exports.onRecordDeletionEventUpdated = exports.onRecordDeletionEventCreated = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.deleteOldNotifications = exports.markAllNotificationsAsRead = exports.markNotificationAsRead = exports.getRecordDisplayName = exports.getUserDisplayName = exports.createNotificationForMultiple = exports.createNotification = void 0;
 /**
  * Notifications Module
  *
@@ -28,4 +28,8 @@ Object.defineProperty(exports, "deleteOldNotifications", { enumerable: true, get
 var subjectNotificationTrigger_1 = require("./triggers/subjectNotificationTrigger");
 Object.defineProperty(exports, "onSubjectConsentRequestCreated", { enumerable: true, get: function () { return subjectNotificationTrigger_1.onSubjectConsentRequestCreated; } });
 Object.defineProperty(exports, "onSubjectConsentRequestUpdated", { enumerable: true, get: function () { return subjectNotificationTrigger_1.onSubjectConsentRequestUpdated; } });
+// Export triggers (for Firebase Functions deployment)
+var deleteRecordNotificationTrigger_1 = require("./triggers/deleteRecordNotificationTrigger");
+Object.defineProperty(exports, "onRecordDeletionEventCreated", { enumerable: true, get: function () { return deleteRecordNotificationTrigger_1.onRecordDeletionEventCreated; } });
+Object.defineProperty(exports, "onRecordDeletionEventUpdated", { enumerable: true, get: function () { return deleteRecordNotificationTrigger_1.onRecordDeletionEventUpdated; } });
 //# sourceMappingURL=index.js.map

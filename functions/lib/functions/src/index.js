@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.aiChat = exports.getSponsorshipStatus = exports.signSponsorship = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.sendShareInvitationEmail = exports.personaWebhook = exports.checkVerificationStatus = exports.createVerificationSession = exports.getEncryptedWallet = exports.createWallet = exports.createDetailedNarrative = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = void 0;
+exports.aiChat = exports.getSponsorshipStatus = exports.signSponsorship = exports.onRecordDeletionEventUpdated = exports.onRecordDeletionEventCreated = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.sendShareInvitationEmail = exports.personaWebhook = exports.checkVerificationStatus = exports.createVerificationSession = exports.getEncryptedWallet = exports.createWallet = exports.createDetailedNarrative = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = void 0;
 // functions/src/index.ts
 const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin
@@ -77,6 +77,9 @@ Object.defineProperty(exports, "initializeRoleOnChain", { enumerable: true, get:
 var subjectNotificationTrigger_1 = require("./notifications/triggers/subjectNotificationTrigger");
 Object.defineProperty(exports, "onSubjectConsentRequestCreated", { enumerable: true, get: function () { return subjectNotificationTrigger_1.onSubjectConsentRequestCreated; } });
 Object.defineProperty(exports, "onSubjectConsentRequestUpdated", { enumerable: true, get: function () { return subjectNotificationTrigger_1.onSubjectConsentRequestUpdated; } });
+var deleteRecordNotificationTrigger_1 = require("./notifications/triggers/deleteRecordNotificationTrigger");
+Object.defineProperty(exports, "onRecordDeletionEventCreated", { enumerable: true, get: function () { return deleteRecordNotificationTrigger_1.onRecordDeletionEventCreated; } });
+Object.defineProperty(exports, "onRecordDeletionEventUpdated", { enumerable: true, get: function () { return deleteRecordNotificationTrigger_1.onRecordDeletionEventUpdated; } });
 // ==================== PAYMASTER ====================
 var paymaster_1 = require("./handlers/paymaster");
 Object.defineProperty(exports, "signSponsorship", { enumerable: true, get: function () { return paymaster_1.signSponsorship; } });

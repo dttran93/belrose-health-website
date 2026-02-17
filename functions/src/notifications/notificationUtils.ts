@@ -26,8 +26,8 @@ export type NotificationType =
   | 'REJECTION_PENDING_CREATOR_DECISION'
   | 'REJECTION_ACKNOWLEDGED'
   | 'REJECTION_PUBLICLY_LISTED'
-  // Messaging (future)
-  | 'NEW_MESSAGE'
+  // Record Deletion
+  | 'RECORD_DELETED'
   // Generic fallback
   | 'GENERIC_NOTIFICATION';
 
@@ -35,7 +35,7 @@ export type NotificationType =
  * Source services - identifies which feature triggered the notification.
  * Useful for filtering and analytics.
  */
-export type SourceService = 'Subject' | 'Messaging' | 'System';
+export type SourceService = 'Subject' | 'Messaging' | 'Record' | 'System';
 
 /**
  * The shape of a notification document in Firestore.
@@ -62,6 +62,8 @@ export interface NotificationPayload {
   requestId?: string;
   requestedBy?: string;
   requestedSubjectRole?: string;
+  // Deletion Related
+  deletedBy?: string;
   // Messaging (future)
   conversationId?: string;
   senderId?: string;
