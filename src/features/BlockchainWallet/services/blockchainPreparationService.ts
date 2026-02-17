@@ -19,10 +19,11 @@
 import { createPublicClient, http, type Address } from 'viem';
 import { sepolia } from 'viem/chains';
 import { SmartAccountService } from './smartAccountService';
+import { MEMBER_ROLE_MANAGER } from '@/config/blockchainAddresses';
 
 // ==================== SMART CONTRACT CONFIG ====================
 
-const MEMBER_ROLE_MANAGER_ADDRESS = '0xC31477f563dC8f7529Ba6AE7E410ABdB84C27d7C' as const;
+const MEMBER_ROLE_MANAGER_ADDRESS = MEMBER_ROLE_MANAGER.proxy;
 
 const MEMBER_ROLE_MANAGER_ABI = [
   {

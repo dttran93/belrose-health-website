@@ -15,13 +15,14 @@
 
 import { ethers, Contract } from 'ethers';
 import { PaymasterService } from '@/features/BlockchainWallet/services/paymasterService';
+import { HEALTH_RECORD_CORE, NETWORK } from '@/config/blockchainAddresses';
 
 // ============================================================================
 // CONFIG
 // ============================================================================
 
-const HEALTH_RECORD_CORE_ADDRESS = '0x97F9eD2af3f9a30Eac958D0994a0F131Eda11A57';
-const RPC_URL = 'https://1rpc.io/sepolia';
+const HEALTH_RECORD_CORE_ADDRESS = HEALTH_RECORD_CORE.proxy;
+const RPC_URL = NETWORK.rpcUrl;
 
 // ============================================================================
 // ABI (only the functions we need)

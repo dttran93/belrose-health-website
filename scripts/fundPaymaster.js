@@ -1,6 +1,6 @@
 import hre from 'hardhat';
 
-const PAYMASTER_ADDRESS = '0xe59573d7856cB641F8790A336EcD7165c706B6EC';
+const PAYMASTER_ADDRESS = '0x967e757609E1118E7164e51A204772a14804E253';
 
 async function main() {
   const [signer] = await hre.ethers.getSigners();
@@ -12,7 +12,7 @@ async function main() {
   console.log('Current deposit:', hre.ethers.formatEther(currentDeposit), 'ETH');
 
   // Add more funds
-  const tx = await paymaster.deposit({ value: hre.ethers.parseEther('0.05') });
+  const tx = await paymaster.deposit({ value: hre.ethers.parseEther('0.5') });
   await tx.wait();
 
   const newDeposit = await paymaster.getDeposit();

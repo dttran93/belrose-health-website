@@ -1,13 +1,15 @@
 // src/features/HealthRecordViewer/lib/constants.ts
 
+import { HEALTH_RECORD_CORE, NETWORK } from '@/config/blockchainAddresses';
+
 /**
  * HealthRecordCore Contract Configuration
  */
 
-export const HEALTH_RECORD_CORE_ADDRESS = '0x97F9eD2af3f9a30Eac958D0994a0F131Eda11A57';
-export const SEPOLIA_RPC_URL = 'https://ethereum-sepolia.publicnode.com';
-export const ETHERSCAN_BASE_URL = 'https://sepolia.etherscan.io';
-export const DEPLOYMENT_BLOCK = 10190796;
+export const HEALTH_RECORD_CORE_ADDRESS = HEALTH_RECORD_CORE.proxy;
+export const SEPOLIA_RPC_URL = NETWORK.rpcUrl;
+export const ETHERSCAN_BASE_URL = NETWORK.etherscanBaseUrl;
+export const DEPLOYMENT_BLOCK = HEALTH_RECORD_CORE.deploymentBlock;
 
 /**
  * Contract ABI - View functions and events needed for the admin dashboard

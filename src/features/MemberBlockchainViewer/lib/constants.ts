@@ -1,14 +1,16 @@
 // src/features/MemberManagement/constants.ts
 
+import { MEMBER_ROLE_MANAGER, NETWORK } from '@/config/blockchainAddresses';
+
 /**
  * MemberRoleManager Contract Configuration
  */
 
-export const MEMBER_ROLE_MANAGER_ADDRESS = '0xC31477f563dC8f7529Ba6AE7E410ABdB84C27d7C';
+export const MEMBER_ROLE_MANAGER_ADDRESS = MEMBER_ROLE_MANAGER.proxy;
 
-export const SEPOLIA_RPC_URL = 'https://ethereum-sepolia.publicnode.com';
-export const ETHERSCAN_BASE_URL = 'https://sepolia.etherscan.io';
-export const DEPLOYMENT_BLOCK = 10190794;
+export const SEPOLIA_RPC_URL = NETWORK.rpcUrl;
+export const ETHERSCAN_BASE_URL = NETWORK.rpcUrlFallback;
+export const DEPLOYMENT_BLOCK = MEMBER_ROLE_MANAGER.deploymentBlock;
 
 /**
  * Contract ABI - Only the view functions needed for the admin dashboard

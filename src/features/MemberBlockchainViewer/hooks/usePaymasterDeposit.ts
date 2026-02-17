@@ -1,11 +1,12 @@
 // src/features/MemberBlockchainViewer/hooks/usePaymasterDeposit.ts
 
+import { PAYMASTER } from '@/config/blockchainAddresses';
 import { useState, useEffect, useCallback } from 'react';
 import { createPublicClient, http, formatEther } from 'viem';
 import { sepolia } from 'viem/chains';
 
-// Your deployed paymaster address (same as in paymasterService.ts)
-const PAYMASTER_ADDRESS = '0x967e757609E1118E7164e51A204772a14804E253';
+// Your deployed paymaster address
+const PAYMASTER_ADDRESS = PAYMASTER.address;
 
 // Minimal ABI - just the function we need
 const PAYMASTER_ABI = [

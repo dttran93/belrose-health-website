@@ -18,12 +18,13 @@
 
 import { ethers, Contract } from 'ethers';
 import { PaymasterService } from '@/features/BlockchainWallet/services/paymasterService';
+import { MEMBER_ROLE_MANAGER, NETWORK } from '@/config/blockchainAddresses';
 
 // Contract address
-const MEMBER_ROLE_MANAGER_ADDRESS = '0xC31477f563dC8f7529Ba6AE7E410ABdB84C27d7C';
+const MEMBER_ROLE_MANAGER_ADDRESS = MEMBER_ROLE_MANAGER.proxy;
 
 // RPC for read-only operations
-const RPC_URL = 'https://1rpc.io/sepolia';
+const RPC_URL = NETWORK.rpcUrl;
 
 // ABI - all functions we need (view + write)
 const MEMBER_ROLE_MANAGER_ABI = [

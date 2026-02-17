@@ -446,7 +446,7 @@ service cloud.firestore {
         // Validate required fields
         request.resource.data.isActive == true &&
         request.resource.data.level in [1, 2, 3] &&
-        request.resource.data.chainStatus == 'pending' &&
+        request.resource.data.chainStatus in ['pending', 'confirmed'] &&
         request.resource.data.createdAt is timestamp;
 
       // Only the original verifier can modify their verification
@@ -488,7 +488,7 @@ service cloud.firestore {
         request.resource.data.isActive == true &&
         request.resource.data.severity in [1, 2, 3] &&
         request.resource.data.culpability in [0, 1, 2, 3, 4, 5] &&
-        request.resource.data.chainStatus == 'pending' &&
+        request.resource.data.chainStatus in ['pending','confirmed'] &&
         request.resource.data.createdAt is timestamp;
 
       // Only the original disputer can modify their dispute
