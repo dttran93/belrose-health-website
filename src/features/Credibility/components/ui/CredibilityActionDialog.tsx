@@ -125,7 +125,7 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
             <ConfirmRetractContent
               title="Retract Verification"
               description="Are you sure you want to retract your verification of this record?"
-              warning="Retracting your verification will remove your endorsement from this record. This action is recorded on the blockchain."
+              warning="Retracting your verification will remove your endorsement from this record. This action is recorded on the distributed network."
               onConfirm={onConfirmRetract}
               onClose={onClose}
             />
@@ -136,7 +136,7 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
             <ConfirmRetractContent
               title="Retract Dispute"
               description="Are you sure you want to retract your dispute of this record?"
-              warning="Retracting your dispute will remove your complaint from this record. This action is recorded on the blockchain."
+              warning="Retracting your dispute will remove your complaint from this record. This action is recorded on the distributed network."
               onConfirm={onConfirmRetract}
               onClose={onClose}
             />

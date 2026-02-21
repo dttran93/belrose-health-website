@@ -70,7 +70,7 @@ const SettingsPage = () => {
 
   const settingsSections = [
     { id: 'profile', name: 'Profile', icon: CircleUserRound },
-    { id: 'wallet', name: 'Blockchain Wallet', icon: Link },
+    { id: 'wallet', name: 'Distributed Network Account', icon: Link },
     { id: 'preferences', name: 'Preferences', icon: Settings2 },
     { id: 'privacy', name: 'Privacy & Security', icon: GlobeLock },
     { id: 'notifications', name: 'Notifications', icon: Bell },
@@ -112,10 +112,12 @@ const SettingsPage = () => {
         return (
           <div className="space-y-6">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Blockchain Wallet</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                Distributed Network Account
+              </h2>
               <p className="text-gray-600 mb-6">
-                Connect a wallet to enable blockchain verification for your medical records. Your
-                wallet will be permanently linked to your account for future use.
+                Connect to the distirbuted network to enable verification for your medical records.
+                Your account will be permanently linked to your account for future use.
               </p>
             </div>
           </div>
@@ -129,9 +131,9 @@ const SettingsPage = () => {
               <div className="bg-white rounded-lg border p-6 space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-medium text-gray-900">Blockchain Verification</h3>
+                    <h3 className="font-medium text-gray-900">Network Verification</h3>
                     <p className="text-sm text-gray-600">
-                      Automatically verify new records on blockchain
+                      Automatically verify new records on network
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">

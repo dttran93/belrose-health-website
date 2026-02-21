@@ -221,7 +221,7 @@ const OptionsContent: React.FC<{
                   {isUserSubject && (
                     <div className="flex items-start gap-2">
                       <Link className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                      <p>You are a subject - you must unanchor from the blockchain first</p>
+                      <p>You are a subject - you must unanchor on the distributed network first</p>
                     </div>
                   )}
 

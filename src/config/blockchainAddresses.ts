@@ -14,8 +14,8 @@
 export const NETWORK = {
   chainId: 11155111,
   name: 'sepolia',
-  rpcUrl: 'https://1rpc.io/sepolia',
-  rpcUrlFallback: 'https://ethereum-sepolia.publicnode.com',
+  rpcUrl: 'https://ethereum-sepolia.publicnode.com',
+  rpcUrlFallback: 'https://1rpc.io/sepolia',
   etherscanBaseUrl: 'https://sepolia.etherscan.io',
 } as const;
 

@@ -167,7 +167,7 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
 
     toast.success('Identity verified!', {
       description: emailVerified
-        ? 'Your blockchain trust score has been upgraded to Verified status'
+        ? 'Your network trust score has been upgraded to Verified status'
         : 'Complete email verification to unlock full Verified status',
     });
   };
@@ -189,10 +189,10 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
     toast.info('Identity verification skipped', {
       description: 'You can complete this later in Account Settings',
     });
-    navigate('/dashboard', { replace: true });
+    navigate('/app', { replace: true });
   };
 
-  const handleContinueToDashboard = async () => {
+  const handleContinueToApp = async () => {
     await auth.currentUser?.reload();
     if (!auth.currentUser?.emailVerified) {
       toast.error('Email verification required', {
@@ -202,7 +202,7 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
       setEmailVerified(false);
       return;
     }
-    navigate('/dashboard', { replace: true });
+    navigate('/app', { replace: true });
   };
 
   const writeVerificationToBlockchain = async (
@@ -479,7 +479,7 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
                             </p>
                             <div className="flex items-center text-sm text-complement-3">
                               <Shield className="w-4 h-4 mr-1" />
-                              <span>Blockchain status: Verified Member</span>
+                              <span>Network status: Verified Member</span>
                             </div>
                           </div>
                         )}
@@ -510,12 +510,12 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
                     </div>
                   )}
                   <Button
-                    onClick={handleContinueToDashboard}
+                    onClick={handleContinueToApp}
                     className="flex items-center space-x-2"
                     disabled={!canProceed}
                     variant={canProceed ? 'default' : 'outline'}
                   >
-                    <span>{canProceed ? 'Continue to Dashboard' : 'Verify Email to Continue'}</span>
+                    <span>{canProceed ? 'Continue to App' : 'Verify Email to Continue'}</span>
                     {canProceed && <ArrowRight className="w-5 h-5" />}
                   </Button>
                 </div>

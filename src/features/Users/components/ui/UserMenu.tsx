@@ -155,7 +155,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
     if (showBlockchain && onVerifyBlockchain) {
       items.push({
         key: 'blockchain',
-        label: 'Blockchain Verification',
+        label: 'Distributed Network Verification',
         icon: Blocks,
         onClick: createHandler(onVerifyBlockchain),
       });

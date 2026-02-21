@@ -13,7 +13,7 @@ exports.MODELS = {
 // Default options
 const DEFAULT_OPTIONS = {
     temperature: 0.1, // Low temperature for consistent, factual outputs
-    maxTokens: 8000,
+    maxTokens: 12000,
 };
 /**
  * Main Anthropic service class

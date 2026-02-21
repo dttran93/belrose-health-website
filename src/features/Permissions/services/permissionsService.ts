@@ -164,11 +164,11 @@ export class PermissionsService {
     const targetWalletAddress = targetProfile.wallet?.address;
 
     if (!userWalletAddress) {
-      throw new Error('Target user does not have a linked blockchain wallet');
+      throw new Error('User does not have a linked network account');
     }
 
     if (!targetWalletAddress) {
-      throw new Error('Target user does not have a linked blockchain wallet');
+      throw new Error('Target user does not have a linked network account');
     }
 
     // Check 6: Check existing role - don't demote owners/admins
@@ -283,11 +283,11 @@ export class PermissionsService {
     const targetWalletAddress = targetProfile.wallet?.address;
 
     if (!userWalletAddress) {
-      throw new Error('Current user does not have a linked blockchain wallet');
+      throw new Error('Current user does not have a linked network account');
     }
 
     if (!targetWalletAddress) {
-      throw new Error('Target user does not have a linked blockchain wallet');
+      throw new Error('Target user does not have a linked network account');
     }
 
     // Check 6: Check existing roles - can't demote owners
@@ -420,11 +420,11 @@ export class PermissionsService {
     const targetWalletAddress = targetProfile.wallet?.address;
 
     if (!userWalletAddress) {
-      throw new Error('Current user does not have a linked blockchain wallet');
+      throw new Error('Current user does not have a linked network account');
     }
 
     if (!targetWalletAddress) {
-      throw new Error('Target user does not have a linked blockchain wallet');
+      throw new Error('Target user does not have a linked network account');
     }
 
     // Check 5: Check if they're already an owner
@@ -438,9 +438,6 @@ export class PermissionsService {
 
     // Step 1: Blockchain - determine action based on existing role
     const hasExistingRole = existingRole !== null;
-    const blockchainAction: 'grantRole' | 'changeRole' = hasExistingRole
-      ? 'changeRole'
-      : 'grantRole';
 
     try {
       console.log(

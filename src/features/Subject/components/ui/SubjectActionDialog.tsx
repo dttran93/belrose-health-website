@@ -446,9 +446,9 @@ const SelectingContent: React.FC<{
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 flex gap-2">
           <Link className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-blue-900">Blockchain Anchoring</p>
+            <p className="text-sm font-medium text-blue-900">Record Anchoring</p>
             <p className="text-xs mt-1 text-blue-800">
-              Your subject status will be recorded on the blockchain for verification.
+              Your subject status will be recorded on the distributed network for verification.
             </p>
           </div>
         </div>
@@ -577,7 +577,7 @@ const PreparingContent: React.FC<{ progress?: SubjectPreparationProgress | null 
       Preparing Secure Connection
     </AlertDialog.Title>
     <AlertDialog.Description className="text-sm text-gray-600 text-center">
-      {progress?.message || 'Setting up your blockchain account...'}
+      {progress?.message || 'Setting up your network account...'}
     </AlertDialog.Description>
 
     {/* Progress Steps */}
@@ -603,7 +603,7 @@ const PreparingContent: React.FC<{ progress?: SubjectPreparationProgress | null 
         }
       />
       <ProgressStep
-        label="Registering on blockchain"
+        label="Registering on network"
         status={
           progress?.step === 'registering'
             ? 'active'
@@ -753,7 +753,7 @@ const ConfirmSetSubjectAsSelfContent: React.FC<{
             <p className="font-medium text-blue-900">What this means</p>
             <ul className="mt-2 text-sm text-blue-800 space-y-1">
               <li>• This record is about you or pertains to you</li>
-              <li>• Your link will be recorded on the blockchain</li>
+              <li>• Your link will be recorded on the distributed network</li>
               <li>• You can remove this link at any time</li>
             </ul>
           </div>
@@ -835,7 +835,7 @@ const ConfirmRequestConsentContent: React.FC<{
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
         <p className="text-xs text-gray-600 leading-relaxed">
           The user will receive a notification and must accept before being added as a subject.
-          Their acceptance will be recorded on the blockchain.
+          Their acceptance will be recorded on the distributed network.
         </p>
       </div>
 
@@ -883,7 +883,7 @@ const ConfirmAcceptRequestContent: React.FC<{
           <ul className="mt-2 text-sm text-green-800 space-y-1">
             <li>• This record is about you</li>
             <li>• You consent to being linked to this record</li>
-            <li>• Your link will be recorded on the blockchain</li>
+            <li>• Your link will be recorded on network</li>
           </ul>
         </div>
       </div>
@@ -950,7 +950,7 @@ const ConfirmRejectRequestContent: React.FC<{
       {/* Info */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
         <p className="text-xs text-gray-600 leading-relaxed">
-          The person who sent this request will be notified that you declined. No blockchain
+          The person who sent this request will be notified that you declined. No network
           transaction is required.
         </p>
       </div>
@@ -1008,7 +1008,7 @@ const ConfirmRemoveSubjectStatusContent: React.FC<{
             <p className="font-medium text-orange-900">What happens next</p>
             <ul className="mt-2 text-sm text-orange-800 space-y-1">
               <li>• Your link to this record will be removed</li>
-              <li>• This will be recorded on the blockchain</li>
+              <li>• This will be recorded on the distributed network</li>
               <li>• The record creator will be notified</li>
               {revokeAccess && <li>• Your access to this record will be revoked</li>}
             </ul>
