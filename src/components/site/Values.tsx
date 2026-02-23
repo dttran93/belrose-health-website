@@ -15,7 +15,7 @@ const Values: React.FC = () => {
       icon: <Shield size={32} />,
       title: "We Don't Want Your Data",
       description:
-        'With our data storage protocol, you can store your records anywhere you want. If stored with us, even Belrose employees cannot see them. We are the only health tech company that does not want your data.',
+        'With our data storage protocol, you can store your records anywhere you want. If stored with us, even Belrose employees cannot see them. We are the only HealthTech that does not want your data.',
       link: '#',
     },
     {
@@ -27,7 +27,7 @@ const Values: React.FC = () => {
     },
     {
       icon: <Handshake size={32} />,
-      title: 'A Healthier, more Equitable World',
+      title: 'A Healthier, More Equitable World',
       description:
         'We believe equity is the only path to truly unlock the potential of technology in healthcare. With Belrose, your wellbeing—not your data—becomes the product.',
       link: '#',

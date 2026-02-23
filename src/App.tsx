@@ -21,6 +21,11 @@ import EmailVerifiedPage from './pages/EmailVerified';
 import NotificationsManager from './features/Notifications/component/NotificationsManager';
 import BlockchainAdminDashboard from './pages/BlockchainAdminDashboard';
 import HashTester from './pages/HashTester';
+import HowItWorksIndex from './pages/OurProtocol';
+import HowItWorksStep from './components/site/OurProtocol/HowItWorksStep';
+import FAQ from './pages/FAQ';
+import AboutUs from './components/site/Company/AboutUs';
+import Company from './components/site/Company/Company';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
@@ -40,6 +45,11 @@ const App: React.FC = (): React.JSX.Element => {
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/how-it-works" element={<HowItWorksIndex />} />
+              <Route path="/how-it-works/:slug" element={<HowItWorksStep />} />
+              <Route path="/faq" element={<FAQ />} />
+              <Route path="/about" element={<AboutUs />} />
+              <Route path="/company" element={<Company />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/verification" element={<VerificationHub />} />
               <Route path="/verify-email" element={<EmailVerifiedPage />} />
