@@ -1,4 +1,4 @@
-// src/pages/how-it-works/howItWorksData.ts
+// src/components/site/OurProtocol/whyItWorksData.ts
 
 import { Building2, Crown, HeartHandshake, TrendingUp } from 'lucide-react';
 

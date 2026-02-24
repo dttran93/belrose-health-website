@@ -1,10 +1,10 @@
-// src/pages/how-it-works/howItWorksData.ts
+// src/components/site/OurProtocol/howItWorksData.ts
 // Edit this file to update all How It Works page content
 
 import { FileSearch, Wand2, Database, Share2, ShieldCheck, LucideIcon } from 'lucide-react';
 
 export interface HowItWorksStep {
-  slug: string; // URL slug: /how-it-works/[slug]
+  slug: string; // URL slug: /how/[slug]
   id: number;
   icon: LucideIcon;
   label: string; // Short label e.g. "Collect"
@@ -58,13 +58,13 @@ export const steps: HowItWorksStep[] = [
       'Identity-verified access',
     ],
     prevSlug: null,
-    nextSlug: 'transform',
+    nextSlug: 'standardize',
   },
   {
-    slug: 'transform',
+    slug: 'standardize',
     id: 2,
     icon: Wand2,
-    label: 'Transform',
+    label: 'Standardize',
     title: 'One Format. Universally Readable.',
     subtitle: 'Raw health records come in dozens of incompatible formats. We standardize them all.',
     accentColor: 'text-complement-5',
@@ -127,7 +127,7 @@ export const steps: HowItWorksStep[] = [
       'HIPAA & GDPR compliant',
       'BYO storage supported',
     ],
-    prevSlug: 'transform',
+    prevSlug: 'standardize',
     nextSlug: 'share',
   },
   {

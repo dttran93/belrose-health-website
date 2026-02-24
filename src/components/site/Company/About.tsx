@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/site/Navbar';
 import Footer from '@/components/site/Footer';
-import Values from '@/components/site/Values';
+import Values from '@/components/site/Home/Values';
 import { ChevronRight } from 'lucide-react';
 
 // ─── Problem card data ────────────────────────────────────────────────────────
@@ -64,8 +64,7 @@ const StatCallout: React.FC<{ text: string; highlight: string }> = ({ text, high
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-const AboutUs: React.FC = () => {
-  const navigate = useNavigate();
+const About: React.FC = () => {
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [activeCard, setActiveCard] = useState(0);
 
@@ -96,15 +95,13 @@ const AboutUs: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      <Navbar />
-
       {/* ── 1. Declaration ─────────────────────────────────────────────────── */}
-      <section className="relative min-h-screen bg-primary flex flex-col justify-center px-8 md:px-[10vw] py-24 overflow-hidden">
+      <section className="relative min-h-screen bg-primary flex flex-col justify-center px-8 py-24 overflow-hidden">
         {/* Decorative blobs */}
         <div className="absolute top-0 right-0 w-[480px] h-[480px] rounded-full bg-white/[0.03] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-[300px] h-[300px] rounded-full bg-pink-500/10 translate-y-1/2 -translate-x-1/2 pointer-events-none" />
 
-        <div className="flex flex-col max-w-[820px]">
+        <div className="flex flex-col w-full max-w-5xl mx-auto items-center">
           <h1 className="font-serif text-[clamp(2.4rem,5vw,4.2rem)] font-bold text-white leading-[1.15] max-w-[820px] mb-10 tracking-tight">
             Belrose Health is
           </h1>
@@ -137,7 +134,7 @@ const AboutUs: React.FC = () => {
           </div>
 
           {/* Scroll hint */}
-          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/25 text-[11px] tracking-widest uppercase animate-bounce">
+          <div className="absolute bottom-[130px] left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/25 text-[11px] tracking-widest uppercase animate-bounce">
             <span>Scroll</span>
             <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -214,24 +211,8 @@ const AboutUs: React.FC = () => {
 
       {/* ── 3. Values (reused component) ───────────────────────────────────── */}
       <Values />
-
-      <Footer />
-
-      {/* ── Fixed right nav button → How It Works ── */}
-      <button
-        onClick={() => navigate('/how-it-works')}
-        aria-label="See How Belrose Works"
-        className="fixed right-6 top-1/2 -translate-y-1/2 z-40 flex flex-col items-center gap-2 group"
-      >
-        <div className="bg-primary text-white rounded-full w-12 h-12 flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
-          <ChevronRight size={22} />
-        </div>
-        <span className="text-xs font-semibold text-gray-500 group-hover:text-gray-900 transition-colors tracking-wide whitespace-nowrap">
-          How Do You Solve This?
-        </span>
-      </button>
     </div>
   );
 };
 
-export default AboutUs;
+export default About;

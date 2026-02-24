@@ -1,34 +1,37 @@
-// src/pages/how-it-works/HowItWorksStep.tsx
+// src/components/site/OurProtocol/HowStepDetails.tsx
 import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { stepsBySlug, steps } from './howItWorksData';
-import Navbar from '@/components/site/Navbar';
-import Footer from '@/components/site/Footer';
-import NotFound from '@/pages/NotFound';
 
-const HowItWorksStep: React.FC = () => {
-  const { slug } = useParams<{ slug: string }>();
-  const navigate = useNavigate();
-  const step = slug ? stepsBySlug[slug] : null;
-
-  if (!step) return <NotFound />;
+const HowStepDetail: React.FC<{
+  slug: string;
+  onBack: () => void;
+  onNavigate: (slug: string) => void;
+}> = ({ slug, onBack, onNavigate }) => {
+  const step = stepsBySlug[slug];
+  if (!step)
+    return (
+      <div className="flex flex-col items-center justify-center py-32 px-8">
+        <p className="text-gray-400 mb-4">Step not found.</p>
+        <button onClick={onBack} className="text-sm font-semibold text-primary hover:underline">
+          ← Back to How It Works
+        </button>
+      </div>
+    );
 
   const Icon = step.icon;
   const prevStep = step.prevSlug ? stepsBySlug[step.prevSlug] : null;
   const nextStep = step.nextSlug ? stepsBySlug[step.nextSlug] : null;
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      <Navbar />
-
+    <div className="min-h-full bg-white flex flex-col">
       <main className="flex-1">
         {/* Hero */}
         <section className={`${step.bgColor} py-20 px-4 border-b ${step.borderColor}`}>
           <div className="container mx-auto max-w-4xl">
             {/* Breadcrumb */}
             <button
-              onClick={() => navigate('/how-it-works')}
+              onClick={onBack}
               className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-8 transition-colors"
             >
               <ArrowLeft size={14} />
@@ -36,14 +39,12 @@ const HowItWorksStep: React.FC = () => {
             </button>
 
             <div className="flex items-start gap-6">
-              {/* Icon */}
               <div
-                className={`flex-shrink-0 w-16 h-16 rounded-2xl bg-white shadow-sm flex items-center justify-center ${step.accentColor}`}
+                className={`flex-shrink-0 w-16 h-16 rounded-2xl bg-white shadow-sm flex
+                items-center justify-center ${step.accentColor}`}
               >
                 <Icon size={32} />
               </div>
-
-              {/* Title block */}
               <div>
                 <p
                   className={`text-sm font-semibold tracking-widest uppercase mb-2 ${step.accentColor}`}
@@ -62,7 +63,7 @@ const HowItWorksStep: React.FC = () => {
               {steps.map(s => (
                 <button
                   key={s.slug}
-                  onClick={() => navigate(`/how-it-works/${s.slug}`)}
+                  onClick={() => onNavigate(s.slug)}
                   title={s.label}
                   className={`h-1.5 rounded-full transition-all ${
                     s.slug === step.slug
@@ -79,7 +80,7 @@ const HowItWorksStep: React.FC = () => {
         <section className="py-16 px-4">
           <div className="container mx-auto max-w-4xl">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-              {/* Main content — 2 cols */}
+              {/* Main content */}
               <div className="md:col-span-2 space-y-10">
                 {step.sections.map((section, i) => (
                   <div key={i}>
@@ -89,9 +90,8 @@ const HowItWorksStep: React.FC = () => {
                 ))}
               </div>
 
-              {/* Sidebar — 1 col */}
+              {/* Sidebar */}
               <aside className="space-y-6">
-                {/* Key points */}
                 <div className={`rounded-2xl border ${step.borderColor} ${step.bgColor} p-6`}>
                   <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider mb-4">
                     Key Points
@@ -109,7 +109,6 @@ const HowItWorksStep: React.FC = () => {
                   </ul>
                 </div>
 
-                {/* All steps nav */}
                 <div className="rounded-2xl border border-gray-100 p-6">
                   <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider mb-4">
                     All Steps
@@ -121,12 +120,13 @@ const HowItWorksStep: React.FC = () => {
                       return (
                         <button
                           key={s.slug}
-                          onClick={() => navigate(`/how-it-works/${s.slug}`)}
-                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
-                            isActive
-                              ? `${step.bgColor} ${step.accentColor} font-semibold`
-                              : 'text-gray-600 hover:bg-gray-50'
-                          }`}
+                          onClick={() => onNavigate(s.slug)}
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm
+                            transition-colors text-left ${
+                              isActive
+                                ? `${step.bgColor} ${step.accentColor} font-semibold`
+                                : 'text-gray-600 hover:bg-gray-50'
+                            }`}
                         >
                           <SIcon size={14} />
                           {s.label}
@@ -140,12 +140,12 @@ const HowItWorksStep: React.FC = () => {
           </div>
         </section>
 
-        {/* Prev / Next navigation */}
+        {/* Prev / Next */}
         <section className="border-t border-gray-100 py-10 px-4">
           <div className="container mx-auto max-w-4xl flex justify-between items-center gap-4">
             {prevStep ? (
               <button
-                onClick={() => navigate(`/how-it-works/${prevStep.slug}`)}
+                onClick={() => onNavigate(prevStep.slug)}
                 className="flex items-center gap-3 group text-left"
               >
                 <ArrowLeft
@@ -165,7 +165,7 @@ const HowItWorksStep: React.FC = () => {
 
             {nextStep ? (
               <button
-                onClick={() => navigate(`/how-it-works/${nextStep.slug}`)}
+                onClick={() => onNavigate(nextStep.slug)}
                 className="flex items-center gap-3 group text-right"
               >
                 <div>
@@ -181,7 +181,7 @@ const HowItWorksStep: React.FC = () => {
               </button>
             ) : (
               <button
-                onClick={() => navigate('/auth')}
+                onClick={() => (window.location.href = '/auth')}
                 className="flex items-center gap-3 group text-right"
               >
                 <div>
@@ -195,10 +195,8 @@ const HowItWorksStep: React.FC = () => {
           </div>
         </section>
       </main>
-
-      <Footer />
     </div>
   );
 };
 
-export default HowItWorksStep;
+export default HowStepDetail;

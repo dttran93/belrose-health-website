@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import HowItWorksCard from './ui/HowItWorksCard';
-import { Button } from '../ui/Button';
+import HowItWorksCard from '../ui/HowItWorksCard';
+import { Button } from '../../ui/Button';
 
 interface StepItem {
   id: number;
@@ -42,7 +42,7 @@ const HowItWorks: React.FC = () => {
       id: 4,
       title: 'Use Your Records',
       description:
-        "Use your records however you want. Belrose's blockchain verification prevents tampering, allowing anyone to rely on your data while you remain in control.",
+        "Use your records however you want. Belrose's distirbuted network verification prevents tampering, allowing anyone to rely on your data while you remain in control.",
       image: '/pexels-tima-miroshnichenko-6011608.jpg', //image of the system comparing record hashes
       delay: '450ms',
     },

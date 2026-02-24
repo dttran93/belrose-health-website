@@ -2,8 +2,7 @@ import React from 'react';
 import { Toaster as Sonner } from 'sonner';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Index from './pages/index';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import NotFound from './pages/NotFound';
 import Auth from './pages/Auth';
 import Layout from './components/app/Layout';
@@ -21,21 +20,16 @@ import EmailVerifiedPage from './pages/EmailVerified';
 import NotificationsManager from './features/Notifications/component/NotificationsManager';
 import BlockchainAdminDashboard from './pages/BlockchainAdminDashboard';
 import HashTester from './pages/HashTester';
-import HowItWorksIndex from './pages/OurProtocol';
-import HowItWorksStep from './components/site/OurProtocol/HowItWorksStep';
-import FAQ from './pages/FAQ';
-import AboutUs from './components/site/Company/AboutUs';
-import Company from './components/site/Company/Company';
+import Index from './pages';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
 
-/**
- * This is the App component that wraps the entire application.
- * It provides global state management, tooltips, and routing functionality.
- *
- * @returns {React.JSX.Element} The main App component
- */
+const HowStepRedirect: React.FC = () => {
+  const { slug } = useParams<{ slug: string }>();
+  return <Navigate to={`/#how/${slug}`} replace />;
+};
+
 const App: React.FC = (): React.JSX.Element => {
   return (
     <QueryClientProvider client={queryClient}>
@@ -44,15 +38,24 @@ const App: React.FC = (): React.JSX.Element => {
           <Sonner />
           <BrowserRouter>
             <Routes>
+              {/* ── Public site shell ── */}
               <Route path="/" element={<Index />} />
-              <Route path="/how-it-works" element={<HowItWorksIndex />} />
-              <Route path="/how-it-works/:slug" element={<HowItWorksStep />} />
-              <Route path="/faq" element={<FAQ />} />
-              <Route path="/about" element={<AboutUs />} />
-              <Route path="/company" element={<Company />} />
+
+              {/* Redirect old standalone routes into shell hash sections */}
+              <Route path="/about" element={<Navigate to="/#about" replace />} />
+              <Route path="/how-it-works" element={<Navigate to="/#how" replace />} />
+              <Route path="/faq" element={<Navigate to="/#faq" replace />} />
+              <Route path="/company" element={<Navigate to="/#company" replace />} />
+
+              {/* Redirect old step deep-links into shell hash sub-routes */}
+              <Route path="/how-it-works/:slug" element={<HowStepRedirect />} />
+
+              {/* ── Auth & verification ── */}
               <Route path="/auth" element={<Auth />} />
               <Route path="/verification" element={<VerificationHub />} />
               <Route path="/verify-email" element={<EmailVerifiedPage />} />
+
+              {/* ── Protected app ── */}
               <Route
                 path="/app/*"
                 element={

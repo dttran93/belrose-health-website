@@ -1,9 +1,7 @@
-// src/pages/FAQ.tsx
+// src/pages/FAQFull.tsx
 
 import React, { useState } from 'react';
-import Navbar from '@/components/site/Navbar';
-import Footer from '@/components/site/Footer';
-import { faqs } from '../components/site/FAQ/faqData';
+import { faqs } from './faqData';
 import {
   Accordion,
   AccordionItem,
@@ -16,7 +14,7 @@ const categories = Object.keys(faqs);
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-const FAQ: React.FC = () => {
+const FAQFull: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<FAQCategory>(categories[0] as FAQCategory);
 
   const handleCategoryChange = (cat: string) => {
@@ -25,8 +23,6 @@ const FAQ: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Navbar />
-
       {/* ── Hero ── */}
       <section className="bg-primary py-20 px-4 text-center relative overflow-hidden">
         {/* Decorative blobs */}
@@ -105,10 +101,8 @@ const FAQ: React.FC = () => {
           </a>
         </div>
       </section>
-
-      <Footer />
     </div>
   );
 };
 
-export default FAQ;
+export default FAQFull;
