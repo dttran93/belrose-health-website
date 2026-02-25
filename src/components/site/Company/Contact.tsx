@@ -5,12 +5,7 @@ import React from 'react';
 
 const contactInfo = [
   {
-    label: 'General Enquiries',
-    value: 'hello@belrosehealth.com',
-    href: 'mailto:hello@belrosehealth.com',
-  },
-  {
-    label: 'Partnerships & Investment',
+    label: 'General Inquiries',
     value: 'dennis@belrosehealth.com',
     href: 'mailto:dennis@belrosehealth.com',
   },
@@ -33,7 +28,7 @@ const Contact: React.FC = () => {
             Contact
           </p>
           <h2
-            className="font-serif text-[clamp(1.6rem,2.5vw,2.4rem)] font-bold
+            className="text-[clamp(1.6rem,2.5vw,2.4rem)] font-bold
             text-gray-900 mb-3"
           >
             Get in touch

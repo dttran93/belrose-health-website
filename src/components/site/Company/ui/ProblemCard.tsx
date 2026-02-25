@@ -31,7 +31,7 @@ const ProblemCard: React.FC<ProblemCardProps> = ({ card, index, cardRef }) => (
     <div className="text-left font-serif text-[5rem] font-black text-gray-300 leading-none mb-4 tracking-tight select-none">
       {card.num}
     </div>
-    <h3 className="text-left font-serif text-[1.55rem] font-bold text-gray-900 leading-snug mb-5">
+    <h3 className="text-left text-[1.55rem] font-bold text-gray-900 leading-snug mb-5">
       {card.title}
     </h3>
     <p className="text-left text-[15px] text-gray-500 leading-[1.85] max-w-[480px]">{card.body}</p>

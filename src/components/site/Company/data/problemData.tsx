@@ -45,10 +45,10 @@ const problemData: ProblemCard[] = [
   },
   {
     num: '03',
-    title: 'Centralization has failed everywhere it has been tried',
+    title: 'Centralization has failed virtually everywhere it has been tried',
     body: (
       <>
-        Virtually every developed nation's government and scores of private businesses
+        Nearly every developed nation's government and scores of private businesses
         <CitationLink id="google-health" />
         <CitationLink id="ms-healthvault" /> have failed at some sort of health record
         centralization effort. The problem is not technical. It is structural: centralized systems

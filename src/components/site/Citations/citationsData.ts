@@ -201,12 +201,12 @@ export const citations: Record<string, Citation> = {
     source: 'French National Assembly',
     apaCitation:
       'Cour des comptes. (2012). Le coût du dossier médical personnel depuis sa mise en place. In Cour Des Comptes. https://www.ccomptes.fr/sites/default/files/EzPublish/rapport_cout_dossier_medical_personnel.pdf',
-    url: 'https://www.ccomptes.fr/sites/default/files/EzPublish/rapport_cout_dossier_medical_personnel.pdf',
+    url: 'https://www.ccomptes.fr/sites/default/files/EzPublish/2_2_5_teleservices_publics_sante.pdf',
   },
   'dmp-audit': {
     num: 21,
     year: '2013',
-    title: 'French National Assembly audit calls DMP "a financial abyss for empty shells"',
+    title: 'French National Assembly report calls DMP "absent of strategy"',
     source: 'French National Assembly',
     apaCitation:
       'Cour des comptes. (2013). Les téléservices publics de santé : un pilotage toujours insuffisant. In Rapport Public Annuel 2013 – Février 2013 (p. 366). https://www.ccomptes.fr/sites/default/files/EzPublish/2_2_5_teleservices_publics_sante.pdf',
@@ -235,8 +235,7 @@ export const citations: Record<string, Citation> = {
   'sweden-journalen-usability': {
     num: 24,
     year: '2022',
-    title:
-      'Swedish Unversity study surveys Journalen users on problems with record interoperability',
+    title: 'Swedish Unversity surveys Journalen users on problems with record interoperability',
     source: 'Journal of Medical Internet Research - Human Factors',
     apaCitation:
       'Hägglund, M., & Scandurra, I. (2022b). Usability of the Swedish Accessible Electronic Health Record: Qualitative Survey study. JMIR Human Factors, 9(2), e37192. https://doi.org/10.2196/37192',
@@ -275,8 +274,7 @@ export const citations: Record<string, Citation> = {
   'cures-act': {
     num: 28,
     year: '2020',
-    title:
-      'A federal judge orders the US Department of Health and Human Services to stop giving deportation officials Medicaid data',
+    title: '21st Century Cures Act imposes penalties for data blocking',
     source: 'US National Archive: Federal Register',
     apaCitation:
       'Office of the National Coordinator for Health Information Technology (ONC) & Department of Health and Human Services (HHS). (2020, June 30). 21st Century Cures Act: Interoperability, information blocking, and the ONC Health IT Certification Program. National Archives: Federal Register. https://www.federalregister.gov/documents/2020/05/01/2020-07419/21st-century-cures-act-interoperability-information-blocking-and-the-onc-health-it-certification',
@@ -328,7 +326,7 @@ export const citations: Record<string, Citation> = {
     source: 'Singapore Ministry of Health',
     apaCitation:
       'Transforming the primary care landscape: Engaging the GP community and our stakeholders in the journey. (2011, October 8). Ministry of Health. https://www.moh.gov.sg/newsroom/transforming-the-primary-care-landscape-engaging-the-gp-community-and-our-stakeholders-in-the-journey/',
-    url: 'https://www.moh.gov.sg/newsroom/health-information-bill-to-support-coordinated-care-across-singapore-s-healthcare-ecosystem/',
+    url: 'https://www.moh.gov.sg/newsroom/transforming-the-primary-care-landscape-engaging-the-gp-community-and-our-stakeholders-in-the-journey/',
   },
   'sg-hib': {
     num: 34,

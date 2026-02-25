@@ -15,7 +15,7 @@ const Team: React.FC = () => {
           The Team
         </p>
         <h2
-          className="font-serif text-[clamp(1.6rem,2.5vw,2.4rem)] font-bold
+          className="text-[clamp(1.6rem,2.5vw,2.4rem)] font-bold
             text-gray-900 mb-3"
         >
           Multi-disciplinary. Mission-aligned.

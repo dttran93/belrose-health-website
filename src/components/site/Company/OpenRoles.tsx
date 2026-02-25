@@ -10,7 +10,7 @@ const OpenRoles: React.FC = () => {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-end mb-8">
           <div>
-            <h2 className="font-serif text-[1.8rem] font-bold text-gray-900">Join Us</h2>
+            <h2 className="text-[1.8rem] font-bold text-gray-900">Join Us</h2>
           </div>
           <span
             className="text-[13px] text-gray-400 bg-white px-3 py-1.5

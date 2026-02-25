@@ -45,11 +45,11 @@ const About: React.FC = () => {
         <div className="absolute bottom-0 left-0 w-[300px] h-[300px] rounded-full bg-pink-500/10 translate-y-1/2 -translate-x-1/2 pointer-events-none" />
 
         <div className="flex flex-col w-full max-w-5xl mx-auto items-center">
-          <h1 className="font-serif text-[clamp(2.4rem,5vw,4.2rem)] font-bold text-white leading-[1.15] max-w-[820px] mb-10 tracking-tight">
+          <h1 className="text-[clamp(2.4rem,5vw,4.2rem)] font-bold text-white leading-[1.15] max-w-[820px] mb-10 tracking-tight">
             Belrose Health is
           </h1>
 
-          <h2 className="font-serif text-[clamp(1.8rem,3.5vw,3rem)] font-bold text-white leading-[1.15] max-w-[820px] mb-10 tracking-tight">
+          <h2 className="text-[clamp(1.8rem,3.5vw,3rem)] font-bold text-white leading-[1.15] max-w-[820px] mb-10 tracking-tight">
             a <em className="not-italic text-accent">technology</em> and{' '}
             <em className="not-italic text-accent">incentivization</em> infrastructure that gives
             people <em className="not-italic text-accent">sovereignty</em> over their health
@@ -100,7 +100,7 @@ const About: React.FC = () => {
             <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-pink-500 mb-5">
               The Problem
             </p>
-            <h2 className="font-serif text-[clamp(2rem,3vw,2.8rem)] font-black text-gray-900 leading-[1.15] mb-6">
+            <h2 className="text-[clamp(2rem,3vw,2.8rem)] font-black text-gray-900 leading-[1.15] mb-6">
               Health records
               <br />
               do not

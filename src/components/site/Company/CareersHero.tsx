@@ -23,7 +23,7 @@ const CareersHero: React.FC = () => {
           Careers at Belrose
         </p>
         <h1
-          className="font-serif text-[clamp(2.2rem,4vw,3.4rem)] font-bold text-white
+          className="text-[clamp(2.2rem,4vw,3.4rem)] font-bold text-white
             leading-[1.15] max-w-[680px] mb-6 tracking-tight"
         >
           We're building infrastructure for{' '}

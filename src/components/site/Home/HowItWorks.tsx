@@ -16,34 +16,43 @@ const HowItWorks: React.FC = () => {
   const steps: StepItem[] = [
     {
       id: 1,
-      title: 'Sign Up',
+      title: 'Collect',
       description:
-        'Create your account with any social login or email. You can have all the tools you need to create your secure health data platform in under 5 minutes',
-      image: '/registerpageimage.jpg',
+        'Create your account in under 5 minutes. If you verify your identity, we can get your records from any healthcare providers on your behalf. You can also self report data, add wearables, and connect other apps.',
+      image: '/pexels-luis-f-rodriguez-jimenez-3618842-5412878.jpg',
       delay: '0ms',
     },
     {
       id: 2,
-      title: 'Gather Your Data',
+      title: 'Standardize',
       description:
-        'If you verify your identity, we can get your records from any healthcare providers on your behalf. You can also self report data, add wearables, and connect other apps.',
-      image: '/pexels-luis-f-rodriguez-jimenez-3618842-5412878.jpg', //list of records from allRecords Screen
+        'Our platform converts your records into interoperable, standardize formats allowing for any provider to seamlessly integrate your new record.',
+      image: '/pexels-karolina-grabowska-6627922.jpg',
+
       delay: '150ms',
     },
     {
       id: 3,
-      title: 'Store Your Data',
+      title: 'Store',
       description:
         'We make your data interoperable and store it anywhere you want. We recommend our encrypted, HIPPA/GDPR compliant servers where only you will have access.',
-      image: '/pexels-tima-miroshnichenko-5452232.jpg', //screenshot of firebase showing ciphertext
+      image: '/pexels-rdne-6129037.jpg',
       delay: '300ms',
     },
     {
       id: 4,
-      title: 'Use Your Records',
+      title: 'Share',
       description:
-        "Use your records however you want. Belrose's distirbuted network verification prevents tampering, allowing anyone to rely on your data while you remain in control.",
-      image: '/pexels-tima-miroshnichenko-6011608.jpg', //image of the system comparing record hashes
+        'Share your record with whoever you want. Granular permission levels let you decide exatly what each recipient can view, edit, comment, or share.',
+      image: '/pexels-tima-miroshnichenko-5452232.jpg',
+      delay: '450ms',
+    },
+    {
+      id: 5,
+      title: 'Verify',
+      description:
+        "Belrose's distirbuted network verification prevents tampering, allowing anyone to rely on your data while you remain in complete control.",
+      image: '/pexels-mahyub-hamida-736226299-30313813.jpg',
       delay: '450ms',
     },
   ];
@@ -92,9 +101,11 @@ const HowItWorks: React.FC = () => {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 justify-center">
-        <Button size="lg" className="px-8 text-lg mt-8">
-          Get More Details
-        </Button>
+        <a href="/#how">
+          <Button size="lg" className="px-8 text-lg mt-8">
+            Get More Details
+          </Button>
+        </a>
       </div>
 
       <style>{`

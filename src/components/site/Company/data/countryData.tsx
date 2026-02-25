@@ -23,9 +23,9 @@ const countryData: CountryEntry[] = [
       <>
         <p className="text-left mb-4">
           The UK's effort to centralize health records is one of the most expensive IT failures in
-          history. In the early 2000s Prime Minister Tony Blair announced NHS Connecting for Health,
-          an effort to centralize the NHS' records with a budget that eventually ballooned to over
-          £10 billion
+          history. In the early 2000s, Prime Minister Tony Blair announced NHS Connecting for
+          Health, an effort to centralize the NHS' records with a budget that eventually ballooned
+          to over £10 billion
           <CitationLink id="nhs-waste" />. The programme was scrapped in 2013, having achieved
           almost none of its core objectives.
         </p>
@@ -37,12 +37,12 @@ const countryData: CountryEntry[] = [
           <CitationLink id="nhs-digital-maturity" /> and an independent review in 2024 concluded
           that the NHS "remains in the foothills of digital transformation" and that "the last
           decade was a missed opportunity"
-          <CitationLink id="nhs-darzi" />
+          <CitationLink id="nhs-darzi" />.
         </p>
         <p className="text-left mb-4">
           With public satisfaction regarding the NHS at its lowest point ever
-          <CitationLink id="nhs-satisfaction" />, the United Kingdom is a stark reminder of the cost
-          of data failure.
+          <CitationLink id="nhs-satisfaction" />, the United Kingdom stands as a stark reminder of
+          the potential of data failures to exacerbate or cascade into broader systemic problems.
         </p>
       </>
     ),
@@ -104,7 +104,7 @@ const countryData: CountryEntry[] = [
         </p>
         <p className="text-left mb-4">
           Mon Espace Santé (MES), as DMP is now known, fixed this by changing to an opt-out system
-          creating 65 million DMP accounts virtually overnight. Further, the empty shell problem has
+          creating 65 million DMP accounts virtually overnight. Further, the inactivity problem has
           improved, with over 420 million automated document uploads to the service. However, the
           practical usage gap remains, as of 2026, only around one third of accounts have been
           accessed even once
@@ -127,7 +127,7 @@ const countryData: CountryEntry[] = [
         </p>
         <p className="text-left mb-4">
           Sweden's 21 autonomous regions each procures and operates their own EHR infrastructure.
-          This led to the National Patient Summary (NPÖ) designed to bridge these regional silos.
+          This led to the National Patient Summary (NPÖ), designed to bridge these regional silos.
           However, in practice it remains incomplete. As the World Health Organization's health
           systems monitor noted plainly, "the information shared through NPÖ is incomplete because
           not all health care providers are connected" <CitationLink id="sweden-who" />.
@@ -257,7 +257,7 @@ const countryData: CountryEntry[] = [
         </p>
         <p className="text-left mb-4">
           The only problem is 80% of primary care is delivered through the private sector
-          <CitationLink id="sg-private" />. And as of 2026, the vast majority of private clinics do
+          <CitationLink id="sg-private" /> and as of 2026, the vast majority of private clinics do
           not contribute to NEHR. This prompted the Singaporean parliament to pass the Health
           Information Bill, mandating private clinic's participation by 2027. What is remarkable
           about the bill is that there is no opt out from contributing data to NEHR, providers must
