@@ -49,7 +49,7 @@ const Why: React.FC = () => {
                     </p>
                   </div>
                   <h2 className="text-xl font-bold mb-3 leading-snug">{section.heading}</h2>
-                  <p className="text-sm opacity-70 leading-relaxed">{section.body}</p>
+                  <div className="text-sm opacity-70 leading-relaxed">{section.body}</div>
                 </div>
               </div>
             );

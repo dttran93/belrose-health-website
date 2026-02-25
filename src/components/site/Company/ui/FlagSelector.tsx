@@ -13,12 +13,12 @@ const FlagSelector: React.FC<FlagSelectorProps> = ({ countries }) => {
   return (
     <div>
       {/* Flag buttons */}
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4 justify-between">
         {countries.map((country, i) => (
           <button
             key={i}
             onClick={() => setSelected(i)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm transition-all duration-150
+            className={`flex flex-grow items-center gap-2 px-3 py-1.5 rounded-lg border text-sm transition-all duration-150
               ${
                 selected === i
                   ? 'border-blue-600 bg-blue-50 text-blue-700 font-semibold'

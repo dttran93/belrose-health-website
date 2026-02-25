@@ -1,15 +1,33 @@
 // src/components/site/OurProtocol/whyItWorksData.ts
 
-import { Building2, Crown, HeartHandshake, TrendingUp } from 'lucide-react';
+import { Building2, Crown, HeartHandshake, LucideIcon, TrendingUp } from 'lucide-react';
+import { ReactNode } from 'react';
+import CitationLink from '../Citations/CitationLink';
 
-export const whySections = [
+export interface WhySection {
+  icon: LucideIcon;
+  label: string;
+  heading: string;
+  body: ReactNode;
+  stat: string;
+  statLabel: ReactNode;
+}
+
+export const whySections: WhySection[] = [
   {
     icon: Building2,
     label: 'The Problem with Current Solutions',
     heading: 'Your data is sold for billions. You get nothing.',
     body: `Health data companies harvest your data from wherever they can legally obtain them, aggregate them into identity graphs, and sell them to hospitals, insurers, and governments. You contributed that value and received nothing. `,
-    stat: '$50B',
-    statLabel: 'Estimate of the annual revenue of US health data brokers',
+    stat: '$20B',
+    statLabel: (
+      <>
+        <p>
+          Annual revenue of just one major health data broker
+          <CitationLink id="databroker-rev" />
+        </p>
+      </>
+    ),
   },
   {
     icon: Crown,
@@ -24,8 +42,15 @@ export const whySections = [
     label: 'Closing the Loop',
     heading: 'When patients win, everyone wins.',
     body: `We believe if patients have genuine control and real incentive, they will voluntarily maintain records far more complete and accurate than anything a data broker could scrape together. These records will form the infrastructure for the next generation of personalized and preventative medicine.`,
-    stat: '$7T',
-    statLabel: 'Estimated healthcare cost savings with better prevention and earlier intervention',
+    stat: '$78B',
+    statLabel: (
+      <>
+        <p>
+          Estimated cost of waste due solely to failure of care coordination
+          <CitationLink id="waste-in-US-healthcare" />
+        </p>
+      </>
+    ),
   },
   {
     icon: HeartHandshake,
