@@ -1,7 +1,7 @@
 // src/components/site/Company/OpenRoles.tsx
 
 import React from 'react';
-import jobsData from './jobListingData';
+import jobsData from './data/jobListingData';
 import JobListingCard from './ui/JobListingCard';
 
 const OpenRoles: React.FC = () => {

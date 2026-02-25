@@ -2,14 +2,10 @@
 
 import { Building2, Crown, HeartHandshake, TrendingUp } from 'lucide-react';
 
-/**
- * Content of Why it works panel
- */
-
 export const whySections = [
   {
     icon: Building2,
-    label: 'The Problem',
+    label: 'The Problem with Current Solutions',
     heading: 'Your data is sold for billions. You get nothing.',
     body: `Health data companies harvest your data from wherever they can legally obtain them, aggregate them into identity graphs, and sell them to hospitals, insurers, and governments. You contributed that value and received nothing. `,
     stat: '$50B',

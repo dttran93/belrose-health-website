@@ -1,6 +1,6 @@
 //src/components/site/Company/jobListingData.ts
 
-import { JobListing } from './ui/JobListingCard';
+import { JobListing } from '../ui/JobListingCard';
 
 const jobsData: JobListing[] = [
   {

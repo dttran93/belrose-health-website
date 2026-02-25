@@ -21,6 +21,7 @@ import NotificationsManager from './features/Notifications/component/Notificatio
 import BlockchainAdminDashboard from './pages/BlockchainAdminDashboard';
 import HashTester from './pages/HashTester';
 import Index from './pages';
+import { CitationProvider } from './components/site/Citations/CitationContext';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
@@ -36,52 +37,48 @@ const App: React.FC = (): React.JSX.Element => {
       <AuthProvider>
         <TooltipProvider>
           <Sonner />
-          <BrowserRouter>
-            <Routes>
-              {/* ── Public site shell ── */}
-              <Route path="/" element={<Index />} />
+          <CitationProvider>
+            <BrowserRouter>
+              <Routes>
+                {/* ── Public site shell ── */}
+                <Route path="/" element={<Index />} />
 
-              {/* Redirect old standalone routes into shell hash sections */}
-              <Route path="/about" element={<Navigate to="/#about" replace />} />
-              <Route path="/how-it-works" element={<Navigate to="/#how" replace />} />
-              <Route path="/faq" element={<Navigate to="/#faq" replace />} />
-              <Route path="/company" element={<Navigate to="/#company" replace />} />
+                {/* ── Auth & verification ── */}
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/verification" element={<VerificationHub />} />
+                <Route path="/verify-email" element={<EmailVerifiedPage />} />
 
-              {/* Redirect old step deep-links into shell hash sub-routes */}
-              <Route path="/how-it-works/:slug" element={<HowStepRedirect />} />
+                {/* ── Protected app ── */}
+                <Route
+                  path="/app/*"
+                  element={
+                    <ProtectedRoute>
+                      <EncryptionGate>
+                        <LayoutProvider>
+                          <Layout>
+                            <Routes>
+                              <Route index element={<AppPortal />} />
+                              <Route path="all-records" element={<AllRecords />} />
+                              <Route path="add-record" element={<AddRecord />} />
+                              <Route path="hash-tester" element={<HashTester />} />
+                              <Route path="settings" element={<SettingsPage />} />
+                              <Route path="notifications" element={<NotificationsManager />} />
+                              <Route
+                                path="blockchain-admin"
+                                element={<BlockchainAdminDashboard />}
+                              />
+                            </Routes>
+                          </Layout>
+                        </LayoutProvider>
+                      </EncryptionGate>
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* ── Auth & verification ── */}
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/verification" element={<VerificationHub />} />
-              <Route path="/verify-email" element={<EmailVerifiedPage />} />
-
-              {/* ── Protected app ── */}
-              <Route
-                path="/app/*"
-                element={
-                  <ProtectedRoute>
-                    <EncryptionGate>
-                      <LayoutProvider>
-                        <Layout>
-                          <Routes>
-                            <Route index element={<AppPortal />} />
-                            <Route path="all-records" element={<AllRecords />} />
-                            <Route path="add-record" element={<AddRecord />} />
-                            <Route path="hash-tester" element={<HashTester />} />
-                            <Route path="settings" element={<SettingsPage />} />
-                            <Route path="notifications" element={<NotificationsManager />} />
-                            <Route path="blockchain-admin" element={<BlockchainAdminDashboard />} />
-                          </Routes>
-                        </Layout>
-                      </LayoutProvider>
-                    </EncryptionGate>
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </CitationProvider>
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>

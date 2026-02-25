@@ -11,13 +11,14 @@ import Who from '@/components/site/Company/Who';
 import About from '@/components/site/Company/About';
 import NavArrow from '@/components/site/ui/NavArrow';
 import FAQFull from '@/components/site/FAQ/FAQFull';
+import CitationModal from '@/components/site/Citations/CitationModal';
 
 // ─── Section config ───────────────────────────────────────────────────────────
 
 const SECTIONS = [
   { id: 'home', label: 'Home', component: Home },
   { id: 'about', label: "What We're About", component: About },
-  { id: 'how', label: 'See How It Work', component: How },
+  { id: 'how', label: 'See How It Works', component: How },
   { id: 'why', label: 'See Why It Works', component: Why },
   { id: 'who', label: 'Who We Are', component: Who },
   { id: 'faq', label: 'Questions?', component: FAQFull },
@@ -185,7 +186,6 @@ const Index: React.FC = () => {
           ))}
         </div>
       </div>
-
       {/* ══════════════════════════════════════════════
           MOBILE — normal vertical scroll, sections stack
           ══════════════════════════════════════════════ */}
@@ -200,6 +200,7 @@ const Index: React.FC = () => {
         </main>
         <Footer />
       </div>
+      <CitationModal />;
     </>
   );
 };

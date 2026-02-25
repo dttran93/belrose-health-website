@@ -1,4 +1,4 @@
-import { TeamMember } from './ui/TeamCard';
+import { TeamMember } from '../ui/TeamCard';
 
 export const team: TeamMember[] = [
   {

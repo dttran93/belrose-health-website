@@ -2,7 +2,7 @@
 
 import React from 'react';
 import TeamCard from './ui/TeamCard';
-import { team } from './teamMemberData';
+import { team } from './data/teamMemberData';
 
 const Team: React.FC = () => {
   return (

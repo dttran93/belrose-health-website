@@ -1,66 +1,9 @@
 // src/components/site/AboutUs.tsx
 
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Navbar from '@/components/site/Navbar';
-import Footer from '@/components/site/Footer';
 import Values from '@/components/site/Home/Values';
-import { ChevronRight } from 'lucide-react';
-
-// ─── Problem card data ────────────────────────────────────────────────────────
-
-interface ProblemCard {
-  num: string;
-  title: string;
-  body: string;
-  stat: {
-    text: string;
-    highlight: string; // the fragment to render in blue
-  };
-}
-
-const problemCards: ProblemCard[] = [
-  {
-    num: '01',
-    title: 'Records are siloed across providers, cities, and countries',
-    body: 'Your GP holds one fragment. The hospital holds another. The specialist across town holds a third. None of them talk to each other. When you move, emigrate, or simply see a new doctor, your history goes dark. The current system is a patchwork of hardcopy records and siloed servers — often in conflicting formats that cannot be merged.',
-    stat: {
-      text: 'At worst, this leads to the unnecessary death of patients and eroded trust in the medical profession.',
-      highlight: 'unnecessary death of patients',
-    },
-  },
-  {
-    num: '02',
-    title: 'Without complete records, the promise of HealthTech cannot be kept',
-    body: 'AI diagnostics, genomic medicine, and personalised treatment protocols all share a single dependency: comprehensive longitudinal health data. That data does not exist in usable form today. Healthcare technology has been starved of what it needs to become truly transformative — the way finance and other industries already have.',
-    stat: {
-      text: '25% of new FDA drug approvals are now personalised medicines — up from 5% in 2005. None of it scales without better records.',
-      highlight: '25% of new FDA drug approvals',
-    },
-  },
-  {
-    num: '03',
-    title: 'Centralisation has failed everywhere it has been tried',
-    body: "The UK's NHS IT programme — the largest civilian IT project in history — was abandoned after a decade and over £10 billion spent. Similar efforts in the US and Europe have stalled repeatedly. The problem is not technical. It is structural: centralised systems require patients to trust governments and corporations with their most intimate data. That trust has been repeatedly broken.",
-    stat: {
-      text: 'The NHS IT programme cost over £10 billion and was ultimately abandoned in 2013.',
-      highlight: 'over £10 billion',
-    },
-  },
-];
-
-// ─── Stat component: bolds the highlight fragment ────────────────────────────
-
-const StatCallout: React.FC<{ text: string; highlight: string }> = ({ text, highlight }) => {
-  const parts = text.split(highlight);
-  return (
-    <div className="mt-6 px-5 py-4 bg-white border-l-[3px] border-pink-400 rounded-r-xl text-sm text-gray-700 leading-relaxed">
-      {parts[0]}
-      <strong className="text-blue-700">{highlight}</strong>
-      {parts[1]}
-    </div>
-  );
-};
+import ProblemCard from './ui/ProblemCard';
+import problemData from './data/problemData';
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -107,9 +50,10 @@ const About: React.FC = () => {
           </h1>
 
           <h2 className="font-serif text-[clamp(1.8rem,3.5vw,3rem)] font-bold text-white leading-[1.15] max-w-[820px] mb-10 tracking-tight">
-            a <em className="text-accent">technology</em> and{' '}
-            <em className="text-accent">incentivization</em> infrastructure that gives people{' '}
-            <em className="text-accent">sovereignty</em> over their health data
+            a <em className="not-italic text-accent">technology</em> and{' '}
+            <em className="not-italic text-accent">incentivization</em> infrastructure that gives
+            people <em className="not-italic text-accent">sovereignty</em> over their health
+            data{' '}
           </h2>
 
           <div className="flex flex-col gap-3">
@@ -170,7 +114,7 @@ const About: React.FC = () => {
 
             {/* Progress dots */}
             <div className="flex gap-2 mt-10">
-              {problemCards.map((_, i) => (
+              {problemData.map((_, i) => (
                 <div
                   key={i}
                   className={`h-1.5 rounded-full transition-all duration-300 ${
@@ -183,27 +127,15 @@ const About: React.FC = () => {
 
           {/* Scrolling right cards */}
           <div className="w-full md:w-[58%] py-16 px-8 md:pr-[8vw] md:pl-8 flex flex-col gap-0">
-            {problemCards.map((card, i) => (
-              <div
+            {problemData.map((card, i) => (
+              <ProblemCard
                 key={i}
-                ref={el => {
+                card={card}
+                index={i}
+                cardRef={el => {
                   cardRefs.current[i] = el;
                 }}
-                data-index={i}
-                className="min-h-[75vh] flex flex-col justify-center py-16 border-b border-gray-200 last:border-0
-                opacity-30 translate-y-5 transition-all duration-500 ease-out"
-              >
-                <div className="text-left font-serif text-[5rem] font-black text-gray-300 leading-none mb-4 tracking-tight select-none">
-                  {card.num}
-                </div>
-                <h3 className="text-left font-serif text-[1.55rem] font-bold text-gray-900 leading-snug mb-5">
-                  {card.title}
-                </h3>
-                <p className="text-left text-[15px] text-gray-500 leading-[1.85] max-w-[480px]">
-                  {card.body}
-                </p>
-                <StatCallout text={card.stat.text} highlight={card.stat.highlight} />
-              </div>
+              />
             ))}
           </div>
         </div>
