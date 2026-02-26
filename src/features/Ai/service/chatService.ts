@@ -36,7 +36,7 @@ export interface Chat {
   titleIv?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
-  subjectId?: string;
+  userId: string;
   recordIds?: string[];
   recordCount: number;
   messageCount: number;
@@ -49,6 +49,7 @@ export interface Message {
   contentIv?: string;
   timestamp: Timestamp;
   context?: MessageContext;
+  isStreaming?: boolean;
 }
 
 export interface MessageContext {
@@ -73,7 +74,7 @@ export interface ContextAttachment {
 export interface CreateChatInput {
   title: string;
   titleIv?: string;
-  userId?: string;
+  userId: string;
   recordIds?: string[];
   recordCount: number;
 }

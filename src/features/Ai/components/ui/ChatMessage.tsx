@@ -3,6 +3,7 @@
 import React from 'react';
 import { User, Bot } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
+import ReactMarkdown from 'react-markdown';
 
 export interface ChatMessageProps {
   message: ChatMessage;
@@ -14,6 +15,7 @@ export interface ChatMessage {
   content: string;
   timestamp: Timestamp;
   model?: string;
+  isStreaming?: boolean;
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
@@ -68,8 +70,26 @@ export function ChatMessage({ message }: ChatMessageProps) {
             </span>
           </div>
 
-          <div className="text-left text-gray-800 whitespace-pre-wrap break-words">
-            {message.content}
+          <div className="text-left text-gray-800">
+            <ReactMarkdown
+              components={{
+                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                ul: ({ children }) => <ul className="list-disc ml-4 mb-2 space-y-1">{children}</ul>,
+                ol: ({ children }) => (
+                  <ol className="list-decimal ml-4 mb-2 space-y-1">{children}</ol>
+                ),
+                li: ({ children }) => <li className="text-gray-800">{children}</li>,
+                h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
+                h3: ({ children }) => <h3 className="text-sm font-semibold mb-1">{children}</h3>,
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+            {message.isStreaming && (
+              <span className="inline-block w-0.5 h-4 bg-gray-800 ml-0.5 align-middle animate-pulse" />
+            )}
           </div>
         </div>
       </div>

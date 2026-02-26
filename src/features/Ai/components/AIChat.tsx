@@ -216,17 +216,6 @@ export function AIChat({
                 }}
               />
             ))}
-            {isLoading && (
-              <div className="flex gap-3 p-4">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                </div>
-                <div className="flex-1">
-                  <span className="font-semibold text-sm text-gray-900">{currentModel.name}</span>
-                  <p className="text-gray-600 text-sm mt-1">Thinking...</p>
-                </div>
-              </div>
-            )}
             <div ref={messagesEndRef} />
           </div>
         </div>

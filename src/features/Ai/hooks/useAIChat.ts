@@ -152,6 +152,8 @@ export function useAIChat({
   // HELPER: CALL AI BACKEND
   // ============================================================================
 
+  const streamingIdRef = useRef<string | null>(null);
+
   /**
    * Call AI backend via Firebase Cloud Function
    */
@@ -164,54 +166,91 @@ export function useAIChat({
     ): Promise<string> => {
       console.log(`🤖 Calling AI: ${model.name} (${model.provider})`);
 
+      const conversationHistory = messages.slice(-10).map(msg => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+
+      const response = await fetch('https://us-central1-belrose-757fe.cloudfunctions.net/aiChat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMessage,
+          healthContext,
+          model: model.id,
+          provider: model.provider,
+          mediaParts,
+          conversationHistory,
+        }),
+        signal: abortControllerRef.current?.signal,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get AI response');
+      }
+
+      // ✅ Create a temporary streaming message in state
+      const streamingId = `streaming-${Date.now()}`;
+      streamingIdRef.current = streamingId;
+
+      setMessages(prev => [
+        ...prev,
+        {
+          id: streamingId,
+          role: 'assistant',
+          content: '',
+          timestamp: Timestamp.now(),
+          isStreaming: true,
+        } as Message,
+      ]);
+
+      // ✅ Read the SSE stream
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedText = '';
+
       try {
-        // Step 1: Prepare conversation history (last 10 messages for context)
-        const conversationHistory = messages.slice(-10).map(msg => ({
-          role: msg.role,
-          content: msg.content,
-        }));
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-        // Step 2: Call Firebase Cloud Function
-        const response = await fetch(
-          'https://us-central1-belrose-757fe.cloudfunctions.net/aiChat',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              message: userMessage,
-              healthContext: healthContext,
-              model: model.id,
-              provider: model.provider,
-              mediaParts: mediaParts,
-              conversationHistory,
-            }),
-            signal: abortControllerRef.current?.signal,
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
+
+          for (const line of lines) {
+            const data = line.replace('data: ', '').trim();
+            if (data === '[DONE]' || data === '') continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.error) throw new Error(parsed.error);
+              if (parsed.delta) {
+                accumulatedText += parsed.delta;
+                // ✅ Update the live message on every chunk
+                setMessages(prev =>
+                  prev.map(m => (m.id === streamingId ? { ...m, content: accumulatedText } : m))
+                );
+              }
+            } catch {
+              // Skip malformed lines
+            }
           }
-        );
-
-        // Step 3: Error Handling
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to get AI response');
         }
-
-        const data = await response.json();
-
-        // Step 4: Return AI's response text
-        return data.response;
       } catch (error) {
+        // Clean up the placeholder on error
+        setMessages(prev => prev.filter(m => m.id !== streamingId));
+        streamingIdRef.current = null;
         if (error instanceof Error && error.name === 'AbortError') {
-          console.log('🛑 AI request cancelled by user');
           throw new Error('Request cancelled');
         }
-
-        console.error('❌ AI Backend Error:', error);
-        throw error instanceof Error
-          ? error
-          : new Error('An unexpected error occurred while connecting to the AI service.');
+        throw error;
       }
+
+      // ✅ Mark streaming as done (cursor disappears)
+      setMessages(prev => prev.map(m => (m.id === streamingId ? { ...m, isStreaming: false } : m)));
+
+      return accumulatedText;
     },
     [messages]
   );
@@ -473,20 +512,17 @@ export function useAIChat({
           throw new Error('Chat ID is missing');
         }
 
+        const streamingIdToReplace = streamingIdRef.current;
+
         const assistantMessageId = await addEncryptedMessage(user.uid, activeChatId, {
           role: 'assistant',
           content: aiResponse,
         });
 
-        setMessages(prev => [
-          ...prev,
-          {
-            id: assistantMessageId,
-            role: 'assistant',
-            content: aiResponse,
-            timestamp: Timestamp.now(),
-          },
-        ]);
+        setMessages(prev =>
+          prev.map(m => (m.id === streamingIdToReplace ? { ...m, id: assistantMessageId } : m))
+        );
+        streamingIdRef.current = null;
 
         console.log('✅ Message exchange complete');
       } catch (error) {

@@ -28,24 +28,41 @@ exports.aiChat = (0, https_1.onRequest)({
                 res.status(400).json({ error: 'Missing required fields' });
                 return;
             }
-            let response;
+            // ✅ Set SSE headers for streaming
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            // Helper to send a chunck to the client
+            const sendChunk = (text) => {
+                res.write(`data: ${JSON.stringify({ delta: text })}\n\n`);
+            };
             switch (provider) {
                 case 'anthropic':
-                    response = await callClaudeAPI(message, healthContext, model, conversationHistory, mediaParts);
+                    await streamClaudeAPI(message, healthContext, model, conversationHistory, mediaParts, sendChunk, anthropicApiKey.value());
                     break;
                 case 'google':
-                    response = await callGeminiAPI(message, healthContext, model, conversationHistory, mediaParts);
+                    const geminiResponse = await callGeminiAPI(message, healthContext, model, conversationHistory, mediaParts);
+                    sendChunk(geminiResponse);
                     break;
                 default:
                     throw new Error(`Unsupported provider: ${provider}`);
             }
-            res.json({ response });
+            // Signal stream is done
+            res.write('data: [DONE]\n\n');
+            res.end();
         }
         catch (error) {
             console.error('AI Chat error:', error);
-            res.status(500).json({
-                error: error instanceof Error ? error.message : 'Internal server error',
-            });
+            // If headers not sent yet, send JSON error
+            if (!res.headersSent) {
+                res.status(500).json({
+                    error: error instanceof Error ? error.message : 'Internal server error',
+                });
+            }
+            else {
+                res.write(`data: ${JSON.stringify({ error: 'Stream error' })}\n\n`);
+                res.end();
+            }
         }
     });
 });
@@ -83,36 +100,19 @@ ${healthContext}`;
 /**
  * Call Anthropic's Claude API
  */
-async function callClaudeAPI(message, healthContext, model, history, mediaParts = []) {
-    const apiKey = anthropicApiKey.value();
-    if (!apiKey) {
-        throw new Error('Anthropic API key not configured');
-    }
-    // Build system prompt with health context
+async function streamClaudeAPI(message, healthContext, model, history, mediaParts, onChunk, apiKey) {
     const systemPrompt = generateSystemPrompt(healthContext);
-    // 2. Format the current message content
     const userContent = [{ type: 'text', text: message }];
-    // Filter out videos since Claude doesn't support them
     const supportedMedia = mediaParts.filter(part => part.type === 'image');
-    if (mediaParts.length > supportedMedia.length) {
-        console.warn(`⚠️ Filtering out ${mediaParts.length - supportedMedia.length} video(s) - Claude doesn't support video`);
-    }
     supportedMedia.forEach(part => {
         userContent.push({
             type: 'image',
             source: { type: 'base64', media_type: part.mimeType, data: part.url.split(',')[1] },
         });
     });
-    // Build conversation messages
     const messages = [
-        ...history.map(msg => ({
-            role: msg.role,
-            content: msg.content,
-        })),
-        {
-            role: 'user',
-            content: userContent,
-        },
+        ...history.map(msg => ({ role: msg.role, content: msg.content })),
+        { role: 'user', content: userContent },
     ];
     const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -127,19 +127,38 @@ async function callClaudeAPI(message, healthContext, model, history, mediaParts 
             temperature: 0.2,
             system: systemPrompt,
             messages,
+            stream: true, // ✅ Enable streaming
         }),
     });
     if (!response.ok) {
         const error = await response.text();
         throw new Error(`Claude API error: ${response.status} - ${error}`);
     }
-    const data = (await response.json());
-    console.log('✅ Claude API response:', {
-        inputTokens: data.usage?.input_tokens,
-        outputTokens: data.usage?.output_tokens,
-        stopReason: data.stop_reason,
-    });
-    return data.content[0].text;
+    // ✅ Read the stream line by line
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done)
+            break;
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
+        for (const line of lines) {
+            const data = line.replace('data: ', '').trim();
+            if (data === '[DONE]' || data === '')
+                continue;
+            try {
+                const parsed = JSON.parse(data);
+                // Anthropic stream events: content_block_delta contains the text
+                if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
+                    onChunk(parsed.delta.text);
+                }
+            }
+            catch {
+                // Ignore malformed JSON lines
+            }
+        }
+    }
 }
 /**
  * Call Google's Gemini API
