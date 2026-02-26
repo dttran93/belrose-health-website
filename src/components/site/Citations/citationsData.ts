@@ -17,7 +17,7 @@ export const citations: Record<string, Citation> = {
   'waste-in-US-healthcare': {
     num: 1,
     year: '2019',
-    title: 'Failure of care coordination costs U.S. up to $80 billion annually',
+    title: 'Failure of care coordination costs U.S. nearly $80 billion annually',
     source: 'Journal of the American Medical Association',
     apaCitation:
       'Shrank, W. H., Rogstad, T. L., & Parekh, N. (2019). Waste in the US health care system. JAMA, 322(15), 1501. https://doi.org/10.1001/jama.2019.13978',

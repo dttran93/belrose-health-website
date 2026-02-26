@@ -269,7 +269,7 @@ const countryData: CountryEntry[] = [
         <p className="text-left mb-4">
           But Singapore also illustrates another dark-side of centralization: catastrophic data
           breaches. In July 2018, Singapore's largest public healthcare group, SingHealth, was
-          hacked. By the time the breach was contained, the records of 1.5 million patients ,
+          hacked. By the time the breach was contained, the records of 1.5 million patients,
           approximately 25% of the country's population, had been exposed
           <CitationLink id="sg-hack" />. When centralization succeeds, a target is placed on a
           massive concentration of sensitive data, attractive enough to draw nation-state-level

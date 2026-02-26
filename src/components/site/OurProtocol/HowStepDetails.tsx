@@ -181,7 +181,7 @@ const HowStepDetail: React.FC<{
               </button>
             ) : (
               <button
-                onClick={() => (window.location.href = '/auth')}
+                onClick={() => (window.location.href = '/auth/register')}
                 className="flex items-center gap-3 group text-right"
               >
                 <div>

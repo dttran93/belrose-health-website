@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import LoginForm from '@/features/Auth/components/LoginForm';
 import RegistrationForm from '@/features/Auth/components/RegistrationForm';
@@ -12,8 +12,12 @@ const Auth: React.FC = () => {
   const navigate = useNavigate();
   const showRegistration = location.state?.showRegistration || false;
   const [currentView, setCurrentView] = useState<AuthPageState>(
-    showRegistration ? 'registration' : 'login'
+    location.pathname === '/auth/register' ? 'registration' : 'login'
   );
+
+  useEffect(() => {
+    setCurrentView(location.pathname === '/auth/register' ? 'registration' : 'login');
+  }, [location.pathname]);
 
   return (
     <>

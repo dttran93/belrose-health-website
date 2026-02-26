@@ -45,6 +45,7 @@ const App: React.FC = (): React.JSX.Element => {
 
                 {/* ── Auth & verification ── */}
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/auth/register" element={<Auth />} />
                 <Route path="/verification" element={<VerificationHub />} />
                 <Route path="/verify-email" element={<EmailVerifiedPage />} />
 

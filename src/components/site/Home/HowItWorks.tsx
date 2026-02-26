@@ -18,7 +18,7 @@ const HowItWorks: React.FC = () => {
       id: 1,
       title: 'Collect',
       description:
-        'Create your account in under 5 minutes. If you verify your identity, we can get your records from any healthcare providers on your behalf. You can also self report data, add wearables, and connect other apps.',
+        'Create your account in under 5 minutes. If you verify your identity, we can collect your records from any healthcare providers on your behalf. You can also self report data, add wearables, and connect other apps.',
       image: '/pexels-luis-f-rodriguez-jimenez-3618842-5412878.jpg',
       delay: '0ms',
     },

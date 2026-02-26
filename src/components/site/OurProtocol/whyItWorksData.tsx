@@ -19,7 +19,7 @@ export const whySections: WhySection[] = [
     label: 'The Problem with Current Solutions',
     heading: 'Your data is sold for billions. You get nothing.',
     body: `Health data companies harvest your data from wherever they can legally obtain them, aggregate them into identity graphs, and sell them to hospitals, insurers, and governments. You contributed that value and received nothing. `,
-    stat: '$20B',
+    stat: '$19B',
     statLabel: (
       <>
         <p>
@@ -56,7 +56,7 @@ export const whySections: WhySection[] = [
     icon: HeartHandshake,
     label: 'A Healthier, More Equitable World',
     heading: 'Your wellbeing is our product.',
-    body: `Health outcomes today are largely predicted by postcode, income, and ethnicity. Belrose puts the same data infrastructure that pharmaceutical companies and insurers use into the hands of every patient. With Belrose, your wellbeing — not your data — becomes the product.`,
+    body: `Health outcomes today are largely predicted by postcode, income, and ethnicity. Belrose puts the same data infrastructure that pharmaceutical companies and insurers use into the hands of every patient regardless of background. With Belrose, your wellbeing — not your data — becomes the product.`,
     stat: '∞',
     statLabel: 'The value of your health, controlled by you',
   },

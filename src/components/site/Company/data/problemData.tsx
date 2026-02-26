@@ -12,7 +12,7 @@ const problemData: ProblemCard[] = [
         Your GP holds one fragment. The hospital holds another. The specialist across town holds a
         third. When you move, immigrate, or simply see a new doctor, your history goes dark. The
         current system is a patchwork of hardcopy records and siloed servers — often in conflicting
-        formats that cannot be merged. The failure to coordinate care costs the US upwards of $80
+        formats that cannot be merged. The failure to coordinate care costs the US alone nearly $80
         billion annually <CitationLink id="waste-in-US-healthcare" />.
       </>
     ),
@@ -61,9 +61,9 @@ const problemData: ProblemCard[] = [
     ),
     highlight: (
       <>
-        These are not stories of lazy governments or poor execution. Brilliant citizens tried
-        seriously and failed seriously. The lesson is not that they did it wrong. It is that
-        centralization itself is the wrong approach.{' '}
+        See how centralization played out in various countries below. These are not stories about
+        bad government. Brilliant citizens with good intentions tried seriously. The lesson is not
+        that they were incompetent. It is that centralization itself is the wrong approach.
         <div className="mt-4">
           <FlagSelector countries={countryData} />
         </div>

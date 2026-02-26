@@ -8,7 +8,7 @@ interface FlagSelectorProps {
 }
 
 const FlagSelector: React.FC<FlagSelectorProps> = ({ countries }) => {
-  const [selected, setSelected] = useState(0);
+  const [selected, setSelected] = useState<number | null>(null);
 
   return (
     <div>
@@ -32,7 +32,7 @@ const FlagSelector: React.FC<FlagSelectorProps> = ({ countries }) => {
       </div>
 
       {/* Content */}
-      <div>{countries[selected]?.content}</div>
+      <div>{selected !== null ? countries[selected]?.content : null}</div>
     </div>
   );
 };

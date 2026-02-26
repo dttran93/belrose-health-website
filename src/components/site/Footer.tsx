@@ -11,15 +11,15 @@ const Footer: React.FC = () => {
 
   const links = {
     company: [
-      { name: 'About Us', href: '#' },
-      { name: 'Careers', href: '#' },
-      { name: 'Contact', href: '#' },
+      { name: 'About Us', href: '/#about' },
+      { name: 'Careers', href: '/#who' },
+      { name: 'Contact', href: '/#who/contact' },
     ],
     product: [
-      { name: 'How It Works', href: '#' },
-      { name: 'FAQ', href: '#' },
-      { name: 'Login', href: '#' },
-      { name: 'Register', href: '#' },
+      { name: 'How It Works', href: '/#how' },
+      { name: 'FAQ', href: '/#faq' },
+      { name: 'Login', href: '/auth' },
+      { name: 'Register', href: '/auth/register' },
     ],
   };
 

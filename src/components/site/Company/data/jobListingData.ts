@@ -2,7 +2,7 @@
 
 import { JobListing } from '../ui/JobListingCard';
 
-const jobsData: JobListing[] = [
+export const jobsDataDraft: JobListing[] = [
   {
     department: 'Engineering',
     title: 'Full-Stack Engineer (React / Firebase)',
@@ -22,5 +22,7 @@ const jobsData: JobListing[] = [
     tagColor: 'bg-emerald-50 text-emerald-700',
   },
 ];
+
+const jobsData: JobListing[] = [];
 
 export default jobsData;

@@ -133,9 +133,7 @@ const Navbar: React.FC = () => {
           <Button variant="outline" onClick={() => navigate('/auth')}>
             Log In
           </Button>
-          <Button onClick={() => navigate('/auth', { state: { showRegistration: true } })}>
-            Get Started
-          </Button>
+          <Button onClick={() => navigate('/auth/register')}>Get Started</Button>
         </div>
 
         {/* Mobile menu button */}

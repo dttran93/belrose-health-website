@@ -94,7 +94,7 @@ const FAQFull: React.FC = () => {
             </p>
           </div>
           <a
-            href="mailto:support@belrosehealth.com"
+            href="mailto:hello@belrosehealth.com"
             className="shrink-0 bg-white text-primary font-semibold text-sm px-6 py-3 rounded-xl hover:bg-gray-50 transition-colors"
           >
             Contact Us
