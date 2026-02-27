@@ -5,8 +5,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthContext } from '@/features/Auth/AuthContext';
-import { FileObject } from '@/types/core';
 import { SubjectInfo } from '@/features/Ai/components/ui/SubjectList';
 import { ContextSelection } from '@/features/Ai/components/ui/ContextBadge';
 import {
@@ -23,19 +23,43 @@ import {
 } from '@/features/Ai/components/AIAssistantView';
 import { AVAILABLE_MODELS } from '@/features/Ai/components/ui/ModelSelector';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
-import { useAIChat } from '@/features/Ai/hooks/useAIChat';
+import { useAIChatContext } from '@/features/Ai/components/AIChatContext';
 import { useFileDrop } from '@/hooks/useFileDrop';
 import { FileDragOverlay } from '@/components/ui/FileDragOverlay';
 import { ChatAttachment } from '@/features/Ai/components/ui/AttachmentBadge';
 
 export default function AppPortal() {
   const { user, loading: authLoading } = useAuthContext();
+  const { chatId } = useParams<{ chatId: string }>(); // ✅ Read chatId from URL
+  const navigate = useNavigate();
+
+  // ============================================================================
+  // CONTEXT — replaces useAIChat
+  // ============================================================================
+
+  const {
+    currentChatId,
+    messages,
+    isLoadingMessages,
+    isSendingMessage,
+    chatError,
+    handleSendMessage,
+    handleLoadChat,
+    handleNewChat,
+    handleStopGeneration,
+    selectedModel,
+    setSelectedModel,
+    selectedContext,
+    setSelectedContext,
+    allRecords,
+    setAllRecords,
+    refreshChats,
+  } = useAIChatContext();
 
   // ============================================================================
   // DATA STATE
   // ============================================================================
 
-  const [allRecords, setAllRecords] = useState<FileObject[]>([]);
   const [availableSubjects, setAvailableSubjects] = useState<SubjectInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -46,24 +70,6 @@ export default function AppPortal() {
 
   // AI Model selection
   const availableModels: AIModel[] = AVAILABLE_MODELS;
-  const DEFAULT_MODEL: AIModel = AVAILABLE_MODELS[0] ?? {
-    id: 'claude-sonnet-4-20250514',
-    name: 'Fallback Model',
-    provider: 'anthropic',
-    description: "Claude's best combination of speed and intelligence",
-  };
-
-  const [selectedModel, setSelectedModel] = useState<AIModel>(DEFAULT_MODEL);
-
-  // Context state
-  const [selectedContext, setSelectedContext] = useState<ContextSelection>({
-    type: 'my-records',
-    subjectId: null,
-    recordCount: 0,
-    description: 'Your health records',
-  });
-
-  // ✅ Updated: Use VirtualAttachment[] instead of File[]
   const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
 
   // ============================================================================
@@ -78,13 +84,25 @@ export default function AppPortal() {
     global: true,
   });
 
-  // AI Chat functionality
-  const chat = useAIChat({
-    user,
-    allRecords,
-    selectedContext,
-    selectedModel,
-  });
+  // ============================================================================
+  // ROUTING EFFECTS
+  // ============================================================================
+
+  // When URL has a chatId, load that chat
+  useEffect(() => {
+    if (chatId && chatId !== currentChatId) {
+      handleLoadChat(chatId);
+    }
+  }, [chatId]);
+
+  // When a new chat gets created (currentChatId changes from null),
+  // update the URL so the user can refresh/share it
+  useEffect(() => {
+    if (currentChatId && !chatId) {
+      navigate(`/app/ai/chat/${currentChatId}`, { replace: true });
+      refreshChats(); // ✅ Update sidebar with the new chat
+    }
+  }, [currentChatId]);
 
   // ============================================================================
   // DATA FETCHING
@@ -191,11 +209,14 @@ export default function AppPortal() {
 
       <AIHealthAssistantView
         user={user}
-        messages={chat.messages}
-        isLoading={chat.isSendingMessage || chat.isLoadingMessages}
-        error={chat.chatError}
-        onSendMessage={chat.handleSendMessage}
-        onClearChat={chat.handleNewChat}
+        messages={messages}
+        isLoading={isSendingMessage || isLoadingMessages}
+        error={chatError}
+        onSendMessage={handleSendMessage}
+        onClearChat={() => {
+          handleNewChat();
+          navigate('/app', { replace: true }); // ✅ Clear URL when starting new chat
+        }}
         selectedModel={selectedModel}
         availableModels={availableModels}
         onModelChange={setSelectedModel}
@@ -207,7 +228,7 @@ export default function AppPortal() {
         getSubjectName={getSubjectName}
         pendingAttachments={pendingAttachments}
         onPendingAttachmentsClear={() => setPendingAttachments([])}
-        onStop={chat.handleStopGeneration}
+        onStop={handleStopGeneration}
       />
     </div>
   );

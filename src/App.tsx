@@ -22,6 +22,8 @@ import BlockchainAdminDashboard from './pages/BlockchainAdminDashboard';
 import HashTester from './pages/HashTester';
 import Index from './pages';
 import { CitationProvider } from './components/site/Citations/CitationContext';
+import { AIChatProvider } from './features/Ai/components/AIChatContext';
+import ChatHistoryPage from './features/Ai/components/ChatHistoryPage';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
@@ -56,20 +58,24 @@ const App: React.FC = (): React.JSX.Element => {
                     <ProtectedRoute>
                       <EncryptionGate>
                         <LayoutProvider>
-                          <Layout>
-                            <Routes>
-                              <Route index element={<AppPortal />} />
-                              <Route path="all-records" element={<AllRecords />} />
-                              <Route path="add-record" element={<AddRecord />} />
-                              <Route path="hash-tester" element={<HashTester />} />
-                              <Route path="settings" element={<SettingsPage />} />
-                              <Route path="notifications" element={<NotificationsManager />} />
-                              <Route
-                                path="blockchain-admin"
-                                element={<BlockchainAdminDashboard />}
-                              />
-                            </Routes>
-                          </Layout>
+                          <AIChatProvider>
+                            <Layout>
+                              <Routes>
+                                <Route index element={<AppPortal />} />
+                                <Route path="ai/chat/:chatId" element={<AppPortal />} />
+                                <Route path="ai/history" element={<ChatHistoryPage />} />
+                                <Route path="all-records" element={<AllRecords />} />
+                                <Route path="add-record" element={<AddRecord />} />
+                                <Route path="hash-tester" element={<HashTester />} />
+                                <Route path="settings" element={<SettingsPage />} />
+                                <Route path="notifications" element={<NotificationsManager />} />
+                                <Route
+                                  path="blockchain-admin"
+                                  element={<BlockchainAdminDashboard />}
+                                />
+                              </Routes>
+                            </Layout>
+                          </AIChatProvider>
                         </LayoutProvider>
                       </EncryptionGate>
                     </ProtectedRoute>

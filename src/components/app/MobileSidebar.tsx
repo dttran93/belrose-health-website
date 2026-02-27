@@ -1,33 +1,43 @@
-import { X, Bot } from 'lucide-react';
+import { X } from 'lucide-react';
 import NavItem from '../ui/NavItem';
 import UserMenuButton from '../ui/UserMenuButton';
-import { NavigationItem } from './navigation';
+import { NavigationSection } from './navigation';
 import { User } from '@/types/core';
+import { Chat } from '@/features/Ai/service/chatService';
+import { ChatHistoryList } from '@/features/Ai/components/ui/ChatHistoryList';
 
 interface MobileSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   user: User;
-  onToggleAI: () => void;
-  isAIOpen: boolean;
-  healthRecords: NavigationItem[];
-  healthCategories: NavigationItem[];
+  navigationSections: NavigationSection[];
   onLogout?: () => void;
   onSettings?: () => void;
   onHelp?: () => void;
+  chats: Chat[];
+  chatsLoading: boolean;
+  currentChatId: string | null;
+  onSelectChat: (chatId: string) => void;
+  onNewChat: () => void;
+  onDeleteChat: (chatId: string) => void;
+  onViewAllChats: () => void;
 }
 
 function MobileSidebar({
   isOpen,
   onClose,
   user,
-  onToggleAI,
-  isAIOpen,
-  healthRecords,
-  healthCategories,
+  navigationSections,
   onLogout,
   onSettings,
   onHelp,
+  chats,
+  chatsLoading,
+  currentChatId,
+  onSelectChat,
+  onNewChat,
+  onDeleteChat,
+  onViewAllChats,
 }: MobileSidebarProps) {
   return (
     <div>
@@ -46,11 +56,9 @@ function MobileSidebar({
       >
         {/* Header */}
         <div className="flex-shrink-0 p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div>
-              <h2 className="font-bold text-lg text-left">Belrose</h2>
-              <p className="text-xs text-gray-400">Medical Records</p>
-            </div>
+          <div>
+            <h2 className="font-bold text-lg text-left">Belrose</h2>
+            <p className="text-xs text-gray-400">Medical Records</p>
           </div>
           <button
             onClick={onClose}
@@ -63,55 +71,48 @@ function MobileSidebar({
         {/* Navigation - Scrollable */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-6">
-            {/* AI Assistant Button */}
-            <div className="mb-4">
-              <button
-                onClick={() => {
-                  onToggleAI();
+            {/* ✅ Render all sections dynamically from the navigation config */}
+            {navigationSections.map(section => (
+              <div key={section.label}>
+                {section.label && (
+                  <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 text-gray-400">
+                    {section.label}
+                  </h3>
+                )}
+                <div className="space-y-1">
+                  {section.items.map(item => (
+                    <NavItem key={item.title} item={item} onClick={onClose} />
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {/* ✅ Chat History */}
+            <div className="border-t border-gray-700 pt-2">
+              <ChatHistoryList
+                chats={chats}
+                isLoading={chatsLoading}
+                currentChatId={currentChatId}
+                onSelectChat={chatId => {
+                  onSelectChat(chatId);
                   onClose();
                 }}
-                className={`
-                  w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
-                  ${
-                    isAIOpen
-                      ? 'bg-blue-500 text-white font-medium'
-                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                  }
-                `}
-              >
-                <Bot className="w-5 h-5 flex-shrink-0" />
-                <span className="text-sm">AI Assistant</span>
-              </button>
-            </div>
-
-            {/* Health Records Section */}
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 text-gray-400">
-                Health Records
-              </h3>
-              <div className="space-y-1">
-                {healthRecords.map(item => (
-                  <NavItem key={item.title} item={item} onClick={onClose} />
-                ))}
-              </div>
-            </div>
-
-            {/* Health Categories Section */}
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 text-gray-400">
-                Health Categories
-              </h3>
-              <div className="space-y-1">
-                {healthCategories.map(item => (
-                  <NavItem key={item.title} item={item} onClick={onClose} />
-                ))}
-              </div>
+                onNewChat={() => {
+                  onNewChat();
+                  onClose();
+                }}
+                onDeleteChat={onDeleteChat}
+                onViewAll={() => {
+                  onViewAllChats();
+                  onClose();
+                }}
+              />
             </div>
           </div>
         </div>
 
-        {/* Mobile User Info */}
-        <div className="">
+        {/* User Info */}
+        <div>
           <UserMenuButton
             user={user}
             isCollapsed={false}

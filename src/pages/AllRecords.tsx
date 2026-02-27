@@ -203,7 +203,7 @@ export const AllRecords: React.FC = () => {
     if (newFilterType !== 'subject') setSelectedSubjectId(undefined);
   };
 
-  const handleAddNewRecord = () => navigate('/app/addrecord');
+  const handleAddNewRecord = () => navigate('/app/add-record');
 
   // ================== LOADING / ERROR STATES ===================
 

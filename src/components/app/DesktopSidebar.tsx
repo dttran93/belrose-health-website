@@ -1,22 +1,27 @@
-import { PanelLeft, ArrowLeftToLine, ArrowRightToLine, Bot } from 'lucide-react';
+import { PanelLeft, ArrowLeftToLine, ArrowRightToLine } from 'lucide-react';
 import UserMenuButton from '@/components/ui/UserMenuButton';
 import NavItem from '@/components/ui/NavItem';
-import { NavigationItem } from './navigation';
+import { NavigationSection } from './navigation';
 import { User } from '@/types/core';
+import { Chat } from '@/features/Ai/service/chatService';
+import { ChatHistoryList } from '@/features/Ai/components/ui/ChatHistoryList';
 
 interface DesktopSidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
   user: User;
   onLogout: () => void;
-  healthRecords: NavigationItem[];
-  healthCategories: NavigationItem[];
+  navigationSections: NavigationSection[];
   onSettings: () => void;
   onNotifications: () => void;
   onHelp: () => void;
-  onToggleAI: () => void;
-  onCloseAI: () => void;
-  isAIOpen: boolean;
+  chats: Chat[];
+  chatsLoading: boolean;
+  currentChatId: string | null;
+  onSelectChat: (chatId: string) => void;
+  onNewChat: () => void;
+  onDeleteChat: (chatId: string) => void;
+  onViewAllChats: () => void;
 }
 
 function DesktopSidebar({
@@ -24,14 +29,17 @@ function DesktopSidebar({
   onToggle,
   user,
   onLogout,
-  healthRecords,
-  healthCategories,
+  navigationSections,
   onSettings,
   onNotifications,
   onHelp,
-  onToggleAI,
-  onCloseAI,
-  isAIOpen,
+  chats,
+  chatsLoading,
+  currentChatId,
+  onSelectChat,
+  onNewChat,
+  onDeleteChat,
+  onViewAllChats,
 }: DesktopSidebarProps) {
   return (
     <div
@@ -82,37 +90,40 @@ function DesktopSidebar({
 
       {/* Navigation */}
       <div className="flex-1 p-4 space-y-6 overflow-y-auto">
-        {/* Health Records Section */}
-        <div>
-          {!isCollapsed && (
-            <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 text-gray-400">
-              Health Records
-            </h3>
-          )}
-          <div className="space-y-1">
-            {healthRecords.map(item => (
-              <NavItem key={item.title} item={item} isCollapsed={isCollapsed} />
-            ))}
+        {/* ✅ Render all sections dynamically from the navigation config */}
+        {navigationSections.map(section => (
+          <div key={section.label}>
+            {!isCollapsed && section.label && (
+              <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 text-gray-400">
+                {section.label}
+              </h3>
+            )}
+            <div className="space-y-1">
+              {section.items.map(item => (
+                <NavItem key={item.title} item={item} isCollapsed={isCollapsed} />
+              ))}
+            </div>
           </div>
-        </div>
+        ))}
 
-        {/* Health Categories Section */}
-        <div>
-          {!isCollapsed && (
-            <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 text-gray-400">
-              Health Categories
-            </h3>
-          )}
-          <div className="space-y-1">
-            {healthCategories.map(item => (
-              <NavItem key={item.title} item={item} isCollapsed={isCollapsed} />
-            ))}
+        {/* ✅ Chat History — hidden when collapsed */}
+        {!isCollapsed && (
+          <div className="border-t border-gray-700 pt-4">
+            <ChatHistoryList
+              chats={chats}
+              isLoading={chatsLoading}
+              currentChatId={currentChatId}
+              onSelectChat={onSelectChat}
+              onNewChat={onNewChat}
+              onDeleteChat={onDeleteChat}
+              onViewAll={onViewAllChats}
+            />
           </div>
-        </div>
+        )}
       </div>
 
-      {/* User Info & Toggle */}
-      <div className="">
+      {/* User Info */}
+      <div>
         <UserMenuButton
           user={user}
           isCollapsed={isCollapsed}

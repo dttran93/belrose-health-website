@@ -4,12 +4,12 @@ import { toast } from 'sonner';
 import DesktopSidebar from '@/components/app/DesktopSidebar';
 import MobileSidebar from '@/components/app/MobileSidebar';
 import MobileHeader from '@/components/app/MobileHeader';
-import ResizeHandle from '@/components/ui/ResizeHandle';
 import useMediaQuery from '@/hooks/useMediaQuery';
-import { healthRecords, healthCategories } from '@/components/app/navigation';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { authService } from '@/features/Auth/services/authServices';
 import { useLayout } from '@/components/app/LayoutProvider';
+import { useAIChatContext } from '@/features/Ai/components/AIChatContext';
+import { navigationSections } from './navigation';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -19,17 +19,36 @@ interface AppLayoutProps {
 function AppLayout({ children }: AppLayoutProps) {
   const { user } = useAuthContext();
   const { header, footer } = useLayout();
+  const navigate = useNavigate();
 
-  // If no user, something went wrong. Error message just in case. But should be hanlded by ProtectedRoute.tsx
+  // Pull chat history + current chat state from context
+  const { chats, chatsLoading, currentChatId, handleLoadChat, handleNewChat, deleteChat } =
+    useAIChatContext();
+
   if (!user) return null;
 
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
-  const [aiPanelWidth, setAIPanelWidth] = useState(400);
-  const [isAIFullscreen, setIsAIFullscreen] = useState(false);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
-  const navigate = useNavigate();
+
+  // Sidebar chat handlers
+  const handleSelectChat = (chatId: string) => {
+    handleLoadChat(chatId);
+    navigate(`/app/ai/chat/${chatId}`);
+    setIsMobileOpen(false);
+  };
+
+  const handleNewChatClick = () => {
+    handleNewChat();
+    navigate('/app', { replace: true });
+    setIsMobileOpen(false);
+  };
+
+  const handleViewAllChats = () => {
+    navigate('/app/ai/history');
+    setIsMobileOpen(false);
+  };
 
   const handleLogout = async () => {
     try {
@@ -52,13 +71,6 @@ function AppLayout({ children }: AppLayoutProps) {
     window.open('https://help.example.com', '_blank');
   };
 
-  const handleAIPanelResize = (deltaX: number) => {
-    setAIPanelWidth(prev => {
-      const newWidth = prev + deltaX;
-      return Math.min(Math.max(newWidth, 300), 800); // Min 300px, Max 800px
-    });
-  };
-
   // Close mobile sidebar when switching to desktop
   useEffect(() => {
     if (isDesktop) {
@@ -77,14 +89,17 @@ function AppLayout({ children }: AppLayoutProps) {
             onToggle={() => setIsDesktopCollapsed(!isDesktopCollapsed)}
             user={user}
             onLogout={handleLogout}
-            healthRecords={healthRecords}
-            healthCategories={healthCategories}
+            navigationSections={navigationSections}
             onSettings={handleSettings}
             onNotifications={handleNotifications}
             onHelp={handleHelp}
-            onCloseAI={() => setIsMobileOpen(false)}
-            onToggleAI={() => setIsAIOpen(!isAIOpen)}
-            isAIOpen={isAIOpen}
+            chats={chats}
+            chatsLoading={chatsLoading}
+            currentChatId={currentChatId}
+            onSelectChat={handleSelectChat}
+            onNewChat={handleNewChatClick}
+            onDeleteChat={deleteChat}
+            onViewAllChats={handleViewAllChats}
           />
         </div>
 
@@ -123,16 +138,19 @@ function AppLayout({ children }: AppLayoutProps) {
         isOpen={isMobileOpen}
         onClose={() => setIsMobileOpen(false)}
         user={user}
-        onToggleAI={() => setIsAIOpen(!isAIOpen)}
-        isAIOpen={isAIOpen}
-        healthRecords={healthRecords}
-        healthCategories={healthCategories}
+        navigationSections={navigationSections}
         onLogout={handleLogout}
         onSettings={handleSettings}
         onHelp={handleHelp}
+        chats={chats}
+        chatsLoading={chatsLoading}
+        currentChatId={currentChatId}
+        onSelectChat={handleSelectChat}
+        onNewChat={handleNewChatClick}
+        onDeleteChat={deleteChat}
+        onViewAllChats={handleViewAllChats}
       />
 
-      {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
         {!isAIOpen ? (
           <main className="flex-1 p-6 overflow-auto">{children}</main>

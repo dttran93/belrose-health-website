@@ -21,14 +21,14 @@ export interface AIModel {
 
 export type AIProvider = 'anthropic' | 'openai' | 'google' | 'deepseek';
 
-const AnthropicLogo = () => (
+export const AnthropicLogo = () => (
   <svg width="16" height="16" viewBox="0 0 92 64" fill="currentColor" className="text-gray-700">
     <path d="M66.4915 0H52.5029L78.0115 64H92.0001L66.4915 0Z" />
     <path d="M26.08 0L0.571472 64H14.8343L20.0512 50.56H46.7374L51.9543 64H66.2172L40.7086 0H26.08ZM24.6647 38.6743L33.3943 16.1829L42.1239 38.6743H24.6647Z" />
   </svg>
 );
 
-const GoogleLogo = () => (
+export const GoogleLogo = () => (
   <svg width="16" height="16" viewBox="0 0 24 24">
     <path
       fill="#4285F4"

@@ -1,16 +1,4 @@
-import {
-  Clipboard,
-  Activity,
-  FilePlus2,
-  Flame,
-  Heart,
-  PersonStanding,
-  Smile,
-  CircleEllipsisIcon,
-  LucideIcon,
-  Link,
-  Hash,
-} from 'lucide-react';
+import { Clipboard, Activity, FilePlus2, LucideIcon, Link, Hash, House } from 'lucide-react';
 
 export interface NavigationItem {
   title: string;
@@ -18,18 +6,24 @@ export interface NavigationItem {
   icon: LucideIcon;
 }
 
-export const healthRecords: NavigationItem[] = [
-  { title: 'Admin Dashboard', url: '/app/blockchain-admin', icon: Link },
-  { title: 'Home', url: '/app', icon: Activity },
-  { title: 'All Records', url: '/app/all-records', icon: Clipboard },
-  { title: 'Add Record', url: '/app/add-record', icon: FilePlus2 },
-  { title: 'HashTester', url: '/app/hash-tester', icon: Hash },
-];
+export interface NavigationSection {
+  label?: string;
+  items: NavigationItem[];
+}
 
-export const healthCategories: NavigationItem[] = [
-  { title: 'Exercise', url: '/app/exercise', icon: Flame },
-  { title: 'Heart', url: '/app/heart', icon: Heart },
-  { title: 'Body Measurements', url: '/app/bodymeasurements', icon: PersonStanding },
-  { title: 'Mental Health', url: '/app/mentalhealth', icon: Smile },
-  { title: 'Other Data', url: '/app/otherdata', icon: CircleEllipsisIcon },
+export const navigationSections: NavigationSection[] = [
+  {
+    label: 'Admin',
+    items: [
+      { title: 'Admin Dashboard', url: '/app/blockchain-admin', icon: Link },
+      { title: 'HashTester', url: '/app/hash-tester', icon: Hash },
+    ],
+  },
+  {
+    items: [
+      { title: 'Home', url: '/app', icon: House },
+      { title: 'All Records', url: '/app/all-records', icon: Clipboard },
+      { title: 'Add Record', url: '/app/add-record', icon: FilePlus2 },
+    ],
+  },
 ];
