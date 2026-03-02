@@ -41,6 +41,12 @@ interface DisputeManagementProps {
   onReact?: (recordHash: string, disputerId: string, support: boolean) => void;
 }
 
+export const getReactionType = (value: boolean | null | undefined): ReactionType => {
+  if (value === true) return 'support';
+  if (value === false) return 'oppose';
+  return null;
+};
+
 export const DisputeManagement: React.FC<DisputeManagementProps> = ({
   record,
   onBack,
@@ -64,12 +70,6 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
   // Modal state
   const [selectedDispute, setSelectedDispute] = useState<DisputeDocDecrypted | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const getReactionType = (value: boolean | null | undefined): ReactionType => {
-    if (value === true) return 'support';
-    if (value === false) return 'oppose';
-    return null;
-  };
 
   // Fetch disputes and user profiles
   useEffect(() => {
@@ -373,7 +373,6 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
               userReaction: null,
             }
           }
-          isLoadingStats={loadingStats}
         />
       )}
     </div>

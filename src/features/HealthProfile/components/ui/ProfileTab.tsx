@@ -2,7 +2,7 @@
 
 import { Clipboard, IdCard, LayoutGrid, List, ShieldCheck } from 'lucide-react';
 
-export type ProfileTab = 'overview' | 'details' | 'blockchain' | 'records' | 'identity';
+export type ProfileTab = 'summary' | 'details' | 'blockchain' | 'records' | 'identity';
 
 /** Tab switcher between Overview and Blockchain Verification */
 const ProfileTabs: React.FC<{
@@ -10,7 +10,7 @@ const ProfileTabs: React.FC<{
   onTabChange: (tab: ProfileTab) => void;
 }> = ({ activeTab, onTabChange }) => {
   const tabs: { key: ProfileTab; label: string; icon: React.FC<{ className?: string }> }[] = [
-    { key: 'overview', label: 'Overview', icon: LayoutGrid },
+    { key: 'summary', label: 'Summary', icon: LayoutGrid },
     { key: 'details', label: 'Details', icon: List },
     { key: 'records', label: 'Records', icon: Clipboard },
     { key: 'identity', label: 'Identity', icon: IdCard },

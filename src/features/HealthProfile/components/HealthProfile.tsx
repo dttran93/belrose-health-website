@@ -16,7 +16,7 @@ import { useAuthContext } from '@/features/Auth/AuthContext';
 import ProfileHeader from './ui/ProfileHeader';
 import ProfileTabs, { ProfileTab } from './ui/ProfileTab';
 import ProfileRecordsTab from './ui/ProfileRecords';
-import ProfileBlockchainTab from './ProfileCredibilityTab';
+import ProfileBlockchainTab from './CredibilityTab/ProfileCredibilityTab';
 
 /** Placeholder for the blockchain tab — will be replaced with SubjectVerificationView */
 const BlockchainTabPlaceholder: React.FC = () => (
@@ -73,7 +73,7 @@ const MissingSubjectId: React.FC = () => {
 
 const HealthProfile: React.FC = () => {
   const { subjectId } = useParams<{ subjectId: string }>();
-  const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
+  const [activeTab, setActiveTab] = useState<ProfileTab>('summary');
 
   const { user } = useAuthContext();
   const resolvedSubjectId = subjectId === 'me' ? user?.uid : subjectId;
@@ -96,7 +96,7 @@ const HealthProfile: React.FC = () => {
     if (error) return <ErrorState message={error.message} />;
 
     switch (activeTab) {
-      case 'overview':
+      case 'summary':
         return (
           <HealthCategoryGrid
             grouped={grouped}

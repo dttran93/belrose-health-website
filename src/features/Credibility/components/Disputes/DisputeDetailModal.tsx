@@ -44,7 +44,6 @@ interface DisputeDetailModalProps {
     supports: number;
     opposes: number;
   };
-  isLoadingStats: boolean;
 }
 
 // ============================================================
@@ -72,7 +71,6 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
   onRetract,
   onReact,
   reactionStats,
-  isLoadingStats,
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('details');
   const [initialReactionTab, setInitialReactionTab] = useState<'support' | 'oppose'>('support');

@@ -29,7 +29,7 @@ import {
   RecordCompletenessResult,
   RecordBlockchainStatus,
   BlockchainCompletenessSummary,
-} from '../hooks/useBlockchainCompleteness';
+} from '../../hooks/useBlockchainCompleteness';
 import {
   getVerificationsByRecordId,
   VerificationDoc,
@@ -44,32 +44,23 @@ import {
   getCulpabilityConfig,
 } from '@/features/Credibility/services/disputeService';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
+import HashRow from './ui/HashRow';
+import RecordRow from './ui/RecordRow';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-interface ProfileBlockchainTabProps {
+interface ProfileCredibilityTabProps {
   subjectFirebaseUid: string;
   records: FileObject[];
-}
-
-type SectionTab = 'hashes' | 'verifications' | 'disputes';
-
-interface RecordCredibilityData {
-  verifications: VerificationDoc[];
-  disputes: DisputeDocDecrypted[];
-  reactionStatsMap: Map<string, ReactionStats>;
-  userProfiles: Map<string, BelroseUserProfile>;
-  isLoading: boolean;
-  error: string | null;
 }
 
 // ============================================================================
 // STATUS CONFIG
 // ============================================================================
 
-const STATUS_CONFIG: Record<
+export const STATUS_CONFIG: Record<
   RecordBlockchainStatus,
   {
     label: string;
@@ -153,7 +144,7 @@ function formatRelativeTime(date: Date): string {
 // ============================================================================
 
 /** Thin coloured pill matching your existing UserBadge style */
-function StatusPill({ status }: { status: RecordBlockchainStatus }) {
+export function StatusPill({ status }: { status: RecordBlockchainStatus }) {
   const cfg = STATUS_CONFIG[status];
   return (
     <span
@@ -163,40 +154,6 @@ function StatusPill({ status }: { status: RecordBlockchainStatus }) {
       <span className="text-[10px]">{cfg.icon}</span>
       {cfg.label}
     </span>
-  );
-}
-
-/** Hash row in the hash history section */
-function HashRow({
-  hash,
-  index,
-  isCurrent,
-  isMatched,
-  matchType,
-}: {
-  hash: string;
-  index: number;
-  isCurrent: boolean;
-  isMatched: boolean;
-  matchType: 'current' | 'previous';
-}) {
-  const matchedGreen = isMatched && matchType === 'current';
-  const matchedBlue = isMatched && matchType === 'previous';
-
-  return (
-    <div className="flex items-center gap-3 py-1.5 border-b border-gray-50 last:border-0">
-      <span className="text-[10px] text-muted-foreground w-5 shrink-0">v{index + 1}</span>
-      <span className="font-mono text-xs text-foreground flex-1 truncate">{hash}</span>
-      <div className="flex gap-1.5 shrink-0">
-        {isCurrent && (
-          <UserBadge text="Current" color="blue" tooltip="This is the current Firestore hash" />
-        )}
-        {matchedGreen && <UserBadge text="Matched" color="green" tooltip="Matches on-chain hash" />}
-        {matchedBlue && (
-          <UserBadge text="Matched ←" color="blue" tooltip="Previous version matched on-chain" />
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -315,275 +272,10 @@ function DisputeEntry({
 }
 
 // ============================================================================
-// RECORD ROW
-// ============================================================================
-
-function RecordRow({
-  result,
-  expanded,
-  onToggle,
-}: {
-  result: RecordCompletenessResult;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  const [activeSection, setActiveSection] = useState<SectionTab>('hashes');
-  const [credData, setCredData] = useState<RecordCredibilityData>({
-    verifications: [],
-    disputes: [],
-    reactionStatsMap: new Map(),
-    userProfiles: new Map(),
-    isLoading: false,
-    error: null,
-  });
-
-  const cfg = STATUS_CONFIG[result.status];
-  const recordId = result.record.id || result.record.firestoreId;
-
-  // Lazy-load verifications + disputes when first expanded
-  useEffect(() => {
-    if (!expanded || !recordId || credData.verifications.length > 0 || credData.isLoading) return;
-
-    const load = async () => {
-      setCredData(prev => ({ ...prev, isLoading: true, error: null }));
-      try {
-        const [verifications, disputes] = await Promise.all([
-          getVerificationsByRecordId(recordId),
-          getDisputesByRecordId(recordId),
-        ]);
-
-        // Fetch reaction stats for every dispute in parallel.
-        // getDisputeReactionStats needs recordId, recordHash, and disputerId.
-        const statsEntries = await Promise.all(
-          disputes.map(async d => {
-            const stats = await getDisputeReactionStats(d.recordId, d.recordHash, d.disputerId);
-            return [d.id, stats] as [string, ReactionStats];
-          })
-        );
-        const reactionStatsMap = new Map(statsEntries);
-
-        // Collect all user IDs to batch-fetch profiles
-        const userIds = [
-          ...verifications.map(v => v.verifierId),
-          ...disputes.map(d => d.disputerId),
-        ].filter(Boolean);
-
-        const profiles = userIds.length > 0 ? await getUserProfiles(userIds) : new Map();
-
-        setCredData({
-          verifications,
-          disputes,
-          reactionStatsMap,
-          userProfiles: profiles,
-          isLoading: false,
-          error: null,
-        });
-      } catch (err) {
-        console.error('Failed to load credibility data for record:', recordId, err);
-        setCredData(prev => ({ ...prev, isLoading: false, error: 'Failed to load' }));
-      }
-    };
-
-    load();
-  }, [expanded, recordId]);
-
-  const verCount = credData.verifications.length;
-  const dispCount = credData.disputes.length;
-
-  const tabs: { id: SectionTab; label: string; count: number }[] = [
-    { id: 'hashes', label: 'Hash History', count: result.onChainHashes.length },
-    { id: 'verifications', label: 'Verifications', count: verCount },
-    { id: 'disputes', label: 'Disputes', count: dispCount },
-  ];
-
-  return (
-    <div
-      className="rounded-xl border transition-colors overflow-hidden"
-      style={{ borderColor: expanded ? cfg.border : undefined }}
-    >
-      {/* ── Collapsed header ── */}
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
-        style={{ background: expanded ? cfg.bg : undefined }}
-      >
-        {/* Status dot */}
-        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: cfg.dot }} />
-
-        {/* Name + source */}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground truncate">
-            {result.record.belroseFields?.title || result.record.fileName}
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {result.record.belroseFields?.institution || result.record.sourceType || '—'}
-            {result.onChainHashes.length > 0 &&
-              ` · ${result.onChainHashes.length} on-chain version${result.onChainHashes.length !== 1 ? 's' : ''}`}
-          </p>
-        </div>
-
-        {/* Credibility counts (shown once loaded) */}
-        {verCount > 0 && (
-          <span className="text-xs text-complement-3 bg-complement-3/10 border border-complement-3/30 rounded-full px-2 py-0.5 shrink-0">
-            {verCount} verification{verCount !== 1 ? 's' : ''}
-          </span>
-        )}
-        {dispCount > 0 && (
-          <span className="text-xs text-complement-4 bg-complement-4/10 border border-complement-4/30 rounded-full px-2 py-0.5 shrink-0">
-            {dispCount} dispute{dispCount !== 1 ? 's' : ''}
-          </span>
-        )}
-
-        {/* Status pill */}
-        <StatusPill status={result.status} />
-
-        {/* Chevron */}
-        <ChevronDown
-          className="w-4 h-4 text-muted-foreground shrink-0 transition-transform"
-          style={{ transform: expanded ? 'rotate(180deg)' : 'none' }}
-        />
-      </button>
-
-      {/* ── Expanded panel ── */}
-      {expanded && (
-        <div style={{ borderTop: `1px solid ${cfg.border}` }}>
-          {/* Context callout for mismatch / traceable */}
-          {result.status === 'anchored_previous_version' && (
-            <div className="mx-4 mt-3 text-xs text-complement-2 bg-complement-2/10 border border-complement-2/20 rounded-lg px-3 py-2">
-              This record has been edited since its last blockchain verification. A previous version
-              matched on-chain — the chain of custody is intact.
-            </div>
-          )}
-          {result.status === 'anchored_mismatch' && (
-            <div className="mx-4 mt-3 text-xs text-complement-4 bg-complement-4/10 border border-complement-4/20 rounded-lg px-3 py-2">
-              No version of this record — current or historical — matches any on-chain hash. The
-              record may have been modified outside normal channels.
-            </div>
-          )}
-
-          {/* Section tabs */}
-          <div className="flex border-b border-border bg-muted/20 mt-3">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveSection(tab.id)}
-                className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium border-b-2 transition-colors ${
-                  activeSection === tab.id
-                    ? 'border-primary text-foreground'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {tab.label}
-                {(tab.count > 0 || tab.id === 'hashes') && (
-                  <span
-                    className={`rounded-full px-1.5 py-0 text-[10px] font-semibold ${
-                      activeSection === tab.id
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground'
-                    }`}
-                  >
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Section content */}
-          <div className="px-4 py-3 space-y-1">
-            {/* HASH HISTORY */}
-            {activeSection === 'hashes' && (
-              <>
-                {result.onChainHashes.length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-6">
-                    {result.status === 'not_anchored'
-                      ? 'This record has not been anchored to the blockchain.'
-                      : 'No hash available to compare.'}
-                  </p>
-                ) : (
-                  result.onChainHashes.map((hash, i) => {
-                    const isLastOnChain = i === result.onChainHashes.length - 1;
-                    const isCurrentMatch = result.status === 'anchored_match' && isLastOnChain;
-                    const isPrevMatch =
-                      result.status === 'anchored_previous_version' &&
-                      hash === result.matchedPreviousHash;
-                    return (
-                      <HashRow
-                        key={hash}
-                        hash={hash}
-                        index={i}
-                        isCurrent={hash === result.record.recordHash}
-                        isMatched={isCurrentMatch || isPrevMatch}
-                        matchType={isPrevMatch ? 'previous' : 'current'}
-                      />
-                    );
-                  })
-                )}
-              </>
-            )}
-
-            {/* VERIFICATIONS */}
-            {activeSection === 'verifications' && (
-              <>
-                {credData.isLoading && (
-                  <p className="text-xs text-muted-foreground text-center py-6">Loading…</p>
-                )}
-                {!credData.isLoading && credData.verifications.length === 0 && (
-                  <div className="text-center py-6">
-                    <Shield className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
-                    <p className="text-xs text-muted-foreground">No verifications on record.</p>
-                  </div>
-                )}
-                {credData.verifications.map(v => (
-                  <VerificationEntry
-                    key={v.id}
-                    verification={v}
-                    userProfile={credData.userProfiles.get(v.verifierId)}
-                    currentRecordHash={result.record.recordHash}
-                  />
-                ))}
-              </>
-            )}
-
-            {/* DISPUTES */}
-            {activeSection === 'disputes' && (
-              <>
-                {credData.isLoading && (
-                  <p className="text-xs text-muted-foreground text-center py-6">Loading…</p>
-                )}
-                {!credData.isLoading && credData.disputes.length === 0 && (
-                  <div className="text-center py-6">
-                    <AlertTriangle className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
-                    <p className="text-xs text-muted-foreground">No disputes filed.</p>
-                  </div>
-                )}
-                {credData.disputes.map(d => (
-                  <DisputeEntry
-                    key={d.id}
-                    dispute={d}
-                    userProfile={credData.userProfiles.get(d.disputerId)}
-                    currentRecordHash={result.record.recordHash}
-                    reactionStats={credData.reactionStatsMap.get(d.id)}
-                  />
-                ))}
-              </>
-            )}
-
-            {credData.error && (
-              <p className="text-xs text-red-500 text-center py-2">{credData.error}</p>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-export const ProfileBlockchainTab: React.FC<ProfileBlockchainTabProps> = ({
+export const ProfileCredibilityTab: React.FC<ProfileCredibilityTabProps> = ({
   subjectFirebaseUid,
   records,
 }) => {
@@ -631,7 +323,7 @@ export const ProfileBlockchainTab: React.FC<ProfileBlockchainTabProps> = ({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-7xl">
       {/* ── Completeness banner ── */}
       <div
         className="rounded-2xl p-5 flex items-center gap-5"
@@ -751,4 +443,4 @@ export const ProfileBlockchainTab: React.FC<ProfileBlockchainTabProps> = ({
   );
 };
 
-export default ProfileBlockchainTab;
+export default ProfileCredibilityTab;

@@ -1,13 +1,21 @@
 // src/features/Users/components/ui/UserBadge.tsx
 
 /**
- * Standardize User Badge containing information f
+ * Standardize User Badge containing information
  */
 
 import React from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 
-export type BadgeColor = 'primary' | 'pink' | 'green' | 'red' | 'blue' | 'purple' | 'yellow';
+export type BadgeColor =
+  | 'primary'
+  | 'pink'
+  | 'green'
+  | 'red'
+  | 'blue'
+  | 'purple'
+  | 'yellow'
+  | 'gray';
 
 export const badgeColorClasses: Record<BadgeColor, { bg: string; text: string; border: string }> = {
   primary: { bg: 'bg-primary/20', text: 'text-primary', border: 'border-primary' },
@@ -17,6 +25,7 @@ export const badgeColorClasses: Record<BadgeColor, { bg: string; text: string; b
   blue: { bg: 'bg-complement-2/30', text: 'text-complement-2', border: 'border-complement-2' },
   purple: { bg: 'bg-complement-5/20', text: 'text-complement-5', border: 'border-complement-5' },
   yellow: { bg: 'bg-yellow-200', text: 'text-yellow-800', border: 'border-complement-4' },
+  gray: { bg: 'bg-background', text: 'text-foreground', border: 'border-border' },
 };
 
 interface UserBadgeProps {

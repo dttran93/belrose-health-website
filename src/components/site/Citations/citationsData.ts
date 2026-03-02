@@ -342,7 +342,7 @@ export const citations: Record<string, Citation> = {
     num: 35,
     year: '2018',
     title:
-      'Singapore Ministry of Health announces data breach of 1.5 million patients including Prime Minister Loong',
+      'Singapore Ministry of Health announces data breach affecting 1.5 million patients including Prime Minister Loong',
     source: 'Singapore Ministry of Health',
     apaCitation:
       "SingHealth’s IT system target of cyberattack. (2018, July 20). Ministry of Health. https://www.moh.gov.sg/newsroom/singhealth's-it-system-target-of-cyberattack/",
