@@ -101,10 +101,6 @@ const About: React.FC = () => {
               <br />
               <em className="not-italic text-blue-700">truly exist</em>
             </h2>
-            <p className="text-[15px] text-gray-500 leading-relaxed">
-              The system that should be the foundation of modern medicine is fractured,
-              inaccessible, and failing patients every day.
-            </p>
 
             {/* Progress dots */}
             <div className="flex gap-2 mt-10">

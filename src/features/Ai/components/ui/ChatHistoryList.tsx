@@ -1,6 +1,6 @@
 // src/features/Ai/components/ui/ChatHistoryList.tsx
 
-import { Trash2, MessageSquare, Plus, ChevronRight, Loader2 } from 'lucide-react';
+import { Trash2, Plus, ChevronRight, Loader2 } from 'lucide-react';
 import { Chat } from '../../service/chatService';
 
 interface ChatHistoryListProps {

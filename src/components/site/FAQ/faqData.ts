@@ -16,7 +16,7 @@ export const faqs: FAQData = {
   'Getting Started': [
     {
       q: 'What is Belrose and who is it for?',
-      a: 'Belrose is a patient-owned health records platform. It is for anyone who wants to take control of their health data — whether you are managing a chronic condition, keeping track of family records, or simply want a complete picture of your health history in one place.',
+      a: 'Belrose is a technology and incentivization infrastructure that gives people sovereignty over their health data. It is for anyone who wants to take control of their health data — whether you are managing a chronic condition, keeping track of family records, or simply want a complete picture of your health history in one place.',
       homepage: true,
     },
     {

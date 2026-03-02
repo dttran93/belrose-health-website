@@ -24,6 +24,8 @@ import Index from './pages';
 import { CitationProvider } from './components/site/Citations/CitationContext';
 import { AIChatProvider } from './features/Ai/components/AIChatContext';
 import ChatHistoryPage from './features/Ai/components/ChatHistoryPage';
+import HealthProfile from './features/HealthProfile/components/HealthProfile';
+import RecordDetail from './pages/RecordDetail';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
@@ -62,9 +64,15 @@ const App: React.FC = (): React.JSX.Element => {
                             <Layout>
                               <Routes>
                                 <Route index element={<AppPortal />} />
+                                <Route
+                                  path="health-profile/:subjectId"
+                                  element={<HealthProfile />}
+                                />{' '}
+                                {/* ← ADD */}
                                 <Route path="ai/chat/:chatId" element={<AppPortal />} />
                                 <Route path="ai/history" element={<ChatHistoryPage />} />
                                 <Route path="all-records" element={<AllRecords />} />
+                                <Route path="records/:recordId" element={<RecordDetail />} />
                                 <Route path="add-record" element={<AddRecord />} />
                                 <Route path="hash-tester" element={<HashTester />} />
                                 <Route path="settings" element={<SettingsPage />} />

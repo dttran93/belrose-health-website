@@ -81,6 +81,13 @@ const HEALTH_RECORD_CORE_ABI = [
     type: 'function',
   },
   {
+    inputs: [{ name: 'userIdHash', type: 'bytes32' }],
+    name: 'getActiveSubjectMedicalHistory',
+    outputs: [{ name: '', type: 'string[]' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
     inputs: [
       { name: 'recordId', type: 'string' },
       { name: 'userIdHash', type: 'bytes32' },
@@ -684,6 +691,18 @@ export class blockchainHealthRecordService {
       return await fn(userIdHash);
     } catch (error) {
       console.error('Error getting subject medical history:', error);
+      return [];
+    }
+  }
+
+  /** Get only ACTIVE records where a user is the subject (excludes unanchored) */
+  static async getActiveSubjectMedicalHistory(userIdHash: string): Promise<string[]> {
+    try {
+      const contract = this.getReadOnlyContract();
+      const fn = contract.getFunction('getActiveSubjectMedicalHistory');
+      return await fn(userIdHash);
+    } catch (error) {
+      console.error('Error getting active subject medical history:', error);
       return [];
     }
   }

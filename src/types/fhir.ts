@@ -43,7 +43,10 @@ export type FHIRResource =
   | MedicationStatementResource
   | DiagnosticReportResource
   | AllergyIntoleranceResource
-  | ImmunizationResource;
+  | ImmunizationResource
+  | EncounterResource // Added: hospital/GP visits
+  | EpisodeOfCareResource // Added: sustained care periods
+  | FamilyMemberHistoryResource; // Added: family health history
 
 // ============================================================================
 // SHARED/COMMON FHIR TYPES
@@ -833,6 +836,201 @@ export interface ImmunizationProtocolApplied {
 }
 
 // ============================================================================
+// ENCOUNTER RESOURCE (Hospital/GP Visits)
+// ============================================================================
+
+export interface EncounterResource {
+  resourceType: 'Encounter';
+  id: string;
+  meta?: Meta;
+  implicitRules?: string;
+  language?: string;
+  text?: Narrative;
+  contained?: FHIRResource[];
+  extension?: Extension[];
+  modifierExtension?: Extension[];
+
+  // Encounter-specific fields
+  identifier?: Identifier[];
+  status:
+    | 'planned'
+    | 'arrived'
+    | 'triaged'
+    | 'in-progress'
+    | 'onleave'
+    | 'finished'
+    | 'cancelled'
+    | 'entered-in-error'
+    | 'unknown';
+  statusHistory?: EncounterStatusHistory[];
+  class: Coding; // e.g. inpatient, outpatient, emergency
+  classHistory?: EncounterClassHistory[];
+  type?: CodeableConcept[]; // Reason/type of visit
+  serviceType?: CodeableConcept; // Specific service (cardiology, etc.)
+  priority?: CodeableConcept;
+  subject?: Reference; // The patient
+  episodeOfCare?: Reference[];
+  basedOn?: Reference[];
+  participant?: EncounterParticipant[];
+  appointment?: Reference[];
+  period?: Period; // R4: when the encounter happened
+  actualPeriod?: Period; // R5: same concept, renamed
+  length?: Duration;
+  reasonCode?: CodeableConcept[];
+  reasonReference?: Reference[];
+  diagnosis?: EncounterDiagnosis[];
+  account?: Reference[];
+  hospitalization?: EncounterHospitalization;
+  location?: EncounterLocation[];
+  serviceProvider?: Reference; // The organisation providing the service
+  partOf?: Reference;
+}
+
+export interface EncounterStatusHistory {
+  status: string;
+  period: Period;
+}
+
+export interface EncounterClassHistory {
+  class: Coding;
+  period: Period;
+}
+
+export interface EncounterParticipant {
+  type?: CodeableConcept[];
+  period?: Period;
+  individual?: Reference; // The practitioner/related person
+}
+
+export interface EncounterDiagnosis {
+  condition: Reference;
+  use?: CodeableConcept;
+  rank?: number;
+}
+
+export interface EncounterHospitalization {
+  preAdmissionIdentifier?: Identifier;
+  origin?: Reference;
+  admitSource?: CodeableConcept;
+  reAdmission?: CodeableConcept;
+  dietPreference?: CodeableConcept[];
+  specialCourtesy?: CodeableConcept[];
+  specialArrangement?: CodeableConcept[];
+  destination?: Reference;
+  dischargeDisposition?: CodeableConcept;
+}
+
+export interface EncounterLocation {
+  location: Reference;
+  status?: 'planned' | 'active' | 'reserved' | 'completed';
+  physicalType?: CodeableConcept;
+  period?: Period;
+}
+
+// ============================================================================
+// EPISODE OF CARE RESOURCE (Sustained care periods, e.g. ongoing cancer treatment)
+// ============================================================================
+
+export interface EpisodeOfCareResource {
+  resourceType: 'EpisodeOfCare';
+  id: string;
+  meta?: Meta;
+  implicitRules?: string;
+  language?: string;
+  text?: Narrative;
+  contained?: FHIRResource[];
+  extension?: Extension[];
+  modifierExtension?: Extension[];
+
+  // EpisodeOfCare-specific fields
+  identifier?: Identifier[];
+  status:
+    | 'planned'
+    | 'waitlist'
+    | 'active'
+    | 'onhold'
+    | 'finished'
+    | 'cancelled'
+    | 'entered-in-error';
+  statusHistory?: EpisodeOfCareStatusHistory[];
+  type?: CodeableConcept[];
+  diagnosis?: EpisodeOfCareDiagnosis[];
+  patient: Reference;
+  managingOrganization?: Reference;
+  period?: Period;
+  referralRequest?: Reference[];
+  careManager?: Reference;
+  team?: Reference[];
+  account?: Reference[];
+}
+
+export interface EpisodeOfCareStatusHistory {
+  status: string;
+  period: Period;
+}
+
+export interface EpisodeOfCareDiagnosis {
+  condition: Reference;
+  role?: CodeableConcept;
+  rank?: number;
+}
+
+// ============================================================================
+// FAMILY MEMBER HISTORY RESOURCE
+// ============================================================================
+
+export interface FamilyMemberHistoryResource {
+  resourceType: 'FamilyMemberHistory';
+  id: string;
+  meta?: Meta;
+  implicitRules?: string;
+  language?: string;
+  text?: Narrative;
+  contained?: FHIRResource[];
+  extension?: Extension[];
+  modifierExtension?: Extension[];
+
+  // FamilyMemberHistory-specific fields
+  identifier?: Identifier[];
+  instantiatesCanonical?: string[];
+  instantiatesUri?: string[];
+  status: 'partial' | 'completed' | 'entered-in-error' | 'health-unknown';
+  dataAbsentReason?: CodeableConcept;
+  patient: Reference;
+  date?: string; // When this history was recorded
+  name?: string; // Name of the family member (if known)
+  relationship: CodeableConcept; // e.g. father, mother, sibling
+  sex?: CodeableConcept;
+  bornPeriod?: Period;
+  bornDate?: string;
+  bornString?: string;
+  ageAge?: Age;
+  ageRange?: Range;
+  ageString?: string;
+  estimatedAge?: boolean;
+  deceasedBoolean?: boolean;
+  deceasedAge?: Age;
+  deceasedRange?: Range;
+  deceasedDate?: string;
+  deceasedString?: string;
+  reasonCode?: CodeableConcept[];
+  reasonReference?: Reference[];
+  note?: Annotation[];
+  condition?: FamilyMemberHistoryCondition[];
+}
+
+export interface FamilyMemberHistoryCondition {
+  code: CodeableConcept; // The condition the family member had
+  outcome?: CodeableConcept; // e.g. deceased
+  contributedToDeath?: boolean;
+  onsetAge?: Age;
+  onsetRange?: Range;
+  onsetPeriod?: Period;
+  onsetString?: string;
+  note?: Annotation[];
+}
+
+// ============================================================================
 // ADDITIONAL SUPPORTING TYPES
 // ============================================================================
 
@@ -1150,7 +1348,10 @@ export type UpdateFHIRResource<T extends FHIRResource> = Partial<T> & {
   resourceType: T['resourceType'];
 };
 
-// Type guards for runtime type checking
+// ============================================================================
+// TYPE GUARDS
+// ============================================================================
+
 export function isPatientResource(resource: FHIRResource): resource is PatientResource {
   return resource.resourceType === 'Patient';
 }
@@ -1207,4 +1408,18 @@ export function isAllergyIntoleranceResource(
 
 export function isImmunizationResource(resource: FHIRResource): resource is ImmunizationResource {
   return resource.resourceType === 'Immunization';
+}
+
+export function isEncounterResource(resource: FHIRResource): resource is EncounterResource {
+  return resource.resourceType === 'Encounter';
+}
+
+export function isEpisodeOfCareResource(resource: FHIRResource): resource is EpisodeOfCareResource {
+  return resource.resourceType === 'EpisodeOfCare';
+}
+
+export function isFamilyMemberHistoryResource(
+  resource: FHIRResource
+): resource is FamilyMemberHistoryResource {
+  return resource.resourceType === 'FamilyMemberHistory';
 }

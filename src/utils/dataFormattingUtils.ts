@@ -76,6 +76,7 @@ export type DateFormatOption =
   | 'long' // "Wed, Nov 6, 2025, 4:35 PM"
   | 'date-only' // "November 6, 2025"
   | 'date-short' // "Nov 6, 2025"
+  | 'month-year' // "Nov 2025"
   | 'time-only' // "4:35 PM"
   | 'relative' // "2 hours ago" / "yesterday"
   | 'custom'; // Use custom options parameter
@@ -91,6 +92,7 @@ export type DateFormatOption =
  * formatTimestamp(myDate) // "Nov 6, 2025, 4:35 PM"
  * formatTimestamp(myDate, 'long') // "Wed, Nov 6, 2025, 4:35 PM"
  * formatTimestamp(myDate, 'date-only') // "November 6, 2025"
+ * formatTimestamp(myDate, 'month-year') // "Nov 2025"
  * formatTimestamp(myDate, 'relative') // "2 hours ago"
  */
 export const formatTimestamp = (
@@ -107,7 +109,7 @@ export const formatTimestamp = (
 
   switch (format) {
     case 'short':
-      return date.toLocaleString('en-US', {
+      return date.toLocaleString('en-GB', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -117,7 +119,7 @@ export const formatTimestamp = (
       });
 
     case 'long':
-      return date.toLocaleString('en-US', {
+      return date.toLocaleString('en-GB', {
         weekday: 'short',
         year: 'numeric',
         month: 'short',
@@ -128,21 +130,27 @@ export const formatTimestamp = (
       });
 
     case 'date-only':
-      return date.toLocaleDateString('en-US', {
+      return date.toLocaleDateString('en-GB', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
       });
 
     case 'date-short':
-      return date.toLocaleDateString('en-US', {
+      return date.toLocaleDateString('en-GB', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
       });
 
+    case 'month-year':
+      return date.toLocaleDateString('en-GB', {
+        month: 'short',
+        year: 'numeric',
+      });
+
     case 'time-only':
-      return date.toLocaleTimeString('en-US', {
+      return date.toLocaleTimeString('en-GB', {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
@@ -156,7 +164,7 @@ export const formatTimestamp = (
         console.warn(
           'Custom format requested but no customOptions provided. Falling back to "short".'
         );
-        return date.toLocaleString('en-US', {
+        return date.toLocaleString('en-GB', {
           year: 'numeric',
           month: 'short',
           day: 'numeric',
@@ -165,10 +173,10 @@ export const formatTimestamp = (
           hour12: true,
         });
       }
-      return date.toLocaleString('en-US', customOptions);
+      return date.toLocaleString('en-GB', customOptions);
 
     default:
-      return date.toLocaleString('en-US', {
+      return date.toLocaleString('en-GB', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
