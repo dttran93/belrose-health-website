@@ -1,44 +1,60 @@
-//src/features/HealthProfile/components/ui/HashRow.tsx
+//src/features/HealthProfile/components/CredibilityTab/ui/HashRow.tsx
 
+import { DisputeDocDecrypted } from '@/features/Credibility/services/disputeService';
+import { VerificationDoc } from '@/features/Credibility/services/verificationService';
 import { UserBadge } from '@/features/Users/components/ui/UserBadge';
+import VersionReviewBadge from '@/features/ViewEditRecord/components/Edit/VersionReviewBadge';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * Hash row in the hash history section of the Health Profile
  */
 
 function HashRow({
+  recordId,
   hash,
   index,
   isCurrent,
-  isMatched,
-  matchType,
+  verifications = [],
+  disputes = [],
 }: {
+  recordId: string | undefined;
   hash: string;
   index: number;
   isCurrent: boolean;
-  isMatched: boolean;
-  matchType: 'current' | 'previous';
+  verifications?: VerificationDoc[];
+  disputes?: DisputeDocDecrypted[];
 }) {
-  const matchedGreen = isMatched && matchType === 'current';
-  const matchedBlue = isMatched && matchType === 'previous';
-
+  const navigate = useNavigate();
   return (
-    <div className="flex items-center gap-3 py-1.5 last:border-0">
+    <div className="flex items-center gap-3 py-1.5">
+      {/* Version number - fixed width */}
       <span className="text-[10px] text-muted-foreground w-8 shrink-0">v{index + 1}</span>
-      <span className="font-mono text-xs text-foreground flex-1 truncate">{hash}</span>
-      <div className="flex gap-1.5 shrink-0 w-40 justify-end">
+
+      {/* Hash - takes remaining space, truncates */}
+      <span className="font-mono text-xs text-foreground flex-1 truncate min-w-0">{hash}</span>
+
+      {/* Badge area - fixed width so hashes always truncate at the same point */}
+      <div className="flex items-center justify-end gap-1.5 w-56 shrink-0">
         {isCurrent && (
-          <UserBadge text="Current" color="blue" tooltip="This is the current Firestore hash" />
+          <UserBadge text="Current" color="blue" tooltip="This is the current version" />
         )}
-        {matchedGreen && (
-          <UserBadge text="On-chain" color="green" tooltip="Matches on-chain hash" />
-        )}
-        {matchedBlue && (
-          <UserBadge text="On-chain ←" color="blue" tooltip="Previous version matched on-chain" />
-        )}
-        {!isCurrent && !isMatched && (
-          <UserBadge text="Self-Reported" color="gray" tooltip="Not found on-chain" />
-        )}
+        <VersionReviewBadge
+          stats={{
+            verifications: {
+              total: verifications.length,
+              active: verifications.filter(v => v.isActive).length,
+            },
+            disputes: {
+              total: disputes.length,
+              active: disputes.filter(d => d.isActive).length,
+            },
+          }}
+          onClick={() => {
+            navigate(`/app/records/${recordId}/?view=versions`);
+          }}
+          isLoading={false}
+        />
       </div>
     </div>
   );

@@ -1,10 +1,7 @@
-// ============================================================================
-// RECORD ROW
-// ============================================================================
+//src/features/HealthProfile/components/CredibilityTab/ui/RecordRow.tsx
 
 import {
   DisputeDocDecrypted,
-  getDisputeReactionsByType,
   getDisputeReactionStats,
   getDisputesByRecordId,
   ReactionStats,
@@ -13,15 +10,11 @@ import {
   getVerificationsByRecordId,
   VerificationDoc,
 } from '@/features/Credibility/services/verificationService';
-import {
-  RecordBlockchainStatus,
-  RecordCompletenessResult,
-} from '@/features/HealthProfile/hooks/useBlockchainCompleteness';
+import { RecordCompletenessResult } from '@/features/HealthProfile/hooks/useBlockchainCompleteness';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { AlertTriangle, ChevronDown, Shield } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import HashRow from './HashRow';
-import { STATUS_CONFIG } from '../ProfileCredibilityTab';
 import { BelroseUserProfile } from '@/types/core';
 import VerificationUserCard from '@/features/Credibility/components/Verifications/VerificationUserCard';
 import VerificationDetailModal from '@/features/Credibility/components/Verifications/VerificationDetailModal';
@@ -30,6 +23,7 @@ import { useNavigate } from 'react-router-dom';
 import DisputeUserCard from '@/features/Credibility/components/Disputes/DisputeUserCard';
 import DisputeDetailModal from '@/features/Credibility/components/Disputes/DisputeDetailModal';
 import { getReactionType } from '@/features/Credibility/components/Disputes/DisputeManagement';
+import CredibilityBadge from '@/features/Credibility/components/ui/CredibilityBadge';
 
 type SectionTab = 'hashes' | 'verifications' | 'disputes';
 interface RecordCredibilityData {
@@ -39,20 +33,6 @@ interface RecordCredibilityData {
   userProfiles: Map<string, BelroseUserProfile>;
   isLoading: boolean;
   error: string | null;
-}
-
-/** Thin coloured pill matching your existing UserBadge style */
-export function StatusPill({ status }: { status: RecordBlockchainStatus }) {
-  const cfg = STATUS_CONFIG[status];
-  return (
-    <span
-      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border"
-      style={{ color: cfg.color, background: cfg.bg, borderColor: cfg.border }}
-    >
-      <span className="text-[10px]">{cfg.icon}</span>
-      {cfg.label}
-    </span>
-  );
 }
 
 function RecordRow({
@@ -78,7 +58,6 @@ function RecordRow({
     error: null,
   });
 
-  const cfg = STATUS_CONFIG[result.status];
   const recordId = result.record.id || result.record.firestoreId;
 
   // ── Extracted so we can call it both on first expand and after retract ──
@@ -123,11 +102,10 @@ function RecordRow({
     }
   }, [recordId]);
 
-  // Lazy-load on first expand
   useEffect(() => {
-    if (!expanded || !recordId || credData.verifications.length > 0 || credData.isLoading) return;
+    if (!recordId) return;
     loadCredData();
-  }, [expanded, recordId]);
+  }, [recordId]);
 
   const handleCredibilityRoute = () => {
     setSelectedVerification(null);
@@ -136,6 +114,22 @@ function RecordRow({
 
   const verCount = credData.verifications.length;
   const dispCount = credData.disputes.length;
+
+  const verByHash = credData.verifications.reduce(
+    (acc, v) => {
+      acc[v.recordHash] = [...(acc[v.recordHash] ?? []), v];
+      return acc;
+    },
+    {} as Record<string, VerificationDoc[]>
+  );
+
+  const dispByHash = credData.disputes.reduce(
+    (acc, d) => {
+      acc[d.recordHash] = [...(acc[d.recordHash] ?? []), d];
+      return acc;
+    },
+    {} as Record<string, DisputeDocDecrypted[]>
+  );
 
   const firestoreHashes = [
     ...(result.record.previousRecordHash ?? []),
@@ -150,19 +144,12 @@ function RecordRow({
 
   return (
     <>
-      <div
-        className="rounded-xl border transition-colors"
-        style={{ borderColor: expanded ? cfg.border : undefined }}
-      >
+      <div className="rounded-xl border transition-colors">
         {/* ── Collapsed header ── */}
         <button
           onClick={onToggle}
           className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
-          style={{ background: expanded ? cfg.bg : undefined }}
         >
-          {/* Status dot */}
-          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: cfg.dot }} />
-
           {/* Name + source */}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground truncate">
@@ -176,19 +163,7 @@ function RecordRow({
           </div>
 
           {/* Credibility counts (shown once loaded) */}
-          {verCount > 0 && (
-            <span className="text-xs text-complement-3 bg-complement-3/10 border border-complement-3/30 rounded-full px-2 py-0.5 shrink-0">
-              {verCount} verification{verCount !== 1 ? 's' : ''}
-            </span>
-          )}
-          {dispCount > 0 && (
-            <span className="text-xs text-complement-4 bg-complement-4/10 border border-complement-4/30 rounded-full px-2 py-0.5 shrink-0">
-              {dispCount} dispute{dispCount !== 1 ? 's' : ''}
-            </span>
-          )}
-
-          {/* Status pill */}
-          <StatusPill status={result.status} />
+          <CredibilityBadge score={result.record.credibility?.score} />
 
           {/* Chevron */}
           <ChevronDown
@@ -199,7 +174,7 @@ function RecordRow({
 
         {/* ── Expanded panel ── */}
         {expanded && (
-          <div style={{ borderTop: `1px solid ${cfg.border}` }}>
+          <div style={{ borderTop: `1px solid` }}>
             {/* Context callout for mismatch / traceable */}
             {result.status === 'anchored_previous_version' && (
               <div className="mx-4 mt-3 text-xs text-complement-2 bg-complement-2/10 border border-complement-2/20 rounded-lg px-3 py-2">
@@ -278,12 +253,13 @@ function RecordRow({
 
                       return (
                         <HashRow
+                          recordId={recordId}
                           key={hash}
                           hash={hash}
                           index={originalIndex}
                           isCurrent={isCurrent}
-                          isMatched={isOnChain}
-                          matchType={matchType}
+                          verifications={verByHash[hash] ?? []}
+                          disputes={dispByHash[hash] ?? []}
                         />
                       );
                     });

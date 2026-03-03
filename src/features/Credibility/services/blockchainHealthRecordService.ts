@@ -699,8 +699,20 @@ export class blockchainHealthRecordService {
   static async getActiveSubjectMedicalHistory(userIdHash: string): Promise<string[]> {
     try {
       const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getActiveSubjectMedicalHistory');
-      return await fn(userIdHash);
+
+      // getActiveSubjectMedicalHistory doesn't exist on-chain —
+      // fetch all and filter active status ourselves
+      const fn = contract.getFunction('getSubjectMedicalHistory');
+      const allRecordIds: string[] = await fn(userIdHash);
+
+      if (allRecordIds.length === 0) return [];
+
+      // Check active status for each record in parallel
+      const activeChecks = await Promise.all(
+        allRecordIds.map(recordId => this.isActiveSubject(recordId, userIdHash))
+      );
+
+      return allRecordIds.filter((_, index) => activeChecks[index]);
     } catch (error) {
       console.error('Error getting active subject medical history:', error);
       return [];

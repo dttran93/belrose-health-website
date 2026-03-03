@@ -30,6 +30,7 @@ import { ethers } from 'ethers';
 import { FileObject } from '@/types/core';
 import { blockchainHealthRecordService } from '@/features/Credibility/services/blockchainHealthRecordService';
 import { RecordHashService } from '@/features/ViewEditRecord/services/generateRecordHash';
+import { BlockchainRoleManagerService } from '@/features/Permissions/services/blockchainRoleManagerService';
 
 // ============================================================================
 // TYPES
@@ -69,9 +70,17 @@ export interface BlockchainCompletenessSummary {
   noHash: number;
 }
 
+export interface PrivateRecordsSummary {
+  total: number;
+  verified: number;
+  disputed: number;
+  selfReported: number;
+}
+
 export interface UseBlockchainCompletenessReturn {
   results: RecordCompletenessResult[];
   summary: BlockchainCompletenessSummary;
+  privateRecordsSummary: PrivateRecordsSummary;
   isLoading: boolean;
   /** True only while recompute() is running — lets the UI show a spinner on the button */
   isRecomputing: boolean;
@@ -189,6 +198,14 @@ export function useBlockchainCompleteness(
   const [isVerified, setIsVerified] = useState(false);
   const [lastVerifiedAt, setLastVerifiedAt] = useState<Date | null>(null);
 
+  // For records the user doesn't have access to
+  const [privateRecordsSummary, setPrivateRecordsSummary] = useState<PrivateRecordsSummary>({
+    total: 0,
+    verified: 0,
+    disputed: 0,
+    selfReported: 0,
+  });
+
   // =========================================================================
   // INITIAL LOAD: Fetch on-chain data only
   // =========================================================================
@@ -211,6 +228,9 @@ export function useBlockchainCompleteness(
         const userIdHash = ethers.id(subjectFirebaseUid);
         console.log(`⛓️ Fetching on-chain data for ${subjectFirebaseUid.slice(0, 8)}...`);
 
+        const wallets = await BlockchainRoleManagerService.getWalletsForUser(userIdHash);
+        console.log('🔑 Registered wallets for user:', wallets);
+
         // getActiveSubjectMedicalHistory filters out unanchored records.
         // The contract keeps all history for audit, but active = currently claimed.
         const onChainRecordIds: string[] =
@@ -230,7 +250,46 @@ export function useBlockchainCompleteness(
           })
         );
 
+        console.log('🔑 Querying chain with:', userIdHash);
+        console.log('📋 On-chain record IDs returned:', onChainRecordIds);
+        console.log(
+          '📁 Firestore record IDs:',
+          records.map(r => r.id)
+        );
+
         setVersionHistoryMap(new Map(historyEntries));
+
+        // Private records = on-chain but not in viewer's accessible records
+        const privateIds = onChainRecordIds.filter(id => !firestoreIds.has(id));
+
+        if (privateIds.length > 0) {
+          const privateStatsResults = await Promise.all(
+            privateIds.map(async recordId => {
+              const hashes = await blockchainHealthRecordService.getRecordVersionHistory(recordId);
+              const currentHash = hashes[hashes.length - 1];
+              if (!currentHash) return { verified: false, disputed: false };
+
+              const [verStats, dispStats] = await Promise.all([
+                blockchainHealthRecordService.getVerificationStats(currentHash),
+                blockchainHealthRecordService.getDisputeStats(currentHash),
+              ]);
+
+              return {
+                verified: verStats.active > 0,
+                disputed: dispStats.active > 0,
+              };
+            })
+          );
+
+          setPrivateRecordsSummary({
+            total: privateIds.length,
+            verified: privateStatsResults.filter(r => r.verified).length,
+            disputed: privateStatsResults.filter(r => r.disputed).length,
+            selfReported: privateStatsResults.filter(r => !r.verified && !r.disputed).length,
+          });
+        } else {
+          setPrivateRecordsSummary({ total: 0, verified: 0, disputed: 0, selfReported: 0 });
+        }
       } catch (err) {
         console.error('❌ Chain fetch failed:', err);
         setError(err instanceof Error ? err : new Error('Failed to fetch blockchain data'));
@@ -319,6 +378,7 @@ export function useBlockchainCompleteness(
   return {
     results,
     summary,
+    privateRecordsSummary,
     isLoading,
     isRecomputing,
     error,

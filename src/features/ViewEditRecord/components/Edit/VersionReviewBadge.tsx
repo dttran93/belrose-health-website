@@ -75,7 +75,7 @@ export const VersionReviewBadge: React.FC<VersionReviewProps> = ({ stats, isLoad
 
       <div className="flex items-center gap-3 text-xs">
         {noActivity ? (
-          <span className="text-gray-500">No verifications or disputes</span>
+          <span className="text-gray-500">No reviews</span>
         ) : (
           <>
             {/* Verifications */}
@@ -83,7 +83,9 @@ export const VersionReviewBadge: React.FC<VersionReviewProps> = ({ stats, isLoad
               <span className="flex items-center gap-1.5">
                 <CheckCircle className="w-3.5 h-3.5 text-green-600" />
                 <span className="font-semibold text-green-700">{verifications.active}</span>
-                <span className="text-gray-600">verifications</span>
+                <span className="text-gray-600">
+                  {verifications.active === 1 ? 'verification' : 'verifications'}
+                </span>
               </span>
             )}
 
@@ -105,7 +107,9 @@ export const VersionReviewBadge: React.FC<VersionReviewProps> = ({ stats, isLoad
                 >
                   {disputes.active}
                 </span>
-                <span className="text-gray-600">disputes</span>
+                <span className="text-gray-600">
+                  {disputes.active === 1 ? 'dispute' : 'disputes'}
+                </span>
               </span>
             )}
           </>

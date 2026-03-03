@@ -16,7 +16,7 @@ import { useAuthContext } from '@/features/Auth/AuthContext';
 import ProfileHeader from './ui/ProfileHeader';
 import ProfileTabs, { ProfileTab } from './ui/ProfileTab';
 import ProfileRecordsTab from './ui/ProfileRecords';
-import ProfileBlockchainTab from './CredibilityTab/ProfileCredibilityTab';
+import { ProfileCredibilityTab } from './CredibilityTab/ProfileCredibilityTab';
 
 /** Placeholder for the blockchain tab — will be replaced with SubjectVerificationView */
 const BlockchainTabPlaceholder: React.FC = () => (
@@ -90,6 +90,7 @@ const HealthProfile: React.FC = () => {
     error,
     isOwnProfile,
     recordCount,
+    subjectName,
   } = useHealthProfile(resolvedSubjectId);
 
   const renderTab = () => {
@@ -108,7 +109,13 @@ const HealthProfile: React.FC = () => {
       case 'records':
         return <ProfileRecordsTab records={records} isLoading={isLoading} />;
       case 'blockchain':
-        return <ProfileBlockchainTab subjectFirebaseUid={resolvedSubjectId} records={records} />;
+        return (
+          <ProfileCredibilityTab
+            subjectFirebaseUid={resolvedSubjectId}
+            records={records}
+            subjectName={subjectName}
+          />
+        );
       default:
         return null;
     }

@@ -18,7 +18,7 @@
  * Keeping these separate makes both easier to test and change independently.
  */
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { useUserRecords } from '@/features/ViewEditRecord/hooks/useUserRecords';
 import { FileObject } from '@/types/core';
@@ -32,6 +32,7 @@ import {
   getCategoryConfig,
   CategoryConfig,
 } from '../utils/fhirGroupingUtils';
+import { getUserProfile } from '@/features/Users/services/userProfileService';
 
 // ============================================================================
 // TYPES
@@ -107,6 +108,7 @@ export interface UseHealthProfileReturn {
    * The UI can show "X records" in the header.
    */
   recordCount: number;
+  subjectName: string;
 }
 
 // ============================================================================
@@ -151,11 +153,32 @@ export function useHealthProfile(subjectId: string): UseHealthProfileReturn {
     }
   );
 
+  const [subjectName, setSubjectName] = useState<string>('');
+
   // =========================================================================
   // STEP 2: DETERMINE CONTEXT
   // =========================================================================
 
   const isOwnProfile = user?.uid === subjectId;
+
+  useEffect(() => {
+    if (!subjectId) return;
+    // If it's the logged-in user's own profile, we already have the name
+    if (isOwnProfile && user) {
+      const name =
+        user.displayName || `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'You';
+      setSubjectName(name);
+      return;
+    }
+    // Otherwise fetch the subject's profile
+    getUserProfile(subjectId).then(profile => {
+      const name =
+        profile?.displayName ||
+        `${profile?.firstName ?? ''} ${profile?.lastName ?? ''}`.trim() ||
+        'this user';
+      setSubjectName(name);
+    });
+  }, [subjectId, isOwnProfile, user]);
 
   // =========================================================================
   // STEP 3: TRANSFORM DATA
@@ -251,6 +274,7 @@ export function useHealthProfile(subjectId: string): UseHealthProfileReturn {
     // Context
     isOwnProfile,
     subjectId,
+    subjectName,
 
     // Loading state
     isLoading: recordsLoading,
