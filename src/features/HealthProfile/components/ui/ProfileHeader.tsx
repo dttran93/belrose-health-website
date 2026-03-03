@@ -1,11 +1,11 @@
 // src/features/HealthProfile/components/ui/ProfileHeader.tsx
 
-import { ArrowLeft, Database, FileText, Mail, User } from 'lucide-react';
+import { ArrowLeft, Cake, Mail, MapPinHouse, Transgender, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getUserProfile } from '@/features/Users/services/userProfileService';
 import { Avatar } from '@/features/Users/components/Avatar';
 import { BelroseUserProfile } from '@/types/core';
-import { useEffect, useState } from 'react';
+import { UserIdentity } from '../../utils/parseUserIdentity';
+import { calculateAge, formatTimestamp } from '@/utils/dataFormattingUtils';
 
 // ============================================================================
 // PROFILE HEADER
@@ -13,20 +13,40 @@ import { useEffect, useState } from 'react';
 
 interface ProfileHeaderProps {
   subjectId: string;
-  recordCount: number;
-  totalResources: number;
+  profile: BelroseUserProfile | null;
+  userIdentity: UserIdentity | null;
   isOwnProfile: boolean;
   isLoading: boolean;
 }
 
-const ProfileHeader: React.FC<ProfileHeaderProps> = ({ subjectId, isOwnProfile }) => {
+const ProfileHeader: React.FC<ProfileHeaderProps> = ({
+  subjectId,
+  profile,
+  userIdentity,
+  isOwnProfile,
+  isLoading,
+}) => {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<BelroseUserProfile | null>(null);
+  const displayName =
+    userIdentity?.fullName ||
+    profile?.displayName ||
+    (isOwnProfile ? 'My Health Profile' : 'Health Profile');
 
-  // getUserProfile is async so we fetch it in an effect
-  useEffect(() => {
-    getUserProfile(subjectId).then(setProfile);
-  }, [subjectId]);
+  // 1. Age/DOB Logic
+  const userAgeInfo = userIdentity?.dateOfBirth
+    ? `${formatTimestamp(userIdentity.dateOfBirth, 'date-only')} (${calculateAge(userIdentity.dateOfBirth)} years old)`
+    : 'Missing Age Information';
+
+  // 2. Gender Logic
+  const userGenderInfo = userIdentity?.gender ? userIdentity.gender : 'Missing Gender Information';
+
+  // 3. Home Info Logic (City/Country > Address > Missing)
+  const userHomeInfo = (() => {
+    if (userIdentity?.city || userIdentity?.country) {
+      return [userIdentity.city, userIdentity.country].filter(Boolean).join(', ');
+    }
+    return userIdentity?.address || 'Missing Location Information';
+  })();
 
   return (
     <div className="bg-accent px-6 py-4 rounded-t-lg">
@@ -49,12 +69,12 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({ subjectId, isOwnProfile }
           </div>
         </div>
 
-        <div className="flex justify-between gap-2">
-          <Avatar profile={profile} size="lg" />
+        <div className="flex justify-between items-center gap-2">
+          <Avatar profile={profile} size="xl" />
           <div className="flex flex-col items-start gap-1">
-            <h1 className="text-lg font-semibold text-card-foreground">
-              {profile?.displayName ?? (isOwnProfile ? 'My Health Profile' : 'Health Profile')}
-            </h1>
+            <h1 className="text-lg font-semibold text-card-foreground">{displayName}</h1>
+
+            {/** Belrose Account Info Row */}
             <div className="flex items-center text-xs gap-1.5">
               <div className="flex gap-1">
                 <User className="w-3.5 h-3.5" />
@@ -66,6 +86,26 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({ subjectId, isOwnProfile }
                 <span className="font-mono">{profile?.email}</span>
               </div>
             </div>
+
+            {/** User Identity Row */}
+            {userIdentity && (
+              <div className="flex items-center text-xs gap-1.5">
+                <div className="flex gap-1 items-center">
+                  <Cake className="w-3.5 h-3.5" />
+                  <span className="font-mono">{userAgeInfo}</span>
+                </div>
+                <div className="h-3 w-px bg-border" />
+                <div className="flex gap-1 items-center">
+                  <Transgender className="w-3.5 h-3.5" />
+                  <span className="font-mono">{userGenderInfo}</span>
+                </div>
+                <div className="h-3 w-px bg-border" />
+                <div className="flex gap-1 items-center">
+                  <MapPinHouse className="w-3.5 h-3.5" />
+                  <span className="font-mono">{userHomeInfo}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

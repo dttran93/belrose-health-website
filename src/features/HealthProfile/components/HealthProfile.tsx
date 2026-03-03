@@ -4,20 +4,40 @@
  * HealthProfile page
  *
  * Entry point for the HealthProfile feature. Reads :subjectId from the URL,
- * delegates all data loading/processing to useHealthProfile
+ * delegates clinical data loading to useHealthProfile, and fetches the
+ * patient context record directly by deterministic ID.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Clipboard, HeartPulse, IdCard, LayoutGrid, List, ShieldCheck } from 'lucide-react';
 import { useHealthProfile } from '@/features/HealthProfile/hooks/useHealthProfile';
 import HealthDataDisplay from '@/features/HealthProfile/components/HealthDataTabs/HealthDataDisplay';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import ProfileHeader from './ui/ProfileHeader';
-import ProfileRecordsTab from './ProfileRecordsTab';
+import ProfileRecordsTab from './RecordsTab/ProfileRecordsTab';
 import { ProfileCredibilityTab } from './CredibilityTab/ProfileCredibilityTab';
-import { ALL_DATA_VIEW, SCR_VIEW } from '../configs/healthDataViews';
 import { Tab, TabNavigation } from '@/components/ui/TabNavigation';
+import { getUserProfile } from '@/features/Users/services/userProfileService';
+import { BelroseUserProfile } from '@/types/core';
+import { useUserRecords } from '@/features/ViewEditRecord/hooks/useUserRecords';
+import { parseIdentityFromRecord } from '../utils/parseUserIdentity';
+import { ALL_DATA_VIEW, SCR_VIEW } from '../configs/healthDataViews';
+import { IdentityTab } from './IdentityTab/IdentityTab';
+
+// ============================================================================
+// TAB CONFIG
+// ============================================================================
+
+export type HealthProfileTabs = 'summary' | 'all-data' | 'records' | 'identity' | 'blockchain';
+
+const PROFILE_TABS: Tab[] = [
+  { id: 'summary', label: 'Summary', icon: LayoutGrid },
+  { id: 'all-data', label: 'All Data', icon: List },
+  { id: 'records', label: 'Records', icon: Clipboard },
+  { id: 'identity', label: 'Identity', icon: IdCard },
+  { id: 'blockchain', label: 'Credibility', icon: ShieldCheck },
+];
 
 // ============================================================================
 // ERROR STATE
@@ -58,16 +78,6 @@ const MissingSubjectId: React.FC = () => {
 // PAGE
 // ============================================================================
 
-const PROFILE_TABS: Tab[] = [
-  { id: 'summary', label: 'Summary', icon: LayoutGrid },
-  { id: 'alldata', label: 'All Data', icon: List },
-  { id: 'records', label: 'Records', icon: Clipboard },
-  { id: 'identity', label: 'Identity', icon: IdCard },
-  { id: 'blockchain', label: 'Credibility', icon: ShieldCheck },
-];
-
-export type HealthProfileTabs = 'summary' | 'alldata' | 'records' | 'identity' | 'blockchain';
-
 const HealthProfile: React.FC = () => {
   const { subjectId } = useParams<{ subjectId: string }>();
   const [activeTab, setActiveTab] = useState<HealthProfileTabs>('summary');
@@ -78,8 +88,33 @@ const HealthProfile: React.FC = () => {
   // Guard: subjectId missing from URL
   if (!resolvedSubjectId) return <MissingSubjectId />;
 
+  // ── Clinical data ──────────────────────────────────────────────────────────
   const { records, grouped, summary, isLoading, error, isOwnProfile, recordCount, subjectName } =
     useHealthProfile(resolvedSubjectId);
+
+  // ── Belrose account profile (avatar, email) ────────────────────────────────
+  const [profile, setProfile] = useState<BelroseUserProfile | null>(null);
+  useEffect(() => {
+    getUserProfile(resolvedSubjectId).then(setProfile);
+  }, [resolvedSubjectId]);
+
+  // ── Patient context record — fetched via normal record pipeline ────────────
+  // Deterministic ID means we can find it with a simple .find() after the
+  // subject records load — no extra Firestore query needed.
+  const { records: allSubjectRecords } = useUserRecords(user?.uid, {
+    filterType: 'subject',
+    subjectId: resolvedSubjectId,
+  });
+
+  const identityRecord = useMemo(
+    () => allSubjectRecords.find(r => r.id === `${resolvedSubjectId}_id`) ?? null,
+    [allSubjectRecords, resolvedSubjectId]
+  );
+
+  const userIdentity = useMemo(
+    () => (identityRecord ? parseIdentityFromRecord(identityRecord) : null),
+    [identityRecord]
+  );
 
   const renderTab = () => {
     if (error) return <ErrorState message={error.message} />;
@@ -94,7 +129,7 @@ const HealthProfile: React.FC = () => {
             isOwnProfile={isOwnProfile}
           />
         );
-      case 'alldata':
+      case 'all-data':
         return (
           <HealthDataDisplay
             grouped={grouped}
@@ -103,8 +138,22 @@ const HealthProfile: React.FC = () => {
             isOwnProfile={isOwnProfile}
           />
         );
+
       case 'records':
         return <ProfileRecordsTab records={records} isLoading={isLoading} />;
+
+      case 'identity':
+        // Placeholder — PatientContextTab coming soon
+        return (
+          <IdentityTab
+            userId={resolvedSubjectId}
+            userIdentity={userIdentity}
+            hasIdentityRecord={identityRecord !== null}
+            isOwnProfile={isOwnProfile}
+            onSaved={() => {}}
+          />
+        );
+
       case 'blockchain':
         return (
           <ProfileCredibilityTab
@@ -113,6 +162,7 @@ const HealthProfile: React.FC = () => {
             subjectName={subjectName}
           />
         );
+
       default:
         return null;
     }
@@ -123,8 +173,8 @@ const HealthProfile: React.FC = () => {
       <div className="max-w-7xl mx-auto bg-background rounded=2xl shadow-xl rounded-lg flex flex-col">
         <ProfileHeader
           subjectId={resolvedSubjectId}
-          recordCount={recordCount}
-          totalResources={summary.totalResourcesExtracted}
+          profile={profile}
+          userIdentity={userIdentity}
           isOwnProfile={isOwnProfile}
           isLoading={isLoading}
         />

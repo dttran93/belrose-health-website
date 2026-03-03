@@ -217,6 +217,19 @@ export const formatRelativeTime = (timestamp: any): string => {
   return formatTimestamp(timestamp, 'date-short');
 };
 
+/**
+ * Data formatting utility for calculating age based on Birthday
+ * @param dob takes Date of Birth as a date object
+ * @returns age as a number
+ */
+export const calculateAge = (dob: Date) => {
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+  return age;
+};
+
 /* 
 ===================================================================
 UNDEFINED DATA FORMATTING

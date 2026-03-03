@@ -229,6 +229,7 @@ service cloud.firestore {
     match /records/{recordId} {
       // READ: User can read if they have any role on the record
       allow read: if request.auth != null && (
+        !exists(/databases/$(database)/documents/records/$(recordId)) ||
         resource.data.uploadedBy == request.auth.uid ||
         request.auth.uid in resource.data.owners ||
         request.auth.uid in resource.data.administrators ||
