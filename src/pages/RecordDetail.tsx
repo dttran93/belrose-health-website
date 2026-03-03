@@ -10,7 +10,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { toast } from 'sonner';
@@ -74,6 +74,22 @@ const RecordDetail: React.FC = () => {
   const [record, setRecord] = useState<FileObject | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+
+  const VALID_VIEWS = [
+    'record',
+    'edit',
+    'versions',
+    'credibility',
+    'permissions',
+    'access',
+    'subject',
+  ] as const;
+  type ValidView = (typeof VALID_VIEWS)[number];
+  const viewParam = searchParams.get('view');
+  const initialViewMode: ValidView = VALID_VIEWS.includes(viewParam as ValidView)
+    ? (viewParam as ValidView)
+    : 'record';
 
   // =========================================================================
   // FETCH SINGLE RECORD
@@ -179,6 +195,7 @@ const RecordDetail: React.FC = () => {
           setIsLoading(true);
           setRecord(null);
         }}
+        initialViewMode={initialViewMode}
       />
 
       {recordToDelete && (

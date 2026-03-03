@@ -46,6 +46,7 @@ import {
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import HashRow from './ui/HashRow';
 import RecordRow from './ui/RecordRow';
+import { formatRelativeTime } from '@/utils/dataFormattingUtils';
 
 // ============================================================================
 // TYPES
@@ -88,7 +89,7 @@ export const STATUS_CONFIG: Record<
     border: '#bae6fd',
     dot: '#0ea5e9',
     icon: '◎',
-    description: 'Edited since anchoring — ancestry confirmed',
+    description: 'Edited since anchoring but history confirmed',
   },
   anchored_mismatch: {
     label: 'Mismatch',
@@ -100,7 +101,7 @@ export const STATUS_CONFIG: Record<
     description: 'On-chain but no hash version matches',
   },
   not_anchored: {
-    label: 'Unanchored',
+    label: 'Self-Reported',
     color: '#6b7280',
     bg: '#f9fafb',
     border: '#e5e7eb',
@@ -131,149 +132,6 @@ function getCompletenessScore(summary: BlockchainCompletenessSummary): number {
     summary.anchoredMismatch * 0.2;
   return Math.round((weighted / summary.total) * 100);
 }
-
-function formatRelativeTime(date: Date): string {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  return `${Math.floor(seconds / 3600)}h ago`;
-}
-
-// ============================================================================
-// SUB-COMPONENTS
-// ============================================================================
-
-/** Thin coloured pill matching your existing UserBadge style */
-export function StatusPill({ status }: { status: RecordBlockchainStatus }) {
-  const cfg = STATUS_CONFIG[status];
-  return (
-    <span
-      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border"
-      style={{ color: cfg.color, background: cfg.bg, borderColor: cfg.border }}
-    >
-      <span className="text-[10px]">{cfg.icon}</span>
-      {cfg.label}
-    </span>
-  );
-}
-
-/** Read-only verification entry using your existing VerificationUserCard pattern */
-function VerificationEntry({
-  verification,
-  userProfile,
-  currentRecordHash,
-}: {
-  verification: VerificationDoc;
-  userProfile: BelroseUserProfile | undefined;
-  currentRecordHash: string | null | undefined;
-}) {
-  const levelInfo = getVerificationConfig(verification.level);
-  const isCurrent = verification.recordHash === currentRecordHash;
-  const isInactive = !verification.isActive;
-
-  return (
-    <div className={isInactive ? 'opacity-60' : ''}>
-      <UserCard
-        user={userProfile}
-        userId={verification.verifierId}
-        variant="default"
-        color={isInactive ? 'red' : 'green'}
-        menuType="none"
-        content={
-          <div className="flex items-center gap-2 flex-wrap">
-            <UserBadge
-              text={isCurrent ? 'Current version' : 'Prior version'}
-              color={isCurrent ? 'green' : 'yellow'}
-              tooltip={isCurrent ? 'Verified the current hash' : 'Verified a previous hash'}
-            />
-            <UserBadge
-              text={levelInfo.name}
-              color="purple"
-              tooltip={`Verification level: ${levelInfo.name}`}
-            />
-            {isInactive && (
-              <UserBadge text="Retracted" color="red" tooltip="This verification was retracted" />
-            )}
-          </div>
-        }
-        metadata={[
-          { label: 'Verified', value: verification.createdAt.toDate().toLocaleDateString() },
-        ]}
-      />
-    </div>
-  );
-}
-
-/** Read-only dispute entry using your existing DisputeUserCard pattern */
-function DisputeEntry({
-  dispute,
-  userProfile,
-  currentRecordHash,
-  reactionStats,
-}: {
-  dispute: DisputeDocDecrypted;
-  userProfile: BelroseUserProfile | undefined;
-  currentRecordHash: string | null | undefined;
-  reactionStats: ReactionStats | undefined;
-}) {
-  const severityInfo = getSeverityConfig(dispute.severity);
-  const culpabilityInfo = getCulpabilityConfig(dispute.culpability);
-  const isCurrent = dispute.recordHash === currentRecordHash;
-  const isInactive = !dispute.isActive;
-
-  const sevColor = dispute.severity === 3 ? 'red' : dispute.severity === 2 ? 'yellow' : 'blue';
-
-  return (
-    <div className={isInactive ? 'opacity-60' : ''}>
-      <UserCard
-        user={userProfile}
-        userId={dispute.disputerId}
-        variant="default"
-        color={isInactive ? 'red' : 'yellow'}
-        menuType="none"
-        content={
-          <div className="flex items-center gap-2 flex-wrap">
-            <UserBadge
-              text={isCurrent ? 'Current version' : 'Prior version'}
-              color={isCurrent ? 'green' : 'yellow'}
-              tooltip={isCurrent ? 'Disputed the current hash' : 'Disputed a previous hash'}
-            />
-            <UserBadge
-              text={severityInfo.name}
-              color={sevColor}
-              tooltip={`Severity: ${severityInfo.name}`}
-            />
-            <UserBadge
-              text={culpabilityInfo.name}
-              color="purple"
-              tooltip={`Culpability: ${culpabilityInfo.name}`}
-            />
-            {isInactive && (
-              <UserBadge text="Retracted" color="red" tooltip="This dispute was retracted" />
-            )}
-            {/* Read-only reaction counts — no action surface in profile view */}
-            {reactionStats && (reactionStats.supports > 0 || reactionStats.opposes > 0) && (
-              <span className="text-xs text-muted-foreground ml-1">
-                ↑{reactionStats.supports} ↓{reactionStats.opposes}
-              </span>
-            )}
-          </div>
-        }
-        metadata={[{ label: 'Filed', value: dispute.createdAt.toDate().toLocaleDateString() }]}
-      />
-      {/* Notes — shown inline since there's no detail modal in this read-only context */}
-      {dispute.notes && (
-        <p className="mt-1 mb-2 ml-12 text-xs text-muted-foreground italic border-l-2 border-gray-200 pl-3">
-          "{dispute.notes}"
-        </p>
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
 
 export const ProfileCredibilityTab: React.FC<ProfileCredibilityTabProps> = ({
   subjectFirebaseUid,
@@ -360,7 +218,7 @@ export const ProfileCredibilityTab: React.FC<ProfileCredibilityTabProps> = ({
 
         {/* Text + bar */}
         <div className="flex-1 min-w-0">
-          <p className="text-base font-bold text-white mb-1">Blockchain Completeness</p>
+          <p className="text-base font-bold text-white mb-1">Record Credibility</p>
           <p className="text-xs text-slate-400">
             {summary.anchoredMatch} matched · {summary.anchoredPreviousVersion} traceable ·{' '}
             {summary.anchoredMismatch} mismatch · {summary.notAnchored} unanchored

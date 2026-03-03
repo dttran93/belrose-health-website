@@ -13,12 +13,15 @@ import {
   getVerificationsByRecordId,
   VerificationDoc,
 } from '@/features/Credibility/services/verificationService';
-import { RecordCompletenessResult } from '@/features/HealthProfile/hooks/useBlockchainCompleteness';
+import {
+  RecordBlockchainStatus,
+  RecordCompletenessResult,
+} from '@/features/HealthProfile/hooks/useBlockchainCompleteness';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { AlertTriangle, ChevronDown, Shield } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import HashRow from './HashRow';
-import { STATUS_CONFIG, StatusPill } from '../ProfileCredibilityTab';
+import { STATUS_CONFIG } from '../ProfileCredibilityTab';
 import { BelroseUserProfile } from '@/types/core';
 import VerificationUserCard from '@/features/Credibility/components/Verifications/VerificationUserCard';
 import VerificationDetailModal from '@/features/Credibility/components/Verifications/VerificationDetailModal';
@@ -36,6 +39,20 @@ interface RecordCredibilityData {
   userProfiles: Map<string, BelroseUserProfile>;
   isLoading: boolean;
   error: string | null;
+}
+
+/** Thin coloured pill matching your existing UserBadge style */
+export function StatusPill({ status }: { status: RecordBlockchainStatus }) {
+  const cfg = STATUS_CONFIG[status];
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border"
+      style={{ color: cfg.color, background: cfg.bg, borderColor: cfg.border }}
+    >
+      <span className="text-[10px]">{cfg.icon}</span>
+      {cfg.label}
+    </span>
+  );
 }
 
 function RecordRow({
@@ -112,24 +129,9 @@ function RecordRow({
     loadCredData();
   }, [expanded, recordId]);
 
-  const handleModify = () => {
+  const handleCredibilityRoute = () => {
     setSelectedVerification(null);
-    navigate(`/records/${recordId}?tab=verifications`);
-  };
-
-  const handleRetract = () => {
-    setSelectedVerification(null);
-    navigate(`/records/${recordId}?tab=verifications`);
-  };
-
-  const handleDisputeModify = () => {
-    setSelectedDispute(null);
-    navigate(`/records/${recordId}`);
-  };
-
-  const handleDisputeRetract = () => {
-    setSelectedDispute(null);
-    navigate(`/records/${recordId}`);
+    navigate(`/app/records/${recordId}?view=credibility`);
   };
 
   const verCount = credData.verifications.length;
@@ -371,8 +373,8 @@ function RecordRow({
           record={result.record}
           userProfile={credData.userProfiles.get(selectedVerification.verifierId)}
           isOwnVerification={user?.uid === selectedVerification.verifierId}
-          onModify={handleModify}
-          onRetract={handleRetract}
+          onModify={handleCredibilityRoute}
+          onRetract={handleCredibilityRoute}
         />
       )}
       {selectedDispute && (
@@ -383,9 +385,9 @@ function RecordRow({
           record={result.record}
           userProfile={credData.userProfiles.get(selectedDispute.disputerId)}
           isOwnDispute={user?.uid === selectedDispute.disputerId}
-          onModify={handleDisputeModify}
-          onRetract={handleDisputeRetract}
-          onReact={() => navigate(`/records/${recordId}`)}
+          onModify={handleCredibilityRoute}
+          onRetract={handleCredibilityRoute}
+          onReact={handleCredibilityRoute}
           reactionStats={
             credData.reactionStatsMap.get(selectedDispute.id) ?? {
               supports: 0,
