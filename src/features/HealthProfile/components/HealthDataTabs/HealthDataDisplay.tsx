@@ -1,7 +1,7 @@
-// src/features/HealthProfile/components/overview/HealthCategoryGrid.tsx
+// src/features/HealthProfile/components/overview/HealthDataDisplay.tsx
 
 /**
- * HealthCategoryGrid
+ * HealthData Display
  *
  * Renders the main overview grid of CategoryCards for the HealthProfile page.
  * Handles all three states: loading skeleton, empty, and populated.
@@ -12,8 +12,9 @@
 
 import React from 'react';
 import { FileX } from 'lucide-react';
-import { GroupedHealthData, HealthProfileCategory } from '../../utils/fhirGroupingUtils';
-import CategoryCard from './CategoryCard';
+import { GroupedHealthData } from '../../utils/fhirGroupingUtils';
+import CategoryCard from './ui/CategoryCard';
+import { HealthDataView } from '../../configs/healthDataViews';
 
 // ============================================================================
 // LOADING SKELETON
@@ -68,33 +69,51 @@ const EmptyState: React.FC<{ isOwnProfile: boolean }> = ({ isOwnProfile }) => (
 // MAIN COMPONENT
 // ============================================================================
 
-interface HealthCategoryGridProps {
+interface HealthDataDisplayProps {
   grouped: GroupedHealthData;
-  populatedCategories: HealthProfileCategory[];
+  view: HealthDataView;
   isLoading: boolean;
   isOwnProfile: boolean;
 }
 
-export const HealthCategoryGrid: React.FC<HealthCategoryGridProps> = ({
+export const HealthDataDisplay: React.FC<HealthDataDisplayProps> = ({
   grouped,
-  populatedCategories,
+  view,
   isLoading,
   isOwnProfile,
 }) => {
+  const isSCR = view.id === 'scr';
+
+  // SCR: always show all sections so clinicians see "not recorded" explicitly
+  // All other views: only show categories that have data
+  const visibleCategories = isSCR
+    ? view.sections
+    : view.sections.filter(cat => (grouped.get(cat)?.length ?? 0) > 0);
+
+  // Overall empty state only applies to non-SCR views
+  const isEmpty = !isSCR && visibleCategories.length === 0;
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <div className="flex flex-col gap-4">
       {isLoading ? (
-        // 8 skeleton placeholders while loading
-        Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)
-      ) : populatedCategories.length === 0 ? (
+        Array.from({ length: isSCR ? view.sections.length : 8 }).map((_, i) => (
+          <SkeletonCard key={i} />
+        ))
+      ) : isEmpty ? (
         <EmptyState isOwnProfile={isOwnProfile} />
       ) : (
-        populatedCategories.map(category => (
-          <CategoryCard key={category} category={category} items={grouped.get(category) ?? []} />
+        visibleCategories.map(category => (
+          <CategoryCard
+            key={category}
+            category={category}
+            items={grouped.get(category) ?? []}
+            isOwnProfile={isOwnProfile}
+            alwaysShow={isSCR}
+          />
         ))
       )}
     </div>
   );
 };
 
-export default HealthCategoryGrid;
+export default HealthDataDisplay;

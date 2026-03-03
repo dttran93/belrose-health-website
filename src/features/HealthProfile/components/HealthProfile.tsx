@@ -9,28 +9,15 @@
 
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { HeartPulse, ShieldCheck } from 'lucide-react';
+import { Clipboard, HeartPulse, IdCard, LayoutGrid, List, ShieldCheck } from 'lucide-react';
 import { useHealthProfile } from '@/features/HealthProfile/hooks/useHealthProfile';
-import { HealthCategoryGrid } from '@/features/HealthProfile/components/ui/HealthCategoryGrid';
+import HealthDataDisplay from '@/features/HealthProfile/components/HealthDataTabs/HealthDataDisplay';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import ProfileHeader from './ui/ProfileHeader';
-import ProfileTabs, { ProfileTab } from './ui/ProfileTab';
-import ProfileRecordsTab from './ui/ProfileRecords';
+import ProfileRecordsTab from './ProfileRecordsTab';
 import { ProfileCredibilityTab } from './CredibilityTab/ProfileCredibilityTab';
-
-/** Placeholder for the blockchain tab — will be replaced with SubjectVerificationView */
-const BlockchainTabPlaceholder: React.FC = () => (
-  <div className="flex flex-col items-center justify-center py-20 text-center">
-    <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-4">
-      <ShieldCheck className="w-7 h-7 text-muted-foreground" />
-    </div>
-    <h3 className="text-base font-semibold text-card-foreground mb-1">Blockchain Verification</h3>
-    <p className="text-sm text-muted-foreground max-w-xs">
-      On-chain completeness verification coming soon. This will show which records are anchored and
-      whether any are missing or tampered.
-    </p>
-  </div>
-);
+import { ALL_DATA_VIEW, SCR_VIEW } from '../configs/healthDataViews';
+import { Tab, TabNavigation } from '@/components/ui/TabNavigation';
 
 // ============================================================================
 // ERROR STATE
@@ -71,9 +58,19 @@ const MissingSubjectId: React.FC = () => {
 // PAGE
 // ============================================================================
 
+const PROFILE_TABS: Tab[] = [
+  { id: 'summary', label: 'Summary', icon: LayoutGrid },
+  { id: 'alldata', label: 'All Data', icon: List },
+  { id: 'records', label: 'Records', icon: Clipboard },
+  { id: 'identity', label: 'Identity', icon: IdCard },
+  { id: 'blockchain', label: 'Credibility', icon: ShieldCheck },
+];
+
+export type HealthProfileTabs = 'summary' | 'alldata' | 'records' | 'identity' | 'blockchain';
+
 const HealthProfile: React.FC = () => {
   const { subjectId } = useParams<{ subjectId: string }>();
-  const [activeTab, setActiveTab] = useState<ProfileTab>('summary');
+  const [activeTab, setActiveTab] = useState<HealthProfileTabs>('summary');
 
   const { user } = useAuthContext();
   const resolvedSubjectId = subjectId === 'me' ? user?.uid : subjectId;
@@ -81,17 +78,8 @@ const HealthProfile: React.FC = () => {
   // Guard: subjectId missing from URL
   if (!resolvedSubjectId) return <MissingSubjectId />;
 
-  const {
-    records,
-    grouped,
-    populatedCategories,
-    summary,
-    isLoading,
-    error,
-    isOwnProfile,
-    recordCount,
-    subjectName,
-  } = useHealthProfile(resolvedSubjectId);
+  const { records, grouped, summary, isLoading, error, isOwnProfile, recordCount, subjectName } =
+    useHealthProfile(resolvedSubjectId);
 
   const renderTab = () => {
     if (error) return <ErrorState message={error.message} />;
@@ -99,9 +87,18 @@ const HealthProfile: React.FC = () => {
     switch (activeTab) {
       case 'summary':
         return (
-          <HealthCategoryGrid
+          <HealthDataDisplay
             grouped={grouped}
-            populatedCategories={populatedCategories}
+            view={SCR_VIEW}
+            isLoading={isLoading}
+            isOwnProfile={isOwnProfile}
+          />
+        );
+      case 'alldata':
+        return (
+          <HealthDataDisplay
+            grouped={grouped}
+            view={ALL_DATA_VIEW}
             isLoading={isLoading}
             isOwnProfile={isOwnProfile}
           />
@@ -122,16 +119,22 @@ const HealthProfile: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-background">
-      <ProfileHeader
-        subjectId={resolvedSubjectId}
-        recordCount={recordCount}
-        totalResources={summary.totalResourcesExtracted}
-        isOwnProfile={isOwnProfile}
-        isLoading={isLoading}
-      />
-      <ProfileTabs activeTab={activeTab} onTabChange={setActiveTab} />
-      <div className="flex-1 overflow-auto p-6">{renderTab()}</div>
+    <div className="p-4">
+      <div className="max-w-7xl mx-auto bg-background rounded=2xl shadow-xl rounded-lg flex flex-col">
+        <ProfileHeader
+          subjectId={resolvedSubjectId}
+          recordCount={recordCount}
+          totalResources={summary.totalResourcesExtracted}
+          isOwnProfile={isOwnProfile}
+          isLoading={isLoading}
+        />
+        <TabNavigation
+          tabs={PROFILE_TABS}
+          activeTab={activeTab}
+          onTabChange={tab => setActiveTab(tab as HealthProfileTabs)}
+        />
+        <div className="flex-1 overflow-auto p-6">{renderTab()}</div>
+      </div>
     </div>
   );
 };

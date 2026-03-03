@@ -9,7 +9,7 @@
  * - Up to MAX_VISIBLE items rendered as ResourceItem rows
  * - "Show X more" overflow indicator when there are more items
  * - Empty state when a category has zero resources (shouldn't normally
- *   render — HealthCategoryGrid filters these out — but safe fallback)
+ *   render — HealthDataDisplay filters these out — but safe fallback)
  *
  * Each category gets a distinct accent colour from the Belrose palette
  * so the grid is visually scannable at a glance.
@@ -32,12 +32,13 @@ import {
   MoreHorizontal,
   ChevronDown,
   ChevronUp,
+  User,
 } from 'lucide-react';
 import {
   FHIRResourceWithProvenance,
   HealthProfileCategory,
   getCategoryConfig,
-} from '../../utils/fhirGroupingUtils';
+} from '../../../utils/fhirGroupingUtils';
 import ResourceItem from './ResourceItem';
 
 // ============================================================================
@@ -57,6 +58,7 @@ const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
   shield: Shield,
   calendar: Calendar,
   users: Users,
+  user: User,
   'user-check': UserCheck,
   'building-2': Building2,
   'map-pin': MapPin,
@@ -137,6 +139,12 @@ const CATEGORY_COLOURS: Record<
     borderAccent: 'border-t-slate-400',
     countBg: 'bg-slate-100 text-slate-700',
   },
+  patients: {
+    iconBg: 'bg-slate-100',
+    iconColor: 'text-slate-600',
+    borderAccent: 'border-t-slate-400',
+    countBg: 'bg-slate-100 text-slate-700',
+  },
   locations: {
     iconBg: 'bg-amber-50',
     iconColor: 'text-amber-600',
@@ -161,14 +169,21 @@ const CATEGORY_COLOURS: Record<
 // COMPONENT
 // ============================================================================
 
-const MAX_VISIBLE = 4; // Items shown before "show more"
+const MAX_VISIBLE = 5; // Items shown before "show more"
 
 interface CategoryCardProps {
   category: HealthProfileCategory;
   items: FHIRResourceWithProvenance[];
+  isOwnProfile?: boolean;
+  alwaysShow?: boolean;
 }
 
-export const CategoryCard: React.FC<CategoryCardProps> = ({ category, items }) => {
+export const CategoryCard: React.FC<CategoryCardProps> = ({
+  category,
+  items,
+  isOwnProfile = false,
+  alwaysShow = false,
+}) => {
   const [expanded, setExpanded] = useState(false);
 
   const config = getCategoryConfig(category);
@@ -180,41 +195,43 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({ category, items }) =
   const hasOverflow = overflowCount > 0;
 
   return (
-    <div
-      className={`
-        bg-white rounded-xl border border-border shadow-sm
-        border-t-2 ${colours.borderAccent}
-        flex flex-col overflow-hidden
-        hover:shadow-md transition-shadow duration-200
-      `}
-    >
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-3">
-        <div className="flex items-center gap-2.5">
-          <div className={`p-2 rounded-lg ${colours.iconBg}`}>
-            <IconComponent className={`w-4 h-4 ${colours.iconColor}`} />
-          </div>
-          <h3 className="text-sm font-semibold text-card-foreground">{config.label}</h3>
+    <div className="border rounded-lg border-border">
+      {/* ── Section header ── */}
+      <div className="flex bg-gray-200 items-center gap-2.5 p-3 rounded-t-lg">
+        <div className={`p-1.5 rounded-md ${colours.iconBg}`}>
+          <IconComponent className={`w-3.5 h-3.5 ${colours.iconColor}`} />
         </div>
-
+        <h3 className="text-sm font-semibold text-card-foreground">{config.label}</h3>
         {/* Count badge */}
         <span
-          className={`
-            text-xs font-semibold px-2 py-0.5 rounded-full
-            ${colours.countBg}
-          `}
+          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+            items.length === 0 ? 'bg-muted text-muted-foreground/50' : colours.countBg
+          }`}
         >
-          {items.length}
+          {items.length === 0 ? '—' : items.length}
         </span>
       </div>
-
-      {/* ── Divider ── */}
-      <div className="h-px bg-border/50 mx-4" />
 
       {/* ── Items ── */}
       <div className="flex-1 px-1 py-1">
         {items.length === 0 ? (
-          <p className="text-xs text-muted-foreground px-3 py-3">No records found.</p>
+          <div className="flex items-start gap-3 px-3 py-4">
+            <div className="flex-1">
+              <p className="text-xs font-medium text-muted-foreground">
+                {isOwnProfile
+                  ? `No ${config.label.toLowerCase()} have been recorded yet.`
+                  : `No ${config.label.toLowerCase()} have been shared for this patient.`}
+              </p>
+              {isOwnProfile && (
+                <p className="text-[11px] text-muted-foreground/50 mt-1">
+                  Upload a record containing {config.label.toLowerCase()} to populate this section.
+                </p>
+              )}
+            </div>
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground/50 flex-shrink-0 whitespace-nowrap">
+              Not recorded
+            </span>
+          </div>
         ) : (
           <>
             {visibleItems.map((item, idx) => (
@@ -226,32 +243,6 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({ category, items }) =
           </>
         )}
       </div>
-
-      {/* ── Show more / less ── */}
-      {hasOverflow && (
-        <button
-          onClick={() => setExpanded(prev => !prev)}
-          className="
-            flex items-center justify-center gap-1.5
-            w-full py-2.5 px-4
-            text-xs font-medium text-muted-foreground
-            hover:text-card-foreground hover:bg-muted/40
-            border-t border-border/50 transition-colors
-          "
-        >
-          {expanded ? (
-            <>
-              <ChevronUp className="w-3.5 h-3.5" />
-              Show less
-            </>
-          ) : (
-            <>
-              <ChevronDown className="w-3.5 h-3.5" />
-              {overflowCount} more
-            </>
-          )}
-        </button>
-      )}
     </div>
   );
 };

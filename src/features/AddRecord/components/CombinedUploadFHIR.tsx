@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import FileUploadZone from './ui/FileUploadZone';
 import { FileListItem } from './FileListItem';
-import { TabNavigation } from './ui/TabNavigation';
+import { TabNavigation } from '../../../components/ui/TabNavigation';
 import { toast } from 'sonner';
 import { FileObject } from '@/types/core';
 import { Button } from '@/components/ui/Button';

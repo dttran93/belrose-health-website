@@ -14,7 +14,7 @@ export interface TabNavigationProps {
 }
 
 export const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabChange, tabs }) => (
-  <div className="flex space-x-1 mb-4 bg-background p-1 rounded-lg">
+  <div className="flex space-x-1 bg-background m-3 rounded-lg">
     {tabs.map(({ id, label, icon: Icon }) => (
       <button
         key={id}

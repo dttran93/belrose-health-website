@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { ClipboardPlus, Code, FileInput, Computer, Info } from 'lucide-react';
 import { FileObject, BelroseFields } from '@/types/core';
-import { TabNavigation } from '@/features/AddRecord/components/ui/TabNavigation';
+import { TabNavigation } from '@/components/ui/TabNavigation';
 import FHIRRecord from '@/features/ViewEditRecord/components/View/FHIRRecord';
 import BelroseRecord from './BelroseRecord';
 import { DecryptedFileViewer } from '@/features/Encryption/components/DecryptedFileViewer';
@@ -64,7 +64,7 @@ export const RecordView: React.FC<RecordViewProps> = ({
   };
 
   return (
-    <div className="p-8">
+    <div>
       {/* Tab Navigation */}
       <TabNavigation tabs={tabs} activeTab={activeTab} onTabChange={handleTabChange} />
 

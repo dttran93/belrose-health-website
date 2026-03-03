@@ -19,13 +19,7 @@ interface ProfileHeaderProps {
   isLoading: boolean;
 }
 
-const ProfileHeader: React.FC<ProfileHeaderProps> = ({
-  subjectId,
-  recordCount,
-  totalResources,
-  isOwnProfile,
-  isLoading,
-}) => {
+const ProfileHeader: React.FC<ProfileHeaderProps> = ({ subjectId, isOwnProfile }) => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<BelroseUserProfile | null>(null);
 
@@ -35,24 +29,32 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   }, [subjectId]);
 
   return (
-    <div className="bg-white border-b border-border px-6 py-4">
+    <div className="bg-accent px-6 py-4 rounded-t-lg">
       {/* Back + title row */}
-      <div className="flex items-center gap-3 mb-3">
-        <button
-          onClick={() => navigate(-1)}
-          className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-card-foreground"
-          aria-label="Go back"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </button>
+      <div className="flex flex-col items-start gap-3 mb-3">
+        <div className="flex justify-between items-center w-full">
+          <div>
+            <span className="px-2 py-1 text-xs font-medium rounded-full border bg-background text-primary">
+              Health Profile
+            </span>
+          </div>
+          <div>
+            <button
+              onClick={() => navigate(-1)}
+              className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-card-foreground"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
 
-        <div className="flex justify-between items-center gap-2">
+        <div className="flex justify-between gap-2">
           <Avatar profile={profile} size="lg" />
           <div className="flex flex-col items-start gap-1">
             <h1 className="text-lg font-semibold text-card-foreground">
               {profile?.displayName ?? (isOwnProfile ? 'My Health Profile' : 'Health Profile')}
             </h1>
-
             <div className="flex items-center text-xs gap-1.5">
               <div className="flex gap-1">
                 <User className="w-3.5 h-3.5" />

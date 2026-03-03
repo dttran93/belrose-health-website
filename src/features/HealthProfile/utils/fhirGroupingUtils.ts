@@ -62,7 +62,10 @@ export type HealthProfileCategory =
   | 'observations'
   | 'procedures'
   | 'immunizations'
+  | 'visits'
+  | 'family_history'
   | 'care_team'
+  | 'patients'
   | 'providers'
   | 'locations'
   | 'documents'
@@ -155,43 +158,62 @@ export const FHIR_CATEGORY_MAP: Record<string, CategoryConfig> = {
     icon: 'shield',
     priority: 6,
   },
+  // --- Encounters & family context ---
+  Encounter: {
+    categoryKey: 'visits',
+    label: 'Visits & Encounters',
+    icon: 'calendar',
+    priority: 7,
+  },
+  EpisodeOfCare: {
+    categoryKey: 'visits',
+    label: 'Visits & Encounters',
+    icon: 'calendar',
+    priority: 7,
+  },
+  FamilyMemberHistory: {
+    categoryKey: 'family_history',
+    label: 'Family History',
+    icon: 'users',
+    priority: 8,
+  },
   // --- Care context (who, where) ---
   Practitioner: {
     categoryKey: 'care_team',
     label: 'Care Team',
     icon: 'user-check',
-    priority: 7,
+    priority: 9,
   },
   PractitionerRole: {
     categoryKey: 'care_team',
     label: 'Care Team',
     icon: 'user-check',
-    priority: 7,
+    priority: 9,
   },
   Patient: {
-    categoryKey: 'care_team',
-    label: 'Care Team',
-    icon: 'user-check',
-    priority: 7,
+    categoryKey: 'patients',
+    label: 'Patient',
+    icon: 'user',
+    priority: 0,
   },
   Organization: {
     categoryKey: 'providers',
     label: 'Providers & Organisations',
     icon: 'building-2',
-    priority: 8,
+    priority: 10,
   },
   Location: {
     categoryKey: 'locations',
     label: 'Locations',
     icon: 'map-pin',
-    priority: 9,
+    priority: 11,
   },
   // --- Documents ---
   DocumentReference: {
     categoryKey: 'documents',
     label: 'Documents',
     icon: 'file-text',
-    priority: 10,
+    priority: 12,
   },
 };
 
@@ -204,7 +226,7 @@ export const OTHER_CATEGORY_CONFIG: CategoryConfig = {
   categoryKey: 'other',
   label: 'Other',
   icon: 'more-horizontal',
-  priority: 11,
+  priority: 13,
 };
 
 // ============================================================================
@@ -242,7 +264,7 @@ export function extractResourcesFromRecord(record: FileObject): FHIRResourceWith
         {
           resource: fhirData as FHIRResource,
           sourceRecordId: record.id,
-          sourceRecordName: record.belroseFields?.title || 'Unknown Record',
+          sourceRecordName: record.belroseFields?.title || record.fileName || 'Unknown Record',
           sourceRecordDate: resolveRecordDate(record),
         },
       ];
@@ -270,7 +292,7 @@ export function extractResourcesFromRecord(record: FileObject): FHIRResourceWith
     results.push({
       resource: resource as FHIRResource,
       sourceRecordId: record.id,
-      sourceRecordName: record.fileName || 'Unknown Record',
+      sourceRecordName: record.belroseFields?.title || record.fileName || 'Unknown Record',
       sourceRecordDate: resolveRecordDate(record),
     });
   }
@@ -306,7 +328,10 @@ export function groupResourcesByCategory(records: FileObject[]): {
     ['observations', []],
     ['procedures', []],
     ['immunizations', []],
+    ['visits', []],
+    ['family_history', []],
     ['care_team', []],
+    ['patients', []],
     ['providers', []],
     ['locations', []],
     ['documents', []],
@@ -442,6 +467,18 @@ export function getResourceDisplayName(resource: FHIRResource): string {
     case 'Immunization':
       return r.vaccineCode?.text || r.vaccineCode?.coding?.[0]?.display || 'Unknown Immunization';
 
+    case 'Encounter':
+      return (
+        r.type?.[0]?.text ||
+        r.type?.[0]?.coding?.[0]?.display ||
+        r.class?.display ||
+        r.class?.code ||
+        'Encounter'
+      );
+
+    case 'FamilyMemberHistory':
+      return r.relationship?.text || r.relationship?.coding?.[0]?.display || 'Family Member';
+
     case 'DocumentReference':
       return r.description || r.type?.text || r.type?.coding?.[0]?.display || 'Document';
 
@@ -485,6 +522,12 @@ export function getResourceDate(resource: FHIRResource): string | undefined {
     case 'Immunization':
       return r.occurrenceDateTime || r.occurrenceString;
 
+    case 'Encounter':
+      return r.period?.start || r.actualPeriod?.start;
+
+    case 'FamilyMemberHistory':
+      return r.date;
+
     case 'DocumentReference':
       return r.date;
 
@@ -527,6 +570,16 @@ export function getResourceSecondaryDetail(resource: FHIRResource): string | und
 
     case 'Immunization':
       return r.status ? `Status: ${r.status}` : undefined;
+
+    case 'Encounter':
+      return r.status ? `Status: ${r.status}` : undefined;
+
+    case 'FamilyMemberHistory': {
+      // Surface any recorded conditions for this family member
+      const condition =
+        r.condition?.[0]?.code?.text || r.condition?.[0]?.code?.coding?.[0]?.display;
+      return condition ? `Condition: ${condition}` : undefined;
+    }
 
     default:
       return undefined;

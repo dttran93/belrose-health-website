@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { X, Save, Ellipsis, Info, UserCheck, AlertCircle } from 'lucide-react';
+import { X, Save, Ellipsis, Info } from 'lucide-react';
 import { FileObject, BelroseFields } from '@/types/core';
 import { LayoutSlot } from '@/components/app/LayoutProvider';
 import VersionControlPanel from './VersionControlPanel';
