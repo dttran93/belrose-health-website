@@ -148,7 +148,7 @@ async function sendSignupInvitation(
             <div class="features">
               <div class="feature">✅ Your health data is encrypted end-to-end</div>
               <div class="feature">✅ You control who sees your records</div>
-              <div class="feature">✅ Blockchain-verified for authenticity</div>
+              <div class="feature">✅ Credibility verified across thousands of independent computers worldwide</div>
               <div class="feature">✅ HIPAA-compliant security</div>
             </div>
             
@@ -161,8 +161,8 @@ async function sendSignupInvitation(
             
             <p style="text-align: center;">
               <a href="${getFrontendUrl()}/register?invite=${encodeURIComponent(
-      receiverEmail
-    )}" class="button">
+                receiverEmail
+              )}" class="button">
                 Create Your Account
               </a>
             </p>
@@ -194,7 +194,7 @@ Once you complete these steps, ${senderName} can share their record with you sec
 Why Belrose?
 ✅ Your health data is encrypted end-to-end
 ✅ You control who sees your records
-✅ Blockchain-verified for authenticity
+✅ Credibility verified across thousands of independent computers worldwide
 
 Get started: ${getFrontendUrl()}/register?invite=${encodeURIComponent(receiverEmail)}
 

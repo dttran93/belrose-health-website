@@ -69,7 +69,7 @@ const countryData: CountryEntry[] = [
         </p>
         <p className="text-left mb-4">
           Although the vulnerabilities were patched and 73 million Germans now technically have a
-          digital health record, the dream of a comprehensive health records remains distant. With
+          digital health record, the dream of comprehensive health records remains distant. With
           over a billion euros spent between running Gematik
           <CitationLink id="gematik-cost-bundestag" />, unnecessary hardware replacements
           <CitationLink id="gematik-cost-connectors" />, and general bureaucratic delay, Gematik has

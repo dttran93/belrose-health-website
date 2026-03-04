@@ -27,7 +27,6 @@ const Who: React.FC = () => {
     <div>
       <CareersHero />
       <OpenRoles />
-      <Team />
       <div id="contact">
         <Contact />
       </div>

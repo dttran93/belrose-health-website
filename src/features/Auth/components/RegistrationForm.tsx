@@ -258,6 +258,12 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         updatedAt: new Date(),
       });
 
+      const inviteRef = doc(db, 'invites', registrationData.email.toLowerCase());
+      await updateDoc(inviteRef, {
+        registeredUserId: registrationData.userId,
+        registeredAt: new Date().toISOString(),
+      });
+
       setRegistrationProgress({
         step: 'complete',
         message: 'Registration complete!',

@@ -12,6 +12,7 @@ import About from '@/components/site/Company/About';
 import NavArrow from '@/components/site/ui/NavArrow';
 import FAQFull from '@/components/site/FAQ/FAQFull';
 import CitationModal from '@/components/site/Citations/CitationModal';
+import WaitlistBanner from '@/components/site/WaitlistBanner';
 
 // ─── Section config ───────────────────────────────────────────────────────────
 
@@ -134,6 +135,7 @@ const Index: React.FC = () => {
       <div className="hidden md:flex fixed inset-0 flex-col bg-white">
         {/* Navbar */}
         <div className="flex-shrink-0 z-40 relative">
+          <WaitlistBanner />
           <Navbar />
         </div>
 

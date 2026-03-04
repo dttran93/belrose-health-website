@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.aiChat = exports.getSponsorshipStatus = exports.signSponsorship = exports.onRecordDeletionEventUpdated = exports.onRecordDeletionEventCreated = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.sendShareInvitationEmail = exports.personaWebhook = exports.checkVerificationStatus = exports.createVerificationSession = exports.getEncryptedWallet = exports.createWallet = exports.createDetailedNarrative = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = void 0;
+exports.aiChat = exports.getSponsorshipStatus = exports.signSponsorship = exports.onRecordDeletionEventUpdated = exports.onRecordDeletionEventCreated = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.sendAlphaApprovalEmail = exports.sendShareInvitationEmail = exports.personaWebhook = exports.checkVerificationStatus = exports.createVerificationSession = exports.getEncryptedWallet = exports.createWallet = exports.createDetailedNarrative = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = void 0;
 // functions/src/index.ts
 const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin
@@ -62,6 +62,8 @@ Object.defineProperty(exports, "personaWebhook", { enumerable: true, get: functi
 // ==================== EMAIL FUNCTIONS ====================
 var sendShareInvitationEmail_1 = require("./handlers/sendShareInvitationEmail");
 Object.defineProperty(exports, "sendShareInvitationEmail", { enumerable: true, get: function () { return sendShareInvitationEmail_1.sendShareInvitationEmail; } });
+var sendAlphaApprovalEmail_1 = require("./handlers/sendAlphaApprovalEmail");
+Object.defineProperty(exports, "sendAlphaApprovalEmail", { enumerable: true, get: function () { return sendAlphaApprovalEmail_1.sendAlphaApprovalEmail; } });
 // ==================== HEALTH CHECK ====================
 var healthCheck_1 = require("./handlers/healthCheck");
 Object.defineProperty(exports, "health", { enumerable: true, get: function () { return healthCheck_1.health; } });

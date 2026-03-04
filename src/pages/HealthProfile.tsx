@@ -22,19 +22,19 @@ import {
 import { useHealthProfile } from '@/features/HealthProfile/hooks/useHealthProfile';
 import HealthDataDisplay from '@/features/HealthProfile/components/HealthDataTabs/HealthDataDisplay';
 import { useAuthContext } from '@/features/Auth/AuthContext';
-import ProfileHeader from './ui/ProfileHeader';
-import ProfileRecordsTab from './RecordsTab/ProfileRecordsTab';
-import { ProfileCredibilityTab } from './CredibilityTab/ProfileCredibilityTab';
+import ProfileHeader from '../features/HealthProfile/components/ui/ProfileHeader';
+import ProfileRecordsTab from '../features/HealthProfile/components/RecordsTab/ProfileRecordsTab';
+import { ProfileCredibilityTab } from '../features/HealthProfile/components/CredibilityTab/ProfileCredibilityTab';
 import { Tab, TabNavigation } from '@/components/ui/TabNavigation';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
 import { BelroseUserProfile } from '@/types/core';
 import { useUserRecords } from '@/features/ViewEditRecord/hooks/useUserRecords';
-import { parseIdentityFromRecord } from '../utils/parseUserIdentity';
-import { ALL_DATA_VIEW, SCR_VIEW } from '../configs/healthDataViews';
-import { IdentityTab } from './IdentityTab/IdentityTab';
-import { useProfileCompleteness } from '../hooks/useProfileCompleteness';
-import ProfileCompletenessTab from './ProfileCompletenessTab/ProfileCompletenessTab';
-import useBlockchainCompleteness from '../hooks/useBlockchainCompleteness';
+import { parseIdentityFromRecord } from '../features/HealthProfile/utils/parseUserIdentity';
+import { ALL_DATA_VIEW, SCR_VIEW } from '../features/HealthProfile/configs/healthDataViews';
+import { IdentityTab } from '../features/HealthProfile/components/IdentityTab/IdentityTab';
+import { useProfileCompleteness } from '../features/HealthProfile/hooks/useProfileCompleteness';
+import ProfileCompletenessTab from '../features/HealthProfile/components/ProfileCompletenessTab/ProfileCompletenessTab';
+import useBlockchainCompleteness from '../features/HealthProfile/hooks/useBlockchainCompleteness';
 
 // ============================================================================
 // TAB CONFIG

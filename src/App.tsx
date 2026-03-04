@@ -24,7 +24,7 @@ import Index from './pages';
 import { CitationProvider } from './components/site/Citations/CitationContext';
 import { AIChatProvider } from './features/Ai/components/AIChatContext';
 import ChatHistoryPage from './features/Ai/components/ChatHistoryPage';
-import HealthProfile from './features/HealthProfile/components/HealthProfile';
+import HealthProfile from './pages/HealthProfile';
 import RecordDetail from './pages/RecordDetail';
 
 // Create QueryClient instance with proper typing
@@ -50,6 +50,7 @@ const App: React.FC = (): React.JSX.Element => {
                 {/* ── Auth & verification ── */}
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/auth/register" element={<Auth />} />
+                <Route path="/waitlist" element={<Auth />} />
                 <Route path="/verification" element={<VerificationHub />} />
                 <Route path="/verify-email" element={<EmailVerifiedPage />} />
 
