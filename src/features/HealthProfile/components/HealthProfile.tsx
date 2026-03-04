@@ -34,6 +34,7 @@ import { ALL_DATA_VIEW, SCR_VIEW } from '../configs/healthDataViews';
 import { IdentityTab } from './IdentityTab/IdentityTab';
 import { useProfileCompleteness } from '../hooks/useProfileCompleteness';
 import ProfileCompletenessTab from './ProfileCompletenessTab/ProfileCompletenessTab';
+import useBlockchainCompleteness from '../hooks/useBlockchainCompleteness';
 
 // ============================================================================
 // TAB CONFIG
@@ -114,6 +115,12 @@ const HealthProfile: React.FC = () => {
   useEffect(() => {
     getUserProfile(resolvedSubjectId).then(setProfile);
   }, [resolvedSubjectId]);
+
+  //=== Call blockchain hook to populate widget and pass down to child components ====
+  const { anchoredRecordIds, isLoading: blockchainLoading } = useBlockchainCompleteness(
+    resolvedSubjectId,
+    records
+  );
 
   // ── Patient context record — fetched via normal record pipeline ────────────
   // Deterministic ID means we can find it with a simple .find() after the
@@ -208,9 +215,12 @@ const HealthProfile: React.FC = () => {
           profile={profile}
           userIdentity={userIdentity}
           isOwnProfile={isOwnProfile}
-          isLoading={isLoading}
           completeness={isOwnProfile ? completeness : undefined}
           onViewCompleteness={() => setActiveTab('completeness')}
+          anchoredRecordIds={anchoredRecordIds}
+          recordIds={records.map(r => r.id).filter(Boolean) as string[]}
+          isLoading={blockchainLoading}
+          onViewCredibility={() => setActiveTab('blockchain')}
         />
         <TabNavigation
           tabs={visibleTabs}

@@ -9,6 +9,7 @@ import { calculateAge, formatTimestamp } from '@/utils/dataFormattingUtils';
 import { IdentityVerifiedBadge } from '@/features/Users/components/ui/IdentityVerifiedBadge';
 import { ProfileCompletenessResult } from '../../hooks/useProfileCompleteness';
 import ProfileCompletenessWidget from './ProfileCompletenessWidget';
+import RecordAccessWidget from '../CredibilityTab/ui/RecordAccessWidget';
 
 // ============================================================================
 // PROFILE HEADER
@@ -23,6 +24,9 @@ interface ProfileHeaderProps {
   // Only passed when isOwnProfile — visitors don't see completeness
   completeness?: ProfileCompletenessResult;
   onViewCompleteness?: () => void;
+  anchoredRecordIds?: Set<string>;
+  recordIds?: string[];
+  onViewCredibility: () => void;
 }
 
 const ProfileHeader: React.FC<ProfileHeaderProps> = ({
@@ -33,6 +37,9 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   isLoading,
   completeness,
   onViewCompleteness,
+  anchoredRecordIds,
+  recordIds,
+  onViewCredibility,
 }) => {
   const navigate = useNavigate();
   const displayName =
@@ -55,6 +62,13 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     }
     return userIdentity?.address || 'Missing Location Information';
   })();
+
+  const visibleCount =
+    anchoredRecordIds && recordIds
+      ? recordIds.filter(id => id && anchoredRecordIds.has(id)).length
+      : 0;
+
+  const anchoredCount = anchoredRecordIds?.size ?? 0;
 
   return (
     <div className="bg-accent px-6 py-4 rounded-t-lg">
@@ -120,15 +134,28 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               )}
             </div>
           </div>
+
           {/* ── Right: profile completeness widget (own profile only) ──────────────── */}
-          {isOwnProfile && completeness && onViewCompleteness && (
-            <div className="w-44 flex-shrink-0 mx-8">
-              <ProfileCompletenessWidget
-                completeness={completeness}
-                onViewDetails={onViewCompleteness}
-              />
-            </div>
-          )}
+          <div className="flex gap-2 mr-8">
+            {anchoredCount > 0 && (
+              <div className="w-44 flex-shrink-0">
+                <RecordAccessWidget
+                  anchoredCount={anchoredCount}
+                  visibleCount={visibleCount}
+                  isLoading={isLoading}
+                  onViewDetails={onViewCredibility}
+                />
+              </div>
+            )}
+            {isOwnProfile && completeness && onViewCompleteness && (
+              <div className="w-44 flex-shrink-0">
+                <ProfileCompletenessWidget
+                  completeness={completeness}
+                  onViewDetails={onViewCompleteness}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

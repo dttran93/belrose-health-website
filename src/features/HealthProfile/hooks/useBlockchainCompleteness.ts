@@ -81,6 +81,7 @@ export interface UseBlockchainCompletenessReturn {
   results: RecordCompletenessResult[];
   summary: BlockchainCompletenessSummary;
   privateRecordsSummary: PrivateRecordsSummary;
+  anchoredRecordIds: Set<string>;
   isLoading: boolean;
   /** True only while recompute() is running — lets the UI show a spinner on the button */
   isRecomputing: boolean;
@@ -379,6 +380,7 @@ export function useBlockchainCompleteness(
     results,
     summary,
     privateRecordsSummary,
+    anchoredRecordIds,
     isLoading,
     isRecomputing,
     error,
