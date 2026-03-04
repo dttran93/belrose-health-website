@@ -6,6 +6,7 @@ import { Avatar } from '@/features/Users/components/Avatar';
 import { BelroseUserProfile } from '@/types/core';
 import { UserIdentity } from '../../utils/parseUserIdentity';
 import { calculateAge, formatTimestamp } from '@/utils/dataFormattingUtils';
+import { IdentityVerifiedBadge } from '@/features/Users/components/ui/IdentityVerifiedBadge';
 
 // ============================================================================
 // PROFILE HEADER
@@ -72,37 +73,40 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         <div className="flex justify-between items-center gap-2">
           <Avatar profile={profile} size="xl" />
           <div className="flex flex-col items-start gap-1">
-            <h1 className="text-lg font-semibold text-card-foreground">{displayName}</h1>
+            <h1 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
+              {displayName}
+              {profile?.identityVerified && <IdentityVerifiedBadge />}
+            </h1>
 
             {/** Belrose Account Info Row */}
-            <div className="flex items-center text-xs gap-1.5">
-              <div className="flex gap-1">
+            <div className="flex items-center text-sm gap-1.5">
+              <div className="flex gap-1 items-center">
                 <User className="w-3.5 h-3.5" />
-                <span className="font-mono">{subjectId}</span>
+                <span>{subjectId}</span>
               </div>
-              <div className="h-3 w-px bg-border" />
-              <div className="flex gap-1">
+              <div className="h-3 w-px bg-border m-1" />
+              <div className="flex gap-1 items-center">
                 <Mail className="w-3.5 h-3.5" />
-                <span className="font-mono">{profile?.email}</span>
+                <span>{profile?.email}</span>
               </div>
             </div>
 
             {/** User Identity Row */}
             {userIdentity && (
-              <div className="flex items-center text-xs gap-1.5">
+              <div className="flex items-center text-sm gap-1.5">
                 <div className="flex gap-1 items-center">
                   <Cake className="w-3.5 h-3.5" />
-                  <span className="font-mono">{userAgeInfo}</span>
+                  <span>{userAgeInfo}</span>
                 </div>
-                <div className="h-3 w-px bg-border" />
+                <div className="h-3 w-px bg-border m-1" />
                 <div className="flex gap-1 items-center">
                   <Transgender className="w-3.5 h-3.5" />
-                  <span className="font-mono">{userGenderInfo}</span>
+                  <span>{userGenderInfo}</span>
                 </div>
-                <div className="h-3 w-px bg-border" />
+                <div className="h-3 w-px bg-border m-1" />
                 <div className="flex gap-1 items-center">
                   <MapPinHouse className="w-3.5 h-3.5" />
-                  <span className="font-mono">{userHomeInfo}</span>
+                  <span>{userHomeInfo}</span>
                 </div>
               </div>
             )}

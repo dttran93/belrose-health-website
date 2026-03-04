@@ -5,6 +5,9 @@ import { Edit2, IdCard } from 'lucide-react';
 import { UserIdentity } from '../../utils/parseUserIdentity';
 import { UserIdentityForm } from './UserIdentityForm';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
+import { FileObject } from '@/types/core';
+import { useSubjectFlow } from '@/features/Subject/hooks/useSubjectFlow';
+import SubjectActionDialog from '@/features/Subject/components/ui/SubjectActionDialog';
 
 interface IdentityTabProps {
   userId: string;
@@ -33,10 +36,27 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({
   onSaved,
 }) => {
   const [editing, setEditing] = useState(!hasIdentityRecord && isOwnProfile);
+  const [savedRecord, setSavedRecord] = useState<FileObject | null>(null);
 
-  const handleSaved = () => {
+  // Update useSubjectFlow — only active once we have a record
+  const subjectFlow = useSubjectFlow({
+    record: savedRecord ?? ({} as FileObject), // fallback to empty object when no record yet
+    onSuccess: () => {
+      setSavedRecord(null); // close dialog after anchoring
+      onSaved?.();
+    },
+  });
+
+  const handleSaved = (record: FileObject) => {
     setEditing(false);
-    onSaved?.();
+
+    // Only prompt blockchain anchoring on first save (not edits)
+    if (!hasIdentityRecord) {
+      setSavedRecord(record);
+      subjectFlow.initiateAddSubject?.(); // opens the dialog at 'selecting' phase
+    } else {
+      onSaved?.();
+    }
   };
 
   // ── Empty state for non-owners ─────────────────────────────────────────────
@@ -149,6 +169,8 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({
           <DetailRow label="Languages" value={userIdentity?.languages?.join(', ')} />
         </dl>
       </div>
+
+      {savedRecord && <SubjectActionDialog {...subjectFlow.dialogProps} />}
     </div>
   );
 };

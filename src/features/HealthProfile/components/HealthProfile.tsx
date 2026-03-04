@@ -107,7 +107,7 @@ const HealthProfile: React.FC = () => {
   });
 
   const identityRecord = useMemo(
-    () => allSubjectRecords.find(r => r.id === `${resolvedSubjectId}_id`) ?? null,
+    () => allSubjectRecords.find(r => r.id === `${resolvedSubjectId}_u_id`) ?? null,
     [allSubjectRecords, resolvedSubjectId]
   );
 

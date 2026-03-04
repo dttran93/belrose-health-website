@@ -63,14 +63,15 @@ export async function saveUserIdentityRecord(
   if (!user) throw new Error('User not authenticated');
 
   const recordId = `${userId}_u_id`;
+  const sourceType = 'Belrose Identity Form';
   const fhirData = buildIdentityFHIRBundle(identity, userId);
   const fileName = 'User Identity';
   const belroseFields = {
     title: 'Belrose Health User Identity Document',
-    visitType: 'Self-Reported',
+    visitType: 'Self-Reported Identity Information',
     summary: `Identity record for ${identity.fullName ?? userId}. See fhirData for further details.`,
     completedDate: new Date().toISOString(),
-    provider: 'Self-Reported',
+    provider: 'Belrose Health',
     institution: 'Self-Reported',
     patient: identity.fullName ?? userId,
     detailedNarrative: `This is an identity record for ${identity.fullName ?? userId}. See fhirData for further details.`,
@@ -120,17 +121,19 @@ export async function saveUserIdentityRecord(
         fileSize: JSON.stringify(fhirData).length,
         status: 'completed',
         isVirtual: true,
-        recordType: 'user_identity', // filter key — keeps it out of clinical lists
         fhirData: encryptedData ? null : fhirData,
         belroseFields: encryptedData ? null : belroseFields,
         recordHash,
         aiProcessingStatus: 'not_needed',
         owners: [userId],
-        administrators: [userId],
-        subjects: [userId],
+        administrators: [],
+        viewers: [],
+        subjects: [],
         uploadedBy: userId,
         lastModified: Timestamp.now(),
         createdAt: Timestamp.now(),
+        uploadedAt: Timestamp.now(),
+        sourceType,
         encryptedFileName: encryptedData?.fileName ?? undefined,
         encryptedFhirData: encryptedData?.fhirData ?? undefined,
         encryptedBelroseFields: encryptedData?.belroseFields ?? undefined,

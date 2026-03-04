@@ -149,7 +149,11 @@ export type FileStatus =
   | 'completed' // Successfully processed
   | 'error'; // Failed with error
 
-export type SourceType = 'Plain Text Submission' | 'Manual FHIR JSON Submission' | 'File Upload';
+export type SourceType =
+  | 'Plain Text Submission'
+  | 'Manual FHIR JSON Submission'
+  | 'File Upload'
+  | 'Belrose Identity Form';
 
 //Processing Stages good for the progress chips in the Add Record process
 export type ProcessingStages =

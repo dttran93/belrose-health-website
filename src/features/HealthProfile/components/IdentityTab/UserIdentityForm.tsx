@@ -5,11 +5,14 @@ import { Save, Loader2 } from 'lucide-react';
 import { UserIdentity } from '../../utils/parseUserIdentity';
 import { saveUserIdentityRecord } from '../../services/userIdentityService';
 import { toast } from 'sonner';
+import { FileObject } from '@/types/core';
+import { doc, getDoc, getFirestore } from 'firebase/firestore';
+import mapFirestoreToFileObject from '@/features/ViewEditRecord/utils/firestoreMapping';
 
 interface UserIdentityFormProps {
   userId: string;
   initial?: UserIdentity; // pre-populated when editing existing record
-  onSaved?: () => void;
+  onSaved?: (record: FileObject) => void;
 }
 
 const GENDER_OPTIONS = ['male', 'female', 'other', 'unknown'];
@@ -39,10 +42,17 @@ export const UserIdentityForm: React.FC<UserIdentityFormProps> = ({
     setSaving(true);
     try {
       await saveUserIdentityRecord(userId, form);
+
+      // Fetch the just-saved record to pass back
+      const recordId = `${userId}_u_id`;
+      const db = getFirestore();
+      const snap = await getDoc(doc(db, 'records', recordId));
+      const record = mapFirestoreToFileObject(snap.id, snap.data()!);
+      onSaved?.(record);
+
       toast.success('Identity saved', {
         description: 'Your identity record has been updated.',
       });
-      onSaved?.();
     } catch (err: any) {
       toast.error('Failed to save identity', { description: err.message });
     } finally {
