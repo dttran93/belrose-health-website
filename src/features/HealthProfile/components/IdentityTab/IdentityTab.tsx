@@ -103,7 +103,7 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({
 
   // ── Read view ──────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl m-auto">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-base font-semibold text-card-foreground">Identity</h2>
         {isOwnProfile && (

@@ -7,6 +7,8 @@ import { BelroseUserProfile } from '@/types/core';
 import { UserIdentity } from '../../utils/parseUserIdentity';
 import { calculateAge, formatTimestamp } from '@/utils/dataFormattingUtils';
 import { IdentityVerifiedBadge } from '@/features/Users/components/ui/IdentityVerifiedBadge';
+import { ProfileCompletenessResult } from '../../hooks/useProfileCompleteness';
+import ProfileCompletenessWidget from './ProfileCompletenessWidget';
 
 // ============================================================================
 // PROFILE HEADER
@@ -18,6 +20,9 @@ interface ProfileHeaderProps {
   userIdentity: UserIdentity | null;
   isOwnProfile: boolean;
   isLoading: boolean;
+  // Only passed when isOwnProfile — visitors don't see completeness
+  completeness?: ProfileCompletenessResult;
+  onViewCompleteness?: () => void;
 }
 
 const ProfileHeader: React.FC<ProfileHeaderProps> = ({
@@ -26,6 +31,8 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   userIdentity,
   isOwnProfile,
   isLoading,
+  completeness,
+  onViewCompleteness,
 }) => {
   const navigate = useNavigate();
   const displayName =
@@ -70,47 +77,58 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           </div>
         </div>
 
-        <div className="flex justify-between items-center gap-2">
-          <Avatar profile={profile} size="xl" />
-          <div className="flex flex-col items-start gap-1">
-            <h1 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
-              {displayName}
-              {profile?.identityVerified && <IdentityVerifiedBadge />}
-            </h1>
+        <div className="flex justify-between items-center w-full gap-2">
+          <div className="flex justify-between items-center gap-2">
+            <Avatar profile={profile} size="xl" />
+            <div className="flex flex-col items-start gap-1">
+              <h1 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
+                {displayName}
+                {profile?.identityVerified && <IdentityVerifiedBadge />}
+              </h1>
 
-            {/** Belrose Account Info Row */}
-            <div className="flex items-center text-sm gap-1.5">
-              <div className="flex gap-1 items-center">
-                <User className="w-3.5 h-3.5" />
-                <span>{subjectId}</span>
-              </div>
-              <div className="h-3 w-px bg-border m-1" />
-              <div className="flex gap-1 items-center">
-                <Mail className="w-3.5 h-3.5" />
-                <span>{profile?.email}</span>
-              </div>
-            </div>
-
-            {/** User Identity Row */}
-            {userIdentity && (
+              {/** Belrose Account Info Row */}
               <div className="flex items-center text-sm gap-1.5">
                 <div className="flex gap-1 items-center">
-                  <Cake className="w-3.5 h-3.5" />
-                  <span>{userAgeInfo}</span>
+                  <User className="w-3.5 h-3.5" />
+                  <span>{subjectId}</span>
                 </div>
                 <div className="h-3 w-px bg-border m-1" />
                 <div className="flex gap-1 items-center">
-                  <Transgender className="w-3.5 h-3.5" />
-                  <span>{userGenderInfo}</span>
-                </div>
-                <div className="h-3 w-px bg-border m-1" />
-                <div className="flex gap-1 items-center">
-                  <MapPinHouse className="w-3.5 h-3.5" />
-                  <span>{userHomeInfo}</span>
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>{profile?.email}</span>
                 </div>
               </div>
-            )}
+
+              {/** User Identity Row */}
+              {userIdentity && (
+                <div className="flex items-center text-sm gap-1.5">
+                  <div className="flex gap-1 items-center">
+                    <Cake className="w-3.5 h-3.5" />
+                    <span>{userAgeInfo}</span>
+                  </div>
+                  <div className="h-3 w-px bg-border m-1" />
+                  <div className="flex gap-1 items-center">
+                    <Transgender className="w-3.5 h-3.5" />
+                    <span>{userGenderInfo}</span>
+                  </div>
+                  <div className="h-3 w-px bg-border m-1" />
+                  <div className="flex gap-1 items-center">
+                    <MapPinHouse className="w-3.5 h-3.5" />
+                    <span>{userHomeInfo}</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
+          {/* ── Right: profile completeness widget (own profile only) ──────────────── */}
+          {isOwnProfile && completeness && onViewCompleteness && (
+            <div className="w-44 flex-shrink-0 mx-8">
+              <ProfileCompletenessWidget
+                completeness={completeness}
+                onViewDetails={onViewCompleteness}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

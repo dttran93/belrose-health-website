@@ -10,7 +10,15 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Clipboard, HeartPulse, IdCard, LayoutGrid, List, ShieldCheck } from 'lucide-react';
+import {
+  Clipboard,
+  HeartPulse,
+  IdCard,
+  LayoutGrid,
+  List,
+  ListChecks,
+  ShieldCheck,
+} from 'lucide-react';
 import { useHealthProfile } from '@/features/HealthProfile/hooks/useHealthProfile';
 import HealthDataDisplay from '@/features/HealthProfile/components/HealthDataTabs/HealthDataDisplay';
 import { useAuthContext } from '@/features/Auth/AuthContext';
@@ -24,12 +32,20 @@ import { useUserRecords } from '@/features/ViewEditRecord/hooks/useUserRecords';
 import { parseIdentityFromRecord } from '../utils/parseUserIdentity';
 import { ALL_DATA_VIEW, SCR_VIEW } from '../configs/healthDataViews';
 import { IdentityTab } from './IdentityTab/IdentityTab';
+import { useProfileCompleteness } from '../hooks/useProfileCompleteness';
+import ProfileCompletenessTab from './ProfileCompletenessTab/ProfileCompletenessTab';
 
 // ============================================================================
 // TAB CONFIG
 // ============================================================================
 
-export type HealthProfileTabs = 'summary' | 'all-data' | 'records' | 'identity' | 'blockchain';
+export type HealthProfileTabs =
+  | 'summary'
+  | 'all-data'
+  | 'records'
+  | 'identity'
+  | 'blockchain'
+  | 'completeness';
 
 const PROFILE_TABS: Tab[] = [
   { id: 'summary', label: 'Summary', icon: LayoutGrid },
@@ -37,6 +53,7 @@ const PROFILE_TABS: Tab[] = [
   { id: 'records', label: 'Records', icon: Clipboard },
   { id: 'identity', label: 'Identity', icon: IdCard },
   { id: 'blockchain', label: 'Credibility', icon: ShieldCheck },
+  { id: 'completeness', label: 'Compeleteness', icon: ListChecks },
 ];
 
 // ============================================================================
@@ -116,6 +133,13 @@ const HealthProfile: React.FC = () => {
     [identityRecord]
   );
 
+  const visibleTabs = useMemo(
+    () => (isOwnProfile ? PROFILE_TABS : PROFILE_TABS.filter(t => t.id !== 'completeness')),
+    [isOwnProfile]
+  );
+
+  const completeness = useProfileCompleteness({ profile, userIdentity, grouped, records });
+
   const renderTab = () => {
     if (error) return <ErrorState message={error.message} />;
 
@@ -163,6 +187,14 @@ const HealthProfile: React.FC = () => {
           />
         );
 
+      case 'completeness':
+        return (
+          <ProfileCompletenessTab
+            completeness={completeness}
+            onNavigateToTab={tab => setActiveTab(tab as HealthProfileTabs)}
+          />
+        );
+
       default:
         return null;
     }
@@ -177,9 +209,11 @@ const HealthProfile: React.FC = () => {
           userIdentity={userIdentity}
           isOwnProfile={isOwnProfile}
           isLoading={isLoading}
+          completeness={isOwnProfile ? completeness : undefined}
+          onViewCompleteness={() => setActiveTab('completeness')}
         />
         <TabNavigation
-          tabs={PROFILE_TABS}
+          tabs={visibleTabs}
           activeTab={activeTab}
           onTabChange={tab => setActiveTab(tab as HealthProfileTabs)}
         />
