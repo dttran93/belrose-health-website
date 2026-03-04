@@ -21,6 +21,7 @@ import { getAuth } from 'firebase/auth';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { WalletOrigin, UserWallet } from '@/types/core';
 import { hexToUint8Array } from '@/utils/dataFormattingUtils';
+import { NETWORK } from '@/config/blockchainAddresses';
 
 // ============================================================================
 // TYPES
@@ -57,7 +58,7 @@ export interface CanSignResult {
 // CONSTANTS
 // ============================================================================
 
-const RPC_URL = 'https://1rpc.io/sepolia';
+const RPC_URL = NETWORK.rpcUrl;
 
 // ============================================================================
 // HELPER FUNCTIONS (Private)
