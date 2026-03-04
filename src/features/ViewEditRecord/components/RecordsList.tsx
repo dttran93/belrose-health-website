@@ -16,7 +16,7 @@ interface RecordsListProps {
   onAccess: (record: FileObject) => void;
   onCredibility: (record: FileObject) => void;
   onPermissions: (record: FileObject) => void;
-  onDelete: (record: FileObject) => void;
+  onDelete?: (record: FileObject) => void;
   onCopy: (record: FileObject) => void;
   onDownload: (record: FileObject) => void;
 }

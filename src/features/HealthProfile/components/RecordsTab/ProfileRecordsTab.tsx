@@ -6,23 +6,21 @@
  * The "Records" tab on the HealthProfile page. Shows all records the current
  * user has access to for this subject, with search + source type filtering.
  *
- * Key design decisions vs AllRecords:
- * - No re-fetch: records flow in from useHealthProfile (already loaded)
- * - No destructive actions: delete/edit/permissions are hidden — this is a
- *   read-only view of another person's (or your own) profile context
- * - "View" navigates to AllRecords with the record pre-opened, rather than
- *   rendering RecordFull inline, so the user gets the full action surface
- *   if they need it
- * - Download and copy are kept — non-destructive and genuinely useful
+ * Full menu functionality, menu routes to recorddetails route with varying
+ * initialview based on selection. Delete modal and recordfile actions
+ * (copy/download) included here as well
+ *
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { FileObject } from '@/types/core';
 import { RecordsList } from '@/features/ViewEditRecord/components/RecordsList';
 import { useRecordFilters } from '@/features/ViewEditRecord/hooks/useRecordFilters';
 import { useRecordFileActions } from '@/features/ViewEditRecord/hooks/useRecordFileActions';
+import { useRecordDeletion } from '@/features/ViewEditRecord/hooks/useRecordDeletion';
+import RecordDeletionDialog from '@/features/ViewEditRecord/components/RecordDeletionDialog';
 
 // ============================================================================
 // TYPES
@@ -61,12 +59,30 @@ export const ProfileRecordsTab: React.FC<ProfileRecordsTabProps> = ({ records, i
     sourceTypes,
   } = useRecordFilters(records);
 
-  /**
-   * Navigate to the standalone RecordDetail page.
-   */
-  const handleView = (record: FileObject) => {
-    navigate(`/app/records/${record.id}`);
+  // Helper to navigate with a specific view mode
+  const navigateToRecord = (record: FileObject, view: string = 'record') => {
+    navigate(`/app/records/${record.id}?view=${view}`);
   };
+
+  // =========================================================================
+  // DELETE HANDLER
+  // =========================================================================
+
+  const [recordToDelete, setRecordToDelete] = useState<FileObject | null>(null);
+
+  const deletion = useRecordDeletion(recordToDelete || ({} as FileObject), () => {
+    setRecordToDelete(null);
+    // After deletion, go back — there's nothing to show here anymore
+    navigate(-1);
+  });
+
+  const handleDelete = (rec: FileObject) => {
+    setRecordToDelete(rec);
+  };
+
+  useEffect(() => {
+    if (recordToDelete) deletion.initiateDeletion();
+  }, [recordToDelete?.id]);
 
   // ============================================================
   // LOADING SKELETON
@@ -136,17 +152,27 @@ export const ProfileRecordsTab: React.FC<ProfileRecordsTabProps> = ({ records, i
       {/* Records list — destructive/owner-only actions suppressed via noop */}
       <RecordsList
         records={sortedRecords}
-        onView={handleView}
-        onEdit={noop}
-        onVersions={noop}
-        onSubject={noop}
-        onAccess={noop}
-        onCredibility={noop}
-        onPermissions={noop}
-        onDelete={noop}
+        onView={rec => navigateToRecord(rec, 'record')}
+        onEdit={rec => navigateToRecord(rec, 'edit')}
+        onVersions={rec => navigateToRecord(rec, 'versions')}
+        onSubject={rec => navigateToRecord(rec, 'subject')}
+        onAccess={rec => navigateToRecord(rec, 'access')}
+        onCredibility={rec => navigateToRecord(rec, 'credibility')}
+        onPermissions={rec => navigateToRecord(rec, 'permissions')}
+        onDelete={handleDelete}
         onCopy={handleCopyRecord}
         onDownload={handleDownloadRecord}
       />
+
+      {recordToDelete && (
+        <RecordDeletionDialog
+          {...deletion.dialogProps}
+          closeDialog={() => {
+            setRecordToDelete(null);
+            deletion.dialogProps.closeDialog();
+          }}
+        />
+      )}
     </div>
   );
 };
