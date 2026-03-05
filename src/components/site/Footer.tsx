@@ -1,5 +1,6 @@
 import React from 'react';
 import { HeartPulse } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface LinkItem {
   name: string;
@@ -104,12 +105,12 @@ const Footer: React.FC = () => {
               <ul className="space-y-2">
                 {links.product.map((link: LinkItem, index: number) => (
                   <li key={index}>
-                    <a
-                      href={link.href}
+                    <Link
+                      to={link.href}
                       className="text-gray-400 hover:text-white transition-colors"
                     >
                       {link.name}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>
