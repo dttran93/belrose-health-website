@@ -12,6 +12,7 @@ import {
   NotepadText,
 } from 'lucide-react';
 import { BelroseUserProfile } from '@/types/core';
+import { useNavigate } from 'react-router-dom';
 
 // Types for the menu system
 interface MenuOption {
@@ -84,13 +85,14 @@ const UserMenu: React.FC<UserMenuProps> = ({
   showBlockchain = true,
   additionalItems = [],
 }) => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Close menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+      const handleClickOutside = (event: MouseEvent) => {
       if (
         menuRef.current &&
         !menuRef.current.contains(event.target as Node) &&
@@ -127,7 +129,12 @@ const UserMenu: React.FC<UserMenuProps> = ({
         key: 'user',
         label: 'User Profile',
         icon: User,
-        onClick: createHandler(onViewUser),
+        onClick: () => {
+          if (user?.uid) {
+            navigate(`/app/health-profile/${user.uid}`);
+          }
+        setIsOpen(false);
+        },
       });
     }
 

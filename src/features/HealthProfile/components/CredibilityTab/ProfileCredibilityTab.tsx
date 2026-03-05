@@ -46,10 +46,8 @@ export const ProfileCredibilityTab: React.FC<ProfileCredibilityTabProps> = ({
 }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const { results, summary, privateRecordsSummary, isLoading, error } = useBlockchainCompleteness(
-    subjectFirebaseUid,
-    records
-  );
+  const { results, summary, anchoredRecordIds, privateRecordsSummary, isLoading, error } =
+    useBlockchainCompleteness(subjectFirebaseUid, records);
 
   const circ = 2 * Math.PI * 28;
 
@@ -87,6 +85,10 @@ export const ProfileCredibilityTab: React.FC<ProfileCredibilityTabProps> = ({
         privateRecordsSummary={privateRecordsSummary}
         totalAccessibleRecords={records.length}
         subjectName={subjectName}
+        anchoredCount={anchoredRecordIds.size} // already available from the hook
+        visibleCount={
+          results.filter(r => r.status !== 'not_anchored' && r.status !== 'no_hash').length
+        }
       />
 
       {/* ── Note on separation of hash matching vs credibility ── */}

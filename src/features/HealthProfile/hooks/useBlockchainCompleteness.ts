@@ -18,11 +18,11 @@
  *    that updated both content AND the stored hash field will be caught.
  *    Sets lastVerifiedAt timestamp so the UI can show "Verified 2 mins ago".
  *
- * STATUS MEANINGS:
- *   'anchored_match'    ✅  On-chain, hash matches
- *   'anchored_mismatch' ⚠️  On-chain but hash differs — possible tampering
- *   'not_anchored'      ⬜  Not found on-chain — unverified record
- *   'no_hash'           ℹ️  No hash available to compare (missing or encrypted)
+ * SUMMARY CATEGORIES:
+ *   currentVerified  ✅  Current hash on-chain AND has an active verification
+ *   traceable        🔵  A previous hash on-chain AND that hash has a verification
+ *   flagged          ⚠️  Broken chain (mismatch) OR has an active dispute
+ *   selfReported     ⬜  Never anchored, no hash, or anchored but no verification/dispute
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -55,19 +55,24 @@ export interface RecordCompletenessResult {
   isLatestHash: boolean;
   /**
    * For 'anchored_previous_version': the specific previous hash that matched on-chain.
-   * Tells the UI which generation of the record was verified — useful for showing
-   * "Verified at version N" or linking to that version in the version history.
    */
   matchedPreviousHash?: string;
+  /** True if the hash that matched on-chain has at least one active verification */
+  hasVerification: boolean;
+  /** True if the hash that matched on-chain has at least one active dispute */
+  hasDispute: boolean;
 }
 
 export interface BlockchainCompletenessSummary {
   total: number;
-  anchoredMatch: number;
-  anchoredPreviousVersion: number; // Edited since anchoring but traceable
-  anchoredMismatch: number;
-  notAnchored: number;
-  noHash: number;
+  /** Current hash is on-chain AND has an active verification */
+  currentVerified: number;
+  /** A previous hash (not current) is on-chain AND has an active verification */
+  traceable: number;
+  /** Broken chain (mismatch) OR has an active dispute */
+  flagged: number;
+  /** Never anchored, no hash, or anchored but no verification or dispute */
+  selfReported: number;
 }
 
 export interface PrivateRecordsSummary {
@@ -83,24 +88,10 @@ export interface UseBlockchainCompletenessReturn {
   privateRecordsSummary: PrivateRecordsSummary;
   anchoredRecordIds: Set<string>;
   isLoading: boolean;
-  /** True only while recompute() is running — lets the UI show a spinner on the button */
   isRecomputing: boolean;
   error: Error | null;
-  /**
-   * Whether the current results are backed by cryptographically recomputed hashes.
-   * False on initial load (uses stored recordHash). True after recompute() completes.
-   */
   isVerified: boolean;
-  /**
-   * Timestamp of the last successful recompute() call. Null until first recompute.
-   * Use this to show "Last verified: 3 minutes ago" in the UI.
-   */
   lastVerifiedAt: Date | null;
-  /**
-   * Trigger cryptographic recomputation of all record hashes.
-   * Computes SHA-256 from live content and re-runs the on-chain comparison.
-   * Sets isVerified=true and updates lastVerifiedAt on success.
-   */
   recompute: () => Promise<void>;
 }
 
@@ -108,71 +99,136 @@ export interface UseBlockchainCompletenessReturn {
 // HELPER
 // ============================================================================
 
-/**
- * Cross-reference a hash (and its previous versions) against the on-chain
- * version history for a record. Extracted so both fast and verified paths
- * use identical logic.
- *
- * Check order:
- *   1. Current hash → anchored_match
- *   2. Any previous hash → anchored_previous_version (edited since anchoring)
- *   3. Anchored but nothing matches → anchored_mismatch (broken chain)
- *   4. Not anchored → not_anchored
- *   5. No hash to check → no_hash
- */
 function resolveStatus(
   currentHash: string | null | undefined,
   previousHashes: string[] | null | undefined,
   recordId: string | undefined,
   anchoredRecordIds: Set<string>,
-  versionHistoryMap: Map<string, string[]>
+  versionHistoryMap: Map<string, string[]>,
+  verificationStatsMap: Map<string, number>,
+  disputeStatsMap: Map<string, number>
 ): Pick<
   RecordCompletenessResult,
-  'status' | 'onChainHashes' | 'isLatestHash' | 'matchedPreviousHash'
+  | 'status'
+  | 'onChainHashes'
+  | 'isLatestHash'
+  | 'matchedPreviousHash'
+  | 'hasVerification'
+  | 'hasDispute'
 > {
   if (!currentHash) {
-    return { status: 'no_hash', onChainHashes: [], isLatestHash: false };
+    return {
+      status: 'no_hash',
+      onChainHashes: [],
+      isLatestHash: false,
+      hasVerification: false,
+      hasDispute: false,
+    };
   }
 
-  // After the !currentHash guard, TS still tracks the type as string | null | undefined
-  // because it can't narrow through early returns in all control paths.
-  // Assigning to a typed const is the correct fix — it's a genuine narrowing, not a cast.
   const hash: string = currentHash;
-
   const isAnchored = recordId ? anchoredRecordIds.has(recordId) : false;
+
   if (!isAnchored) {
-    return { status: 'not_anchored', onChainHashes: [], isLatestHash: false };
+    return {
+      status: 'not_anchored',
+      onChainHashes: [],
+      isLatestHash: false,
+      hasVerification: false,
+      hasDispute: false,
+    };
   }
 
   const onChainHashes = recordId ? (versionHistoryMap.get(recordId) ?? []) : [];
 
+  // Check current hash against chain
   const currentIndex = onChainHashes.indexOf(hash);
-  if (currentIndex !== -1) {
+  const currentIsOnChain = currentIndex !== -1;
+  const currentHasVerification = currentIsOnChain && (verificationStatsMap.get(hash) ?? 0) > 0;
+  const currentHasDispute = currentIsOnChain && (disputeStatsMap.get(hash) ?? 0) > 0;
+
+  // Check previous hashes against chain — newest first
+  const prevHashes = (previousHashes ?? []).filter((h): h is string => !!h);
+  let matchedPrevHash: string | undefined;
+  let matchedPrevIndex = -1;
+  let matchedPrevVerified = false;
+
+  for (const prevHash of [...prevHashes].reverse()) {
+    const prevIndex = onChainHashes.indexOf(prevHash);
+    if (prevIndex !== -1) {
+      const hasVer = (verificationStatsMap.get(prevHash) ?? 0) > 0;
+      // Always take the first on-chain match, but upgrade if we find a verified one
+      if (matchedPrevHash === undefined || (!matchedPrevVerified && hasVer)) {
+        matchedPrevHash = prevHash;
+        matchedPrevIndex = prevIndex;
+        matchedPrevVerified = hasVer;
+      }
+      if (matchedPrevVerified) break;
+    }
+  }
+
+  const prevHasVerification =
+    matchedPrevHash !== undefined && (verificationStatsMap.get(matchedPrevHash) ?? 0) > 0;
+  const prevHasDispute =
+    matchedPrevHash !== undefined && (disputeStatsMap.get(matchedPrevHash) ?? 0) > 0;
+
+  // Now decide status based on the full picture:
+
+  // Current hash is on-chain and verified → currentVerified in summary
+  if (currentIsOnChain && currentHasVerification) {
     return {
       status: 'anchored_match',
       onChainHashes,
       isLatestHash: currentIndex === onChainHashes.length - 1,
+      hasVerification: true,
+      hasDispute: currentHasDispute,
     };
   }
 
-  // Check previous hashes — iterate newest-first
-  const prevHashes = (previousHashes ?? []).filter((h): h is string => !!h);
-
-  // Use a for...of loop instead of index-based iteration
-  for (const prevHash of [...prevHashes].reverse()) {
-    const prevIndex = onChainHashes.indexOf(prevHash);
-
-    if (prevIndex !== -1) {
-      return {
-        status: 'anchored_previous_version',
-        onChainHashes,
-        isLatestHash: prevIndex === onChainHashes.length - 1,
-        matchedPreviousHash: prevHash,
-      };
-    }
+  // A previous hash is on-chain and verified → traceable in summary
+  // (regardless of whether current hash is on-chain or not)
+  if (prevHasVerification) {
+    return {
+      status: 'anchored_previous_version',
+      onChainHashes,
+      isLatestHash: matchedPrevIndex === onChainHashes.length - 1,
+      matchedPreviousHash: matchedPrevHash,
+      hasVerification: true,
+      hasDispute: prevHasDispute,
+    };
   }
 
-  return { status: 'anchored_mismatch', onChainHashes, isLatestHash: false };
+  // Current hash is on-chain but unverified → selfReported in summary
+  if (currentIsOnChain) {
+    return {
+      status: 'anchored_match',
+      onChainHashes,
+      isLatestHash: currentIndex === onChainHashes.length - 1,
+      hasVerification: false,
+      hasDispute: currentHasDispute,
+    };
+  }
+
+  // A previous hash is on-chain but unverified → also selfReported in summary
+  if (matchedPrevHash !== undefined) {
+    return {
+      status: 'anchored_previous_version',
+      onChainHashes,
+      isLatestHash: matchedPrevIndex === onChainHashes.length - 1,
+      matchedPreviousHash: matchedPrevHash,
+      hasVerification: false,
+      hasDispute: prevHasDispute,
+    };
+  }
+
+  // Anchored but nothing matches — broken chain → flagged in summary
+  return {
+    status: 'anchored_mismatch',
+    onChainHashes,
+    isLatestHash: false,
+    hasVerification: false,
+    hasDispute: false,
+  };
 }
 
 // ============================================================================
@@ -183,23 +239,17 @@ export function useBlockchainCompleteness(
   subjectFirebaseUid: string,
   records: FileObject[]
 ): UseBlockchainCompletenessReturn {
-  // On-chain data (fetched once on load)
   const [anchoredRecordIds, setAnchoredRecordIds] = useState<Set<string>>(new Set());
   const [versionHistoryMap, setVersionHistoryMap] = useState<Map<string, string[]>>(new Map());
-
-  // Recomputed hashes — only populated after recompute() is called
+  const [verificationStatsMap, setVerificationStatsMap] = useState<Map<string, number>>(new Map());
+  const [disputeStatsMap, setDisputeStatsMap] = useState<Map<string, number>>(new Map());
   const [computedHashMap, setComputedHashMap] = useState<Map<string, string>>(new Map());
 
-  // Loading states
   const [isLoading, setIsLoading] = useState(true);
   const [isRecomputing, setIsRecomputing] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-
-  // Verification state
   const [isVerified, setIsVerified] = useState(false);
   const [lastVerifiedAt, setLastVerifiedAt] = useState<Date | null>(null);
-
-  // For records the user doesn't have access to
   const [privateRecordsSummary, setPrivateRecordsSummary] = useState<PrivateRecordsSummary>({
     total: 0,
     verified: 0,
@@ -208,9 +258,8 @@ export function useBlockchainCompleteness(
   });
 
   // =========================================================================
-  // INITIAL LOAD: Fetch on-chain data only
+  // INITIAL LOAD
   // =========================================================================
-  // We don't recompute hashes here — fast mode uses record.recordHash directly.
 
   useEffect(() => {
     if (!subjectFirebaseUid || records.length === 0) {
@@ -221,9 +270,10 @@ export function useBlockchainCompleteness(
     const fetchChainData = async () => {
       setIsLoading(true);
       setError(null);
-      // Reset verification state when records change
       setIsVerified(false);
       setComputedHashMap(new Map());
+      setVerificationStatsMap(new Map());
+      setDisputeStatsMap(new Map());
 
       try {
         const userIdHash = ethers.id(subjectFirebaseUid);
@@ -232,24 +282,45 @@ export function useBlockchainCompleteness(
         const wallets = await BlockchainRoleManagerService.getWalletsForUser(userIdHash);
         console.log('🔑 Registered wallets for user:', wallets);
 
-        // getActiveSubjectMedicalHistory filters out unanchored records.
-        // The contract keeps all history for audit, but active = currently claimed.
         const onChainRecordIds: string[] =
           await blockchainHealthRecordService.getActiveSubjectMedicalHistory(userIdHash);
 
         console.log(`📋 ${onChainRecordIds.length} anchored records on-chain`);
         setAnchoredRecordIds(new Set(onChainRecordIds));
 
-        // Only fetch version history for records we have in Firestore
         const firestoreIds = new Set(records.map(r => r.id).filter(Boolean) as string[]);
         const overlap = onChainRecordIds.filter(id => firestoreIds.has(id));
 
+        // Fetch version history for all accessible anchored records
         const historyEntries = await Promise.all(
           overlap.map(async recordId => {
             const hashes = await blockchainHealthRecordService.getRecordVersionHistory(recordId);
             return [recordId, hashes] as [string, string[]];
           })
         );
+        const newVersionHistoryMap = new Map(historyEntries);
+        setVersionHistoryMap(newVersionHistoryMap);
+
+        // Batch-fetch verification + dispute stats for every known hash in parallel
+        const allHashes = [...newVersionHistoryMap.values()].flat();
+        const [verificationEntries, disputeEntries] = await Promise.all([
+          Promise.all(
+            allHashes.map(async hash => {
+              const stats = await blockchainHealthRecordService.getVerificationStats(hash);
+              return [hash, stats.active] as [string, number];
+            })
+          ),
+          Promise.all(
+            allHashes.map(async hash => {
+              const stats = await blockchainHealthRecordService.getDisputeStats(hash);
+              return [hash, stats.active] as [string, number];
+            })
+          ),
+        ]);
+        setVerificationStatsMap(new Map(verificationEntries));
+        setDisputeStatsMap(new Map(disputeEntries));
+
+        console.log(`✅ Fetched credibility stats for ${allHashes.length} hashes`);
 
         console.log('🔑 Querying chain with:', userIdHash);
         console.log('📋 On-chain record IDs returned:', onChainRecordIds);
@@ -257,8 +328,6 @@ export function useBlockchainCompleteness(
           '📁 Firestore record IDs:',
           records.map(r => r.id)
         );
-
-        setVersionHistoryMap(new Map(historyEntries));
 
         // Private records = on-chain but not in viewer's accessible records
         const privateIds = onChainRecordIds.filter(id => !firestoreIds.has(id));
@@ -275,10 +344,7 @@ export function useBlockchainCompleteness(
                 blockchainHealthRecordService.getDisputeStats(currentHash),
               ]);
 
-              return {
-                verified: verStats.active > 0,
-                disputed: dispStats.active > 0,
-              };
+              return { verified: verStats.active > 0, disputed: dispStats.active > 0 };
             })
           );
 
@@ -303,7 +369,7 @@ export function useBlockchainCompleteness(
   }, [subjectFirebaseUid, records.length]);
 
   // =========================================================================
-  // RECOMPUTE: Cryptographic verification on demand
+  // RECOMPUTE
   // =========================================================================
 
   const recompute = useCallback(async () => {
@@ -317,7 +383,7 @@ export function useBlockchainCompleteness(
 
       const hashEntries = await Promise.all(
         records
-          .filter(r => r.id && !r.isEncrypted) // Skip encrypted — hash would be wrong
+          .filter(r => r.id && !r.isEncrypted)
           .map(async record => {
             const hash = await RecordHashService.generateRecordHash(record);
             return [record.id!, hash] as [string, string];
@@ -337,28 +403,49 @@ export function useBlockchainCompleteness(
   }, [records, isRecomputing]);
 
   // =========================================================================
-  // RESULTS: Cross-reference using whichever hash source is active
+  // RESULTS
   // =========================================================================
 
   const results = useMemo<RecordCompletenessResult[]>(() => {
     return records.map(record => {
-      // Fast mode: stored recordHash. Verified mode: recomputed hash.
-      // Explicitly typed to match resolveStatus's accepted parameter type.
       const hash: string | null | undefined =
         isVerified && record.id ? (computedHashMap.get(record.id) ?? null) : record.recordHash;
 
-      return {
-        record,
-        ...resolveStatus(
-          hash,
-          record.previousRecordHash,
-          record.id,
-          anchoredRecordIds,
-          versionHistoryMap
-        ),
-      };
+      const resolved = resolveStatus(
+        hash,
+        record.previousRecordHash,
+        record.id,
+        anchoredRecordIds,
+        versionHistoryMap,
+        verificationStatsMap,
+        disputeStatsMap
+      );
+
+      // TEMP DEBUG — remove when fixed
+      console.log(`🔍 [${record.id}]`, {
+        currentHash: hash,
+        previousHashes: record.previousRecordHash,
+        onChainHashes: resolved.onChainHashes,
+        verificationStatsForCurrentHash: verificationStatsMap.get(hash ?? ''),
+        verificationStatsForPrevHashes: (record.previousRecordHash ?? []).map(h => ({
+          hash: h,
+          verifications: verificationStatsMap.get(h),
+        })),
+        resolvedStatus: resolved.status,
+        hasVerification: resolved.hasVerification,
+      });
+
+      return { record, ...resolved };
     });
-  }, [records, isVerified, computedHashMap, anchoredRecordIds, versionHistoryMap]);
+  }, [
+    records,
+    isVerified,
+    computedHashMap,
+    anchoredRecordIds,
+    versionHistoryMap,
+    verificationStatsMap,
+    disputeStatsMap,
+  ]);
 
   // =========================================================================
   // SUMMARY
@@ -367,11 +454,24 @@ export function useBlockchainCompleteness(
   const summary = useMemo<BlockchainCompletenessSummary>(
     () => ({
       total: results.length,
-      anchoredMatch: results.filter(r => r.status === 'anchored_match').length,
-      anchoredPreviousVersion: results.filter(r => r.status === 'anchored_previous_version').length,
-      anchoredMismatch: results.filter(r => r.status === 'anchored_mismatch').length,
-      notAnchored: results.filter(r => r.status === 'not_anchored').length,
-      noHash: results.filter(r => r.status === 'no_hash').length,
+      // Current hash on-chain AND verified — best case
+      currentVerified: results.filter(
+        r => r.status === 'anchored_match' && r.hasVerification && !r.hasDispute
+      ).length,
+      // A previous hash on-chain AND verified — edited since anchoring
+      traceable: results.filter(
+        r => r.status === 'anchored_previous_version' && r.hasVerification && !r.hasDispute
+      ).length,
+      // Broken chain OR has an active dispute (dispute takes priority over verification)
+      flagged: results.filter(r => r.status === 'anchored_mismatch' || r.hasDispute).length,
+      // Never anchored, no hash, or anchored but unverified
+      selfReported: results.filter(
+        r =>
+          r.status === 'not_anchored' ||
+          r.status === 'no_hash' ||
+          (r.status === 'anchored_match' && !r.hasVerification && !r.hasDispute) ||
+          (r.status === 'anchored_previous_version' && !r.hasVerification && !r.hasDispute)
+      ).length,
     }),
     [results]
   );
