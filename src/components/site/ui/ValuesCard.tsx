@@ -12,8 +12,8 @@ const ValuesCard: React.FC<ValuesCardProps> = ({ icon, title, description, link 
   return (
     <a href={link} className="h-full">
       <div className="relative group bg-card text-primary rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-100 flex flex-col cursor-pointer h-full">
-        <div className="mb-4 h-12">{icon}</div>
-        <h3 className="text-xl font-semibold mb-3">{title}</h3>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center mb-5"><div className="flex justify-start">{icon}</div>
+        <span className="text-xl font-semibold">{title}</span></div>
         <p className="flex-grow">{description}</p>
 
         {/* Hover Effect Overlay with Link Indicator */}

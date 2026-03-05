@@ -78,7 +78,7 @@ const HowItWorks: React.FC = () => {
               <img
                 src={selected?.image}
                 alt={selected?.title}
-                className="w-full h-auto object-cover transition-all duration-700"
+                className="w-full h-[400px] object-cover transition-all duration-700"
               />
             </div>
           </div>

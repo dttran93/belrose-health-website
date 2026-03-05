@@ -15,7 +15,7 @@ const Values: React.FC = () => {
       icon: <Shield size={32} />,
       title: "We Don't Want Your Data",
       description:
-        'With our data storage protocol, you can store your records anywhere you want. If stored with us, even Belrose employees cannot see them. We are the only HealthTech that does not want your data.',
+        'Even Belrose employees cannot see data you store with us. With our data storage protocol, you can store your records anywhere you want. We are the only HealthTech that does not want your data.',
       link: '/#about',
     },
     {

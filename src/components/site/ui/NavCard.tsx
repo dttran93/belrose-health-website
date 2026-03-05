@@ -20,8 +20,8 @@ const NavCard: React.FC<NavCardProps> = ({ icon, title, description, link, color
       onClick={handleClick}
       className={`h-full relative group bg-${color} text-primary rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-100 flex flex-col cursor-pointer`}
     >
-      <div className="mb-4 h-12">{icon}</div>
-      <h3 className="flex text-2xl font-semibold mb-3">{title}</h3>
+      <div className="flex gap-2"><div>{icon}</div>
+      <h3 className="flex text-xl font-semibold mb-3">{title}</h3></div>
       <p className="flex-grow text-left">{description}</p>
 
       {/* Hover Effect Overlay with Link Indicator */}

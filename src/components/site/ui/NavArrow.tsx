@@ -16,7 +16,7 @@ const NavArrow: React.FC<NavArrowProps> = ({ direction, label, onClick, dark }) 
     aria-label={label}
     className={`
       fixed ${direction === 'left' ? 'left-6' : 'right-6'} top-1/2 -translate-y-1/2
-      z-50 hidden md:flex flex-col items-center gap-2 group
+      z-50 hidden md:flex flex-col items-center gap-2 group opacity-30 hover:opacity-100 transition-opacity duration-300
     `}
   >
     <div

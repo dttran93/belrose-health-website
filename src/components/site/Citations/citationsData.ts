@@ -152,7 +152,7 @@ export const citations: Record<string, Citation> = {
     source: 'GKV-Spitzenverband',
     apaCitation:
       'Gkv-Spitzenverband. (2015, January 16). Teuren Stillstand bei eGK-Projekt beenden - Schmerzgrenze für Beitragszahler überschritten. https://www.gkv-spitzenverband.de/presse/pressemitteilungen_und_statements/pressemitteilung_215744.jsp',
-    url: 'https://www.gov.uk/government/publications/independent-investigation-of-the-nhs-in-england',
+    url: 'https://www.gkv-spitzenverband.de/presse/pressemitteilungen_und_statements/pressemitteilung_215744.jsp',
   },
   'gematik-hack-2025': {
     num: 16,

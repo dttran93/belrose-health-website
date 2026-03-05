@@ -53,8 +53,8 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({
         }`}
         style={{ left: 'calc(-50vw + 50%)' }}
       >
-        <div className="flex items-center justify-center p-6">
-          <div className="container mx-auto grid grid-cols-1 md:grid-cols-3 gap-1">
+        <div className="flex items-center justify-center max-w-7xl m-auto p-4">
+          <div className="container mx-auto grid grid-cols-1 md:grid-cols-3 px-12 gap-1">
             {items.map((item: DropdownItem, index: number) => (
               <div
                 key={index}

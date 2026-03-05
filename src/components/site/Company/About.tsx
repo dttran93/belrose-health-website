@@ -39,7 +39,7 @@ const About: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-white">
       {/* ── 1. Declaration ─────────────────────────────────────────────────── */}
-      <section className="relative h-[calc(100dvh-4rem)] bg-primary flex flex-col justify-between px-8 py-24 overflow-hidden">
+      <section className="relative h-[calc(100dvh-4rem)] bg-primary flex flex-col justify-between p-8 overflow-hidden">
         {/* Decorative blobs */}
         <div className="absolute top-0 right-0 w-[480px] h-[480px] rounded-full bg-white/[0.03] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-[300px] h-[300px] rounded-full bg-pink-500/10 translate-y-1/2 -translate-x-1/2 pointer-events-none" />
@@ -78,7 +78,7 @@ const About: React.FC = () => {
           </div>
         </div>
         {/* Scroll hint */}
-        <div className="absolute bottom-11 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/25 text-[11px] tracking-widest uppercase animate-bounce">
+        <div className="flex flex-col items-center gap-2 text-white/25 text-[11px] tracking-widest uppercase animate-bounce pb-6 pt-4">
           <span>Scroll</span>
           <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />

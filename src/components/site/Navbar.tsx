@@ -101,7 +101,7 @@ const Navbar: React.FC = () => {
         {/* Logo */}
         <a href="/#home" className="flex items-center gap-2">
           <div className="w-8 h-8 flex items-center justify-center" />
-          <span className="text-xl font-semibold text-gray-900">Belrose</span>
+          <span className="text-xl font-semibold text-gray-900">Belrose Health</span>
         </a>
 
         {/* Desktop navigation */}

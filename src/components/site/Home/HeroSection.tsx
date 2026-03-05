@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 const HeroSection: React.FC = () => {
   return (
     <section className="relative bg-gradient-to-b from-gray-50 to-white py-10 md:py-20">
-      <div className="container mx-auto px-4 md:px-6">
+      <div className="container mx-auto px-4 md:px-20">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="flex flex-col space-y-8 max-w-xl">
             <h1 className="text-4xl md:text-5xl font-bold text-primary leading-tight">

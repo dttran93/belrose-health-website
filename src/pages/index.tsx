@@ -148,7 +148,7 @@ const Index: React.FC = () => {
                 panelRefs.current[i] = el;
               }}
               className={`
-                absolute inset-0 overflow-y-auto
+                absolute inset-0 overflow-y-auto panel-scroll
                 transition-all ease-in-out
                 ${getSlideClass(i)}
               `}
@@ -202,7 +202,7 @@ const Index: React.FC = () => {
         </main>
         <Footer />
       </div>
-      <CitationModal />;
+      <CitationModal />
     </>
   );
 };
