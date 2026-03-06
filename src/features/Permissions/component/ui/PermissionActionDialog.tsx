@@ -146,10 +146,10 @@ const PreparingContent: React.FC = () => (
   <div className="flex flex-col items-center gap-4 py-4">
     <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
     <AlertDialog.Title className="text-lg font-bold text-center">
-      Preparing Blockchain
+      Preparing Distributed Network
     </AlertDialog.Title>
     <AlertDialog.Description className="text-sm text-gray-600 text-center">
-      Verifying accounts and checking record status on-chain.
+      Verifying accounts and checking record status on-network.
       <br />
       This may take a moment...
     </AlertDialog.Description>
@@ -163,7 +163,7 @@ const ExecutingContent: React.FC<{ operationType: OperationType }> = ({ operatio
       {operationType === 'grant' ? 'Granting Access' : 'Updating Access'}
     </AlertDialog.Title>
     <AlertDialog.Description className="text-sm text-gray-600 text-center">
-      Writing to blockchain and updating encryption keys...
+      Writing to network and updating encryption keys...
     </AlertDialog.Description>
   </div>
 );

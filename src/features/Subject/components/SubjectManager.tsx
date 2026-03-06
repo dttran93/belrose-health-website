@@ -353,7 +353,9 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
                           <li>Subjects must be either record viewers, administrators, or owners</li>
                           <li>Adding someone else as a subject requires their consent</li>
                           <li>A record can have multiple subjects (e.g., for family records)</li>
-                          <li>Subject links are recorded on the blockchain for verification</li>
+                          <li>
+                            Subject links are recorded on the distributed network for verification
+                          </li>
                         </ol>
                         <Tooltip.Arrow className="fill-gray-900" />
                       </Tooltip.Content>

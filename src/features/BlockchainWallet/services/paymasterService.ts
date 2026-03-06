@@ -24,11 +24,12 @@ import { entryPoint07Address, getUserOperationHash } from 'viem/account-abstract
 import { privateKeyToAccount } from 'viem/accounts';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { WalletService } from './walletService';
+import { PAYMASTER } from '@/config/blockchainAddresses';
 
 // ==================== CONFIG ====================
 
 // Deployed paymaster contract address
-const PAYMASTER_ADDRESS = '0x967e757609E1118E7164e51A204772a14804E253';
+const PAYMASTER_ADDRESS = PAYMASTER.address;
 
 // Pimlico bundler URL (from dashboard.pimlico.io)
 const BUNDLER_URL = import.meta.env.VITE_PIMLICO_BUNDLER_URL;

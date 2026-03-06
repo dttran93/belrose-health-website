@@ -52,7 +52,6 @@ export interface EncryptedSnapshot {
   };
   originalFileHash?: string | null;
   id: string;
-  isEncrypted: true;
 }
 
 export interface RecordVersion {

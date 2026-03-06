@@ -9,7 +9,6 @@ import {
   MemberStatus,
   MemberInfo,
 } from '@/features/Permissions/services/blockchainRoleManagerService';
-import { ethers } from 'ethers';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 
 interface UserSettingsProps {
@@ -63,7 +62,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({
       setOnChainData(memberData);
     } catch (error) {
       console.error('Error fetching on-chain data:', error);
-      setOnChainError('Failed to query blockchain');
+      setOnChainError('Failed to query network');
     } finally {
       setIsLoadingOnChain(false);
     }
@@ -74,25 +73,6 @@ const UserSettings: React.FC<UserSettingsProps> = ({
       fetchOnChainData();
     }
   }, [user.wallet?.address]);
-
-  const formatOnChainStatus = (status: MemberStatus) => {
-    switch (status) {
-      case MemberStatus.Verified:
-        return { label: 'Verified', color: 'text-complement-3', bg: 'bg-complement-3' };
-      case MemberStatus.Active:
-        return { label: 'Active', color: 'text-complement-1', bg: 'bg-complement-1' };
-      case MemberStatus.Inactive:
-        return { label: 'Inactive', color: 'text-complement-4', bg: 'bg-complement-4' };
-      default:
-        return { label: 'Unknown', color: 'text-muted-foreground', bg: 'bg-foreground' };
-    }
-  };
-
-  const computedUserIdHash = user.uid ? ethers.keccak256(ethers.toUtf8Bytes(user.uid)) : null;
-  const hashesMatch =
-    computedUserIdHash && onChainData?.userIdHash
-      ? computedUserIdHash.toLowerCase() === onChainData.userIdHash.toLowerCase()
-      : false;
 
   //Helper to  get Current wallets
   const getCurrentWalletRecord = (
@@ -206,7 +186,7 @@ const UserSettings: React.FC<UserSettingsProps> = ({
       />
 
       {/* Blockchain Member Registry Section */}
-      <SectionHeader title="Blockchain Member Registry" />
+      <SectionHeader title="Distributed Network Member Registry" />
 
       {currentWalletRecord ? (
         <>

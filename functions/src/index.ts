@@ -27,6 +27,7 @@ export {
 // ==================== EMAIL FUNCTIONS ====================
 export { sendShareInvitationEmail } from './handlers/sendShareInvitationEmail';
 export { sendAlphaApprovalEmail } from './handlers/sendAlphaApprovalEmail';
+export { sendWaitlistConfirmationEmail } from './handlers/sendWaitlistConfirmationEmail';
 
 // ==================== HEALTH CHECK ====================
 export { health, healthDetailed } from './handlers/healthCheck';

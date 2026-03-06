@@ -13,11 +13,12 @@ import { WalletService } from './walletService';
 import { getFirestore, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { MemberRegistryBlockchain } from '@/features/Auth/services/memberRegistryBlockchain';
+import { MEMBER_ROLE_MANAGER } from '@/config/blockchainAddresses';
 
 const CHAIN = sepolia;
 
 // ABI for checking if wallet is already registered
-const MEMBER_ROLE_MANAGER_ADDRESS = '0xC31477f563dC8f7529Ba6AE7E410ABdB84C27d7C' as const;
+const MEMBER_ROLE_MANAGER_ADDRESS = MEMBER_ROLE_MANAGER.proxy;
 const MEMBER_ROLE_MANAGER_ABI = [
   {
     name: 'wallets',

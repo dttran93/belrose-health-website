@@ -78,10 +78,10 @@ const DisputeUserCard: React.FC<DisputeCardProps> = ({
             <UserBadge text="Retracted" color="red" tooltip="This dispute has been retracted" />
           )}
           {dispute.chainStatus === 'pending' && (
-            <UserBadge text="Pending" color="yellow" tooltip="Awaiting blockchain confirmation" />
+            <UserBadge text="Pending" color="yellow" tooltip="Awaiting network confirmation" />
           )}
           {dispute.chainStatus === 'failed' && (
-            <UserBadge text="Failed" color="red" tooltip="Blockchain transaction failed" />
+            <UserBadge text="Failed" color="red" tooltip="Network transaction failed" />
           )}
         </div>
 

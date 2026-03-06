@@ -28,7 +28,7 @@ export const useSocialAuth = () => {
         duration: 3000,
       });
 
-      const from = location.state?.from?.pathname || '/dashboard';
+      const from = location.state?.from?.pathname || '/app';
       navigate(from, { replace: true });
     } catch (error) {
       console.error(`${provider} sign in error:`, error);

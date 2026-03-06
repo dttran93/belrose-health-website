@@ -141,8 +141,7 @@ export class PermissionPreparationService {
       if (!callerStatus.ready) {
         return {
           ready: false,
-          reason:
-            'Your blockchain wallet is not fully set up. Please complete the preparation step.',
+          reason: 'Your network account is not fully set up. Please complete the preparation step.',
           callerSmartAccountAddress: callerStatus.smartAccountAddress || undefined,
           checks: {
             callerReady: false,
@@ -163,7 +162,7 @@ export class PermissionPreparationService {
         return {
           ready: false,
           reason:
-            'The target user has not completed their blockchain setup. They must set up their wallet before receiving permissions.',
+            'The target user has not completed their network setup. They must set up their network account before receiving permissions.',
           callerSmartAccountAddress: callerStatus.smartAccountAddress || undefined,
           checks: {
             callerReady: true,
@@ -179,7 +178,7 @@ export class PermissionPreparationService {
         return {
           ready: false,
           reason:
-            'This record has not been initialized on the blockchain. Please run preparation first.',
+            'This record has not been initialized on the network. Please run preparation first.',
           callerSmartAccountAddress: callerStatus.smartAccountAddress || undefined,
           checks: {
             callerReady: true,
@@ -203,7 +202,7 @@ export class PermissionPreparationService {
       console.error('❌ PermissionPreparationService: Error verifying prerequisites:', error);
       return {
         ready: false,
-        reason: `Failed to verify blockchain prerequisites: ${(error as Error).message}`,
+        reason: `Failed to verify network prerequisites: ${(error as Error).message}`,
       };
     }
   }
@@ -224,7 +223,7 @@ export class PermissionPreparationService {
       if (!callerStatus.ready) {
         return {
           ready: false,
-          reason: 'Your blockchain wallet is not fully set up.',
+          reason: 'Your network account is not fully set up.',
           callerSmartAccountAddress: callerStatus.smartAccountAddress || undefined,
         };
       }
@@ -236,7 +235,7 @@ export class PermissionPreparationService {
       if (!isRecordInitialized) {
         return {
           ready: false,
-          reason: 'This record has not been initialized on the blockchain.',
+          reason: 'This record has not been initialized on the network.',
           callerSmartAccountAddress: callerStatus.smartAccountAddress || undefined,
         };
       }
@@ -252,7 +251,7 @@ export class PermissionPreparationService {
       );
       return {
         ready: false,
-        reason: `Failed to verify blockchain prerequisites: ${(error as Error).message}`,
+        reason: `Failed to verify network prerequisites: ${(error as Error).message}`,
       };
     }
   }
@@ -320,7 +319,7 @@ export class PermissionPreparationService {
     if (!isRecordInitialized) {
       onProgress?.({
         step: 'initializing_record',
-        message: 'Initializing record on blockchain...',
+        message: 'Initializing record on network...',
       });
 
       console.log('🚀 PermissionPreparationService: Initializing record...');
@@ -360,7 +359,7 @@ export class PermissionPreparationService {
     walletAddress: string,
     role: InitialRole
   ): Promise<InitializeRecordResult> {
-    console.log('🔗 Initializing record on blockchain...', { recordId, role });
+    console.log('🔗 Initializing record on network...', { recordId, role });
 
     try {
       const functions = getFunctions();
@@ -381,7 +380,7 @@ export class PermissionPreparationService {
         error.message?.includes('already initialized') ||
         error.message?.includes('Conflict')
       ) {
-        console.log('ℹ️ Record already initialized on blockchain');
+        console.log('ℹ️ Record already initialized on network');
         return {
           success: true,
           txHash: '',
@@ -391,7 +390,7 @@ export class PermissionPreparationService {
       }
 
       console.error('❌ Record initialization failed:', error);
-      throw new Error(error.message || 'Failed to initialize record on blockchain');
+      throw new Error(error.message || 'Failed to initialize record on network');
     }
   }
 

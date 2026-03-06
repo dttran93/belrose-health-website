@@ -199,7 +199,7 @@ const PreparingContent: React.FC<{ progress?: CredibilityPreparationProgress | n
       />
       <ProgressStep label="Saving to profile" status={getStepStatus(progress?.step, ['saving'])} />
       <ProgressStep
-        label="Registering on blockchain"
+        label="Registering on network"
         status={getStepStatus(progress?.step, ['registering'])}
       />
       <ProgressStep

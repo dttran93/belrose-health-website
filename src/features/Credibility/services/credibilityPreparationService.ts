@@ -121,7 +121,7 @@ export class CredibilityPreparationService {
         return {
           ready: false,
           reason:
-            'Your blockchain wallet needs to be set up before you can verify records. This is a one-time setup.',
+            'Your network account needs to be set up before you can verify records. This is a one-time setup.',
           callerSmartAccountAddress: callerStatus.smartAccountAddress || undefined,
           checks: {
             callerReady: false,
@@ -253,17 +253,17 @@ export class CredibilityPreparationService {
 
     // Step 3: Ensure record hash exists on blockchain
     try {
-      onProgress?.({ step: 'verifying_hash', message: 'Verifying record on blockchain...' });
+      onProgress?.({ step: 'verifying_hash', message: 'Verifying record on network...' });
 
       const isHashOnChain = await blockchainHealthRecordService.doesHashExist(recordHash);
 
       if (!isHashOnChain) {
-        onProgress?.({ step: 'adding_hash', message: 'Adding record to blockchain...' });
+        onProgress?.({ step: 'adding_hash', message: 'Adding record to network...' });
 
         await blockchainHealthRecordService.addRecordHash(recordId, recordHash);
-        console.log('✅ Record hash added to blockchain');
+        console.log('✅ Record hash added to network');
       } else {
-        console.log('✅ Record hash already exists on blockchain');
+        console.log('✅ Record hash already exists on network');
       }
 
       onProgress?.({ step: 'complete', message: 'Preparation complete' });
@@ -271,7 +271,7 @@ export class CredibilityPreparationService {
       return address;
     } catch (error) {
       console.error('❌ Failed to prepare record hash:', error);
-      throw new Error(`Failed to prepare blockchain: ${(error as Error).message}`);
+      throw new Error(`Failed to prepare network: ${(error as Error).message}`);
     }
   }
 

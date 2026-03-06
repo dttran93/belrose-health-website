@@ -248,8 +248,6 @@ function RecordRow({
                     return [...firestoreHashes].reverse().map((hash, reversedIndex) => {
                       const originalIndex = firestoreHashes.length - 1 - reversedIndex;
                       const isCurrent = hash === result.record.recordHash;
-                      const isOnChain = onChainSet.has(hash);
-                      const matchType = isCurrent ? 'current' : 'previous';
 
                       return (
                         <HashRow

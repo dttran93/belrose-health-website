@@ -124,15 +124,18 @@ function buildApprovalEmailHtml(
 <div class="wrapper">
   <div class="header">
     <span class="badge">✓ Access Approved</span>
-    <h1>Welcome to Belrose Alpha</h1>
+    <h1>Welcome to Belrose's Alpha Test!</h1>
     <p>Your invite code is ready</p>
   </div>
   <div class="body">
     <p>Hi there,</p>
     <p>
-      Great news — you've been approved for the Belrose alpha. You're joining a small,
+      Great news — you've been approved for the Belrose Health alpha. You're joining a small,
       carefully selected group of testers helping us build a better way to own and
       control your health data.
+    </p>
+    <p>
+      Remember that this is a testing environment, features and infrastructure are actively evolving. But we guarantee your data will always belong solely to you.
     </p>
     <p>Here's your personal invite code:</p>
 
@@ -178,14 +181,19 @@ function buildApprovalEmailText(
   registrationUrl: string
 ): string {
   return `
-You've been approved for Belrose Alpha!
+Hi there,
 
-Your invite code: ${displayCode}
+Great news — you've been approved for the Belrose Health alpha. You're joining a small, carefully selected group of testers helping us build a better way to own and control your health data.
+
+Remember that this is a testing environment, features and infrastructure are actively evolving. But we guarantee your data will always belong solely to you.
+
+Here's your personal invite code: ${displayCode}
 
 To create your account:
-1. Visit ${registrationUrl}
+1. Click the button below to go to the registration page
 2. Enter ${email} as your email address
 3. Enter your invite code when prompted
+4. Complete your account setup
 
 Your code is personal to your email address and can only be used once.
 
