@@ -17,11 +17,7 @@ import DocumentProcessorService from '../services/documentProcessorService';
 import { convertToFHIR } from '../services/fhirConversionService';
 import { createBelroseFields } from '../services/belroseFieldsService';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
-import {
-  isEncryptionEnabled,
-  measurePerformance,
-  logEncryption,
-} from '@/features/Encryption/encryptionConfig';
+import { measurePerformance, logEncryption } from '@/features/Encryption/encryptionConfig';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { FileObject, VirtualFileInput, BelroseFields, ProcessingStages } from '@/types/core';
 import {
@@ -204,63 +200,57 @@ export class CombinedRecordProcessingService {
       }
 
       // STEP 5: Encryption
-      if (isEncryptionEnabled()) {
-        logEncryption('Starting complete record encryption', {
-          fileName: fileObj.fileName,
-        });
-        console.log(`🔒 Step 5: Encrypting file: ${fileObj.fileName}`);
-        onStageUpdate?.('Encrypting record data...');
 
-        const userKey = await EncryptionKeyManager.getSessionKey();
-        if (!userKey) {
-          throw new Error('No encryption session active');
-        }
+      logEncryption('Starting complete record encryption', {
+        fileName: fileObj.fileName,
+      });
+      console.log(`🔒 Step 5: Encrypting file: ${fileObj.fileName}`);
+      onStageUpdate?.('Encrypting record data...');
 
-        try {
-          result.encryptedData = await measurePerformance(
-            `Complete Record Encryption: ${fileObj.fileName}`,
-            async () => {
-              return await EncryptionService.encryptCompleteRecord(
-                fileObj.fileName,
-                fileObj.file,
-                result.extractedText,
-                fileObj.originalText,
-                fileObj.contextText,
-                result.fhirData,
-                result.belroseFields,
-                null,
-                userKey
-              );
-            }
-          );
-
-          logEncryption('Encryption complete', {
-            fileName: fileObj.fileName,
-            components: Object.keys(result.encryptedData).filter(k => k !== 'encryptedKey'),
-          });
-
-          onStageUpdate?.('Record encrypted', { encryptedData: result.encryptedData });
-
-          toast.success(`🔒 Record encrypted for ${fileObj.fileName}`, {
-            description: 'All sensitive data is now encrypted',
-            duration: 3000,
-          });
-        } catch (error: any) {
-          console.error(`❌ Encryption failed for ${fileObj.fileName}:`, error);
-
-          toast.error(`Encryption failed for ${fileObj.fileName}`, {
-            description: error.message,
-            duration: 5000,
-          });
-
-          throw new Error(`Encryption failed: ${error.message}`);
-        }
-      } else {
-        logEncryption('Encryption disabled - storing plaintext', {
-          fileName: fileObj.fileName,
-        });
+      const userKey = await EncryptionKeyManager.getSessionKey();
+      if (!userKey) {
+        throw new Error('No encryption session active');
       }
 
+      try {
+        result.encryptedData = await measurePerformance(
+          `Complete Record Encryption: ${fileObj.fileName}`,
+          async () => {
+            return await EncryptionService.encryptCompleteRecord(
+              fileObj.fileName,
+              fileObj.file,
+              result.extractedText,
+              fileObj.originalText,
+              fileObj.contextText,
+              result.fhirData,
+              result.belroseFields,
+              null,
+              userKey
+            );
+          }
+        );
+
+        logEncryption('Encryption complete', {
+          fileName: fileObj.fileName,
+          components: Object.keys(result.encryptedData).filter(k => k !== 'encryptedKey'),
+        });
+
+        onStageUpdate?.('Record encrypted', { encryptedData: result.encryptedData });
+
+        toast.success(`🔒 Record encrypted for ${fileObj.fileName}`, {
+          description: 'All sensitive data is now encrypted',
+          duration: 3000,
+        });
+      } catch (error: any) {
+        console.error(`❌ Encryption failed for ${fileObj.fileName}:`, error);
+
+        toast.error(`Encryption failed for ${fileObj.fileName}`, {
+          description: error.message,
+          duration: 5000,
+        });
+
+        throw new Error(`Encryption failed: ${error.message}`);
+      }
       return result;
     } catch (error: any) {
       console.error(`💥 Processing failed for ${fileObj.fileName}:`, error);
@@ -390,7 +380,7 @@ export class CombinedRecordProcessingService {
     }
 
     // STEP 3: Encryption
-    if (isEncryptionEnabled() && (virtualData.fhirData || virtualData.originalText)) {
+    if (virtualData.fhirData || virtualData.originalText) {
       logEncryption('Encrypting virtual file', { fileName });
       onStageUpdate?.('Encrypting record data...');
 

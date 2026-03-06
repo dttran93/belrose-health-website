@@ -6,7 +6,6 @@ import { removeUndefinedValues } from '@/utils/dataFormattingUtils';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { RecordHashService } from '@/features/ViewEditRecord/services/generateRecordHash';
-import { isEncryptionEnabled } from '@/features/Encryption/encryptionConfig';
 import { auth } from '@/firebase/config';
 import { updateFirestoreRecord } from '@/firebase/uploadUtils';
 
@@ -94,21 +93,20 @@ export async function saveUserIdentityRecord(
   });
 
   let encryptedData: any = null;
-  if (isEncryptionEnabled()) {
-    const masterKey = await EncryptionKeyManager.getSessionKey();
-    if (masterKey) {
-      encryptedData = await EncryptionService.encryptCompleteRecord(
-        fileName, // fileName
-        undefined, // file (no actual file for virtual records)
-        null, // extractedText
-        null, // originalText
-        null, // contextText
-        fhirData, // fhirData
-        belroseFields, // belroseFields
-        null, // customData
-        masterKey // userKey
-      );
-    }
+
+  const masterKey = await EncryptionKeyManager.getSessionKey();
+  if (masterKey) {
+    encryptedData = await EncryptionService.encryptCompleteRecord(
+      fileName, // fileName
+      undefined, // file (no actual file for virtual records)
+      null, // extractedText
+      null, // originalText
+      null, // contextText
+      fhirData, // fhirData
+      belroseFields, // belroseFields
+      null, // customData
+      masterKey // userKey
+    );
   }
   try {
     await setDoc(

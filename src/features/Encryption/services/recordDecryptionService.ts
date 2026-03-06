@@ -7,22 +7,17 @@ import { getAuth } from 'firebase/auth';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
 import { FileObject } from '@/types/core';
+import { EncryptedSnapshot } from '@/features/ViewEditRecord/services/versionControlService.types';
 
 export class RecordDecryptionService {
   /**
    * Decrypt a record fetched from Firestore
    */
   static async decryptRecord(
-    encryptedRecord: FileObject,
+    encryptedRecord: FileObject | EncryptedSnapshot,
     encryptedRecordKey?: string, //For the cases where the key IS provided within the component, optimized so there aren't multiple firebase reads, see VersionControlService
     isCreator?: boolean
   ): Promise<FileObject> {
-    // If not encrypted, return as-is
-    if (!encryptedRecord.isEncrypted) {
-      console.log('📄 Record is not encrypted, returning as-is');
-      return encryptedRecord;
-    }
-
     console.log('🔓 Decrypting record:', encryptedRecord.id);
 
     // Get the master key from session
@@ -56,7 +51,7 @@ export class RecordDecryptionService {
       }
 
       // 2. Decrypt all the fields
-      const decryptedData: FileObject = {
+      const decryptedData: Partial<FileObject> & { id: string } = {
         ...encryptedRecord, // Start with all fields
       };
 
@@ -121,7 +116,7 @@ export class RecordDecryptionService {
       }
 
       console.log('✅ Record decryption complete');
-      return decryptedData;
+      return decryptedData as FileObject;
     } catch (error) {
       console.error('❌ Failed to decrypt record:', error);
       throw new Error(

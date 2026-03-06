@@ -51,21 +51,8 @@ export interface EncryptedSnapshot {
     iv: string;
   };
   originalFileHash?: string | null;
-
+  id: string;
   isEncrypted: true;
-}
-
-// Plain snapshot structure
-export interface PlainSnapshot {
-  // Plain data
-  fileName?: string;
-  extractedText?: string | null;
-  originalText?: string | null;
-  fhirData?: any;
-  belroseFields?: any;
-
-  // Flag for type discrimination
-  isEncrypted: false;
 }
 
 export interface RecordVersion {
@@ -91,7 +78,7 @@ export interface RecordVersion {
   credibility?: CredibilityScore;
 
   // Snapshot - can be either encrypted or plain
-  recordSnapshot: EncryptedSnapshot | PlainSnapshot;
+  recordSnapshot: EncryptedSnapshot;
 }
 
 // Consolidated Change interface with all needed properties

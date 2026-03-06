@@ -1,10 +1,6 @@
 // src/features/Encryption/config/encryptionConfig.ts
 
 export const ENCRYPTION_CONFIG = {
-  // ==================== FEATURE FLAG ====================
-  // Set to false during development, true for production
-  enabled: true, // ← START WITH THIS FALSE!
-
   // ==================== ENCRYPTION SETTINGS ====================
   algorithm: 'AES-GCM' as const,
   keyLength: 256,
@@ -38,22 +34,6 @@ export const ENCRYPTION_CONFIG = {
 };
 
 // ==================== HELPER FUNCTIONS ====================
-
-/**
- * Check if encryption is enabled
- */
-export function isEncryptionEnabled(): boolean {
-  return ENCRYPTION_CONFIG.enabled;
-}
-
-/**
- * Check if a specific component should be encrypted
- */
-export function shouldEncryptComponent(
-  component: keyof typeof ENCRYPTION_CONFIG.encryptComponents
-): boolean {
-  return ENCRYPTION_CONFIG.enabled && ENCRYPTION_CONFIG.encryptComponents[component];
-}
 
 /**
  * Log encryption operation (only in dev mode)

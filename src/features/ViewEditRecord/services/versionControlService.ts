@@ -105,13 +105,6 @@ export class VersionControlService {
   ): Promise<string> {
     if (!this.currentUser) throw new Error('User not authenticated');
 
-    // Check for Encryption - Zero access/knowledge architecture
-    if (!updatedRecord.isEncrypted) {
-      throw new Error(
-        'Cannot create version: Record must be encrypted. Plaintext storage is not supported.'
-      );
-    }
-
     // Step 1: Get the CURRENT record from Firestore (the original, pre-edit state)
     console.log('  📸 Fetching original record state...');
     const recordRef = doc(this.db, 'records', recordId);
@@ -151,7 +144,6 @@ export class VersionControlService {
       encryptedBelroseFields: originalRecord.encryptedBelroseFields ?? null,
       encryptedCustomData: originalRecord.encryptedCustomData ?? null,
       originalFileHash: originalRecord.originalFileHash ?? null,
-      isEncrypted: true,
       fileType: originalRecord.fileType ?? null,
       fileSize: originalRecord.fileSize ?? null,
     };
@@ -180,13 +172,6 @@ export class VersionControlService {
     if (!this.currentUser) throw new Error('User not authenticated');
 
     console.log('📝 Creating version for record:', recordId);
-
-    // 🔐 ENFORCE ENCRYPTION
-    if (!updatedRecord.isEncrypted) {
-      throw new Error(
-        'Cannot create version: Record must be encrypted. Plaintext storage is not supported.'
-      );
-    }
 
     try {
       const versionHistory = await this.getVersionHistory(recordId);
@@ -258,7 +243,6 @@ export class VersionControlService {
         encryptedBelroseFields: updatedRecord.encryptedBelroseFields,
         encryptedCustomData: updatedRecord.encryptedCustomData ?? null,
         originalFileHash: updatedRecord.originalFileHash ?? null,
-        isEncrypted: true,
       };
 
       const cleanedVersion = this.cleanUndefinedValues(version);
@@ -360,10 +344,6 @@ export class VersionControlService {
       return [];
     }
 
-    if (!version.recordSnapshot.isEncrypted) {
-      throw new Error('Invalid version: Snapshot must be encrypted');
-    }
-
     const keyData = await this.fetchWrappedKeyData(version.recordId);
     return await this.decryptChanges(version.encryptedChanges, keyData);
   }
@@ -376,11 +356,6 @@ export class VersionControlService {
     version: RecordVersion,
     keyData?: { wrappedKey: string; isCreator: boolean }
   ): Promise<any> {
-    // If the version isn't encrypted, throw error
-    if (!version.recordSnapshot.isEncrypted) {
-      throw new Error('Invalid version: Snapshot must be encrypted');
-    }
-
     console.log(`🔓 Decrypting version ${version.versionNumber}...`);
 
     //Get the key from caller or fetch
@@ -405,7 +380,6 @@ export class VersionControlService {
         encryptedFhirData: version.recordSnapshot.encryptedFhirData,
         encryptedBelroseFields: version.recordSnapshot.encryptedBelroseFields,
         encryptedCustomData: version.recordSnapshot.encryptedCustomData,
-        isEncrypted: true,
       };
 
       const decryptedData = await RecordDecryptionService.decryptRecord(
@@ -546,8 +520,6 @@ export class VersionControlService {
     console.log('🔍 Comparing versions:', {
       v1: version1.versionNumber,
       v2: version2.versionNumber,
-      v1Encrypted: version1.recordSnapshot?.isEncrypted,
-      v2Encrypted: version2.recordSnapshot?.isEncrypted,
     });
 
     // Fetch the key once and pass it to avoid redundant lookups

@@ -2,7 +2,7 @@
 import { useState, useCallback } from 'react';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { EncryptionKeyManager } from '../services/encryptionKeyManager';
-import { isEncryptionEnabled, measurePerformance } from '@/features/Encryption/encryptionConfig';
+import { measurePerformance } from '@/features/Encryption/encryptionConfig';
 
 interface CompleteRecordEncryption {
   fileName: {
@@ -68,7 +68,6 @@ interface UseEncryptionReturn {
 
   isEncrypting: boolean;
   isDecrypting: boolean;
-  isEnabled: boolean;
   error: Error | null;
 }
 
@@ -88,12 +87,6 @@ export function useEncryption(): UseEncryptionReturn {
       belroseFields: any | null,
       customData: any | null
     ): Promise<CompleteRecordEncryption | null> => {
-      // Check if encryption is enabled
-      if (!isEncryptionEnabled()) {
-        console.log('ℹ️ Encryption is disabled - skipping encryption');
-        return null;
-      }
-
       // Get session key
       const userKey = await EncryptionKeyManager.getSessionKey();
       if (!userKey) {
@@ -134,12 +127,6 @@ export function useEncryption(): UseEncryptionReturn {
 
   const decryptCompleteRecord = useCallback(
     async (encryptedKey: string, encryptedData: any): Promise<any> => {
-      // If encryption is disabled, data shouldn't be encrypted
-      if (!isEncryptionEnabled()) {
-        console.log('ℹ️ Encryption is disabled - returning data as-is');
-        return encryptedData;
-      }
-
       // Get session key
       const userKey = await EncryptionKeyManager.getSessionKey();
       if (!userKey) {
@@ -177,7 +164,6 @@ export function useEncryption(): UseEncryptionReturn {
     decryptCompleteRecord,
     isEncrypting,
     isDecrypting,
-    isEnabled: isEncryptionEnabled(),
     error,
   };
 }
