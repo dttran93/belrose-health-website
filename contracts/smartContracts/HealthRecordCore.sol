@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
-import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+import 'contracts/node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
+import 'contracts/node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
 /**
  * @title MemberRoleManagerInterface
@@ -24,6 +24,11 @@ interface MemberRoleManagerInterface {
   function isOwnerOrAdmin(string memory recordId, address wallet) external view returns (bool);
 
   function getUserForWallet(address wallet) external view returns (bytes32);
+
+  function isControllerOf(
+    bytes32 trustorIdHash,
+    bytes32 controllerIdHash
+  ) external view returns (bool);
 }
 
 /**
@@ -110,6 +115,31 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
   }
 
   // ===============================================================
+  // INTERNAL HELPERS
+  // ===============================================================
+
+  /**
+   * @dev Resolves the effective subject identity for anchoring operations.
+   * Pass bytes32(0) to act as yourself — preserves existing behaviour for all current callers.
+   * Pass a trustorIdHash to act as their controller — caller must be an active controller.
+   */
+  function _resolveSubject(bytes32 subjectIdHash) internal view returns (bytes32) {
+    bytes32 callerIdHash = memberRoleManager.getUserForWallet(msg.sender);
+    require(callerIdHash != bytes32(0), 'Wallet not registered');
+
+    if (subjectIdHash == bytes32(0) || subjectIdHash == callerIdHash) {
+      return callerIdHash;
+    }
+
+    require(
+      memberRoleManager.isControllerOf(subjectIdHash, callerIdHash),
+      'Not a controller for this identity'
+    );
+
+    return subjectIdHash;
+  }
+
+  // ===============================================================
   // RECORD ANCHORING
   // ===============================================================
 
@@ -170,17 +200,20 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    */
   function anchorRecord(
     string memory recordId,
-    string memory recordHash
+    string memory recordHash,
+    bytes32 subjectIdHash
   ) external onlyActiveMember onlyRecordParticipant(recordId) {
     require(bytes(recordId).length > 0, 'Record ID cannot be empty');
     require(bytes(recordHash).length > 0, 'Record hash cannot be empty');
 
-    //Caller is the Subject
-    bytes32 subjectIdHash = memberRoleManager.getUserForWallet(msg.sender);
-    require(subjectIdHash != bytes32(0), 'Wallet not registered');
+    //Resolve subject as either the subject themselves or an assigned Controller Trustee
+    bytes32 resolvedSubject = _resolveSubject(subjectIdHash);
 
     // Check not already anchored
-    require(!isSubjectOfRecord[recordId][subjectIdHash], 'Record already anchored to this subject');
+    require(
+      !isSubjectOfRecord[recordId][resolvedSubject],
+      'Record already anchored to this subject'
+    );
 
     //Check if this is the first subject
     bool isFirstSubject = recordSubjects[recordId].length == 0;
@@ -196,21 +229,19 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
         );
       } else {
         require(!isHashActive[recordHash], 'Hash already used');
-
         recordIdForHash[recordHash] = recordId;
         recordVersionHistory[recordId].push(recordHash);
         isHashActive[recordHash] = true;
       }
     }
 
-    recordSubjects[recordId].push(subjectIdHash);
-    isSubjectOfRecord[recordId][subjectIdHash] = true;
-    isSubjectActive[recordId][subjectIdHash] = true;
-    subjectMedicalHistory[subjectIdHash].push(recordId);
-
+    recordSubjects[recordId].push(resolvedSubject);
+    isSubjectOfRecord[recordId][resolvedSubject] = true;
+    isSubjectActive[recordId][resolvedSubject] = true;
+    subjectMedicalHistory[resolvedSubject].push(recordId);
     totalAnchoredRecords++;
 
-    emit RecordAnchored(recordId, recordHash, subjectIdHash, block.timestamp);
+    emit RecordAnchored(recordId, recordHash, resolvedSubject, block.timestamp);
   }
 
   /**
@@ -218,17 +249,18 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    * @param recordId The record ID
    */
   function unanchorRecord(
-    string memory recordId
+    string memory recordId,
+    bytes32 subjectIdHash
   ) external onlyActiveMember onlyRecordParticipant(recordId) {
-    bytes32 subjectIdHash = memberRoleManager.getUserForWallet(msg.sender);
-    require(subjectIdHash != bytes32(0), 'Wallet not registered');
-    require(isSubjectOfRecord[recordId][subjectIdHash], 'Not a subject of this record');
-    require(isSubjectActive[recordId][subjectIdHash], 'Already unanchored');
+    bytes32 resolvedSubject = _resolveSubject(subjectIdHash);
 
-    isSubjectActive[recordId][subjectIdHash] = false;
+    require(isSubjectOfRecord[recordId][resolvedSubject], 'Not a subject of this record');
+    require(isSubjectActive[recordId][resolvedSubject], 'Already unanchored');
+
+    isSubjectActive[recordId][resolvedSubject] = false;
     //Don't remove from subjectMedicalHistory to preserve audit trail
 
-    emit RecordUnanchored(recordId, subjectIdHash, block.timestamp);
+    emit RecordUnanchored(recordId, resolvedSubject, block.timestamp);
   }
 
   /**
@@ -236,16 +268,17 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    * @param recordId The record ID
    */
   function reanchorRecord(
-    string memory recordId
+    string memory recordId,
+    bytes32 subjectIdHash
   ) external onlyActiveMember onlyRecordParticipant(recordId) {
-    bytes32 subjectIdHash = memberRoleManager.getUserForWallet(msg.sender);
-    require(subjectIdHash != bytes32(0), 'Wallet not registered');
-    require(isSubjectOfRecord[recordId][subjectIdHash], 'Was never a subject');
-    require(!isSubjectActive[recordId][subjectIdHash], 'Already active');
+    bytes32 resolvedSubject = _resolveSubject(subjectIdHash);
 
-    isSubjectActive[recordId][subjectIdHash] = true;
+    require(isSubjectOfRecord[recordId][resolvedSubject], 'Was never a subject');
+    require(!isSubjectActive[recordId][resolvedSubject], 'Already active');
 
-    emit RecordReanchored(recordId, subjectIdHash, block.timestamp);
+    isSubjectActive[recordId][resolvedSubject] = true;
+
+    emit RecordReanchored(recordId, resolvedSubject, block.timestamp);
   }
 
   /**

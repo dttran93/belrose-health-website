@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
-import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+import 'contracts/node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
+import 'contracts/node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
 /**
  * @title MemberRoleManagerInterface
@@ -26,6 +26,11 @@ interface MemberRoleManagerInterface {
   function isOwnerOrAdmin(string memory recordId, address wallet) external view returns (bool);
 
   function getUserForWallet(address wallet) external view returns (bytes32);
+
+  function isControllerOf(
+    bytes32 trustorIdHash,
+    bytes32 controllerIdHash
+  ) external view returns (bool);
 }
 
 /**
@@ -927,5 +932,150 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   ) external view returns (bytes32) {
     bytes32 roleKey = _getRoleKey(recordId, userIdHash);
     return roleGrantedBy[roleKey];
+  }
+
+  // ===============================================================
+  // CONTROLLER TRUSTEE RELATIONSHIPS
+  // ===============================================================
+
+  // =================== CONTROLLER - ENUMS ===================
+  enum ControllerStatus {
+    None, // 0 - Default/non-existent
+    Pending, // 1 - Trustor proposed, awaiting trustee acceptance
+    Active, // 2 - Trustee accepted, relationship is live
+    Revoked // 3 - Either party ended the relationship
+  }
+
+  // =================== CONTROLLER - STORAGE ===================
+  // trustorIdHash => controllerIdHash => status
+  mapping(bytes32 => mapping(bytes32 => ControllerStatus)) public controllerStatus;
+
+  //==================== CONTROLLER - EVENTS ====================
+  event ControllerProposed(
+    bytes32 indexed trustorIdHash,
+    bytes32 indexed controllerIdHash,
+    uint256 timestamp
+  );
+  event ControllerAccepted(
+    bytes32 indexed trustorIdHash,
+    bytes32 indexed controllerIdHash,
+    uint256 timestamp
+  );
+  event ControllerRevoked(
+    bytes32 indexed trustorIdHash,
+    bytes32 indexed controllerIdHash,
+    bytes32 indexed revokedBy,
+    uint256 timestamp
+  );
+
+  // =================== CONTROLLER - FUNCTIONS ===================
+
+  /**
+   * @notice Trustor proposes a controller relationship (Step 1)
+   * @param controllerIdHash The identity hash of the proposed controller
+   */
+  function proposeController(bytes32 controllerIdHash) external onlyActiveMember {
+    bytes32 trustorIdHash = _getCallerIdHash();
+    require(controllerIdHash != bytes32(0), 'Invalid controller');
+    require(trustorIdHash != controllerIdHash, 'Cannot appoint yourself');
+    require(
+      userStatus[controllerIdHash] != MemberStatus.NotRegistered,
+      'Controller not registered'
+    );
+    require(
+      controllerStatus[trustorIdHash][controllerIdHash] == ControllerStatus.None ||
+        controllerStatus[trustorIdHash][controllerIdHash] == ControllerStatus.Revoked,
+      'Proposal already exists'
+    );
+
+    controllerStatus[trustorIdHash][controllerIdHash] = ControllerStatus.Pending;
+    emit ControllerProposed(trustorIdHash, controllerIdHash, block.timestamp);
+  }
+
+  /**
+   * @notice Trustee accepts a pending controller proposal (Step 2)
+   * @param trustorIdHash The identity hash of the trustor who proposed
+   */
+  function acceptController(bytes32 trustorIdHash) external onlyActiveMember {
+    bytes32 controllerIdHash = _getCallerIdHash();
+    require(
+      controllerStatus[trustorIdHash][controllerIdHash] == ControllerStatus.Pending,
+      'No pending proposal'
+    );
+
+    controllerStatus[trustorIdHash][controllerIdHash] = ControllerStatus.Active;
+    emit ControllerAccepted(trustorIdHash, controllerIdHash, block.timestamp);
+  }
+
+  /**
+   * @notice Revoke a controller relationship — callable by either party
+   * @param trustorIdHash The trustor's identity hash
+   * @param controllerIdHash The controller's identity hash
+   */
+  function revokeController(
+    bytes32 trustorIdHash,
+    bytes32 controllerIdHash
+  ) external onlyActiveMember {
+    bytes32 callerIdHash = _getCallerIdHash();
+    require(
+      callerIdHash == trustorIdHash || callerIdHash == controllerIdHash,
+      'Not a party to this relationship'
+    );
+    require(
+      controllerStatus[trustorIdHash][controllerIdHash] == ControllerStatus.Active ||
+        controllerStatus[trustorIdHash][controllerIdHash] == ControllerStatus.Pending,
+      'No active or pending relationship'
+    );
+
+    controllerStatus[trustorIdHash][controllerIdHash] = ControllerStatus.Revoked;
+    emit ControllerRevoked(trustorIdHash, controllerIdHash, callerIdHash, block.timestamp);
+  }
+
+  /**
+   * @notice Controller grants themselves the same role as their trustor on a record
+   * @param recordId The record ID
+   * @param trustorIdHash The identity hash of the trustor
+   */
+  function grantRoleAsController(
+    string memory recordId,
+    bytes32 trustorIdHash
+  ) external onlyActiveMember {
+    bytes32 controllerIdHash = _getCallerIdHash();
+
+    require(
+      isControllerOf(trustorIdHash, controllerIdHash),
+      'Not an active controller for this trustor'
+    );
+    require(_hasActiveRole(recordId, trustorIdHash), 'Trustor has no role on this record');
+    require(
+      !_hasActiveRole(recordId, controllerIdHash),
+      'Controller already has a role on this record. Use changeRole() instead'
+    );
+
+    string memory trustorRole = _getUserRole(recordId, trustorIdHash);
+    _grantRoleInternal(recordId, controllerIdHash, trustorRole, trustorIdHash);
+  }
+
+  // =================== CONTROLLER - VIEW FUNCTIONS ===================
+
+  /**
+   * @notice Check if a controller relationship is active
+   * @dev Used by HealthRecordCore via the interface
+   */
+  function isControllerOf(
+    bytes32 trustorIdHash,
+    bytes32 controllerIdHash
+  ) external view returns (bool) {
+    return controllerStatus[trustorIdHash][controllerIdHash] == ControllerStatus.Active;
+  }
+
+  /**
+   * @notice Get the full status of a controller relationship
+   */
+  function getControllerStatus(
+    bytes32 trustorIdHash,
+    bytes32 controllerIdHash
+  ) external view returns (ControllerStatus) {
+    return controllerStatus[trustorIdHash][controllerIdHash];
   }
 }

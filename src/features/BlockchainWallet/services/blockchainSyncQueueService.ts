@@ -80,7 +80,10 @@ type SyncContext =
       newSupport: boolean;
     }
   | { type: 'flagUnacceptedUpdate'; recordId: string; recordHash: string; disputeId: string }
-  | { type: 'resolveUnacceptedUpdate'; recordId: string; recordHash: string; disputeId: string };
+  | { type: 'resolveUnacceptedUpdate'; recordId: string; recordHash: string; disputeId: string }
+  | { type: 'controller-propose'; trustorId: string; trusteeId: string }
+  | { type: 'controller-accept'; trustorId: string; trusteeId: string }
+  | { type: 'controller-revoke'; trustorId: string; trusteeId: string };
 
 export interface BlockchainSyncFailure extends BaseSyncFailure {
   context: SyncContext;

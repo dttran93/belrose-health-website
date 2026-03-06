@@ -252,6 +252,67 @@ const MEMBER_ROLE_MANAGER_ABI = [
     stateMutability: 'nonpayable',
     type: 'function',
   },
+  // ============================================================================
+  // CONTROLLER TRUSTEE - WRITE FUNCTIONS
+  // ============================================================================
+  {
+    inputs: [{ internalType: 'bytes32', name: 'controllerIdHash', type: 'bytes32' }],
+    name: 'proposeController',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [{ internalType: 'bytes32', name: 'trustorIdHash', type: 'bytes32' }],
+    name: 'acceptController',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'bytes32', name: 'trustorIdHash', type: 'bytes32' },
+      { internalType: 'bytes32', name: 'controllerIdHash', type: 'bytes32' },
+    ],
+    name: 'revokeController',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'trustorIdHash', type: 'bytes32' },
+    ],
+    name: 'grantRoleAsController',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+
+  // ============================================================================
+  // CONTROLLER TRUSTEE - VIEW FUNCTIONS
+  // ============================================================================
+  {
+    inputs: [
+      { internalType: 'bytes32', name: 'trustorIdHash', type: 'bytes32' },
+      { internalType: 'bytes32', name: 'controllerIdHash', type: 'bytes32' },
+    ],
+    name: 'isControllerOf',
+    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'bytes32', name: 'trustorIdHash', type: 'bytes32' },
+      { internalType: 'bytes32', name: 'controllerIdHash', type: 'bytes32' },
+    ],
+    name: 'getControllerStatus',
+    outputs: [{ internalType: 'uint8', name: '', type: 'uint8' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
 ];
 
 // ============================================================================
@@ -769,6 +830,98 @@ export class BlockchainRoleManagerService {
     const result = await this.executeWrite('voluntarilyLeaveOwnership', [recordId]);
     console.log('✅ Ownership left:', result.txHash);
     return result;
+  }
+
+  // ==========================================================================
+  // CONTROLLER TRUSTEE - WRITE FUNCTIONS
+  // ==========================================================================
+
+  /**
+   * Trustor proposes a controller relationship on-chain (Step 1)
+   * Called by the TRUSTOR — msg.sender must be an active member
+   */
+  static async proposeController(controllerIdHash: string): Promise<TransactionResult> {
+    console.log('🔗 Proposing controller on blockchain...', { controllerIdHash });
+    const result = await this.executeWrite('proposeController', [controllerIdHash]);
+    console.log('✅ Controller proposed:', result.txHash);
+    return result;
+  }
+
+  /**
+   * Trustee accepts a pending controller proposal on-chain (Step 2)
+   * Called by the TRUSTEE — msg.sender must be an active member
+   */
+  static async acceptController(trustorIdHash: string): Promise<TransactionResult> {
+    console.log('🔗 Accepting controller on blockchain...', { trustorIdHash });
+    const result = await this.executeWrite('acceptController', [trustorIdHash]);
+    console.log('✅ Controller accepted:', result.txHash);
+    return result;
+  }
+
+  /**
+   * Revoke a controller relationship on-chain
+   * Callable by EITHER the trustor or the trustee
+   */
+  static async revokeController(
+    trustorIdHash: string,
+    controllerIdHash: string
+  ): Promise<TransactionResult> {
+    console.log('🔗 Revoking controller on blockchain...', { trustorIdHash, controllerIdHash });
+    const result = await this.executeWrite('revokeController', [trustorIdHash, controllerIdHash]);
+    console.log('✅ Controller revoked:', result.txHash);
+    return result;
+  }
+
+  /**
+   * Controller grants themselves the same role as their trustor on a record.
+   * Only callable by an active controller for the trustor.
+   * Trustor must have an active role on the record.
+   * Controller must not already have a role (use changeRole instead).
+   */
+  static async grantRoleAsController(
+    recordId: string,
+    trustorIdHash: string
+  ): Promise<TransactionResult> {
+    console.log('🔗 Granting controller role on blockchain...', { recordId, trustorIdHash });
+    const result = await this.executeWrite('grantRoleAsController', [recordId, trustorIdHash]);
+    console.log('✅ Controller role granted:', result.txHash);
+    return result;
+  }
+
+  // ==========================================================================
+  // CONTROLLER TRUSTEE - VIEW FUNCTIONS
+  // ==========================================================================
+
+  static async isControllerOf(trustorIdHash: string, controllerIdHash: string): Promise<boolean> {
+    try {
+      const contract = this.getReadOnlyContract();
+      const fn = contract.getFunction('isControllerOf');
+      return await fn(trustorIdHash, controllerIdHash);
+    } catch (error) {
+      console.error('Error checking controller status:', error);
+      return false;
+    }
+  }
+
+  static async getControllerStatus(
+    trustorIdHash: string,
+    controllerIdHash: string
+  ): Promise<'None' | 'Pending' | 'Active' | 'Revoked'> {
+    try {
+      const contract = this.getReadOnlyContract();
+      const fn = contract.getFunction('getControllerStatus');
+      const statusIndex = Number(await fn(trustorIdHash, controllerIdHash));
+      const statusMap: Record<number, 'None' | 'Pending' | 'Active' | 'Revoked'> = {
+        0: 'None',
+        1: 'Pending',
+        2: 'Active',
+        3: 'Revoked',
+      };
+      return statusMap[statusIndex] ?? 'None';
+    } catch (error) {
+      console.error('Error getting controller status:', error);
+      return 'None';
+    }
   }
 
   // ==========================================================================
