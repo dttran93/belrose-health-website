@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import 'contracts/node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
-import 'contracts/node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
 /**
  * @title MemberRoleManagerInterface
@@ -27,7 +27,7 @@ interface MemberRoleManagerInterface {
 
   function isControllerOf(
     bytes32 trustorIdHash,
-    bytes32 controllerIdHash
+    bytes32 trusteeIdHash
   ) external view returns (bool);
 }
 
@@ -88,7 +88,6 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    * @param _memberRoleManager Address of the MemberRoleManager proxy
    */
   function initialize(address _memberRoleManager) public initializer {
-    __UUPSUpgradeable_init();
     require(_memberRoleManager != address(0), 'Invalid MemberRoleManager address');
     memberRoleManager = MemberRoleManagerInterface(_memberRoleManager);
     admin = msg.sender;

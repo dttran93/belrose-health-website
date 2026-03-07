@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import 'contracts/node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
-import 'contracts/node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
+import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
 /**
  * @title MemberRoleManagerInterface
@@ -91,7 +91,6 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
    * @dev Can only be called once during proxy deployment
    */
   function initialize() public initializer {
-    __UUPSUpgradeable_init();
     admin = msg.sender;
   }
 
@@ -935,11 +934,18 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   }
 
   // ===============================================================
-  // CONTROLLER TRUSTEE RELATIONSHIPS
+  // TRUSTEE RELATIONSHIPS
   // ===============================================================
 
   // =================== CONTROLLER - ENUMS ===================
-  enum ControllerStatus {
+
+  enum TrusteeLevel {
+    Observer, // 0 - Read only, always gets viewer role
+    Custodian, // 1 - Mirrors trustor role, capped at administrator
+    Controller // 2 - Mirrors trustor role fully, including owner
+  }
+
+  enum TrusteeStatus {
     None, // 0 - Default/non-existent
     Pending, // 1 - Trustor proposed, awaiting trustee acceptance
     Active, // 2 - Trustee accepted, relationship is live
@@ -947,23 +953,31 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   }
 
   // =================== CONTROLLER - STORAGE ===================
-  // trustorIdHash => controllerIdHash => status
-  mapping(bytes32 => mapping(bytes32 => ControllerStatus)) public controllerStatus;
+
+  struct TrusteeRelationship {
+    TrusteeStatus status;
+    TrusteeLevel level;
+  }
+
+  // trustorIdHash => trusteeIdHash => TrusteeRelationship
+  mapping(bytes32 => mapping(bytes32 => TrusteeRelationship)) public trusteeRelationships;
 
   //==================== CONTROLLER - EVENTS ====================
-  event ControllerProposed(
+  event TrusteeProposed(
     bytes32 indexed trustorIdHash,
-    bytes32 indexed controllerIdHash,
+    bytes32 indexed trusteeIdHash,
+    TrusteeLevel level,
     uint256 timestamp
   );
-  event ControllerAccepted(
+  event TrusteeAccepted(
     bytes32 indexed trustorIdHash,
-    bytes32 indexed controllerIdHash,
+    bytes32 indexed trusteeIdHash,
+    TrusteeLevel level,
     uint256 timestamp
   );
-  event ControllerRevoked(
+  event TrusteeRevoked(
     bytes32 indexed trustorIdHash,
-    bytes32 indexed controllerIdHash,
+    bytes32 indexed trusteeIdHash,
     bytes32 indexed revokedBy,
     uint256 timestamp
   );
@@ -971,111 +985,179 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   // =================== CONTROLLER - FUNCTIONS ===================
 
   /**
-   * @notice Trustor proposes a controller relationship (Step 1)
-   * @param controllerIdHash The identity hash of the proposed controller
+   * @notice Trustor proposes a trustee relationship (Step 1)
+   * @param trusteeIdHash The identity hash of the proposed trustee
+   * @param level The trust level (0=Observer, 1=Custodian, 2=Controller)
    */
-  function proposeController(bytes32 controllerIdHash) external onlyActiveMember {
+  function proposeTrustee(bytes32 trusteeIdHash, TrusteeLevel level) external onlyActiveMember {
     bytes32 trustorIdHash = _getCallerIdHash();
-    require(controllerIdHash != bytes32(0), 'Invalid controller');
-    require(trustorIdHash != controllerIdHash, 'Cannot appoint yourself');
+    require(trusteeIdHash != bytes32(0), 'Invalid trustee');
+    require(trustorIdHash != trusteeIdHash, 'Cannot appoint yourself');
+    require(userStatus[trusteeIdHash] != MemberStatus.NotRegistered, 'Trustee not registered');
+
+    TrusteeStatus currentStatus = trusteeRelationships[trustorIdHash][trusteeIdHash].status;
     require(
-      userStatus[controllerIdHash] != MemberStatus.NotRegistered,
-      'Controller not registered'
-    );
-    require(
-      controllerStatus[trustorIdHash][controllerIdHash] == ControllerStatus.None ||
-        controllerStatus[trustorIdHash][controllerIdHash] == ControllerStatus.Revoked,
+      currentStatus == TrusteeStatus.None || currentStatus == TrusteeStatus.Revoked,
       'Proposal already exists'
     );
 
-    controllerStatus[trustorIdHash][controllerIdHash] = ControllerStatus.Pending;
-    emit ControllerProposed(trustorIdHash, controllerIdHash, block.timestamp);
+    trusteeRelationships[trustorIdHash][trusteeIdHash] = TrusteeRelationship({
+      status: TrusteeStatus.Pending,
+      level: level
+    });
+
+    emit TrusteeProposed(trustorIdHash, trusteeIdHash, level, block.timestamp);
   }
 
   /**
-   * @notice Trustee accepts a pending controller proposal (Step 2)
+   * @notice Trustee accepts a pending proposal (Step 2)
    * @param trustorIdHash The identity hash of the trustor who proposed
    */
-  function acceptController(bytes32 trustorIdHash) external onlyActiveMember {
-    bytes32 controllerIdHash = _getCallerIdHash();
-    require(
-      controllerStatus[trustorIdHash][controllerIdHash] == ControllerStatus.Pending,
-      'No pending proposal'
-    );
+  function acceptTrustee(bytes32 trustorIdHash) external onlyActiveMember {
+    bytes32 trusteeIdHash = _getCallerIdHash();
+    TrusteeRelationship storage r = trusteeRelationships[trustorIdHash][trusteeIdHash];
 
-    controllerStatus[trustorIdHash][controllerIdHash] = ControllerStatus.Active;
-    emit ControllerAccepted(trustorIdHash, controllerIdHash, block.timestamp);
+    require(r.status == TrusteeStatus.Pending, 'No pending proposal');
+
+    r.status = TrusteeStatus.Active;
+
+    emit TrusteeAccepted(trustorIdHash, trusteeIdHash, r.level, block.timestamp);
   }
 
   /**
-   * @notice Revoke a controller relationship — callable by either party
+   * @notice Revoke a trustee relationship — callable by either party
    * @param trustorIdHash The trustor's identity hash
-   * @param controllerIdHash The controller's identity hash
+   * @param trusteeIdHash The trustee's identity hash
    */
-  function revokeController(
-    bytes32 trustorIdHash,
-    bytes32 controllerIdHash
-  ) external onlyActiveMember {
+  function revokeTrustee(bytes32 trustorIdHash, bytes32 trusteeIdHash) external onlyActiveMember {
     bytes32 callerIdHash = _getCallerIdHash();
     require(
-      callerIdHash == trustorIdHash || callerIdHash == controllerIdHash,
+      callerIdHash == trustorIdHash || callerIdHash == trusteeIdHash,
       'Not a party to this relationship'
     );
+
+    TrusteeStatus currentStatus = trusteeRelationships[trustorIdHash][trusteeIdHash].status;
     require(
-      controllerStatus[trustorIdHash][controllerIdHash] == ControllerStatus.Active ||
-        controllerStatus[trustorIdHash][controllerIdHash] == ControllerStatus.Pending,
+      currentStatus == TrusteeStatus.Active || currentStatus == TrusteeStatus.Pending,
       'No active or pending relationship'
     );
 
-    controllerStatus[trustorIdHash][controllerIdHash] = ControllerStatus.Revoked;
-    emit ControllerRevoked(trustorIdHash, controllerIdHash, callerIdHash, block.timestamp);
+    trusteeRelationships[trustorIdHash][trusteeIdHash].status = TrusteeStatus.Revoked;
+
+    emit TrusteeRevoked(trustorIdHash, trusteeIdHash, callerIdHash, block.timestamp);
+  }
+
+  // =================== TRUSTEE - ROLE GRANT HELPERS ===================
+
+  /**
+   * @dev Resolves what role a trustee should get on a record based on their level
+   *   Observer  → always viewer
+   *   Custodian → mirrors trustor, capped at administrator
+   *   Controller → mirrors trustor exactly (including owner)
+   */
+  function _resolveTrusteeRole(
+    string memory recordId,
+    bytes32 trustorIdHash,
+    TrusteeLevel level
+  ) internal view returns (string memory) {
+    if (level == TrusteeLevel.Observer) {
+      return 'viewer';
+    }
+
+    string memory trustorRole = _getUserRole(recordId, trustorIdHash);
+
+    if (level == TrusteeLevel.Custodian) {
+      if (keccak256(bytes(trustorRole)) == keccak256(bytes('owner'))) {
+        return 'administrator';
+      }
+      return trustorRole;
+    }
+
+    // Controller — full mirror including owner
+    return trustorRole;
   }
 
   /**
-   * @notice Controller grants themselves the same role as their trustor on a record
-   * @param recordId The record ID
-   * @param trustorIdHash The identity hash of the trustor
+   * @dev Internal batch grant — caller is responsible for permission checks before invoking
+   * @param recordIds Array of record IDs
+   * @param targetIdHash The identity to grant roles to
+   * @param roles Array of roles — must match recordIds length
+   * @param granterIdHash The identity granting the roles (for audit trail)
    */
-  function grantRoleAsController(
-    string memory recordId,
-    bytes32 trustorIdHash
-  ) external onlyActiveMember {
-    bytes32 controllerIdHash = _getCallerIdHash();
-
-    require(
-      isControllerOf(trustorIdHash, controllerIdHash),
-      'Not an active controller for this trustor'
-    );
-    require(_hasActiveRole(recordId, trustorIdHash), 'Trustor has no role on this record');
-    require(
-      !_hasActiveRole(recordId, controllerIdHash),
-      'Controller already has a role on this record. Use changeRole() instead'
-    );
-
-    string memory trustorRole = _getUserRole(recordId, trustorIdHash);
-    _grantRoleInternal(recordId, controllerIdHash, trustorRole, trustorIdHash);
+  function _grantRoleBatchInternal(
+    string[] memory recordIds,
+    bytes32 targetIdHash,
+    string[] memory roles,
+    bytes32 granterIdHash
+  ) internal {
+    for (uint256 i = 0; i < recordIds.length; i++) {
+      if (!_isValidRole(roles[i])) continue;
+      if (!_hasActiveRole(recordIds[i], granterIdHash)) continue; // granter must have role
+      if (_hasActiveRole(recordIds[i], targetIdHash)) continue; // skip if already has role
+      _grantRoleInternal(recordIds[i], targetIdHash, roles[i], granterIdHash);
+    }
   }
 
-  // =================== CONTROLLER - VIEW FUNCTIONS ===================
+  /**
+   * @notice General purpose batch role grant — caller grants target a role on multiple records
+   * @param recordIds Array of record IDs
+   * @param targetIdHash The identity to grant roles to
+   * @param roles Array of roles — must match recordIds length
+   */
+  function grantRoleBatch(
+    string[] memory recordIds,
+    bytes32 targetIdHash,
+    string[] memory roles
+  ) external onlyActiveMember {
+    require(recordIds.length == roles.length, 'Array length mismatch');
+    bytes32 userIdHash = _getCallerIdHash();
+    _grantRoleBatchInternal(recordIds, targetIdHash, roles, userIdHash);
+  }
+
+  /**
+   * @notice Trustee grants themselves access to multiple records in one transaction
+   * @param recordIds Array of record IDs
+   * @param trustorIdHash The identity hash of the trustor
+   */
+  function grantRoleAsTrusteeBatch(
+    string[] memory recordIds,
+    bytes32 trustorIdHash
+  ) external onlyActiveMember {
+    bytes32 trusteeIdHash = _getCallerIdHash();
+    TrusteeRelationship memory r = trusteeRelationships[trustorIdHash][trusteeIdHash];
+    require(r.status == TrusteeStatus.Active, 'No active trustee relationship');
+
+    string[] memory roles = new string[](recordIds.length);
+    for (uint256 i = 0; i < recordIds.length; i++) {
+      roles[i] = _resolveTrusteeRole(recordIds[i], trustorIdHash, r.level);
+    }
+
+    // granter is trustorIdHash since permission flows from trustor's role on each record
+    _grantRoleBatchInternal(recordIds, trusteeIdHash, roles, trustorIdHash);
+  }
+
+  // =================== TRUSTEE - VIEW FUNCTIONS ===================
 
   /**
    * @notice Check if a controller relationship is active
-   * @dev Used by HealthRecordCore via the interface
+   * @dev Kept for HealthRecordCore._resolveSubject compatibility — checks Controller level
    */
   function isControllerOf(
     bytes32 trustorIdHash,
-    bytes32 controllerIdHash
-  ) external view returns (bool) {
-    return controllerStatus[trustorIdHash][controllerIdHash] == ControllerStatus.Active;
+    bytes32 trusteeIdHash
+  ) external view override returns (bool) {
+    TrusteeRelationship memory r = trusteeRelationships[trustorIdHash][trusteeIdHash];
+    return r.status == TrusteeStatus.Active && r.level == TrusteeLevel.Controller;
   }
 
   /**
-   * @notice Get the full status of a controller relationship
+   * @notice Get the full trustee relationship
    */
-  function getControllerStatus(
+  function getTrusteeRelationship(
     bytes32 trustorIdHash,
-    bytes32 controllerIdHash
-  ) external view returns (ControllerStatus) {
-    return controllerStatus[trustorIdHash][controllerIdHash];
+    bytes32 trusteeIdHash
+  ) external view returns (TrusteeStatus status, TrusteeLevel level) {
+    TrusteeRelationship memory r = trusteeRelationships[trustorIdHash][trusteeIdHash];
+    return (r.status, r.level);
   }
 }

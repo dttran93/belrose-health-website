@@ -1,19 +1,37 @@
 require('@nomicfoundation/hardhat-toolbox');
 require('@openzeppelin/hardhat-upgrades');
+require('hardhat-contract-sizer');
 require('dotenv/config');
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
-    version: '0.8.23',
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200,
+    compilers: [
+      {
+        version: '0.8.24',
+        settings: {
+          optimizer: { enabled: true, runs: 200 },
+          viaIR: true,
+          evmVersion: 'cancun',
+        },
       },
-      viaIR: true,
-      evmVersion: 'paris',
-    },
+      {
+        version: '0.8.23',
+        settings: {
+          optimizer: { enabled: true, runs: 200 },
+          viaIR: true,
+          evmVersion: 'cancun',
+        },
+      },
+    ],
+  },
+  paths: {
+    sources: './smartContracts',
+  },
+  contractSizer: {
+    alphaSort: true,
+    runOnCompile: false,
+    strict: false,
   },
   networks: {
     hardhat: {
