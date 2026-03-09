@@ -937,7 +937,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   // TRUSTEE RELATIONSHIPS
   // ===============================================================
 
-  // =================== CONTROLLER - ENUMS ===================
+  // =================== TRUSTEE - ENUMS ===================
 
   enum TrusteeLevel {
     Observer, // 0 - Read only, always gets viewer role
@@ -952,7 +952,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     Revoked // 3 - Either party ended the relationship
   }
 
-  // =================== CONTROLLER - STORAGE ===================
+  // =================== TRUSTEE - STORAGE ===================
 
   struct TrusteeRelationship {
     TrusteeStatus status;
@@ -962,7 +962,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   // trustorIdHash => trusteeIdHash => TrusteeRelationship
   mapping(bytes32 => mapping(bytes32 => TrusteeRelationship)) public trusteeRelationships;
 
-  //==================== CONTROLLER - EVENTS ====================
+  //==================== TRUSTEE - EVENTS ====================
   event TrusteeProposed(
     bytes32 indexed trustorIdHash,
     bytes32 indexed trusteeIdHash,
@@ -981,8 +981,15 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     bytes32 indexed revokedBy,
     uint256 timestamp
   );
+  event TrusteeLevelUpdated(
+    bytes32 indexed trustorIdHash,
+    bytes32 indexed trusteeIdHash,
+    TrusteeLevel oldLevel,
+    TrusteeLevel newLevel,
+    uint256 timestamp
+  );
 
-  // =================== CONTROLLER - FUNCTIONS ===================
+  // =================== TRUSTEE - FUNCTIONS ===================
 
   /**
    * @notice Trustor proposes a trustee relationship (Step 1)
@@ -1047,6 +1054,28 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     emit TrusteeRevoked(trustorIdHash, trusteeIdHash, callerIdHash, block.timestamp);
   }
 
+  /**
+   * @notice Trustor updates the trust level of an active relationship
+   * @dev Only callable by the trustor — no re-acceptance required
+   * @param trusteeIdHash The identity hash of the trustee
+   * @param newLevel The new trust level
+   */
+  function updateTrusteeLevel(
+    bytes32 trusteeIdHash,
+    TrusteeLevel newLevel
+  ) external onlyActiveMember {
+    bytes32 trustorIdHash = _getCallerIdHash();
+    TrusteeRelationship storage r = trusteeRelationships[trustorIdHash][trusteeIdHash];
+
+    require(r.status == TrusteeStatus.Active, 'No active trustee relationship');
+    require(r.level != newLevel, 'Already this trust level');
+
+    TrusteeLevel oldLevel = r.level;
+    r.level = newLevel;
+
+    emit TrusteeLevelUpdated(trustorIdHash, trusteeIdHash, oldLevel, newLevel, block.timestamp);
+  }
+
   // =================== TRUSTEE - ROLE GRANT HELPERS ===================
 
   /**
@@ -1101,16 +1130,18 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   /**
    * @notice General purpose batch role grant — caller grants target a role on multiple records
    * @param recordIds Array of record IDs
-   * @param targetIdHash The identity to grant roles to
+   * @param targetWallet The identity to grant roles to
    * @param roles Array of roles — must match recordIds length
    */
   function grantRoleBatch(
     string[] memory recordIds,
-    bytes32 targetIdHash,
+    address targetWallet,
     string[] memory roles
   ) external onlyActiveMember {
     require(recordIds.length == roles.length, 'Array length mismatch');
     bytes32 userIdHash = _getCallerIdHash();
+    bytes32 targetIdHash = wallets[targetWallet].userIdHash;
+    require(targetIdHash != bytes32(0), 'Target wallet not registered');
     _grantRoleBatchInternal(recordIds, targetIdHash, roles, userIdHash);
   }
 
@@ -1134,6 +1165,74 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
 
     // granter is trustorIdHash since permission flows from trustor's role on each record
     _grantRoleBatchInternal(recordIds, trusteeIdHash, roles, trustorIdHash);
+  }
+
+  /**
+   * @notice Batch change a target's role across multiple records
+   * @param recordIds Array of record IDs
+   * @param targetWallet The identity whose role is being changed
+   * @param newRoles Array of new roles — must match recordIds length
+   */
+  function changeRoleBatch(
+    string[] memory recordIds,
+    address targetWallet,
+    string[] memory newRoles
+  ) external onlyActiveMember {
+    require(recordIds.length == newRoles.length, 'Array length mismatch');
+    bytes32 userIdHash = _getCallerIdHash();
+    bytes32 targetIdHash = wallets[targetWallet].userIdHash;
+    require(targetIdHash != bytes32(0), 'Target wallet not registered');
+
+    for (uint256 i = 0; i < recordIds.length; i++) {
+      if (!_isValidRole(newRoles[i])) continue;
+      if (!_hasActiveRole(recordIds[i], userIdHash)) continue; // caller must have role
+      if (!_hasActiveRole(recordIds[i], targetIdHash)) continue; // target must have role to change
+      bytes32 targetRoleKey = _getRoleKey(recordIds[i], targetIdHash);
+      string memory oldRole = recordRoles[targetRoleKey].role;
+
+      _grantRoleInternal(recordIds[i], targetIdHash, newRoles[i], userIdHash);
+      emit RoleChanged(
+        recordIds[i],
+        targetIdHash,
+        oldRole,
+        newRoles[i],
+        userIdHash,
+        block.timestamp
+      );
+    }
+  }
+
+  /**
+   * @notice Batch revoke a target's role across multiple records
+   * @param recordIds Array of record IDs
+   * @param targetWallet A wallet belonging to the target identity
+   */
+  function revokeRoleBatch(
+    string[] memory recordIds,
+    address targetWallet
+  ) external onlyActiveMember {
+    require(targetWallet != address(0), 'Invalid wallet');
+    bytes32 userIdHash = _getCallerIdHash();
+    bytes32 targetIdHash = wallets[targetWallet].userIdHash;
+    require(targetIdHash != bytes32(0), 'Target wallet not registered');
+
+    for (uint256 i = 0; i < recordIds.length; i++) {
+      if (!_hasActiveRole(recordIds[i], targetIdHash)) continue;
+      if (!_hasActiveRole(recordIds[i], userIdHash)) continue;
+
+      bytes32 targetRoleKey = _getRoleKey(recordIds[i], targetIdHash);
+      string memory role = recordRoles[targetRoleKey].role;
+      bytes32 roleHash = keccak256(bytes(role));
+
+      // Never revoke owners in batch — only an owner can revoke themselves
+      if (roleHash == keccak256(bytes('owner'))) continue;
+
+      _removeFromRoleArray(recordIds[i], targetIdHash, role);
+      recordRoles[targetRoleKey].isActive = false;
+      delete roleGrantedBy[targetRoleKey];
+
+      emit RoleRevoked(recordIds[i], targetIdHash, role, userIdHash, block.timestamp);
+    }
   }
 
   // =================== TRUSTEE - VIEW FUNCTIONS ===================

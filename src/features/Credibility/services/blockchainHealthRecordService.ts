@@ -34,6 +34,7 @@ const HEALTH_RECORD_CORE_ABI = [
     inputs: [
       { name: 'recordId', type: 'string' },
       { name: 'recordHash', type: 'string' },
+      { name: 'subjectIdHash', type: 'bytes32' },
     ],
     name: 'anchorRecord',
     outputs: [],
@@ -41,14 +42,20 @@ const HEALTH_RECORD_CORE_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ name: 'recordId', type: 'string' }],
+    inputs: [
+      { name: 'recordId', type: 'string' },
+      { name: 'subjectIdHash', type: 'bytes32' },
+    ],
     name: 'unanchorRecord',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function',
   },
   {
-    inputs: [{ name: 'recordId', type: 'string' }],
+    inputs: [
+      { name: 'recordId', type: 'string' },
+      { name: 'subjectIdHash', type: 'bytes32' },
+    ],
     name: 'reanchorRecord',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -638,7 +645,7 @@ export class blockchainHealthRecordService {
       recordId,
       recordHash: recordHash.slice(0, 12) + '...',
     });
-    const result = await this.executeWrite('anchorRecord', [recordId, recordHash]);
+    const result = await this.executeWrite('anchorRecord', [recordId, recordHash, ethers.ZeroHash]);
     console.log('✅ Record anchored:', result.txHash);
     return result;
   }
@@ -646,7 +653,7 @@ export class blockchainHealthRecordService {
   /** Deactivate your subject link (soft delete) */
   static async unanchorRecord(recordId: string): Promise<TransactionResult> {
     console.log('⛓️ Unanchoring record...', { recordId });
-    const result = await this.executeWrite('unanchorRecord', [recordId]);
+    const result = await this.executeWrite('unanchorRecord', [recordId, ethers.ZeroHash]);
     console.log('✅ Record unanchored:', result.txHash);
     return result;
   }
@@ -654,7 +661,7 @@ export class blockchainHealthRecordService {
   /** Reactivate a previously unanchored subject link */
   static async reanchorRecord(recordId: string): Promise<TransactionResult> {
     console.log('⛓️ Reanchoring record...', { recordId });
-    const result = await this.executeWrite('reanchorRecord', [recordId]);
+    const result = await this.executeWrite('reanchorRecord', [recordId, ethers.ZeroHash]);
     console.log('✅ Record reanchored:', result.txHash);
     return result;
   }

@@ -3,7 +3,7 @@
 import React from 'react';
 import { User, Mail, Hash, X, Check, CircleCheck } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import UserMenu from './UserMenu';
+import UserMenu, { MenuItem } from './UserMenu';
 import { BelroseUserProfile } from '@/types/core';
 import { copyToClipboard } from '@/utils/browserUtils';
 
@@ -31,6 +31,7 @@ interface UserCardProps {
   clickable?: boolean;
   className?: string;
   content?: React.ReactNode; // Primary slot for UserBadge or custom status
+  additionalItems?: MenuItem[];
 }
 
 const colorClasses: Record<
@@ -91,6 +92,7 @@ export const UserCard: React.FC<UserCardProps> = ({
   clickable = false,
   className = '',
   content,
+  additionalItems,
 }) => {
   const colors = colorClasses[color];
   const displayName = user?.displayName || 'Unknown User';
@@ -158,6 +160,7 @@ export const UserCard: React.FC<UserCardProps> = ({
           onShare={onShare}
           onDelete={onDelete}
           onVerifyBlockchain={onVerifyBlockchain}
+          additionalItems={additionalItems}
         />
       )}
       {renderActionButtons()}

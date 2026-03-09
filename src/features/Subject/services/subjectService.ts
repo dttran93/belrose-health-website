@@ -34,6 +34,7 @@ import SubjectMembershipService from './subjectMembershipService';
 import SubjectPermissionService from './subjectPermissionService';
 import { FileObject } from '@/types/core';
 import SubjectRemovalService from './subjectRemovalService';
+import { TrusteePermissionService } from '@/features/Trustee/services/trusteePermissionService';
 
 // ============================================================================
 // TYPES
@@ -137,6 +138,15 @@ export class SubjectService {
       // Step 2: Update Firestore
       await SubjectMembershipService.addSubject(recordId, user.uid);
       console.log('✅ Firestore: Subject added');
+
+      // Step 3: Grant access to any trustees of the subject
+      try {
+        await TrusteePermissionService.grantAccessForNewRecord(user.uid, recordId);
+        console.log('✅ Access granted to subject trustees');
+      } catch (trusteeError) {
+        // Non-fatal — subject was successfully added
+        console.error('⚠️ Failed to grant trustee access for new record:', trusteeError);
+      }
 
       console.log('✅ Subject set as self successfully');
       return { success: true, recordId, subjectId: user.uid, blockchainAnchored };
@@ -323,6 +333,15 @@ export class SubjectService {
     await SubjectMembershipService.addSubject(recordId, user.uid);
     console.log('✅ Firestore: Subject added to record');
 
+    // Step 4: Grant access to subject's trustees
+    try {
+      await TrusteePermissionService.grantAccessForNewRecord(user.uid, recordId);
+      console.log('✅ Access granted to subject trustees');
+    } catch (trusteeError) {
+      // Non-fatal — subject request was successfully accepted
+      console.error('⚠️ Failed to grant trustee access for new record:', trusteeError);
+    }
+
     console.log('✅ Subject request accepted successfully');
     return { success: true };
   }
@@ -447,6 +466,15 @@ export class SubjectService {
         pendingCreatorDecision =
           rejectionData.creatorResponse?.status === 'pending_creator_decision';
         console.log('✅ Subject status rejected after acceptance');
+      }
+
+      // Step 3: Remove any trustees that have access through the removed subject
+      try {
+        await TrusteePermissionService.revokeAccessOnSubjectRemoval(user.uid, recordId);
+        console.log('✅ Subject trustees removed from record');
+      } catch (trusteeError) {
+        // Non-fatal — subject removal already succeeded
+        console.error('⚠️ Failed to revoke trustee access on subject removal:', trusteeError);
       }
 
       console.log('✅ Subject status rejection complete');

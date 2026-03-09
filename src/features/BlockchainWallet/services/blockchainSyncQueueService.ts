@@ -25,7 +25,7 @@ interface BaseSyncFailure {
 }
 
 // Context payload varies by operation type
-type SyncContext =
+export type SyncContext =
   | {
       type: 'permission';
       targetUserId: string;
@@ -81,9 +81,11 @@ type SyncContext =
     }
   | { type: 'flagUnacceptedUpdate'; recordId: string; recordHash: string; disputeId: string }
   | { type: 'resolveUnacceptedUpdate'; recordId: string; recordHash: string; disputeId: string }
-  | { type: 'controller-propose'; trustorId: string; trusteeId: string }
-  | { type: 'controller-accept'; trustorId: string; trusteeId: string }
-  | { type: 'controller-revoke'; trustorId: string; trusteeId: string };
+  | { type: 'trustee-propose'; trustorId: string; trusteeId: string }
+  | { type: 'trustee-accept'; trustorId: string; trusteeId: string }
+  | { type: 'trustee-revoke'; trustorId: string; trusteeId: string }
+  | { type: 'trustee-grant'; trustorId: string; trusteeId: string; recordIds: string[] }
+  | { type: 'trustee-level-update'; trustorId: string; trusteeId: string };
 
 export interface BlockchainSyncFailure extends BaseSyncFailure {
   context: SyncContext;

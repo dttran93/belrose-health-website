@@ -42,6 +42,7 @@ import {
 import { getAuth } from 'firebase/auth';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
 import { TrusteeBlockchainService } from './trusteeBlockchainService';
+import { TrusteePermissionService } from './trusteePermissionService';
 
 // ============================================================================
 // TYPES
@@ -91,6 +92,8 @@ export const getTrusteeRelationshipId = (trustorId: string, trusteeId: string): 
   return `${trustorId}_${trusteeId}`;
 };
 
+const trustLevelMap = { observer: 0, custodian: 1, controller: 2 } as const;
+
 // ============================================================================
 // SERVICE
 // ============================================================================
@@ -129,14 +132,12 @@ export class TrusteeRelationshipService {
     const targetProfile = await getUserProfile(trusteeId);
     if (!targetProfile) throw new Error('Target user does not exist or has no profile');
 
-    // Check 2: Controller requires a blockchain wallet for both parties
-    if (trustLevel === 'controller') {
-      if (!currentUserProfile?.onChainIdentity?.linkedWallets.some(w => w.isWalletActive)) {
-        throw new Error('Trustor does not have an existing blockchain account');
-      }
-      if (!targetProfile?.onChainIdentity?.linkedWallets.some(w => w.isWalletActive)) {
-        throw new Error('Trustee does not have an existing blockchain account');
-      }
+    // Check 2: Requires a blockchain wallet for both parties
+    if (!currentUserProfile?.onChainIdentity?.linkedWallets.some(w => w.isWalletActive)) {
+      throw new Error('Trustor does not have an existing blockchain account');
+    }
+    if (!targetProfile?.onChainIdentity?.linkedWallets.some(w => w.isWalletActive)) {
+      throw new Error('Trustee does not have an existing blockchain account');
     }
 
     const db = getFirestore();
@@ -158,16 +159,15 @@ export class TrusteeRelationshipService {
       }
     }
 
-    if (trustLevel === 'controller') {
-      console.log('🔗 Proposing controller on blockchain...');
-      const { success, txHash } = await TrusteeBlockchainService.proposeController(
-        trustorId,
-        trusteeId
-      );
-      if (!success) throw new Error('Blockchain proposal failed — see sync queue for details');
-      inviteTxHash = txHash;
-      console.log('✅ Blockchain: Controller proposed');
-    }
+    console.log('🔗 Proposing controller on blockchain...');
+    const { success, txHash } = await TrusteeBlockchainService.proposeTrustee(
+      trustorId,
+      trusteeId,
+      trustLevelMap[trustLevel]
+    );
+    if (!success) throw new Error('Blockchain proposal failed — see sync queue for details');
+    inviteTxHash = txHash;
+    console.log('✅ Blockchain: Controller proposed');
 
     if (existing.exists()) {
       // Reactivate as new pending invite (mirrors wrappedKey reactivation)
@@ -233,22 +233,22 @@ export class TrusteeRelationshipService {
     if (data.status === 'revoked') throw new Error('Relationship is already revoked');
     if (data.status === 'declined') throw new Error('Cannot revoke a declined relationship');
 
-    let revocationTxHash: string | null = null;
+    // Step 1: Revoke on blockchain
+    console.log('🔗 Revoking trustee on blockchain...');
+    const { success, txHash: revocationTxHash } = await TrusteeBlockchainService.revokeTrustee(
+      trustorId,
+      trusteeId,
+      trustorId
+    );
+    if (!success) throw new Error('Blockchain revocation failed — see sync queue for details');
+    console.log('✅ Blockchain: Trustee revoked');
 
-    //Does NOT require a blockchain check becuase if they were successfully added, they must have had a wallet
-    //If controller, revoke on-chain first
-    if (data.trustLevel === 'controller') {
-      console.log('🔗 Revoking controller on blockchain...');
-      const { success, txHash } = await TrusteeBlockchainService.revokeController(
-        trustorId,
-        trusteeId,
-        trustorId // trustor is the caller
-      );
-      if (!success) throw new Error('Blockchain revocation failed — see sync queue for details');
-      revocationTxHash = txHash;
-      console.log('✅ Blockchain: Controller revoked');
+    // Step 2: Revoke record permissions, if relationship was active
+    if (data.status === 'active') {
+      await TrusteePermissionService.revokeTrusteeAccess(trustorId, trusteeId);
     }
 
+    // Step 3: Update Firestore trustee document
     await updateDoc(relationshipRef, {
       isActive: false,
       status: 'revoked',
@@ -258,7 +258,6 @@ export class TrusteeRelationshipService {
       revocationTxHash,
     });
 
-    // NOTE: Notification to trustee fired by Cloud Function trigger
     console.log(`✅ Trustee revoked: ${trustorId} revoked ${trusteeId}`);
   }
 
@@ -289,50 +288,30 @@ export class TrusteeRelationshipService {
       throw new Error('Trustee already has this trust level');
     }
 
-    // Changes involving a Controller require blockchain transactions
-    const upgradingToController = newTrustLevel === 'controller'; //Revoke and then send new invite
-    const downgradingFromController =
-      data.trustLevel === 'controller' && newTrustLevel !== 'controller'; //revoke but then just update firestore, no second blockchain transaction required
+    const isUpgrade =
+      (data.trustLevel === 'observer' && newTrustLevel !== 'observer') ||
+      (data.trustLevel === 'custodian' && newTrustLevel === 'controller');
 
-    if (upgradingToController) {
-      // Revoke + new invite — trustee must accept on-chain
-      let revocationTxHash: string | null = null;
+    // Step 1: Update trust level on blockchain
+    console.log('🔗 Updating trust level on blockchain...');
+    const { success, txHash } = await TrusteeBlockchainService.updateTrusteeLevel(
+      trustorId,
+      trusteeId,
+      trustLevelMap[newTrustLevel]
+    );
+    if (!success) throw new Error('Blockchain update failed — see sync queue for details');
+    console.log('✅ Blockchain: Trust level updated');
 
-      await updateDoc(relationshipRef, {
-        isActive: false,
-        status: 'revoked',
-        revokedAt: Timestamp.now(),
-        revokedBy: trustorId,
-        statusUpdateReason: 'trust_level_upgrade',
-        revocationTxHash,
-      });
+    // Step 2: Update record permissions to reflect new trust level
+    await TrusteePermissionService.updateTrusteeAccess(trustorId, trusteeId, newTrustLevel);
 
-      await this.inviteTrustee(trusteeId, newTrustLevel);
-    } else if (downgradingFromController) {
-      console.log('🔗 Revoking controller on blockchain...');
-      const { success, txHash } = await TrusteeBlockchainService.revokeController(
-        trustorId,
-        trusteeId,
-        trustorId
-      );
-      if (!success) throw new Error('Blockchain revocation failed — see sync queue for details');
-      console.log('✅ Blockchain: Controller revoked');
+    // Step 3: Update Firestore
+    await updateDoc(relationshipRef, {
+      trustLevel: newTrustLevel,
+      statusUpdateReason: isUpgrade ? 'trust_level_upgrade' : 'trust_level_downgrade',
+    });
 
-      await updateDoc(relationshipRef, {
-        trustLevel: newTrustLevel,
-        revocationTxHash: txHash,
-        statusUpdateReason: 'trust_level_downgrade',
-      });
-
-      console.log(`✅ Trust level downgraded: ${trustorId} → ${trusteeId} (${newTrustLevel})`);
-    } else {
-      // observer <-> custodian — pure Firestore, no blockchain
-      await updateDoc(relationshipRef, {
-        trustLevel: newTrustLevel,
-      });
-
-      console.log(`✅ Trust level updated: ${trustorId} → ${trusteeId} (${newTrustLevel})`);
-    }
+    console.log(`✅ Trust level updated: ${trustorId} → ${trusteeId} (${newTrustLevel})`);
   }
 
   // ============================================================================
@@ -374,25 +353,22 @@ export class TrusteeRelationshipService {
 
     let acceptTxHash: string | null = null;
 
-    if (data.trustLevel === 'controller') {
-      const activeWallets =
-        currentUserProfile?.onChainIdentity?.linkedWallets
-          ?.filter(w => w.isWalletActive)
-          .map(w => w.address) ?? [];
+    const activeWallets =
+      currentUserProfile?.onChainIdentity?.linkedWallets
+        ?.filter(w => w.isWalletActive)
+        .map(w => w.address) ?? [];
 
-      if (activeWallets.length === 0) {
-        throw new Error('You need an active blockchain wallet to accept a controller invite');
-      }
-
-      console.log('🔗 Accepting controller on blockchain...');
-      const { success, txHash } = await TrusteeBlockchainService.acceptController(
-        trustorId,
-        trusteeId
-      );
-      if (!success) throw new Error('Blockchain acceptance failed — see sync queue for details');
-      acceptTxHash = txHash;
-      console.log('✅ Blockchain: Controller accepted');
+    if (activeWallets.length === 0) {
+      throw new Error('You need an active blockchain wallet to accept a trustee invite');
     }
+
+    console.log('🔗 Accepting controller on blockchain...');
+    const { success, txHash } = await TrusteeBlockchainService.acceptTrustee(trustorId, trusteeId);
+    if (!success) throw new Error('Blockchain acceptance failed — see sync queue for details');
+    acceptTxHash = txHash;
+    console.log('✅ Blockchain: Controller accepted');
+
+    await TrusteePermissionService.grantTrusteeAccess(trustorId, trusteeId, data.trustLevel);
 
     // Only reached if blockchain succeeded (or non-controller)
     await updateDoc(relationshipRef, {
@@ -467,21 +443,20 @@ export class TrusteeRelationshipService {
       throw new Error('Can only resign from an active trustee relationship');
     }
 
-    let revocationTxHash: string | null = null;
+    // Step 1: Revoke on blockchain
+    console.log('🔗 Revoking trustee on blockchain...');
+    const { success, txHash: revocationTxHash } = await TrusteeBlockchainService.revokeTrustee(
+      trustorId,
+      trusteeId,
+      trusteeId
+    );
+    if (!success) throw new Error('Blockchain revocation failed — see sync queue for details');
+    console.log('✅ Blockchain: Trustee revoked');
 
-    // If controller, revoke on-chain first — Firestore never touched if this fails
-    if (data.trustLevel === 'controller') {
-      console.log('🔗 Revoking controller on blockchain...');
-      const { success, txHash } = await TrusteeBlockchainService.revokeController(
-        trustorId,
-        trusteeId,
-        trusteeId // trustee is the caller this time
-      );
-      if (!success) throw new Error('Blockchain revocation failed — see sync queue for details');
-      revocationTxHash = txHash;
-      console.log('✅ Blockchain: Controller revoked');
-    }
+    // Step 2: Revoke record permissions
+    await TrusteePermissionService.revokeTrusteeAccess(trustorId, trusteeId);
 
+    // Step 3: Update Firestore
     await updateDoc(relationshipRef, {
       isActive: false,
       status: 'revoked',
@@ -491,7 +466,6 @@ export class TrusteeRelationshipService {
       revocationTxHash,
     });
 
-    // NOTE: Notification to trustor fired by Cloud Function trigger
     console.log(`✅ Trustee resigned: ${trusteeId} resigned from ${trustorId}'s account`);
   }
 

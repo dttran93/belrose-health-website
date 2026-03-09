@@ -75,11 +75,12 @@ export interface UserWallet {
  */
 export interface LinkedWalletRecord {
   address: string;
-  type: 'eoa' | 'smart-account';
+  type: 'eoa' | 'smart-account' | 'controller-trustee';
   txHash: string;
   blockNumber: number;
   linkedAt: any; // Timestamp
   isWalletActive: boolean; // Reflects contract's isWalletActive status
+  trusteeId?: string;
 }
 
 // Authentication context data structure
@@ -195,6 +196,7 @@ export interface FileObject {
   administrators: string[]; //Array of userIDs with administrative access to records, can't remove others
   viewers?: string[]; // Array of user IDs with view access to record
   subjects?: string[]; //The subject of this record. Made it an array for edge cases where there are multiple subjects (couples therapy, mother/newborn, family history, genetic testing)
+  trustees?: string[]; // userIds who have access via an active trustee relationship
 
   // === PROCESSING STATUS ===
   status: FileStatus; //Processing property. Initially set as pending. Then pending/processing... see below

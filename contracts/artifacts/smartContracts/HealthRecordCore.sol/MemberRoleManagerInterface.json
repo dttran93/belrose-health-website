@@ -103,7 +103,7 @@
         },
         {
           "internalType": "bytes32",
-          "name": "controllerIdHash",
+          "name": "trusteeIdHash",
           "type": "bytes32"
         }
       ],
