@@ -55,6 +55,7 @@ export async function getUserProfile(
       affiliations: userData.affiliations || [],
       createdAt: userData.createdAt,
       encryption: userData.encryption,
+      onChainIdentity: userData.onChainIdentity,
     };
 
     // Store in cache

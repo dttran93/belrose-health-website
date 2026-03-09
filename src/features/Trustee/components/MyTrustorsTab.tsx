@@ -6,7 +6,7 @@
 // Pending: accept/decline via UserCard menuType="acceptOrCancel".
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { ShieldCheck, Loader2, HelpCircle, Eye, ShieldAlert, LogOut } from 'lucide-react';
+import { ShieldCheck, Loader2, HelpCircle, LogOut } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
@@ -14,6 +14,10 @@ import { UserCard } from '@/features/Users/components/ui/UserCard';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { BelroseUserProfile } from '@/types/core';
 import { TrustLevel } from '../services/trusteeRelationshipService';
+import { TrustLevelBadge } from './ui/TrusteLevelBadge';
+import { TrusteeToolTip } from './ui/TrusteeToolTip';
+import TrusteeActionDialog from './ui/TrusteeActionDialog';
+import { useTrusteeFlow } from '../hooks/useTrusteeFlow';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,48 +31,24 @@ interface TrusteeRelationshipRow {
   createdAt: any;
 }
 
-// ─── Trust level badge ────────────────────────────────────────────────────────
-
-const trustLevelConfig: Record<
-  TrustLevel,
-  { label: string; icon: React.ReactNode; color: string }
-> = {
-  observer: {
-    label: 'Observer',
-    icon: <Eye className="w-3 h-3" />,
-    color: 'bg-blue-100 text-blue-700 border-blue-200',
-  },
-  custodian: {
-    label: 'Custodian',
-    icon: <ShieldCheck className="w-3 h-3" />,
-    color: 'bg-purple-100 text-purple-700 border-purple-200',
-  },
-  controller: {
-    label: 'Controller',
-    icon: <ShieldAlert className="w-3 h-3" />,
-    color: 'bg-red-100 text-red-700 border-red-200',
-  },
-};
-
-const TrustLevelBadge: React.FC<{ level: TrustLevel }> = ({ level }) => {
-  const config = trustLevelConfig[level];
-  return (
-    <span
-      className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${config.color}`}
-    >
-      {config.icon}
-      {config.label}
-    </span>
-  );
-};
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export const MyTrustorsTab: React.FC = () => {
+interface MyTrustorsTabProps {
+  onRefreshNeeded?: () => void;
+}
+
+export const MyTrustorsTab: React.FC<MyTrustorsTabProps> = ({ onRefreshNeeded }) => {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<TrusteeRelationshipRow[]>([]);
   const [pending, setPending] = useState<TrusteeRelationshipRow[]>([]);
   const [profiles, setProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
+
+  const { dialogProps, initiateAccept, initiateDecline, initiateResign } = useTrusteeFlow({
+    onSuccess: () => {
+      fetchRelationships();
+      onRefreshNeeded?.();
+    },
+  });
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -85,7 +65,6 @@ export const MyTrustorsTab: React.FC = () => {
         where('trusteeId', '==', currentUser.uid),
         where('status', 'in', ['active', 'pending'])
       );
-
       const snap = await getDocs(q);
       const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }) as TrusteeRelationshipRow);
 
@@ -108,21 +87,24 @@ export const MyTrustorsTab: React.FC = () => {
     fetchRelationships();
   }, [fetchRelationships]);
 
-  // ── Handlers (stubs — modals come next) ───────────────────────────────────
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
-  const handleAccept = (row: TrusteeRelationshipRow) => {
-    // TODO: open AcceptTrusteeInviteModal (blockchain tx)
-    console.log('Accept invite from', row.trustorId);
+  const handleAccept = async (row: TrusteeRelationshipRow) => {
+    const profile = profiles.get(row.trustorId);
+    if (!profile) return;
+    await initiateAccept(row.trustorId, profile, row.trustLevel);
   };
 
-  const handleDecline = (row: TrusteeRelationshipRow) => {
-    // TODO: open DeclineTrusteeInviteModal
-    console.log('Decline invite from', row.trustorId);
+  const handleDecline = async (row: TrusteeRelationshipRow) => {
+    const profile = profiles.get(row.trustorId);
+    if (!profile) return;
+    initiateDecline(row.trustorId, profile, row.trustLevel);
   };
 
-  const handleResign = (row: TrusteeRelationshipRow) => {
-    // TODO: open ResignAsTrusteeModal (blockchain tx)
-    console.log('Resign from', row.trustorId);
+  const handleResign = async (row: TrusteeRelationshipRow) => {
+    const profile = profiles.get(row.trustorId);
+    if (!profile) return;
+    await initiateResign(row.trustorId, profile, row.trustLevel);
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -141,30 +123,7 @@ export const MyTrustorsTab: React.FC = () => {
               </span>
             )}
           </div>
-          <Tooltip.Provider>
-            <Tooltip.Root>
-              <Tooltip.Trigger asChild>
-                <button>
-                  <HelpCircle className="w-4 h-4 text-gray-500" />
-                </button>
-              </Tooltip.Trigger>
-              <Tooltip.Portal>
-                <Tooltip.Content
-                  className="bg-gray-900 text-white rounded-lg p-4 max-w-sm shadow-xl z-50"
-                  sideOffset={5}
-                >
-                  <p className="font-semibold mb-2 text-sm">Accounts you manage as a trustee:</p>
-                  <ol className="list-decimal list-inside space-y-1 text-xs">
-                    <li>As Observer you can view their records</li>
-                    <li>As Custodian you can manage records up to your own role level</li>
-                    <li>As Controller you have full access on their behalf</li>
-                    <li>You can resign at any time</li>
-                  </ol>
-                  <Tooltip.Arrow className="fill-gray-900" />
-                </Tooltip.Content>
-              </Tooltip.Portal>
-            </Tooltip.Root>
-          </Tooltip.Provider>
+          <TrusteeToolTip />
         </div>
 
         <div className="p-4 bg-secondary space-y-2 rounded-b-lg">
@@ -228,10 +187,7 @@ export const MyTrustorsTab: React.FC = () => {
                   className="bg-gray-900 text-white rounded-lg p-3 max-w-xs shadow-xl z-50"
                   sideOffset={5}
                 >
-                  <p className="text-xs">
-                    Users who have invited you to be their trustee. Accepting requires a blockchain
-                    transaction to confirm.
-                  </p>
+                  <p className="text-xs">Users who have invited you to be their trustee.</p>
                   <Tooltip.Arrow className="fill-gray-900" />
                 </Tooltip.Content>
               </Tooltip.Portal>
@@ -267,6 +223,8 @@ export const MyTrustorsTab: React.FC = () => {
           )}
         </div>
       </div>
+
+      <TrusteeActionDialog {...dialogProps} />
     </div>
   );
 };

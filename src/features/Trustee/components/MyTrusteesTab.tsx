@@ -5,17 +5,7 @@
 // Actions (edit level, revoke, cancel invite) via UserMenu additionalItems.
 
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Shield,
-  UserPlus,
-  Loader2,
-  HelpCircle,
-  Pencil,
-  UserMinus,
-  Eye,
-  ShieldCheck,
-  ShieldAlert,
-} from 'lucide-react';
+import { Shield, UserPlus, Loader2, HelpCircle, Pencil, UserMinus, Plus } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
@@ -23,6 +13,12 @@ import { UserCard } from '@/features/Users/components/ui/UserCard';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { BelroseUserProfile } from '@/types/core';
 import { TrustLevel } from '../services/trusteeRelationshipService';
+import { TrustLevelBadge } from './ui/TrusteLevelBadge';
+import { TrusteeToolTip } from './ui/TrusteeToolTip';
+import { Button } from '@/components/ui/Button';
+import UserSearch from '@/features/Users/components/UserSearch';
+import TrusteeActionDialog from './ui/TrusteeActionDialog';
+import { useTrusteeFlow } from '../hooks/useTrusteeFlow';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,48 +32,25 @@ interface TrusteeRelationshipRow {
   createdAt: any;
 }
 
-// ─── Trust level badge ────────────────────────────────────────────────────────
-
-const trustLevelConfig: Record<
-  TrustLevel,
-  { label: string; icon: React.ReactNode; color: string }
-> = {
-  observer: {
-    label: 'Observer',
-    icon: <Eye className="w-3 h-3" />,
-    color: 'bg-blue-100 text-blue-700 border-blue-200',
-  },
-  custodian: {
-    label: 'Custodian',
-    icon: <ShieldCheck className="w-3 h-3" />,
-    color: 'bg-purple-100 text-purple-700 border-purple-200',
-  },
-  controller: {
-    label: 'Controller',
-    icon: <ShieldAlert className="w-3 h-3" />,
-    color: 'bg-red-100 text-red-700 border-red-200',
-  },
-};
-
-const TrustLevelBadge: React.FC<{ level: TrustLevel }> = ({ level }) => {
-  const config = trustLevelConfig[level];
-  return (
-    <span
-      className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${config.color}`}
-    >
-      {config.icon}
-      {config.label}
-    </span>
-  );
-};
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export const MyTrusteesTab: React.FC = () => {
+interface MyTrusteesTabProps {
+  onRefreshNeeded?: () => void;
+}
+
+export const MyTrusteesTab: React.FC<MyTrusteesTabProps> = ({ onRefreshNeeded }) => {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<TrusteeRelationshipRow[]>([]);
   const [pending, setPending] = useState<TrusteeRelationshipRow[]>([]);
   const [profiles, setProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
+  const [showUserSearch, setShowUserSearch] = useState(false);
+
+  const { dialogProps, initiateInvite, initiateEditLevel, initiateRevoke } = useTrusteeFlow({
+    onSuccess: () => {
+      fetchRelationships();
+      onRefreshNeeded?.();
+    },
+  });
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -117,33 +90,57 @@ export const MyTrusteesTab: React.FC = () => {
     fetchRelationships();
   }, [fetchRelationships]);
 
-  // ── Handlers (stubs — modals come next) ───────────────────────────────────
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
-  const handleEditLevel = (row: TrusteeRelationshipRow) => {
-    // TODO: open EditTrustLevelModal
-    console.log('Edit level for', row.trusteeId);
+  const handleUserSelected = async (user: BelroseUserProfile) => {
+    setShowUserSearch(false);
+    await initiateInvite(user);
   };
 
-  const handleRevoke = (row: TrusteeRelationshipRow) => {
-    // TODO: open RevokeTrusteeModal
-    console.log('Revoke', row.trusteeId);
+  const handleEditLevel = async (row: TrusteeRelationshipRow) => {
+    const profile = profiles.get(row.trusteeId);
+    if (!profile) return;
+    await initiateEditLevel(row.trusteeId, profile, row.trustLevel);
   };
 
-  const handleCancelInvite = (row: TrusteeRelationshipRow) => {
-    // TODO: open CancelInviteModal
-    console.log('Cancel invite for', row.trusteeId);
+  const handleRevoke = async (row: TrusteeRelationshipRow) => {
+    const profile = profiles.get(row.trusteeId);
+    if (!profile) return;
+    await initiateRevoke(row.trusteeId, profile, row.trustLevel);
   };
 
-  const handleInviteTrustee = () => {
-    // TODO: open InviteTrusteeModal
-    console.log('Invite trustee');
+  const handleCancelInvite = async (row: TrusteeRelationshipRow) => {
+    const profile = profiles.get(row.trusteeId);
+    if (!profile) return;
+    // Cancel invite = revoke on a pending relationship
+    await initiateRevoke(row.trusteeId, profile, row.trustLevel);
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-4">
-      {/* Active Trustees Section */}
+      {/* User Search (shown when inviting) */}
+      {showUserSearch && (
+        <div className="border border-primary/30 rounded-lg p-4 bg-primary/5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-medium text-gray-700">Search for a user to invite</p>
+            <button
+              onClick={() => setShowUserSearch(false)}
+              className="text-xs text-gray-500 hover:text-gray-700"
+            >
+              Cancel
+            </button>
+          </div>
+          <UserSearch
+            onUserSelect={handleUserSelected}
+            placeholder="Search by name, email, or user ID..."
+            autoFocus
+          />
+        </div>
+      )}
+
+      {/* Active Trustees */}
       <div className="border border-accent rounded-lg">
         <div className="px-4 py-3 bg-accent flex items-center justify-between rounded-t-lg">
           <div className="flex items-center gap-2">
@@ -156,34 +153,12 @@ export const MyTrusteesTab: React.FC = () => {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Tooltip.Provider>
-              <Tooltip.Root>
-                <Tooltip.Trigger asChild>
-                  <button className="inline-flex items-center">
-                    <HelpCircle className="w-4 h-4 text-gray-500" />
-                  </button>
-                </Tooltip.Trigger>
-                <Tooltip.Portal>
-                  <Tooltip.Content
-                    className="bg-gray-900 text-white rounded-lg p-4 max-w-sm shadow-xl z-50"
-                    sideOffset={5}
-                  >
-                    <p className="font-semibold mb-2 text-sm">Trustees act on your behalf:</p>
-                    <ol className="list-decimal list-inside space-y-1 text-xs">
-                      <li>Observers can view your records</li>
-                      <li>Custodians can manage your records up to their own role level</li>
-                      <li>Controllers have full access including ownership actions</li>
-                    </ol>
-                    <Tooltip.Arrow className="fill-gray-900" />
-                  </Tooltip.Content>
-                </Tooltip.Portal>
-              </Tooltip.Root>
-            </Tooltip.Provider>
+            <TrusteeToolTip />
             <button
-              onClick={handleInviteTrustee}
+              onClick={() => setShowUserSearch(true)}
               className="rounded-full hover:bg-gray-300 p-1 transition-colors"
             >
-              <UserPlus className="w-5 h-5" />
+              <Plus className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -212,7 +187,7 @@ export const MyTrusteesTab: React.FC = () => {
                       icon: Pencil,
                       onClick: () => handleEditLevel(row),
                     },
-                    { type: 'divider', key: 'divider-trustee' },
+                    { type: 'divider', key: 'div' },
                     {
                       key: 'revoke',
                       label: 'Revoke Trustee',
@@ -225,14 +200,9 @@ export const MyTrusteesTab: React.FC = () => {
               ))}
             </div>
           ) : (
-            <div className="flex justify-between items-center py-2">
+            <div className="flex justify-between items-center">
               <p className="text-gray-500 text-sm">No active trustees</p>
-              <button
-                onClick={handleInviteTrustee}
-                className="text-sm text-primary font-medium hover:underline"
-              >
-                Invite a trustee
-              </button>
+              <Button onClick={() => setShowUserSearch(true)}>Invite a Trustee</Button>
             </div>
           )}
         </div>
@@ -293,7 +263,7 @@ export const MyTrusteesTab: React.FC = () => {
                   className="opacity-75"
                   additionalItems={[
                     {
-                      key: 'cancel-invite',
+                      key: 'cancel',
                       label: 'Cancel Invite',
                       icon: UserMinus,
                       onClick: () => handleCancelInvite(row),
@@ -308,6 +278,8 @@ export const MyTrusteesTab: React.FC = () => {
           )}
         </div>
       </div>
+
+      <TrusteeActionDialog {...dialogProps} />
     </div>
   );
 };

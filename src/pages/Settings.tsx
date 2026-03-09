@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Bell, CircleUserRound, CreditCard, GlobeLock, Link, Settings2 } from 'lucide-react';
+import {
+  Bell,
+  CircleUserRound,
+  CreditCard,
+  GlobeLock,
+  HeartHandshake,
+  Link,
+  Settings2,
+} from 'lucide-react';
 import UserSettings from '@/features/Settings/components/UserSettings';
 import { getAuth } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
@@ -9,6 +17,7 @@ import { useUserSettings } from '@/features/Settings/hooks/useUserSettings';
 import ChangeNameModal from '@/features/Settings/components/ChangeNameModal';
 import ChangeEmailModal from '@/features/Settings/components/ChangeEmailModal';
 import ChangePhotoModal from '@/features/Settings/components/ChangePhotoModal';
+import TrusteePage from '@/features/Trustee/components/TrusteePage';
 
 const SettingsPage = () => {
   const auth = getAuth();
@@ -70,6 +79,7 @@ const SettingsPage = () => {
 
   const settingsSections = [
     { id: 'profile', name: 'Profile', icon: CircleUserRound },
+    { id: 'trustee', name: 'Trustees', icon: HeartHandshake },
     { id: 'wallet', name: 'Distributed Network Account', icon: Link },
     { id: 'preferences', name: 'Preferences', icon: Settings2 },
     { id: 'privacy', name: 'Privacy & Security', icon: GlobeLock },
@@ -107,6 +117,9 @@ const SettingsPage = () => {
             }}
           />
         );
+
+      case 'trustee':
+        return <TrusteePage />;
 
       case 'wallet':
         return (
