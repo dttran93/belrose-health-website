@@ -25,6 +25,16 @@
  *    by a separate TrusteePermissionService
  *  - Notifications are fired via Cloud Function triggers on status changes,
  *    not called directly here (same pattern as subjectConsentRequest triggers)
+ *
+ * Permission fan-out lifecycle:
+ *  - inviteTrustee      → TrusteePermissionService.grantPendingTrusteeAccess
+ *                         (trustor is online; creates inactive wrappedKeys + role arrays)
+ *  - acceptInvite       → TrusteePermissionService.activateTrusteeAccess
+ *                         (flips wrappedKeys to isActive: true)
+ *  - declineInvite      → TrusteePermissionService.rollbackPendingTrusteeAccess
+ *                         (removes from role arrays, deletes inactive wrappedKeys)
+ *  - revokeTrustee      → TrusteePermissionService.revokeTrusteeAccess
+ *  - resignAsTrustee    → TrusteePermissionService.revokeTrusteeAccess
  */
 
 import {
@@ -104,13 +114,16 @@ export class TrusteeRelationshipService {
   // ============================================================================
 
   /**
-   * Invite a user to become a trustee. Only called by the trustor. We don't want a
-   * situation where a trustor is just hitting accept mindlessly on a notification
-   * and then gives access to a trustee. We want active initiation by the trustor
+   * Invite a user to become a trustee. Only called by the trustor.
    *
    * If a relationship document already exists (previous revocation or decline),
    * reactivates it as a new pending invite rather than creating a duplicate.
-   * This mirrors how sharingService handles wrappedKey reactivation.
+   *
+   * Permission fan-out happens at invite time (not accept time) because the
+   * trustor is guaranteed online and has the session key needed for encryption.
+   * wrappedKeys are created with isActive: false — trustee can't decrypt until
+   * they accept. If the permission fan-out fails, the relationship doc is rolled
+   * back so the invite isn't left in a broken state.
    *
    * @param trusteeId - The userId of the person being invited
    * @param trustLevel - The level of trust being granted
@@ -146,8 +159,6 @@ export class TrusteeRelationshipService {
     const existing = await getDoc(relationshipRef);
     const now = Timestamp.now();
 
-    let inviteTxHash: string | null = null;
-
     // Check existing doc FIRST before touching blockchain
     if (existing.exists()) {
       const existingData = existing.data() as TrusteeRelationship;
@@ -159,18 +170,23 @@ export class TrusteeRelationshipService {
       }
     }
 
-    console.log('🔗 Proposing controller on blockchain...');
-    const { success, txHash } = await TrusteeBlockchainService.proposeTrustee(
+    // Step 1: Blockchain proposal
+    console.log('🔗 Proposing trustee on blockchain...');
+    const { success, txHash: inviteTxHash } = await TrusteeBlockchainService.proposeTrustee(
       trustorId,
       trusteeId,
       trustLevelMap[trustLevel]
     );
     if (!success) throw new Error('Blockchain proposal failed — see sync queue for details');
-    inviteTxHash = txHash;
-    console.log('✅ Blockchain: Controller proposed');
+    console.log('✅ Blockchain: Trustee proposed');
 
+    // Step 2: Fan out pending permissions — trustor is online so session key is available
+    // Do this BEFORE writing the relationship doc so no rollback is needed if it fails
+    await TrusteePermissionService.grantPendingTrusteeAccess(trusteeId, trustLevel);
+    console.log('✅ Pending permissions granted');
+
+    // Step 2: Write relationship doc
     if (existing.exists()) {
-      // Reactivate as new pending invite (mirrors wrappedKey reactivation)
       console.log('🔄 Reactivating existing trustee relationship as new invite');
       await updateDoc(relationshipRef, {
         trustLevel,
@@ -243,12 +259,16 @@ export class TrusteeRelationshipService {
     if (!success) throw new Error('Blockchain revocation failed — see sync queue for details');
     console.log('✅ Blockchain: Trustee revoked');
 
-    // Step 2: Revoke record permissions, if relationship was active
+    // Step 2: Revoke record permissions
+    // For active relationships: deactivates wrappedKeys + removes from role arrays
+    // For pending relationships: deletes inactive wrappedKeys + removes from role arrays
     if (data.status === 'active') {
       await TrusteePermissionService.revokeTrusteeAccess(trustorId, trusteeId);
+    } else if (data.status === 'pending') {
+      await TrusteePermissionService.rollbackPendingTrusteeAccess(trustorId);
     }
 
-    // Step 3: Update Firestore trustee document
+    // Step 3: Update Firestore relationship doc
     await updateDoc(relationshipRef, {
       isActive: false,
       status: 'revoked',
@@ -261,6 +281,13 @@ export class TrusteeRelationshipService {
     console.log(`✅ Trustee revoked: ${trustorId} revoked ${trusteeId}`);
   }
 
+  /**
+   * Edit the trust level of an active trustee relationship.
+   * Only the trustor can call this.
+   *
+   * @param trusteeId - The userId of the trustee
+   * @param newTrustLevel - The new trust level to set
+   */
   static async editTrusteeRelationship(
     trusteeId: string,
     newTrustLevel: TrustLevel
@@ -322,6 +349,9 @@ export class TrusteeRelationshipService {
    * Accept a pending trustee invite.
    * Only the trustee (the invited user) can call this.
    *
+   * Activates all wrappedKeys that were created at invite time (isActive: false → true).
+   * The trustee already has role array access — this just unlocks decryption.
+   *
    * @param trustorId - The userId of the trustor who sent the invite
    */
   static async acceptInvite(trustorId: string): Promise<void> {
@@ -345,13 +375,9 @@ export class TrusteeRelationshipService {
       throw new Error(`Cannot accept an invite with status: ${data.status}`);
     }
 
-    // Verify this user is actually the trustee on the document
-    // (Firestore rules enforce this too, but good to check in service)
     if (data.trusteeId !== trusteeId) {
       throw new Error('You are not the intended recipient of this invite');
     }
-
-    let acceptTxHash: string | null = null;
 
     const activeWallets =
       currentUserProfile?.onChainIdentity?.linkedWallets
@@ -362,15 +388,21 @@ export class TrusteeRelationshipService {
       throw new Error('You need an active blockchain wallet to accept a trustee invite');
     }
 
-    console.log('🔗 Accepting controller on blockchain...');
-    const { success, txHash } = await TrusteeBlockchainService.acceptTrustee(trustorId, trusteeId);
+    // Step 1: Accept on blockchain
+    console.log('🔗 Accepting trustee on blockchain...');
+    const { success, txHash: acceptTxHash } = await TrusteeBlockchainService.acceptTrustee(
+      trustorId,
+      trusteeId
+    );
     if (!success) throw new Error('Blockchain acceptance failed — see sync queue for details');
-    acceptTxHash = txHash;
-    console.log('✅ Blockchain: Controller accepted');
+    console.log('✅ Blockchain: Trustee accepted');
 
-    await TrusteePermissionService.grantTrusteeAccess(trustorId, trusteeId, data.trustLevel);
+    // Step 2: Activate all wrappedKeys created at invite time
+    // This is the only thing the trustee needs to do — role arrays were already
+    // updated by the trustor at invite time
+    await TrusteePermissionService.activateTrusteeAccess(trustorId);
 
-    // Only reached if blockchain succeeded (or non-controller)
+    // Step 3: Flip relationship to active
     await updateDoc(relationshipRef, {
       isActive: true,
       status: 'active',
@@ -384,6 +416,9 @@ export class TrusteeRelationshipService {
   /**
    * Decline a pending trustee invite.
    * Only the trustee (the invited user) can call this.
+   *
+   * Rolls back all permissions granted at invite time:
+   * removes from role arrays and deletes inactive wrappedKeys.
    *
    * @param trustorId - The userId of the trustor who sent the invite
    */
@@ -407,6 +442,10 @@ export class TrusteeRelationshipService {
       throw new Error(`Cannot decline an invite with status: ${data.status}`);
     }
 
+    // Step 1: Roll back all pending permissions granted at invite time
+    await TrusteePermissionService.rollbackPendingTrusteeAccess(trustorId);
+
+    // Step 2: Update relationship doc
     await updateDoc(relationshipRef, {
       isActive: false,
       status: 'declined',
@@ -419,7 +458,7 @@ export class TrusteeRelationshipService {
 
   /**
    * Resign from an active trustee relationship.
-   * Only the trustee can call this. This is the "trustee ends the relationship" path.
+   * Only the trustee can call this.
    *
    * @param trustorId - The userId of the trustor
    */
@@ -444,14 +483,14 @@ export class TrusteeRelationshipService {
     }
 
     // Step 1: Revoke on blockchain
-    console.log('🔗 Revoking trustee on blockchain...');
+    console.log('🔗 Resigning as trustee on blockchain...');
     const { success, txHash: revocationTxHash } = await TrusteeBlockchainService.revokeTrustee(
       trustorId,
       trusteeId,
       trusteeId
     );
     if (!success) throw new Error('Blockchain revocation failed — see sync queue for details');
-    console.log('✅ Blockchain: Trustee revoked');
+    console.log('✅ Blockchain: Trustee resigned');
 
     // Step 2: Revoke record permissions
     await TrusteePermissionService.revokeTrusteeAccess(trustorId, trusteeId);
@@ -519,8 +558,7 @@ export class TrusteeRelationshipService {
   }
 
   /**
-   * Get all pending invites for the current user (invites they need to respond to).
-   * Used to show the "Pending Trustee Invites" notification/inbox item.
+   * Get all pending invites for the current user.
    */
   static async getPendingInvitesForTrustee(): Promise<TrusteeRelationship[]> {
     const auth = getAuth();

@@ -37,11 +37,13 @@ export class SharingService {
    * @param recordID - The record ID
    * @param userID - The user getting the access
    * @param grantorID - the user granting the access
+   * @param options - isActive flag for when trustor gives out wrappedKeys to trustee in inactive mode at first
    */
   static async grantEncryptionAccess(
     recordId: string,
     userId: string,
-    grantorId: string
+    grantorId: string,
+    options?: { isActive?: boolean }
   ): Promise<void> {
     const auth = getAuth();
     const db = getFirestore();
@@ -57,6 +59,8 @@ export class SharingService {
     }
 
     console.log('🔐 Granting encryption access for record:', recordId, 'to user:', userId);
+
+    const isActive = options?.isActive ?? true;
 
     // Step 1. Check for existing active wrapped key
     const wrappedKeyId = `${recordId}_${userId}`;
@@ -101,7 +105,7 @@ export class SharingService {
     if (isReactivation) {
       await updateDoc(wrappedKeyRef, {
         wrappedKey: wrappedKeyForReceiver,
-        isActive: true,
+        isActive,
         reactivatedAt: new Date(),
         reactivatedBy: grantorId,
       });
@@ -112,7 +116,7 @@ export class SharingService {
         userId,
         wrappedKey: wrappedKeyForReceiver,
         createdAt: new Date(),
-        isActive: true,
+        isActive,
         isCreator: false,
         grantedBy: grantorId,
       });

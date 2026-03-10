@@ -45,7 +45,7 @@ export const PAYMASTER = {
 
 export const MEMBER_ROLE_MANAGER = {
   proxy: '0xC31477f563dC8f7529Ba6AE7E410ABdB84C27d7C',
-  implementation: '0x63C67c007350FF8eF564b7e63De4b44B01b7eD52',
+  implementation: '0xdE43f36806229CE17A5351E369D0b3acDc694a18',
   deploymentBlock: 10190794,
 } as const;
 
@@ -56,7 +56,7 @@ export const MEMBER_ROLE_MANAGER = {
 
 export const HEALTH_RECORD_CORE = {
   proxy: '0x97F9eD2af3f9a30Eac958D0994a0F131Eda11A57',
-  implementation: '0x0B62d6474043eEFf83f9096701f0bdDECC95632F',
+  implementation: '0x6D3bb289FdAC00d758311619EC034C7405666f63',
   deploymentBlock: 10190796,
 } as const;
 

@@ -9,6 +9,7 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import PermissionActionDialog from './ui/PermissionActionDialog';
 import { PermissionUserCard } from './ui/PermissionUserCard';
+import { TrusteeByIdMap, TrustorByIdMap } from '@/features/Trustee/hooks/useRecordTrustees';
 
 interface OwnerManagementProps {
   record: FileObject;
@@ -17,6 +18,8 @@ interface OwnerManagementProps {
   onBack?: () => void;
   onAddMode?: () => void;
   isAddMode?: boolean;
+  trusteeMap: TrusteeByIdMap;
+  trustorMap: TrustorByIdMap;
 }
 
 export const OwnerManagement: React.FC<OwnerManagementProps> = ({
@@ -26,6 +29,8 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
   onBack,
   onAddMode,
   isAddMode,
+  trusteeMap,
+  trustorMap,
 }) => {
   const [selectedUser, setSelectedUser] = useState<BelroseUserProfile | null>(null);
   const [loadingOwners, setLoadingOwners] = useState(true);
@@ -193,6 +198,8 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
                     record={record}
                     onDelete={() => handleDeleteOwner(ownerId)}
                     color="red"
+                    trusteeEntry={trusteeMap.get(ownerId)}
+                    trusteeList={trustorMap.get(ownerId) ?? []}
                   />
                 );
               })}

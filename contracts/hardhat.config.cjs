@@ -15,14 +15,6 @@ module.exports = {
           evmVersion: 'cancun',
         },
       },
-      {
-        version: '0.8.23',
-        settings: {
-          optimizer: { enabled: true, runs: 200 },
-          viaIR: true,
-          evmVersion: 'cancun',
-        },
-      },
     ],
   },
   paths: {
@@ -59,11 +51,7 @@ module.exports = {
     },
   },
   etherscan: {
-    apiKey: {
-      sepolia: process.env.ETHERSCAN_API_KEY,
-      base: process.env.BASESCAN_API_KEY,
-      baseSepolia: process.env.BASESCAN_API_KEY,
-    },
+    apiKey: process.env.ETHERSCAN_API_KEY,
     customChains: [
       {
         network: 'baseSepolia',

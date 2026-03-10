@@ -1,4 +1,4 @@
-// src/features/Permissions/components/AdminManagement.tsx
+// src/features/Permissions/components/AdministratorManagement.tsx
 
 import React, { useState, useEffect } from 'react';
 import { Users, ArrowLeft, HelpCircle, Plus } from 'lucide-react';
@@ -11,6 +11,7 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import PermissionActionDialog from './ui/PermissionActionDialog';
 import { PermissionUserCard } from './ui/PermissionUserCard';
+import { TrusteeByIdMap, TrustorByIdMap } from '@/features/Trustee/hooks/useRecordTrustees';
 
 interface AdminManagementProps {
   record: FileObject;
@@ -19,6 +20,8 @@ interface AdminManagementProps {
   onBack?: () => void;
   onAddMode?: () => void;
   isAddMode?: boolean;
+  trusteeMap: TrusteeByIdMap;
+  trustorMap: TrustorByIdMap;
 }
 
 export const AdminManagement: React.FC<AdminManagementProps> = ({
@@ -28,6 +31,8 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
   onBack,
   onAddMode,
   isAddMode,
+  trusteeMap,
+  trustorMap,
 }) => {
   const [selectedUser, setSelectedUser] = useState<BelroseUserProfile | null>(null);
   const [loadingAdmins, setLoadingAdmins] = useState(true);
@@ -199,6 +204,8 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
                     record={record}
                     color="blue"
                     onDelete={() => handleDeleteAdmin(admin)}
+                    trusteeEntry={trusteeMap.get(admin)}
+                    trusteeList={trustorMap.get(admin) ?? []}
                   />
                 );
               })}

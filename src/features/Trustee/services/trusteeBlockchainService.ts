@@ -3,6 +3,7 @@
 import { ethers } from 'ethers';
 import {
   BlockchainRoleManagerService,
+  RoleType,
   TrusteeLevel,
 } from '@/features/Permissions/services/blockchainRoleManagerService';
 import {
@@ -10,6 +11,7 @@ import {
   SyncContext,
 } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
+import { getUserProfile } from '@/features/Users/services/userProfileService';
 
 interface TrusteeResult {
   success: boolean;
@@ -143,22 +145,25 @@ export class TrusteeBlockchainService {
   static async grantRoleAsTrusteeBatch(
     trustorId: string,
     trusteeId: string,
-    recordIds: string[]
+    recordIds: string[],
+    roles: string[]
   ): Promise<TrusteeResult> {
-    const walletAddress = await this.requireUserWalletAddress(trusteeId);
+    let trusteeWallet: string | undefined;
 
     try {
-      console.log('⛓️ Granting trustee batch roles on blockchain...', {
-        trustorId,
-        trusteeId,
-        recordCount: recordIds.length,
-      });
-      const trustorIdHash = ethers.id(trustorId);
-      const result = await BlockchainRoleManagerService.grantRoleAsTrusteeBatch(
+      // Need trustee's wallet address for grantRoleBatch
+      const trusteeProfile = await getUserProfile(trusteeId);
+      trusteeWallet = trusteeProfile?.onChainIdentity?.linkedWallets.find(
+        w => w.isWalletActive
+      )?.address;
+
+      if (!trusteeWallet) throw new Error('Trustee has no active wallet');
+
+      const result = await BlockchainRoleManagerService.grantRoleBatch(
         recordIds,
-        trustorIdHash
+        trusteeWallet,
+        roles as RoleType[]
       );
-      console.log('✅ Trustee batch roles granted on blockchain');
       return { success: true, txHash: result.txHash };
     } catch (error) {
       await this.logTrusteeFailure({
@@ -166,7 +171,7 @@ export class TrusteeBlockchainService {
         trustorId,
         trusteeId,
         callerId: trusteeId,
-        walletAddress,
+        walletAddress: trusteeWallet ?? '',
         error,
       });
       return { success: false, txHash: null };
