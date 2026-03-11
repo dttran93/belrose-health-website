@@ -118,7 +118,7 @@ export const steps: HowItWorksStep[] = [
       },
       {
         heading: 'Bring Your Own Storage',
-        body: "Don't Trust Belrose? You can store your data literally anywhere you want. You would lose access to our sharing, editing, and versioning capabilities, but can still benefit from our transformation and verification layers.",
+        body: "Don't trust Belrose? You can store your data literally anywhere you want. You would lose access to our sharing, editing, and versioning capabilities, but can still benefit from our transformation and verification layers.",
       },
     ],
     keyPoints: [

@@ -38,7 +38,7 @@ export interface BelroseUserProfile extends User {
   credibility?: CredibilityScore;
 
   onChainIdentity?: {
-    userIdHash: string; // The keccak256 hash of the UID
+    userIdHash: string; // The keccak256 hash of the UID. Intentionally not a search path for users. Want to maintain privacy separation between on-chain/off-chain identities.
     status: 'Inactive' | 'Active' | 'Verified';
     statusUpdatedAt?: any;
     statusTxHash?: string;
@@ -49,6 +49,8 @@ export interface BelroseUserProfile extends User {
 
   //Other Info
   affiliations?: [string] | [];
+  searchDiscoverable?: boolean; // defaults to absent. Privacy setting. Controls whether this user appears in email/name searches. Exact UID/email lookups work because that requires the searcher to know the person
+  displayNameLower?: string; //For name search purposes
 }
 
 // ==================== WALLET TYPES ====================

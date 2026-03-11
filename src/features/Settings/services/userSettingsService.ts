@@ -47,6 +47,7 @@ export class UserSettingsService {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         displayName,
+        displayNameLower: displayName.toLowerCase(),
         updatedAt: serverTimestamp(),
       });
 

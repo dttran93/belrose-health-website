@@ -34,6 +34,7 @@ export class UserService {
       email: user.email || '',
       emailVerified: user.emailVerified,
       displayName: user.displayName || '',
+      displayNameLower: (user.displayName || '').toLowerCase(),
       firstName: firstName || '',
       lastName: lastName || '',
       createdAt: serverTimestamp(),

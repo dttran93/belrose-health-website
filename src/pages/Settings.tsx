@@ -18,6 +18,7 @@ import ChangeNameModal from '@/features/Settings/components/ChangeNameModal';
 import ChangeEmailModal from '@/features/Settings/components/ChangeEmailModal';
 import ChangePhotoModal from '@/features/Settings/components/ChangePhotoModal';
 import TrusteePage from '@/features/Trustee/components/TrusteePage';
+import SearchDiscoverabilityToggle from '@/features/Settings/components/SearchDiscoveryabilityToggle';
 
 const SettingsPage = () => {
   const auth = getAuth();
@@ -192,43 +193,18 @@ const SettingsPage = () => {
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Privacy & Security</h2>
               <div className="bg-white rounded-lg border p-6 space-y-6">
                 <div>
-                  <h3 className="font-medium text-gray-900 mb-3">Data Sharing</h3>
+                  <h3 className="font-medium text-gray-900 mb-3">Discoverability</h3>
                   <div className="space-y-3">
                     <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      <SearchDiscoverabilityToggle
+                        currentValue={userProfile?.searchDiscoverable ?? false}
+                        onUpdate={val =>
+                          setUserProfile(prev =>
+                            prev ? { ...prev, searchDiscoverable: val } : prev
+                          )
+                        }
                       />
-                      <span className="ml-2 text-sm text-gray-700">Allow anonymous analytics</span>
                     </label>
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        defaultChecked
-                      />
-                      <span className="ml-2 text-sm text-gray-700">
-                        Share verification status with providers
-                      </span>
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-3">Account Security</h3>
-                  <div className="space-y-3">
-                    <button className="w-full text-left px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">Change Password</span>
-                        <span className="text-gray-400">→</span>
-                      </div>
-                    </button>
-                    <button className="w-full text-left px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">Two-Factor Authentication</span>
-                        <span className="text-gray-400">→</span>
-                      </div>
-                    </button>
                   </div>
                 </div>
               </div>
