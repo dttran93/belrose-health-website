@@ -62,6 +62,7 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
     administrators: data.administrators,
     viewers: data.viewers || [],
     subjects: data.subjects || [],
+    trustees: data.trustees || [],
 
     //Blockchain Verification
     blockchainRoleInitialization: data.blockchainRoleInitialization,

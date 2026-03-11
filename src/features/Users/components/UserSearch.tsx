@@ -192,7 +192,7 @@ export const UserSearch: React.FC<UserSearchProps> = ({
             <UserCard
               key={user.uid}
               user={user}
-              onView={() => {}}
+              onViewUser={() => {}}
               onDelete={() => {}}
               onCardClick={() => {}}
               variant="default"

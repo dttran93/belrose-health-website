@@ -44,7 +44,7 @@ const OpenRoles: React.FC = () => {
             <p className="text-gray-400 text-[14px]">
               But we'd still love to hear from you —{' '}
               <a
-                href="mailto:dennis@belrosehealth.com"
+                href="mailto:hello@belrosehealth.com"
                 className="text-blue-600 font-medium hover:underline"
               >
                 reach out directly

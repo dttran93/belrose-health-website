@@ -111,7 +111,7 @@ export const PermissionUserCard: React.FC<PermissionUserCardProps> = ({
           <Tooltip.Provider>
             <Tooltip.Root>
               <Tooltip.Trigger asChild>
-                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border bg-teal-50 text-teal-700 border-teal-300 cursor-help">
+                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border bg-complement-3/50 text-primary border-complement-3">
                   <ShieldCheck className="w-3 h-3" />
                   Trustee
                 </span>
@@ -138,10 +138,10 @@ export const PermissionUserCard: React.FC<PermissionUserCardProps> = ({
               e.stopPropagation();
               setExpanded(prev => !prev);
             }}
-            className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100 transition-colors"
+            className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border bg-complement-3/50 text-primary border-complement-3 hover:bg-complement-3/30 transition-colors"
           >
             <ShieldCheck className="w-3 h-3" />
-            {trusteeList.length} {trusteeList.length === 1 ? 'trustee' : 'trustees'}
+            {trusteeList.length} {trusteeList.length === 1 ? 'Trustee' : 'Trustees'}
             {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </button>
         )}
@@ -152,9 +152,7 @@ export const PermissionUserCard: React.FC<PermissionUserCardProps> = ({
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div
-      className={`rounded-lg overflow-hidden ${isTrustee ? 'border border-teal-200 bg-teal-50/30' : ''}`}
-    >
+    <div className={`rounded-lg ${isTrustee ? 'bg-complement-3/30' : ''}`}>
       <UserCard
         user={userProfile}
         userId={userId}
@@ -169,9 +167,9 @@ export const PermissionUserCard: React.FC<PermissionUserCardProps> = ({
 
       {/* Expand panel — trustees of this trustor */}
       {hasTrustees && expanded && (
-        <div className="bg-blue-50/50 border-t border-blue-100 px-3 py-2 space-y-2">
-          <p className="text-xs text-blue-600 font-semibold mb-1">
-            Trustees with access via this user:
+        <div className="bg-supplement-3 px-3 py-2 space-y-2">
+          <p className="text-xs font-semibold mb-1">
+            Trustees with access via {userProfile?.firstName}:
           </p>
           {trusteeList.map(entry => (
             <TrusteeMiniCard key={entry.trusteeId} entry={entry} />

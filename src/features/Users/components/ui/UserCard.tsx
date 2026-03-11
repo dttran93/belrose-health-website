@@ -6,6 +6,7 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import UserMenu, { MenuItem } from './UserMenu';
 import { BelroseUserProfile } from '@/types/core';
 import { copyToClipboard } from '@/utils/browserUtils';
+import Avatar from '../Avatar';
 
 export type UserCardVariant = 'compact' | 'default';
 export type UserCardColor = 'primary' | 'green' | 'red' | 'blue' | 'purple' | 'yellow';
@@ -175,11 +176,12 @@ export const UserCard: React.FC<UserCardProps> = ({
     >
       <div className="flex items-center flex-1 min-w-0">
         {variant === 'default' && (
-          <div
-            className={`w-10 h-10 ${colors.iconBg} rounded-full flex items-center justify-center mr-3 flex-shrink-0`}
-          >
-            <User className={`w-5 h-5 ${colors.icon}`} />
-          </div>
+          <Avatar
+            profile={user ?? null}
+            size="md"
+            className="mr-3"
+            bgClassName={`${colors.iconBg} ${colors.icon}`}
+          />
         )}
         <div className="flex-1 min-w-0 mr-3">
           <div className="flex items-center gap-2">

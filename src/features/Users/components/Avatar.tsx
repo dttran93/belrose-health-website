@@ -34,6 +34,7 @@ interface AvatarProps {
   profile: BelroseUserProfile | null;
   size?: AvatarSize;
   className?: string;
+  bgClassName?: string;
 }
 
 // ============================================================================
@@ -71,7 +72,12 @@ function getInitials(profile: BelroseUserProfile): string | null {
 // COMPONENT
 // ============================================================================
 
-export const Avatar: React.FC<AvatarProps> = ({ profile, size = 'sm', className = '' }) => {
+export const Avatar: React.FC<AvatarProps> = ({
+  profile,
+  size = 'sm',
+  className = '',
+  bgClassName = 'bg-primary text-primary-foreground',
+}) => {
   const { container, text, icon } = SIZE_CONFIG[size];
   const base = `${container} rounded-full flex items-center justify-center flex-shrink-0 ${className}`;
 
@@ -89,11 +95,7 @@ export const Avatar: React.FC<AvatarProps> = ({ profile, size = 'sm', className 
   // 2. Initials
   const initials = profile ? getInitials(profile) : null;
   if (initials) {
-    return (
-      <div className={`${base} bg-primary text-primary-foreground font-semibold ${text}`}>
-        {initials}
-      </div>
-    );
+    return <div className={`${base} ${bgClassName} font-semibold ${text}`}>{initials}</div>;
   }
 
   // 3. Generic icon fallback

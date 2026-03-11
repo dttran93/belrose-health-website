@@ -1,6 +1,6 @@
 // src/components/site/Company/Contact.tsx
 
-import { Mail } from 'lucide-react';
+import { Mail, MapPin, MessageCircleQuestion, SearchCheck } from 'lucide-react';
 import React from 'react';
 
 const contactInfo = [
@@ -8,21 +8,25 @@ const contactInfo = [
     label: 'General Inquiries',
     value: 'hello@belrosehealth.com',
     href: 'mailto:hello@belrosehealth.com',
+    icon: Mail,
   },
   {
     label: 'Support Inquiries',
     value: 'support@belrosehealth.com',
     href: 'mailto:support@belrosehealth.com',
+    icon: MessageCircleQuestion,
   },
   {
     label: 'Privacy Inquiries',
     value: 'privacy@belrosehealth.com',
     href: 'mailto:privacy@belrosehealth.com',
+    icon: SearchCheck,
   },
   {
     label: 'Location',
     value: 'London, United Kingdom',
     href: null,
+    icon: MapPin,
   },
 ];
 
@@ -57,7 +61,7 @@ const Contact: React.FC = () => {
                   className="w-10 h-10 rounded-xl bg-white border border-gray-200
                     flex items-center justify-center flex-shrink-0"
                 >
-                  <Mail size={14} className="text-gray-400" />
+                  <item.icon size={14} className="text-gray-400" />
                 </div>
                 <div>
                   <p

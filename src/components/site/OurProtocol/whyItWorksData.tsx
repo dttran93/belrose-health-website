@@ -56,7 +56,7 @@ export const whySections: WhySection[] = [
     icon: HeartHandshake,
     label: 'A Healthier, More Equitable World',
     heading: 'Your wellbeing is our product.',
-    body: `Health outcomes today are largely predicted by postcode, income, and ethnicity. Belrose puts the same data infrastructure that pharmaceutical companies and insurers use into the hands of every patient regardless of background. With Belrose, your wellbeing — not your data — becomes the product.`,
+    body: `Health outcomes today are largely predicted by postcode, income, and ethnicity. Belrose puts the same data infrastructure that pharmaceutical companies and insurers use into the hands of every patient regardless of background. With Belrose, your wellbeing — not your data — is the product.`,
     stat: '∞',
     statLabel: 'The value of your health, controlled by you',
   },

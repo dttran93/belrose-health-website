@@ -53,6 +53,7 @@ import { getAuth } from 'firebase/auth';
 interface TrusteeRecordAccess {
   recordId: string;
   role: Role;
+  hadPriorAccess?: boolean; // true if trustee already had independent access before this relationship
 }
 
 export class TrusteePermissionService {
@@ -63,36 +64,68 @@ export class TrusteePermissionService {
   /**
    * Query all records where the trustor is an active subject.
    * Runs on the trustor's client — they have read access to their own records.
+   *
+   * Optionally pass trusteeId to also return the trustee's current role on each record.
+   * Used by grantPendingTrusteeAccess to skip/upgrade appropriately.
    */
   private static async getRecordsForTrustor(
-    trustorId: string
-  ): Promise<{ recordId: string; trustorRole: Role | null }[]> {
+    trustorId: string,
+    trusteeId?: string
+  ): Promise<{ recordId: string; trustorRole: Role | null; currentTrusteeRole?: Role | null }[]> {
     const db = getFirestore();
     const q = query(collection(db, 'records'), where('subjects', 'array-contains', trustorId));
     const snapshot = await getDocs(q);
 
     return snapshot.docs.map(d => {
       const data = d.data();
+
       let trustorRole: Role | null = null;
       if (data.owners?.includes(trustorId)) trustorRole = 'owner';
       else if (data.administrators?.includes(trustorId)) trustorRole = 'administrator';
       else if (data.viewers?.includes(trustorId)) trustorRole = 'viewer';
-      return { recordId: d.id, trustorRole };
+
+      if (!trusteeId) return { recordId: d.id, trustorRole };
+
+      let currentTrusteeRole: Role | null = null;
+      if (data.owners?.includes(trusteeId)) currentTrusteeRole = 'owner';
+      else if (data.administrators?.includes(trusteeId)) currentTrusteeRole = 'administrator';
+      else if (data.viewers?.includes(trusteeId)) currentTrusteeRole = 'viewer';
+
+      return { recordId: d.id, trustorRole, currentTrusteeRole };
     });
   }
 
   /**
    * Resolve what role the trustee should get based on trust level + trustor's role.
    * Mirrors _resolveTrusteeRole in MemberRoleManager.sol.
+   *
+   * Optionally pass currentTrusteeRole to skip the grant if the trustee already has
+   * an equal or higher role — prevents redundant grants and unintended downgrades
+   * at invite time. Don't pass this for updateTrusteeAccess (downgrades are valid there).
    */
-  private static resolveTrusteeRole(trustLevel: TrustLevel, trustorRole: Role | null): Role | null {
-    if (trustLevel === 'observer') return 'viewer';
-    if (!trustorRole) return null;
-    if (trustLevel === 'custodian') {
-      return trustorRole === 'owner' ? 'administrator' : trustorRole;
+  private static resolveTrusteeRole(
+    trustLevel: TrustLevel,
+    trustorRole: Role | null,
+    currentTrusteeRole?: Role | null
+  ): Role | null {
+    const resolved = (() => {
+      if (trustLevel === 'observer') return 'viewer';
+      if (!trustorRole) return null;
+      if (trustLevel === 'custodian')
+        return trustorRole === 'owner' ? 'administrator' : trustorRole;
+      return trustorRole; // controller — full mirror
+    })();
+
+    // If trustee already has an equal or higher role, no change needed
+    if (currentTrusteeRole !== undefined && resolved !== null && currentTrusteeRole !== null) {
+      const rank: Record<Role, number> = { viewer: 1, administrator: 2, owner: 3 };
+      if (rank[currentTrusteeRole] >= rank[resolved]) {
+        console.log(`ℹ️ Trustee already has equal/higher role (${currentTrusteeRole}) — skipping`);
+        return null;
+      }
     }
-    // controller — full mirror
-    return trustorRole;
+
+    return resolved;
   }
 
   /**
@@ -139,20 +172,24 @@ export class TrusteePermissionService {
 
     console.log('🔄 Fanning out pending trustee access...', { trustorId, trusteeId, trustLevel });
 
-    const records = await this.getRecordsForTrustor(trustorId);
+    // Pass trusteeId so we can check their current role on each record
+    const records = await this.getRecordsForTrustor(trustorId, trusteeId);
 
     if (records.length === 0) {
       console.log('ℹ️ No records found for trustor — nothing to fan out');
       return;
     }
 
-    // Resolve role per record, filter out records where trustor has no role
     const accessList: TrusteeRecordAccess[] = records
-      .map(({ recordId, trustorRole }) => ({
+      .map(({ recordId, trustorRole, currentTrusteeRole }) => ({
         recordId,
-        role: this.resolveTrusteeRole(trustLevel, trustorRole),
+        // Pass currentTrusteeRole — skips if trustee already has equal/higher role
+        role: this.resolveTrusteeRole(trustLevel, trustorRole, currentTrusteeRole),
+        hadPriorAccess: currentTrusteeRole !== null,
       }))
-      .filter((r): r is TrusteeRecordAccess => r.role !== null);
+      .filter(
+        (r): r is { recordId: string; role: Role; hadPriorAccess: boolean } => r.role !== null
+      );
 
     if (accessList.length === 0) {
       console.log('ℹ️ Trustor has no roles on any records — nothing to grant');
@@ -177,17 +214,22 @@ export class TrusteePermissionService {
     // We do these together so the record stays consistent even if we crash partway through
     const db = getFirestore();
 
-    for (const { recordId, role } of accessList) {
+    for (const { recordId, role, hadPriorAccess } of accessList) {
       try {
         // Create wrappedKey in inactive state — trustee can't decrypt until they accept
         await SharingService.grantEncryptionAccess(recordId, trusteeId, trustorId, {
           isActive: false,
         });
 
-        // Add trustee to the correct role array + trustees[]
+        // Move trustee into the correct role array.
+        // Only add to trustees[] if they didn't already have independent access —
+        // trustees[] marks access as trustee-derived (cascades on trustor removal).
         await updateDoc(doc(db, 'records', recordId), {
+          owners: arrayRemove(trusteeId),
+          administrators: arrayRemove(trusteeId),
+          viewers: arrayRemove(trusteeId),
           [this.roleToArray(role)]: arrayUnion(trusteeId),
-          trustees: arrayUnion(trusteeId),
+          ...(!hadPriorAccess && { trustees: arrayUnion(trusteeId) }),
         });
 
         console.log(`✅ Pending access granted: ${trusteeId} as ${role} on record ${recordId}`);
@@ -381,10 +423,21 @@ export class TrusteePermissionService {
 
     for (const relationshipDoc of snapshot.docs) {
       const { trusteeId, trustLevel } = relationshipDoc.data();
-      const role = this.resolveTrusteeRole(trustLevel as TrustLevel, subjectRole);
+
+      // Check trustee's current role to avoid redundant grants / unintended downgrades
+      let currentTrusteeRole: Role | null = null;
+      if (recordData.owners?.includes(trusteeId)) currentTrusteeRole = 'owner';
+      else if (recordData.administrators?.includes(trusteeId)) currentTrusteeRole = 'administrator';
+      else if (recordData.viewers?.includes(trusteeId)) currentTrusteeRole = 'viewer';
+
+      const role = this.resolveTrusteeRole(
+        trustLevel as TrustLevel,
+        subjectRole,
+        currentTrusteeRole
+      );
 
       if (!role) {
-        console.log(`ℹ️ Subject has no role on record ${recordId} — skipping trustee ${trusteeId}`);
+        console.log(`ℹ️ Skipping trustee ${trusteeId} on record ${recordId} — no role needed`);
         continue;
       }
 
@@ -406,9 +459,13 @@ export class TrusteePermissionService {
         // Active wrappedKey since trustee already accepted the relationship
         await SharingService.grantEncryptionAccess(recordId, trusteeId, subjectId);
 
+        // Only tag as trustee-derived if they didn't already have independent access
         await updateDoc(doc(db, 'records', recordId), {
+          owners: arrayRemove(trusteeId),
+          administrators: arrayRemove(trusteeId),
+          viewers: arrayRemove(trusteeId),
           [this.roleToArray(role)]: arrayUnion(trusteeId),
-          trustees: arrayUnion(trusteeId),
+          ...(!currentTrusteeRole && { trustees: arrayUnion(trusteeId) }),
         });
 
         console.log(`✅ Trustee ${trusteeId} granted ${role} on new record ${recordId}`);
@@ -457,8 +514,7 @@ export class TrusteePermissionService {
 
     for (const { recordId, role } of accessList) {
       try {
-        // Remove from all role arrays first, then add to the correct one
-        // This handles both upgrades and downgrades cleanly
+        // After (removes from all first, then adds to correct one)
         await updateDoc(doc(db, 'records', recordId), {
           owners: arrayRemove(trusteeId),
           administrators: arrayRemove(trusteeId),
