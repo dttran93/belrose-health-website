@@ -18,6 +18,7 @@ import {
   List,
   ListChecks,
   ShieldCheck,
+  UserPlus,
 } from 'lucide-react';
 import { useHealthProfile } from '@/features/HealthProfile/hooks/useHealthProfile';
 import HealthDataDisplay from '@/features/HealthProfile/components/HealthDataTabs/HealthDataDisplay';
@@ -97,11 +98,13 @@ const MissingSubjectId: React.FC = () => {
 // ============================================================================
 
 const HealthProfile: React.FC = () => {
+  const navigate = useNavigate();
   const { subjectId } = useParams<{ subjectId: string }>();
   const [activeTab, setActiveTab] = useState<HealthProfileTabs>('summary');
 
   const { user } = useAuthContext();
   const resolvedSubjectId = subjectId === 'me' ? user?.uid : subjectId;
+  const isGuest = (user as any)?.isGuest === true;
 
   // Guard: subjectId missing from URL
   if (!resolvedSubjectId) return <MissingSubjectId />;
@@ -210,6 +213,24 @@ const HealthProfile: React.FC = () => {
   return (
     <div className="p-4">
       <div className="max-w-7xl mx-auto bg-background rounded=2xl shadow-xl rounded-lg flex flex-col">
+        {isGuest && (
+          <div className="bg-slate-900 text-white rounded-xl p-4 mb-4 flex items-center justify-between gap-4">
+            <div>
+              <p className="font-semibold text-sm">You're viewing as a guest</p>
+              <p className="text-slate-400 text-xs mt-0.5">
+                Create a free account to receive records from any patient.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/auth/register')}
+              className="flex items-center gap-2 bg-white text-slate-900 text-sm font-semibold
+                 px-4 py-2 rounded-lg whitespace-nowrap hover:bg-slate-100 transition-colors"
+            >
+              <UserPlus className="w-4 h-4" />
+              Create free account
+            </button>
+          </div>
+        )}
         <ProfileHeader
           subjectId={resolvedSubjectId}
           profile={profile}

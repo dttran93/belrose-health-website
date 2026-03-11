@@ -36,6 +36,7 @@ export interface BelroseUserProfile extends User {
   identityVerified: boolean;
   identityVerifiedAt?: any;
   credibility?: CredibilityScore;
+  isGuest?: boolean; //For guest accounts
 
   onChainIdentity?: {
     userIdHash: string; // The keccak256 hash of the UID. Intentionally not a search path for users. Want to maintain privacy separation between on-chain/off-chain identities.

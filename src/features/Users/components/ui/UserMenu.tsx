@@ -31,7 +31,7 @@ interface MenuDivider {
   key?: string;
 }
 
-type MenuItem = MenuOption | MenuDivider;
+export type MenuItem = MenuOption | MenuDivider;
 
 interface UserMenuProps {
   // Required props
@@ -92,7 +92,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
 
   // Close menu when clicking outside
   useEffect(() => {
-      const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent) => {
       if (
         menuRef.current &&
         !menuRef.current.contains(event.target as Node) &&
@@ -133,7 +133,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
           if (user?.uid) {
             navigate(`/app/health-profile/${user.uid}`);
           }
-        setIsOpen(false);
+          setIsOpen(false);
         },
       });
     }

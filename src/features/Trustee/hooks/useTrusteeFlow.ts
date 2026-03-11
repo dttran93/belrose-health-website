@@ -67,8 +67,6 @@ async function checkBothWalletsReady(
     getUserProfile(targetUserId),
   ]);
 
-  console.log('getUserProfile,', currentProfile);
-
   if (!currentProfile?.onChainIdentity?.linkedWallets?.some(w => w.isWalletActive)) {
     return { ready: false, reason: 'You do not have an active blockchain wallet.' };
   }

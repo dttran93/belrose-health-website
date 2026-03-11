@@ -26,6 +26,7 @@ import { AIChatProvider } from './features/Ai/components/AIChatContext';
 import ChatHistoryPage from './features/Ai/components/ChatHistoryPage';
 import HealthProfile from './pages/HealthProfile';
 import RecordDetail from './pages/RecordDetail';
+import GuestInvitePage from './pages/GuestInvitePage';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
@@ -53,6 +54,9 @@ const App: React.FC = (): React.JSX.Element => {
                 <Route path="/waitlist" element={<Auth />} />
                 <Route path="/verification" element={<VerificationHub />} />
                 <Route path="/verify-email" element={<EmailVerifiedPage />} />
+
+                {/* ── Auth & verification ── */}
+                <Route path="/invite" element={<GuestInvitePage />} />
 
                 {/* ── Protected app ── */}
                 <Route
