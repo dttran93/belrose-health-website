@@ -43,6 +43,9 @@ export const authService = {
         await updateProfile(userCredential.user, { displayName });
       }
 
+      // Create Firestore user document
+      await UserService.createUserDocument(userCredential.user);
+
       // Send verification email
       await sendEmailVerification(userCredential.user, {
         url: window.location.origin + '/verify-email', // Redirect URL after verification
@@ -50,9 +53,6 @@ export const authService = {
       });
 
       console.log('✅ Verification email sent to:', email);
-
-      // Create Firestore user document
-      await UserService.createUserDocument(userCredential.user);
 
       console.log('User registered and profile created successfully');
       return userCredential.user;

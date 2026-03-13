@@ -258,11 +258,15 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         updatedAt: new Date(),
       });
 
-      const inviteRef = doc(db, 'invites', registrationData.email.toLowerCase());
-      await updateDoc(inviteRef, {
-        registeredUserId: registrationData.userId,
-        registeredAt: new Date().toISOString(),
-      });
+      try {
+        const inviteRef = doc(db, 'invites', registrationData.email.toLowerCase());
+        await updateDoc(inviteRef, {
+          registeredUserId: registrationData.userId,
+          registeredAt: new Date().toISOString(),
+        });
+      } catch (e) {
+        console.warn('Could not update invite doc — may not exist or no permission:', e);
+      }
 
       setRegistrationProgress({
         step: 'complete',

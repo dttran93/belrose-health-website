@@ -1,12 +1,25 @@
 rules_version = '2';
-
-// Craft rules based on data in your Firestore database
-// allow write: if firestore.get(
-//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
 service firebase.storage {
   match /b/{bucket}/o {
-    match /{allPaths=**} {
-      allow read, write: if false;
+    
+    match /records/{recordId}/{fileName} {
+      function hasRoleOnRecord() {
+        let record = firestore.get(/databases/(default)/documents/records/$(recordId)).data;
+        return record != null && (
+          request.auth.uid == record.uploadedBy ||
+          request.auth.uid in record.owners ||
+          request.auth.uid in record.administrators ||
+          request.auth.uid in record.viewers ||
+          request.auth.uid in record.subjects
+        );
+      }
+
+      allow read: if request.auth != null && hasRoleOnRecord();
+      allow write: if request.auth != null && hasRoleOnRecord();
+      allow delete: if request.auth != null && (
+        request.auth.uid in firestore.get(/databases/(default)/documents/records/$(recordId)).data.owners ||
+        request.auth.uid in firestore.get(/databases/(default)/documents/records/$(recordId)).data.administrators
+      );
     }
   }
 }

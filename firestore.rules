@@ -709,10 +709,10 @@ service cloud.firestore {
     }
 
     match /invites/{email} {
-      // Readable by anyone so the gate check works without auth.
-      // Only exposes approved: true/false and the code — acceptable for alpha.
-      allow read: if true;
-      allow write: if false;  // admin only via Firebase Console / Admin SDK
+      allow read: if true; //unauthenticated signup
+      allow update: if request.auth != null &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['registeredUserId', 'registeredAt']);
     }
 
     match /waitlist/{email} {
