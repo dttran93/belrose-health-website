@@ -2,12 +2,15 @@
 import React from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { stepsBySlug, steps } from './howItWorksData';
+import { useNavigate } from 'react-router-dom';
 
 const HowStepDetail: React.FC<{
   slug: string;
   onBack: () => void;
   onNavigate: (slug: string) => void;
 }> = ({ slug, onBack, onNavigate }) => {
+  const navigate = useNavigate();
+
   const step = stepsBySlug[slug];
   if (!step)
     return (
@@ -181,7 +184,7 @@ const HowStepDetail: React.FC<{
               </button>
             ) : (
               <button
-                onClick={() => (window.location.href = '/auth/register')}
+                onClick={() => navigate('/auth/register')}
                 className="flex items-center gap-3 group text-right"
               >
                 <div>
