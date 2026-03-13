@@ -113,17 +113,6 @@ export const RecordFull: React.FC<RecordFullProps> = ({
    * Decrypt a version's snapshot if it's encrypted
    */
   const decryptVersionSnapshot = async (version: RecordVersion): Promise<any> => {
-    // If not encrypted, return plain data directly
-    if (!version.recordSnapshot.isEncrypted) {
-      return {
-        fileName: version.recordSnapshot.fileName ?? null,
-        fhirData: version.recordSnapshot.fhirData ?? null,
-        belroseFields: version.recordSnapshot.belroseFields ?? null,
-        extractedText: version.recordSnapshot.extractedText ?? null,
-        originalText: version.recordSnapshot.originalText ?? null,
-      };
-    }
-
     // Check if encryption session is active
     const masterKey = await EncryptionKeyManager.getSessionKey();
     if (!masterKey) {

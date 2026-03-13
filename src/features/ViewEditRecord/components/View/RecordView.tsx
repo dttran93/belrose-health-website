@@ -83,7 +83,7 @@ export const RecordView: React.FC<RecordViewProps> = ({
 
         {/* FHIR Resources Tab*/}
         {activeTab === 'fhir' && (
-          <div className="space-y-6">
+          <div className="space-y-6 p-6">
             <FHIRRecord
               fhirData={record.fhirData}
               editable={editable}
@@ -95,7 +95,7 @@ export const RecordView: React.FC<RecordViewProps> = ({
 
         {/* JSON Tab */}
         {activeTab === 'data' && (
-          <div className="space-y-6">
+          <div className="space-y-6 p-6">
             {editable && (
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
                 <div className="flex items-start gap-3">
@@ -139,7 +139,7 @@ export const RecordView: React.FC<RecordViewProps> = ({
 
         {/* Original Data Tab */}
         {activeTab === 'original' && (
-          <div className="space-y-6">
+          <div className="space-y-6 p-6">
             {/* Original Text Submission */}
             {editable && (
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
