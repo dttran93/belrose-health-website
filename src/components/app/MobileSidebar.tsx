@@ -5,6 +5,7 @@ import { NavigationSection } from './navigation';
 import { User } from '@/types/core';
 import { Chat } from '@/features/Ai/service/chatService';
 import { ChatHistoryList } from '@/features/Ai/components/ui/ChatHistoryList';
+import QuickActions from '../ui/QuickActions';
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ interface MobileSidebarProps {
   onLogout?: () => void;
   onSettings?: () => void;
   onHelp?: () => void;
+  onNewAiChat: () => void;
   chats: Chat[];
   chatsLoading: boolean;
   currentChatId: string | null;
@@ -31,6 +33,7 @@ function MobileSidebar({
   onLogout,
   onSettings,
   onHelp,
+  onNewAiChat,
   chats,
   chatsLoading,
   currentChatId,
@@ -39,6 +42,11 @@ function MobileSidebar({
   onDeleteChat,
   onViewAllChats,
 }: MobileSidebarProps) {
+  const handleNewAiChat = () => {
+    onNewAiChat();
+    onClose();
+  };
+
   return (
     <div>
       {/* Backdrop */}
@@ -68,10 +76,12 @@ function MobileSidebar({
           </button>
         </div>
 
+        {/* Quick action buttons */}
+        <QuickActions onNewAiChat={handleNewAiChat} />
+
         {/* Navigation - Scrollable */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-6">
-            {/* ✅ Render all sections dynamically from the navigation config */}
             {navigationSections.map(section => (
               <div key={section.label}>
                 {section.label && (
@@ -87,7 +97,7 @@ function MobileSidebar({
               </div>
             ))}
 
-            {/* ✅ Chat History */}
+            {/* Chat History */}
             <div className="border-t border-gray-700 pt-2">
               <ChatHistoryList
                 chats={chats}

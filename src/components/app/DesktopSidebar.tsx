@@ -5,6 +5,7 @@ import { NavigationSection } from './navigation';
 import { User } from '@/types/core';
 import { Chat } from '@/features/Ai/service/chatService';
 import { ChatHistoryList } from '@/features/Ai/components/ui/ChatHistoryList';
+import QuickActions from '../ui/QuickActions';
 
 interface DesktopSidebarProps {
   isCollapsed: boolean;
@@ -15,6 +16,7 @@ interface DesktopSidebarProps {
   onSettings: () => void;
   onNotifications: () => void;
   onHelp: () => void;
+  onNewAiChat: () => void;
   chats: Chat[];
   chatsLoading: boolean;
   currentChatId: string | null;
@@ -33,6 +35,7 @@ function DesktopSidebar({
   onSettings,
   onNotifications,
   onHelp,
+  onNewAiChat,
   chats,
   chatsLoading,
   currentChatId,
@@ -75,7 +78,7 @@ function DesktopSidebar({
                 }`}
               />
 
-              {/* Hover tooltip - positioned directly over the PanelLeft icon */}
+              {/* Hover tooltip */}
               <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
                 {isCollapsed ? (
                   <ArrowRightToLine className="w-5 h-5 text-white bg-primary" />
@@ -88,9 +91,11 @@ function DesktopSidebar({
         </div>
       </div>
 
-      {/* Navigation */}
+      {/* Quick action buttons — stacks vertically when sidebar is collapsed */}
+      <QuickActions onNewAiChat={onNewAiChat} isCollapsed={isCollapsed} />
+
+      {/* Navigation — hidden labels when collapsed */}
       <div className="flex-1 p-4 space-y-6 overflow-y-auto">
-        {/* ✅ Render all sections dynamically from the navigation config */}
         {navigationSections.map(section => (
           <div key={section.label}>
             {!isCollapsed && section.label && (
@@ -106,7 +111,7 @@ function DesktopSidebar({
           </div>
         ))}
 
-        {/* ✅ Chat History — hidden when collapsed */}
+        {/* Chat History — hidden when collapsed */}
         {!isCollapsed && (
           <div className="border-t border-gray-700 pt-4">
             <ChatHistoryList

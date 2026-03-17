@@ -19,6 +19,8 @@ import RegistrationProgressDialog, {
   RegistrationPhase,
   RegistrationProgress,
 } from './ui/RegistrationProgressDialog';
+import { KeyBundleService } from '@/features/Messaging/services/keyBundleService';
+import { generateKeyBundle, PublicKeyBundle } from '@/features/Messaging';
 
 interface StepConfig {
   number: number;
@@ -62,6 +64,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     publicKey: '',
     encryptedPrivateKey: '',
     encryptedPrivateKeyIV: '',
+    signalKeyBundle: null as PublicKeyBundle | null,
   });
 
   const steps: StepConfig[] = [
@@ -123,7 +126,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         console.log('✓ Recovery key generated');
         const recoveryKeyHash = await EncryptionKeyManager.hashRecoveryKey(recoveryKey);
 
-        // 4. generate RSA key pair for sharing
+        // 4. Generate RSA key pair for record sharing
         const { publicKey, privateKey } = await SharingKeyManagementService.generateUserKeyPair();
         console.log('✓ RSA key pair generated');
 
@@ -146,7 +149,15 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         });
         console.log('✓ Wallet created:', walletData.walletAddress);
 
-        // 8. Update registration data with all encryption info
+        // 8. Generate Signal Protocol key bundle
+        //    - Generates identity keypair, signed prekey, and 100 one-time prekeys
+        //    - Private keys are saved to IndexedDB by generateKeyBundle() internally
+        //    - Public keys are returned here for upload during handleCompleteRegistration
+        console.log('💬 Generating Signal Protocol keys...');
+        const signalKeyBundle = await generateKeyBundle();
+        console.log('✓ Signal keys generated');
+
+        // 9. Update registration data with all setup info
         setRegistrationData(prev => ({
           ...prev,
           ...data,
@@ -161,6 +172,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
           walletAddress: walletData.walletAddress,
           walletType: 'generated',
           walletGenerationComplete: true,
+          signalKeyBundle,
         }));
 
         toast.success('Account and encryption setup complete!', {
@@ -258,6 +270,26 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         updatedAt: new Date(),
       });
 
+      // 4. Upload Signal public key bundle to Firestore
+      //    Private keys are already in IndexedDB from step 1.
+      //    This is a separate write so a Firestore failure here doesn't
+      //    roll back the main account creation above.
+      if (registrationData.signalKeyBundle) {
+        setRegistrationProgress({
+          step: 'firestore_update',
+          message: 'Setting up secure messaging...',
+        });
+        await KeyBundleService.uploadKeyBundle(
+          registrationData.userId,
+          registrationData.signalKeyBundle
+        );
+        console.log('✓ Signal key bundle uploaded');
+      } else {
+        // Non-fatal — messaging won't work until keys are uploaded,
+        // but account creation should still succeed.
+        console.warn('⚠️ Signal key bundle missing — messaging setup incomplete');
+      }
+
       try {
         const inviteRef = doc(db, 'invites', registrationData.email.toLowerCase());
         await updateDoc(inviteRef, {
@@ -279,7 +311,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
 
       // Provide specific error message
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-
       setDialogError(errorMessage);
       setDialogPhase('error');
     } finally {
@@ -289,7 +320,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
 
   const handleDialogClose = () => {
     if (dialogPhase === 'success') {
-      // Navigate on success
       navigate('/verification', {
         replace: true,
         state: {

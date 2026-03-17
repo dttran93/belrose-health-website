@@ -93,6 +93,7 @@ function AppLayout({ children }: AppLayoutProps) {
             onSettings={handleSettings}
             onNotifications={handleNotifications}
             onHelp={handleHelp}
+            onNewAiChat={handleNewChatClick}
             chats={chats}
             chatsLoading={chatsLoading}
             currentChatId={currentChatId}
@@ -127,9 +128,6 @@ function AppLayout({ children }: AppLayoutProps) {
       <MobileHeader
         user={user}
         onMenuToggle={() => setIsMobileOpen(true)}
-        onLogout={handleLogout}
-        onToggleAI={() => setIsAIOpen(!isAIOpen)}
-        isAIOpen={isAIOpen}
         additionalContent={header}
       />
 
@@ -142,6 +140,7 @@ function AppLayout({ children }: AppLayoutProps) {
         onLogout={handleLogout}
         onSettings={handleSettings}
         onHelp={handleHelp}
+        onNewAiChat={handleNewChatClick}
         chats={chats}
         chatsLoading={chatsLoading}
         currentChatId={currentChatId}

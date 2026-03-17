@@ -1,12 +1,14 @@
 import {
   Clipboard,
-  Activity,
   FilePlus2,
   LucideIcon,
   Link,
   Hash,
   House,
   CircleUser,
+  MessageSquare,
+  Bell,
+  Sparkles,
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -20,6 +22,25 @@ export interface NavigationSection {
   items: NavigationItem[];
 }
 
+/**
+ * Quick action buttons shown at the top of the sidebar.
+ * Always visible, icon-only, and distinct from the full nav sections.
+ * Some are simple routes (url provided); AI triggers a context callback.
+ */
+export interface QuickActionItem {
+  id: 'home' | 'notifications' | 'messages' | 'ai';
+  title: string;
+  url?: string;
+  icon: LucideIcon;
+}
+
+export const quickActions: QuickActionItem[] = [
+  { id: 'home', title: 'Home', url: '/app', icon: House },
+  { id: 'notifications', title: 'Notifications', url: '/app/notifications', icon: Bell },
+  { id: 'messages', title: 'Messages', url: '/app/messages', icon: MessageSquare },
+  { id: 'ai', title: 'AI Assistant', icon: Sparkles },
+];
+
 export const navigationSections: NavigationSection[] = [
   {
     label: 'Admin',
@@ -30,7 +51,6 @@ export const navigationSections: NavigationSection[] = [
   },
   {
     items: [
-      { title: 'Home', url: '/app', icon: House },
       { title: 'Health Profile', url: '/app/health-profile/me', icon: CircleUser },
       { title: 'All Records', url: '/app/all-records', icon: Clipboard },
       { title: 'Add Record', url: '/app/add-record', icon: FilePlus2 },

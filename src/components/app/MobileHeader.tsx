@@ -5,20 +5,10 @@ import { User } from '@/types/core';
 interface MobileHeaderProps {
   user: User;
   onMenuToggle: () => void;
-  onLogout: () => void;
-  onToggleAI: () => void;
-  isAIOpen: Boolean;
   additionalContent?: ReactNode;
 }
 
-function MobileHeader({
-  user,
-  onMenuToggle,
-  onLogout,
-  onToggleAI,
-  isAIOpen,
-  additionalContent,
-}: MobileHeaderProps) {
+function MobileHeader({ user, onMenuToggle, additionalContent }: MobileHeaderProps) {
   return (
     <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
       {/* Left side - Always show menu button */}
@@ -41,21 +31,6 @@ function MobileHeader({
           </div>
         )}
       </div>
-
-      {/* Right side - Show AI button when no additional content */}
-      {!additionalContent && (
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onToggleAI}
-            className={`
-              p-2 rounded-lg
-              ${isAIOpen ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'}
-            `}
-          >
-            <Bot className="w-5 h-5" />
-          </button>
-        </div>
-      )}
     </header>
   );
 }

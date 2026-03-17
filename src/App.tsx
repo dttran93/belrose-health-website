@@ -27,6 +27,7 @@ import ChatHistoryPage from './features/Ai/components/ChatHistoryPage';
 import HealthProfile from './pages/HealthProfile';
 import RecordDetail from './pages/RecordDetail';
 import GuestInvitePage from './pages/GuestInvitePage';
+import Messaging from './pages/Messaging';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
@@ -86,6 +87,8 @@ const App: React.FC = (): React.JSX.Element => {
                                   path="blockchain-admin"
                                   element={<BlockchainAdminDashboard />}
                                 />
+                                <Route path="messages" element={<Messaging />} />
+                                <Route path="messages/:recipientId" element={<Messaging />} />
                               </Routes>
                             </Layout>
                           </AIChatProvider>
