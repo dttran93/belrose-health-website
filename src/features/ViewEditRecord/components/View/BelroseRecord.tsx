@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Calendar, User, Stethoscope, Building2, FileText, Clock } from 'lucide-react';
 import { BelroseFields } from '@/types/core';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
+import ReactMarkdown from 'react-markdown';
 
 interface BelroseRecordProps {
   Data: BelroseFields | undefined;
@@ -205,10 +206,8 @@ export const BelroseRecord: React.FC<BelroseRecordProps> = ({
               placeholder="Enter detailed narrative..."
             />
           ) : (
-            <div className="prose prose-sm max-w-none">
-              <p className="text-gray-800 text-left leading-relaxed whitespace-pre-wrap">
-                {Data.detailedNarrative}
-              </p>
+            <div className="prose prose-sm max-w-none text-left">
+              <ReactMarkdown>{Data.detailedNarrative}</ReactMarkdown>
             </div>
           )}
         </div>
