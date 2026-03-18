@@ -144,7 +144,7 @@ function RecordRow({
 
   return (
     <>
-      <div className="rounded-xl border transition-colors">
+      <div className="rounded-xl border border-border/20 transition-colors">
         {/* ── Collapsed header ── */}
         <button
           onClick={onToggle}
@@ -174,7 +174,7 @@ function RecordRow({
 
         {/* ── Expanded panel ── */}
         {expanded && (
-          <div style={{ borderTop: `1px solid` }}>
+          <div className="border-t border-border/20">
             {/* Context callout for mismatch / traceable */}
             {result.status === 'anchored_previous_version' && (
               <div className="mx-4 mt-3 text-xs text-complement-2 bg-complement-2/10 border border-complement-2/20 rounded-lg px-3 py-2">
@@ -190,7 +190,7 @@ function RecordRow({
             )}
 
             {/* Section tabs */}
-            <div className="flex border-b border-border bg-muted/20 mt-3">
+            <div className="flex border-b border-border/20 bg-muted/20 mt-3">
               {tabs.map(tab => (
                 <button
                   key={tab.id}
@@ -223,7 +223,7 @@ function RecordRow({
               {activeSection === 'hashes' && (
                 <>
                   {/* Table header */}
-                  <div className="flex items-center gap-3 pb-1.5 mb-1 border-b border-border">
+                  <div className="flex items-center gap-3 pb-1.5 mb-1 border-b border-border/20">
                     <span className="text-[10px] font-semibold text-muted-foreground uppercase w-8 shrink-0">
                       Version
                     </span>

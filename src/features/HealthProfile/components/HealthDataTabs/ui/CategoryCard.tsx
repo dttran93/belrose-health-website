@@ -195,7 +195,7 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({
   const hasOverflow = overflowCount > 0;
 
   return (
-    <div className="border rounded-lg border-border">
+    <div className="border rounded-lg border-border/20">
       {/* ── Section header ── */}
       <div className="flex bg-gray-200 items-center gap-2.5 p-3 rounded-t-lg">
         <div className={`p-1.5 rounded-md ${colours.iconBg}`}>
