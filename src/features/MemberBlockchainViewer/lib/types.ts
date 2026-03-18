@@ -93,6 +93,7 @@ export interface UserData {
   records: string[];
   profile?: UserProfile;
   registrationTxHash?: string;
+  trusteeRelationships?: TrusteeRelationshipOnChain[];
 }
 
 /**
@@ -128,6 +129,9 @@ export interface MemberRoleManagerContract {
   getRecordViewers(recordId: string): Promise<string[]>;
   getRecordRoleStats(recordId: string): Promise<[bigint, bigint, bigint]>;
 
+  //Trustee functions
+  getTrusteeRelationship(trustorIdHash: string, trusteeIdHash: string): Promise<[number, number]>;
+
   // Event filters
   filters: {
     MemberRegistered(wallet?: string | null, userIdHash?: string | null): any;
@@ -136,8 +140,35 @@ export interface MemberRoleManagerContract {
       targetIdHash?: string | null,
       userIdHash?: string | null
     ): any;
+    TrusteeProposed(trustorIdHash?: string | null, trusteeIdHash?: string | null): any;
   };
 
   // Query filter method
   queryFilter(filter: any): Promise<ethers.EventLog[]>;
+}
+
+// ============================================================================
+// TRUSTEE TYPES
+// ============================================================================
+
+export enum TrusteeLevel {
+  Observer = 0,
+  Custodian = 1,
+  Controller = 2,
+}
+
+export enum TrusteeStatus {
+  None = 0,
+  Pending = 1,
+  Active = 2,
+  Revoked = 3,
+}
+
+export interface TrusteeRelationshipOnChain {
+  trusteeIdHash: string; // the other party's identity hash
+  status: TrusteeStatus;
+  level: TrusteeLevel;
+  txHash?: string; // from the TrusteeProposed/Accepted event
+  // Populated from Firebase profile lookup (same pattern as RoleAssignment)
+  profile?: UserProfile;
 }

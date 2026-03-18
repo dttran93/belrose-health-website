@@ -1,7 +1,7 @@
 // src/features/MemberManagement/components/UsersTable.tsx
 
 import React from 'react';
-import { Eye, Wallet, User, Mail, CheckCircle, XCircle } from 'lucide-react';
+import { Eye, Wallet, User, Mail, CheckCircle, XCircle, Users } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import type { UserData } from '@/features/MemberBlockchainViewer/lib/types';
 import {
@@ -15,12 +15,18 @@ interface UsersTableProps {
   users: UserData[];
   onViewRoles: (user: UserData) => void;
   onViewWallets: (user: UserData) => void;
+  onViewTrustees: (user: UserData) => void;
 }
 
 /**
  * Table displaying all users with their profile info, status, and actions
  */
-export const UsersTable: React.FC<UsersTableProps> = ({ users, onViewRoles, onViewWallets }) => {
+export const UsersTable: React.FC<UsersTableProps> = ({
+  users,
+  onViewRoles,
+  onViewWallets,
+  onViewTrustees,
+}) => {
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div className="overflow-x-auto">
@@ -57,6 +63,7 @@ export const UsersTable: React.FC<UsersTableProps> = ({ users, onViewRoles, onVi
                 user={user}
                 onViewRoles={onViewRoles}
                 onViewWallets={onViewWallets}
+                onViewTrustees={onViewTrustees}
               />
             ))}
           </tbody>
@@ -73,9 +80,10 @@ interface UserRowProps {
   user: UserData;
   onViewRoles: (user: UserData) => void;
   onViewWallets: (user: UserData) => void;
+  onViewTrustees: (user: UserData) => void;
 }
 
-const UserRow: React.FC<UserRowProps> = ({ user, onViewRoles, onViewWallets }) => {
+const UserRow: React.FC<UserRowProps> = ({ user, onViewRoles, onViewWallets, onViewTrustees }) => {
   const statusInfo = getStatusInfo(user.status);
   const activeWallets = user.wallets.filter(w => w.isActive).length;
   const hasProfile = !!user.profile;
@@ -132,16 +140,27 @@ const UserRow: React.FC<UserRowProps> = ({ user, onViewRoles, onViewWallets }) =
 
       {/* Actions */}
       <td className="px-4 py-3 text-left">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onViewRoles(user)}
-          className="text-xs"
-          disabled={user.records.length === 0}
-        >
-          <Eye className="w-3 h-3 mr-1" />
-          View Roles
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onViewRoles(user)}
+            className="text-xs"
+            disabled={user.records.length === 0}
+          >
+            <Eye className="w-3 h-3 mr-1" />
+            Roles
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onViewTrustees(user)}
+            className="text-xs"
+          >
+            <Users className="w-3 h-3 mr-1" />
+            Trustees
+          </Button>
+        </div>
       </td>
     </tr>
   );

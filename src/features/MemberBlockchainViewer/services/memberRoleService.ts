@@ -14,7 +14,9 @@ import type {
   WalletInfo,
   RoleAssignment,
   DashboardStats,
+  TrusteeRelationshipOnChain,
 } from '../lib/types';
+import { TrusteeStatus, TrusteeLevel } from '../lib/types';
 import { getProfilesByUserIdHashes, transformToUserProfile } from './userProfileService';
 
 /**
@@ -425,7 +427,7 @@ async function queryFilterInChunks(
   const currentBlock =
     typeof toBlock === 'number'
       ? toBlock
-      : (await contract.runner?.provider?.getBlockNumber()) || fromBlock + chunkSize;
+      : ((await contract.runner?.provider?.getBlockNumber()) ?? fromBlock + chunkSize);
 
   let allEvents: (ethers.EventLog | ethers.Log)[] = [];
   let start = fromBlock;
@@ -441,4 +443,64 @@ async function queryFilterInChunks(
   }
 
   return allEvents;
+}
+
+/**
+ * Fetch all active trustee relationships for a given user (as trustor).
+ * Strategy: query TrusteeProposed events to find all trusteeIdHashes for this trustor,
+ * then call getTrusteeRelationship() for each to get current status/level.
+ */
+export async function getTrusteeRelationships(
+  trustorIdHash: string
+): Promise<TrusteeRelationshipOnChain[]> {
+  const contract = getContract();
+
+  try {
+    // Query events where this user is the trustor (first indexed param)
+    const events = await queryFilterInChunks(
+      contract,
+      contract.filters.TrusteeProposed(trustorIdHash),
+      DEPLOYMENT_BLOCK,
+      'latest'
+    );
+
+    // Deduplicate trusteeIdHashes (a user could have re-proposed after revocation)
+    const uniqueTrusteeHashes = [
+      ...new Set(
+        events
+          .filter(e => e instanceof ethers.EventLog)
+          .map(e => (e as ethers.EventLog).args?.[1] as string)
+          .filter(Boolean)
+      ),
+    ];
+
+    // For each, fetch current on-chain status
+    const relationships = await Promise.all(
+      uniqueTrusteeHashes.map(async trusteeIdHash => {
+        const [status, level] = await contract.getTrusteeRelationship(trustorIdHash, trusteeIdHash);
+        return {
+          trusteeIdHash,
+          status: Number(status) as TrusteeStatus,
+          level: Number(level) as TrusteeLevel,
+        };
+      })
+    );
+
+    // Filter out None/Revoked if you only want active ones — or return all
+    const filtered = relationships.filter(r => r.status !== TrusteeStatus.None);
+
+    // 👇 Batch fetch all profiles in one Firestore query
+    const profileMap = await getProfilesByUserIdHashes(filtered.map(r => r.trusteeIdHash));
+
+    // 👇 Attach profile to each relationship (same pattern as verifications/disputes)
+    return filtered.map(r => ({
+      ...r,
+      profile: profileMap.has(r.trusteeIdHash)
+        ? transformToUserProfile(profileMap.get(r.trusteeIdHash)!)
+        : undefined,
+    }));
+  } catch (error) {
+    console.error('Failed to fetch trustee relationships:', error);
+    return [];
+  }
 }

@@ -140,4 +140,40 @@ export const MEMBER_ROLE_MANAGER_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
+  {
+    inputs: [
+      { internalType: 'bytes32', name: 'trustorIdHash', type: 'bytes32' },
+      { internalType: 'bytes32', name: 'trusteeIdHash', type: 'bytes32' },
+    ],
+    name: 'getTrusteeRelationship',
+    outputs: [
+      { internalType: 'uint8', name: 'status', type: 'uint8' },
+      { internalType: 'uint8', name: 'level', type: 'uint8' },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  // Events for querying trustee proposals/acceptances
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: 'bytes32', name: 'trustorIdHash', type: 'bytes32' },
+      { indexed: true, internalType: 'bytes32', name: 'trusteeIdHash', type: 'bytes32' },
+      { indexed: false, internalType: 'uint8', name: 'level', type: 'uint8' },
+      { indexed: false, internalType: 'uint256', name: 'timestamp', type: 'uint256' },
+    ],
+    name: 'TrusteeProposed',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: 'bytes32', name: 'trustorIdHash', type: 'bytes32' },
+      { indexed: true, internalType: 'bytes32', name: 'trusteeIdHash', type: 'bytes32' },
+      { indexed: false, internalType: 'uint8', name: 'level', type: 'uint8' },
+      { indexed: false, internalType: 'uint256', name: 'timestamp', type: 'uint256' },
+    ],
+    name: 'TrusteeAccepted',
+    type: 'event',
+  },
 ] as const;

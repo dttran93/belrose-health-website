@@ -22,6 +22,7 @@ import { getStatusInfo } from '@/features/MemberBlockchainViewer/lib/utils';
 import { useMemberDashboard } from '@/features/MemberBlockchainViewer/hooks/useMemberDashboards';
 import { RoleAssignmentsTable } from '@/features/MemberBlockchainViewer/components/RoleAssignmentTable';
 import { usePaymasterDeposit } from '@/features/MemberBlockchainViewer/hooks/usePaymasterDeposit';
+import { TrusteesPanel } from './TrusteesPanel';
 
 interface SearchInputProps {
   value: string;
@@ -232,6 +233,12 @@ const MemberDashboard: React.FC = () => {
     selectedUserForWallets,
     viewWallets,
     closeWalletsModal,
+    //Trustee modal
+    selectedUserForTrustees,
+    trustees,
+    isLoadingTrustees,
+    viewTrustees,
+    closeTrusteesModal,
   } = useMemberDashboard();
 
   const { deposit, isLoading: isLoadingDeposit } = usePaymasterDeposit(0.01);
@@ -371,7 +378,12 @@ const MemberDashboard: React.FC = () => {
           ) : filteredUsers.length === 0 ? (
             <EmptyState hasFilters={hasFilters} />
           ) : (
-            <UsersTable users={filteredUsers} onViewRoles={viewRoles} onViewWallets={viewWallets} />
+            <UsersTable
+              users={filteredUsers}
+              onViewRoles={viewRoles}
+              onViewWallets={viewWallets}
+              onViewTrustees={viewTrustees}
+            />
           )
         ) : // Role Assignments View
         isLoadingAssignments ? (
@@ -395,6 +407,15 @@ const MemberDashboard: React.FC = () => {
 
       {selectedUserForWallets && (
         <WalletsPanel user={selectedUserForWallets} onClose={closeWalletsModal} />
+      )}
+
+      {selectedUserForTrustees && (
+        <TrusteesPanel
+          user={selectedUserForTrustees}
+          trustees={trustees}
+          isLoading={isLoadingTrustees}
+          onClose={closeTrusteesModal}
+        />
       )}
     </div>
   );

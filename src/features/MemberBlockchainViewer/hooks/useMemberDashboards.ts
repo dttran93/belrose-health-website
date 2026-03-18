@@ -6,8 +6,15 @@ import {
   getStats,
   getUserRoles,
   getAllRoleAssignments,
+  getTrusteeRelationships,
 } from '../services/memberRoleService';
-import type { UserData, DashboardStats, RoleAssignment, UserStatus } from '../lib/types';
+import type {
+  UserData,
+  DashboardStats,
+  RoleAssignment,
+  UserStatus,
+  TrusteeRelationshipOnChain,
+} from '../lib/types';
 
 export type DashboardView = 'users' | 'verified' | 'roles';
 
@@ -55,6 +62,13 @@ interface UseMemberDashboardReturn {
   selectedUserForWallets: UserData | null;
   viewWallets: (user: UserData) => void;
   closeWalletsModal: () => void;
+
+  //Trustee modal
+  selectedUserForTrustees: UserData | null;
+  trustees: TrusteeRelationshipOnChain[];
+  isLoadingTrustees: boolean;
+  viewTrustees: (user: UserData) => void;
+  closeTrusteesModal: () => void;
 }
 
 /**
@@ -107,6 +121,11 @@ export function useMemberDashboard(): UseMemberDashboardReturn {
   // Wallets modal state
   // ============================================
   const [selectedUserForWallets, setSelectedUserForWallets] = useState<UserData | null>(null);
+
+  // Trustees modal state
+  const [selectedUserForTrustees, setSelectedUserForTrustees] = useState<UserData | null>(null);
+  const [trustees, setTrustees] = useState<TrusteeRelationshipOnChain[]>([]);
+  const [isLoadingTrustees, setIsLoadingTrustees] = useState(false);
 
   // ============================================
   // Data fetching - Users
@@ -241,6 +260,29 @@ export function useMemberDashboard(): UseMemberDashboardReturn {
   }, []);
 
   // ============================================
+  // Trustee
+  // ============================================
+
+  const viewTrustees = useCallback(async (user: UserData) => {
+    setSelectedUserForTrustees(user);
+    setIsLoadingTrustees(true);
+    setTrustees([]);
+    try {
+      const data = await getTrusteeRelationships(user.userIdHash);
+      setTrustees(data);
+    } catch (err) {
+      console.error('Failed to fetch trustee relationships:', err);
+    } finally {
+      setIsLoadingTrustees(false);
+    }
+  }, []);
+
+  const closeTrusteesModal = useCallback(() => {
+    setSelectedUserForTrustees(null);
+    setTrustees([]);
+  }, []);
+
+  // ============================================
   // Refresh (resets everything)
   // ============================================
 
@@ -296,5 +338,12 @@ export function useMemberDashboard(): UseMemberDashboardReturn {
     selectedUserForWallets,
     viewWallets,
     closeWalletsModal,
+
+    //Trustee modal
+    selectedUserForTrustees,
+    trustees,
+    isLoadingTrustees,
+    viewTrustees,
+    closeTrusteesModal,
   };
 }
