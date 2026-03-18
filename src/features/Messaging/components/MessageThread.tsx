@@ -13,6 +13,7 @@ import React, { useEffect, useRef } from 'react';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import type { DecryptedMessage } from '../hooks/useMessaging';
+import MessageBubble from './MessageBubble';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -106,71 +107,6 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
 };
 
 // ---------------------------------------------------------------------------
-// MessageBubble
-// ---------------------------------------------------------------------------
-
-interface MessageBubbleProps {
-  message: DecryptedMessage;
-  isGrouped: boolean;
-}
-
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isGrouped }) => {
-  const timestamp = message.sentAt
-    ? message.sentAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : '';
-
-  const isDecryptionError = message.text === '[Unable to decrypt message]';
-
-  if (message.isOwn) {
-    return (
-      <div className={`flex justify-end ${isGrouped ? 'mt-0.5' : 'mt-3'}`}>
-        <div className="max-w-[70%] flex flex-col items-end gap-0.5">
-          <div
-            className={`
-              px-4 py-2.5 rounded-2xl text-sm
-              bg-primary text-primary-foreground
-              ${isGrouped ? 'rounded-tr-md' : ''}
-            `}
-          >
-            {message.text}
-          </div>
-          {!isGrouped && (
-            <span className="text-xs text-muted-foreground px-1">
-              {timestamp}
-              {message.readAt && <span className="ml-1 text-complement-3">· Read</span>}
-              {!message.readAt && message.deliveredAt && (
-                <span className="ml-1 text-muted-foreground">· Delivered</span>
-              )}
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`flex justify-start ${isGrouped ? 'mt-0.5' : 'mt-3'}`}>
-      <div className="max-w-[70%] flex flex-col items-start gap-0.5">
-        <div
-          className={`
-            px-4 py-2.5 rounded-2xl text-sm
-            ${
-              isDecryptionError
-                ? 'bg-destructive/10 text-destructive italic'
-                : 'bg-muted text-foreground'
-            }
-            ${isGrouped ? 'rounded-tl-md' : ''}
-          `}
-        >
-          {message.text}
-        </div>
-        {!isGrouped && <span className="text-xs text-muted-foreground px-1">{timestamp}</span>}
-      </div>
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -180,8 +116,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isGrouped }) => 
  */
 function isWithinGroupWindow(a: DecryptedMessage, b: DecryptedMessage): boolean {
   if (!a.sentAt || !b.sentAt) return false;
-  const diffMs = b.sentAt.toDate().getTime() - a.sentAt.toDate().getTime();
-  return diffMs < 2 * 60 * 1000; // 2 minutes
+
+  // Helper to get a Date regardless of if it's a Timestamp or a serialized object
+  const getDate = (ts: any) => {
+    if (typeof ts.toDate === 'function') return ts.toDate();
+    if (ts.seconds) return new Date(ts.seconds * 1000); // Handle serialized Firestore object
+    return new Date(ts); // Fallback for strings
+  };
+
+  const diffMs = getDate(b).getTime() - getDate(a).getTime();
+  return diffMs < 2 * 60 * 1000;
 }
 
 export default MessageThread;

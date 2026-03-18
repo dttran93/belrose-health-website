@@ -54,6 +54,9 @@ import {
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { db } from '@/firebase/config';
+import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
+import { EncryptionService } from '@/features/Encryption/services/encryptionService';
+import { arrayBufferToBase64 } from '@/utils/dataFormattingUtils';
 import type { EncryptedMessage } from '../lib/sessionManager';
 
 // ---------------------------------------------------------------------------
@@ -68,8 +71,10 @@ export interface Conversation {
   participants: string[];
   createdAt: Timestamp;
   lastMessageAt: Timestamp | null;
-  /** Always a generic string — never exposes plaintext content */
+  /** AES-GCM encrypted preview text (base64) — never stores plaintext */
   lastMessagePreview: string;
+  /** IV for decrypting lastMessagePreview (base64) */
+  lastMessagePreviewIV?: string;
 }
 
 /**
@@ -113,7 +118,11 @@ export class MessageService {
     const currentUser = auth.currentUser;
     if (!currentUser) throw new Error('User not authenticated');
 
-    // Deterministic conversation ID — same result regardless of who calls it
+    // Guard against messaging yourself — would create a broken conversation
+    if (currentUser.uid === recipientUserId) {
+      throw new Error('Cannot create a conversation with yourself');
+    }
+
     const conversationId = buildConversationId(currentUser.uid, recipientUserId);
     const conversationRef = doc(db, 'conversations', conversationId);
     const snapshot = await getDoc(conversationRef);
@@ -146,18 +155,18 @@ export class MessageService {
     const q = query(
       collection(db, 'conversations'),
       where('participants', 'array-contains', currentUser.uid),
-      orderBy('lastMessageAt', 'desc')
+      orderBy('createdAt', 'desc')
     );
 
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map(
-      d =>
-        ({
-          id: d.id,
-          ...d.data(),
-        }) as Conversation
-    );
+    return snapshot.docs
+      .map(d => ({ id: d.id, ...d.data() }) as Conversation)
+      .sort((a, b) => {
+        const aTime = a.lastMessageAt?.toDate().getTime() ?? a.createdAt?.toDate().getTime() ?? 0;
+        const bTime = b.lastMessageAt?.toDate().getTime() ?? b.createdAt?.toDate().getTime() ?? 0;
+        return bTime - aTime;
+      });
   }
 
   /**
@@ -175,22 +184,32 @@ export class MessageService {
     const currentUser = auth.currentUser;
     if (!currentUser) throw new Error('User not authenticated');
 
+    // Order by createdAt rather than lastMessageAt for two reasons:
+    //   1. lastMessageAt is null on new conversations — Firestore excludes
+    //      null values from ordered queries, so new convos would disappear
+    //      from the list until the first message is sent
+    //   2. Avoids a composite index on (participants, lastMessageAt)
+    // We sort client-side by lastMessageAt after fetching instead.
     const q = query(
       collection(db, 'conversations'),
       where('participants', 'array-contains', currentUser.uid),
-      orderBy('lastMessageAt', 'desc')
+      orderBy('createdAt', 'desc')
     );
 
     return onSnapshot(
       q,
       (snapshot: QuerySnapshot<DocumentData>) => {
-        const conversations = snapshot.docs.map(
-          d =>
-            ({
-              id: d.id,
-              ...d.data(),
-            }) as Conversation
-        );
+        const conversations = snapshot.docs
+          .map(d => ({ id: d.id, ...d.data() }) as Conversation)
+          // Sort client-side: most recent message first,
+          // falling back to createdAt for conversations with no messages yet
+          .sort((a, b) => {
+            const aTime =
+              a.lastMessageAt?.toDate().getTime() ?? a.createdAt?.toDate().getTime() ?? 0;
+            const bTime =
+              b.lastMessageAt?.toDate().getTime() ?? b.createdAt?.toDate().getTime() ?? 0;
+            return bTime - aTime;
+          });
         onUpdate(conversations);
       },
       error => {
@@ -218,7 +237,8 @@ export class MessageService {
    */
   static async sendMessage(
     conversationId: string,
-    encryptedMessage: EncryptedMessage
+    encryptedMessage: EncryptedMessage,
+    plaintextPreview: string
   ): Promise<string> {
     const auth = getAuth();
     const currentUser = auth.currentUser;
@@ -237,12 +257,26 @@ export class MessageService {
       readAt: null,
     });
 
-    // Update conversation metadata for sorting/preview
-    // lastMessagePreview is intentionally generic — never exposes content
-    await updateDoc(doc(db, 'conversations', conversationId), {
+    // Encrypt the preview with the user's master key before storing
+    // Truncate to 60 chars — enough for a preview, not the full message
+    const conversationUpdate: Record<string, any> = {
       lastMessageAt: serverTimestamp(),
-      lastMessagePreview: 'New message',
-    });
+      lastMessagePreview: '…', // fallback if encryption fails
+    };
+
+    try {
+      const masterKey = await EncryptionKeyManager.getSessionKey();
+      if (masterKey) {
+        const preview = plaintextPreview.trim().slice(0, 60);
+        const { encrypted, iv } = await EncryptionService.encryptText(preview, masterKey);
+        conversationUpdate.lastMessagePreview = arrayBufferToBase64(encrypted);
+        conversationUpdate.lastMessagePreviewIV = arrayBufferToBase64(iv);
+      }
+    } catch {
+      // Non-fatal — preview just shows ellipsis
+    }
+
+    await updateDoc(doc(db, 'conversations', conversationId), conversationUpdate);
 
     console.log('✅ Message sent:', messageDoc.id);
     return messageDoc.id;

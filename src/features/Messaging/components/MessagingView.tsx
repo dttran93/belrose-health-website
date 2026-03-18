@@ -7,14 +7,19 @@
  * Left pane:  conversation list
  * Right pane: active message thread + input
  *
+ * Reads recipientId from the URL via useParams so navigation from
+ * NewConversationPanel (navigate('/app/messages/:id')) correctly
+ * opens the right thread even when already on the messages page.
+ *
  * Usage:
- *   <MessagingView />         — standalone page
- *   <MessagingView initialRecipientId="uid_abc" />  — open directly to a conversation
+ *   <MessagingView />   — standalone page, reads param from URL
  */
 
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, ArrowLeft } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ConversationList } from './ConversationList';
+import { NewConversationPanel } from './NewConversationPanel';
 import { MessageThread } from './MessageThread';
 import { MessageInput } from './MessageInput';
 import { useMessaging } from '../hooks/useMessaging';
@@ -23,24 +28,37 @@ import Avatar from '@/features/Users/components/Avatar';
 import type { BelroseUserProfile } from '@/types/core';
 
 // ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface MessagingViewProps {
-  /** Optional — open directly to a conversation on mount */
-  initialRecipientId?: string;
-}
-
-// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export const MessagingView: React.FC<MessagingViewProps> = ({ initialRecipientId }) => {
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
-  const [recipientUserId, setRecipientUserId] = useState<string>(initialRecipientId ?? '');
-  const [recipientProfile, setRecipientProfile] = useState<BelroseUserProfile | null>(null);
+export const MessagingView: React.FC = () => {
+  const { recipientId: urlRecipientId } = useParams<{ recipientId?: string }>();
+  const navigate = useNavigate();
 
-  // Load recipient profile whenever the selected recipient changes
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [recipientUserId, setRecipientUserId] = useState<string>(urlRecipientId ?? '');
+  const [recipientProfile, setRecipientProfile] = useState<BelroseUserProfile | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Suppress the slide transition on first render — without this the panels
+  // animate from their default positions on page load/refresh, causing a
+  // visible flash where NewConversationPanel partially slides into view.
+  // Must be useState (not useRef) so the re-render actually applies the class.
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // React to URL changes from deep links or browser back/forward
+  useEffect(() => {
+    if (urlRecipientId && urlRecipientId !== recipientUserId) {
+      setRecipientUserId(urlRecipientId);
+      setSelectedConversationId(null);
+      setIsSearching(false);
+    }
+  }, [urlRecipientId]);
+
+  // Load recipient profile whenever selected recipient changes
   useEffect(() => {
     if (!recipientUserId) {
       setRecipientProfile(null);
@@ -49,9 +67,23 @@ export const MessagingView: React.FC<MessagingViewProps> = ({ initialRecipientId
     getUserProfile(recipientUserId).then(setRecipientProfile);
   }, [recipientUserId]);
 
+  /**
+   * Called when user selects from ConversationList or NewConversationPanel.
+   * Updates state directly (no navigation needed — avoids React Router
+   * param-change detection issues when already on the messages page).
+   * Also updates the URL so the conversation is deep-linkable.
+   */
+  const handleSelectUser = (userId: string) => {
+    setRecipientUserId(userId);
+    setSelectedConversationId(null);
+    setIsSearching(false);
+    // Update URL for deep-linking without triggering a remount
+    navigate(`/app/messages/${userId}`, { replace: true });
+  };
+
   const handleSelectConversation = (conversationId: string, userId: string) => {
     setSelectedConversationId(conversationId);
-    setRecipientUserId(userId);
+    handleSelectUser(userId);
   };
 
   const recipientName = recipientProfile
@@ -63,32 +95,48 @@ export const MessagingView: React.FC<MessagingViewProps> = ({ initialRecipientId
   const hasActiveConversation = !!recipientUserId;
 
   return (
-    <div className="flex h-full bg-background rounded-2xl border border-border overflow-hidden shadow-sm">
+    <div className="flex h-full bg-background rounded-2xl border border-border/20 overflow-hidden shadow-sm">
       {/* ------------------------------------------------------------------ */}
-      {/* LEFT PANE — Conversation list                                        */}
+      {/* LEFT PANE — Conversation list / New conversation panel             */}
       {/* ------------------------------------------------------------------ */}
 
       <div
         className={`
-          flex flex-col border-r border-border bg-card
-          w-full md:w-80 lg:w-96 flex-shrink-0
+          flex flex-col border-r border-border/20 bg-card
+          w-full md:w-80 lg:w-96 flex-shrink-0 min-h-0
           ${hasActiveConversation ? 'hidden md:flex' : 'flex'}
         `}
       >
-        {/* Header */}
-        <div className="px-4 py-4 border-b border-border">
-          <div className="flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-complement-1" />
-            <h2 className="text-base font-semibold text-foreground">Messages</h2>
+        {/* Slide between ConversationList and NewConversationPanel */}
+        <div className="flex-1 grid grid-cols-1 grid-rows-1 overflow-hidden min-h-0 w-full">
+          {/* ConversationList — slides out left when searching */}
+          <div
+            className={`
+              col-start-1 row-start-1 flex flex-col overflow-hidden w-full
+               ${isMounted ? 'transition-all duration-300 ease-in-out' : ''}
+              ${isSearching ? '-translate-x-full invisible' : 'translate-x-0 visible'}
+          `}
+          >
+            <ConversationList
+              selectedConversationId={selectedConversationId}
+              onSelectConversation={handleSelectConversation}
+              onNewConversation={() => setIsSearching(true)}
+            />
           </div>
-        </div>
 
-        {/* Conversation list */}
-        <div className="flex-1 overflow-y-auto">
-          <ConversationList
-            selectedConversationId={selectedConversationId}
-            onSelectConversation={handleSelectConversation}
-          />
+          {/* NewConversationPanel — slides in from right when searching */}
+          <div
+            className={`
+            col-start-1 row-start-1 flex flex-col overflow-hidden w-full
+            ${isMounted ? 'transition-all duration-300 ease-in-out' : ''}
+            ${isSearching ? 'translate-x-0 visible' : 'translate-x-full invisible'}
+          `}
+          >
+            <NewConversationPanel
+              onClose={() => setIsSearching(false)}
+              onSelectUser={handleSelectUser}
+            />
+          </div>
         </div>
       </div>
 
@@ -107,6 +155,7 @@ export const MessagingView: React.FC<MessagingViewProps> = ({ initialRecipientId
             recipientUserId={recipientUserId}
             recipientProfile={recipientProfile}
             recipientName={recipientName}
+            onConversationReady={setSelectedConversationId}
             onBack={() => {
               setSelectedConversationId(null);
               setRecipientUserId('');
@@ -128,6 +177,7 @@ interface ActiveThreadProps {
   recipientUserId: string;
   recipientProfile: BelroseUserProfile | null;
   recipientName: string;
+  onConversationReady: (conversationId: string) => void;
   onBack: () => void;
 }
 
@@ -135,12 +185,19 @@ const ActiveThread: React.FC<ActiveThreadProps> = ({
   recipientUserId,
   recipientProfile,
   recipientName,
+  onConversationReady,
   onBack,
 }) => {
-  const { messages, isLoading, isSending, sendMessage, markAllRead } =
+  const { messages, isLoading, isSettingUp, isSending, sendMessage, markAllRead, conversationId } =
     useMessaging(recipientUserId);
 
-  // Mark messages as read when thread comes into view
+  // Sync the resolved conversationId back up to MessagingView so
+  // ConversationList can highlight the correct item — works for both
+  // DMs and future group conversations since it's always ID-based
+  useEffect(() => {
+    if (conversationId) onConversationReady(conversationId);
+  }, [conversationId]);
+
   useEffect(() => {
     markAllRead();
   }, [recipientUserId]);
@@ -148,8 +205,7 @@ const ActiveThread: React.FC<ActiveThreadProps> = ({
   return (
     <>
       {/* Thread header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card flex-shrink-0">
-        {/* Back button — mobile only */}
+      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/20 bg-card flex-shrink-0">
         <button
           onClick={onBack}
           className="md:hidden p-1.5 rounded-full hover:bg-muted transition-colors"
@@ -158,25 +214,39 @@ const ActiveThread: React.FC<ActiveThreadProps> = ({
           <ArrowLeft className="w-5 h-5 text-foreground" />
         </button>
 
-        <Avatar profile={recipientProfile} size="md" />
+        <Avatar profile={recipientProfile} size="sm" />
 
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground truncate">
             {recipientName || 'Loading...'}
           </p>
-          {recipientProfile?.affiliations && recipientProfile.affiliations.length > 0 && (
-            <p className="text-xs text-muted-foreground truncate">
-              {recipientProfile.affiliations[0]}
-            </p>
+          {isSettingUp && (
+            <p className="text-xs text-complement-4 truncate">Setting up secure messaging…</p>
           )}
+          {recipientProfile?.affiliations &&
+            recipientProfile.affiliations.length > 0 &&
+            !isSettingUp && (
+              <p className="text-xs text-muted-foreground truncate">
+                {recipientProfile.affiliations[0]}
+              </p>
+            )}
         </div>
       </div>
 
       {/* Message thread */}
-      <MessageThread messages={messages} isLoading={isLoading} recipientName={recipientName} />
+      <MessageThread
+        messages={messages}
+        isLoading={isLoading || isSettingUp}
+        recipientName={recipientName}
+      />
 
-      {/* Input */}
-      <MessageInput onSend={sendMessage} isSending={isSending} disabled={isLoading} />
+      {/* Input — disabled while setting up so user can't send before keys exist */}
+      <MessageInput
+        onSend={sendMessage}
+        isSending={isSending}
+        disabled={isLoading || isSettingUp}
+        placeholder={isSettingUp ? 'Setting up secure messaging…' : 'Message...'}
+      />
     </>
   );
 };

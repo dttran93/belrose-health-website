@@ -65,8 +65,8 @@ const App: React.FC = (): React.JSX.Element => {
                   element={
                     <ProtectedRoute>
                       <EncryptionGate>
-                        <LayoutProvider>
-                          <AIChatProvider>
+                        <AIChatProvider>
+                          <LayoutProvider>
                             <Layout>
                               <Routes>
                                 <Route index element={<AppPortal />} />
@@ -91,8 +91,8 @@ const App: React.FC = (): React.JSX.Element => {
                                 <Route path="messages/:recipientId" element={<Messaging />} />
                               </Routes>
                             </Layout>
-                          </AIChatProvider>
-                        </LayoutProvider>
+                          </LayoutProvider>
+                        </AIChatProvider>
                       </EncryptionGate>
                     </ProtectedRoute>
                   }

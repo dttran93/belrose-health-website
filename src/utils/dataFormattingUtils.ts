@@ -79,6 +79,7 @@ export type DateFormatOption =
   | 'month-year' // "Nov 2025"
   | 'time-only' // "4:35 PM"
   | 'relative' // "2 hours ago" / "yesterday"
+  | 'chat' // Today --> "4:20PM", This week --> "Mon" older --> "Apr 20"
   | 'custom'; // Use custom options parameter
 
 /**
@@ -158,6 +159,23 @@ export const formatTimestamp = (
 
     case 'relative':
       return formatRelativeTime(timestamp);
+
+    case 'chat': {
+      const now = new Date();
+      const isToday = date.toDateString() === now.toDateString();
+      if (isToday) {
+        return date.toLocaleTimeString('en-GB', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        });
+      }
+      const daysDiff = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysDiff < 7) {
+        return date.toLocaleDateString('en-GB', { weekday: 'short' });
+      }
+      return date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
+    }
 
     case 'custom':
       if (!customOptions) {

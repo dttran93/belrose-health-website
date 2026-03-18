@@ -14,6 +14,10 @@ const MEMBER_ROLE_MANAGER_ABI = [
     'function deactivateWallet(address wallet) external',
     'function reactivateWallet(address wallet) external',
     'function initializeRecordRole(string recordId, address targetWallet, string role) external',
+    // Controller Trustee Functions (called directly by user wallets, not admin)
+    'function proposeController(bytes32 controllerIdHash) external',
+    'function acceptController(bytes32 trustorIdHash) external',
+    'function revokeController(bytes32 trustorIdHash, bytes32 controllerIdHash) external',
     // View Functions
     'function ownersByRecord(string recordId, uint256 index) external view returns (bytes32)',
     'function adminsByRecord(string recordId, uint256 index) external view returns (bytes32)',
@@ -21,6 +25,8 @@ const MEMBER_ROLE_MANAGER_ABI = [
     'function getRecordAdmins(string recordId) external view returns (bytes32[])',
     'function getUserForWallet(address wallet) external view returns (bytes32)',
     'function wallets(address wallet) external view returns (bytes32 userIdHash, bool isWalletActive)',
+    'function isControllerOf(bytes32 trustorIdHash, bytes32 controllerIdHash) external view returns (bool)',
+    'function getControllerStatus(bytes32 trustorIdHash, bytes32 controllerIdHash) external view returns (uint8)',
 ];
 // ============================================================================
 // HELPERS
@@ -47,7 +53,7 @@ function getAdminContract() {
 // ============================================================================
 /**
  * Register a new member/Wallet combination on the blockchain
- * One member can be associated with multiple wallets, so this can be
+ * One member can be associated with multiple wallets
  */
 exports.registerMemberOnChain = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_PRIVATE_KEY', 'RPC_URL'] }, async (request) => {
     if (!request.auth)

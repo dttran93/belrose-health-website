@@ -96,8 +96,8 @@ function DesktopSidebar({
 
       {/* Navigation — hidden labels when collapsed */}
       <div className="flex-1 p-4 space-y-6 overflow-y-auto">
-        {navigationSections.map(section => (
-          <div key={section.label}>
+        {navigationSections.map((section, index) => (
+          <div key={section.label ?? `section-${index}`}>
             {!isCollapsed && section.label && (
               <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 text-gray-400">
                 {section.label}

@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.aiChat = exports.getSponsorshipStatus = exports.signSponsorship = exports.onRecordDeletionEventUpdated = exports.onRecordDeletionEventCreated = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.sendWaitlistConfirmationEmail = exports.sendAlphaApprovalEmail = exports.sendShareInvitationEmail = exports.personaWebhook = exports.checkVerificationStatus = exports.createVerificationSession = exports.getEncryptedWallet = exports.createWallet = exports.createDetailedNarrative = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = void 0;
+exports.getKeyBundle = exports.aiChat = exports.getSponsorshipStatus = exports.signSponsorship = exports.onRecordDeletionEventUpdated = exports.onRecordDeletionEventCreated = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.createGuestInvite = exports.sendWaitlistConfirmationEmail = exports.sendAlphaApprovalEmail = exports.sendShareInvitationEmail = exports.personaWebhook = exports.checkVerificationStatus = exports.createVerificationSession = exports.getEncryptedWallet = exports.createWallet = exports.createDetailedNarrative = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = void 0;
 // functions/src/index.ts
 const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin
@@ -66,6 +66,8 @@ var sendAlphaApprovalEmail_1 = require("./handlers/sendAlphaApprovalEmail");
 Object.defineProperty(exports, "sendAlphaApprovalEmail", { enumerable: true, get: function () { return sendAlphaApprovalEmail_1.sendAlphaApprovalEmail; } });
 var sendWaitlistConfirmationEmail_1 = require("./handlers/sendWaitlistConfirmationEmail");
 Object.defineProperty(exports, "sendWaitlistConfirmationEmail", { enumerable: true, get: function () { return sendWaitlistConfirmationEmail_1.sendWaitlistConfirmationEmail; } });
+var createGuestInvite_1 = require("./handlers/createGuestInvite");
+Object.defineProperty(exports, "createGuestInvite", { enumerable: true, get: function () { return createGuestInvite_1.createGuestInvite; } });
 // ==================== HEALTH CHECK ====================
 var healthCheck_1 = require("./handlers/healthCheck");
 Object.defineProperty(exports, "health", { enumerable: true, get: function () { return healthCheck_1.health; } });
@@ -91,4 +93,7 @@ Object.defineProperty(exports, "getSponsorshipStatus", { enumerable: true, get: 
 // ==================== AI CHAT FUNCTIONS ====================
 var aiChat_1 = require("./handlers/aiChat");
 Object.defineProperty(exports, "aiChat", { enumerable: true, get: function () { return aiChat_1.aiChat; } });
+// ==================== MESSAGING FUNCTIONS ====================
+var getKeyBundle_1 = require("./handlers/getKeyBundle");
+Object.defineProperty(exports, "getKeyBundle", { enumerable: true, get: function () { return getKeyBundle_1.getKeyBundle; } });
 //# sourceMappingURL=index.js.map

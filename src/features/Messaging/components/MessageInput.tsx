@@ -64,7 +64,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   };
 
   return (
-    <div className="flex items-end gap-2 px-4 py-3 border-t border-border bg-background">
+    <div className="flex items-end gap-2 px-4 py-3 border-t border-border/20 bg-background">
       <textarea
         ref={textareaRef}
         value={text}
@@ -74,7 +74,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         disabled={disabled || isSending}
         rows={1}
         className={`
-          flex-1 resize-none rounded-2xl border border-border bg-muted/50
+          flex-1 resize-none rounded-2xl border border-border/20 bg-muted/50
           px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground
           focus:outline-none focus:ring-2 focus:ring-complement-1/30 focus:border-complement-1
           transition-all duration-150 leading-5

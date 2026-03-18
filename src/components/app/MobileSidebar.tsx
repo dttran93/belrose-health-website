@@ -82,8 +82,8 @@ function MobileSidebar({
         {/* Navigation - Scrollable */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-6">
-            {navigationSections.map(section => (
-              <div key={section.label}>
+            {navigationSections.map((section, index) => (
+              <div key={section.label ?? `section-${index}`}>
                 {section.label && (
                   <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 text-gray-400">
                     {section.label}

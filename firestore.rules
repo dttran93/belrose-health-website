@@ -129,7 +129,7 @@ service cloud.firestore {
         allow delete: if request.auth.uid == userId && isServerWrite();
       }
 
-      // -- CHATS COLLECTION ---
+      // -- AI CHATS COLLECTION ---
       match /chats/{chatId} {
         // Helper: Check if user owns this chat
         function isOwner() {
@@ -160,7 +160,7 @@ service cloud.firestore {
         // DELETE: User can delete their own chats
         allow delete: if isOwner();
 
-        // --- MESSAGES SUBCOLLECTION ---
+        // --- AI CHAT MESSAGES SUBCOLLECTION ---
         match /messages/{messageId} {
           // READ: Only chat owner can read messages
           allow read: if request.auth != null && request.auth.uid == userId;
@@ -180,6 +180,14 @@ service cloud.firestore {
           // DELETE: Only chat owner can delete messages
           allow delete: if request.auth != null && request.auth.uid == userId;
         }
+      }
+
+      // --- MESSAGE BACKUPS SUBCOLLECTION ---
+      match /messageBackups/{conversationId} {
+        // Only the owner can read/write their own backups.
+        // The backup contains AES-encrypted plaintext — nobody else
+        // should be able to read or modify it.
+        allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }
 
@@ -690,6 +698,129 @@ service cloud.firestore {
 
       // DELETE: Not allowed — soft delete only
       allow delete: if false;
+    }
+
+  // ============================================
+  // MESSAGING
+  // ============================================
+  
+    match /conversations/{conversationId} {
+      function isParticipant() {
+        return request.auth.uid in resource.data.participants;
+      }
+    
+      // Helper for creates — resource doesn't exist yet so we read from request
+      function isParticipantOnCreate() {
+        return request.auth.uid in request.resource.data.participants;
+      }
+    
+      // READ: Only participants can read a conversation
+      allow read: if request.auth != null && (
+        !exists(/databases/$(database)/documents/conversations/$(conversationId)) ||
+        isParticipant()
+      );
+    
+      // CREATE: Any authenticated user can create a conversation provided:
+      //   - They include themselves as a participant (can't create on behalf of others)
+      //   - Exactly 2 participants (direct messaging only for now)
+      //   - Required metadata fields are present
+      allow create: if request.auth != null &&
+        isParticipantOnCreate() &&
+        request.resource.data.participants.size() == 2 &&
+        request.resource.data.participants is list &&
+        request.resource.data.lastMessageAt == null &&
+        request.resource.data.lastMessagePreview is string;
+    
+      // UPDATE: Only participants can update, and only the metadata fields
+      // that messageService.sendMessage() touches. Message content itself
+      // lives in the subcollection — this document is just housekeeping.
+      allow update: if request.auth != null &&
+        isParticipant() &&
+        // Participants list is immutable — conversations can't be reassigned
+        request.resource.data.participants == resource.data.participants &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        // Only these fields can change
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['lastMessageAt', 'lastMessagePreview','lastMessagePreviewIV']);
+    
+      // DELETE: Not allowed — conversations are permanent records
+      // (soft delete via a field could be added later if needed)
+      allow delete: if false;
+    
+      // --- MESSAGES SUBCOLLECTION ---
+      match /messages/{messageId} {
+    
+        // READ: Only conversation participants can read messages
+        allow read: if request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+    
+        // CREATE: Only participants can send messages
+        // We validate the shape but NOT the ciphertext content —
+        // the server is zero-knowledge about message content by design.
+        allow create: if request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants &&
+          // Sender must be the authenticated user
+          request.resource.data.senderId == request.auth.uid &&
+          // Signal Protocol message types: 1 = WhisperMessage, 3 = PreKeyWhisperMessage
+          request.resource.data.type in [1, 3] &&
+          // Ciphertext body must be a non-empty string
+          request.resource.data.body is string &&
+          request.resource.data.body.size() > 0 &&
+          request.resource.data.registrationId is int &&
+          request.resource.data.sentAt is timestamp &&
+          // Delivery/read receipts start null
+          request.resource.data.deliveredAt == null &&
+          request.resource.data.readAt == null;
+    
+        // UPDATE: Only the RECIPIENT can update delivery/read receipts
+        // Senders cannot mark their own messages as read (avoids spoofing)
+        allow update: if request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants &&
+          // Cannot be the original sender (recipients update receipts only)
+          request.auth.uid != resource.data.senderId &&
+          // Message content fields are all immutable
+          request.resource.data.senderId == resource.data.senderId &&
+          request.resource.data.type == resource.data.type &&
+          request.resource.data.body == resource.data.body &&
+          request.resource.data.registrationId == resource.data.registrationId &&
+          request.resource.data.sentAt == resource.data.sentAt &&
+          // Only receipt fields can be updated
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['deliveredAt', 'readAt']);
+    
+        // DELETE: Not allowed — message history is permanent
+        allow delete: if false;
+      }
+    }
+    
+    // ============================================
+    // SIGNAL PROTOCOL KEY BUNDLES
+    // ============================================
+    
+    match /users/{userId}/signal/{document} {
+    
+      // READ: Any authenticated user can fetch another user's public key bundle.
+      // This is required for X3DH — Alice needs Bob's public keys to initiate
+      // a session. The bundle contains ONLY public keys, never private keys.
+      // OPK consumption (the sensitive part) is handled by a Cloud Function
+      // with a Firestore transaction, not directly by clients.
+      allow read: if request.auth != null;
+    
+      // CREATE/UPDATE: Only the key owner can write their own bundle.
+      // Validation ensures only public key material is stored
+      // (private keys never leave the client device / IndexedDB).
+      allow create, update: if request.auth != null &&
+        request.auth.uid == userId &&
+        request.resource.data.registrationId is int &&
+        request.resource.data.identityKey is string &&
+        request.resource.data.signedPreKey is map &&
+        request.resource.data.signedPreKey.keyId is int &&
+        request.resource.data.signedPreKey.publicKey is string &&
+        request.resource.data.signedPreKey.signature is string &&
+        request.resource.data.oneTimePreKeys is list;
+    
+      // DELETE: Users can delete their own key bundle (e.g. account deletion)
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
     // ============================================

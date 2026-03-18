@@ -26,6 +26,10 @@ export const db: Firestore = getFirestore(app);
 export const storage: FirebaseStorage = getStorage(app);
 export const functions = getFunctions(app);
 
+if (import.meta.env.DEV) {
+  connectFunctionsEmulator(functions, 'localhost', 5001);
+}
+
 export { firebaseConfig };
 
 export default app;
