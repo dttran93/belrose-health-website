@@ -42,6 +42,7 @@ const CHAIN = sepolia;
 interface SponsorshipResponse {
   sponsored: boolean;
   signature?: string;
+  validUntil?: number;
   reason?: string;
 }
 
@@ -294,6 +295,7 @@ export class PaymasterService {
     const validAfter = 0; // Valid immediately
 
     // 2. Format as 6-byte hex strings
+    // Note: confirmedValidUntilHex (from backend response) is used for final paymasterData
     const validUntilHex = pad(toHex(validUntil), { size: 6 });
     const validAfterHex = pad(toHex(validAfter), { size: 6 });
 
@@ -327,15 +329,16 @@ export class PaymasterService {
     console.log('📝 PaymasterService: UserOpHash:', userOpHash);
 
     // 6. Request sponsorship signature from backend
-    const signature = await this.requestSponsorship(
+    const { signature, validUntil: confirmedValidUntil } = await this.requestSponsorship(
       userOpHash,
       smartAccountAddress,
       validUntil,
       validAfter
     );
 
-    // 7. Build final paymasterData with real signature
-    const finalPaymasterData = concat([validUntilHex, validAfterHex, signature as Hex]);
+    // 7. Build final paymasterData with real signature and confirmed validUntil
+    const confirmedValidUntilHex = pad(toHex(confirmedValidUntil), { size: 6 });
+    const finalPaymasterData = concat([confirmedValidUntilHex, validAfterHex, signature as Hex]);
 
     console.log('✅ PaymasterService: Final paymaster data ready');
 
@@ -358,7 +361,7 @@ export class PaymasterService {
     sender: string,
     validUntil: number,
     validAfter: number
-  ): Promise<string> {
+  ): Promise<{ signature: string; validUntil: number }> {
     console.log('💰 PaymasterService: Requesting sponsorship from backend...');
 
     const functions = getFunctions();
@@ -373,7 +376,11 @@ export class PaymasterService {
       throw new Error(result.data.reason || 'Sponsorship denied');
     }
 
+    if (!result.data.signature || result.data.validUntil === undefined) {
+      throw new Error('Backend returned sponsored: true but missing signature or validUntil');
+    }
+
     console.log('✅ PaymasterService: Sponsorship approved!');
-    return result.data.signature!;
+    return { signature: result.data.signature, validUntil: result.data.validUntil };
   }
 }

@@ -71,6 +71,17 @@ It is key to distinguish subjects and participants
 - **Subject:** The person the record is _about_ (the patient)
 - **Participant:** Anyone with a role on the record (from MemberRoleManager)
 
+### Controllers and Delegated Anchoring
+
+A user with a Controller trustee relationship (see MemberRoleManager docs) can perform
+anchoring operations on behalf of their trustor. This is the key mechanism for
+managed care scenarios — e.g. a parent anchoring records on behalf of a child.
+
+The `subjectIdHash` parameter on anchoring functions controls this:
+
+- Pass `bytes32(0)` (or your own hash) → act as yourself (default behaviour)
+- Pass a trustor's `userIdHash` → act on their behalf, if you are their active Controller
+
 ### There are two potential flows for anchoring/verification of a record
 
 **1. User anchoring themselves to a record before a verification or dispute**
@@ -96,20 +107,22 @@ It is key to distinguish subjects and participants
 
 ### 1. Anchor a Record (Patient)
 
-**What it does:** Patient links themselves to a record with its hash
-
 ```typescript
-// Patient anchors themselves to record
-const tx = await healthRecordCore.anchorRecord(recordId, recordHash);
+// Anchor as yourself (most common case)
+const tx = await healthRecordCore.anchorRecord(recordId, recordHash, ethers.ZeroHash);
+
+// Anchor on behalf of someone you are a Controller for
+const tx = await healthRecordCore.anchorRecord(recordId, recordHash, trustorUserIdHash);
 await tx.wait();
 ```
 
 **Requirements:**
 
 - Caller must have an active role on the record (from MemberRoleManager)
-- Patient can't already be anchored to this record
+- Subject can't already be anchored to this record
 - If first subject: establishes the initial hash
 - If additional subjects: they confirm the existing hash
+- If acting as a Controller, the trustee relationship must be active
 
 ### 2. Add a New Record Hash (Provider)
 

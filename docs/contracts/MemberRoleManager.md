@@ -58,6 +58,38 @@ Three types of roles for record access:
 | **Administrator** | Manage record, invite users | Admins, Viewers    |
 | **Viewer**        | Read-only access            | No one             |
 
+### Trustee Relationships
+
+Trustee relationships are account-level trust grants between two identities. Unlike roles
+(which are scoped to a specific record), a trustee relationship gives one person
+standing access across all of the records in which the trustor is the subject.
+
+**How it works:**
+
+1. Trustor proposes a trustee relationship (Step 1)
+2. Trustee accepts the proposal (Step 2)
+3. The trustee is granted access to the trustors records and will be added to any future records in which the trustor is the subject
+
+**Trust Levels:**
+
+| Level          | Value | What the Trustee Gets                                 |
+| -------------- | ----- | ----------------------------------------------------- |
+| **Observer**   | 0     | Always gets viewer role, regardless of trustor's role |
+| **Custodian**  | 1     | Mirrors trustor's role, capped at administrator       |
+| **Controller** | 2     | Mirrors trustor's role exactly, including owner       |
+
+**Typical use cases:**
+
+- A parent managing a child's health records (Controller)
+- A carer with read-only access to a patient's records (Observer)
+- A healthcare proxy with administrative but not ownership rights (Custodian)
+
+**Key rules:**
+
+- Either party can revoke the relationship at any time
+- The trustor can update the trust level without requiring re-acceptance
+- A trustee cannot appoint themselves; a trustor cannot appoint themselves
+
 ## Common Operations
 
 ### 1. Register a New User Wallet
@@ -148,6 +180,23 @@ await tx.wait();
 
 **Note:** You cannot revoke an owner. Owners must remove themselves.
 
+### 6. Set Up a Trustee Relationship
+
+**Step 1 — Trustor proposes:**
+
+```typescript
+// TrusteeLevel: 0 = Observer, 1 = Custodian, 2 = Controller
+const tx = await contract.proposeTrustee(trusteeIdHash, 2); // Controller
+await tx.wait();
+```
+
+**Step 2 — Trustee accepts:**
+
+```typescript
+const tx = await contract.acceptTrustee(trustorIdHash);
+await tx.wait();
+```
+
 ## Business Rules (Enforced by Contract)
 
 ### Role Granting Rules
@@ -231,6 +280,19 @@ const totalUsers = await contract.getTotalUsers();
 
 // Total role assignments across all records
 const totalRoles = await contract.getTotalRoles();
+```
+
+### Trustee Relationships
+
+```typescript
+// Check if an active trustee relationship exists and get its details
+const [status, level] = await contract.getTrusteeRelationship(trustorIdHash, trusteeIdHash);
+// status: 0=None, 1=Pending, 2=Active, 3=Revoked
+// level: 0=Observer, 1=Custodian, 2=Controller
+
+// Check specifically if someone is a Controller of another identity
+// (used internally by HealthRecordCore to resolve subject permissions)
+const isController = await contract.isControllerOf(trustorIdHash, controllerIdHash);
 ```
 
 ## Integration with Firebase

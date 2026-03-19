@@ -11,11 +11,15 @@ Health records do not truly exist. Records are siloed across multiple providers,
 
 ## Our Solution
 
-- **Patient-Owned Records**: Allow patients sovereignty over their data and the ability to capture the economics and value that comes from it.
-- **Interoperability Standards**: Transform those records into standardize FHIR format so data can work across healthcare systems.
+- **Collect Records**: Build systems to allow patients to utilize their GDPR/HIPAA rights to compel medical professionals to provide them their health records
+- **Standardize, Interoperable Records**: Transform those records into standardize FHIR format so data can work across healthcare systems.
 - **Client-Side Encryption**: Records are encrypted with a user's encryption key before uploading. Therefore only the patient has access.
+- **Share At Will**: Build granular permission controls to give users complete control over who they share their records with.
 - **Blockchain Verification**: Health data is hashed and stored on the blockchain along with verifications and disputes from third-parties.
-- **Incentivization**: Build resources and infrastructure around these records to make people healthier.
+
+This all enables the ultimate goal:
+
+- **Sovereignty**: Allow patients sovereignty over their data and the ability to capture the economics and value that comes from it.
 
 ## Tech Stack
 
@@ -26,6 +30,7 @@ Health records do not truly exist. Records are siloed across multiple providers,
 - Blockchain (Solidity) for data verification
 - Pimlico - Account Abstraction for gasless blockchain transactions
 - Firebase (backend database, authentication, and file storage)
+- Signal Protocol - For E2EE encrypted Messaging
 
 ## Project Status
 

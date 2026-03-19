@@ -71,9 +71,13 @@ async function checkRateLimit(db, userId, userOpHash) {
  * Build the signature for the paymaster
  * Format: [paymaster(20)][validUntil(6)][validAfter(6)][signature(65)]
  */
-async function buildSignature(userOpHash, validUntil, //client provided to ensure hashes match
-validAfter, //client provided to ensure hashes match
+async function buildSignature(userOpHash, validUntil, // client-provided, clamped server-side before use
+validAfter, //client-provided, used as-is (always 0 in practice)
 signerPrivateKey) {
+    //Server-side cap - skeptical of client-provided validUntil
+    const MAX_VALIDITY_SECONDS = 300;
+    const serverMaxValidUntil = Math.floor(Date.now() / 1000) + MAX_VALIDITY_SECONDS;
+    const safeValidUntil = Math.min(validUntil, serverMaxValidUntil);
     // Create signer
     const signingKey = new ethers_1.ethers.SigningKey(signerPrivateKey);
     const abiCoder = new ethers_1.ethers.AbiCoder();
@@ -81,12 +85,12 @@ signerPrivateKey) {
     if (!PAYMASTER_CONTRACT_ADDRESS) {
         throw new Error('Contract Address Missing');
     }
-    // Matches Solidity: abi.encode(innerHash, chainId, address, until, after)
+    // 1. Compute Hash Matches Solidity: abi.encode(innerHash, chainId, address, until, after)
     const encodedData = abiCoder.encode(['bytes32', 'uint256', 'address', 'uint48', 'uint48'], [
         userOpHash,
         BigInt(CHAIN_ID),
         ethers_1.ethers.getAddress(PAYMASTER_CONTRACT_ADDRESS),
-        BigInt(validUntil),
+        BigInt(safeValidUntil),
         BigInt(validAfter),
     ]);
     const hashToSign = ethers_1.ethers.keccak256(encodedData);
@@ -95,7 +99,8 @@ signerPrivateKey) {
     console.log('UserOpHash:', userOpHash);
     console.log('ChainId:', CHAIN_ID);
     console.log('PaymasterAddr:', PAYMASTER_CONTRACT_ADDRESS);
-    console.log('ValidUntil:', validUntil);
+    console.log('ValidUntil (client):', validUntil);
+    console.log('ValidUntil (clamped by backend):', safeValidUntil);
     console.log('ValidAfter:', validAfter);
     console.log('Final Hash to Sign:', hashToSign);
     console.log('RAW ENCODED DATA:', encodedData);
@@ -108,7 +113,7 @@ signerPrivateKey) {
     console.log('--- SIGNATURE CHECK ---');
     console.log('Signature Length (chars):', signature.length); // Should be 132 (0x + 130)
     console.log('Full Signature Hex:', signature);
-    return signature;
+    return { signature, safeValidUntil };
 }
 // ==================== MAIN HANDLER ====================
 /**
@@ -172,13 +177,13 @@ exports.signSponsorship = (0, https_1.onCall)({
             return { sponsored: false, reason: rateLimitCheck.reason };
         }
         // 6. Build signature
-        const signature = await buildSignature(userOpHash, validUntil, validAfter, signerKey);
+        const { signature, safeValidUntil } = await buildSignature(userOpHash, validUntil, validAfter, signerKey);
         // 7. Log for analytics (optional)
         await db.collection('paymasterLogs').add({
             userId,
             sender,
             userOpHash,
-            validUntil,
+            validUntil: safeValidUntil,
             validAfter,
             timestamp: new Date(),
             sponsored: true,
@@ -187,6 +192,7 @@ exports.signSponsorship = (0, https_1.onCall)({
         return {
             sponsored: true,
             signature,
+            validUntil: safeValidUntil,
         };
     }
     catch (error) {
