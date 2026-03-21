@@ -38,6 +38,19 @@ In order to achieve our goal of patient sovereignty over health data, records ne
 - Roles are assigned to the **identity** not individual wallets
 - Any wallet linked to an identity can exercise that identity's permissions
 
+### Why userIdHash Instead of userId
+
+Every on-chain identity deliberately uses a Keccak256 hash of the user's Firebase UID (`ethers.id(userId)`) rather than the UID itself.
+
+Firebase UIDs are effectively permanent identifiers tied directly to a real person's account — knowing someone's UID gives you a direct handle on their identity, similar to knowing their email address. If UIDs were stored on a
+public blockchain, it would be much easier to:
+
+- Look up a specific person's record permissions and role assignments
+- Send unsolicited trustee proposals or role grants to known users
+- Build a map of who has access to whose records
+
+By hashing the UID before putting it on chain, the public blockchain contains only opaque 32-byte values. The app is built so that you only have access to search for people if they have opted in, you know their exact uid or email, or you have shared records.
+
 ### Member Registry Status Levels
 
 | Status               | Value | Description         | Can Do                |

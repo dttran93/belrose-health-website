@@ -73,9 +73,7 @@ It is key to distinguish subjects and participants
 
 ### Controllers and Delegated Anchoring
 
-A user with a Controller trustee relationship (see MemberRoleManager docs) can perform
-anchoring operations on behalf of their trustor. This is the key mechanism for
-managed care scenarios — e.g. a parent anchoring records on behalf of a child.
+A user with a Controller trustee relationship (see MemberRoleManager docs) can perform anchoring operations on behalf of their trustor. This is the key mechanism for managed care scenarios — e.g. a parent anchoring records on behalf of a child.
 
 The `subjectIdHash` parameter on anchoring functions controls this:
 
@@ -101,7 +99,7 @@ The `subjectIdHash` parameter on anchoring functions controls this:
 
 1. The ethos of Belrose is patient sovereignty, however there are certainly situations where sovereignty must be balanced with accuracy and public safety. Imagine for example, a user suffering from opioid addiction, they may not want opioid addiction to appear on their record and could reject requests to anchor themselves as subject to a record that includes information on the treatment of their opioid addiction
 2. In the case where a patient does not accept a provider's request for the patient to anchor themselves as subject to a record, a provider can drop the request if they feel it is not vital to the patient's medical history OR escalate it to Belrose
-3. If it is escalated, Belrose may flag the unaccepted update on chain. The flag would contain only the target subject's userIdHash as well as a recordId linked to a provider's verification. So although they would not know the record contents, Future providers would be able to determine that there may be information missing from the patient's record
+3. If it is escalated, Belrose may flag the unaccepted update on chain. The flag would contain only the target subject's userIdHash as well as a recordId linked to a provider's verification. So although they would not know the record contents, Future providers would be able to determine that there may be information missing from the patient's record. The full flow for this is still under development.
 
 ## Common Operations
 

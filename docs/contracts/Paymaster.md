@@ -2,7 +2,7 @@
 
 ## Why This Exists
 
-Every write operation on the Ethereum blockchai nrequires the sender to pay "gas" - a fee for the computation. Without the paymaster, every user would need to have ETH in their wallet just to share a record or post a verification, creating a terrible UX and a significant barrier to adoption.
+Every write operation on the Ethereum blockchain requires the sender to pay "gas" - a fee for the computation. Without the paymaster, every user would need to have ETH in their wallet just to share a record or post a verification, creating a terrible UX and a significant barrier to adoption.
 
 The Belrose Paymaster uses ERC-4337 Account Abstraction and Pimlico's bundler to allow Belrose to sponsor gas costs on behalf of users, making blockchain operations like sharing a record or anchoring a record (see HealthRecordCore and MemberRoleManager contracts) feel like a normal Web2 App.
 
@@ -23,8 +23,7 @@ User does something in the app that requires a blockchain write (e.g. sharing a 
 
 ### Step 2 - Frontend Requests Sponsorship (Frontend --> Backend)
 
-The frontend sends the `userOpHash` (a hash of the UserOperation) to the Firebase
-backend function `signSponsorship` in `paymaster.ts`.
+The frontend sends the `userOpHash` (a hash of the UserOperation) to the Firebase backend function `signSponsorship` in `paymaster.ts`.
 
 ### Step 3 - Backend validates and signs (Backend)
 
@@ -183,16 +182,12 @@ paymaster: {
 3. Receive back `{signature, validUntil} ` - using the backend's confirmed `validUntil`, not the locally computed one
 4. Bulid final `paymasterData` using `confirmedValidUntilHex` from the backend response
 
-**The two-phase approach exists because of a chicken-and-egg problem:** you need
-gas estimates to compute the hash, but you need the hash to get the signature, and
-you need the signature to have a valid UserOperation. Stub data breaks the cycle.
+**The two-phase approach exists because of a chicken-and-egg problem:** you need gas estimates to compute the hash, but you need the hash to get the signature, and you need the signature to have a valid UserOperation. Stub data breaks the cycle.
 
 **How Feature Services Use This**
 
 Any feature that needs to write to the blockchain calls `PaymasterService.sendTransaction`
 with a simple `{ to, data, value }` object.
-
-Example from blockchainHealthRecordService.ts:
 
 ```typescript
   /** Execute a write transaction via PaymasterService */
