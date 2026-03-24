@@ -2,11 +2,11 @@
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
-import sgMail from '@sendgrid/mail';
 import { defineSecret } from 'firebase-functions/params';
+import { Resend } from 'resend';
 
-// Define SendGrid API key as a secret
-const sendgridKey = defineSecret('SENDGRID_API_KEY');
+// Define Resend API key as a secret
+const resendKey = defineSecret('RESEND_API_KEY');
 
 interface ShareInvitationData {
   senderName: string;
@@ -27,7 +27,7 @@ interface ShareInvitationResult {
  */
 export const sendShareInvitationEmail = onCall(
   {
-    secrets: [sendgridKey], // Make the secret available to this function
+    secrets: [resendKey], // Make the secret available to this function
   },
   async (request): Promise<ShareInvitationResult> => {
     // Verify the user is authenticated
@@ -35,12 +35,8 @@ export const sendShareInvitationEmail = onCall(
       throw new HttpsError('unauthenticated', 'User must be authenticated to send invitations.');
     }
 
-    // Initialize SendGrid
-    const apiKey = sendgridKey.value();
-    if (!apiKey) {
-      throw new HttpsError('failed-precondition', 'SendGrid API key not configured');
-    }
-    sgMail.setApiKey(apiKey);
+    // Initialize Resend
+    const resend = new Resend(resendKey.value());
 
     // Extract and validate data
     const data = request.data as ShareInvitationData;
@@ -60,7 +56,7 @@ export const sendShareInvitationEmail = onCall(
 
       if (receiverQuery.empty) {
         // User doesn't exist - send signup invitation
-        await sendSignupInvitation(senderName, senderEmail, receiverEmail, recordName);
+        await sendSignupInvitation(resend, senderName, senderEmail, receiverEmail, recordName);
         return {
           success: true,
           message: 'Signup invitation sent',
@@ -73,7 +69,13 @@ export const sendShareInvitationEmail = onCall(
 
       if (receiverData.emailVerified === false) {
         // User exists but email not verified - send verification reminder
-        await sendVerificationReminder(senderName, receiverEmail, recordName, receiverDoc.id);
+        await sendVerificationReminder(
+          resend,
+          senderName,
+          receiverEmail,
+          recordName,
+          receiverDoc.id
+        );
         return {
           success: true,
           message: 'Verification reminder sent',
@@ -98,6 +100,7 @@ export const sendShareInvitationEmail = onCall(
  * Send an invitation to sign up for Belrose
  */
 async function sendSignupInvitation(
+  resend: Resend,
   senderName: string,
   senderEmail: string,
   receiverEmail: string,
@@ -114,7 +117,7 @@ async function sendSignupInvitation(
   });
 
   // Send the actual email
-  const msg = {
+  await resend.emails.send({
     to: receiverEmail,
     from: 'noreply@belrosehealth.com',
     subject: `${senderName} wants to share a health record with you`,
@@ -201,9 +204,7 @@ Get started: ${getFrontendUrl()}/register?invite=${encodeURIComponent(receiverEm
 Best regards,
 The Belrose Health Team
     `,
-  };
-
-  await sgMail.send(msg);
+  });
   console.log(`✅ Signup invitation sent to ${receiverEmail}`);
 }
 
@@ -211,6 +212,7 @@ The Belrose Health Team
  * Send a reminder to verify email
  */
 async function sendVerificationReminder(
+  resend: Resend,
   senderName: string,
   receiverEmail: string,
   recordName: string,
@@ -321,7 +323,7 @@ The Belrose Health Team
     `,
   };
 
-  await sgMail.send(msg);
+  await resend.emails.send(msg);
   console.log(`✅ Verification reminder sent to ${receiverEmail}`);
 }
 

@@ -3,7 +3,8 @@
 import React from 'react';
 import { XCircle, Wallet, User } from 'lucide-react';
 import type { UserData } from '@/features/MemberBlockchainViewer/lib/types';
-import { truncateHash, copyToClipboard } from '@/features/MemberBlockchainViewer/lib/utils';
+import { truncateHash } from '@/features/MemberBlockchainViewer/lib/utils';
+import { copyToClipboard } from '@/utils/browserUtils';
 
 interface WalletsPanelProps {
   user: UserData;

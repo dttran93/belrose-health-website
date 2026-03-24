@@ -14,13 +14,6 @@ export function truncateHash(hash: string, startChars = 6, endChars = 4): string
 }
 
 /**
- * Copy text to clipboard
- */
-export function copyToClipboard(text: string): void {
-  navigator.clipboard.writeText(text);
-}
-
-/**
  * Get status display info (label, color, icon)
  */
 export function getStatusInfo(status: UserStatus): {

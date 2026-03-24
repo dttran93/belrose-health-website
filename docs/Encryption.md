@@ -6,8 +6,7 @@ The central promise of Belrose is data sovereignty - the idea that a person's he
 
 Most platforms encrypt data "at rest" on their servers, which means the platform holds the encryption keys and can read your data when they want, hand it over to anyone they want, expose it in a breach, or monetise it. Customers just have to hope those things do not happen.
 
-Belrose takes a different approach: **encryption keys are derived from the user's password and never leave the device in unencrypted form**. The data that reaches our servers is already encrypted. We physically cannot read it. Neither can our engineers, nor anyone with access to our Firebase instance, nor law enforcement with a server
-warrant. The only people who can decrypt a Belrose record are people who hold an encryption key for it — and those keys are controlled entirely by the user.
+Belrose takes a different approach: **encryption keys are derived from the user's password and never leave the device in unencrypted form**. The data that reaches our servers is already encrypted. We physically cannot read it. Even law enforcement with a warrant would be unable to read the records. The only people who can decrypt a Belrose record are people who hold an encryption key for it — and those keys are controlled entirely by the user.
 
 This is not novel technology. WhatsApp, ProtonMail, and Signal all operate on the same principle. Belrose applies it to health data.
 
@@ -62,7 +61,7 @@ Refer to BelroseSignalProtocol for further discussion.
 
 ## Registration: Setting Up the Key Hierarchy
 
-Everything in the encryption system is set up during registartion in the `handleStepComplete` call in `RegistrationForm.tsx`. The steps in order:
+Everything in the encryption system is set up during registration in the `handleStepComplete` call in `RegistrationForm.tsx`. The steps in order:
 
 **1. Generate master key**
 A fresh 256-bit AES-GCM key is generated using `crypto.subtle.generateKey`. This is centerpiece of the user's encryption stack.
@@ -77,8 +76,7 @@ A fresh 256-bit AES-GCM key is generated using `crypto.subtle.generateKey`. This
 The KEK is never stored. It is re-derived on demand from the password each time the user logs in.
 
 **3. Generate recovery key**
-The master key is exported as raw bytes and converted to a BIP-39 24-word mnemonic (the same wordlist used by crypto wallets). This gives the user a human-readable backup. A SHA-256 hash of the recovery key is stored in Firestore so we can verify
-it without storing the key itself. The recovery key is shown to the user once and never stored anywhere on Belrose's servers.
+The master key is exported as raw bytes and converted to a BIP-39 24-word mnemonic (the same wordlist used by crypto wallets). This gives the user a human-readable backup. A SHA-256 hash of the recovery key is stored in Firestore so we can verify it without storing the key itself. The recovery key is shown to the user once and never stored anywhere on Belrose's servers.
 
 **4. Generate RSA key pair**
 A 2048-bit RSA-OAEP key pair is generated for record sharing. The public key is stored plaintext in Firestore. The private key is encrypted with the master key and stored in Firestore under `encryption.encryptedPrivateKey`. Only masterKey can decrypt.
@@ -173,8 +171,7 @@ When a user grants someone access to a record (`SharingService.grantEncryptionAc
 4. Call `SharingKeyManagementService.wrapKey` — RSA-OAEP wraps the DEK with the recipient's public key
 5. Store a new `wrappedKeys` document for the recipient with `isCreator: false`
 
-The recipient can now decrypt the DEK using their RSA private key (which only they can access, since it's encrypted with their master key). The granter never sees the recipient's private key; the recipient never sees the granter's master key. Neither
-party's root secret is exposed.
+The recipient can now decrypt the DEK using their RSA private key (which only they can access, since it's encrypted with their master key). The granter never sees the recipient's private key; the recipient never sees the granter's master key. Neither party's root secret is exposed.
 
 **Revoking access** is simple: set `isActive: false` on the recipient's `wrappedKeys` document. Their key is immediately invalidated — they can no longer call `getRecordKey` successfully.
 
@@ -198,20 +195,17 @@ The AI itself receives decrypted content only within the context of a specific A
 
 ### The AI Lab Exposure Problem
 
-Client-side encryption protects data at rest in Belrose's infrastructure, but there is an inherent tension with AI features: to generate a response, the AI model must receive decrypted health data in plaintext. That plaintext travels
-to a third-party AI lab's servers — outside Belrose's zero-knowledge perimeter.
+Client-side encryption protects data at rest in Belrose's infrastructure, but there is an inherent tension with AI features: to generate a response, the AI model must receive decrypted health data in plaintext. That plaintext travels to a third-party AI lab's servers — outside Belrose's zero-knowledge perimeter.
 
 This is a known and acknowledged limitation. The risk depends entirely on what the AI lab does with the data once it receives it.
 
 **Current position (Alpha):**
 
-Most major AI APIs (Anthropic, OpenAI etc.) operate under API terms that distinguish between API usage and consumer product usage. API calls are generally not used to train models and are not retained beyond the immediate request by default. This is meaningfully different from consumer products like ChatGPT where data may be used for training. However, "generally not retained"
-is a contractual assurance from a third party, not a technical guarantee — Belrose cannot verify it independently.
+Most major AI APIs (Anthropic, OpenAI etc.) operate under API terms that distinguish between API usage and consumer product usage. API calls are generally not used to train models and are not retained beyond the immediate request by default. This is meaningfully different from consumer products like ChatGPT where data may be used for training. However, "generally not retained" is a contractual assurance from a third party, not a technical guarantee — Belrose cannot verify it independently.
 
 **Step 1 — Zero-data-retention agreements:**
 
-Before any production launch involving real patient data, Belrose will establish formal zero-data-retention (ZDR) agreements with AI providers. These are enterprise-tier contracts where the provider contractually commits to not logging, storing, or training on any data from Belrose's API calls. Anthropic, OpenAI, and other major providers offer these agreements at enterprise tier. This converts "generally not retained by policy" into a contractual obligation with legal
-recourse.
+Before any production launch involving real patient data, Belrose will establish formal zero-data-retention (ZDR) agreements with AI providers. These are enterprise-tier contracts where the provider contractually commits to not logging, storing, or training on any data from Belrose's API calls. Anthropic, OpenAI, and other major providers offer these agreements at enterprise tier. This converts "generally not retained by policy" into a contractual obligation with legal recourse.
 
 **Step 2 — Open-source models on Belrose-controlled infrastructure:**
 
@@ -239,9 +233,7 @@ either prepended to the file (first 12 bytes) or stored separately depending on
 the context. The file is decrypted after download using the same record DEK used
 for the text fields of that record.
 
-This means Firebase Storage holds only ciphertext. Even with direct Storage
-access, the files are unreadable without the record DEK, which requires the
-user's master key to unwrap.
+This means Firebase Storage holds only ciphertext. Even with direct Storage access, the files are unreadable without the record DEK, which requires the user's master key to unwrap.
 
 ---
 
@@ -271,7 +263,7 @@ Name, email, and eventually phone number are stored unencrypted in the `users/{u
 - **Email delivery** — sending verification emails, notifications, and account recovery communications requires access to the user's email address.
 - **Future 2FA** — phone-based two-factor authentication requires the server to be able to initiate an SMS or call to the registered number.
 
-The boundary we are draing is that: anything required to operate the account is plaintext; anything that is the health content of the account, records, AI Chats, messages, files, is encrypted.
+The boundary we are drawing is that: anything required to operate the account is plaintext; anything that is the health content of the account, records, AI Chats, messages, files, is encrypted.
 
 ---
 

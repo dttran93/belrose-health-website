@@ -1,6 +1,6 @@
 // src/features/Settings/services/userSettingsService.ts
 
-import { getFirestore, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import {
   getAuth,
   verifyBeforeUpdateEmail,
@@ -8,7 +8,10 @@ import {
   sendEmailVerification,
   EmailAuthProvider,
   reauthenticateWithCredential,
+  updatePassword,
 } from 'firebase/auth';
+import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 /**
  * Service for updating user settings/profile data
@@ -204,6 +207,62 @@ export class UserSettingsService {
       }
 
       throw new Error('Failed to send verification email');
+    }
+  }
+
+  static async updatePassword(
+    uid: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<void> {
+    const auth = getAuth();
+    const db = getFirestore();
+    const user = auth.currentUser;
+
+    if (!user || !user.email) throw new Error('User not authenticated');
+
+    // Step 1: Re-authenticate
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+
+    // Step 2: Unwrap master key with current password
+    const userDoc = await getDoc(doc(db, 'users', uid));
+    const { encryptedMasterKey, masterKeyIV, masterKeySalt } = userDoc.data()?.encryption;
+    const masterKey = await EncryptionKeyManager.unwrapMasterKeyWithPassword(
+      encryptedMasterKey,
+      masterKeyIV,
+      currentPassword,
+      masterKeySalt
+    );
+
+    // Step 3: Re-wrap with new password
+    const { encryptedKey, iv, salt } = await EncryptionKeyManager.wrapMasterKeyWithPassword(
+      masterKey,
+      newPassword
+    );
+
+    // Step 4: Save new wrapped key to Firestore first
+    await updateDoc(doc(db, 'users', uid), {
+      'encryption.encryptedMasterKey': encryptedKey,
+      'encryption.masterKeyIV': iv,
+      'encryption.masterKeySalt': salt,
+      updatedAt: serverTimestamp(),
+    });
+
+    // Step 5: Update Firebase Auth password
+    await updatePassword(user, newPassword);
+
+    // Step 6: Send email
+    try {
+      const functions = getFunctions();
+      const notify = httpsCallable(functions, 'sendPasswordChangeEmail');
+      await notify({
+        email: user.email,
+        displayName: user.displayName,
+      });
+    } catch (err) {
+      console.error('Failed to send password change notification: ', err);
+      // Don't throw - password change was fine.
     }
   }
 }

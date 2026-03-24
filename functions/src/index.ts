@@ -28,6 +28,7 @@ export {
 export { sendShareInvitationEmail } from './handlers/sendShareInvitationEmail';
 export { sendAlphaApprovalEmail } from './handlers/sendAlphaApprovalEmail';
 export { sendWaitlistConfirmationEmail } from './handlers/sendWaitlistConfirmationEmail';
+export { sendPasswordChangeEmail } from './handlers/sendPasswordChangeEmail';
 export { createGuestInvite } from './handlers/createGuestInvite';
 
 // ==================== HEALTH CHECK ====================

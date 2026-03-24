@@ -50,22 +50,19 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendAlphaApprovalEmail = void 0;
 const admin = __importStar(require("firebase-admin"));
-const mail_1 = __importDefault(require("@sendgrid/mail"));
 const params_1 = require("firebase-functions/params");
 const firestore_1 = require("firebase-functions/v2/firestore");
-const sendgridKey = (0, params_1.defineSecret)('SENDGRID_API_KEY');
+const resend_1 = require("resend");
+const resendKey = (0, params_1.defineSecret)('RESEND_API_KEY');
 const APP_BASE_URL = process.env.APP_BASE_URL || 'https://app.belrosehealth.com';
 const FROM_EMAIL = 'noreply@belrosehealth.com';
 const FROM_NAME = 'Belrose Health';
 exports.sendAlphaApprovalEmail = (0, firestore_1.onDocumentUpdated)({
     document: 'invites/{email}',
-    secrets: [sendgridKey],
+    secrets: [resendKey],
 }, async (event) => {
     const before = event.data?.before.data();
     const after = event.data?.after.data();
@@ -83,7 +80,7 @@ exports.sendAlphaApprovalEmail = (0, firestore_1.onDocumentUpdated)({
         await event.data.after.ref.update({
             approvedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        mail_1.default.setApiKey(sendgridKey.value());
+        const resend = new resend_1.Resend(resendKey.value());
         // Format code with dashes for display: XXXX-XXXX-XXXX-XXXX
         const displayCode = code
             .toUpperCase()
@@ -91,9 +88,9 @@ exports.sendAlphaApprovalEmail = (0, firestore_1.onDocumentUpdated)({
             .match(/.{1,4}/g)
             ?.join('-') ?? code;
         const registrationUrl = `${APP_BASE_URL}/auth/register`;
-        await mail_1.default.send({
+        await resend.emails.send({
             to: email,
-            from: { email: FROM_EMAIL, name: FROM_NAME },
+            from: `${FROM_NAME} <${FROM_EMAIL}>`,
             subject: "You're in — here's your Belrose invite code 🎉",
             html: buildApprovalEmailHtml(email, displayCode, registrationUrl),
             text: buildApprovalEmailText(email, displayCode, registrationUrl),

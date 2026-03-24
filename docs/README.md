@@ -30,7 +30,7 @@ This all enables the ultimate goal:
 - Blockchain (Solidity) for data verification
 - Pimlico - Account Abstraction for gasless blockchain transactions
 - Firebase (backend database, authentication, and file storage)
-- Signal Protocol - For E2EE encrypted Messaging
+- Signal Protocol - For E2EE Messaging
 
 ## Project Status
 

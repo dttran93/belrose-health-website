@@ -18,12 +18,14 @@ interface UseUserSettingsReturn {
   isUpdatingEmail: boolean;
   isUpdatingPhoto: boolean;
   isResendingVerification: boolean;
+  isUpdatingPassword: boolean;
 
   // Actions
   updateName: (firstName: string, lastName: string) => Promise<boolean>;
   updateEmail: (newEmail: string, currentPassword: string) => Promise<boolean>;
   updatePhoto: (photoURL: string | null) => Promise<boolean>;
   resendEmailVerification: () => Promise<boolean>;
+  updatePassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
 
   // Refresh user data
   refreshUserProfile: () => Promise<BelroseUserProfile | null>;
@@ -39,6 +41,7 @@ export function useUserSettings(options: UseUserSettingsOptions = {}): UseUserSe
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
   const [isUpdatingPhoto, setIsUpdatingPhoto] = useState(false);
   const [isResendingVerification, setIsResendingVerification] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   const auth = getAuth();
 
@@ -140,6 +143,29 @@ export function useUserSettings(options: UseUserSettingsOptions = {}): UseUserSe
     [auth, handleSuccess, handleError]
   );
 
+  const updatePassword = useCallback(
+    async (currentPassword: string, newPassword: string): Promise<boolean> => {
+      const user = auth.currentUser;
+      if (!user) {
+        handleError('Not authenticated');
+        return false;
+      }
+
+      setIsUpdatingPassword(true);
+      try {
+        await UserSettingsService.updatePassword(user.uid, currentPassword, newPassword);
+        handleSuccess('Password updated successfully');
+        return true;
+      } catch (error: any) {
+        handleError(error.message || 'Failed to update password');
+        return false;
+      } finally {
+        setIsUpdatingPassword(false);
+      }
+    },
+    [auth, handleSuccess, handleError]
+  );
+
   /**
    * Resend email verification
    */
@@ -177,9 +203,11 @@ export function useUserSettings(options: UseUserSettingsOptions = {}): UseUserSe
     isUpdatingEmail,
     isUpdatingPhoto,
     isResendingVerification,
+    isUpdatingPassword,
     updateName,
     updateEmail,
     updatePhoto,
+    updatePassword,
     resendEmailVerification,
     refreshUserProfile,
   };

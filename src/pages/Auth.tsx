@@ -13,71 +13,65 @@ type AuthPageState = 'login' | 'alphaGate' | 'registration' | 'waitlist' | 'acco
 const Auth: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [gatedEmail, setGatedEmail] = useState('');
+  const [localView, setLocalView] = useState<'registration' | null>(null);
 
   // Derive initial view from route
-  const getInitialView = (): AuthPageState => {
+  const currentView = (): AuthPageState => {
     if (location.pathname === '/auth/register') return 'alphaGate';
-    // Direct hit on /waitlist renders the waitlist immediately
     if (location.pathname === '/waitlist') return 'waitlist';
+    if (location.pathname === '/auth/recover') return 'accountRecovery';
     return 'login';
   };
-
-  const [currentView, setCurrentView] = useState<AuthPageState>(getInitialView);
-  const [gatedEmail, setGatedEmail] = useState('');
-
-  useEffect(() => {
-    if (location.pathname === '/auth/register') {
-      setCurrentView('alphaGate');
-    } else if (location.pathname === '/waitlist') {
-      setCurrentView('waitlist');
-    } else {
-      setCurrentView('login');
-    }
-  }, [location.pathname]);
 
   // Called when AlphaGateScreen confirms the email is on the invite list
   const handleApproved = (email: string) => {
     setGatedEmail(email);
-    setCurrentView('registration');
+    setLocalView('registration');
   };
 
   // Called when AlphaGateScreen finds no invite for the email
   const handleNotApproved = (email: string) => {
     setGatedEmail(email);
-    setCurrentView('waitlist');
+    navigate('/waitlist');
   };
+
+  // The actual resolved view — local state overrides URL for mid-flow transitions
+  const resolvedView = localView ?? currentView();
+
+  // Clear local override when URL changes
+  useEffect(() => {
+    setLocalView(null);
+  }, [location.pathname]);
 
   return (
     <>
-      {currentView === 'login' && (
+      {resolvedView === 'login' && (
         <LoginForm
-          onSwitchToRegister={() => setCurrentView('alphaGate')}
-          onForgotPassword={() => setCurrentView('accountRecovery')}
+          onSwitchToRegister={() => navigate('/auth/register')}
+          onForgotPassword={() => navigate('/auth/recover')}
           onBack={() => navigate('/')}
         />
       )}
 
-      {currentView === 'alphaGate' && (
+      {resolvedView === 'alphaGate' && (
         <AlphaGateScreen
           onApproved={handleApproved}
           onNotApproved={handleNotApproved}
-          onSwitchToLogin={() => setCurrentView('login')}
+          onSwitchToLogin={() => navigate('/auth')}
         />
       )}
 
-      {currentView === 'registration' && (
-        <RegistrationForm
-          onSwitchToLogin={() => setCurrentView('login')}
-          // prefillEmail={gatedEmail}
-        />
+      {resolvedView === 'registration' && (
+        <RegistrationForm onSwitchToLogin={() => navigate('/auth')} />
       )}
 
-      {currentView === 'waitlist' && (
-        <WaitlistForm prefillEmail={gatedEmail} onBackToLogin={() => setCurrentView('login')} />
+      {resolvedView === 'waitlist' && (
+        <WaitlistForm prefillEmail={gatedEmail} onBackToLogin={() => navigate('/auth')} />
       )}
 
-      {currentView === 'accountRecovery' && (
-        <AccountRecovery onBackToLogin={() => setCurrentView('login')} />
+      {resolvedView === 'accountRecovery' && (
+        <AccountRecovery onBackToLogin={() => navigate('/auth')} />
       )}
     </>
   );

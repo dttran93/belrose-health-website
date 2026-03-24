@@ -42,8 +42,7 @@ In order to achieve our goal of patient sovereignty over health data, records ne
 
 Every on-chain identity deliberately uses a Keccak256 hash of the user's Firebase UID (`ethers.id(userId)`) rather than the UID itself.
 
-Firebase UIDs are effectively permanent identifiers tied directly to a real person's account — knowing someone's UID gives you a direct handle on their identity, similar to knowing their email address. If UIDs were stored on a
-public blockchain, it would be much easier to:
+Firebase UIDs are effectively permanent identifiers tied directly to a real person's account — knowing someone's UID gives you a direct handle on their identity, similar to knowing their email address. If UIDs were stored on a public blockchain, it would be much easier to:
 
 - Look up a specific person's record permissions and role assignments
 - Send unsolicited trustee proposals or role grants to known users

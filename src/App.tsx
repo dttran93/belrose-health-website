@@ -52,6 +52,7 @@ const App: React.FC = (): React.JSX.Element => {
                 {/* ── Auth & verification ── */}
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/auth/register" element={<Auth />} />
+                <Route path="/auth/recover" element={<Auth />} />
                 <Route path="/waitlist" element={<Auth />} />
                 <Route path="/verification" element={<VerificationHub />} />
                 <Route path="/verify-email" element={<EmailVerifiedPage />} />
@@ -73,15 +74,14 @@ const App: React.FC = (): React.JSX.Element => {
                                 <Route
                                   path="health-profile/:subjectId"
                                   element={<HealthProfile />}
-                                />{' '}
-                                {/* ← ADD */}
+                                />
                                 <Route path="ai/chat/:chatId" element={<AppPortal />} />
                                 <Route path="ai/history" element={<ChatHistoryPage />} />
                                 <Route path="all-records" element={<AllRecords />} />
                                 <Route path="records/:recordId" element={<RecordDetail />} />
                                 <Route path="add-record" element={<AddRecord />} />
                                 <Route path="hash-tester" element={<HashTester />} />
-                                <Route path="settings" element={<SettingsPage />} />
+                                <Route path="settings/*" element={<SettingsPage />} />
                                 <Route path="notifications" element={<NotificationsManager />} />
                                 <Route
                                   path="blockchain-admin"

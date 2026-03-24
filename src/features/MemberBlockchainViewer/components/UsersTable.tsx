@@ -4,12 +4,9 @@ import React from 'react';
 import { Eye, Wallet, User, Mail, CheckCircle, XCircle, Users } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import type { UserData } from '@/features/MemberBlockchainViewer/lib/types';
-import {
-  truncateHash,
-  copyToClipboard,
-  getStatusInfo,
-} from '@/features/MemberBlockchainViewer/lib/utils';
+import { truncateHash, getStatusInfo } from '@/features/MemberBlockchainViewer/lib/utils';
 import { EtherscanLink } from './EtherscanLink';
+import { copyToClipboard } from '@/utils/browserUtils';
 
 interface UsersTableProps {
   users: UserData[];

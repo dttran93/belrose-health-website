@@ -1,16 +1,7 @@
 import { useEffect, useState } from 'react';
-import {
-  Bell,
-  CircleUserRound,
-  CreditCard,
-  GlobeLock,
-  HeartHandshake,
-  Link,
-  Settings2,
-} from 'lucide-react';
-import UserSettings from '@/features/Settings/components/UserSettings';
+import GeneralSettings from '@/features/Settings/components/GeneralSettings';
 import { getAuth } from 'firebase/auth';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { UserService } from '@/features/Auth/services/userService';
 import { BelroseUserProfile } from '@/types/core';
 import { useUserSettings } from '@/features/Settings/hooks/useUserSettings';
@@ -19,27 +10,36 @@ import ChangeEmailModal from '@/features/Settings/components/ChangeEmailModal';
 import ChangePhotoModal from '@/features/Settings/components/ChangePhotoModal';
 import TrusteePage from '@/features/Trustee/components/TrusteePage';
 import SearchDiscoverabilityToggle from '@/features/Settings/components/SearchDiscoveryabilityToggle';
+import SettingsNav from '@/features/Settings/components/SettingsNav';
+import AccountSettings from '@/features/Settings/components/AccountSettings';
+import ChangePasswordModal from '@/features/Settings/components/ChangePasswordModal';
 
 const SettingsPage = () => {
   const auth = getAuth();
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState('profile');
   const [userProfile, setUserProfile] = useState<BelroseUserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const location = useLocation();
+
+  //Active Section for deriving URL - e.g. /app/settings/trustee --> trustee page
+  const activeSection = location.pathname.split('/').pop() || 'general';
 
   //Modal states
   const [isChangeNameModalOpen, setIsChangeNameModalOpen] = useState(false);
   const [isChangeEmailModalOpen, setIsChangeEmailModalOpen] = useState(false);
   const [isChangePhotoModalOpen, setIsChangePhotoModalOpen] = useState(false);
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
 
   //User settings hook
   const {
     isUpdatingName,
     isUpdatingEmail,
     isUpdatingPhoto,
+    isUpdatingPassword,
     updateName,
     updateEmail,
     updatePhoto,
+    updatePassword,
     refreshUserProfile,
   } = useUserSettings({
     onSuccess: async () => {
@@ -78,19 +78,15 @@ const SettingsPage = () => {
     fetchUserData();
   }, [auth.currentUser]);
 
-  const settingsSections = [
-    { id: 'profile', name: 'Profile', icon: CircleUserRound },
-    { id: 'trustee', name: 'Trustees', icon: HeartHandshake },
-    { id: 'wallet', name: 'Distributed Network Account', icon: Link },
-    { id: 'preferences', name: 'Preferences', icon: Settings2 },
-    { id: 'privacy', name: 'Privacy & Security', icon: GlobeLock },
-    { id: 'notifications', name: 'Notifications', icon: Bell },
-    { id: 'billing', name: 'Billing & Plans', icon: CreditCard },
-  ];
+  useEffect(() => {
+    if (activeSection === 'settings' || activeSection === '') {
+      navigate('/app/settings/general', { replace: true });
+    }
+  }, [activeSection]);
 
   const renderContent = () => {
     switch (activeSection) {
-      case 'profile':
+      case 'general':
         if (isLoading) {
           return (
             <div className="flex items-center justify-center py-12">
@@ -108,7 +104,7 @@ const SettingsPage = () => {
         }
 
         return (
-          <UserSettings
+          <GeneralSettings
             user={userProfile}
             onChangeName={() => setIsChangeNameModalOpen(true)}
             onChangeEmail={() => setIsChangeEmailModalOpen(true)}
@@ -119,72 +115,24 @@ const SettingsPage = () => {
           />
         );
 
+      case 'account':
+        if (!userProfile) {
+          return (
+            <div className="bg-white rounded-lg border p-8 text-center">
+              <p className="text-gray-600">Unable to load profile data</p>
+            </div>
+          );
+        }
+        return (
+          <AccountSettings
+            user={userProfile}
+            onChangeEmail={() => setIsChangeEmailModalOpen(true)}
+            onChangePassword={() => setIsChangePasswordModalOpen(true)}
+          />
+        );
+
       case 'trustee':
         return <TrusteePage />;
-
-      case 'wallet':
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                Distributed Network Account
-              </h2>
-              <p className="text-gray-600 mb-6">
-                Connect to the distirbuted network to enable verification for your medical records.
-                Your account will be permanently linked to your account for future use.
-              </p>
-            </div>
-          </div>
-        );
-
-      case 'preferences':
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Preferences</h2>
-              <div className="bg-white rounded-lg border p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium text-gray-900">Network Verification</h3>
-                    <p className="text-sm text-gray-600">
-                      Automatically verify new records on network
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium text-gray-900">Auto-connect Wallet</h3>
-                    <p className="text-sm text-gray-600">
-                      Automatically connect wallet when you sign in
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium text-gray-900">Email Notifications</h3>
-                    <p className="text-sm text-gray-600">
-                      Receive updates about your records and verifications
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
 
       case 'privacy':
         return (
@@ -224,34 +172,19 @@ const SettingsPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="flex">
-        {/* Sidebar */}
-        <div className="w-64 bg-white shadow-sm border-r border-gray-200 min-h-screen">
-          <div className="p-6">
-            <h1 className="text-xl font-semibold text-primary">Settings</h1>
-          </div>
-
-          <nav className="px-3">
-            {settingsSections.map(section => (
-              <button
-                key={section.id}
-                onClick={() => setActiveSection(section.id)}
-                className={`w-full flex items-center px-3 py-2 text-left rounded-lg mb-1 transition-colors ${
-                  activeSection === section.id
-                    ? 'bg-complement-1/10 text-primary'
-                    : 'text-foreground hover:bg-complement-1/5'
-                }`}
-              >
-                <section.icon className="mr-4 w-5 h-5" />
-                <span>{section.name}</span>
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex-1">
-          <div className="p-8">{renderContent()}</div>
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <header className="flex w-full mx-auto md:h-24 md:items-end">
+          <h1 className="flex items-center gap-2 text-center max-md:hidden min-w-0 font-semibold text-xl py-3">
+            <span>Settings</span>
+          </h1>
+        </header>
+        <div className="flex flex-col md:flex-row gap-0 items-start">
+          <SettingsNav
+            activeSection={activeSection}
+            onSectionChange={id => navigate(`/app/settings/${id}`)}
+          />
+          {/* Content */}
+          <div className="flex-1 min-w-0 md:pl-6">{renderContent()}</div>
         </div>
       </div>
 
@@ -280,6 +213,12 @@ const SettingsPage = () => {
             isLoading={isUpdatingPhoto}
             currentPhotoURL={userProfile.photoURL || null}
             userInitials={`${userProfile.firstName?.[0] || ''}${userProfile.lastName?.[0] || ''}`.toUpperCase()}
+          />
+          <ChangePasswordModal
+            isOpen={isChangePasswordModalOpen}
+            onClose={() => setIsChangePasswordModalOpen(false)}
+            onSubmit={updatePassword}
+            isLoading={isUpdatingPassword}
           />
         </>
       )}

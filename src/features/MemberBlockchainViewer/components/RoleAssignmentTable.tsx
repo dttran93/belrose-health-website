@@ -5,11 +5,11 @@ import { User, FileText } from 'lucide-react';
 import type { RoleAssignment } from '@/features/MemberBlockchainViewer/lib/types';
 import {
   truncateHash,
-  copyToClipboard,
   getRoleInfo,
   capitalizeFirst,
 } from '@/features/MemberBlockchainViewer/lib/utils';
 import { EtherscanLink } from './EtherscanLink';
+import { copyToClipboard } from '@/utils/browserUtils';
 
 interface RoleAssignmentsTableProps {
   assignments: RoleAssignment[];

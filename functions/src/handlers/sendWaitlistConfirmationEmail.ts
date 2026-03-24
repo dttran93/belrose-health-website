@@ -15,11 +15,11 @@
 //     notified: boolean         ← set to true after email is sent
 
 import * as admin from 'firebase-admin';
-import sgMail from '@sendgrid/mail';
 import { defineSecret } from 'firebase-functions/params';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { Resend } from 'resend';
 
-const sendgridKey = defineSecret('SENDGRID_API_KEY');
+const resendKey = defineSecret('RESEND_API_KEY');
 
 const MARKETING_URL = 'https://belrosehealth.com/#about';
 const FROM_EMAIL = 'noreply@belrosehealth.com';
@@ -28,7 +28,7 @@ const FROM_NAME = 'Belrose Health';
 export const sendWaitlistConfirmationEmail = onDocumentCreated(
   {
     document: 'waitlist/{email}',
-    secrets: [sendgridKey],
+    secrets: [resendKey],
   },
   async event => {
     const email = event.params.email;
@@ -42,13 +42,13 @@ export const sendWaitlistConfirmationEmail = onDocumentCreated(
         notified: true,
       });
 
-      sgMail.setApiKey(sendgridKey.value());
+      const resend = new Resend(resendKey.value());
 
       const marketingUrl = MARKETING_URL;
 
-      await sgMail.send({
+      await resend.emails.send({
         to: email,
-        from: { email: FROM_EMAIL, name: FROM_NAME },
+        from: `${FROM_NAME} <${FROM_EMAIL}>`,
         subject: "You're on the Belrose waitlist — here's what we're building",
         html: buildWaitlistEmailHtml(email, marketingUrl),
         text: buildWaitlistEmailText(email, marketingUrl),

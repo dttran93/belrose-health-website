@@ -2,11 +2,11 @@
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
-import sgMail from '@sendgrid/mail';
 import { defineSecret } from 'firebase-functions/params';
 import * as crypto from 'crypto';
+import { Resend } from 'resend';
 
-const sendgridKey = defineSecret('SENDGRID_API_KEY');
+const resendKey = defineSecret('RESEND_API_KEY');
 
 // ==================== TYPES ====================
 
@@ -54,7 +54,7 @@ function generateRsaKeyPair(): { publicKeyBase64: string; privateKeyBase64: stri
 // ==================== MAIN FUNCTION ====================
 
 export const createGuestInvite = onCall(
-  { secrets: [sendgridKey] },
+  { secrets: [resendKey] },
   async (request): Promise<CreateGuestInviteResult> => {
     // ── Auth check ──────────────────────────────────────────────────────────
     if (!request.auth) {
@@ -187,22 +187,21 @@ export const createGuestInvite = onCall(
     // intercepts the URL in transit, the key isn't in the logged path.
     //
     // URL format: /invite?token=<customToken>#<privateKeyBase64>
-    const appUrl = process.env.APP_URL || 'https://app.belrosehealth.com';
+    const appUrl = 'https://belrosehealth.com/app';
     const inviteUrl = `${appUrl}/invite?token=${customToken}#${privateKeyBase64}`;
 
-    const apiKey = sendgridKey.value();
-    if (apiKey) {
-      sgMail.setApiKey(apiKey);
-      await sgMail.send({
+    const resend = new Resend(resendKey.value());
+    try {
+      await resend.emails.send({
         to: doctorEmail,
-        from: 'noreply@belrosehealth.com',
+        from: 'Belrose Health <noreply@belrosehealth.com>',
         subject: `${patientName} has shared their health records with you`,
         html: buildInviteEmail(patientName, inviteUrl),
       });
       console.log(`✅ Invite email sent to ${doctorEmail}`);
-    } else {
-      // In dev/test environments SendGrid may not be configured — log and continue
-      console.warn('⚠️  SENDGRID_API_KEY not set. Skipping email send.');
+    } catch (emailError) {
+      // Log but don't fail the whole function — invite doc and token are already created
+      console.error('⚠️  Failed to send invite email:', emailError);
       console.log(`🔗 Invite URL (dev only): ${inviteUrl}`);
     }
 

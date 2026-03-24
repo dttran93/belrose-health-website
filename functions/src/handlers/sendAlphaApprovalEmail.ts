@@ -18,11 +18,11 @@
 //     registeredUserId?: string  ← set during registration to mark invite as used
 
 import * as admin from 'firebase-admin';
-import sgMail from '@sendgrid/mail';
 import { defineSecret } from 'firebase-functions/params';
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
+import { Resend } from 'resend';
 
-const sendgridKey = defineSecret('SENDGRID_API_KEY');
+const resendKey = defineSecret('RESEND_API_KEY');
 
 const APP_BASE_URL = process.env.APP_BASE_URL || 'https://app.belrosehealth.com';
 const FROM_EMAIL = 'noreply@belrosehealth.com';
@@ -31,7 +31,7 @@ const FROM_NAME = 'Belrose Health';
 export const sendAlphaApprovalEmail = onDocumentUpdated(
   {
     document: 'invites/{email}',
-    secrets: [sendgridKey],
+    secrets: [resendKey],
   },
   async event => {
     const before = event.data?.before.data();
@@ -55,7 +55,7 @@ export const sendAlphaApprovalEmail = onDocumentUpdated(
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      sgMail.setApiKey(sendgridKey.value());
+      const resend = new Resend(resendKey.value());
 
       // Format code with dashes for display: XXXX-XXXX-XXXX-XXXX
       const displayCode =
@@ -67,9 +67,9 @@ export const sendAlphaApprovalEmail = onDocumentUpdated(
 
       const registrationUrl = `${APP_BASE_URL}/auth/register`;
 
-      await sgMail.send({
+      await resend.emails.send({
         to: email,
-        from: { email: FROM_EMAIL, name: FROM_NAME },
+        from: `${FROM_NAME} <${FROM_EMAIL}>`,
         subject: "You're in — here's your Belrose invite code 🎉",
         html: buildApprovalEmailHtml(email, displayCode, registrationUrl),
         text: buildApprovalEmailText(email, displayCode, registrationUrl),

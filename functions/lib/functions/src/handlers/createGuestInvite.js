@@ -33,17 +33,14 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createGuestInvite = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
-const mail_1 = __importDefault(require("@sendgrid/mail"));
 const params_1 = require("firebase-functions/params");
 const crypto = __importStar(require("crypto"));
-const sendgridKey = (0, params_1.defineSecret)('SENDGRID_API_KEY');
+const resend_1 = require("resend");
+const resendKey = (0, params_1.defineSecret)('RESEND_API_KEY');
 // ==================== HELPERS ====================
 /**
  * Generate an RSA-OAEP key pair using Node's crypto module.
@@ -68,7 +65,7 @@ function generateRsaKeyPair() {
     };
 }
 // ==================== MAIN FUNCTION ====================
-exports.createGuestInvite = (0, https_1.onCall)({ secrets: [sendgridKey] }, async (request) => {
+exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async (request) => {
     // ── Auth check ──────────────────────────────────────────────────────────
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'You must be logged in to share records.');
@@ -180,22 +177,21 @@ exports.createGuestInvite = (0, https_1.onCall)({ secrets: [sendgridKey] }, asyn
     // intercepts the URL in transit, the key isn't in the logged path.
     //
     // URL format: /invite?token=<customToken>#<privateKeyBase64>
-    const appUrl = process.env.APP_URL || 'https://app.belrosehealth.com';
+    const appUrl = 'https://belrosehealth.com/app';
     const inviteUrl = `${appUrl}/invite?token=${customToken}#${privateKeyBase64}`;
-    const apiKey = sendgridKey.value();
-    if (apiKey) {
-        mail_1.default.setApiKey(apiKey);
-        await mail_1.default.send({
+    const resend = new resend_1.Resend(resendKey.value());
+    try {
+        await resend.emails.send({
             to: doctorEmail,
-            from: 'noreply@belrosehealth.com',
+            from: 'Belrose Health <noreply@belrosehealth.com>',
             subject: `${patientName} has shared their health records with you`,
             html: buildInviteEmail(patientName, inviteUrl),
         });
         console.log(`✅ Invite email sent to ${doctorEmail}`);
     }
-    else {
-        // In dev/test environments SendGrid may not be configured — log and continue
-        console.warn('⚠️  SENDGRID_API_KEY not set. Skipping email send.');
+    catch (emailError) {
+        // Log but don't fail the whole function — invite doc and token are already created
+        console.error('⚠️  Failed to send invite email:', emailError);
         console.log(`🔗 Invite URL (dev only): ${inviteUrl}`);
     }
     // ── Return to patient's client ───────────────────────────────────────────

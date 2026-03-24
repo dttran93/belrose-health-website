@@ -45,8 +45,8 @@ HealthRecordCore enables the system by:
 | **No Fault**        | 1     | Honest mistake, unavoidable      |
 | **Systemic**        | 2     | Process/system failure           |
 | **Preventable**     | 3     | Should have been caught          |
-| **Reckless**        | 2     | Careless disregard for accuracy  |
-| **Intentional**     | 3     | Deliberate falsification         |
+| **Reckless**        | 4     | Careless disregard for accuracy  |
+| **Intentional**     | 5     | Deliberate falsification         |
 
 - **Reactions:** Allow other record participants to support or oppose a dispute
 

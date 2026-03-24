@@ -47,22 +47,19 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendWaitlistConfirmationEmail = void 0;
 const admin = __importStar(require("firebase-admin"));
-const mail_1 = __importDefault(require("@sendgrid/mail"));
 const params_1 = require("firebase-functions/params");
 const firestore_1 = require("firebase-functions/v2/firestore");
-const sendgridKey = (0, params_1.defineSecret)('SENDGRID_API_KEY');
+const resend_1 = require("resend");
+const resendKey = (0, params_1.defineSecret)('RESEND_API_KEY');
 const MARKETING_URL = 'https://belrosehealth.com/#about';
 const FROM_EMAIL = 'noreply@belrosehealth.com';
 const FROM_NAME = 'Belrose Health';
 exports.sendWaitlistConfirmationEmail = (0, firestore_1.onDocumentCreated)({
     document: 'waitlist/{email}',
-    secrets: [sendgridKey],
+    secrets: [resendKey],
 }, async (event) => {
     const email = event.params.email;
     console.log(`✉️  Sending waitlist confirmation to: ${email}`);
@@ -72,11 +69,11 @@ exports.sendWaitlistConfirmationEmail = (0, firestore_1.onDocumentCreated)({
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             notified: true,
         });
-        mail_1.default.setApiKey(sendgridKey.value());
+        const resend = new resend_1.Resend(resendKey.value());
         const marketingUrl = MARKETING_URL;
-        await mail_1.default.send({
+        await resend.emails.send({
             to: email,
-            from: { email: FROM_EMAIL, name: FROM_NAME },
+            from: `${FROM_NAME} <${FROM_EMAIL}>`,
             subject: "You're on the Belrose waitlist — here's what we're building",
             html: buildWaitlistEmailHtml(email, marketingUrl),
             text: buildWaitlistEmailText(email, marketingUrl),

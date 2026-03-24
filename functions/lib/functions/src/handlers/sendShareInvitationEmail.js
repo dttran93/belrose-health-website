@@ -33,34 +33,27 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendShareInvitationEmail = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
-const mail_1 = __importDefault(require("@sendgrid/mail"));
 const params_1 = require("firebase-functions/params");
-// Define SendGrid API key as a secret
-const sendgridKey = (0, params_1.defineSecret)('SENDGRID_API_KEY');
+const resend_1 = require("resend");
+// Define Resend API key as a secret
+const resendKey = (0, params_1.defineSecret)('RESEND_API_KEY');
 /**
  * Cloud Function to send an email invitation when someone tries to share
  * a record with an unverified user
  */
 exports.sendShareInvitationEmail = (0, https_1.onCall)({
-    secrets: [sendgridKey], // Make the secret available to this function
+    secrets: [resendKey], // Make the secret available to this function
 }, async (request) => {
     // Verify the user is authenticated
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'User must be authenticated to send invitations.');
     }
-    // Initialize SendGrid
-    const apiKey = sendgridKey.value();
-    if (!apiKey) {
-        throw new https_1.HttpsError('failed-precondition', 'SendGrid API key not configured');
-    }
-    mail_1.default.setApiKey(apiKey);
+    // Initialize Resend
+    const resend = new resend_1.Resend(resendKey.value());
     // Extract and validate data
     const data = request.data;
     const { senderName, senderEmail, receiverEmail, recordName } = data;
@@ -73,7 +66,7 @@ exports.sendShareInvitationEmail = (0, https_1.onCall)({
         const receiverQuery = await usersRef.where('email', '==', receiverEmail).get();
         if (receiverQuery.empty) {
             // User doesn't exist - send signup invitation
-            await sendSignupInvitation(senderName, senderEmail, receiverEmail, recordName);
+            await sendSignupInvitation(resend, senderName, senderEmail, receiverEmail, recordName);
             return {
                 success: true,
                 message: 'Signup invitation sent',
@@ -84,7 +77,7 @@ exports.sendShareInvitationEmail = (0, https_1.onCall)({
         const receiverData = receiverDoc.data();
         if (receiverData.emailVerified === false) {
             // User exists but email not verified - send verification reminder
-            await sendVerificationReminder(senderName, receiverEmail, recordName, receiverDoc.id);
+            await sendVerificationReminder(resend, senderName, receiverEmail, recordName, receiverDoc.id);
             return {
                 success: true,
                 message: 'Verification reminder sent',
@@ -106,7 +99,7 @@ exports.sendShareInvitationEmail = (0, https_1.onCall)({
 /**
  * Send an invitation to sign up for Belrose
  */
-async function sendSignupInvitation(senderName, senderEmail, receiverEmail, recordName) {
+async function sendSignupInvitation(resend, senderName, senderEmail, receiverEmail, recordName) {
     // Store pending invitation in Firestore
     await admin.firestore().collection('pendingInvitations').add({
         senderName,
@@ -117,7 +110,7 @@ async function sendSignupInvitation(senderName, senderEmail, receiverEmail, reco
         status: 'pending',
     });
     // Send the actual email
-    const msg = {
+    await resend.emails.send({
         to: receiverEmail,
         from: 'noreply@belrosehealth.com',
         subject: `${senderName} wants to share a health record with you`,
@@ -202,14 +195,13 @@ Get started: ${getFrontendUrl()}/register?invite=${encodeURIComponent(receiverEm
 Best regards,
 The Belrose Health Team
     `,
-    };
-    await mail_1.default.send(msg);
+    });
     console.log(`✅ Signup invitation sent to ${receiverEmail}`);
 }
 /**
  * Send a reminder to verify email
  */
-async function sendVerificationReminder(senderName, receiverEmail, recordName, receiverUserId) {
+async function sendVerificationReminder(resend, senderName, receiverEmail, recordName, receiverUserId) {
     // Store pending share in Firestore
     await admin.firestore().collection('pendingInvitations').add({
         senderName,
@@ -313,7 +305,7 @@ Best regards,
 The Belrose Health Team
     `,
     };
-    await mail_1.default.send(msg);
+    await resend.emails.send(msg);
     console.log(`✅ Verification reminder sent to ${receiverEmail}`);
 }
 /**

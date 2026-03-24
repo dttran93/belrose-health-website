@@ -35,7 +35,6 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   isLoading,
   recipientName,
 }) => {
-  const { user } = useAuthContext();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages
