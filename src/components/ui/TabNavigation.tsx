@@ -4,7 +4,8 @@ import { LucideIcon } from 'lucide-react';
 export interface Tab {
   id: string;
   label: string;
-  icon?: LucideIcon; // Optional icon
+  shortLabel?: string; // Optional shorter label for compact display
+  icon?: LucideIcon;
 }
 
 export interface TabNavigationProps {
@@ -14,21 +15,19 @@ export interface TabNavigationProps {
 }
 
 export const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabChange, tabs }) => (
-  <div className="flex space-x-1 bg-background m-3 rounded-lg">
-    {tabs.map(({ id, label, icon: Icon }) => (
+  <div className="flex overflow-x-auto scrollbar-hide bg-background mx-3 mt-3 rounded-lg">
+    {tabs.map(({ id, label, shortLabel, icon: Icon }) => (
       <button
         key={id}
         onClick={() => onTabChange(id)}
-        className={`px-3 py-2 text-sm font-medium transition-colors ${
+        className={`flex-shrink-0 flex flex-col items-center gap-1 md:flex-row md:gap-2 px-3 md:px-4 py-2.5 text-xs font-medium transition-colors border-b-2 ${
           activeTab === id
-            ? 'bg-background text-complement-1 border-b border-complement-1'
-            : 'text-gray-600 hover:text-complement-1'
+            ? 'border-complement-1 text-complement-1'
+            : 'border-transparent text-muted-foreground hover:text-complement-1'
         }`}
       >
-        <div className="flex items-center space-x-2">
-          {Icon && <Icon className="w-4 h-4" />}
-          <span>{label}</span>
-        </div>
+        {Icon && <Icon className="w-4 h-4" />}
+        <span>{shortLabel ?? label}</span>
       </button>
     ))}
   </div>

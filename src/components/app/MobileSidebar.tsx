@@ -80,7 +80,7 @@ function MobileSidebar({
         <QuickActions onNewAiChat={handleNewAiChat} />
 
         {/* Navigation - Scrollable */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto dark-scroll">
           <div className="p-4 space-y-6">
             {navigationSections.map((section, index) => (
               <div key={section.label ?? `section-${index}`}>

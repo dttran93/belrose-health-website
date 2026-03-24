@@ -95,7 +95,7 @@ function DesktopSidebar({
       <QuickActions onNewAiChat={onNewAiChat} isCollapsed={isCollapsed} />
 
       {/* Navigation — hidden labels when collapsed */}
-      <div className="flex-1 p-4 space-y-6 overflow-y-auto">
+      <div className="flex-1 p-4 space-y-6 overflow-y-auto dark-scroll">
         {navigationSections.map((section, index) => (
           <div key={section.label ?? `section-${index}`}>
             {!isCollapsed && section.label && (
