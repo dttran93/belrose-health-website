@@ -395,33 +395,37 @@ export const RecordFull: React.FC<RecordFullProps> = ({
         )}
 
         {/* Main Header */}
-        <div className="bg-primary px-8 py-6 rounded-t-lg">
+        <div className="bg-primary px-4 md:px-8 py-6 rounded-t-lg">
           {/* Top Row - Badges and Actions */}
-          <div className="flex items-center justify-between space-x-1 mb-3">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            {/*Left: type badges - scrollable on mobile */}
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide min-w-0">
               {viewMode !== 'edit' && (
                 <>
-                  <span className="px-2 py-1 text-xs font-medium rounded-full border bg-background text-primary">
+                  <span className="flex-shrink-0 px-2 py-1 text-xs font-medium rounded-full border bg-background text-primary">
                     {displayRecord.belroseFields?.visitType}
                   </span>
-                  <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded border">
+                  <span className="flex-shrink-0 px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded border">
                     {displayRecord.sourceType}
                   </span>
                 </>
               )}
               {viewMode === 'edit' && (
-                <span className="px-2 py-1 text-xs font-medium bg-yellow-500/20 text-yellow-100 rounded border border-yellow-500/30">
+                <span className="flex-shrink-0 px-2 py-1 text-xs font-medium bg-yellow-500/20 text-yellow-100 rounded border border-yellow-500/30">
                   Editing Mode
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-1">
-              <SubjectBadge
-                record={record}
-                onOpenManager={handleSubjectPage}
-                onSuccess={() => {}}
-              />
+            {/**Right: credibility + divider + subject (md+) + menu + close */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <div className="hidden md:flex items-center">
+                <SubjectBadge
+                  record={record}
+                  onOpenManager={handleSubjectPage}
+                  onSuccess={() => {}}
+                />
+              </div>
               <CredibilityBadge score={record.credibility?.score} />
               {!readOnly && (
                 <HealthRecordMenu
@@ -468,19 +472,27 @@ export const RecordFull: React.FC<RecordFullProps> = ({
           ) : (
             // View Mode - Normal Header
             <>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4 text-white">
-                  <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold">{displayRecord.belroseFields?.title}</h1>
-                  </div>
-                </div>
-              </div>
+              <h1 className="text-xl md:text-2xl font-bold text-white mb-2 text-left">
+                {displayRecord.belroseFields?.title}
+              </h1>
 
-              <div className="flex text-sm text-white items-start gap-4 my-2">
-                <div>
-                  {displayRecord.belroseFields?.completedDate} •{' '}
-                  {displayRecord.belroseFields?.patient} • {displayRecord.belroseFields?.provider} •{' '}
-                  {displayRecord.belroseFields?.institution}
+              {/* Metadata — stacked on mobile, inline on md+ */}
+              <div className="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-white/80 mb-2">
+                <span>{displayRecord.belroseFields?.completedDate}</span>
+                {/* SubjectBadge inline with metadata on mobile only */}
+
+                <span className="text-white/30">•</span>
+                <span>{displayRecord.belroseFields?.patient}</span>
+                <span className="text-white/30">•</span>
+                <span>{displayRecord.belroseFields?.provider}</span>
+                <span className="text-white/30">•</span>
+                <span>{displayRecord.belroseFields?.institution}</span>
+                <div className="flex items-center gap-1 md:hidden">
+                  <SubjectBadge
+                    record={record}
+                    onOpenManager={handleSubjectPage}
+                    onSuccess={() => {}}
+                  />
                 </div>
               </div>
 
