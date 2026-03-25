@@ -176,9 +176,9 @@ export function AIChat({
   return (
     <>
       <LayoutSlot slot="header">
-        <div className="flex justify-between items-center p-3 rounded-lg">
+        <div className="flex justify-between items-center md:p-2 rounded-lg">
           <div className="flex gap-3">
-            <Button onClick={handleClearChat}>Clear Chat</Button>
+            <Button onClick={handleClearChat}>New Chat</Button>
           </div>
         </div>
       </LayoutSlot>

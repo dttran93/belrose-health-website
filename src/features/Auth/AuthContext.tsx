@@ -1,7 +1,6 @@
 import React, { createContext, useContext } from 'react';
 import { useAuth } from './hooks/useAuth';
-import { AuthContextData, AuthProviderProps } from '@/types/core'; // Import from core types
-import { useSignalSetup } from '../Messaging/hooks/useSignalSetup';
+import { AuthContextData, AuthProviderProps } from '@/types/core';
 
 const AuthContext = createContext<AuthContextData | null>(null);
 

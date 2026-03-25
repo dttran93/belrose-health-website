@@ -82,7 +82,7 @@ export function ErrorView({ error }: { error: Error }) {
 export function NoRecordsView() {
   return (
     <div className="min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 lg:py-8">
         <div className="rounded-xl shadow-sm border p-12 text-center">
           <div className="max-w-md mx-auto">
             <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -154,7 +154,7 @@ export function AIHealthAssistantView({
   onStop,
 }: AIHealthAssistantViewProps) {
   return (
-    <div className="min-h-screen max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen max-w-4xl mx-auto lg:px-8 lg:py-8">
       {/* AI Chat Component */}
       <div className="rounded-xl">
         <AIChat

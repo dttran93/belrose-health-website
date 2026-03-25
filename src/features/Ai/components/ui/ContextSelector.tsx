@@ -116,7 +116,7 @@ export function ContextSelector({
           }`}
         >
           <FileText className="w-4 h-4 text-gray-600" />
-          <span className="text-sm font-medium text-gray-700">{getContextLabel()}</span>
+          <span className="text-xs font-medium text-gray-700">{getContextLabel()}</span>
           <ChevronDown
             className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
           />

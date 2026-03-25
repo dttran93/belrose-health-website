@@ -29,7 +29,6 @@ function AppLayout({ children }: AppLayoutProps) {
 
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [isAIOpen, setIsAIOpen] = useState(false);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
 
   // Sidebar chat handlers
@@ -151,13 +150,7 @@ function AppLayout({ children }: AppLayoutProps) {
       />
 
       <div className="flex flex-1 overflow-hidden">
-        {!isAIOpen ? (
-          <main className="flex-1 p-6 overflow-auto">{children}</main>
-        ) : (
-          <>
-            <main className="flex-1 p-6 overflow-auto lg:block hidden">{children}</main>
-          </>
-        )}
+        <main className="flex-1 overflow-auto">{children}</main>
       </div>
 
       {/* Conditional Footer */}

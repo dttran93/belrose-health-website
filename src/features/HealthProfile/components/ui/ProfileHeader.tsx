@@ -44,7 +44,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
   // 1. Age/DOB Logic
   const userAgeInfo = userIdentity?.dateOfBirth
-    ? `${formatTimestamp(userIdentity.dateOfBirth, 'date-only')} (${calculateAge(userIdentity.dateOfBirth)} years old)`
+    ? `${formatTimestamp(userIdentity.dateOfBirth, 'date-short')} (${calculateAge(userIdentity.dateOfBirth)} years old)`
     : 'Missing Age Information';
 
   // 2. Gender Logic
@@ -100,7 +100,9 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               <div className="flex items-center text-sm gap-1.5 flex-wrap">
                 <div className="flex gap-1 items-center">
                   <User className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span>{subjectId}</span>
+                  <span className="truncate md:truncate-none max-w-[160px] md:max-w-none">
+                    {subjectId}
+                  </span>
                 </div>
                 <div className="hidden md:block h-3 w-px bg-border" />
                 <div className="flex gap-1 items-center">

@@ -30,11 +30,17 @@ export const RowShell: React.FC<RowShellProps> = ({
     <div className="rounded-lg hover:bg-muted/30 transition-colors">
       <div className="flex items-center gap-2 py-2 px-3">
         {/* Primary label — left-aligned, takes remaining space */}
-        <div className="flex-1 min-w-0 text-left">{primary}</div>
+        <div className="flex-shrink-0 min-w-0 max-w-[40%] md:flex-1 text-left truncate md:truncate-none">
+          {primary}
+        </div>
 
         {/* Secondary fields — right side, evenly spaced */}
         {children && (
-          <div className="flex items-center justify-between gap-4 flex-shrink-0">{children}</div>
+          <div className="flex-1 overflow-x-auto md:overflow-x-visible scrollbar-none">
+            <div className="flex items-center gap-4 flex-nowrap md:flex-wrap justify-end">
+              {children}
+            </div>
+          </div>
         )}
 
         {/* View record button — always visible */}
@@ -53,9 +59,9 @@ export const RowShell: React.FC<RowShellProps> = ({
           title={expanded ? 'Hide details' : 'Show details'}
         >
           {expanded ? (
-            <ChevronUp className="w-3.5 h-3.5" />
+            <ChevronUp className="flex-shrink-0 w-3.5 h-3.5" />
           ) : (
-            <ChevronDown className="w-3.5 h-3.5" />
+            <ChevronDown className="flex-shrink-0 w-3.5 h-3.5" />
           )}
         </button>
       </div>

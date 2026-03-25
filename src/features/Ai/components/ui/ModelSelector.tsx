@@ -120,7 +120,7 @@ export function ModelSelector({
           disabled ? 'opacity-50 cursor-not-allowed' : isOpen ? 'bg-gray-100' : 'hover:bg-gray-50'
         }`}
       >
-        <span className="text-sm font-medium text-gray-700">{selectedModel.name}</span>
+        <span className="text-xs font-medium text-gray-700">{selectedModel.name}</span>
         <ChevronDown
           className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
         />

@@ -37,11 +37,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
               })}
             </div>
           </div>
-
-          {/* Avatar */}
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
-            <User className="w-5 h-5 text-white" />
-          </div>
         </div>
       </div>
     );
@@ -51,25 +46,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
   return (
     <div className="flex gap-3 p-4">
       <div className="w-full max-w-3xl mx-auto flex gap-3">
-        {/* Avatar */}
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
-          <Bot className="w-5 h-5 text-white" />
-        </div>
-
         {/* Message content */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 mb-1">
-            <span className="font-semibold text-sm text-gray-900">
-              {message.model || 'Assistant'}
-            </span>
-            <span className="text-xs text-gray-500">
-              {message.timestamp.toDate().toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </span>
-          </div>
-
           <div className="text-left text-gray-800">
             <ReactMarkdown
               components={{
