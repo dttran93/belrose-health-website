@@ -21,7 +21,6 @@
  *     participants:     string[]       (array of Firebase Auth UIDs)
  *     createdAt:        Timestamp
  *     lastMessageAt:    Timestamp      (for sorting conversation list)
- *     lastMessagePreview: string       (always "New message" — never plaintext)
  *
  *   /conversations/{conversationId}/messages/{messageId}
  *     senderId:         string         (Firebase Auth UID)
@@ -54,9 +53,6 @@ import {
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { db } from '@/firebase/config';
-import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
-import { EncryptionService } from '@/features/Encryption/services/encryptionService';
-import { arrayBufferToBase64 } from '@/utils/dataFormattingUtils';
 import type { EncryptedMessage } from '../lib/sessionManager';
 
 // ---------------------------------------------------------------------------
@@ -72,9 +68,6 @@ export interface Conversation {
   createdAt: Timestamp;
   lastMessageAt: Timestamp | null;
   /** AES-GCM encrypted preview text (base64) — never stores plaintext */
-  lastMessagePreview: string;
-  /** IV for decrypting lastMessagePreview (base64) */
-  lastMessagePreviewIV?: string;
 }
 
 /**
@@ -133,7 +126,6 @@ export class MessageService {
         participants: [currentUser.uid, recipientUserId],
         createdAt: serverTimestamp(),
         lastMessageAt: null,
-        lastMessagePreview: 'New conversation',
       });
 
       console.log('✅ Conversation created:', conversationId);
@@ -237,8 +229,7 @@ export class MessageService {
    */
   static async sendMessage(
     conversationId: string,
-    encryptedMessage: EncryptedMessage,
-    plaintextPreview: string
+    encryptedMessage: EncryptedMessage
   ): Promise<string> {
     const auth = getAuth();
     const currentUser = auth.currentUser;
@@ -261,20 +252,7 @@ export class MessageService {
     // Truncate to 60 chars — enough for a preview, not the full message
     const conversationUpdate: Record<string, any> = {
       lastMessageAt: serverTimestamp(),
-      lastMessagePreview: '…', // fallback if encryption fails
     };
-
-    try {
-      const masterKey = await EncryptionKeyManager.getSessionKey();
-      if (masterKey) {
-        const preview = plaintextPreview.trim().slice(0, 60);
-        const { encrypted, iv } = await EncryptionService.encryptText(preview, masterKey);
-        conversationUpdate.lastMessagePreview = arrayBufferToBase64(encrypted);
-        conversationUpdate.lastMessagePreviewIV = arrayBufferToBase64(iv);
-      }
-    } catch {
-      // Non-fatal — preview just shows ellipsis
-    }
 
     await updateDoc(doc(db, 'conversations', conversationId), conversationUpdate);
 

@@ -12,9 +12,7 @@ import { MessageSquare, Loader2, Plus } from 'lucide-react';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { MessageService } from '../services/messageService';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
-import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
-import { EncryptionService } from '@/features/Encryption/services/encryptionService';
-import { base64ToArrayBuffer, formatTimestamp } from '@/utils/dataFormattingUtils';
+import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import Avatar from '@/features/Users/components/Avatar';
 import type { Conversation } from '../services/messageService';
 import type { BelroseUserProfile } from '@/types/core';
@@ -36,7 +34,7 @@ interface ConversationWithProfile {
   conversation: Conversation;
   recipientProfile: BelroseUserProfile | null;
   recipientUserId: string;
-  decryptedPreview: string;
+  preview: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -62,8 +60,6 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 
     const unsubscribe = MessageService.subscribeToConversations(
       async conversations => {
-        const masterKey = await EncryptionKeyManager.getSessionKey();
-
         const withProfiles = await Promise.all(
           conversations
             .filter(c => c.lastMessageAt !== null)
@@ -73,25 +69,10 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                 ? await getUserProfile(recipientUserId)
                 : null;
 
-              // Decrypt preview if master key and IV are available
-              let decryptedPreview = '';
-              if (
-                masterKey &&
-                conversation.lastMessagePreview &&
-                conversation.lastMessagePreviewIV
-              ) {
-                try {
-                  decryptedPreview = await EncryptionService.decryptText(
-                    base64ToArrayBuffer(conversation.lastMessagePreview),
-                    masterKey,
-                    base64ToArrayBuffer(conversation.lastMessagePreviewIV)
-                  );
-                } catch {
-                  // Non-fatal — show empty rather than crash
-                }
-              }
+              const preview =
+                localStorage.getItem(`${user.uid}_${conversation.id}_preview`) ?? '...';
 
-              return { conversation, recipientProfile, recipientUserId, decryptedPreview };
+              return { conversation, recipientProfile, recipientUserId, preview };
             })
         );
 
@@ -185,7 +166,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
         </div>
       ) : (
         <div className="flex flex-col">
-          {items.map(({ conversation, recipientProfile, recipientUserId, decryptedPreview }) => {
+          {items.map(({ conversation, recipientProfile, recipientUserId, preview }) => {
             const isSelected = conversation.id === selectedConversationId;
             const displayName = recipientProfile
               ? `${recipientProfile.firstName ?? ''} ${recipientProfile.lastName ?? ''}`.trim() ||
@@ -219,9 +200,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">
-                    {decryptedPreview}
-                  </p>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">{preview}</p>
                 </div>
               </button>
             );

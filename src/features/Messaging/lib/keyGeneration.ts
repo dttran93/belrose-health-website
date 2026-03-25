@@ -60,8 +60,8 @@ export interface PublicKeyBundle {
  *
  * @returns PublicKeyBundle — safe to upload to Firestore, no private key material
  */
-export async function generateKeyBundle(): Promise<PublicKeyBundle> {
-  const store = new BelroseSignalStore();
+export async function generateKeyBundle(userId: string): Promise<PublicKeyBundle> {
+  const store = new BelroseSignalStore(userId);
 
   // -- 1. Identity keypair + registration ID --------------------------------
   //
@@ -138,9 +138,10 @@ export async function generateKeyBundle(): Promise<PublicKeyBundle> {
  * @returns Array of public OPKs safe to upload to Firestore
  */
 export async function generateAdditionalOneTimePreKeys(
-  startingKeyId: number
+  startingKeyId: number,
+  userId: string
 ): Promise<Array<{ keyId: number; publicKey: ArrayBuffer }>> {
-  const store = new BelroseSignalStore();
+  const store = new BelroseSignalStore(userId);
 
   const newPreKeys = await Promise.all(
     Array.from({ length: ONE_TIME_PREKEY_BATCH_SIZE }, (_, i) =>
@@ -172,12 +173,15 @@ export async function generateAdditionalOneTimePreKeys(
  * @param newKeyId - Must be higher than the previous SPK keyId
  * @returns New public SPK data safe to upload to Firestore
  */
-export async function rotateSignedPreKey(newKeyId: number): Promise<{
+export async function rotateSignedPreKey(
+  newKeyId: number,
+  userId: string
+): Promise<{
   keyId: number;
   publicKey: ArrayBuffer;
   signature: ArrayBuffer;
 }> {
-  const store = new BelroseSignalStore();
+  const store = new BelroseSignalStore(userId);
   const identityKeyPair = await store.getIdentityKeyPair();
 
   if (!identityKeyPair) {

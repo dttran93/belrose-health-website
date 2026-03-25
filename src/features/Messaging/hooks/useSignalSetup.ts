@@ -34,9 +34,9 @@ const setupPromises = new Map<string, Promise<void>>();
 // Helper: check whether private keys exist in local IndexedDB
 // ---------------------------------------------------------------------------
 
-async function hasLocalPrivateKeys(): Promise<boolean> {
+async function hasLocalPrivateKeys(userId: string): Promise<boolean> {
   try {
-    const store = new BelroseSignalStore();
+    const store = new BelroseSignalStore(userId);
     const keyPair = await store.getIdentityKeyPair();
     return !!keyPair;
   } catch {
@@ -52,7 +52,7 @@ async function hasLocalPrivateKeys(): Promise<boolean> {
  * Leaving stale sessions causes Bad MAC errors on the next decrypt
  * because the Double Ratchet state no longer matches the key material.
  */
-async function clearStaleSessions(): Promise<void> {
+async function clearStaleSessions(userId: string): Promise<void> {
   return new Promise(resolve => {
     const req = indexedDB.open('belrose-signal');
     req.onsuccess = e => {
@@ -68,17 +68,35 @@ async function clearStaleSessions(): Promise<void> {
         }
 
         const tx = db.transaction(storeName, 'readwrite');
-        tx.objectStore(storeName).clear().onsuccess = () => {
-          cleared++;
-          if (cleared === storesToClear.length) {
-            console.log('🧹 Cleared stale Signal sessions and preKeys from IndexedDB');
-            resolve();
+        const store = tx.objectStore(storeName);
+
+        store.getAllKeys().onsuccess = keyEvent => {
+          const keys = (keyEvent.target as IDBRequest).result as string[];
+          const userKeys = keys.filter(k => String(k).startsWith(`${userId}_`));
+
+          let deleted = 0;
+          if (userKeys.length === 0) {
+            cleared++;
+            if (cleared === storesToClear.length) resolve();
+            return;
           }
+
+          userKeys.forEach(key => {
+            store.delete(key).onsuccess = () => {
+              deleted++;
+              if (deleted === userKeys.length) {
+                cleared++;
+                if (cleared === storesToClear.length) {
+                  console.log('🧹 Cleared stale Signal sessions and preKeys for:', userId);
+                  resolve();
+                }
+              }
+            };
+          });
         };
       });
     };
     req.onerror = () => {
-      // Non-fatal — log and continue, worst case is Bad MAC on stale messages
       console.warn('⚠️ Could not clear stale Signal sessions');
       resolve();
     };
@@ -135,7 +153,7 @@ export function useSignalSetup(): UseSignalSetupReturn {
     const promise = (async () => {
       const [hasBundle, hasLocalKeys] = await Promise.all([
         KeyBundleService.hasKeyBundle(user.uid),
-        hasLocalPrivateKeys(),
+        hasLocalPrivateKeys(user.uid),
       ]);
 
       if (hasBundle && hasLocalKeys) {
@@ -144,15 +162,17 @@ export function useSignalSetup(): UseSignalSetupReturn {
         return;
       }
 
-      // Either Firestore bundle is missing, OR local private keys were cleared
-      // (e.g. IndexedDB wiped during debugging). Either way regenerate everything
-      // so public and private keys are guaranteed to be in sync.
       if (hasBundle && !hasLocalKeys) {
-        console.log(
-          '⚠️ Firestore bundle exists but local private keys are missing — regenerating to resync...'
-        );
-      } else {
-        console.log('📦 No Signal key bundle found — setting up messaging for this account...');
+        // No local private keys exist at all — can't decrypt anything encrypted
+        // to the old bundle. Must upload fresh bundle so new conversations work.
+        // This happens on first login to a new browser/device.
+        console.warn('⚠️ Local private keys missing — generating fresh key bundle');
+
+        setStatus('registering');
+        const keyBundle = await generateKeyBundle(user.uid);
+        await KeyBundleService.uploadKeyBundle(user.uid, keyBundle);
+        setStatus('ready');
+        return;
       }
 
       setStatus('registering');
@@ -164,11 +184,11 @@ export function useSignalSetup(): UseSignalSetupReturn {
 
       // Clear any stale session state first — sessions built with old keys
       // will cause Bad MAC errors on decrypt if left in IndexedDB
-      await clearStaleSessions();
+      await clearStaleSessions(user.uid);
 
       // generateKeyBundle() saves fresh private keys to IndexedDB
       // and returns the public bundle for Firestore upload
-      const keyBundle = await generateKeyBundle();
+      const keyBundle = await generateKeyBundle(user.uid);
       await KeyBundleService.uploadKeyBundle(user.uid, keyBundle);
 
       console.log('✅ Signal key bundle generated and uploaded');

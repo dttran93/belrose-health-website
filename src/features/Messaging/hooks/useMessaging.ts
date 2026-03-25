@@ -25,7 +25,6 @@ import { MessageService } from '../services/messageService';
 import { KeyBundleService } from '../services/keyBundleService';
 import { MessageBackupService } from '../services/messageBackupService';
 import { generateAdditionalOneTimePreKeys } from '../lib/keyGeneration';
-import { useSignalSetup } from './useSignalSetup';
 import type { StoredMessage } from '../services/messageService';
 
 // ---------------------------------------------------------------------------
@@ -51,8 +50,6 @@ export interface DecryptedMessage {
 export interface UseMessagingReturn {
   /** Decrypted messages in chronological order */
   messages: DecryptedMessage[];
-  /** True while Signal keys are being set up (first-time existing accounts) */
-  isSettingUp: boolean;
   /** True while initial messages are loading */
   isLoading: boolean;
   /** True while sendMessage() is in progress */
@@ -87,14 +84,8 @@ export interface UseMessagingReturn {
  *
  * @param recipientUserId - Firebase Auth UID of the conversation partner
  */
-export function useMessaging(recipientUserId: string): UseMessagingReturn {
+export function useMessaging(recipientUserId: string, signalReady: boolean): UseMessagingReturn {
   const { user } = useAuthContext();
-
-  // Ensure this user has a Signal key bundle before doing anything else.
-  // For accounts created after messaging launched this is instant (just a read).
-  // For older accounts it generates and uploads keys once, then resolves.
-  const { isReady: signalReady, status: signalStatus } = useSignalSetup();
-
   const [messages, setMessages] = useState<DecryptedMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
@@ -153,6 +144,7 @@ export function useMessaging(recipientUserId: string): UseMessagingReturn {
           setMessages(restored);
           // Pre-populate cache so the snapshot doesn't re-decrypt backed-up messages
           backup.forEach(m => decryptedCacheRef.current.set(m.id, m.text));
+          console.log('Cache size after backup restore:', decryptedCacheRef.current.size);
           console.log(`📂 Restored ${restored.length} messages from backup`);
         }
 
@@ -287,6 +279,13 @@ export function useMessaging(recipientUserId: string): UseMessagingReturn {
 
       setMessages(decrypted);
 
+      // Last message preview, stored in local storage
+      const lastMessage = decrypted[decrypted.length - 1];
+      if (lastMessage) {
+        const currentUserId = getAuth().currentUser?.uid;
+        localStorage.setItem(`${currentUserId}_${convId}_preview`, lastMessage.text.slice(0, 60));
+      }
+
       // Save encrypted backup — non-blocking, failures don't affect the UI
       // This ensures message history survives IndexedDB clears, device switches,
       // CCleaner runs, and incognito sessions
@@ -330,15 +329,14 @@ export function useMessaging(recipientUserId: string): UseMessagingReturn {
         const encryptedMessage = await SessionManager.encryptMessage(recipientUserId, plaintext);
 
         // 2. Write to Firestore
-        const messageId = await MessageService.sendMessage(
-          conversationId,
-          encryptedMessage,
-          plaintext
-        );
+        const messageId = await MessageService.sendMessage(conversationId, encryptedMessage);
 
         // Cache our own plaintext so handleIncomingMessages retrieves it
         // correctly when Firestore's onSnapshot fires for this message
         decryptedCacheRef.current.set(messageId, plaintext);
+
+        // Write preview to localStorage immediately so ConversationList shows preview
+        localStorage.setItem(`${currentUserId}_${conversationId}_preview`, plaintext.slice(0, 60));
 
         // 3. Optimistic update — add our plaintext immediately so the sender
         //    doesn't see "[Sent message]" while waiting for the Firestore round-trip
@@ -408,7 +406,7 @@ export function useMessaging(recipientUserId: string): UseMessagingReturn {
   const checkAndReplenishPreKeys = async (userId: string) => {
     // Generate new batch starting from after the last known keyId
     // lastPreKeyIdRef tracks this across sends in this session
-    const newPreKeys = await generateAdditionalOneTimePreKeys(lastPreKeyIdRef.current + 1);
+    const newPreKeys = await generateAdditionalOneTimePreKeys(lastPreKeyIdRef.current + 1, userId);
 
     // Update our ref so next replenishment starts from the right keyId
     const lastKey = newPreKeys.at(-1);
@@ -423,7 +421,6 @@ export function useMessaging(recipientUserId: string): UseMessagingReturn {
 
   return {
     messages,
-    isSettingUp: signalStatus === 'checking' || signalStatus === 'registering',
     isLoading,
     isSending,
     error,

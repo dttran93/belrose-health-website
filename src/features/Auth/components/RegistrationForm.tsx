@@ -154,7 +154,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         //    - Private keys are saved to IndexedDB by generateKeyBundle() internally
         //    - Public keys are returned here for upload during handleCompleteRegistration
         console.log('💬 Generating Signal Protocol keys...');
-        const signalKeyBundle = await generateKeyBundle();
+        const signalKeyBundle = await generateKeyBundle(data.userId);
         console.log('✓ Signal keys generated');
 
         // 9. Update registration data with all setup info

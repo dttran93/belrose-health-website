@@ -70,6 +70,18 @@ async function getDB(): Promise<IDBPDatabase> {
 // ---------------------------------------------------------------------------
 
 export class BelroseSignalStore implements StorageType {
+  private userId: string;
+
+  constructor(userId: string) {
+    this.userId = userId;
+  }
+
+  // Namespaces any key with the current userId so that one broswer can handle multiple accounts
+  // Think a family sharing a computer, a doctors accessing their accounts on the same tablet etc.
+  private k(key: string | number): string {
+    return `${this.userId}_${key}`;
+  }
+
   // -------------------------------------------------------------------------
   // 1. Identity Key
   //
@@ -83,12 +95,12 @@ export class BelroseSignalStore implements StorageType {
 
   async getIdentityKeyPair(): Promise<KeyPairType | undefined> {
     const db = await getDB();
-    return db.get(STORES.IDENTITY, 'identityKeyPair');
+    return db.get(STORES.IDENTITY, this.k('identityKeyPair'));
   }
 
   async saveIdentityKeyPair(keyPair: KeyPairType): Promise<void> {
     const db = await getDB();
-    await db.put(STORES.IDENTITY, keyPair, 'identityKeyPair');
+    await db.put(STORES.IDENTITY, keyPair, this.k('identityKeyPair'));
   }
 
   /**
@@ -97,12 +109,12 @@ export class BelroseSignalStore implements StorageType {
    */
   async getLocalRegistrationId(): Promise<number | undefined> {
     const db = await getDB();
-    return db.get(STORES.IDENTITY, 'registrationId');
+    return db.get(STORES.IDENTITY, this.k('registrationId'));
   }
 
   async saveLocalRegistrationId(registrationId: number): Promise<void> {
     const db = await getDB();
-    await db.put(STORES.IDENTITY, registrationId, 'registrationId');
+    await db.put(STORES.IDENTITY, registrationId, this.k('registrationId'));
   }
 
   /**
@@ -115,9 +127,9 @@ export class BelroseSignalStore implements StorageType {
    */
   async saveIdentity(identifier: string, identityKey: ArrayBuffer): Promise<boolean> {
     const db = await getDB();
-    const existing = await db.get(STORES.IDENTITY, `remote_${identifier}`);
+    const existing = await db.get(STORES.IDENTITY, this.k(`remote_${identifier}`));
     const isNewOrChanged = !existing || !buffersAreEqual(existing, identityKey);
-    await db.put(STORES.IDENTITY, identityKey, `remote_${identifier}`);
+    await db.put(STORES.IDENTITY, identityKey, this.k(`remote_${identifier}`));
     return isNewOrChanged;
   }
 
@@ -136,7 +148,7 @@ export class BelroseSignalStore implements StorageType {
     _direction: Direction // SENDING or RECEIVING — reserved for future directional trust logic
   ): Promise<boolean> {
     const db = await getDB();
-    const trusted = await db.get(STORES.IDENTITY, `remote_${identifier}`);
+    const trusted = await db.get(STORES.IDENTITY, this.k(`remote_${identifier}`));
 
     // First contact — trust and store
     if (!trusted) return true;
@@ -147,7 +159,7 @@ export class BelroseSignalStore implements StorageType {
 
   async loadIdentityKey(identifier: string): Promise<ArrayBuffer | undefined> {
     const db = await getDB();
-    return db.get(STORES.IDENTITY, `remote_${identifier}`);
+    return db.get(STORES.IDENTITY, this.k(`remote_${identifier}`));
   }
 
   // -------------------------------------------------------------------------
@@ -163,17 +175,17 @@ export class BelroseSignalStore implements StorageType {
 
   async loadPreKey(keyId: number | string): Promise<KeyPairType | undefined> {
     const db = await getDB();
-    return db.get(STORES.PRE_KEYS, keyId);
+    return db.get(STORES.PRE_KEYS, this.k(keyId));
   }
 
   async storePreKey(keyId: number | string, keyPair: KeyPairType): Promise<void> {
     const db = await getDB();
-    await db.put(STORES.PRE_KEYS, keyPair, keyId);
+    await db.put(STORES.PRE_KEYS, keyPair, this.k(keyId));
   }
 
   async removePreKey(keyId: number | string): Promise<void> {
     const db = await getDB();
-    await db.delete(STORES.PRE_KEYS, keyId);
+    await db.delete(STORES.PRE_KEYS, this.k(keyId));
   }
 
   // -------------------------------------------------------------------------
@@ -190,17 +202,17 @@ export class BelroseSignalStore implements StorageType {
   // loadSignedPreKey returns KeyPairType (not SignedPreKeyPairType) per StorageType interface
   async loadSignedPreKey(keyId: number | string): Promise<KeyPairType | undefined> {
     const db = await getDB();
-    return db.get(STORES.SIGNED_PRE_KEYS, keyId);
+    return db.get(STORES.SIGNED_PRE_KEYS, this.k(keyId));
   }
 
   async storeSignedPreKey(keyId: number | string, keyPair: KeyPairType): Promise<void> {
     const db = await getDB();
-    await db.put(STORES.SIGNED_PRE_KEYS, keyPair, keyId);
+    await db.put(STORES.SIGNED_PRE_KEYS, keyPair, this.k(keyId));
   }
 
   async removeSignedPreKey(keyId: number | string): Promise<void> {
     const db = await getDB();
-    await db.delete(STORES.SIGNED_PRE_KEYS, keyId);
+    await db.delete(STORES.SIGNED_PRE_KEYS, this.k(keyId));
   }
 
   // -------------------------------------------------------------------------
@@ -223,7 +235,7 @@ export class BelroseSignalStore implements StorageType {
 
   async loadSession(identifier: string): Promise<SessionRecordType | undefined> {
     const db = await getDB();
-    return db.get(STORES.SESSIONS, identifier);
+    return db.get(STORES.SESSIONS, this.k(identifier));
   }
 
   /**
@@ -232,12 +244,12 @@ export class BelroseSignalStore implements StorageType {
    */
   async storeSession(identifier: string, record: SessionRecordType): Promise<void> {
     const db = await getDB();
-    await db.put(STORES.SESSIONS, record, identifier);
+    await db.put(STORES.SESSIONS, record, this.k(identifier));
   }
 
   async removeSession(identifier: string): Promise<void> {
     const db = await getDB();
-    await db.delete(STORES.SESSIONS, identifier);
+    await db.delete(STORES.SESSIONS, this.k(identifier));
   }
 
   /**
@@ -248,7 +260,8 @@ export class BelroseSignalStore implements StorageType {
     const db = await getDB();
     const tx = db.transaction(STORES.SESSIONS, 'readwrite');
     const keys = await tx.store.getAllKeys();
-    const userSessionKeys = keys.filter(k => String(k).startsWith(`${userId}.`));
+    // Now scoped by this.userId prefix, then the recipient userId
+    const userSessionKeys = keys.filter(k => String(k).startsWith(`${this.userId}_${userId}.`));
     await Promise.all(userSessionKeys.map(k => tx.store.delete(k)));
     await tx.done;
   }

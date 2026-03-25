@@ -31,6 +31,7 @@ import type { DeviceType } from '@privacyresearch/libsignal-protocol-typescript'
 import { BelroseSignalStore } from './BelroseSignalStore';
 import { KeyBundleService } from '../services/keyBundleService';
 import type { ReceivedKeyBundle } from '../services/keyBundleService';
+import { getAuth } from 'firebase/auth';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -96,7 +97,9 @@ export class SessionManager {
     recipientUserId: string,
     plaintext: string
   ): Promise<EncryptedMessage> {
-    const store = new BelroseSignalStore();
+    const currentUserId = getAuth().currentUser?.uid;
+    if (!currentUserId) throw new Error('Not authenticated');
+    const store = new BelroseSignalStore(currentUserId);
     const recipientAddress = new SignalProtocolAddress(recipientUserId, DEVICE_ID);
 
     // -- Check for existing session -----------------------------------------
@@ -146,7 +149,9 @@ export class SessionManager {
     senderUserId: string,
     encryptedMessage: EncryptedMessage
   ): Promise<string> {
-    const store = new BelroseSignalStore();
+    const currentUserId = getAuth().currentUser?.uid;
+    if (!currentUserId) throw new Error('Not authenticated');
+    const store = new BelroseSignalStore(currentUserId);
     const senderAddress = new SignalProtocolAddress(senderUserId, DEVICE_ID);
     const cipher = new SessionCipher(store, senderAddress);
 
@@ -188,7 +193,9 @@ export class SessionManager {
    * @param store           - Optional pre-constructed store (avoids double instantiation)
    */
   static async initSession(recipientUserId: string, store?: BelroseSignalStore): Promise<void> {
-    const signalStore = store ?? new BelroseSignalStore();
+    const currentUserId = getAuth().currentUser?.uid;
+    if (!currentUserId) throw new Error('Not authenticated');
+    const signalStore = store ?? new BelroseSignalStore(currentUserId);
     const recipientAddress = new SignalProtocolAddress(recipientUserId, DEVICE_ID);
 
     // Fetch recipient's public key bundle — OPK consumed atomically by Cloud Function
@@ -221,7 +228,9 @@ export class SessionManager {
    * Used to decide whether to show "secure session established" UI indicators.
    */
   static async hasSession(recipientUserId: string): Promise<boolean> {
-    const store = new BelroseSignalStore();
+    const currentUserId = getAuth().currentUser?.uid;
+    if (!currentUserId) throw new Error('Not authenticated');
+    const store = new BelroseSignalStore(currentUserId);
     const recipientAddress = new SignalProtocolAddress(recipientUserId, DEVICE_ID);
     const cipher = new SessionCipher(store, recipientAddress);
     return cipher.hasOpenSession();
@@ -233,7 +242,9 @@ export class SessionManager {
    * After this, the next message will trigger a fresh X3DH exchange.
    */
   static async closeSession(recipientUserId: string): Promise<void> {
-    const store = new BelroseSignalStore();
+    const currentUserId = getAuth().currentUser?.uid;
+    if (!currentUserId) throw new Error('Not authenticated');
+    const store = new BelroseSignalStore(currentUserId);
     const recipientAddress = new SignalProtocolAddress(recipientUserId, DEVICE_ID);
     const cipher = new SessionCipher(store, recipientAddress);
     await cipher.closeOpenSessionForDevice();

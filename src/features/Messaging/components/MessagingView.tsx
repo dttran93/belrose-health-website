@@ -26,12 +26,14 @@ import { useMessaging } from '../hooks/useMessaging';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
 import Avatar from '@/features/Users/components/Avatar';
 import type { BelroseUserProfile } from '@/types/core';
+import { SignalSetupStatus, useSignalSetup } from '../hooks/useSignalSetup';
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export const MessagingView: React.FC = () => {
+  const { isReady: signalReady, status: signalStatus } = useSignalSetup();
   const { recipientId: urlRecipientId } = useParams<{ recipientId?: string }>();
   const navigate = useNavigate();
 
@@ -160,6 +162,8 @@ export const MessagingView: React.FC = () => {
               setSelectedConversationId(null);
               setRecipientUserId('');
             }}
+            signalReady={signalReady}
+            signalStatus={signalStatus}
           />
         ) : (
           <EmptyThreadState />
@@ -179,6 +183,8 @@ interface ActiveThreadProps {
   recipientName: string;
   onConversationReady: (conversationId: string) => void;
   onBack: () => void;
+  signalReady: boolean;
+  signalStatus: SignalSetupStatus;
 }
 
 const ActiveThread: React.FC<ActiveThreadProps> = ({
@@ -187,9 +193,15 @@ const ActiveThread: React.FC<ActiveThreadProps> = ({
   recipientName,
   onConversationReady,
   onBack,
+  signalReady,
+  signalStatus,
 }) => {
-  const { messages, isLoading, isSettingUp, isSending, sendMessage, markAllRead, conversationId } =
-    useMessaging(recipientUserId);
+  const { messages, isLoading, isSending, sendMessage, markAllRead, conversationId } = useMessaging(
+    recipientUserId,
+    signalReady
+  );
+
+  const isSettingUp = signalStatus === 'checking' || signalStatus === 'registering';
 
   // Sync the resolved conversationId back up to MessagingView so
   // ConversationList can highlight the correct item — works for both

@@ -728,8 +728,7 @@ service cloud.firestore {
         isParticipantOnCreate() &&
         request.resource.data.participants.size() == 2 &&
         request.resource.data.participants is list &&
-        request.resource.data.lastMessageAt == null &&
-        request.resource.data.lastMessagePreview is string;
+        request.resource.data.lastMessageAt == null;
     
       // UPDATE: Only participants can update, and only the metadata fields
       // that messageService.sendMessage() touches. Message content itself
@@ -741,7 +740,7 @@ service cloud.firestore {
         request.resource.data.createdAt == resource.data.createdAt &&
         // Only these fields can change
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['lastMessageAt', 'lastMessagePreview','lastMessagePreviewIV']);
+          .hasOnly(['lastMessageAt']);
     
       // DELETE: Not allowed — conversations are permanent records
       // (soft delete via a field could be added later if needed)
