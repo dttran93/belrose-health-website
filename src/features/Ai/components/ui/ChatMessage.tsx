@@ -3,23 +3,16 @@
 import { Button } from '@/components/ui/Button';
 import { copyToClipboard } from '@/utils/browserUtils';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
-import { Timestamp } from 'firebase/firestore';
 import { Check, Copy, GitBranch, Pencil } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { Message } from '../../service/chatService';
+import { Citation, CitationPanel, extractCitations } from './CitationPanel';
+import { CitationBadge } from './CitationBadge';
 
 export interface ChatMessageProps {
-  message: ChatMessage;
+  message: Message;
   onEdit?: (messageId: string, newContent: string) => void;
-}
-
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Timestamp;
-  model?: string;
-  isStreaming?: boolean;
 }
 
 export function ChatMessage({ message, onEdit }: ChatMessageProps) {
@@ -27,6 +20,53 @@ export function ChatMessage({ message, onEdit }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(message.content);
+
+  // Extract citations once per message content change
+  const citations = useMemo(
+    () => (isUser ? [] : extractCitations(message.content)),
+    [message.content, isUser]
+  );
+
+  // Build a URL → index map for the inline superscript renderer
+  const citationMap = useMemo(() => new Map(citations.map(c => [c.url, c])), [citations]);
+
+  function groupConsecutiveCitations(
+    children: React.ReactNode,
+    citationMap: Map<string, Citation>
+  ): React.ReactNode {
+    const nodes = Array.isArray(children) ? children : [children];
+    const result: React.ReactNode[] = [];
+    let pendingCitations: Citation[] = [];
+
+    const flushPending = () => {
+      if (pendingCitations.length > 0) {
+        const first = pendingCitations[0];
+        if (!first) return;
+        result.push(<CitationBadge key={`group-${first.index}`} citations={pendingCitations} />);
+        pendingCitations = [];
+      }
+    };
+
+    nodes.forEach(node => {
+      // Check if this node is a citation anchor element
+      if (
+        node &&
+        typeof node === 'object' &&
+        'props' in node &&
+        (node as any).props?.href &&
+        citationMap.has((node as any).props.href)
+      ) {
+        const citation = citationMap.get((node as any).props.href)!;
+        pendingCitations.push(citation);
+      } else {
+        flushPending();
+        result.push(node);
+      }
+    });
+
+    flushPending();
+    return result;
+  }
 
   const handleCopy = async () => {
     await copyToClipboard(message.content, 'Prompt');
@@ -141,9 +181,25 @@ export function ChatMessage({ message, onEdit }: ChatMessageProps) {
         {/* Message content */}
         <div className="flex-1 min-w-0">
           <div className="text-left text-gray-800">
+            {/* ✅ Searching indicator — shows before any text streams in */}
+            {message.isStreaming && message.streamingStatus === 'searching' && (
+              <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+                <div className="flex gap-1">
+                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
+                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
+                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
+                </div>
+                Searching the web...
+              </div>
+            )}
+
             <ReactMarkdown
               components={{
-                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                p: ({ children }) => (
+                  <p className="mb-2 last:mb-0">
+                    {groupConsecutiveCitations(children, citationMap)}
+                  </p>
+                ),
                 strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
                 ul: ({ children }) => <ul className="list-disc ml-4 mb-2 space-y-1">{children}</ul>,
                 ol: ({ children }) => (
@@ -153,12 +209,23 @@ export function ChatMessage({ message, onEdit }: ChatMessageProps) {
                 h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
                 h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
                 h3: ({ children }) => <h3 className="text-sm font-semibold mb-1">{children}</h3>,
+                a: ({ href, children }) => (
+                  <a href={href} target="_blank" rel="noopener noreferrer">
+                    {children}
+                  </a>
+                ),
               }}
             >
               {message.content}
             </ReactMarkdown>
-            {message.isStreaming && (
+            {/* Streaming cursor */}
+            {message.isStreaming && !message.streamingStatus && (
               <span className="inline-block w-0.5 h-4 bg-gray-800 ml-0.5 align-middle animate-pulse" />
+            )}
+
+            {/* ✅ Citation panel — only renders when message is done streaming */}
+            {!message.isStreaming && citations.length > 0 && (
+              <CitationPanel citations={citations} />
             )}
           </div>
         </div>

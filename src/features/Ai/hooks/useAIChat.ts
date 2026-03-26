@@ -205,6 +205,7 @@ export function useAIChat({
           content: '',
           timestamp: Timestamp.now(),
           isStreaming: true,
+          streamingStatus: undefined,
         } as Message,
       ]);
 
@@ -228,11 +229,25 @@ export function useAIChat({
             try {
               const parsed = JSON.parse(data);
               if (parsed.error) throw new Error(parsed.error);
+
+              // ✅ Handle status events
+              if (parsed.status) {
+                setMessages(prev =>
+                  prev.map(m =>
+                    m.id === streamingId ? { ...m, streamingStatus: parsed.status } : m
+                  )
+                );
+              }
+
               if (parsed.delta) {
                 accumulatedText += parsed.delta;
                 // ✅ Update the live message on every chunk
                 setMessages(prev =>
-                  prev.map(m => (m.id === streamingId ? { ...m, content: accumulatedText } : m))
+                  prev.map(m =>
+                    m.id === streamingId
+                      ? { ...m, content: accumulatedText, streamingStatus: undefined } // ✅ clear status once text starts
+                      : m
+                  )
                 );
               }
             } catch {
@@ -250,8 +265,11 @@ export function useAIChat({
         throw error;
       }
 
-      // ✅ Mark streaming as done (cursor disappears)
-      setMessages(prev => prev.map(m => (m.id === streamingId ? { ...m, isStreaming: false } : m)));
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === streamingId ? { ...m, isStreaming: false, streamingStatus: undefined } : m
+        )
+      );
 
       return accumulatedText;
     },

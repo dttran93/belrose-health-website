@@ -208,7 +208,7 @@ export function AIChat({
         <div className="absolute bottom-0 left-0 right-0">
           {/* Fade gradient so messages don't hard-cut behind input */}
           <div className="w-full max-w-3xl mx-auto h-12 bg-gradient-to-t from-background to-transparent pointer-events-none" />
-          <div className="bg-background w-full max-w-3xl mx-auto px-4 pb-2">
+          <div className="bg-background w-full max-w-3xl mx-auto px-4">
             <ChatInput
               value={inputValue}
               onChange={setInputValue}
@@ -224,6 +224,13 @@ export function AIChat({
               isLoading={isLoading}
               onStop={onStop}
             />
+          </div>
+          <div className="pb-2 text-xs w-full bg-background text-foreground">
+            <span>
+              {' '}
+              Belrose's AI is not a doctor and can make mistakes. Consult qualified healthcare
+              providers for any medical decisions.
+            </span>
           </div>
         </div>
       </div>

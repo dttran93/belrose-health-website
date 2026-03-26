@@ -36,9 +36,12 @@ exports.aiChat = (0, https_1.onRequest)({
             const sendChunk = (text) => {
                 res.write(`data: ${JSON.stringify({ delta: text })}\n\n`);
             };
+            const sendStatus = (status) => {
+                res.write(`data: ${JSON.stringify({ status })}\n\n`);
+            };
             switch (provider) {
                 case 'anthropic':
-                    await streamClaudeAPI(message, healthContext, model, conversationHistory, mediaParts, sendChunk, anthropicApiKey.value());
+                    await streamClaudeAPI(message, healthContext, model, conversationHistory, mediaParts, sendChunk, sendStatus, anthropicApiKey.value());
                     break;
                 case 'google':
                     const geminiResponse = await callGeminiAPI(message, healthContext, model, conversationHistory, mediaParts);
@@ -71,14 +74,16 @@ exports.aiChat = (0, https_1.onRequest)({
  * Defines the personality, constraints, and data-handling rules for Belrose's AI Assistant.
  */
 const generateSystemPrompt = (healthContext) => {
-    return `You are Belrose's AI Health Assistant, a specialized assistant for analyzing patient health data.
+    return `You are Belrose's AI Health Assistant. Your role is to help the user with any health related questions they may have. If a 
+  user's prompt is not health related, try to redirect them towards health questions. However, you recognize that health is a broad 
+  topic including social determinants of health, mental health, social relationships, exercise health, the environment, medicine, and much more.
+  
 You have access to structured health data wrapped in XML tags (<HEALTH_RECORD>, <FILE_ATTACHMENT>, etc.).
 
+## When asked about the user's health data follow these guidelines:  
 ### 1. GROUNDING & ACCURACY
 - ONLY answer based on the provided records and visual media.
-- If information is not present, explicitly state: "I don't see that information in your records."
 - DO NOT infer, assume, or hallucinate medical details. 
-- When citing information, include record titles, IDs, and dates (e.g., "According to your blood test record from reocrdID: abc123 dated 2025-05-10...").
 
 ### 2. DATA HANDLING & CITATION
 - Use the [CONTEXT_MANIFEST] at the top of the context to understand the inventory.
@@ -87,12 +92,23 @@ You have access to structured health data wrapped in XML tags (<HEALTH_RECORD>, 
 
 ### 3. TONE & STYLE
 - Use a professional, empathetic, and clear tone.
-- Explain medical terminology using plain language.
+- Explain medical terminology clearly, concisely, and using plain language.
 - Provide structured summaries (bullet points) for complex data.
 
 ### 4. SAFETY & DISCLAIMERS
-- You are an assistant, not a doctor. 
-- ALWAYS conclude with a recommendation to consult a qualified healthcare provider for medical decisions.
+- A recommendation to consult a qualified healthcare provider for medical decisions is always present in the user interface, but if discussing a serious 
+medical problem, reiterate that you are an assistant, not a doctor.
+
+### 5. WEB CITATIONS
+- ALWAYS cite sources when referencing general health information and search for current evidence.
+- Only cite reputable medical sources such as: NHS, CDC, WHO, Mayo Clinic, PubMed, NICE, NEJM, JAMA, NIH, etc.
+- Format citations as markdown links inline: [Source Name](URL)
+- Place citations IMMEDIATELY after the specific claim they support, not at the end of the sentence. Similar to an APA or MLA citation.
+- If multiple sources support the same claim, place them consecutively with no space between them: [Source 1](URL)[Source 2](URL)
+- Avoid citing Wikipedia, blogs, or non-peer-reviewed sources.
+
+Example of correct citation format:
+Statins are recommended for LDL above 4.9 mmol/L [NHS](https://nhs.uk/...)[NICE](https://nice.org.uk/...). 
 
 ### HEALTH RECORDS CONTEXT:
 ${healthContext}`;
@@ -100,7 +116,7 @@ ${healthContext}`;
 /**
  * Call Anthropic's Claude API
  */
-async function streamClaudeAPI(message, healthContext, model, history, mediaParts, onChunk, apiKey) {
+async function streamClaudeAPI(message, healthContext, model, history, mediaParts, onChunk, onStatus, apiKey) {
     const systemPrompt = generateSystemPrompt(healthContext);
     const userContent = [{ type: 'text', text: message }];
     const supportedMedia = mediaParts.filter(part => part.type === 'image');
@@ -114,50 +130,134 @@ async function streamClaudeAPI(message, healthContext, model, history, mediaPart
         ...history.map(msg => ({ role: msg.role, content: msg.content })),
         { role: 'user', content: userContent },
     ];
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-            model: model || 'claude-sonnet-4-20250514',
-            max_tokens: 4096,
-            temperature: 0.2,
-            system: systemPrompt,
-            messages,
-            stream: true, // ✅ Enable streaming
-        }),
-    });
+    const callClaude = async (msgs) => {
+        return fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+                model: model || 'claude-sonnet-4-20250514',
+                max_tokens: 4096,
+                temperature: 0.2,
+                system: systemPrompt,
+                messages: msgs,
+                stream: true,
+                tools: [
+                    {
+                        type: 'web_search_20250305',
+                        name: 'web_search',
+                    },
+                ],
+            }),
+        });
+    };
+    const readStream = async (response) => {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let text = '';
+        let stopReason = '';
+        const toolUseBlocks = [];
+        let currentToolBlock = null;
+        let currentToolInput = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done)
+                break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
+            for (const line of lines) {
+                const data = line.replace('data: ', '').trim();
+                if (data === '[DONE]' || data === '')
+                    continue;
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.type === 'message_delta') {
+                        stopReason = parsed.delta?.stop_reason || '';
+                    }
+                    // Streaming text chunk — send to client immediately
+                    if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
+                        const deltaText = parsed.delta.text;
+                        text += deltaText;
+                        onChunk(deltaText);
+                    }
+                    // Tool use starting — capture the tool name and id
+                    if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_use') {
+                        if (parsed.content_block.name === 'web_search') {
+                            onStatus('searching');
+                        }
+                        currentToolBlock = {
+                            id: parsed.content_block.id,
+                            name: parsed.content_block.name,
+                        };
+                        currentToolInput = '';
+                    }
+                    // Tool input streaming in
+                    if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'input_json_delta') {
+                        currentToolInput += parsed.delta.partial_json;
+                    }
+                    // Tool use block finished
+                    if (parsed.type === 'content_block_stop' && currentToolBlock) {
+                        try {
+                            currentToolBlock.input = JSON.parse(currentToolInput);
+                        }
+                        catch {
+                            currentToolBlock.input = {};
+                        }
+                        toolUseBlocks.push(currentToolBlock);
+                        currentToolBlock = null;
+                        currentToolInput = '';
+                    }
+                }
+                catch {
+                    // ignore malformed lines
+                }
+            }
+        }
+        return { text, toolUseBlocks, stopReason };
+    };
+    // ── Round 1: initial call ──
+    let response = await callClaude(messages);
     if (!response.ok) {
         const error = await response.text();
         throw new Error(`Claude API error: ${response.status} - ${error}`);
     }
-    // ✅ Read the stream line by line
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done)
-            break;
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
-        for (const line of lines) {
-            const data = line.replace('data: ', '').trim();
-            if (data === '[DONE]' || data === '')
-                continue;
-            try {
-                const parsed = JSON.parse(data);
-                // Anthropic stream events: content_block_delta contains the text
-                if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
-                    onChunk(parsed.delta.text);
-                }
-            }
-            catch {
-                // Ignore malformed JSON lines
-            }
+    const round1 = await readStream(response);
+    // ── Round 2: if Claude used a tool, send tool results back ──
+    if (round1.stopReason === 'tool_use' && round1.toolUseBlocks.length > 0) {
+        // Build the assistant message with tool use blocks
+        const assistantMessage = {
+            role: 'assistant',
+            content: [
+                ...(round1.text ? [{ type: 'text', text: round1.text }] : []),
+                ...round1.toolUseBlocks.map(block => ({
+                    type: 'tool_use',
+                    id: block.id,
+                    name: block.name,
+                    input: block.input,
+                })),
+            ],
+        };
+        // Tool results — Anthropic handles the actual search,
+        // we just tell it the results are ready
+        const toolResults = {
+            role: 'user',
+            content: round1.toolUseBlocks.map(block => ({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                // No content needed — Anthropic fills this in server-side for web_search
+            })),
+        };
+        const updatedMessages = [...messages, assistantMessage, toolResults];
+        onStatus('responding');
+        response = await callClaude(updatedMessages);
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`Claude API error (round 2): ${response.status} - ${error}`);
         }
+        await readStream(response); // streams the final response to client via onChunk
     }
 }
 /**

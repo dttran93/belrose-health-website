@@ -176,7 +176,7 @@ export function ChatInput({
   // ============================================================================
   return (
     <div className="w-full bg-transparent">
-      <div className="mx-auto px-1 py-1 md:px-6 md:py-4">
+      <div className="mx-auto px-1 py-1 md:px-6">
         <form onSubmit={handleFormSubmit} className="relative">
           <div className="border border-gray-300 rounded-2xl shadow-sm hover:shadow-md focus-within:shadow-md transition-shadow bg-white">
             {/* Attached Files & Pasted Text Display */}

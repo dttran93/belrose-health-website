@@ -50,6 +50,7 @@ export interface Message {
   timestamp: Timestamp;
   context?: MessageContext;
   isStreaming?: boolean;
+  streamingStatus?: 'searching' | 'responding';
 }
 
 export interface MessageContext {
