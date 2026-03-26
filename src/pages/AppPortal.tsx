@@ -44,6 +44,7 @@ export default function AppPortal() {
     isSendingMessage,
     chatError,
     handleSendMessage,
+    handleEditMessage,
     handleLoadChat,
     handleNewChat,
     handleStopGeneration,
@@ -229,6 +230,7 @@ export default function AppPortal() {
         pendingAttachments={pendingAttachments}
         onPendingAttachmentsClear={() => setPendingAttachments([])}
         onStop={handleStopGeneration}
+        onEditMessage={handleEditMessage}
       />
     </div>
   );

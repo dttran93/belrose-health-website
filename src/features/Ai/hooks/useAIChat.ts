@@ -21,6 +21,7 @@ import {
   addEncryptedMessage,
   createEncryptedChatWithMessage,
   getEncryptedChatMessages,
+  deleteMessagesAfter,
 } from '@/features/Ai/service/encryptedChatService';
 import { AIModel } from '@/features/Ai/components/ui/ModelSelector';
 import { ContextBuilder } from '@/features/Ai/service/contextBuilder';
@@ -47,6 +48,7 @@ interface UseAIChatReturn {
 
   // Chat actions
   handleSendMessage: (messageContent: string, attachments?: ChatAttachment[]) => Promise<void>;
+  handleEditMessage: (messageId: string, newContent: string) => Promise<void>;
   handleLoadChat: (chatId: string) => Promise<void>;
   handleNewChat: () => void;
   handleStopGeneration: () => void;
@@ -112,6 +114,7 @@ export function useAIChat({
         await page.render({
           canvasContext: context,
           viewport: viewport,
+          canvas: canvas,
         }).promise;
 
         // Convert canvas to blob
@@ -548,6 +551,51 @@ export function useAIChat({
   );
 
   // ============================================================================
+  // ACTION: EDIT MESSAGE (creates a new branch by truncating)
+  // ============================================================================
+
+  /**
+   * Edit a user message — deletes all subsequent messages in Firestore
+   * and resends from the edited message, creating a new conversation branch
+   */
+  const handleEditMessage = useCallback(
+    async (messageId: string, newContent: string) => {
+      if (!user || !currentChatId || !newContent.trim()) return;
+
+      // Find the message being edited in local state
+      const messageIndex = messages.findIndex(m => m.id === messageId);
+      if (messageIndex === -1) return;
+
+      const editedMessage = messages[messageIndex];
+
+      if (!editedMessage) {
+        throw new Error('Edited message missing');
+      }
+
+      try {
+        setChatError(null);
+
+        // ✅ Step 1: Delete the edited message + everything after it in Firestore
+        // We use the edited message's timestamp so it gets replaced too
+        await deleteMessagesAfter(user.uid, currentChatId, editedMessage.timestamp);
+
+        // ✅ Step 2: Truncate local state to everything BEFORE the edited message
+        setMessages(prev => prev.slice(0, messageIndex));
+
+        console.log(`✂️ Branched from message index ${messageIndex}`);
+
+        // ✅ Step 3: Resend as a new message — reuses all the existing
+        // context-building, streaming, and storage logic in handleSendMessage
+        await handleSendMessage(newContent);
+      } catch (error) {
+        console.error('❌ Failed to edit message:', error);
+        setChatError(error instanceof Error ? error : new Error('Failed to edit message'));
+      }
+    },
+    [user, currentChatId, messages, handleSendMessage]
+  );
+
+  // ============================================================================
   // ACTION: LOAD EXISTING CHAT
   // ============================================================================
 
@@ -616,6 +664,7 @@ export function useAIChat({
 
     // Actions
     handleSendMessage,
+    handleEditMessage,
     handleLoadChat,
     handleNewChat,
     handleStopGeneration,

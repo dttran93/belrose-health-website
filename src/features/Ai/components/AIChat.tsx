@@ -28,11 +28,13 @@ interface AIChatProps {
   onModelChange?: (model: AIModel) => void;
   // Footer and empty state customization
   leftFooterContent?: React.ReactNode;
-  emptyStateContent?: React.ReactNode;
+  aboveInputContent?: React.ReactNode;
+  belowInputContent?: React.ReactNode;
   onMessagesChange?: (messageCount: number) => void;
   pendingAttachments?: ChatAttachment[];
   onPendingAttachmentsClear?: () => void;
   onStop?: () => void; // New prop for stopping generation
+  onEditMessage: (messageId: string, newContent: string) => Promise<void>;
 }
 
 export function AIChat({
@@ -47,11 +49,13 @@ export function AIChat({
   availableModels = AVAILABLE_MODELS,
   onModelChange,
   leftFooterContent,
-  emptyStateContent,
+  aboveInputContent,
+  belowInputContent,
   onMessagesChange,
   pendingAttachments = [],
   onPendingAttachmentsClear,
   onStop,
+  onEditMessage,
 }: AIChatProps) {
   const [inputValue, setInputValue] = useState('');
   const [showHeaderShadow, setShowHeaderShadow] = useState(false);
@@ -82,9 +86,16 @@ export function AIChat({
     }
   }, [pendingAttachments, onPendingAttachmentsClear]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Instant jump when the chat view first appears (no animation)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+  }, []); // runs once on mount
+
+  // Smooth scroll for subsequent messages
+  useEffect(() => {
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -124,50 +135,30 @@ export function AIChat({
     return (
       <div className={`relative flex flex-col h-full ${className}`}>
         {/* Empty state content */}
-        <div className="flex-1 flex flex-col items-center justify-center p-8">
-          {emptyStateContent || (
-            <div className="text-center max-w-md">
-              <div className="mb-4 text-gray-400">
-                <svg
-                  className="w-16 h-16 mx-auto"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Start a conversation</h3>
-              <p className="text-sm text-gray-600">
-                Ask questions about your health records, medications, test results, or medical
-                history.
-              </p>
-            </div>
-          )}
-        </div>
+        <div className="flex-1 flex flex-col items-center justify-center">
+          <div className="w-full max-w-3xl mb-6">{aboveInputContent}</div>
+          <div className="max-w-3xl w-full mx-auto">
+            {/* Chat Input */}
+            <ChatInput
+              value={inputValue}
+              onChange={setInputValue}
+              onSubmit={handleSubmit}
+              placeholder={getPlaceholder()}
+              disabled={isLoading}
+              selectedModel={currentModel}
+              availableModels={availableModels}
+              onModelChange={handleModelChange}
+              leftFooterContent={leftFooterContent}
+              attachments={attachments}
+              onAttachmentsChange={setAttachments}
+              maxFiles={5}
+              isLoading={isLoading}
+              onStop={onStop}
+            />
+          </div>
 
-        {/* Chat Input */}
-        <ChatInput
-          value={inputValue}
-          onChange={setInputValue}
-          onSubmit={handleSubmit}
-          placeholder={getPlaceholder()}
-          disabled={isLoading}
-          selectedModel={currentModel}
-          availableModels={availableModels}
-          onModelChange={handleModelChange}
-          leftFooterContent={leftFooterContent}
-          attachments={attachments}
-          onAttachmentsChange={setAttachments}
-          maxFiles={5}
-          isLoading={isLoading}
-          onStop={onStop}
-        />
+          {belowInputContent && <div className="w-full max-w-3xl mt-6">{belowInputContent}</div>}
+        </div>
       </div>
     );
   }
@@ -183,28 +174,19 @@ export function AIChat({
         </div>
       </LayoutSlot>
       <div className={`relative flex flex-col h-full bg-white ${className}`}>
-        {/* Sticky Header with shadow on scroll */}
-        <div
-          className={`
-          sticky top-0 z-10 bg-white
-          transition-shadow duration-200
-          ${showHeaderShadow ? 'shadow-md' : ''}
-        `}
-        >
-          {/* Error display */}
-          {error && (
-            <div className="px-4 py-3 bg-red-50 border-b border-red-200">
-              <div className="flex items-center gap-2 text-sm text-red-800">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                <span>{error.message}</span>
-              </div>
+        {/* Error display */}
+        {error && (
+          <div className="px-4 py-3 bg-red-50 border-b border-red-200">
+            <div className="flex items-center gap-2 text-sm text-red-800">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{error.message}</span>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Scrollable messages area*/}
-        <div className="flex-1 overflow-auto">
-          <div>
+        <div className="absolute inset-0 overflow-auto">
+          <div className="w-full max-w-3xl mx-auto px-4">
             {messages.map(message => (
               <ChatMessage
                 key={message.id}
@@ -214,29 +196,35 @@ export function AIChat({
                   content: message.content,
                   timestamp: message.timestamp,
                 }}
+                onEdit={onEditMessage}
               />
             ))}
             <div ref={messagesEndRef} />
+            <div className="h-48" />
           </div>
         </div>
 
         {/* Chat Input */}
-        <div className="sticky bottom-0">
-          <ChatInput
-            value={inputValue}
-            onChange={setInputValue}
-            onSubmit={handleSubmit}
-            placeholder={getPlaceholder()}
-            disabled={isLoading}
-            selectedModel={currentModel}
-            availableModels={availableModels}
-            onModelChange={handleModelChange}
-            leftFooterContent={leftFooterContent}
-            attachments={attachments}
-            onAttachmentsChange={setAttachments}
-            isLoading={isLoading}
-            onStop={onStop}
-          />
+        <div className="absolute bottom-0 left-0 right-0">
+          {/* Fade gradient so messages don't hard-cut behind input */}
+          <div className="w-full max-w-3xl mx-auto h-12 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+          <div className="bg-background w-full max-w-3xl mx-auto px-4 pb-2">
+            <ChatInput
+              value={inputValue}
+              onChange={setInputValue}
+              onSubmit={handleSubmit}
+              placeholder={getPlaceholder()}
+              disabled={isLoading}
+              selectedModel={currentModel}
+              availableModels={availableModels}
+              onModelChange={handleModelChange}
+              leftFooterContent={leftFooterContent}
+              attachments={attachments}
+              onAttachmentsChange={setAttachments}
+              isLoading={isLoading}
+              onStop={onStop}
+            />
+          </div>
         </div>
       </div>
     </>

@@ -22,6 +22,7 @@ interface AIChatContextValue {
   isSendingMessage: boolean;
   chatError: Error | null;
   handleSendMessage: ReturnType<typeof useAIChat>['handleSendMessage'];
+  handleEditMessage: ReturnType<typeof useAIChat>['handleEditMessage'];
   handleLoadChat: ReturnType<typeof useAIChat>['handleLoadChat'];
   handleNewChat: () => void;
   handleStopGeneration: () => void;
@@ -88,6 +89,7 @@ export function AIChatProvider({ children }: { children: ReactNode }) {
         isSendingMessage: chat.isSendingMessage,
         chatError: chat.chatError,
         handleSendMessage: chat.handleSendMessage,
+        handleEditMessage: chat.handleEditMessage,
         handleLoadChat: chat.handleLoadChat,
         handleNewChat,
         handleStopGeneration: chat.handleStopGeneration,

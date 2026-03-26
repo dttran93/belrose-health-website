@@ -10,6 +10,7 @@ import {
   generateChatTitle,
   MessageContext,
   ContextAttachment,
+  deleteMessage,
 } from './chatService';
 import { Chat, Message, CreateChatInput, CreateMessageInput } from './chatService';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
@@ -283,6 +284,25 @@ export async function createEncryptedChatWithMessage(
   });
 
   return { chatId, messageId };
+}
+
+/**
+ * Delete all messages after a given timestamp (for edit branching)
+ */
+export async function deleteMessagesAfter(
+  userId: string,
+  chatId: string,
+  afterTimestamp: Timestamp
+): Promise<void> {
+  console.log('✂️ Deleting messages after timestamp for branch...');
+
+  const allMessages = await getChatMessages(userId, chatId);
+  const toDelete = allMessages.filter(m => m.timestamp?.toMillis() > afterTimestamp.toMillis());
+
+  console.log(`🗑️ Deleting ${toDelete.length} messages...`);
+  await Promise.all(toDelete.map(m => deleteMessage(userId, chatId, m.id)));
+
+  console.log('✅ Branch truncation complete');
 }
 
 // ============================================================================

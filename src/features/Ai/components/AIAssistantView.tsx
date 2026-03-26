@@ -127,6 +127,7 @@ interface AIHealthAssistantViewProps {
   pendingAttachments?: ChatAttachment[];
   onPendingAttachmentsClear?: () => void;
   onStop?: () => void;
+  onEditMessage: (messageId: string, newContent: string) => Promise<void>;
 }
 
 /**
@@ -152,11 +153,12 @@ export function AIHealthAssistantView({
   pendingAttachments,
   onPendingAttachmentsClear,
   onStop,
+  onEditMessage,
 }: AIHealthAssistantViewProps) {
   return (
-    <div className="min-h-screen max-w-4xl mx-auto lg:px-8 lg:py-8">
+    <div className="h-full mx-auto">
       {/* AI Chat Component */}
-      <div className="rounded-xl">
+      <div className="rounded-xl h-full">
         <AIChat
           healthContext={healthContext}
           className=""
@@ -183,7 +185,7 @@ export function AIHealthAssistantView({
               onContextChange={onContextChange}
             />
           }
-          emptyStateContent={
+          aboveInputContent={
             messages.length === 0 ? (
               <div className="w-full max-w-3xl pt-12">
                 {/* Welcome Header */}
@@ -196,60 +198,61 @@ export function AIHealthAssistantView({
               </div>
             ) : undefined
           }
+          belowInputContent={
+            messages.length === 0 && (
+              <div className="max-w-3xl mx-auto mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white border rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Shield className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900 text-sm">Private & Secure</h4>
+                      <p className="text-xs text-gray-600 mt-1">
+                        All chats are end-to-end encrypted and never used for AI training
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white border rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <Sparkles className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900 text-sm">Context-Aware</h4>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Switch between different record contexts for precise answers
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white border rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <MessageSquare className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900 text-sm">Natural Language</h4>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Ask questions in plain English, just like talking to a doctor
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          }
           onMessagesChange={messageCount => {
             // Could track analytics here
             console.log('Message count changed:', messageCount);
           }}
           onStop={onStop}
+          onEditMessage={onEditMessage}
         />
       </div>
-
-      {/* Info Cards - Only visible when no messages */}
-      {messages.length === 0 && (
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white border rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Shield className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900 text-sm">Private & Secure</h4>
-                <p className="text-xs text-gray-600 mt-1">
-                  All chats are end-to-end encrypted and never used for AI training
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white border rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Sparkles className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900 text-sm">Context-Aware</h4>
-                <p className="text-xs text-gray-600 mt-1">
-                  Switch between different record contexts for precise answers
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white border rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <MessageSquare className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900 text-sm">Natural Language</h4>
-                <p className="text-xs text-gray-600 mt-1">
-                  Ask questions in plain English, just like talking to a doctor
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
