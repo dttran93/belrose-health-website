@@ -249,7 +249,23 @@ const FHIRField: React.FC<EditFHIRFieldProps> = ({
       );
     }
 
-    return <span className="text-sm text-gray-900">{String(content)}</span>;
+    const strContent = String(content);
+    const isUrl = strContent.startsWith('http://') || strContent.startsWith('https://');
+
+    if (isUrl) {
+      return (
+        <a
+          href={strContent}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-blue-600 hover:text-blue-800 hover:underline break-all"
+        >
+          {strContent}
+        </a>
+      );
+    }
+
+    return <span className="text-sm text-gray-900">{strContent}</span>;
   };
 
   return (
