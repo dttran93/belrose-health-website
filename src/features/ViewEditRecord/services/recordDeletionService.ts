@@ -30,7 +30,13 @@
 
 import { PermissionsService } from '@/features/Permissions/services/permissionsService';
 import SubjectQueryService from '@/features/Subject/services/subjectQueryService';
-import { deleteFileComplete } from '@/firebase/uploadUtils';
+import {
+  deleteFromFirestore,
+  deleteFromStorage,
+  deleteRecordVersions,
+  deleteWrappedKeys,
+  getFileMetadata,
+} from '@/firebase/uploadUtils';
 import { FileObject } from '@/types/core';
 import { getFirestore, doc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
 
@@ -243,8 +249,14 @@ class RecordDeletionService {
       await this.createDeletionEvent(record, userId, check);
 
       // Step 2: Delete from Firebase (storage + Firestore + versions + wrapped keys)
-      await deleteFileComplete(record.id);
-      console.log('✅ Record deleted from Firebase');
+      const metadata = await getFileMetadata(record.id);
+
+      if (metadata.storagePath) {
+        await deleteFromStorage(metadata.storagePath);
+      }
+      await deleteRecordVersions(record.id);
+      await deleteWrappedKeys(record.id);
+      await deleteFromFirestore(record.id);
 
       // Step 3: Mark deletion event as complete
       await this.markDeletionComplete(record.id);
@@ -317,7 +329,7 @@ class RecordDeletionService {
    * NOTE: If user is a subject, they must unanchor via SubjectActionDialog first.
    * This method only removes their permissions role.
    */
-  async removeUserFromRecord(record: FileObject, userId: string): Promise<void> {
+  static async removeUserFromRecord(record: FileObject, userId: string): Promise<void> {
     console.log('👤 Removing user from record:', userId);
 
     try {

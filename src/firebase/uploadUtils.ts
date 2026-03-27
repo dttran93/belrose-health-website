@@ -234,7 +234,7 @@ export async function createFirestoreRecord({
     createdAt: Timestamp.now(),
   };
 
-  // Save to GLOBAL records collection
+  // Save to global records collection
   console.log('📄 Saving documentData:', documentData);
   const docRef = await addDoc(collection(db, 'records'), removeUndefinedValues(documentData));
 
@@ -267,31 +267,11 @@ export const updateFirestoreRecord = async (
   try {
     // Get current document
     const docRef = doc(db, 'records', documentId);
-    console.log('📖 Attempting to read document...', {
-      collection: 'records',
-      docId: documentId,
-      userId: user.uid,
-    });
 
     const currentDoc = await getDoc(docRef);
 
     if (!currentDoc.exists()) throw new Error('Document not found');
     const currentData = currentDoc.data();
-
-    // Verify user is an owner or administrator
-    const owners: string[] = currentData.owners || [currentData.uploadedBy];
-    const administrators: string[] = currentData.administrators || [];
-    const isOwner = owners.includes(user.uid);
-    const isAdmin = administrators.includes(user.uid);
-
-    if (!isOwner && !isAdmin) {
-      throw new Error('You do not have permission to update this record');
-    }
-
-    // Check if Encrypted, if not throw error
-    if (!currentData.isEncrypted) {
-      throw new Error('Cannot update a non-encrypted record. All updates must be encrypted.');
-    }
 
     console.log('🔐 Processing encrypted record update...');
     // Get the user's master key from session
@@ -427,9 +407,8 @@ export const updateFirestoreRecord = async (
       isEncrypted: true,
     };
     try {
-      const { VersionControlService } = await import(
-        '@/features/ViewEditRecord/services/versionControlService'
-      );
+      const { VersionControlService } =
+        await import('@/features/ViewEditRecord/services/versionControlService');
       const versionService = new VersionControlService();
       await versionService.createVersion(documentId, encryptedUpdatedFileObject, commitMessage);
       console.log('✅ Version history created');
@@ -449,7 +428,7 @@ export const updateFirestoreRecord = async (
 
 // ==================== DELETE FUNCTIONS ====================
 
-async function deleteFromStorage(storagePath: string): Promise<void> {
+export async function deleteFromStorage(storagePath: string): Promise<void> {
   const storage = getStorage();
   const fileRef = ref(storage, storagePath);
 
@@ -462,7 +441,7 @@ async function deleteFromStorage(storagePath: string): Promise<void> {
   }
 }
 
-async function deleteFromFirestore(documentId: string): Promise<void> {
+export async function deleteFromFirestore(documentId: string): Promise<void> {
   const user = auth.currentUser;
 
   if (!user) throw new Error('User not authenticated');
@@ -476,18 +455,6 @@ async function deleteFromFirestore(documentId: string): Promise<void> {
       throw new Error('Document not found');
     }
 
-    const docData = docSnap.data();
-
-    // Verify user is an owner or the subject
-    const owners = docData.owners || [docData.uploadedBy];
-    const administrators = docData.administrators || [];
-    const isOwner = owners.includes(user.uid);
-    const isAdmin = administrators.includes(user.uid);
-
-    if (!isOwner && !isAdmin) {
-      throw new Error('You do not have permission to delete this record');
-    }
-
     await deleteDoc(docRef);
     console.log('✅ Document deleted from Firestore:', documentId);
   } catch (error: any) {
@@ -496,13 +463,12 @@ async function deleteFromFirestore(documentId: string): Promise<void> {
   }
 }
 
-async function getFileMetadata(documentId: string): Promise<any> {
+export async function getFileMetadata(documentId: string): Promise<any> {
   const user = auth.currentUser;
 
   if (!user) throw new Error('User not authenticated');
 
   try {
-    // 🆕 Get from global records collection
     const docRef = doc(db, 'records', documentId);
     const docSnap = await getDoc(docRef);
 
@@ -525,7 +491,6 @@ export async function deleteRecordVersions(documentId: string): Promise<void> {
   try {
     console.log('🗑️ Deleting all versions for document:', documentId);
 
-    // 🆕 Delete from GLOBAL recordVersions collection
     const q = query(collection(db, 'recordVersions'), where('recordId', '==', documentId));
 
     const snapshot = await getDocs(q);
@@ -559,69 +524,6 @@ export async function deleteWrappedKeys(documentId: string): Promise<void> {
   } catch (error: any) {
     console.error('❌ Error deleting wrapped keys:', error);
     console.warn('⚠️ Continuing despite wrapped key deletion error');
-  }
-}
-
-export async function deleteFileComplete(documentId: string): Promise<DeleteResult> {
-  const user = auth.currentUser;
-
-  if (!user) throw new Error('User not authenticated');
-  if (!documentId) throw new Error('Document ID is required');
-
-  try {
-    const fileMetadata = await getFileMetadata(documentId);
-    const storagePath = fileMetadata.storagePath;
-
-    console.log('🗑️ Starting complete file deletion for:', documentId);
-
-    // Delete from storage (if it exists)
-    let deletedFromStorage = false;
-    if (storagePath) {
-      try {
-        await deleteFromStorage(storagePath);
-        deletedFromStorage = true;
-      } catch (storageError) {
-        console.warn('⚠️ Failed to delete from storage, continuing...', storageError);
-        // Continue even if storage deletion fails
-      }
-    } else {
-      console.log('🎯 No storage path found - virtual file, skipping storage deletion');
-    }
-
-    // Delete versions (best effort - don't fail if this fails)
-    let deletedVersions = false;
-    try {
-      await deleteRecordVersions(documentId);
-      deletedVersions = true;
-    } catch (versionError) {
-      console.warn('⚠️ Failed to delete versions, continuing...', versionError);
-      // Continue even if version deletion fails
-    }
-
-    // Delete wrapped keys (best effort)
-    let deletedWrappedKeys = false;
-    try {
-      await deleteWrappedKeys(documentId);
-      deletedWrappedKeys = true;
-    } catch (keyError) {
-      console.warn('⚠️ Failed to delete wrapped keys, continuing...', keyError);
-    }
-
-    // Delete from Firestore (this is the critical operation)
-    await deleteFromFirestore(documentId);
-
-    console.log('✅ Complete file deletion successful:', documentId);
-
-    return {
-      success: true,
-      deletedFromStorage,
-      deletedFromFirestore: true,
-      deletedVersions,
-      deletedWrappedKeys,
-    };
-  } catch (error: any) {
-    console.error('Error in complete file deletion:', error);
-    throw error;
   }
 }
 
