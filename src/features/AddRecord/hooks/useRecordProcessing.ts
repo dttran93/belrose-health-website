@@ -276,7 +276,7 @@ export class CombinedRecordProcessingService {
     // STEP 1: AI Processing (if FHIR data exists and belroseFields not provided)
     if (virtualData.fhirData && !virtualData.belroseFields) {
       console.log(`🤖 Starting AI processing for virtual file: ${fileName}`);
-      onStageUpdate?.('AI analyzing content...');
+      onStageUpdate?.('AI analyzing content...', { aiProcessingStatus: 'processing' });
 
       try {
         const virtualBelroseFieldInputs = {
@@ -343,6 +343,12 @@ export class CombinedRecordProcessingService {
         console.error(`❌ Narrative generation failed for virtual file ${fileName}:`, error);
       }
     }
+
+    // Marks AI analysis as complete for UI/UX
+    onStageUpdate?.('AI analyzing content...', {
+      aiProcessingStatus: 'completed',
+      belroseFields: result.belroseFields,
+    });
 
     // STEP 2: Generate record hash
     console.log('🔗 Generating record hash for virtual file:', fileName);

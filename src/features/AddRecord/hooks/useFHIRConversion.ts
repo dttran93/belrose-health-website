@@ -1,13 +1,88 @@
+//src/features/AddRecord/hooks/useFHIRConversion.ts
+
+/**
+ * This hook manages the FHIR conversion lifecycle for a batch of uploaded files.
+ *
+ * Conversion: triggers AI conversion for a file's extracted text, attaches
+ * optional user context, and persists the result to Firestore.
+ *
+ * Review: tracks whether the user has confirmed or rejected each converted
+ * file — confirmed files are uploaded to Firebase Storage and saved;
+ * rejected files are removed from processing.
+ *
+ * State queries: exposes helpers for parent components to check whether all
+ * files have been converted and reviewed, and to get a total resource count.
+ */
+
 import { useState, useCallback } from 'react';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { toast } from 'sonner';
 import { FileObject } from '@/types/core';
 import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
 import { FileUploadService } from '../services/fileUploadService';
+import type { FHIRWithValidation } from '../services/fhirConversionService.type';
+import type { FHIRBundle } from '@/types/fhir';
 
-import type { ReviewedData, FHIRConversionHookReturn } from './useFHIRConversion.type';
+// ============================================================================
+// TYPES
+// ============================================================================
 
-import type { FHIRWithValidation, FHIRBundle } from '../services/fhirConversionService.type';
+export interface ReviewedData {
+  subject: string;
+  provider?: string | null;
+  institution?: string | null;
+  address?: string | null;
+  notes: string;
+  sourceType: string;
+  confirmedAt: string;
+}
+
+export interface HealthRecordData {
+  id: string;
+  subject: string;
+  provider: string;
+  institutionName: string;
+  institutionAddress: string;
+  date: string | undefined;
+  clinicNotes: string;
+  attachments: Array<{
+    name: string;
+    size: string;
+    url: string;
+  }>;
+  isBlockchainVerified: boolean;
+  createdAt: string;
+  lastModified: string;
+  originalFhirData: FHIRWithValidation;
+}
+
+export interface FHIRConversionHookReturn {
+  fhirData: Map<string, FHIRWithValidation>;
+  reviewedData: Map<string, ReviewedData>;
+  handleFHIRConverted: (
+    fileId: string,
+    fhirData: FHIRWithValidation,
+    fileObj?: FileObject
+  ) => Promise<void>;
+  handleDataConfirmed: (fileId: string, editedData: any) => Promise<void>;
+  handleDataRejected: (fileId: string) => void;
+  isAllFilesConverted: () => boolean;
+  isAllFilesReviewed: () => boolean;
+  getFHIRStats: () => number;
+  reset: () => void;
+}
+
+export interface FHIRConversionHookParams {
+  processedFiles: FileObject[];
+  firestoreData?: Map<string, any>;
+  updateFirestoreRecord?: (fileId: string, data: any) => void;
+  uploadFiles?: () => Promise<any[]>;
+  removeProcessedFile?: (fileId: string) => void;
+}
+
+// ============================================================================
+// HOOK
+// ============================================================================
 
 /**
  * Custom hook for managing FHIR conversion state and data processing
@@ -15,7 +90,7 @@ import type { FHIRWithValidation, FHIRBundle } from '../services/fhirConversionS
 export const useFHIRConversion = (
   processedFiles: FileObject[],
   updateFirestoreRecord?: (fileId: string, data: any) => void,
-  uploadFiles?: (filesToUpload: FileObject[]) => Promise<any[]>, // Updated type signature
+  uploadFiles?: (filesToUpload: FileObject[]) => Promise<any[]>,
   removeProcessedFile?: (fileId: string) => void
 ): FHIRConversionHookReturn => {
   const [fhirData, setFhirData] = useState<Map<string, FHIRWithValidation>>(new Map());
@@ -29,62 +104,31 @@ export const useFHIRConversion = (
   const handleFHIRConverted = useCallback(
     async (fileId: string, uploadResult: any, fileObj?: FileObject): Promise<void> => {
       console.log('Starting FHIR conversion for file:', fileId);
-      console.log('Upload result received:', uploadResult);
 
-      let targetFile = fileObj;
-      if (!targetFile) {
-        targetFile = processedFiles.find(f => f.id === fileId);
-      }
+      let targetFile = fileObj ?? processedFiles.find(f => f.id === fileId);
 
       if (!targetFile || !targetFile.extractedText) {
         console.error('File not found or no extracted text:', fileId);
-        console.log(
-          'Available processed files:',
-          processedFiles.map(f => ({ id: f.id, name: f.fileName }))
-        );
         return;
       }
 
       try {
-        console.log('Converting extracted text to FHIR...');
-
         let contentForConversion = targetFile.extractedText;
 
-        //If there was context text, add that to the extractedText
-        if (targetFile.contextText && targetFile.contextText.trim()) {
+        if (targetFile.contextText?.trim()) {
           console.log('Including user context in FHIR conversion');
-          contentForConversion = `USER PROVIDED CONTEXT:
-${targetFile.contextText.trim()}
-
-DOCUMENT CONTENT:
-${targetFile.extractedText}`;
-
-          console.log('Context preview:', targetFile.contextText.substring(0, 100) + '...');
+          contentForConversion = `USER PROVIDED CONTEXT:\n${targetFile.contextText.trim()}\n\nDOCUMENT CONTENT:\n${targetFile.extractedText}`;
         }
-
-        console.log(
-          'Content for conversion preview:',
-          contentForConversion.substring(0, 100) + '...'
-        );
 
         const fhirResult = await convertToFHIR(contentForConversion);
 
-        console.log('FHIR conversion successful:', fhirResult);
-
-        // Store the converted FHIR data
-        setFhirData(prev => {
-          const updated = new Map(prev);
-          updated.set(fileId, fhirResult);
-          return updated;
-        });
+        setFhirData(prev => new Map(prev).set(fileId, fhirResult));
 
         if (user?.uid && uploadResult?.documentId) {
           try {
             await uploadService.updateWithFHIR(uploadResult.documentId, fhirResult);
-            console.log('FHIR data saved via service!');
-
             toast.success(`FHIR data saved for ${targetFile.fileName}`, {
-              description: 'Medical data saved to cloud storage',
+              description: 'FHIR data saved to cloud storage',
               duration: 4000,
             });
           } catch (error) {
@@ -96,8 +140,6 @@ ${targetFile.extractedText}`;
           }
         }
 
-        console.log('FHIR data stored in state for fileId:', fileId);
-
         toast.success(`FHIR conversion completed for ${targetFile.fileName}`, {
           description: targetFile.contextText
             ? 'Medical data with your context converted to FHIR format'
@@ -106,7 +148,6 @@ ${targetFile.extractedText}`;
         });
       } catch (error) {
         console.error('FHIR conversion failed:', error);
-
         toast.error(`FHIR conversion failed for ${targetFile.fileName}`, {
           description: error instanceof Error ? error.message : 'Unknown error',
           duration: 6000,
@@ -117,88 +158,58 @@ ${targetFile.extractedText}`;
   );
 
   /**
-   * Handle data confirmation from review - Updated to match original functionality
+   * Handle data confirmation from review
    */
   const handleDataConfirmed = useCallback(
     async (fileId: string, editedData: any): Promise<void> => {
-      console.log('Data confirmed for file:', fileId, editedData);
+      console.log('Data confirmed for file:', fileId);
 
-      // Mark as reviewed
-      setReviewedData(prev => {
-        const updated = new Map(prev);
-        updated.set(fileId, editedData);
-        return updated;
-      });
+      setReviewedData(prev => new Map(prev).set(fileId, editedData));
 
-      // Get the original file info
       const originalFile = processedFiles.find(f => f.id === fileId);
       if (!originalFile) {
         console.error('Original file not found for fileId:', fileId);
         return;
       }
 
-      console.log('originalFile found:', originalFile);
-
-      let documentId: string | null = null;
-
-      // Step 1: Upload the file to Firebase Storage and get documentId
-      if (uploadFiles) {
-        console.log('uploadFiles exists - attempting upload');
-        console.log('Uploading file to Firebase storage...');
-        try {
-          console.log('Calling uploadFiles (no parameters)');
-          const uploadResults = await uploadFiles([originalFile]);
-          console.log('Upload completed successfully:', uploadResults);
-
-          // Get the document ID from the first (and only) upload result
-          if (uploadResults && uploadResults.length > 0 && uploadResults[0].success) {
-            documentId = uploadResults[0].documentId;
-            console.log('Document ID from upload:', documentId);
-          } else {
-            console.error('Upload succeeded but no documentId returned:', uploadResults);
-            return;
-          }
-        } catch (error) {
-          console.error('Error uploading file:', error);
-          return; // Don't continue if file upload fails
-        }
-      } else {
-        console.log('uploadFiles is not available');
+      if (!uploadFiles) {
+        console.error('uploadFiles is not available');
         return;
       }
 
-      // Step 2: Prepare FHIR data for storage
-      const fhirDataToSave = editedData.fhirData; // This is your FHIR Bundle
+      let documentId: string | null = null;
 
+      try {
+        const uploadResults = await uploadFiles([originalFile]);
+        if (uploadResults?.[0]?.success) {
+          documentId = uploadResults[0].documentId;
+        } else {
+          console.error('Upload succeeded but no documentId returned:', uploadResults);
+          return;
+        }
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        return;
+      }
+
+      const fhirDataToSave = editedData.fhirData;
       if (!fhirDataToSave) {
         console.error('No FHIR data found in editedData');
         return;
       }
 
-      // Step 3: Save FHIR data directly to Firestore
       if (user?.uid && documentId) {
         try {
-          console.log('Saving FHIR data to Firestore document:', documentId);
-
-          // Import the updateFirestoreRecord function
           const { updateFirestoreRecord: saveToFirestore } = await import('@/firebase/uploadUtils');
-
-          // Save the FHIR data directly
           await saveToFirestore(documentId, fhirDataToSave);
 
-          console.log('FHIR data saved successfully to document:', documentId);
-
-          // Update the firestoreData Map to reflect this save
-          if (updateFirestoreRecord) {
-            updateFirestoreRecord(fileId, {
-              documentId,
-              fhirData: fhirDataToSave,
-              status: 'saved',
-            });
-          }
+          updateFirestoreRecord?.(fileId, {
+            documentId,
+            fhirData: fhirDataToSave,
+            status: 'saved',
+          });
         } catch (error) {
           console.error('Error saving FHIR data to Firestore:', error);
-          // You might want to show a user-friendly error message here
         }
       } else {
         console.error('Cannot save FHIR data: missing user or documentId', {
@@ -215,27 +226,18 @@ ${targetFile.extractedText}`;
    */
   const handleDataRejected = useCallback(
     (fileId: string): void => {
-      console.log('Data rejected for file:', fileId);
-      console.log('removeProcessedFile function exists:', !!removeProcessedFile);
-
-      // Remove from FHIR data map
       setFhirData(prev => {
         const updated = new Map(prev);
         updated.delete(fileId);
         return updated;
       });
-
-      // Remove from reviewed data map
       setReviewedData(prev => {
         const updated = new Map(prev);
         updated.delete(fileId);
         return updated;
       });
 
-      // Remove the processed file if function is provided
-      if (removeProcessedFile) {
-        removeProcessedFile(fileId);
-      }
+      removeProcessedFile?.(fileId);
 
       toast.info('Document processing cancelled', {
         description: 'The document has been rejected and removed from processing.',
@@ -246,42 +248,19 @@ ${targetFile.extractedText}`;
   );
 
   /**
-   * Check if all files are converted AND reviewed
+   * Check if all eligible files have been converted to FHIR
    */
   const isAllFilesConverted = useCallback((): boolean => {
-    const eligibleFiles = processedFiles.filter(f => {
-      const hasExtractedText = !!f.extractedText;
-      const isProcessed = ['completed', 'medical_detected', 'non_medical_detected'].includes(
-        f.status
-      );
-
-      console.log(
-        `File ${f.fileName}: status=${f.status}, hasText=${hasExtractedText}, isProcessed=${isProcessed}`
-      );
-
-      return hasExtractedText && isProcessed;
-    });
-
-    // Debug logging
-    console.log('FHIR Data Map contents:', Array.from(fhirData.keys()));
-    console.log(
-      'Eligible files:',
-      eligibleFiles.map(f => ({ id: f.id, name: f.fileName }))
+    const eligibleFiles = processedFiles.filter(
+      f =>
+        !!f.extractedText &&
+        ['completed', 'medical_detected', 'non_medical_detected'].includes(f.status)
     );
-
-    const result =
-      eligibleFiles.length > 0 &&
-      eligibleFiles.every(f => {
-        const hasFhir = fhirData.has(f.id);
-        console.log(`File ${f.fileName} (${f.id}) has FHIR: ${hasFhir}`);
-        return hasFhir;
-      });
-
-    return result;
+    return eligibleFiles.length > 0 && eligibleFiles.every(f => fhirData.has(f.id));
   }, [processedFiles, fhirData]);
 
   /**
-   * Check if all files are reviewed and ready for completion
+   * Check if all completed files have been reviewed
    */
   const isAllFilesReviewed = useCallback((): boolean => {
     const completedFiles = processedFiles.filter(f => f.status === 'completed' && f.extractedText);
@@ -289,18 +268,18 @@ ${targetFile.extractedText}`;
   }, [processedFiles, reviewedData]);
 
   /**
-   * Get total FHIR resources count
+   * Get total FHIR resource count across all converted files
    */
   const getFHIRStats = useCallback((): number => {
-    let totalResources = 0;
+    let total = 0;
     fhirData.forEach(fhir => {
-      if (fhir.resourceType === 'Bundle' && (fhir as FHIRBundle).entry) {
-        totalResources += (fhir as FHIRBundle).entry?.length || 0;
+      if (fhir.resourceType === 'Bundle') {
+        total += (fhir as unknown as FHIRBundle).entry?.length ?? 0;
       } else {
-        totalResources += 1; // Single resource
+        total += 1;
       }
     });
-    return totalResources;
+    return total;
   }, [fhirData]);
 
   /**

@@ -3,7 +3,7 @@ import { FileObject, VirtualFileInput } from '@/types/core';
 import { UploadResult } from '../services/shared.types';
 
 // ============================================================================
-// FILE MANAGEMENT TYPES - UPDATED TO MATCH HOOK
+// FILE MANAGEMENT TYPES
 // ============================================================================
 
 /**
@@ -29,7 +29,7 @@ export interface VirtualFileResult {
 }
 
 // ============================================================================
-// COMPONENT PROPS - UPDATED TO MATCH HOOK INTERFACE
+// COMPONENT PROPS
 // ============================================================================
 
 export interface CombinedUploadFHIRProps {
@@ -56,7 +56,7 @@ export interface CombinedUploadFHIRProps {
   uploadFiles: (filesToUpload: FileObject[]) => Promise<UploadResult[]>;
   savingToFirestore: Set<string>;
 
-  // FHIR PRops
+  // FHIR Props
   fhirData?: Map<string, FHIRWithValidation>;
   onFHIRConverted?: (fileId: string, uploadResult: any, fileObj?: FileObject) => Promise<void>;
 

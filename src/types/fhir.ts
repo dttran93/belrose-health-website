@@ -32,6 +32,7 @@ export interface FHIREntry {
 
 // Union type of all FHIR resources you'll use
 export type FHIRResource =
+  | BundleResource
   | PatientResource
   | ObservationResource
   | DocumentReferenceResource
@@ -132,6 +133,13 @@ export interface Attachment {
   hash?: string; // base64Binary
   title?: string;
   creation?: string; // DateTime
+}
+
+export interface BundleResource {
+  resourceType: 'Bundle';
+  id: string;
+  entry?: FHIREntry[];
+  type?: string;
 }
 
 // ============================================================================

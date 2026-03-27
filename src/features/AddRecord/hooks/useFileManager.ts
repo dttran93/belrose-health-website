@@ -21,7 +21,7 @@ import {
 } from './useFileManager.type';
 import { VirtualFileResult } from '../components/CombinedUploadFHIR.type';
 import { UploadResult } from '../services/shared.types';
-import { CombinedRecordProcessingService } from './useRecordProcessing';
+import { CombinedRecordProcessingService, ProcessingCallbacks } from './useRecordProcessing';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { Timestamp } from 'firebase/firestore';
 
@@ -56,11 +56,6 @@ export function useFileManager(): UseFileManagerTypes {
     }
   }, [files]);
 
-  console.log(
-    '📁 Current files in hook:',
-    files.length,
-    files.map(f => f.fileName)
-  );
   const [savingToFirestore, setSavingToFirestore] = useState<Set<string>>(new Set());
 
   // ==================== REFS & SERVICES ====================
@@ -561,15 +556,15 @@ export function useFileManager(): UseFileManagerTypes {
 
   // ==================== VIRTUAL FILE SUPPORT ====================
 
-  const addVirtualFile = useCallback(
+  const processVirtualFileData = useCallback(
     async (
-      virtualData: VirtualFileInput
+      virtualData: VirtualFileInput,
+      callbacks?: ProcessingCallbacks
     ): Promise<{
       fileId: string;
       recordHash?: string;
-      virtualFile: FileObject; // ← Add this
+      virtualFile: FileObject;
     }> => {
-      // Guard clause for user
       if (!user) {
         throw new Error('User must be authenticated to add virtual file');
       }
@@ -579,7 +574,8 @@ export function useFileManager(): UseFileManagerTypes {
       // Process the virtual file through the pipeline
       const result = await CombinedRecordProcessingService.processVirtualFile(
         virtualData,
-        fileName
+        fileName,
+        callbacks
       );
 
       // Create virtual file with processed data
@@ -605,16 +601,12 @@ export function useFileManager(): UseFileManagerTypes {
         administrators: virtualData.administrators || [user.uid],
       };
 
-      // Add to state
-      setFiles(prev => [...prev, virtualFile]);
-      console.log(`✅ Added virtual file: ${virtualFile.fileName}`);
-
       return { fileId, recordHash: result.recordHash, virtualFile };
     },
-    [setFiles, user]
+    [user]
   );
 
-  const addFhirAsVirtualFile = useCallback(
+  const processVirtualRecord = useCallback(
     async (
       fhirData: any | undefined,
       options: VirtualFileInput & { autoUpload?: boolean } = {}
@@ -622,78 +614,104 @@ export function useFileManager(): UseFileManagerTypes {
       const fileId = options.id || generateId();
       const fileName = options.fileName || `FHIR Document ${fileId}`;
 
-      const virtualFileInput: VirtualFileInput = {
+      // Add placeholder immediately so FileListItem renders with progress
+      const placeholder: FileObject = {
         id: fileId,
-        fileName: fileName,
-        fileSize: JSON.stringify(fhirData).length,
+        fileName,
+        fileSize: 0,
         fileType: 'application/fhir+json',
-        originalText: options.originalText,
-        contextText: options.contextText,
-        wordCount: JSON.stringify(fhirData).split(/\s+/).length,
+        status: 'processing',
+        processingStage: 'Starting processing...',
+        uploadedAt: Timestamp.now(),
+        uploadedBy: user?.uid,
+        isVirtual: true,
+        wordCount: 0,
         sourceType: options.sourceType,
-        fhirData,
-        ...options,
+        extractedText: '',
+        administrators: options.administrators || [user!.uid],
       };
-
-      // Get the processed virtual file directly from the return value
-      const { fileId: generatedFileId, virtualFile } = await addVirtualFile(virtualFileInput);
-
-      console.log('🧩 virtualFile AFTER addVirtualFile:', {
-        hasEncryptedData: !!virtualFile.encryptedData,
-        encryptedDataKeys: virtualFile.encryptedData
-          ? Object.keys(virtualFile.encryptedData)
-          : Object.keys(virtualFile || {}),
-      });
+      setFiles(prev => [...prev, placeholder]);
 
       try {
-        if (savingToFirestore.has(generatedFileId)) {
-          throw new Error('File already uploading');
+        const virtualFileInput: VirtualFileInput = {
+          id: fileId,
+          fileName,
+          fileSize: JSON.stringify(fhirData).length,
+          fileType: 'application/fhir+json',
+          originalText: options.originalText,
+          contextText: options.contextText,
+          wordCount: JSON.stringify(fhirData).split(/\s+/).length,
+          sourceType: options.sourceType,
+          fhirData,
+          ...options,
+        };
+
+        updateFileStatus(fileId, 'processing', { processingStage: 'Starting processing...' });
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        if (options.sourceType === 'Manual FHIR JSON Submission') {
+          updateFileStatus(fileId, 'processing', { fhirData });
         }
 
-        setSavingToFirestore(prev => new Set([...prev, generatedFileId]));
+        const { virtualFile } = await processVirtualFileData(virtualFileInput, {
+          onStageUpdate: (stage, data) => {
+            updateFileStatus(fileId, 'processing', {
+              processingStage: stage,
+              ...data,
+            });
+          },
+        });
 
+        // Write back originalText so extract/process chip completes for text uploads
+        updateFileStatus(fileId, 'processing', {
+          originalText: virtualFile.originalText,
+          fhirData: virtualFile.fhirData,
+        });
+
+        updateFileStatus(fileId, 'uploading', {});
+        setSavingToFirestore(prev => new Set([...prev, fileId]));
         const uploadResult = await fileUploadService.current.uploadFile(virtualFile);
-        console.log(`✅ Auto-upload successful for ${virtualFile.fileName}:`, uploadResult);
 
-        updateFileStatus(generatedFileId, 'completed', {
+        updateFileStatus(fileId, 'completed', {
           id: uploadResult.documentId,
           firestoreId: uploadResult.documentId,
           uploadedAt: uploadResult.uploadedAt || Timestamp.now(),
-          administrators: virtualFile.administrators || [virtualFile.uploadedBy!],
+          administrators: virtualFile.administrators,
+          processingStage: undefined,
         });
 
-        toast.success(`📁 ${virtualFile.fileName} uploaded successfully!`, {
+        toast.success(`${fileName} uploaded successfully!`, {
           description: 'Your file has been saved to cloud storage',
           duration: 4000,
         });
 
         return {
-          fileId: generatedFileId,
+          fileId,
           virtualFile,
           uploadResult: {
             success: true,
             documentId: uploadResult.documentId,
-            fileId: generatedFileId,
+            fileId,
             uploadedAt: uploadResult.uploadedAt,
             filePath: uploadResult.filePath,
             downloadURL: uploadResult.downloadURL,
           },
         };
       } catch (error) {
-        console.error(`❌ Auto-upload failed for ${virtualFile.fileName}:`, error);
-        updateFileStatus(generatedFileId, 'error', {
+        updateFileStatus(fileId, 'error', {
           error: error instanceof Error ? error.message : 'Upload failed',
+          processingStage: undefined,
         });
         throw error;
       } finally {
         setSavingToFirestore(prev => {
           const newSet = new Set(prev);
-          newSet.delete(generatedFileId);
+          newSet.delete(fileId);
           return newSet;
         });
       }
     },
-    [addVirtualFile, fileUploadService, savingToFirestore, updateFileStatus]
+    [processVirtualFileData, savingToFirestore, updateFileStatus, user]
   );
 
   // ==================== FHIR INTEGRATION ====================
@@ -765,8 +783,8 @@ export function useFileManager(): UseFileManagerTypes {
     savingCount: savingToFirestore.size,
 
     // VirtualFile Support
-    addVirtualFile,
-    addFhirAsVirtualFile,
+    processVirtualFileData,
+    processVirtualRecord,
 
     // Reset function
     reset: clearAll,

@@ -63,8 +63,8 @@ export interface UseFileManagerTypes {
   savingCount: number;
 
   // Virtual file support
-  addVirtualFile: (virtualData: VirtualFileInput) => Promise<{ fileId: string }>;
-  addFhirAsVirtualFile: (fhirData: any, options?: VirtualFileInput) => Promise<VirtualFileResult>;
+  processVirtualFileData: (virtualData: VirtualFileInput) => Promise<{ fileId: string }>;
+  processVirtualRecord: (fhirData: any, options?: VirtualFileInput) => Promise<VirtualFileResult>;
 
   // Reset function
   reset: () => void;

@@ -172,6 +172,7 @@ export type ProcessingStages =
   | 'Encrypting record data...'
   | 'Record encrypted'
   | 'Generating record hash...'
+  | 'Uploading...'
   | undefined;
 
 export interface VirtualFileInput {

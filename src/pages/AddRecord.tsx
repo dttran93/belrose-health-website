@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import useFileManager from '@/features/AddRecord/hooks/useFileManager';
 import { useFHIRConversion } from '@/features/AddRecord/hooks/useFHIRConversion';
 import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
@@ -32,7 +32,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
     getStats,
     savedToFirestoreCount,
     savingCount,
-    addFhirAsVirtualFile,
+    processVirtualRecord,
     setFHIRConversionCallback,
     processFile,
     reset: resetFileUpload,
@@ -44,13 +44,11 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
     reset: resetFHIR,
   } = useFHIRConversion(processedFiles, updateFirestoreRecord, uploadFiles);
 
-  // 🔥 SET UP FHIR CONVERSION CALLBACK WITH DEBUGGING
   React.useEffect(() => {
     console.log('🔍 Setting FHIR callback:', typeof handleFHIRConverted);
     setFHIRConversionCallback((fileId: string, uploadResult: any) => {
       console.log('🎯 FHIR CALLBACK TRIGGERED:', fileId, uploadResult);
 
-      // 🔥 FIND THE FILE IN THE CURRENT FILES ARRAY
       const currentFile = files.find(f => f.id === fileId);
       if (!currentFile || !currentFile.extractedText) {
         console.error('❌ File not found in current files:', fileId);
@@ -93,7 +91,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
           removeFileFromLocal={removeFileFromLocal}
           retryFile={retryFile}
           getStats={getStats}
-          addFhirAsVirtualFile={addFhirAsVirtualFile}
+          addFhirAsVirtualFile={processVirtualRecord}
           uploadFiles={uploadFiles}
           fhirData={fhirData}
           onFHIRConverted={handleFHIRConverted}
