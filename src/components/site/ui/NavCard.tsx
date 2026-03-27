@@ -1,3 +1,5 @@
+// src/components/site/ui/NavCard.tsx
+
 import React, { ReactNode } from 'react';
 import { ArrowRight } from 'lucide-react';
 
@@ -11,8 +13,7 @@ interface NavCardProps {
 
 const NavCard: React.FC<NavCardProps> = ({ icon, title, description, link, color }) => {
   const handleClick = () => {
-    const hash = link.replace('/#', '').replace('#', '');
-    window.location.hash = hash;
+    window.location.href = link;
   };
 
   return (
@@ -20,8 +21,10 @@ const NavCard: React.FC<NavCardProps> = ({ icon, title, description, link, color
       onClick={handleClick}
       className={`h-full relative group bg-${color} text-primary rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-100 flex flex-col cursor-pointer`}
     >
-      <div className="flex gap-2"><div>{icon}</div>
-      <h3 className="flex text-xl font-semibold mb-3">{title}</h3></div>
+      <div className="flex gap-2">
+        <div>{icon}</div>
+        <h3 className="flex text-xl font-semibold mb-3">{title}</h3>
+      </div>
       <p className="flex-grow text-left">{description}</p>
 
       {/* Hover Effect Overlay with Link Indicator */}

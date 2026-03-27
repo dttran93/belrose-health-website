@@ -28,6 +28,7 @@ import HealthProfile from './pages/HealthProfile';
 import RecordDetail from './pages/RecordDetail';
 import GuestInvitePage from './pages/GuestInvitePage';
 import Messaging from './pages/Messaging';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
@@ -48,6 +49,7 @@ const App: React.FC = (): React.JSX.Element => {
               <Routes>
                 {/* ── Public site shell ── */}
                 <Route path="/" element={<Index />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
 
                 {/* ── Auth & verification ── */}
                 <Route path="/auth" element={<Auth />} />
