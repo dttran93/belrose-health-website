@@ -34,6 +34,7 @@ interface UserBadgeProps {
   icon?: React.ReactNode;
   tooltip?: string;
   className?: string;
+  onClick?: (e: React.MouseEvent) => void;
 }
 
 export const UserBadge: React.FC<UserBadgeProps> = ({
@@ -42,14 +43,16 @@ export const UserBadge: React.FC<UserBadgeProps> = ({
   icon,
   tooltip,
   className = '',
+  onClick,
 }) => {
   const badgeColors = badgeColorClasses[color];
 
   const badgeElement = (
     <span
+      onClick={onClick}
       className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full 
         ${badgeColors.bg} ${badgeColors.text} border ${badgeColors.border} ${className}
-        ${tooltip ? 'cursor-help' : ''}`}
+        ${onClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : tooltip ? 'cursor-help' : ''}`}
     >
       {icon}
       {text}

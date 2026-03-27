@@ -207,7 +207,13 @@ export const BelroseRecord: React.FC<BelroseRecordProps> = ({
             />
           ) : (
             <div className="prose prose-sm max-w-none text-left">
-              <ReactMarkdown>{Data.detailedNarrative}</ReactMarkdown>
+              <ReactMarkdown
+                components={{
+                  h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>, //Otherwise h1 is just ridiculously large
+                }}
+              >
+                {Data.detailedNarrative}
+              </ReactMarkdown>
             </div>
           )}
         </div>

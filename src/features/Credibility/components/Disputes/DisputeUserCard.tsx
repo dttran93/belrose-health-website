@@ -11,6 +11,7 @@ import {
   getSeverityConfig,
 } from '../../services/disputeService';
 import { BelroseUserProfile } from '@/types/core';
+import { useNavigate } from 'react-router-dom';
 
 interface DisputeCardProps {
   dispute: DisputeDocDecrypted;
@@ -43,6 +44,7 @@ const DisputeUserCard: React.FC<DisputeCardProps> = ({
 }) => {
   const severityInfo = getSeverityConfig(dispute.severity);
   const culpabilityInfo = getCulpabilityConfig(dispute.culpability);
+  const navigate = useNavigate();
 
   if (!severityInfo || !culpabilityInfo) {
     throw new Error('Invalid severity or culpability level');
@@ -63,6 +65,10 @@ const DisputeUserCard: React.FC<DisputeCardProps> = ({
                 ? 'Disputed the current version'
                 : `Disputed a previous version of this record`
             }
+            onClick={e => {
+              e.stopPropagation();
+              navigate(`/app/records/${dispute.recordId}?view=versions`);
+            }}
           />
           <UserBadge
             text={severityInfo.name}

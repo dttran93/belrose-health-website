@@ -1,32 +1,33 @@
 //src/pages/AllRecords.tsx
 
 /**
- * AllRecords Component - Smart container for the health records page.
+ * AllRecords - Smart container for the health records list page.
  *
- * Owns all state: which record is selected, view navigation, filtering,
- * search, deletion and save logic. Renders RecordsList/RecordFull conditionally.
+ * Owns: record fetching, filtering, search, subject profiles, deletion.
  *
- * useUserProfile/useRecordFilters and other hooks are called for functions logic
+ * Calls RecordDetail at /app/records/:recordId. Clicking a record (or any action
+ * from the menu) navigates there with ?view= set appropriately.
  */
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { useRecordFileActions } from '@/features/ViewEditRecord/hooks/useRecordFileActions';
 import { RecordsList } from '@/features/ViewEditRecord/components/RecordsList';
 import { RecordFilterType, useUserRecords } from '@/features/ViewEditRecord/hooks/useUserRecords';
 import useUserProfiles from '@/features/Users/hooks/useUserProfiles';
-import useFileManager from '@/features/AddRecord/hooks/useFileManager';
 import { useRecordFilters } from '@/features/ViewEditRecord/hooks/useRecordFilters';
 import { FileObject } from '@/types/core';
-import { toast } from 'sonner';
 import { useRecordDeletion } from '@/features/ViewEditRecord/hooks/useRecordDeletion';
-import { AlertCircle, Loader2, Search, Upload } from 'lucide-react';
-import RecordFull from '@/features/ViewEditRecord/components/RecordFull';
+import { AlertCircle, Loader2, Upload } from 'lucide-react';
 import RecordDeletionDialog from '@/features/ViewEditRecord/components/RecordDeletionDialog';
 import FilterTabs from '@/features/ViewEditRecord/components/View/FilterTabs';
 
-type InitialRecordView =
+// ============================================================================
+// TYPES
+// ============================================================================
+
+type RecordView =
   | 'record'
   | 'edit'
   | 'versions'
@@ -35,17 +36,21 @@ type InitialRecordView =
   | 'access'
   | 'subject';
 
+// ============================================================================
+// COMPONENT
+// ============================================================================
+
 export const AllRecords: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user } = useAuthContext();
-  const { updateFirestoreRecord } = useFileManager();
 
   // ================== RECORD FETCHING ==========================
 
   const [filterType, setFilterType] = useState<RecordFilterType>('all');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | undefined>(undefined);
 
+  // Second fetch (filterType: 'all') is only used to build the subject list
+  // for the filter tabs — doesn't affect the main list.
   const { records: allRecordsForSubjects } = useUserRecords(user?.uid, { filterType: 'all' });
 
   const { records, loading, error, refetchRecords } = useUserRecords(user?.uid, {
@@ -55,7 +60,6 @@ export const AllRecords: React.FC = () => {
 
   // ================== SUBJECT PROFILES ==========================
 
-  // Extract unique subjects from records
   const uniqueSubjects = React.useMemo(() => {
     const subjectIds = new Set<string>();
     allRecordsForSubjects.forEach(record => {
@@ -64,7 +68,6 @@ export const AllRecords: React.FC = () => {
     return Array.from(subjectIds);
   }, [allRecordsForSubjects]);
 
-  // Load user profiles for all unique subjects
   const { loading: loadingProfiles, getDisplayName } = useUserProfiles(uniqueSubjects);
 
   // ================== SEARCH & FILTER ==========================
@@ -78,91 +81,12 @@ export const AllRecords: React.FC = () => {
     sourceTypes,
   } = useRecordFilters(records);
 
-  // ================== RECORD SELECTION (view/RecordFull) =======
+  // ================== NAVIGATION ===============================
 
-  const [selectedRecord, setSelectedRecord] = useState<FileObject | null>(null);
-  const [initialRecordView, setInitialRecordView] = useState<InitialRecordView>('record');
-  const [comingFromAddRecord, setComingFromAddRecord] = useState(false);
-
-  // Keep selectedRecord in sync when Firestore pushes record updates
-  useEffect(() => {
-    if (selectedRecord && records.length > 0) {
-      const updated = records.find(r => r.id === selectedRecord.id);
-      if (updated && updated !== selectedRecord) {
-        console.log('🔄 Syncing selected record with fresh data.');
-        setSelectedRecord(updated);
-      }
-    }
-  }, [records]);
-
-  const openRecord = (record: FileObject, view: InitialRecordView = 'record') => {
-    setSelectedRecord(record);
-    setInitialRecordView(view);
-    setComingFromAddRecord(false);
-  };
-
-  const closeRecord = () => {
-    setSelectedRecord(null);
-    setInitialRecordView('record');
-    setComingFromAddRecord(false);
-  };
-
-  // ================== AUTO-OPEN (from AddRecord navigation) =====
-
-  const [autoOpenRecordId, setAutoOpenRecordId] = useState<string | null>(null);
-  const [autoOpenInEditMode, setAutoOpenInEditMode] = useState(false);
-
-  // Check for navigation state on mount and when records load
-  useEffect(() => {
-    const state = location.state as { openRecordId?: string; openInEditMode?: boolean };
-
-    if (state?.openRecordId) {
-      console.log('🎯 Received navigation state:', state);
-      setAutoOpenRecordId(state.openRecordId);
-      setAutoOpenInEditMode(state.openInEditMode || false);
-
-      // Clear the state so it doesn't re-trigger
-      window.history.replaceState({}, document.title);
-    }
-  }, [location.state]);
-
-  useEffect(() => {
-    if (autoOpenRecordId && records.length > 0) {
-      const record = records.find(r => r.id === autoOpenRecordId);
-      if (record) {
-        console.log('🎯 Auto-opening record:', record.id, 'Edit mode:', autoOpenInEditMode);
-        setSelectedRecord(record);
-        setInitialRecordView(autoOpenInEditMode ? 'edit' : 'record');
-        setComingFromAddRecord(true);
-        setAutoOpenRecordId(null); // clear so it doesn't re-trigger
-      }
-    }
-  }, [autoOpenRecordId, records]);
-
-  // ================== SAVE HANDLER =============================
-
-  const handleSaveRecord = async (updatedRecord: FileObject) => {
-    try {
-      if (!updatedRecord.id) throw new Error('Cannot save record - no document ID found');
-
-      await updateFirestoreRecord(updatedRecord.id, {
-        fhirData: updatedRecord.fhirData,
-        belroseFields: updatedRecord.belroseFields,
-        lastModified: new Date().toISOString(),
-      });
-
-      setSelectedRecord(updatedRecord);
-      toast.success(`💾 Record saved for ${updatedRecord.belroseFields?.title}`, {
-        description: 'Record updates saved to cloud storage',
-        duration: 4000,
-      });
-    } catch (err) {
-      console.error('Failed to save record:', err);
-      toast.error(`Failed to save ${updatedRecord.belroseFields?.title}`, {
-        description: err instanceof Error ? err.message : 'Unknown error occurred',
-        duration: 4000,
-      });
-    }
+  // All record opens are now just navigations to RecordDetail.
+  // ?view= maps 1:1 to the ViewMode in RecordFull.
+  const openRecord = (record: FileObject, view: RecordView = 'record') => {
+    navigate(`/app/records/${record.id}?view=${view}`);
   };
 
   // ================== DELETE HANDLER ===========================
@@ -170,10 +94,8 @@ export const AllRecords: React.FC = () => {
   const [recordToDelete, setRecordToDelete] = useState<FileObject | null>(null);
 
   const deletion = useRecordDeletion(recordToDelete || ({} as FileObject), () => {
-    const deletedId = recordToDelete?.id;
     setRecordToDelete(null);
     refetchRecords();
-    if (selectedRecord?.id === deletedId) closeRecord();
   });
 
   const handleDeleteRecord = (record: FileObject) => {
@@ -234,31 +156,8 @@ export const AllRecords: React.FC = () => {
     );
   }
 
-  // ================== RECORD FULL VIEW =========================
+  // ================== EMPTY STATE ==============================
 
-  if (selectedRecord) {
-    return (
-      <div className="p-4">
-        <RecordFull
-          record={selectedRecord}
-          onDownload={handleDownloadRecord}
-          onCopy={handleCopyRecord}
-          onDelete={handleDeleteRecord}
-          onBack={closeRecord}
-          onSave={handleSaveRecord}
-          initialViewMode={initialRecordView}
-          comingFromAddRecord={comingFromAddRecord}
-          onRefreshRecord={refetchRecords}
-        />
-        {recordToDelete && (
-          <RecordDeletionDialog {...deletion.dialogProps} closeDialog={handleCloseDeleteDialog} />
-        )}
-      </div>
-    );
-  }
-  // ================== LIST VIEW ================================
-
-  // Empty state (no records at all, before search filtering)
   if (records.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -280,34 +179,20 @@ export const AllRecords: React.FC = () => {
           </p>
           <button
             onClick={handleAddNewRecord}
-            className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium"
           >
-            <Upload className="w-5 h-5 mr-2" />
-            Upload Your First Record
+            <Upload className="w-5 h-5" />
+            Add Your First Record
           </button>
         </div>
       </div>
     );
   }
 
+  // ================== LIST VIEW ================================
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Page Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Your Health Records</h1>
-          </div>
-          <button
-            onClick={handleAddNewRecord}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            Add Record
-          </button>
-        </div>
-      </div>
-      {/* Filter Tabs + Subject Selector */}
       <FilterTabs
         filterType={filterType}
         onFilterChange={handleFilterChange}
@@ -319,28 +204,27 @@ export const AllRecords: React.FC = () => {
         getDisplayName={getDisplayName}
       />
 
-      {/* Search and Source Type Filter */}
+      {/* Search & Filter Bar */}
       <div className="max-w-7xl mx-auto px-4 py-4">
-        <div className="flex items-center gap-4 bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex-1 relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <div className="flex gap-3 items-center">
+          <div className="relative flex-1">
             <input
               type="text"
               placeholder="Search records..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-background border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="bg-background w-full pl-4 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
           </div>
           <select
             value={sourceTypeFilter}
             onChange={e => setSourceTypeFilter(e.target.value)}
-            className="px-3 py-2 bg-background border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 bg-white"
           >
-            <option value="all">All Types</option>
+            <option value="">All Types</option>
             {sourceTypes.map(type => (
               <option key={type} value={type}>
-                {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                {type.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
               </option>
             ))}
           </select>

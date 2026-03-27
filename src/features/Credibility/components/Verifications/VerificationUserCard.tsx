@@ -5,6 +5,7 @@ import UserCard from '@/features/Users/components/ui/UserCard';
 import { UserBadge } from '@/features/Users/components/ui/UserBadge';
 import { getVerificationConfig, VerificationDoc } from '../../services/verificationService';
 import { BelroseUserProfile } from '@/types/core';
+import { useNavigate } from 'react-router-dom';
 
 interface VerificationCardProps {
   verification: VerificationDoc;
@@ -26,6 +27,7 @@ const VerificationUserCard: React.FC<VerificationCardProps> = ({
   onClick,
 }) => {
   const levelInfo = getVerificationConfig(verification.level);
+  const navigate = useNavigate();
 
   // Simple hash comparison to determine if current
   const isCurrent = verification.recordHash === currentRecordHash;
@@ -40,6 +42,10 @@ const VerificationUserCard: React.FC<VerificationCardProps> = ({
         tooltip={
           isCurrent ? 'Verified the current version' : 'Verified a previous version of this record'
         }
+        onClick={e => {
+          e.stopPropagation();
+          navigate(`/app/records/${verification.recordId}?view=versions`);
+        }}
       />
 
       {/* Level Badge */}

@@ -7,9 +7,12 @@
  * Fetches the record by ID, then renders RecordFull with the full action
  * surface (save, delete, download, etc.).
  *
+ * View state is owned here via URL search params (?view=credibility etc.)
+ * and passed into RecordFull via onViewModeChange. This means views are
+ * deep-linkable and the browser back button works naturally.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
@@ -61,6 +64,22 @@ const ErrorState: React.FC<{ message: string }> = ({ message }) => {
 };
 
 // ============================================================================
+// VALID VIEWS
+// ============================================================================
+
+const VALID_VIEWS = [
+  'record',
+  'edit',
+  'versions',
+  'credibility',
+  'permissions',
+  'access',
+  'subject',
+] as const;
+
+type ValidView = (typeof VALID_VIEWS)[number];
+
+// ============================================================================
 // PAGE
 // ============================================================================
 
@@ -74,62 +93,68 @@ const RecordDetail: React.FC = () => {
   const [record, setRecord] = useState<FileObject | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchParams] = useSearchParams();
 
-  const VALID_VIEWS = [
-    'record',
-    'edit',
-    'versions',
-    'credibility',
-    'permissions',
-    'access',
-    'subject',
-  ] as const;
-  type ValidView = (typeof VALID_VIEWS)[number];
+  // searchParams owns the view state — RecordFull reads initialViewMode from
+  // here and calls onViewModeChange to write back whenever the user navigates
+  // between panels.
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const viewParam = searchParams.get('view');
   const initialViewMode: ValidView = VALID_VIEWS.includes(viewParam as ValidView)
     ? (viewParam as ValidView)
     : 'record';
 
+  // Called by RecordFull whenever the active panel changes.
+  // replace:true keeps the history stack clean — navigating record→credibility
+  // shouldn't require two back-button presses to leave the page.
+  const handleViewModeChange = useCallback(
+    (view: string) => {
+      setSearchParams({ view }, { replace: true });
+    },
+    [setSearchParams]
+  );
+
   // =========================================================================
   // FETCH SINGLE RECORD
   // =========================================================================
 
-  useEffect(() => {
+  const fetchRecord = useCallback(async () => {
     if (!recordId) {
       setError('No record ID in URL.');
       setIsLoading(false);
       return;
     }
 
-    const fetchRecord = async () => {
-      try {
-        const db = getFirestore();
-        const docRef = doc(db, 'records', recordId);
-        const docSnap = await getDoc(docRef);
+    setIsLoading(true);
+    setRecord(null);
 
-        if (!docSnap.exists()) {
-          setError('Record not found. It may have been deleted or you may not have access.');
-          setIsLoading(false);
-          return;
-        }
+    try {
+      const db = getFirestore();
+      const docRef = doc(db, 'records', recordId);
+      const docSnap = await getDoc(docRef);
 
-        // Map Firestore doc → FileObject (same util used by useUserRecords)
-        const mapped = mapFirestoreToFileObject(docSnap.id, docSnap.data());
-
-        // Decrypt if needed (same path as useUserRecords)
-        const [decrypted] = await RecordDecryptionService.decryptRecords([mapped as any]);
-        setRecord(decrypted as FileObject);
-      } catch (err) {
-        console.error('❌ Error loading record:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load record.');
-      } finally {
-        setIsLoading(false);
+      if (!docSnap.exists()) {
+        setError('Record not found. It may have been deleted or you may not have access.');
+        return;
       }
-    };
 
-    fetchRecord();
+      // Map Firestore doc → FileObject (same util used by useUserRecords)
+      const mapped = mapFirestoreToFileObject(docSnap.id, docSnap.data());
+
+      // Decrypt if needed (same path as useUserRecords)
+      const [decrypted] = await RecordDecryptionService.decryptRecords([mapped as any]);
+      setRecord(decrypted as FileObject);
+    } catch (err) {
+      console.error('❌ Error loading record:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load record.');
+    } finally {
+      setIsLoading(false);
+    }
   }, [recordId]);
+
+  useEffect(() => {
+    fetchRecord();
+  }, [fetchRecord]);
 
   // =========================================================================
   // SAVE HANDLER
@@ -190,12 +215,9 @@ const RecordDetail: React.FC = () => {
         onDownload={handleDownloadRecord}
         onCopy={handleCopyRecord}
         onBack={() => navigate(-1)}
-        onRefreshRecord={() => {
-          // Re-fetch the record to pick up any external changes
-          setIsLoading(true);
-          setRecord(null);
-        }}
+        onRefreshRecord={fetchRecord}
         initialViewMode={initialViewMode}
+        onViewModeChange={handleViewModeChange}
       />
 
       {recordToDelete && (

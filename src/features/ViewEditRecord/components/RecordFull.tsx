@@ -17,7 +17,6 @@ import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import PermissionsManager from '@/features/Permissions/component/PermissionManager';
 import SubjectManager from '@/features/Subject/components/SubjectManager';
 import SubjectBadge from '@/features/Subject/components/SubjectBadge';
-import useAuth from '@/features/Auth/hooks/useAuth';
 import { useSubjectFlow } from '@/features/Subject/hooks/useSubjectFlow';
 import { SubjectActionDialog } from '@/features/Subject/components/ui/SubjectActionDialog';
 import {
@@ -28,6 +27,7 @@ import {
 import { useSubjectAlerts } from '@/features/Subject/hooks/useSubjectAlerts';
 import SubjectService from '@/features/Subject/services/subjectService';
 import SubjectRemovalService from '@/features/Subject/services/subjectRemovalService';
+import { useNavigate } from 'react-router-dom';
 
 type ViewMode =
   | 'record'
@@ -38,6 +38,8 @@ type ViewMode =
   | 'access'
   | 'permissions'
   | 'subject';
+
+type UrlViewMode = Exclude<ViewMode, 'version-detail'>; //Initial view mode is never version-detail
 
 interface RecordFullProps {
   record: FileObject;
@@ -51,18 +53,11 @@ interface RecordFullProps {
   onDelete: (record: FileObject) => void;
   onRefreshRecord?: () => void;
 
-  //Navigation Props
-  onBack: (record: FileObject) => void; //for returning to the previous screen, could be different so need a prop
-  initialViewMode?:
-    | 'record'
-    | 'edit'
-    | 'versions'
-    | 'credibility'
-    | 'permissions'
-    | 'access'
-    | 'subject'; //version-detail can never be the initial view, since it only comes from versions
-  comingFromAddRecord?: boolean; //so the Save button is activated when coming from the AddRecord screen, otherwise it'd be disabled and the user is stuck
+  // Navigation Props
+  onBack: (record: FileObject) => void;
+  initialViewMode?: UrlViewMode; // Seeded from ?view= in the URL by RecordDetail. Defaults to 'record'.
   readOnly?: boolean;
+  onViewModeChange?: (view: string) => void;
 }
 
 export const RecordFull: React.FC<RecordFullProps> = ({
@@ -74,11 +69,9 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   onRefreshRecord,
   onBack,
   initialViewMode = 'record',
-  comingFromAddRecord = false,
   readOnly = false,
+  onViewModeChange,
 }) => {
-  const { user } = useAuth();
-
   // Subject Alerts hook
   const subjectAlerts = useSubjectAlerts({ recordId: record.id });
 
@@ -92,11 +85,31 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     },
   });
 
-  const getInitialViewMode = (): ViewMode => {
-    return initialViewMode as ViewMode;
+  // =========================================================================
+  // VIEW STATE
+  //
+  // urlViewMode: the "real" panel — synced to the URL via onViewModeChange.
+  // isVersionDetail: local-only overlay for viewing a decrypted historical
+  //   version. Kept out of the URL because the decrypted snapshot is
+  //   ephemeral in-memory data — the URL would be meaningless if shared.
+  //
+  // The computed `viewMode` combines both: if isVersionDetail is true it wins,
+  // otherwise urlViewMode is used. setViewMode handles the split automatically.
+  // =========================================================================
+
+  const [isVersionDetail, setIsVersionDetail] = useState(false);
+  const viewMode: ViewMode = isVersionDetail ? 'version-detail' : initialViewMode;
+
+  const setViewMode = (mode: ViewMode) => {
+    if (mode === 'version-detail') {
+      // version-detail is local only — don't touch the URL
+      setIsVersionDetail(true);
+      return;
+    }
+    setIsVersionDetail(false);
+    onViewModeChange?.(mode); // sync URL in parent
   };
 
-  const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewMode());
   const [activeTab, setActiveTab] = useState<TabType>('record');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [hasFhirChanges, setHasFhirChanges] = useState(false);
@@ -108,10 +121,12 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   const [decryptedVersionData, setDecryptedVersionData] = useState<any>(null);
   const [enterVerificationInModifyMode, setEnterVerificationinModifyMode] = useState(false);
   const [enterDisputeInModifyMode, setEnterDisputeinModifyMode] = useState(false);
+  const navigate = useNavigate();
 
-  /**
-   * Decrypt a version's snapshot if it's encrypted
-   */
+  // =========================================================================
+  // VERSION DECRYPTION
+  // =========================================================================
+
   const decryptVersionSnapshot = async (version: RecordVersion): Promise<any> => {
     // Check if encryption session is active
     const masterKey = await EncryptionKeyManager.getSessionKey();
@@ -170,7 +185,9 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       ? reconstructFileObjectFromVersion(decryptedVersionData, viewingVersion, record)
       : record;
 
-  // View Mode Handlers
+  // =========================================================================
+  // VIEW MODE HANDLERS
+  // =========================================================================
 
   const handleModifyVerificationFromVersions = () => {
     setEnterVerificationinModifyMode(true);
@@ -231,21 +248,22 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     setDecryptedVersionData(null); //Clear decrypted data
   };
 
+  // =========================================================================
   // DATA HANDLERS
-  const handleFhirDataChange = (updatedData: any) => {
-    setCurrentFhirData(updatedData);
-  };
+  // =========================================================================
 
-  const handleFhirChanged = (hasChanges: boolean) => {
-    setHasFhirChanges(hasChanges);
-  };
+  const handleFhirDataChange = (updatedData: any) => setCurrentFhirData(updatedData);
+  const handleFhirChanged = (hasChanges: boolean) => setHasFhirChanges(hasChanges);
 
   const handleBelroseFieldsChange = (updatedFields: BelroseFields) => {
     setEditedBelroseFields(updatedFields);
     setHasUnsavedChanges(true);
   };
 
-  // SAVE AND CANCEL HANDLERS
+  // =========================================================================
+  // SAVE / CANCEL HANDLERS
+  // =========================================================================
+
   const hasAnyChanges = hasUnsavedChanges || hasFhirChanges;
 
   const handleSaveRecord = () => {
@@ -280,8 +298,10 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       );
       if (!confirmExit) return;
     }
-    if (onBack) {
-      onBack(record);
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/app/all-records'); // fallback if no history
     }
   };
 
@@ -291,6 +311,10 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     setViewMode('record');
     onRefreshRecord?.();
   };
+
+  // =========================================================================
+  // SUBJECT HANDLERS
+  // =========================================================================
 
   const handleDropRejection = async (subjectId: string) => {
     try {
@@ -325,6 +349,10 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       console.error('Error escalating rejection:', error);
     }
   };
+
+  // =========================================================================
+  // RENDER
+  // =========================================================================
 
   return (
     <div className="max-w-7xl mx-auto bg-background rounded-2xl shadow-xl rounded-lg">
@@ -454,7 +482,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
             </div>
           </div>
 
-          {/* Content Area */}
+          {/* Header Content */}
           {viewMode === 'edit' ? (
             // Edit Mode Banner
             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
@@ -551,21 +579,11 @@ export const RecordFull: React.FC<RecordFullProps> = ({
             </div>
 
             <div className="flex gap-3">
-              {comingFromAddRecord ? (
-                <>
-                  {/* Buttons when coming from "Add Record" */}
-                  <Button onClick={handleCancelEdit} disabled={hasAnyChanges}>
-                    Confirm
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button variant="outline" onClick={handleCancelEdit}>
-                    <X className="w-4 h-4" />
-                    Cancel
-                  </Button>
-                </>
-              )}
+              <Button variant="outline" onClick={handleCancelEdit}>
+                <X className="w-4 h-4" />
+                Cancel
+              </Button>
+
               <Button onClick={handleSaveRecord} disabled={!hasAnyChanges}>
                 <Save className="w-4 h-4" />
                 Save Changes

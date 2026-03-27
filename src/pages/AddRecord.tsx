@@ -77,12 +77,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
     console.log('🚀 Navigating to AllRecords with record:', fileRecord.firestoreId);
 
     // Navigate to AllRecords with the record to open in edit mode
-    navigate('/app/all-records', {
-      state: {
-        openRecordId: fileRecord.firestoreId,
-        openInEditMode: true,
-      },
-    });
+    navigate(`/app/records/${fileRecord.id}?view=edit`);
   };
 
   // ==================== RENDER JSX ====================
