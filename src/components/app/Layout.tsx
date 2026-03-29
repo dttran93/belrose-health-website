@@ -86,7 +86,6 @@ function AppLayout({ children }: AppLayoutProps) {
           <DesktopSidebar
             isCollapsed={isDesktopCollapsed}
             onToggle={() => setIsDesktopCollapsed(!isDesktopCollapsed)}
-            user={user}
             onLogout={handleLogout}
             navigationSections={navigationSections}
             onSettings={handleSettings}
@@ -134,7 +133,6 @@ function AppLayout({ children }: AppLayoutProps) {
       <MobileSidebar
         isOpen={isMobileOpen}
         onClose={() => setIsMobileOpen(false)}
-        user={user}
         navigationSections={navigationSections}
         onLogout={handleLogout}
         onSettings={handleSettings}

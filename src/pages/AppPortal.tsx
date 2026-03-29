@@ -30,7 +30,8 @@ import { ChatAttachment } from '@/features/Ai/components/ui/AttachmentBadge';
 
 export default function AppPortal() {
   const { user, loading: authLoading } = useAuthContext();
-  const { chatId } = useParams<{ chatId: string }>(); // ✅ Read chatId from URL
+
+  const { chatId } = useParams<{ chatId: string }>();
   const navigate = useNavigate();
 
   // ============================================================================

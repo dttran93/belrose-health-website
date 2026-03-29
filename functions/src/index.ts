@@ -6,6 +6,9 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
+// ==================== ADMIN FUNCTIONS ====================
+export { setPlatformAdmin } from './handlers/setAdminClaim';
+
 // ==================== IMAGE ANALYSIS FUNCTIONS ====================
 export { analyzeImageWithAI } from './handlers/image';
 

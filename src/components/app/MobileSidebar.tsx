@@ -6,11 +6,11 @@ import { User } from '@/types/core';
 import { Chat } from '@/features/Ai/service/chatService';
 import { ChatHistoryList } from '@/features/Ai/components/ui/ChatHistoryList';
 import QuickActions from '../ui/QuickActions';
+import { useAuthContext } from '@/features/Auth/AuthContext';
 
 interface MobileSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  user: User;
   navigationSections: NavigationSection[];
   onLogout?: () => void;
   onSettings?: () => void;
@@ -28,7 +28,6 @@ interface MobileSidebarProps {
 function MobileSidebar({
   isOpen,
   onClose,
-  user,
   navigationSections,
   onLogout,
   onSettings,
@@ -46,6 +45,13 @@ function MobileSidebar({
     onNewAiChat();
     onClose();
   };
+
+  const { user } = useAuthContext(); // already imported, just use it
+
+  const visibleSections = navigationSections.filter(section => {
+    if (section.label === 'Admin') return user?.isPlatformAdmin;
+    return true;
+  });
 
   return (
     <div>
@@ -82,7 +88,7 @@ function MobileSidebar({
         {/* Navigation - Scrollable */}
         <div className="flex-1 overflow-y-auto dark-scroll">
           <div className="p-4 space-y-6">
-            {navigationSections.map((section, index) => (
+            {visibleSections.map((section, index) => (
               <div key={section.label ?? `section-${index}`}>
                 {section.label && (
                   <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 text-gray-400">

@@ -73,7 +73,6 @@ export const useAuth = (): AuthContextData => {
           affiliations: profile.affiliations || [],
         } as BelroseUserProfile;
 
-        // ... (Your email sync logic remains here, using baseAuthUser.email!) ...
         if (profile.email !== user.email && user.email) {
           console.log('Email change detected, syncing to Firestore...');
           await UserSettingsService.syncEmailToFirestore(
@@ -82,6 +81,8 @@ export const useAuth = (): AuthContextData => {
             user.emailVerified
           );
         }
+        const idTokenResult = await user.getIdTokenResult(true);
+        mergedUser.isPlatformAdmin = idTokenResult.claims.platformAdmin === true;
       }
     } catch (error) {
       console.error('Error fetching or syncing user profile:', error);

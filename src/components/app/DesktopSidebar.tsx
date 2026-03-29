@@ -2,15 +2,14 @@ import { PanelLeft, ArrowLeftToLine, ArrowRightToLine } from 'lucide-react';
 import UserMenuButton from '@/components/ui/UserMenuButton';
 import NavItem from '@/components/ui/NavItem';
 import { NavigationSection } from './navigation';
-import { User } from '@/types/core';
 import { Chat } from '@/features/Ai/service/chatService';
 import { ChatHistoryList } from '@/features/Ai/components/ui/ChatHistoryList';
 import QuickActions from '../ui/QuickActions';
+import { useAuthContext } from '@/features/Auth/AuthContext';
 
 interface DesktopSidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
-  user: User;
   onLogout: () => void;
   navigationSections: NavigationSection[];
   onSettings: () => void;
@@ -29,7 +28,6 @@ interface DesktopSidebarProps {
 function DesktopSidebar({
   isCollapsed,
   onToggle,
-  user,
   onLogout,
   navigationSections,
   onSettings,
@@ -44,6 +42,13 @@ function DesktopSidebar({
   onDeleteChat,
   onViewAllChats,
 }: DesktopSidebarProps) {
+  const { user } = useAuthContext(); // already imported, just use it
+
+  const visibleSections = navigationSections.filter(section => {
+    if (section.label === 'Admin') return user?.isPlatformAdmin;
+    return true;
+  });
+
   return (
     <div
       className={`
@@ -96,7 +101,7 @@ function DesktopSidebar({
 
       {/* Navigation — hidden labels when collapsed */}
       <div className="flex-1 p-4 space-y-6 overflow-y-auto dark-scroll">
-        {navigationSections.map((section, index) => (
+        {visibleSections.map((section, index) => (
           <div key={section.label ?? `section-${index}`}>
             {!isCollapsed && section.label && (
               <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 text-gray-400">

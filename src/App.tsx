@@ -29,6 +29,7 @@ import RecordDetail from './pages/RecordDetail';
 import GuestInvitePage from './pages/GuestInvitePage';
 import Messaging from './pages/Messaging';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import { RequiresPlatformAdmin } from './features/Users/components/RequirePlatformAdmin';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
@@ -68,6 +69,16 @@ const App: React.FC = (): React.JSX.Element => {
                             <Layout>
                               <Routes>
                                 <Route index element={<AppPortal />} />
+                                // Admin Routes
+                                <Route path="hash-tester" element={<HashTester />} />
+                                <Route
+                                  path="blockchain-admin"
+                                  element={
+                                    <RequiresPlatformAdmin>
+                                      <BlockchainAdminDashboard />
+                                    </RequiresPlatformAdmin>
+                                  }
+                                />
                                 <Route
                                   path="health-profile/:subjectId"
                                   element={<HealthProfile />}
@@ -77,13 +88,8 @@ const App: React.FC = (): React.JSX.Element => {
                                 <Route path="all-records" element={<AllRecords />} />
                                 <Route path="records/:recordId" element={<RecordDetail />} />
                                 <Route path="add-record" element={<AddRecord />} />
-                                <Route path="hash-tester" element={<HashTester />} />
                                 <Route path="settings/*" element={<SettingsPage />} />
                                 <Route path="notifications" element={<NotificationsManager />} />
-                                <Route
-                                  path="blockchain-admin"
-                                  element={<BlockchainAdminDashboard />}
-                                />
                                 <Route path="messages" element={<Messaging />} />
                                 <Route path="messages/:recipientId" element={<Messaging />} />
                               </Routes>
