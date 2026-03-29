@@ -1,7 +1,7 @@
 // src/features/Users/components/ui/UserCard.tsx
 
 import React from 'react';
-import { User, Mail, Hash, X, Check, CircleCheck } from 'lucide-react';
+import { Mail, Hash, X, Check, CircleCheck } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import UserMenu, { MenuItem } from './UserMenu';
 import { BelroseUserProfile } from '@/types/core';
@@ -150,8 +150,8 @@ export const UserCard: React.FC<UserCardProps> = ({
     );
   };
 
-  const commonLayout = (
-    <div className="flex items-center gap-3 flex-shrink-0">
+  const menuSlot = (
+    <div className="flex items-center gap-1 flex-shrink-0">
       {content && <div onClick={e => e.stopPropagation()}>{content}</div>}
       {menuType === 'default' && (
         <UserMenu
@@ -168,56 +168,104 @@ export const UserCard: React.FC<UserCardProps> = ({
     </div>
   );
 
+  // ─── Detail rows shared between layouts ───────────────────────────────────
+  const detailRows =
+    variant === 'default' ? (
+      <>
+        {showEmail && email && (
+          <div className="flex items-center gap-1 text-xs text-gray-500">
+            <Mail className="w-3 h-3 flex-shrink-0" />
+            <span className="whitespace-nowrap">{email}</span>
+          </div>
+        )}
+        {showUserId && uid && (
+          <div
+            onClick={e => {
+              e.stopPropagation();
+              copyToClipboard(uid);
+            }}
+            className="flex items-center gap-1 text-xs text-gray-400 cursor-pointer hover:text-gray-600"
+          >
+            <Hash className="w-3 h-3 flex-shrink-0" />
+            <span className="whitespace-nowrap font-mono">{uid}</span>
+          </div>
+        )}
+        {showAffiliations && user?.affiliations && user.affiliations.length > 0 && (
+          <p className="text-xs text-gray-500 whitespace-nowrap">{user.affiliations.join(', ')}</p>
+        )}
+      </>
+    ) : null;
+
   return (
     <div
       onClick={onCardClick}
-      className={`flex items-center justify-between p-4 ${colors.bg} rounded-lg border ${colors.border} 
+      className={`p-4 ${colors.bg} rounded-lg border ${colors.border}
       ${isClickable ? 'cursor-pointer hover:opacity-80' : ''} ${className}`}
     >
-      <div className="flex items-center flex-1 min-w-0">
-        {variant === 'default' && (
-          <Avatar
-            profile={user ?? null}
-            size="md"
-            className="mr-3"
-            bgClassName={`${colors.iconBg} ${colors.icon}`}
-          />
-        )}
-        <div className="flex-1 min-w-0 mr-3">
-          <div className="flex items-center gap-2">
+      {/* ── MOBILE layout (hidden on sm+) ── */}
+      <div className="flex flex-col gap-1 sm:hidden">
+        {/* Top row: name + menu — always visible, never truncated */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <span className="text-sm font-semibold text-gray-900 truncate">{displayName}</span>
             {renderVerifiedBadge()}
           </div>
-          {variant === 'default' && (
-            <>
-              {showEmail && email && (
-                <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
-                  <Mail className="w-3 h-3" />
-                  <span className="truncate">{email}</span>
-                </div>
-              )}
-              {showUserId && uid && (
-                <div
-                  onClick={e => {
-                    e.stopPropagation();
-                    copyToClipboard(uid);
-                  }}
-                  className="flex items-center gap-1 text-xs text-gray-400 mt-0.5 cursor-pointer hover:text-gray-600"
-                >
-                  <Hash className="w-3 h-3" />
-                  <span className="truncate font-mono">{uid}</span>
-                </div>
-              )}
-              {showAffiliations && user?.affiliations && user.affiliations.length > 0 && (
-                <p className="text-xs text-gray-500 truncate mt-1">
-                  {user.affiliations.join(', ')}
-                </p>
-              )}
-            </>
-          )}
+          {menuSlot}
         </div>
+
+        {/* Scrollable detail strip */}
+        {detailRows && (
+          <div className="flex items-center gap-3 overflow-x-auto pb-0.5 scrollbar-hide">
+            {detailRows}
+          </div>
+        )}
       </div>
-      {commonLayout}
+
+      {/* ── DESKTOP layout (hidden on mobile, shown on sm+) ── */}
+      <div className="hidden sm:flex sm:items-center sm:justify-between">
+        <div className="flex items-center flex-1 min-w-0">
+          {variant === 'default' && (
+            <Avatar
+              profile={user ?? null}
+              size="md"
+              className="mr-3"
+              bgClassName={`${colors.iconBg} ${colors.icon}`}
+            />
+          )}
+          <div className="flex-1 min-w-0 mr-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-gray-900 truncate">{displayName}</span>
+              {renderVerifiedBadge()}
+            </div>
+            {variant === 'default' && (
+              <div className="mt-0.5 space-y-0.5">
+                {showEmail && email && (
+                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <Mail className="w-3 h-3" />
+                    <span className="truncate">{email}</span>
+                  </div>
+                )}
+                {showUserId && uid && (
+                  <div
+                    onClick={e => {
+                      e.stopPropagation();
+                      copyToClipboard(uid);
+                    }}
+                    className="flex items-center gap-1 text-xs text-gray-400 cursor-pointer hover:text-gray-600"
+                  >
+                    <Hash className="w-3 h-3" />
+                    <span className="truncate font-mono">{uid}</span>
+                  </div>
+                )}
+                {showAffiliations && user?.affiliations && user.affiliations.length > 0 && (
+                  <p className="text-xs text-gray-500 truncate">{user.affiliations.join(', ')}</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        {menuSlot}
+      </div>
     </div>
   );
 };

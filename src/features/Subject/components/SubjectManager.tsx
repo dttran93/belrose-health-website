@@ -13,20 +13,10 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  ArrowLeft,
-  FileUser,
-  HelpCircle,
-  PersonStanding,
-  Plus,
-  Loader2,
-  UserX,
-  UserMinus,
-} from 'lucide-react';
+import { ArrowLeft, FileUser, PersonStanding, Plus, Loader2, UserX, UserMinus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { FileObject, BelroseUserProfile } from '@/types/core';
-import * as Tooltip from '@radix-ui/react-tooltip';
 import { SubjectService } from '../services/subjectService';
 import { useSubjectFlow } from '../hooks/useSubjectFlow';
 import { SubjectActionDialog } from './ui/SubjectActionDialog';
@@ -37,6 +27,7 @@ import SubjectQueryService from '../services/subjectQueryService';
 import { PendingRequestDetails } from './ui/PendingRequestDetails';
 import SubjectRemovalService, { SubjectRemovalRequest } from '../services/subjectRemovalService';
 import { toast } from 'sonner';
+import RecordSectionPanel from '@/components/ui/RecordSectionPanel';
 
 // View modes for SubjectManager
 type SubjectViewMode = 'list' | 'pending-details' | 'rejected-details';
@@ -165,21 +156,8 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
     fetchRequests();
   }, [fetchSubjectProfiles, fetchRequests]);
 
-  console.log('Removal Requests', removalRequests);
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
-  // ==========================================================================
-  // HANDLERS
-  // ==========================================================================
-
-  const handleAddSubjectClick = () => {
-    initiateAddSubject();
-  };
-
-  /**
-   * Handle clicking on a pending request
-   * - If the current user IS the pending subject: show inline review
-   * - Otherwise: show PendingRequestDetails
-   */
   const handlePendingRequestClick = (request: SubjectConsentRequest) => {
     setSelectedRequest(request);
     setViewMode('pending-details');
@@ -215,8 +193,12 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
       if (!confirmRemove) return;
 
       try {
-        const title = record.belroseFields?.title || record.fileName;
-        await SubjectService.requestSubjectRemoval(record.id, subjectId, undefined, title);
+        await SubjectService.requestSubjectRemoval(
+          record.id,
+          subjectId,
+          undefined,
+          record.belroseFields?.title || record.fileName
+        );
         fetchSubjectProfiles();
         onSuccess?.();
         toast.success('Subject Removal Request Sent!');
@@ -258,21 +240,33 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
     }
   };
 
-  // ==========================================================================
-  // RENDER
-  // ==========================================================================
+  // ── Tooltip content ────────────────────────────────────────────────────────
+
+  const subjectTooltipContent = (
+    <>
+      <p className="font-semibold mb-2 text-sm">
+        The Subject is the person this health record is about:
+      </p>
+      <ol className="list-decimal list-inside space-y-1 text-xs">
+        <li>Setting a subject helps organize records by person</li>
+        <li>Subjects must be either record viewers, administrators, or owners</li>
+        <li>Adding someone else as a subject requires their consent</li>
+        <li>A record can have multiple subjects (e.g., for family records)</li>
+        <li>Subject links are recorded on the distributed network for verification</li>
+      </ol>
+    </>
+  );
 
   const currentSubjects = record.subjects || [];
 
   // Pending details view
   if (viewMode === 'pending-details' && selectedRequest) {
-    const profile = requestProfiles.get(selectedRequest.subjectId);
     return (
       <div className="w-full mx-auto p-8">
         <PendingRequestDetails
           request={selectedRequest}
           record={record}
-          subjectProfile={profile}
+          subjectProfile={requestProfiles.get(selectedRequest.subjectId)}
           onBack={handleBackToList}
           onCancelRequest={() => handleCancelPendingRequest(selectedRequest.subjectId)}
         />
@@ -283,13 +277,12 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
 
   // Rejected details view
   if (viewMode === 'rejected-details' && selectedRequest) {
-    const profile = requestProfiles.get(selectedRequest.subjectId);
     return (
       <div className="w-full mx-auto p-8">
         <PendingRequestDetails
           request={selectedRequest}
           record={record}
-          subjectProfile={profile}
+          subjectProfile={requestProfiles.get(selectedRequest.subjectId)}
           onBack={handleBackToList}
           onCancelRequest={() => {}}
           isRejected={true}
@@ -302,7 +295,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
   // Main list view
   return (
     <div className="w-full mx-auto p-8 space-y-6">
-      {/* Header */}
+      {/* Page header */}
       <div className="flex items-center justify-between mb-4 pb-2 border-b">
         <h3 className="font-semibold text-lg flex items-center gap-2">
           <FileUser className="w-5 h-5" />
@@ -315,275 +308,173 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
 
       {!isAddMode && (
         <>
-          {/* Current Subjects Section */}
-          <div className="mb-4 border border-accent rounded-lg">
-            <div className="w-full px-4 py-3 bg-accent flex items-center justify-between rounded-t-lg">
-              <div className="flex items-center gap-2">
-                <PersonStanding className="w-5 h-5 text-gray-700" />
-                <span className="font-semibold text-gray-900">Subjects</span>
-                {currentSubjects.length > 0 && (
-                  <span className="text-xs border border-red-800 bg-red-100 text-red-800 px-2 py-1 rounded-full">
-                    {currentSubjects.length}
-                  </span>
+          {/* Subjects */}
+          <RecordSectionPanel
+            variant="accent"
+            icon={<PersonStanding className="w-5 h-5 text-gray-700" />}
+            title="Subjects"
+            badges={
+              currentSubjects.length > 0
+                ? [
+                    {
+                      label: String(currentSubjects.length),
+                      className: 'border border-red-800 bg-red-100 text-red-800',
+                    },
+                  ]
+                : []
+            }
+            tooltipLabel="Record Subject"
+            tooltipClassName="border border-red-800 bg-red-200 text-red-800"
+            tooltipContent={subjectTooltipContent}
+            // Custom add button with loading spinner
+            headerAction={
+              <button
+                className="p-1 rounded-full hover:bg-black/10 transition-colors"
+                onClick={initiateAddSubject}
+                disabled={isSubjectFlowLoading}
+              >
+                {isSubjectFlowLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Plus className="w-5 h-5" />
                 )}
+              </button>
+            }
+            isLoading={loadingSubjects}
+            loadingLabel="Loading subjects..."
+            isEmpty={currentSubjects.length === 0}
+            emptyState={
+              <div className="flex justify-between items-center">
+                <p className="text-gray-500">No subject set for this record</p>
+                <Button onClick={initiateAddSubject} disabled={isSubjectFlowLoading}>
+                  Set Record Subject
+                </Button>
               </div>
+            }
+          >
+            {currentSubjects.map(subjectId => (
+              <SubjectCard
+                key={subjectId}
+                userId={subjectId}
+                userProfile={subjectProfiles.get(subjectId)}
+                onDelete={() => handleRemoveSubject(subjectId)}
+                record={record}
+                subjectRequest={{} as any}
+              />
+            ))}
+          </RecordSectionPanel>
 
-              <div className="flex items-center gap-2">
-                {/* Help Tooltip */}
-                <Tooltip.Provider>
-                  <Tooltip.Root>
-                    <Tooltip.Trigger asChild>
-                      <button className="inline-flex items-center ml-1">
-                        <span className="text-xs border border-red-800 bg-red-200 text-red-800 px-2 py-1 rounded-full flex items-center">
-                          Record Subject
-                          <HelpCircle className="w-4 h-4 ml-1" />
-                        </span>
-                      </button>
-                    </Tooltip.Trigger>
-                    <Tooltip.Portal>
-                      <Tooltip.Content
-                        className="bg-gray-900 text-white rounded-lg p-4 max-w-sm shadow-xl z-50"
-                        sideOffset={5}
-                      >
-                        <p className="font-semibold mb-2 text-sm">
-                          The Subject is the person this health record is about:
-                        </p>
-                        <ol className="list-decimal list-inside space-y-1 text-xs">
-                          <li>Setting a subject helps organize records by person</li>
-                          <li>Subjects must be either record viewers, administrators, or owners</li>
-                          <li>Adding someone else as a subject requires their consent</li>
-                          <li>A record can have multiple subjects (e.g., for family records)</li>
-                          <li>
-                            Subject links are recorded on the distributed network for verification
-                          </li>
-                        </ol>
-                        <Tooltip.Arrow className="fill-gray-900" />
-                      </Tooltip.Content>
-                    </Tooltip.Portal>
-                  </Tooltip.Root>
-                </Tooltip.Provider>
+          {/* Pending Requests */}
+          <RecordSectionPanel
+            icon={<PersonStanding className="w-5 h-5" />}
+            title="Pending Requests"
+            badges={
+              pendingRequests.length > 0
+                ? [
+                    {
+                      label: String(pendingRequests.length),
+                      className: 'border border-gray-600 bg-gray-200 text-gray-800',
+                    },
+                  ]
+                : []
+            }
+            showActions={true}
+            tooltipContent={
+              <p className="text-xs">
+                Users invited as subjects who haven't responded yet. Click to view details or
+                cancel.
+              </p>
+            }
+            tooltipLabel="Pending"
+            isLoading={loadingRequests}
+            loadingLabel="Loading requests..."
+            isEmpty={pendingRequests.length === 0}
+            emptyState={<p className="text-gray-500 text-center py-2">No pending requests</p>}
+          >
+            {pendingRequests.map(request => (
+              <SubjectCard
+                key={request.subjectId}
+                userId={request.subjectId}
+                userProfile={requestProfiles.get(request.subjectId)}
+                record={record}
+                isPending={true}
+                onDelete={() => handleCancelPendingRequest(request.subjectId)}
+                onClick={() => handlePendingRequestClick(request)}
+                subjectRequest={request}
+              />
+            ))}
+          </RecordSectionPanel>
 
-                {/* Add Subject Button */}
-                <button
-                  className="rounded-full hover:bg-gray-300 p-1"
-                  onClick={handleAddSubjectClick}
-                  disabled={isSubjectFlowLoading}
-                >
-                  {isSubjectFlowLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Plus className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Subjects List */}
-            <div className="p-4 bg-secondary space-y-2 rounded-b-lg">
-              {loadingSubjects ? (
-                <div className="flex justify-center items-center py-8">
-                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                  <p className="text-gray-500">Loading subjects...</p>
-                </div>
-              ) : currentSubjects.length > 0 ? (
-                <div className="space-y-3">
-                  {currentSubjects.map(subjectId => (
-                    <SubjectCard
-                      key={subjectId}
-                      userId={subjectId}
-                      userProfile={subjectProfiles.get(subjectId)}
-                      onDelete={() => handleRemoveSubject(subjectId)}
-                      record={record}
-                      subjectRequest={{} as any} //No open requests for confirmed
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="flex justify-between items-center">
-                  <p className="text-gray-500">No subject set for this record</p>
-                  <Button onClick={handleAddSubjectClick} disabled={isSubjectFlowLoading}>
-                    Set Record Subject
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Pending Requests Section */}
-          <div className="mb-4 border border-gray-300 rounded-lg">
-            <div className="w-full px-4 py-3 bg-gray-300 flex items-center justify-between rounded-t-lg">
-              <div className="flex items-center gap-2">
-                <PersonStanding className="w-5 h-5" />
-                <span className="font-semibold text-foreground">Pending Requests</span>
-                {pendingRequests.length > 0 && (
-                  <span className="text-xs border border-gray-600 bg-gray-200 text-gray-800 px-2 py-1 rounded-full">
-                    {pendingRequests.length}
-                  </span>
-                )}
-              </div>
-
-              {/* Help tooltip for pending section */}
-              <Tooltip.Provider>
-                <Tooltip.Root>
-                  <Tooltip.Trigger asChild>
-                    <button className="inline-flex items-center">
-                      <HelpCircle className="w-4 h-4 text-gray-600" />
-                    </button>
-                  </Tooltip.Trigger>
-                  <Tooltip.Portal>
-                    <Tooltip.Content
-                      className="bg-gray-900 text-white rounded-lg p-3 max-w-xs shadow-xl z-50"
-                      sideOffset={5}
-                    >
-                      <p className="text-xs">
-                        Users invited as subjects who haven't responded yet. Click to view details
-                        or cancel.
-                      </p>
-                      <Tooltip.Arrow className="fill-gray-900" />
-                    </Tooltip.Content>
-                  </Tooltip.Portal>
-                </Tooltip.Root>
-              </Tooltip.Provider>
-            </div>
-
-            <div className="p-4 bg-gray-50 space-y-2 rounded-b-lg">
-              {loadingRequests ? (
-                <div className="flex justify-center items-center py-8">
-                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                  <p className="text-gray-500">Loading requests...</p>
-                </div>
-              ) : pendingRequests.length > 0 ? (
-                <div className="space-y-3">
-                  {pendingRequests.map(request => (
-                    <SubjectCard
-                      key={request.subjectId}
-                      userId={request.subjectId}
-                      userProfile={requestProfiles.get(request.subjectId)}
-                      record={record}
-                      isPending={true}
-                      onDelete={() => handleCancelPendingRequest(request.subjectId)}
-                      onClick={() => handlePendingRequestClick(request)}
-                      subjectRequest={request}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-center py-2">No pending requests</p>
-              )}
-            </div>
-          </div>
-
-          {/* Rejected Requests Section */}
+          {/* Declined Requests — only shown when there are some */}
           {rejectedRequests.length > 0 && (
-            <div className="mb-4 border border-complement-4 rounded-lg">
-              <div className="w-full px-4 py-3 bg-complement-4/50 flex items-center justify-between rounded-t-lg">
-                <div className="flex items-center gap-2">
-                  <UserX className="w-5 h-5 text-primary" />
-                  <span className="font-semibold text-primary">Declined Requests</span>
-                  <span className="text-xs border border-complement-4 text-primary px-2 py-1 rounded-full">
-                    {rejectedRequests.length}
-                  </span>
-                </div>
-
-                {/* Help tooltip for pending section */}
-                <Tooltip.Provider>
-                  <Tooltip.Root>
-                    <Tooltip.Trigger asChild>
-                      <button className="inline-flex items-center">
-                        <HelpCircle className="w-4 h-4 text-red-600" />
-                      </button>
-                    </Tooltip.Trigger>
-                    <Tooltip.Portal>
-                      <Tooltip.Content
-                        className="bg-gray-900 text-white rounded-lg p-3 max-w-xs shadow-xl z-50"
-                        sideOffset={5}
-                      >
-                        <p className="text-xs">
-                          Users who declined the subject request. Click to view details or dismiss.
-                        </p>
-                        <Tooltip.Arrow className="fill-gray-900" />
-                      </Tooltip.Content>
-                    </Tooltip.Portal>
-                  </Tooltip.Root>
-                </Tooltip.Provider>
-              </div>
-
-              <div className="p-4 bg-complement-4/10 space-y-2 rounded-b-lg">
-                {rejectedRequests.map(request => (
-                  <SubjectCard
-                    key={request.subjectId}
-                    userId={request.subjectId}
-                    userProfile={requestProfiles.get(request.subjectId)}
-                    record={record}
-                    isRejected={true}
-                    onDelete={() => {}}
-                    onClick={() => handleRejectedRequestClick(request)}
-                    subjectRequest={request}
-                  />
-                ))}
-              </div>
-            </div>
+            <RecordSectionPanel
+              icon={<UserX className="w-5 h-5 text-primary" />}
+              title="Declined Requests"
+              badges={[
+                {
+                  label: String(rejectedRequests.length),
+                  className: 'border border-complement-4 text-primary',
+                },
+              ]}
+              showActions={true}
+              tooltipContent={
+                <p className="text-xs">
+                  Users who declined the subject request. Click to view details or dismiss.
+                </p>
+              }
+              tooltipLabel="Declined"
+              isEmpty={false}
+            >
+              {rejectedRequests.map(request => (
+                <SubjectCard
+                  key={request.subjectId}
+                  userId={request.subjectId}
+                  userProfile={requestProfiles.get(request.subjectId)}
+                  record={record}
+                  isRejected={true}
+                  onDelete={() => {}}
+                  onClick={() => handleRejectedRequestClick(request)}
+                  subjectRequest={request}
+                />
+              ))}
+            </RecordSectionPanel>
           )}
 
           {/* Pending Removal Requests Section */}
           {removalRequests.length > 0 && (
-            <div className="mb-4 border border-gray-300 rounded-lg">
-              <div className="w-full px-4 py-3 bg-gray-300 flex items-center justify-between rounded-t-lg">
-                <div className="flex items-center gap-2">
-                  <UserMinus className="w-5 h-5" />
-                  <span className="font-semibold text-foreground">Pending Removal Requests</span>
-                  <span className="text-xs border border-gray-900 bg-gray-200 text-gray-800 px-2 py-1 rounded-full">
-                    {removalRequests.length}
-                  </span>
-                </div>
-
-                {/* Help tooltip */}
-                <Tooltip.Provider>
-                  <Tooltip.Root>
-                    <Tooltip.Trigger asChild>
-                      <button className="inline-flex items-center">
-                        <HelpCircle className="w-4 h-4 text-gray-600" />
-                      </button>
-                    </Tooltip.Trigger>
-                    <Tooltip.Portal>
-                      <Tooltip.Content
-                        className="bg-gray-900 text-white rounded-lg p-3 max-w-xs shadow-xl z-50"
-                        sideOffset={5}
-                      >
-                        <p className="text-xs">
-                          Requests you've sent asking subjects to remove themselves from this
-                          record. Only the subject can complete the removal.
-                        </p>
-                        <Tooltip.Arrow className="fill-gray-900" />
-                      </Tooltip.Content>
-                    </Tooltip.Portal>
-                  </Tooltip.Root>
-                </Tooltip.Provider>
-              </div>
-
-              <div className="p-4 bg-gray-50 space-y-2 rounded-b-lg">
-                {loadingRequests ? (
-                  <div className="flex justify-center items-center py-8">
-                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                    <p className="text-gray-500">Loading removal requests...</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {removalRequests.map(request => (
-                      <SubjectCard
-                        key={request.subjectId}
-                        userId={request.subjectId}
-                        userProfile={requestProfiles.get(request.subjectId)}
-                        record={record}
-                        isPending={true}
-                        onDelete={() => handleCancelRemovalRequest(request.subjectId)}
-                        subjectRequest={{} as any}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <RecordSectionPanel
+              icon={<UserMinus className="w-5 h-5" />}
+              title="Pending Removal Requests"
+              badges={[
+                {
+                  label: String(removalRequests.length),
+                  className: 'border border-gray-900 bg-gray-200 text-gray-800',
+                },
+              ]}
+              showActions={true}
+              tooltipContent={
+                <p className="text-xs">
+                  Requests you've sent asking subjects to remove themselves. Only the subject can
+                  complete the removal.
+                </p>
+              }
+              tooltipLabel="Removals"
+              isLoading={loadingRequests}
+              loadingLabel="Loading removal requests..."
+              isEmpty={false}
+            >
+              {removalRequests.map(request => (
+                <SubjectCard
+                  key={request.subjectId}
+                  userId={request.subjectId}
+                  userProfile={requestProfiles.get(request.subjectId)}
+                  record={record}
+                  isPending={true}
+                  onDelete={() => handleCancelRemovalRequest(request.subjectId)}
+                  subjectRequest={{} as any}
+                />
+              ))}
+            </RecordSectionPanel>
           )}
         </>
       )}

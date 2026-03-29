@@ -1,18 +1,18 @@
 // src/features/Sharing/components/EncryptionAccessView.tsx
 
 import React, { useState, useEffect } from 'react';
-import { Key, XCircle, HelpCircle, ArrowLeft, Plus, View } from 'lucide-react';
+import { Key, XCircle, Plus, View, ArrowLeft } from 'lucide-react';
 import { getFirestore, collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import UserCard from '@/features/Users/components/ui/UserCard';
-import * as Tooltip from '@radix-ui/react-tooltip';
 import { Button } from '@/components/ui/Button';
 import { usePermissionFlow } from '@/features/Permissions/hooks/usePermissionFlow';
 import { PermissionActionDialog } from '@/features/Permissions/component/ui/PermissionActionDialog';
 import UserSearch from '@/features/Users/components/UserSearch';
 import type { Role } from '@/features/Permissions/services/permissionsService';
 import AccessUserCard from './ui/AccessUserCard';
+import RecordSectionPanel from '@/components/ui/RecordSectionPanel';
 
 interface WrappedKeyInfo {
   userId: string;
@@ -41,8 +41,9 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
   const [accessEntries, setAccessEntries] = useState<AccessEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
+  const [selectedUserForGrant, setSelectedUserForGrant] = useState<BelroseUserProfile | null>(null);
 
-  // Use the new permission flow hook
   const {
     dialogProps,
     initiateRevoke,
@@ -50,14 +51,8 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
     isLoading: isActionLoading,
   } = usePermissionFlow({
     recordId: record.id,
-    onSuccess: () => {
-      fetchEncryptionAccess();
-    },
+    onSuccess: () => fetchEncryptionAccess(),
   });
-
-  // State for user search/selection when granting access
-  const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
-  const [selectedUserForGrant, setSelectedUserForGrant] = useState<BelroseUserProfile | null>(null);
 
   const fetchEncryptionAccess = async () => {
     if (!record.id) return;
@@ -65,25 +60,17 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
     try {
       const db = getFirestore();
 
-      // 1. Fetch the LATEST record data to get updated roles
-      const recordDocRef = doc(db, 'records', record.id);
-      const recordSnap = await getDoc(recordDocRef);
+      const recordSnap = await getDoc(doc(db, 'records', record.id));
       const latestRecord = recordSnap.exists() ? (recordSnap.data() as FileObject) : record;
 
-      // 2. Fetch wrapped keys
-      const wrappedKeysRef = collection(db, 'wrappedKeys');
-      const q = query(wrappedKeysRef, where('recordId', '==', record.id));
-      const querySnapshot = await getDocs(q);
-
-      const wrappedKeys: WrappedKeyInfo[] = querySnapshot.docs.map(
-        doc =>
-          ({
-            ...doc.data(),
-            createdAt: doc.data().createdAt?.toDate(),
-          }) as WrappedKeyInfo
+      const querySnapshot = await getDocs(
+        query(collection(db, 'wrappedKeys'), where('recordId', '==', record.id))
       );
 
-      // 3. Use latestRecord for calculating allUserIds
+      const wrappedKeys: WrappedKeyInfo[] = querySnapshot.docs.map(
+        doc => ({ ...doc.data(), createdAt: doc.data().createdAt?.toDate() }) as WrappedKeyInfo
+      );
+
       const allUserIds = new Set<string>([
         ...wrappedKeys.map(wk => wk.userId),
         ...(latestRecord.owners || []),
@@ -94,11 +81,9 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
 
       const profiles = await getUserProfiles(Array.from(allUserIds));
 
-      // 4. Map entries using latestRecord roles
       const entries: AccessEntry[] = Array.from(allUserIds).map(userId => {
         const wrappedKey = wrappedKeys.find(wk => wk.userId === userId) ?? null;
         let role: AccessEntry['role'] = 'none';
-
         if (latestRecord.owners?.includes(userId)) role = 'owner';
         else if (latestRecord.administrators?.includes(userId)) role = 'administrator';
         else if (latestRecord.viewers?.includes(userId)) role = 'viewer';
@@ -134,21 +119,8 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
    * Initiates the revoke flow with the permission dialog
    */
   const handleRevokeClick = (entry: AccessEntry) => {
-    // Only initiate revoke if user has a role and a profile
-    if (entry.role === 'none' || !entry.profile) {
-      return;
-    }
-
-    // Map AccessEntry role to Role type (excluding 'none')
-    const role = entry.role as Role;
-    initiateRevoke(entry.profile, role);
-  };
-
-  /**
-   * Handle user selection from search
-   */
-  const handleUserSelect = (user: BelroseUserProfile) => {
-    setSelectedUserForGrant(user);
+    if (entry.role === 'none' || !entry.profile) return;
+    initiateRevoke(entry.profile, entry.role as Role);
   };
 
   /**
@@ -171,8 +143,29 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
     setIsUserSearchOpen(false);
   };
 
-  // Get list of user IDs to exclude from search (already have access)
-  const excludeUserIds = accessEntries.map(entry => entry.userId);
+  const tooltipContent = (
+    <>
+      <p className="font-semibold mb-2 text-sm">Encryption Access Overview</p>
+      <p className="text-xs mb-3">
+        This view shows who has cryptographic access to decrypt this record, cross-referenced with
+        their permission roles.
+      </p>
+      <ol className="list-decimal list-inside space-y-1 text-xs">
+        <li>
+          <strong>Synced:</strong> User has both a role and can decrypt
+        </li>
+        <li>
+          <strong>Missing Key:</strong> Has role but can't decrypt (re-grant to fix)
+        </li>
+        <li>
+          <strong>Orphaned Key:</strong> Can decrypt but has no role (security issue)
+        </li>
+        <li>
+          <strong>Revoked:</strong> Previously had access, now revoked
+        </li>
+      </ol>
+    </>
+  );
 
   return (
     <div className="w-full mx-auto p-8 space-y-6">
@@ -182,117 +175,66 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
           <View className="w-5 h-5" />
           Manage Access
         </h3>
-        <div className="flex items-center gap-2">
-          <Button onClick={onBack} className="w-8 h-8 border-none bg-transparent hover:bg-gray-200">
-            <ArrowLeft className="text-primary" />
-          </Button>
-        </div>
+        <Button onClick={onBack} className="w-8 h-8 border-none bg-transparent hover:bg-gray-200">
+          <ArrowLeft className="text-primary" />
+        </Button>
       </div>
 
-      {/* Current Wrapped Keys Section */}
-      <div className="mb-4 border border-gray-200 rounded-lg">
-        <div className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between rounded-t-lg">
-          <div className="flex items-center gap-2">
-            <Key className="w-5 h-5 text-gray-700" />
-            <span className="font-semibold text-gray-900">Encrypted Access</span>
-            <span className="text-xs border border-primary bg-primary/20 text-primary px-2 py-1 rounded-full">
-              {activeKeyCount}
-            </span>
-            {issueCount > 0 && (
-              <span className="text-xs border border-red-700 bg-red-100 text-red-800 px-2 py-1 rounded-full">
-                {issueCount} issue{issueCount > 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <div className="flex items-center gap-2">
-              <Tooltip.Provider>
-                <Tooltip.Root>
-                  <Tooltip.Trigger asChild>
-                    <button className="inline-flex items-center ml-1">
-                      <span className="text-xs border border-primary bg-primary/20 text-primary px-2 py-1 rounded-full flex items-center">
-                        Encrypted Access
-                        <HelpCircle className="w-4 h-4 ml-1" />
-                      </span>
-                    </button>
-                  </Tooltip.Trigger>
-                  <Tooltip.Portal>
-                    <Tooltip.Content
-                      className="bg-gray-900 text-white rounded-lg p-4 max-w-sm shadow-xl z-50"
-                      sideOffset={5}
-                    >
-                      <p className="font-semibold mb-2 text-sm">Encryption Access Overview</p>
-                      <p className="text-xs mb-3">
-                        This view shows who has cryptographic access to decrypt this record,
-                        cross-referenced with their permission roles.
-                      </p>
-                      <ol className="list-decimal list-inside space-y-1 text-xs">
-                        <li>
-                          <strong>Synced:</strong> User has both a role and can decrypt
-                        </li>
-                        <li>
-                          <strong>Missing Key:</strong> Has role but can't decrypt (re-grant to fix)
-                        </li>
-                        <li>
-                          <strong>Orphaned Key:</strong> Can decrypt but has no role (security
-                          issue)
-                        </li>
-                        <li>
-                          <strong>Revoked:</strong> Previously had access, now revoked
-                        </li>
-                      </ol>
-                      <Tooltip.Arrow className="fill-gray-900" />
-                    </Tooltip.Content>
-                  </Tooltip.Portal>
-                </Tooltip.Root>
-              </Tooltip.Provider>
-            </div>
-            <button
-              className="rounded-full hover:bg-gray-300 p-1"
-              onClick={() => setIsUserSearchOpen(!isUserSearchOpen)}
-            >
-              <Plus />
-            </button>
-          </div>
-        </div>
-
-        <div className="p-4 bg-white space-y-2 rounded-b-lg">
-          {loading ? (
-            <div className="flex justify-center items-center py-8">
-              <p className="text-gray-500">Loading encryption access...</p>
-            </div>
-          ) : error ? (
+      <RecordSectionPanel
+        icon={<Key className="w-5 h-5 text-gray-700" />}
+        title="Encrypted Access"
+        badges={[
+          {
+            label: String(activeKeyCount),
+            className: 'border border-primary bg-primary/20 text-primary',
+          },
+          ...(issueCount > 0
+            ? [
+                {
+                  label: `${issueCount} issue${issueCount > 1 ? 's' : ''}`,
+                  className: 'border border-red-700 bg-red-100 text-red-800',
+                },
+              ]
+            : []),
+        ]}
+        tooltipLabel="Encrypted Access"
+        tooltipClassName="border border-primary bg-primary/20 text-primary"
+        tooltipContent={tooltipContent}
+        headerAction={
+          <button
+            className="rounded-full hover:bg-gray-200 p-1 transition-colors"
+            onClick={() => setIsUserSearchOpen(!isUserSearchOpen)}
+          >
+            <Plus className="w-5 h-5" />
+          </button>
+        }
+        isLoading={loading}
+        loadingLabel="Loading encryption access..."
+        errorState={
+          error ? (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <p className="text-red-800">{error}</p>
             </div>
-          ) : accessEntries.length > 0 ? (
-            <div className="space-y-3">
-              {accessEntries.map(entry => {
-                const hasIssue = entry.status === 'missing-key' || entry.status === 'missing-role';
-                const cardColor = hasIssue ? 'red' : 'primary';
-                const canRevoke = entry.role !== 'none' && entry.profile;
-
-                return (
-                  <AccessUserCard
-                    key={entry.userId}
-                    entry={entry}
-                    record={record}
-                    onDelete={
-                      entry.role !== 'none' && entry.profile
-                        ? () => handleRevokeClick(entry)
-                        : undefined
-                    }
-                  />
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex justify-center items-center py-8">
-              <p className="text-gray-600">No encryption access found</p>
-            </div>
-          )}
-        </div>
-      </div>
+          ) : undefined
+        }
+        isEmpty={accessEntries.length === 0}
+        emptyState={
+          <div className="flex justify-center items-center py-8">
+            <p className="text-gray-600">No encryption access found</p>
+          </div>
+        }
+      >
+        {accessEntries.map(entry => (
+          <AccessUserCard
+            key={entry.userId}
+            entry={entry}
+            record={record}
+            onDelete={
+              entry.role !== 'none' && entry.profile ? () => handleRevokeClick(entry) : undefined
+            }
+          />
+        ))}
+      </RecordSectionPanel>
 
       {/* User Search for Granting Access */}
       {isUserSearchOpen && (
@@ -303,14 +245,11 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
               <XCircle className="w-5 h-5" />
             </button>
           </div>
-
           <UserSearch
-            onUserSelect={handleUserSelect}
-            excludeUserIds={excludeUserIds}
+            onUserSelect={user => setSelectedUserForGrant(user)}
+            excludeUserIds={accessEntries.map(e => e.userId)}
             placeholder="Search by name, email, or user ID..."
           />
-
-          {/* Selected User Preview */}
           {selectedUserForGrant && (
             <div className="mt-4 pt-4 border-t border-gray-200">
               <p className="text-sm font-medium text-gray-700 mb-3">Grant access to this user:</p>
