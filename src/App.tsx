@@ -29,15 +29,9 @@ import RecordDetail from './pages/RecordDetail';
 import GuestInvitePage from './pages/GuestInvitePage';
 import Messaging from './pages/Messaging';
 import PrivacyPolicy from './pages/PrivacyPolicy';
-import CookieBanner from './components/site/CookieBanner';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
-
-const HowStepRedirect: React.FC = () => {
-  const { slug } = useParams<{ slug: string }>();
-  return <Navigate to={`/#how/${slug}`} replace />;
-};
 
 const App: React.FC = (): React.JSX.Element => {
   return (
@@ -47,7 +41,6 @@ const App: React.FC = (): React.JSX.Element => {
           <Sonner />
           <CitationProvider>
             <BrowserRouter>
-              <CookieBanner />
               <Routes>
                 {/* ── Public site shell ── */}
                 <Route path="/" element={<Index />} />

@@ -49,6 +49,16 @@ const A = ({ href, children }: { href: string; children: React.ReactNode }) => (
   </a>
 );
 
+// ─── Callout ──────────────────────────────────────────────────────────────────
+// Used to highlight privacy-positive choices we've made
+
+const Callout = ({ children }: { children: React.ReactNode }) => (
+  <div className="my-4 flex gap-3 rounded-lg border border-pink-100 bg-pink-50 px-4 py-3">
+    <span className="mt-0.5 text-pink-400 flex-shrink-0">★</span>
+    <p className="text-[14px] leading-relaxed text-slate-600">{children}</p>
+  </div>
+);
+
 // ─── Table ────────────────────────────────────────────────────────────────────
 
 const Table = ({ headers, rows }: { headers: string[]; rows: string[][] }) => (
@@ -110,6 +120,11 @@ const sections: Section[] = [
           Protection Regulation (UK GDPR) and the Data Protection Act 2018. Belrose Health Ltd is
           the data controller for the purposes of this policy.
         </P>
+        <Callout>
+          Data sovereignty is core to what Belrose stands for — not just for health records, but for
+          our operations as well. We have deliberately chosen infrastructure and analytics tools
+          that minimise data collection and avoid sending your data to third parties unnecessarily.
+        </Callout>
         <P>
           Questions? Contact us at{' '}
           <A href="mailto:privacy@belrosehealth.com">privacy@belrosehealth.com</A>.
@@ -123,11 +138,13 @@ const sections: Section[] = [
     content: (
       <>
         <P>We collect the following categories of information:</P>
+
         <H3>1. Account Information</H3>
         <P>
-          When you create an account, we collect your email address and a hashed version of your
-          password. We do not store your password in plain text.
+          When you create an account, we collect your name, email address, and a hashed version of
+          your password. We do not store your password in plain text.
         </P>
+
         <H3>2. Health Records (Client-Side Encrypted)</H3>
         <P>
           You may upload or connect health records to the platform. These records are{' '}
@@ -141,23 +158,23 @@ const sections: Section[] = [
           — only you hold the decryption keys. We store only the encrypted ciphertext so you can
           retrieve it.
         </P>
+        <P>You are the sole data controller of your encrypted health records.</P>
+
+        <H3>3. Analytics Data (Plausible)</H3>
         <P>
-          Because we cannot access this data, it falls outside our operational control. You are the
-          sole data controller of your encrypted health records.
+          We use <A href="https://plausible.io">Plausible Analytics</A> to understand how visitors
+          use our website. Plausible is{' '}
+          <strong className="font-semibold text-slate-800">cookieless</strong> and collects{' '}
+          <strong className="font-semibold text-slate-800">no personal data whatsoever</strong> — no
+          IP addresses, no device fingerprints, no cross-site tracking. It tells us only aggregated
+          information such as which pages are popular and how visitors find us.
         </P>
-        <H3>3. Analytics Data (Google Analytics)</H3>
-        <P>
-          With your consent, we use Google Analytics to understand how visitors use our website.
-          This includes pages visited, session duration, general geographic location, device type,
-          and browser. This data is aggregated and anonymised; it does not identify you personally.
-        </P>
-        <P>
-          You can opt out at any time via the cookie banner or the{' '}
-          <A href="https://tools.google.com/dlpage/gaoptout">
-            Google Analytics opt-out browser add-on
-          </A>
-          .
-        </P>
+        <Callout>
+          Unlike Google Analytics, Plausible is open-source, independently owned, and hosted
+          entirely within the EU. Your visit data never touches Google's servers. No cookie consent
+          is required because no cookies are set and no personal data is processed.
+        </Callout>
+
         <H3>4. Payment Information</H3>
         <P>
           Payments are processed by a third-party processor (Stripe). We do not store your card
@@ -177,7 +194,7 @@ const sections: Section[] = [
           headers={['Data', 'Purpose', 'Legal Basis']}
           rows={[
             [
-              'Email address',
+              'Name and Email address',
               'Account creation, authentication, service communications',
               'Contract performance',
             ],
@@ -187,9 +204,9 @@ const sections: Section[] = [
               'Contract performance',
             ],
             [
-              'Analytics data',
+              'Aggregated analytics (Plausible)',
               'Understanding usage to improve the product',
-              'Consent (opt-in via cookie banner)',
+              'No personal data processed — consent not required',
             ],
             [
               'Payment identifiers',
@@ -206,11 +223,13 @@ const sections: Section[] = [
     title: 'Cookies',
     content: (
       <>
+        <P>
+          We use as few cookies as possible. Because we use Plausible Analytics (which is
+          cookieless), we do not set any third-party analytics cookies.
+        </P>
         <Table
           headers={['Cookie', 'Provider', 'Purpose', 'Duration']}
           rows={[
-            ['_ga, _ga_*', 'Google Analytics', 'Distinguish unique users and sessions', '2 years'],
-            ['cookie_consent', 'Belrose', 'Remember your cookie preference', '1 year'],
             [
               'auth_session',
               'Firebase / Belrose',
@@ -219,11 +238,10 @@ const sections: Section[] = [
             ],
           ]}
         />
-        <P>
-          Strictly necessary cookies (auth_session) operate without consent as they are required for
-          the Service to function. Analytics cookies are only set after you give explicit consent
-          via the cookie banner.
-        </P>
+        <Callout>
+          No analytics cookies. No advertising cookies. No third-party tracking cookies. The only
+          cookie we set is the one that keeps you logged in.
+        </Callout>
       </>
     ),
   },
@@ -238,8 +256,14 @@ const sections: Section[] = [
         </P>
         <UL>
           <LI>
-            <strong className="font-semibold text-slate-700">Google LLC</strong> — Analytics and
-            Firebase infrastructure (Authentication, Firestore, Storage)
+            <strong className="font-semibold text-slate-700">Plausible Analytics</strong> — Website
+            analytics. EU-hosted, cookieless, no personal data collected. Open source.{' '}
+            <A href="https://plausible.io/privacy">plausible.io/privacy</A>
+          </LI>
+          <LI>
+            <strong className="font-semibold text-slate-700">Google LLC</strong> — Firebase
+            infrastructure only (Authentication, Firestore, Storage). We do not use Google
+            Analytics.
           </LI>
           <LI>
             <strong className="font-semibold text-slate-700">Stripe Inc.</strong> — Payment
@@ -271,8 +295,9 @@ const sections: Section[] = [
           you delete them or close your account.
         </LI>
         <LI>
-          <strong className="font-semibold text-slate-700">Analytics data</strong> — 26 months
-          (Google Analytics default).
+          <strong className="font-semibold text-slate-700">Analytics data</strong> — Aggregated,
+          non-personal page view counts retained by Plausible for 24 months. No personal data is
+          retained because none is collected.
         </LI>
         <LI>
           <strong className="font-semibold text-slate-700">Payment records</strong> — 7 years for
@@ -312,10 +337,6 @@ const sections: Section[] = [
             <strong className="font-semibold text-slate-700">Object</strong> — Object to processing
             based on legitimate interests.
           </LI>
-          <LI>
-            <strong className="font-semibold text-slate-700">Withdraw consent</strong> — Withdraw
-            analytics consent at any time via cookie settings.
-          </LI>
         </UL>
         <P>
           Contact us at <A href="mailto:privacy@belrosehealth.com">privacy@belrosehealth.com</A>. We
@@ -336,6 +357,7 @@ const sections: Section[] = [
           <LI>Firebase Authentication for secure identity management</LI>
           <LI>Blockchain-based verification of record integrity</LI>
           <LI>Role-based access controls within the platform</LI>
+          <LI>EU-hosted, cookieless analytics — no personal data collected about site visitors</LI>
         </UL>
         <P>
           No system is completely secure. To report a security issue, contact{' '}
@@ -473,7 +495,7 @@ const PrivacyPolicy: React.FC = () => {
             ))}
 
             {/* Contact card */}
-            <div className="mt-4 p-8 rounded-xl bg-[#0f172a] relative overflow-hidden">
+            <div className="mt-4 p-8 rounded-xl bg-primary relative overflow-hidden">
               <div className="absolute inset-0 bg-[radial-gradient(ellipse_50%_80%_at_100%_50%,rgba(236,72,153,0.15),transparent)] pointer-events-none" />
               <div className="relative">
                 <h3 className="text-white font-bold text-base mb-2">Questions about your data?</h3>

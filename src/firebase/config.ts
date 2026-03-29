@@ -1,8 +1,7 @@
 import { initializeApp, FirebaseApp } from 'firebase/app';
-import { getAnalytics, Analytics } from 'firebase/analytics';
-import { getAuth, Auth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
-import { getStorage, FirebaseStorage, connectStorageEmulator } from 'firebase/storage';
+import { getAuth, Auth } from 'firebase/auth';
+import { getFirestore, Firestore } from 'firebase/firestore';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { connectFunctionsEmulator, getFunctions } from 'firebase/functions';
 
 // Your web app's Firebase configuration
@@ -18,19 +17,6 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app: FirebaseApp = initializeApp(firebaseConfig);
-
-// Analytics - Consent Gated for GDPR compliance, see CookieBanner
-let analytics: Analytics | null = null;
-
-export function initAnalytics(): void {
-  if (!analytics) {
-    analytics = getAnalytics(app);
-  }
-}
-
-export function getAnalyticsInstance(): Analytics | null {
-  return analytics;
-}
 
 // Initialize Firebase services
 export const auth: Auth = getAuth(app);
