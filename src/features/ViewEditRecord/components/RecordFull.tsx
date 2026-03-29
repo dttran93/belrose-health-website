@@ -23,11 +23,13 @@ import {
   PendingSubjectRequestAlert,
   RejectionResponseAlert,
   RemovalRequestAlert,
+  VerifiedNoSubjectAlert,
 } from '@/features/Subject/components/SubjectAlertBanners';
 import { useSubjectAlerts } from '@/features/Subject/hooks/useSubjectAlerts';
 import SubjectService from '@/features/Subject/services/subjectService';
 import SubjectRemovalService from '@/features/Subject/services/subjectRemovalService';
 import { useNavigate } from 'react-router-dom';
+import { useReviewedByCurrentUser } from '@/features/Credibility/hooks/useVerifiedByCurrentUser';
 
 type ViewMode =
   | 'record'
@@ -121,7 +123,17 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   const [decryptedVersionData, setDecryptedVersionData] = useState<any>(null);
   const [enterVerificationInModifyMode, setEnterVerificationinModifyMode] = useState(false);
   const [enterDisputeInModifyMode, setEnterDisputeinModifyMode] = useState(false);
+  const { hasReviewed, isLoading: isCheckingReview } = useReviewedByCurrentUser(record);
   const navigate = useNavigate();
+
+  // For managing subject banner
+  const hasSubject = (record.subjects || []).length > 0;
+  const showVerifiedNoSubjectBanner =
+    !isCheckingReview &&
+    hasReviewed &&
+    !hasSubject &&
+    !subjectAlerts.hasSubjectRequest && // don't double-stack with the pending invite banner
+    viewMode !== 'version-detail'; // don't double stack with version detail
 
   // =========================================================================
   // VERSION DECRYPTION
@@ -389,6 +401,13 @@ export const RecordFull: React.FC<RecordFullProps> = ({
                   onRemove={handleRemoveSelf}
                   onDispute={handleDisputeRemoval}
                   isLoading={subjectFlow.isLoading}
+                />
+              )}
+
+              {showVerifiedNoSubjectBanner && (
+                <VerifiedNoSubjectAlert
+                  onSetSubject={handleSubjectPage}
+                  isLoading={isCheckingReview}
                 />
               )}
             </div>

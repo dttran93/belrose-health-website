@@ -1,6 +1,7 @@
 // src/features/Subject/components/SubjectAlertBanners.tsx
 
 import { AlertBanner } from '@/components/ui/AlertBanner';
+import { Button } from '@/components/ui/Button';
 import { UserCheck, UserX, UserMinus } from 'lucide-react';
 
 interface SubjectAlertConfig {
@@ -79,5 +80,23 @@ export const RemovalRequestAlert: React.FC<RemovalRequestAlertProps> = ({
       { label: 'Dispute', onClick: onDispute, variant: 'outline', disabled: isLoading },
       { label: 'Remove Myself', onClick: onRemove, disabled: isLoading },
     ]}
+  />
+);
+
+interface VerifiedNoSubjectAlertProps {
+  onSetSubject: () => void;
+  isLoading?: boolean;
+}
+
+export const VerifiedNoSubjectAlert: React.FC<VerifiedNoSubjectAlertProps> = ({
+  onSetSubject,
+  isLoading,
+}) => (
+  <AlertBanner
+    icon={UserCheck}
+    title="No Subject Set"
+    description="You've reviewed this record, but no subject has been linked yet. Invite the subject to complete the verification chain."
+    variant="warning"
+    actions={[{ label: 'Set Subject', onClick: onSetSubject, disabled: isLoading }]}
   />
 );
