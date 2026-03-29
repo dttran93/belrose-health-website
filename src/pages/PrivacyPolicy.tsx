@@ -134,9 +134,12 @@ const sections: Section[] = [
           <strong className="font-semibold text-slate-800">
             encrypted on your device before being transmitted to our servers
           </strong>{' '}
-          using client-side encryption. This means Belrose cannot read, access, or use your health
-          data — only you hold the decryption keys. We store only the encrypted ciphertext so you
-          can retrieve it.
+          using client-side encryption. This means Belrose{' '}
+          <strong className="font-semibold text-slate-800">
+            cannot read, access, or use your health data
+          </strong>{' '}
+          — only you hold the decryption keys. We store only the encrypted ciphertext so you can
+          retrieve it.
         </P>
         <P>
           Because we cannot access this data, it falls outside our operational control. You are the
@@ -457,12 +460,12 @@ const PrivacyPolicy: React.FC = () => {
               <section
                 key={id}
                 id={id}
-                className="mb-14 scroll-mt-24"
+                className="mb-6 scroll-mt-24"
                 ref={el => {
                   sectionRefs.current[id] = el;
                 }}
               >
-                <h2 className="text-left text-xl font-bold text-black tracking-tight mb-5 pb-3 border-b border-slate-200">
+                <h2 className="text-left text-xl font-bold text-black tracking-tight mb-2 pb-2 border-b border-slate-200">
                   {title}
                 </h2>
                 {content}

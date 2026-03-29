@@ -18,7 +18,19 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app: FirebaseApp = initializeApp(firebaseConfig);
-const analytics: Analytics = getAnalytics(app);
+
+// Analytics - Consent Gated for GDPR compliance, see CookieBanner
+let analytics: Analytics | null = null;
+
+export function initAnalytics(): void {
+  if (!analytics) {
+    analytics = getAnalytics(app);
+  }
+}
+
+export function getAnalyticsInstance(): Analytics | null {
+  return analytics;
+}
 
 // Initialize Firebase services
 export const auth: Auth = getAuth(app);
