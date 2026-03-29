@@ -188,16 +188,7 @@ export function AIChat({
         <div className="absolute inset-0 overflow-auto">
           <div className="w-full max-w-3xl mx-auto px-4">
             {messages.map(message => (
-              <ChatMessage
-                key={message.id}
-                message={{
-                  id: message.id,
-                  role: message.role,
-                  content: message.content,
-                  timestamp: message.timestamp,
-                }}
-                onEdit={onEditMessage}
-              />
+              <ChatMessage key={message.id} message={message} onEdit={onEditMessage} />
             ))}
             <div ref={messagesEndRef} />
             <div className="h-48" />

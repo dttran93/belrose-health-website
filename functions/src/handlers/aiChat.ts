@@ -1,4 +1,4 @@
-// functions/src/aiChat.ts
+// functions/src/handlers/aiChat.ts
 
 import { defineSecret } from 'firebase-functions/params';
 import cors from 'cors';
@@ -26,20 +26,6 @@ interface ChatRequest {
     role: 'user' | 'assistant';
     content: string;
   }>;
-}
-
-interface GeminiResponse {
-  candidates?: Array<{
-    content: {
-      parts: Array<{ text: string }>;
-      role: string;
-    };
-    finishReason?: string;
-  }>;
-  error?: {
-    message: string;
-    code: number;
-  };
 }
 
 export const aiChat = onRequest(
@@ -98,14 +84,15 @@ export const aiChat = onRequest(
             );
             break;
           case 'google':
-            const geminiResponse = await callGeminiAPI(
+            await streamGeminiAPI(
               message,
               healthContext,
               model,
               conversationHistory,
-              mediaParts
+              mediaParts,
+              sendChunk,
+              sendStatus
             );
-            sendChunk(geminiResponse);
             break;
           default:
             throw new Error(`Unsupported provider: ${provider}`);
@@ -141,28 +128,21 @@ const generateSystemPrompt = (healthContext: string): string => {
   
 You have access to structured health data wrapped in XML tags (<HEALTH_RECORD>, <FILE_ATTACHMENT>, etc.).
 
-## When asked about the user's health data follow these guidelines:  
-### 1. GROUNDING & ACCURACY
+## When asked about the user's health data follow these guidelines:
+
+### 1. DATA HANDLING, GROUNDING, & ACCURACY
+- Use the [CONTEXT_MANIFEST] at the top of the context to understand the inventory.
 - ONLY answer based on the provided records and visual media.
 - DO NOT infer, assume, or hallucinate medical details. 
-
-### 2. DATA HANDLING & CITATION
-- Use the [CONTEXT_MANIFEST] at the top of the context to understand the inventory.
 - Reference specific records by their ID or Title (e.g., "In your 'Complete Blood Count' (recordID: abc123) from 2025-05-10...").
-- If visual media (images/videos) are provided, analyze them in conjunction with the metadata provided in the XML.
 
-### 3. TONE & STYLE
-- Use a professional, empathetic, and clear tone.
-- Explain medical terminology clearly, concisely, and using plain language.
-- Provide structured summaries (bullet points) for complex data.
-
-### 4. SAFETY & DISCLAIMERS
+### 2. SAFETY & DISCLAIMERS
 - A recommendation to consult a qualified healthcare provider for medical decisions is always present in the user interface, but if discussing a serious 
 medical problem, reiterate that you are an assistant, not a doctor.
 
-### 5. WEB CITATIONS
+### 3. WEB SEARCH & CITATIONS
 - ALWAYS cite sources when referencing general health information and search for current evidence.
-- Only cite reputable medical sources such as: NHS, CDC, WHO, Mayo Clinic, PubMed, NICE, NEJM, JAMA, NIH, etc.
+- Cite reputable medical sources such as: NHS, CDC, WHO, Mayo Clinic, PubMed, NICE, NEJM, JAMA, NIH, etc.
 - Format citations as markdown links inline: [Source Name](URL)
 - Place citations IMMEDIATELY after the specific claim they support, not at the end of the sentence. Similar to an APA or MLA citation.
 - If multiple sources support the same claim, place them consecutively with no space between them: [Source 1](URL)[Source 2](URL)
@@ -213,7 +193,7 @@ async function streamClaudeAPI(
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: model || 'claude-sonnet-4-20250514',
+        model: model || 'claude-sonnet-4-6',
         max_tokens: 4096,
         temperature: 0.2,
         system: systemPrompt,
@@ -221,10 +201,11 @@ async function streamClaudeAPI(
         stream: true,
         tools: [
           {
-            type: 'web_search_20250305',
+            type: 'web_search_20260209',
             name: 'web_search',
           },
         ],
+        tool_choice: { type: 'auto' },
       }),
     });
   };
@@ -257,7 +238,6 @@ async function streamClaudeAPI(
 
         try {
           const parsed = JSON.parse(data);
-
           if (parsed.type === 'message_delta') {
             stopReason = parsed.delta?.stop_reason || '';
           }
@@ -270,15 +250,22 @@ async function streamClaudeAPI(
           }
 
           // Tool use starting — capture the tool name and id
-          if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_use') {
-            if (parsed.content_block.name === 'web_search') {
-              onStatus('searching');
+          if (parsed.type === 'content_block_start') {
+            // Handle both old tool_use and new server_tool_use
+            const blockType = parsed.content_block?.type;
+            const blockName = parsed.content_block?.name;
+
+            if (blockType === 'tool_use' || blockType === 'server_tool_use') {
+              if (blockName === 'web_search') {
+                onStatus('searching');
+              }
+              currentToolBlock = {
+                id: parsed.content_block.id,
+                name: blockName,
+                type: blockType,
+              };
+              currentToolInput = '';
             }
-            currentToolBlock = {
-              id: parsed.content_block.id,
-              name: parsed.content_block.name,
-            };
-            currentToolInput = '';
           }
 
           // Tool input streaming in
@@ -315,7 +302,9 @@ async function streamClaudeAPI(
 
   const round1 = await readStream(response);
 
-  // ── Round 2: if Claude used a tool, send tool results back ──
+  // ── Round 2: legacy fallback for tool_use stop reason ──
+  // Note: web_search_20260209 is server-side so this rarely/never triggers,
+  // but kept for safety in case of tool type changes.
   if (round1.stopReason === 'tool_use' && round1.toolUseBlocks.length > 0) {
     // Build the assistant message with tool use blocks
     const assistantMessage = {
@@ -357,24 +346,24 @@ async function streamClaudeAPI(
 }
 
 /**
- * Call Google's Gemini API
+ * Call Google's Gemini API with streaming + Google Search grounding
  */
-async function callGeminiAPI(
+async function streamGeminiAPI(
   message: string,
   healthContext: string,
   model: string,
   history: Array<{ role: string; content: string }>,
-  mediaParts: MediaPart[] = []
-): Promise<string> {
+  mediaParts: MediaPart[],
+  onChunk: (text: string) => void,
+  onStatus: (status: string) => void
+): Promise<void> {
   const apiKey = geminiApiKey.value();
-
-  if (!apiKey) {
-    throw new Error('Gemini API key not configured');
-  }
+  if (!apiKey) throw new Error('Gemini API key not configured');
 
   const systemPrompt = generateSystemPrompt(healthContext);
+  const modelName = model || 'gemini-2.5-flash';
 
-  // Gemini uses 'user' and 'model' as roles
+  // Gemini uses 'user' and 'model' roles (not 'assistant')
   const contents = [
     ...history.map(msg => ({
       role: msg.role === 'assistant' ? 'model' : 'user',
@@ -391,36 +380,110 @@ async function callGeminiAPI(
     },
   ];
 
-  const modelName = model || 'gemini-2.5-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+  // Helper: make a streaming request to Gemini
+  const callGemini = async (msgs: any[]) => {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?key=${apiKey}&alt=sse`;
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: msgs,
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        tools: [{ googleSearch: {} }], // 👈 Enables grounding with Google Search
+        generationConfig: { maxOutputTokens: 4096, temperature: 0.1 },
+      }),
+    });
+  };
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      contents,
-      system_instruction: {
-        parts: [{ text: systemPrompt }],
+  // Helper: read a Gemini SSE stream, returns text + any tool calls
+  const readGeminiStream = async (
+    response: Response
+  ): Promise<{
+    text: string;
+    functionCalls: any[];
+    finishReason: string;
+  }> => {
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let text = '';
+    let finishReason = '';
+    const functionCalls: any[] = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
+
+      for (const line of lines) {
+        const data = line.replace('data: ', '').trim();
+        if (data === '' || data === '[DONE]') continue;
+
+        try {
+          const parsed = JSON.parse(data);
+          const candidate = parsed.candidates?.[0];
+          if (!candidate) continue;
+
+          finishReason = candidate.finishReason || finishReason;
+
+          for (const part of candidate.content?.parts || []) {
+            if (part.text) {
+              text += part.text;
+              onChunk(part.text); // Stream text to client immediately
+            }
+            // Gemini signals a search call via functionCall parts
+            if (part.functionCall) {
+              functionCalls.push(part.functionCall);
+              onStatus('searching');
+            }
+          }
+        } catch {
+          // Ignore malformed lines
+        }
+      }
+    }
+
+    return { text, functionCalls, finishReason };
+  };
+
+  // ── Round 1: initial call ──
+  let response = await callGemini(contents);
+  if (!response.ok)
+    throw new Error(`Gemini API error: ${response.status} - ${await response.text()}`);
+
+  const round1 = await readGeminiStream(response);
+
+  // ── Round 2: if Gemini used search, send tool results back ──
+  if (round1.functionCalls.length > 0) {
+    // Append what the model said + its tool calls to the conversation
+    const updatedContents = [
+      ...contents,
+      {
+        role: 'model',
+        parts: [
+          ...(round1.text ? [{ text: round1.text }] : []),
+          ...round1.functionCalls.map(fc => ({ functionCall: fc })),
+        ],
       },
-      generationConfig: {
-        maxOutputTokens: 4096,
-        temperature: 0.1,
+      // Tell Gemini "yes, go use that search result" — it fills in the actual data
+      {
+        role: 'user',
+        parts: round1.functionCalls.map(fc => ({
+          functionResponse: {
+            name: fc.name,
+            response: { output: 'Search executed. Use grounding results.' },
+          },
+        })),
       },
-    }),
-  });
+    ];
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Gemini API error: ${response.status} - ${error}`);
+    onStatus('responding');
+
+    response = await callGemini(updatedContents);
+    if (!response.ok)
+      throw new Error(`Gemini API error (round 2): ${response.status} - ${await response.text()}`);
+
+    await readGeminiStream(response); // streams final response to client
   }
-
-  const data = (await response.json()) as GeminiResponse;
-
-  if (!data.candidates || data.candidates.length === 0) {
-    throw new Error('Gemini returned no response candidates');
-  }
-
-  return data.candidates[0].content.parts[0].text;
 }

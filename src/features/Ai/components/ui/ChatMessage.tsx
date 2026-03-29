@@ -9,6 +9,7 @@ import ReactMarkdown from 'react-markdown';
 import { Message } from '../../service/chatService';
 import { Citation, CitationPanel, extractCitations } from './CitationPanel';
 import { CitationBadge } from './CitationBadge';
+import remarkGfm from 'remark-gfm';
 
 export interface ChatMessageProps {
   message: Message;
@@ -181,24 +182,26 @@ export function ChatMessage({ message, onEdit }: ChatMessageProps) {
         {/* Message content */}
         <div className="flex-1 min-w-0">
           <div className="text-left text-gray-800">
-            {/* ✅ Searching indicator — shows before any text streams in */}
-            {message.isStreaming && message.streamingStatus === 'searching' && (
-              <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+            {/* Thinking indicator — always shows while waiting for first content */}
+            {message.isStreaming && (
+              <div className="flex items-center gap-2 py-2">
                 <div className="flex gap-1">
                   <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
                   <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
                   <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
                 </div>
-                Searching the web...
+                <span className="text-sm text-gray-500">
+                  {message.streamingStatus === 'searching' ? 'Searching the web...' : 'Thinking...'}
+                </span>
               </div>
             )}
-
             <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
               components={{
                 p: ({ children }) => (
-                  <p className="mb-2 last:mb-0">
+                  <div className="mb-2 last:mb-0">
                     {groupConsecutiveCitations(children, citationMap)}
-                  </p>
+                  </div>
                 ),
                 strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
                 ul: ({ children }) => <ul className="list-disc ml-4 mb-2 space-y-1">{children}</ul>,
@@ -213,6 +216,26 @@ export function ChatMessage({ message, onEdit }: ChatMessageProps) {
                   <a href={href} target="_blank" rel="noopener noreferrer">
                     {children}
                   </a>
+                ),
+                table: ({ children }) => (
+                  <div className="overflow-x-auto my-3">
+                    <table className="min-w-full border-collapse text-sm">{children}</table>
+                  </div>
+                ),
+                thead: ({ children }) => <thead className="bg-gray-50">{children}</thead>,
+                tbody: ({ children }) => (
+                  <tbody className="divide-y divide-gray-200">{children}</tbody>
+                ),
+                tr: ({ children }) => (
+                  <tr className="hover:bg-gray-50 transition-colors">{children}</tr>
+                ),
+                th: ({ children }) => (
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide border-b border-gray-200">
+                    {children}
+                  </th>
+                ),
+                td: ({ children }) => (
+                  <td className="px-3 py-2 text-gray-800 border-b border-gray-100">{children}</td>
                 ),
               }}
             >

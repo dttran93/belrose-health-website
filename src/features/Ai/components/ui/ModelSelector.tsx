@@ -51,8 +51,8 @@ export const GoogleLogo = () => (
 
 export const AVAILABLE_MODELS: AIModel[] = [
   {
-    id: 'claude-sonnet-4-5-20250929',
-    name: 'Claude Sonnet 4.5',
+    id: 'claude-sonnet-4-6',
+    name: 'Claude Sonnet 4.6',
     provider: 'anthropic',
     icon: AnthropicLogo,
     description: "Anthropic's best combination of speed and intelligence",

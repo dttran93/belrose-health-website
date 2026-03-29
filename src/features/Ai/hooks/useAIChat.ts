@@ -156,125 +156,124 @@ export function useAIChat({
   // ============================================================================
 
   const streamingIdRef = useRef<string | null>(null);
+  const setMessagesRef = useRef(setMessages);
+  setMessagesRef.current = setMessages;
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
   /**
    * Call AI backend via Firebase Cloud Function
    */
-  const callAIBackend = useCallback(
-    async (
-      userMessage: string,
-      healthContext: string | null,
-      model: AIModel,
-      mediaParts?: MediaPart[]
-    ): Promise<string> => {
-      console.log(`🤖 Calling AI: ${model.name} (${model.provider})`);
+  const callAIBackend = async (
+    userMessage: string,
+    healthContext: string | null,
+    model: AIModel,
+    mediaParts?: MediaPart[]
+  ): Promise<string> => {
+    console.log(`🤖 Calling AI: ${model.name} (${model.provider})`);
 
-      const conversationHistory = messages.slice(-10).map(msg => ({
-        role: msg.role,
-        content: msg.content,
-      }));
+    const conversationHistory = messagesRef.current.slice(-10).map(msg => ({
+      role: msg.role,
+      content: msg.content,
+    }));
 
-      const response = await fetch('https://us-central1-belrose-757fe.cloudfunctions.net/aiChat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userMessage,
-          healthContext,
-          model: model.id,
-          provider: model.provider,
-          mediaParts,
-          conversationHistory,
-        }),
-        signal: abortControllerRef.current?.signal,
-      });
+    const response = await fetch('https://us-central1-belrose-757fe.cloudfunctions.net/aiChat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: userMessage,
+        healthContext,
+        model: model.id,
+        provider: model.provider,
+        mediaParts,
+        conversationHistory,
+      }),
+      signal: abortControllerRef.current?.signal,
+    });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get AI response');
-      }
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to get AI response');
+    }
 
-      // ✅ Create a temporary streaming message in state
-      const streamingId = `streaming-${Date.now()}`;
-      streamingIdRef.current = streamingId;
+    // ✅ Create a temporary streaming message in state
+    const streamingId = `streaming-${Date.now()}`;
+    streamingIdRef.current = streamingId;
 
-      setMessages(prev => [
-        ...prev,
-        {
-          id: streamingId,
-          role: 'assistant',
-          content: '',
-          timestamp: Timestamp.now(),
-          isStreaming: true,
-          streamingStatus: undefined,
-        } as Message,
-      ]);
+    setMessagesRef.current(prev => [
+      ...prev,
+      {
+        id: streamingId,
+        role: 'assistant',
+        content: '',
+        timestamp: Timestamp.now(),
+        isStreaming: true,
+        streamingStatus: undefined,
+      } as Message,
+    ]);
 
-      // ✅ Read the SSE stream
-      const reader = response.body!.getReader();
-      const decoder = new TextDecoder();
-      let accumulatedText = '';
+    // ✅ Read the SSE stream
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let accumulatedText = '';
 
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
 
-          for (const line of lines) {
-            const data = line.replace('data: ', '').trim();
-            if (data === '[DONE]' || data === '') continue;
+        for (const line of lines) {
+          const data = line.replace('data: ', '').trim();
+          if (data === '[DONE]' || data === '') continue;
 
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.error) throw new Error(parsed.error);
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.error) throw new Error(parsed.error);
 
-              // ✅ Handle status events
-              if (parsed.status) {
-                setMessages(prev =>
-                  prev.map(m =>
-                    m.id === streamingId ? { ...m, streamingStatus: parsed.status } : m
-                  )
-                );
-              }
-
-              if (parsed.delta) {
-                accumulatedText += parsed.delta;
-                // ✅ Update the live message on every chunk
-                setMessages(prev =>
-                  prev.map(m =>
-                    m.id === streamingId
-                      ? { ...m, content: accumulatedText, streamingStatus: undefined } // ✅ clear status once text starts
-                      : m
-                  )
-                );
-              }
-            } catch {
-              // Skip malformed lines
+            // Handle status events
+            if (parsed.status) {
+              setMessagesRef.current(prev =>
+                prev.map(m => (m.id === streamingId ? { ...m, streamingStatus: parsed.status } : m))
+              );
             }
+
+            if (parsed.delta) {
+              accumulatedText += parsed.delta;
+              // ✅ Update the live message on every chunk
+              setMessagesRef.current(prev =>
+                prev.map(m =>
+                  m.id === streamingId
+                    ? { ...m, content: accumulatedText, streamingStatus: m.streamingStatus } // ✅ clear status once text starts
+                    : m
+                )
+              );
+            }
+          } catch {
+            // Skip malformed lines
           }
         }
-      } catch (error) {
-        // Clean up the placeholder on error
-        setMessages(prev => prev.filter(m => m.id !== streamingId));
-        streamingIdRef.current = null;
-        if (error instanceof Error && error.name === 'AbortError') {
-          throw new Error('Request cancelled');
-        }
-        throw error;
       }
+    } catch (error) {
+      // Clean up the placeholder on error
+      setMessagesRef.current(prev => prev.filter(m => m.id !== streamingId));
+      streamingIdRef.current = null;
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Request cancelled');
+      }
+      throw error;
+    }
 
-      setMessages(prev =>
-        prev.map(m =>
-          m.id === streamingId ? { ...m, isStreaming: false, streamingStatus: undefined } : m
-        )
-      );
+    setMessagesRef.current(prev =>
+      prev.map(m =>
+        m.id === streamingId ? { ...m, isStreaming: false, streamingStatus: undefined } : m
+      )
+    );
 
-      return accumulatedText;
-    },
-    [messages]
-  );
+    return accumulatedText;
+  };
 
   // ============================================================================
   // MAIN ACTION: SEND MESSAGE
@@ -488,7 +487,7 @@ export function useAIChat({
           activeChatId = chatId;
           setCurrentChatId(chatId);
 
-          setMessages([
+          setMessagesRef.current([
             {
               id: messageId,
               role: 'user',
@@ -504,7 +503,7 @@ export function useAIChat({
             content: finalMessage,
           });
 
-          setMessages(prev => [
+          setMessagesRef.current(prev => [
             ...prev,
             {
               id: messageId,
@@ -540,7 +539,7 @@ export function useAIChat({
           content: aiResponse,
         });
 
-        setMessages(prev =>
+        setMessagesRef.current(prev =>
           prev.map(m => (m.id === streamingIdToReplace ? { ...m, id: assistantMessageId } : m))
         );
         streamingIdRef.current = null;
@@ -557,15 +556,7 @@ export function useAIChat({
         abortControllerRef.current = null;
       }
     },
-    [
-      user,
-      currentChatId,
-      allRecords,
-      selectedContext,
-      selectedModel,
-      callAIBackend,
-      extractTextFromPDFViaOCR,
-    ]
+    [user, currentChatId, allRecords, selectedContext, selectedModel, extractTextFromPDFViaOCR]
   );
 
   // ============================================================================
@@ -598,7 +589,7 @@ export function useAIChat({
         await deleteMessagesAfter(user.uid, currentChatId, editedMessage.timestamp);
 
         // ✅ Step 2: Truncate local state to everything BEFORE the edited message
-        setMessages(prev => prev.slice(0, messageIndex));
+        setMessagesRef.current(prev => prev.slice(0, messageIndex));
 
         console.log(`✂️ Branched from message index ${messageIndex}`);
 
@@ -629,7 +620,7 @@ export function useAIChat({
 
       try {
         const chatMessages = await getEncryptedChatMessages(user.uid, chatId);
-        setMessages(chatMessages);
+        setMessagesRef.current(chatMessages);
       } catch (error) {
         console.error('❌ Failed to load chat messages:', error);
         setChatError(error instanceof Error ? error : new Error('Failed to load chat'));
@@ -649,7 +640,7 @@ export function useAIChat({
    */
   const handleNewChat = useCallback(() => {
     setCurrentChatId(null);
-    setMessages([]);
+    setMessagesRef.current([]);
     setChatError(null);
   }, []);
 
