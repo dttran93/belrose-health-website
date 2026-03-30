@@ -50,6 +50,7 @@ import UserSearch from '@/features/Users/components/UserSearch';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { REJECTION_REASON_OPTIONS, RejectionReasons } from '../../services/subjectRejectionService';
+import NetworkPreparingContent from '@/features/BlockchainWallet/components/NetworkPreparingContent';
 
 // ============================================================================
 // TYPES
@@ -184,7 +185,7 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
           style={{ zIndex: zIndex.overlay }}
         />
         <AlertDialog.Content
-          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl p-6 shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
           style={{ zIndex: zIndex.content }}
         >
           {/* Selecting Phase */}
@@ -215,7 +216,12 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
           )}
 
           {/* Preparing Phase */}
-          {phase === 'preparing' && <PreparingContent progress={preparationProgress} />}
+          {phase === 'preparing' && (
+            <NetworkPreparingContent
+              progress={preparationProgress}
+              steps={['computing', 'saving', 'registering', 'initializing_record']}
+            />
+          )}
 
           {/* Executing Phase */}
           {phase === 'executing' && <ExecutingContent operationType={operationType} />}
@@ -238,7 +244,7 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
             />
           )}
 
-          {/* Confirming Phase - Request Consent (other flow) */}
+          {/* Confirming Phase - Request Consent */}
           {phase === 'confirming' && selectedUser && subjectChoice === 'other' && (
             <ConfirmRequestConsentContent
               record={record}
@@ -323,7 +329,7 @@ const SelectingContent: React.FC<{
   });
 
   return (
-    <div className="p-6">
+    <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <AlertDialog.Title className="text-lg font-bold flex items-center gap-2">
@@ -492,7 +498,7 @@ const SearchingContent: React.FC<{
   };
 
   return (
-    <div className="p-6">
+    <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -568,79 +574,10 @@ const SearchingContent: React.FC<{
 // PHASE CONTENT COMPONENTS
 // ============================================================================
 
-const PreparingContent: React.FC<{ progress?: SubjectPreparationProgress | null }> = ({
-  progress,
-}) => (
-  <div className="p-6 flex flex-col items-center gap-4 py-8">
-    <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
-    <AlertDialog.Title className="text-lg font-bold text-center">
-      Preparing Secure Connection
-    </AlertDialog.Title>
-    <AlertDialog.Description className="text-sm text-gray-600 text-center">
-      {progress?.message || 'Setting up your network account...'}
-    </AlertDialog.Description>
-
-    {/* Progress Steps */}
-    <div className="w-full mt-2 space-y-2">
-      <ProgressStep
-        label="Computing wallet address"
-        status={
-          progress?.step === 'computing'
-            ? 'active'
-            : progress?.step && ['saving', 'registering', 'complete'].includes(progress.step)
-              ? 'complete'
-              : 'pending'
-        }
-      />
-      <ProgressStep
-        label="Saving to profile"
-        status={
-          progress?.step === 'saving'
-            ? 'active'
-            : progress?.step && ['registering', 'complete'].includes(progress.step)
-              ? 'complete'
-              : 'pending'
-        }
-      />
-      <ProgressStep
-        label="Registering on network"
-        status={
-          progress?.step === 'registering'
-            ? 'active'
-            : progress?.step === 'complete'
-              ? 'complete'
-              : 'pending'
-        }
-      />
-    </div>
-  </div>
-);
-
-const ProgressStep: React.FC<{
-  label: string;
-  status: 'pending' | 'active' | 'complete';
-}> = ({ label, status }) => (
-  <div className="flex items-center gap-2">
-    {status === 'complete' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
-    {status === 'active' && <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />}
-    {status === 'pending' && <div className="w-4 h-4 rounded-full border-2 border-gray-300" />}
-    <span
-      className={`text-sm ${
-        status === 'complete'
-          ? 'text-green-600'
-          : status === 'active'
-            ? 'text-blue-600 font-medium'
-            : 'text-gray-400'
-      }`}
-    >
-      {label}
-    </span>
-  </div>
-);
-
 const ExecutingContent: React.FC<{ operationType: SubjectOperationType }> = ({ operationType }) => {
   const messages: Record<SubjectOperationType, string> = {
     setSubjectAsSelf: 'Linking you to this record...',
+    requestSubjectConsent: 'Sending subject request...',
     acceptSubjectRequest: 'Accepting subject request...',
     rejectSubjectRequest: 'Declining subject request...',
     rejectSubjectStatus: 'Removing your subject status...',
@@ -648,7 +585,7 @@ const ExecutingContent: React.FC<{ operationType: SubjectOperationType }> = ({ o
   };
 
   return (
-    <div className="p-6 flex flex-col items-center gap-4 py-8">
+    <div className="flex flex-col items-center gap-4 py-8">
       <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
       <AlertDialog.Title className="text-lg font-bold text-center">Processing</AlertDialog.Title>
       <AlertDialog.Description className="text-sm text-gray-600 text-center">
@@ -662,7 +599,7 @@ const ErrorContent: React.FC<{ error?: string | null; onClose: () => void }> = (
   error,
   onClose,
 }) => (
-  <div className="p-6 flex flex-col items-center gap-4 py-8">
+  <div className="flex flex-col items-center gap-4 py-8">
     <XCircle className="w-10 h-10 text-red-500" />
     <AlertDialog.Title className="text-lg font-bold text-center text-red-600">
       Something went wrong
@@ -682,6 +619,7 @@ const SuccessContent: React.FC<{
 }> = ({ operationType, onClose }) => {
   const messages: Record<SubjectOperationType, string> = {
     setSubjectAsSelf: 'You are now linked to this record as a subject.',
+    requestSubjectConsent: 'You have sent a subject request to the selected user.',
     acceptSubjectRequest: 'You have accepted the subject request.',
     rejectSubjectRequest: 'You have declined the subject request.',
     rejectSubjectStatus: 'You have been removed as a subject of this record.',
@@ -689,7 +627,7 @@ const SuccessContent: React.FC<{
   };
 
   return (
-    <div className="p-6 flex flex-col items-center gap-4 py-8">
+    <div className="flex flex-col items-center gap-4 py-8">
       <CheckCircle2 className="w-10 h-10 text-green-500" />
       <AlertDialog.Title className="text-lg font-bold text-center text-green-600">
         Success
@@ -718,7 +656,7 @@ const ConfirmSetSubjectAsSelfContent: React.FC<{
   const RoleIcon = roleConfig.icon;
 
   return (
-    <div className="p-6">
+    <div>
       <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
         <UserCheck className="w-5 h-5 text-blue-500" />
         Confirm Subject Status
@@ -793,7 +731,7 @@ const ConfirmRequestConsentContent: React.FC<{
   const RoleIcon = roleConfig.icon;
 
   return (
-    <div className="p-6">
+    <div>
       <AlertDialog.Title className="text-lg font-bold flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2">
           <Users className="w-5 h-5 text-blue-500" />
@@ -856,7 +794,7 @@ const ConfirmAcceptRequestContent: React.FC<{
   onConfirm: () => void;
   onClose: () => void;
 }> = ({ record, onConfirm, onClose }) => (
-  <div className="p-6">
+  <div>
     <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
       <UserCheck className="w-5 h-5 text-green-500" />
       Accept Subject Request
@@ -910,7 +848,7 @@ const ConfirmRejectRequestContent: React.FC<{
   const [reason, setReason] = useState<RejectionReasons | ''>('');
 
   return (
-    <div className="p-6">
+    <div>
       <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
         <UserX className="w-5 h-5 text-red-500" />
         Decline Subject Request
@@ -982,7 +920,7 @@ const ConfirmRemoveSubjectStatusContent: React.FC<{
   const [reason, setReason] = useState<RejectionReasons | ''>('');
 
   return (
-    <div className="p-6">
+    <div>
       <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
         <UserMinus className="w-5 h-5 text-orange-500" />
         Remove Subject Status

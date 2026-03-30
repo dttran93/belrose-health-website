@@ -724,13 +724,14 @@ export class PermissionsService {
       });
       console.log('✅ Demoted to viewer');
     } else {
+      // Revoke encryption access only if fully removing
+      // Must remove before updating arrays, otherwise wrappedKey update will fail
+      await SharingService.revokeEncryptionAccess(recordId, targetUserId, currentUser.uid);
+
       await updateDoc(recordRef, {
         administrators: arrayRemove(targetUserId),
       });
       console.log('✅ Removed from administrators array');
-
-      // Revoke encryption access only if fully removing
-      await SharingService.revokeEncryptionAccess(recordId, targetUserId, currentUser.uid);
     }
 
     console.log('✅ Administrator access removed successfully');
@@ -859,13 +860,14 @@ export class PermissionsService {
       });
       console.log('✅ Demoted to viewer');
     } else {
+      // Revoke encryption access only if fully removing
+      // Must remove before updating arrays, otherwise wrappedKey update will fail
+      await SharingService.revokeEncryptionAccess(recordId, targetUserId, currentUser.uid);
+
       await updateDoc(recordRef, {
         owners: arrayRemove(targetUserId),
       });
       console.log('✅ Removed from owners array');
-
-      // Revoke encryption access only if fully removing
-      await SharingService.revokeEncryptionAccess(recordId, targetUserId, currentUser.uid);
     }
 
     console.log('✅ Owner access removed successfully');

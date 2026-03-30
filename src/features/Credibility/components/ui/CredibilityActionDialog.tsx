@@ -8,7 +8,6 @@ import {
   XCircle,
   CheckCircle2,
   AlertTriangle,
-  FileCheck,
   FileX,
   ThumbsUp,
   ThumbsDown,
@@ -31,6 +30,7 @@ import {
   getSeverityConfig,
   getCulpabilityConfig,
 } from '../../services/disputeService';
+import NetworkPreparingContent from '@/features/BlockchainWallet/components/NetworkPreparingContent';
 
 // ============================================================================
 // TYPES
@@ -92,7 +92,13 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
         <AlertDialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" />
         <AlertDialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl p-6 shadow-2xl z-[101] w-full max-w-md max-h-[90vh] overflow-y-auto">
           {/* Preparing Phase */}
-          {phase === 'preparing' && <PreparingContent progress={preparationProgress} />}
+          {phase === 'preparing' && (
+            <NetworkPreparingContent
+              progress={preparationProgress}
+              steps={['computing', 'saving', 'registering', 'initializing_record', 'ensuring_hash']}
+              title="Preparing Secure Network"
+            />
+          )}
 
           {/* Executing Phase */}
           {phase === 'executing' && <ExecutingContent operationType={operationType} />}
@@ -179,81 +185,17 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
 // PHASE CONTENT COMPONENTS
 // ============================================================================
 
-const PreparingContent: React.FC<{ progress?: CredibilityPreparationProgress | null }> = ({
-  progress,
-}) => (
-  <div className="flex flex-col items-center gap-4 py-4">
-    <Loader2 className="w-10 h-10 text-complement-3 animate-spin" />
-    <AlertDialog.Title className="text-lg font-bold text-center">
-      Preparing Secure Network
-    </AlertDialog.Title>
-    <AlertDialog.Description className="text-sm text-gray-600 text-center">
-      {progress?.message || 'Setting up your network account...'}
-    </AlertDialog.Description>
-
-    {/* Progress Steps */}
-    <div className="w-full mt-2 space-y-2">
-      <ProgressStep
-        label="Computing wallet address"
-        status={getStepStatus(progress?.step, ['computing'])}
-      />
-      <ProgressStep label="Saving to profile" status={getStepStatus(progress?.step, ['saving'])} />
-      <ProgressStep
-        label="Registering on network"
-        status={getStepStatus(progress?.step, ['registering'])}
-      />
-      <ProgressStep
-        label="Verifying record on chain"
-        status={getStepStatus(progress?.step, ['verifying_hash', 'adding_hash'])}
-      />
-    </div>
-  </div>
-);
-
-function getStepStatus(
-  currentStep: string | undefined,
-  stepNames: string[]
-): 'pending' | 'active' | 'complete' {
-  if (!currentStep) return 'pending';
-
-  const steps = ['computing', 'saving', 'registering', 'verifying_hash', 'adding_hash', 'complete'];
-  const currentIndex = steps.indexOf(currentStep);
-  const stepIndices = stepNames.map(s => steps.indexOf(s));
-  const maxStepIndex = Math.max(...stepIndices);
-
-  if (stepNames.includes(currentStep)) return 'active';
-  if (currentIndex > maxStepIndex) return 'complete';
-
-  return 'pending';
-}
-
-const ProgressStep: React.FC<{
-  label: string;
-  status: 'pending' | 'active' | 'complete';
-}> = ({ label, status }) => (
-  <div className="flex items-center gap-3">
-    {status === 'complete' && <CheckCircle2 className="w-5 h-5 text-complement-3" />}
-    {status === 'active' && <Loader2 className="w-5 h-5 text-complement-3 animate-spin" />}
-    {status === 'pending' && <div className="w-5 h-5 rounded-full border-2 border-gray-300" />}
-    <span
-      className={`text-sm ${status === 'complete' ? 'text-complement-3' : status === 'active' ? 'text-complement-3' : 'text-gray-400'}`}
-    >
-      {label}
-    </span>
-  </div>
-);
-
 const ExecutingContent: React.FC<{ operationType: CredibilityOperationType }> = ({
   operationType,
 }) => {
   const messages: Record<CredibilityOperationType, { title: string; description: string }> = {
     verify: {
       title: 'Submitting Verification',
-      description: 'Recording your verification on the record...',
+      description: 'Recording your verification on the network...',
     },
     dispute: {
       title: 'Filing Dispute',
-      description: 'Recording your dispute on the record...',
+      description: 'Recording your dispute on the network...',
     },
     retractVerification: {
       title: 'Retracting Verification',
@@ -265,15 +207,15 @@ const ExecutingContent: React.FC<{ operationType: CredibilityOperationType }> = 
     },
     modifyVerification: {
       title: 'Modifying Verification',
-      description: 'Updating your verification on the record...',
+      description: 'Updating your verification on the network...',
     },
     modifyDispute: {
       title: 'Modifying Dispute',
-      description: 'Updating your dispute on the record...',
+      description: 'Updating your dispute on the network...',
     },
     reactToDispute: {
       title: 'Submitting Reaction',
-      description: 'Recording your reaction on the record...',
+      description: 'Recording your reaction on the network...',
     },
   };
 

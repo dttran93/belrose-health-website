@@ -365,13 +365,13 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
   }, [subjectChoice, selectedRole, recordId, runPreparation]);
 
   /**
-   * Select a user in the "other" flow and proceed to confirmation
+   * Select a user in the request flow and proceed to confirmation
    */
   const selectUserAndProceed = useCallback(
     async (user: BelroseUserProfile) => {
       setSelectedUser(user);
       setPendingOperation({
-        type: 'acceptSubjectRequest', // Will actually be requestSubjectConsent
+        type: 'requestSubjectConsent',
         recordId,
         subjectChoice: 'other',
         selectedRole,

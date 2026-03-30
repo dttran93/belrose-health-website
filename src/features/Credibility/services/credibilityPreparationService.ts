@@ -24,10 +24,7 @@
 
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import {
-  BlockchainPreparationService,
-  type ProgressCallback,
-} from '@/features/BlockchainWallet/services/blockchainPreparationService';
+import { BlockchainPreparationService } from '@/features/BlockchainWallet/services/blockchainPreparationService';
 import { blockchainHealthRecordService } from './blockchainHealthRecordService';
 import { PermissionPreparationService } from '@/features/Permissions/services/permissionPreparationService';
 import { BlockchainRoleManagerService } from '@/features/Permissions/services/blockchainRoleManagerService';
@@ -72,8 +69,7 @@ export interface CredibilityPreparationProgress {
     | 'saving'
     | 'registering'
     | 'initializing_record'
-    | 'verifying_hash'
-    | 'adding_hash'
+    | 'ensuring_hash'
     | 'complete';
   message: string;
 }
@@ -253,13 +249,11 @@ export class CredibilityPreparationService {
 
     // Step 3: Ensure record hash exists on blockchain
     try {
-      onProgress?.({ step: 'verifying_hash', message: 'Verifying record on network...' });
+      onProgress?.({ step: 'ensuring_hash', message: 'Verifying record fingerprint...' });
 
       const isHashOnChain = await blockchainHealthRecordService.doesHashExist(recordHash);
 
       if (!isHashOnChain) {
-        onProgress?.({ step: 'adding_hash', message: 'Adding record to network...' });
-
         await blockchainHealthRecordService.addRecordHash(recordId, recordHash);
         console.log('✅ Record hash added to network');
       } else {

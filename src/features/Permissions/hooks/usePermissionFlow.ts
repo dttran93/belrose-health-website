@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import {
   PermissionPreparationService,
   InitialRole,
+  PermissionPreparationProgress,
 } from '../services/permissionPreparationService';
 import { PermissionsService, Role } from '../services/permissionsService';
 import { BelroseUserProfile } from '@/types/core';
@@ -48,6 +49,8 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
   const [phase, setPhase] = useState<DialogPhase>('idle');
   const [error, setError] = useState<string | null>(null);
   const [pendingOperation, setPendingOperation] = useState<PendingOperation | null>(null);
+  const [preparationProgress, setPreparationProgress] =
+    useState<PermissionPreparationProgress | null>(null);
 
   // ==========================================================================
   // HELPERS
@@ -60,6 +63,7 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
     setPhase('idle');
     setError(null);
     setPendingOperation(null);
+    setPreparationProgress(null);
   }, []);
 
   /**
@@ -121,7 +125,7 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
         if (!prereqs.ready) {
           // Need to prepare - get caller's role for initialization
           const initialRole = await getCurrentUserRole();
-          await PermissionPreparationService.prepare(recordId, initialRole);
+          await PermissionPreparationService.prepare(recordId, initialRole, setPreparationProgress);
 
           // Verify preparation succeeded
           const finalCheck = await PermissionPreparationService.verifyPrerequisites(
@@ -300,6 +304,7 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
     dialogProps: {
       isOpen: phase !== 'idle',
       phase,
+      preparationProgress,
       operationType: (pendingOperation?.type || 'grant') as OperationType,
       role: pendingOperation?.role || 'viewer',
       user: pendingOperation?.user || null,

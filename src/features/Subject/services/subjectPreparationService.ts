@@ -35,6 +35,7 @@ import { PermissionPreparationService } from '@/features/Permissions/services/pe
 
 export type SubjectOperationType =
   | 'setSubjectAsSelf'
+  | 'requestSubjectConsent'
   | 'acceptSubjectRequest'
   | 'rejectSubjectRequest'
   | 'rejectSubjectStatus'

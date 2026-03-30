@@ -7,6 +7,7 @@ import { BelroseUserProfile } from '@/types/core';
 import { Role } from '@/features/Permissions/services/permissionsService';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { useState } from 'react';
+import NetworkPreparingContent from '@/features/BlockchainWallet/components/NetworkPreparingContent';
 
 // ============================================================================
 // TYPES
@@ -24,6 +25,7 @@ interface PermissionActionDialogProps {
   role: Role;
   user: BelroseUserProfile | null;
   error?: string | null;
+  preparationProgress?: { step: string; message: string } | null;
   grantVariant?: GrantVariant;
   onClose: () => void;
   onConfirmGrant: (role?: Role) => void;
@@ -87,6 +89,7 @@ export const PermissionActionDialog: React.FC<PermissionActionDialogProps> = ({
   role,
   user,
   error,
+  preparationProgress,
   grantVariant = 'confirm',
   onClose,
   onConfirmGrant,
@@ -103,7 +106,12 @@ export const PermissionActionDialog: React.FC<PermissionActionDialogProps> = ({
         <AlertDialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" />
         <AlertDialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl p-6 shadow-2xl z-[101] w-full max-w-md">
           {/* Render different content based on phase */}
-          {phase === 'preparing' && <PreparingContent />}
+          {phase === 'preparing' && (
+            <NetworkPreparingContent
+              progress={preparationProgress}
+              steps={['computing', 'saving', 'registering', 'initializing_record']}
+            />
+          )}
           {phase === 'executing' && <ExecutingContent operationType={operationType} />}
           {phase === 'error' && <ErrorContent error={error} onClose={onClose} />}
           {phase === 'confirming' && operationType === 'grant' && grantVariant === 'confirm' && (
@@ -141,20 +149,6 @@ export const PermissionActionDialog: React.FC<PermissionActionDialogProps> = ({
 // ============================================================================
 // PHASE CONTENT COMPONENTS
 // ============================================================================
-
-const PreparingContent: React.FC = () => (
-  <div className="flex flex-col items-center gap-4 py-4">
-    <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
-    <AlertDialog.Title className="text-lg font-bold text-center">
-      Preparing Distributed Network
-    </AlertDialog.Title>
-    <AlertDialog.Description className="text-sm text-gray-600 text-center">
-      Verifying accounts and checking record status on-network.
-      <br />
-      This may take a moment...
-    </AlertDialog.Description>
-  </div>
-);
 
 const ExecutingContent: React.FC<{ operationType: OperationType }> = ({ operationType }) => (
   <div className="flex flex-col items-center gap-4 py-4">

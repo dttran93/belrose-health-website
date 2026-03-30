@@ -299,11 +299,6 @@ export class CombinedRecordProcessingService {
         };
 
         result.aiProcessingStatus = 'completed';
-
-        toast.success(`🤖 AI analysis completed for ${fileName}`, {
-          description: `Classified as: ${aiResult.visitType}`,
-          duration: 3000,
-        });
       } catch (error: any) {
         console.error(`❌ AI processing failed for virtual file ${fileName}:`, error);
         result.aiProcessingStatus = 'failed';
