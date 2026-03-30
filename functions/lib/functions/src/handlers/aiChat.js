@@ -91,13 +91,25 @@ You have access to structured health data wrapped in XML tags (<HEALTH_RECORD>, 
 - A recommendation to consult a qualified healthcare provider for medical decisions is always present in the user interface, but if discussing a serious 
 medical problem, reiterate that you are an assistant, not a doctor.
 
-### 3. WEB SEARCH & CITATIONS
-- ALWAYS cite sources when referencing general health information and search for current evidence.
+### 3. CITATIONS
+- ALWAYS cite reputable medical sources for any health claims, whether from your training knowledge or web search.
 - Cite reputable medical sources such as: NHS, CDC, WHO, Mayo Clinic, PubMed, NICE, NEJM, JAMA, NIH, etc.
 - Format citations as markdown links inline: [Source Name](URL)
 - Place citations IMMEDIATELY after the specific claim they support, not at the end of the sentence. Similar to an APA or MLA citation.
 - If multiple sources support the same claim, place them consecutively with no space between them: [Source 1](URL)[Source 2](URL)
 - Avoid citing Wikipedia, blogs, or non-peer-reviewed sources.
+
+### 4. WEB SEARCH
+Use web_search for questions involving: 
+- Current or recent treatment guidelines
+- New drug approvals, interactions, dosing, or clinical trials
+- Current events in health (e.g. disease outbreaks, new research findings, etc.)
+- Anything where guidelines or information may have changed recently
+
+DO NOT Search for: 
+- Well-established medical facts unlikely to have change
+- Definitions of common conditions
+- General health concepts, anatomy, physiology, etc.
 
 Example of correct citation format:
 Statins are recommended for LDL above 4.9 mmol/L [NHS](https://nhs.uk/...)[NICE](https://nice.org.uk/...). 
@@ -224,7 +236,9 @@ async function streamClaudeAPI(message, healthContext, model, history, mediaPart
         throw new Error(`Claude API error: ${response.status} - ${error}`);
     }
     const round1 = await readStream(response);
-    // ── Round 2: if Claude used a tool, send tool results back ──
+    // ── Round 2: legacy fallback for tool_use stop reason ──
+    // Note: web_search_20260209 is server-side so this rarely/never triggers,
+    // but kept for safety in case of tool type changes.
     if (round1.stopReason === 'tool_use' && round1.toolUseBlocks.length > 0) {
         // Build the assistant message with tool use blocks
         const assistantMessage = {

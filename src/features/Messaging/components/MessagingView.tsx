@@ -27,12 +27,15 @@ import { getUserProfile } from '@/features/Users/services/userProfileService';
 import Avatar from '@/features/Users/components/Avatar';
 import type { BelroseUserProfile } from '@/types/core';
 import { SignalSetupStatus, useSignalSetup } from '../hooks/useSignalSetup';
+import SignalDevPanel from './SignalDevPanel';
+import { useAuthContext } from '@/features/Auth/AuthContext';
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export const MessagingView: React.FC = () => {
+  const { user } = useAuthContext();
   const { isReady: signalReady, status: signalStatus } = useSignalSetup();
   const { recipientId: urlRecipientId } = useParams<{ recipientId?: string }>();
   const navigate = useNavigate();
@@ -169,6 +172,14 @@ export const MessagingView: React.FC = () => {
           <EmptyThreadState />
         )}
       </div>
+
+      {import.meta.env.DEV && (
+        <SignalDevPanel
+          currentUserId={user?.uid ?? null}
+          recipientUserId={recipientUserId || null}
+          signalStatus={signalStatus}
+        />
+      )}
     </div>
   );
 };
