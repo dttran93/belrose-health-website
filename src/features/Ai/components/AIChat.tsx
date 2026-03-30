@@ -190,6 +190,20 @@ export function AIChat({
             {messages.map(message => (
               <ChatMessage key={message.id} message={message} onEdit={onEditMessage} />
             ))}
+            {isLoading && !messages.some(m => m.isStreaming) && (
+              <div className="flex gap-3 p-4">
+                <div className="w-full max-w-3xl mx-auto">
+                  <div className="flex items-center gap-2 py-2">
+                    <div className="flex gap-1">
+                      <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
+                      <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
+                      <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
+                    </div>
+                    <span className="text-sm text-gray-500">Thinking...</span>
+                  </div>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
             <div className="h-48" />
           </div>

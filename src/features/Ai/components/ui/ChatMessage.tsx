@@ -175,7 +175,6 @@ export function ChatMessage({ message, onEdit }: ChatMessageProps) {
     );
   }
 
-  // Assistant messages unchanged
   return (
     <div className="flex gap-3 p-4">
       <div className="w-full max-w-3xl mx-auto flex gap-3">
@@ -241,10 +240,6 @@ export function ChatMessage({ message, onEdit }: ChatMessageProps) {
             >
               {message.content}
             </ReactMarkdown>
-            {/* Streaming cursor */}
-            {message.isStreaming && !message.streamingStatus && (
-              <span className="inline-block w-0.5 h-4 bg-gray-800 ml-0.5 align-middle animate-pulse" />
-            )}
 
             {/* ✅ Citation panel — only renders when message is done streaming */}
             {!message.isStreaming && citations.length > 0 && (
