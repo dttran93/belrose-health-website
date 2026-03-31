@@ -149,6 +149,15 @@ export class RecordDecryptionService {
    * @returns The decrypted record AES key
    */
   static async getRecordKey(recordId: string, masterKey: CryptoKey): Promise<CryptoKey> {
+    // Guest sessions pre-load file keys via RSA unwrapping in GuestInvitePage.
+    // Check here first so we never attempt AES decryption with the throwaway key.
+    const guestFileKey = EncryptionKeyManager.getGuestFileKey(recordId);
+    if (guestFileKey) {
+      console.log('ℹ️  Decrypting as guest (pre-loaded file key)');
+      return guestFileKey;
+    }
+
+    // Standard user flow for creators and shared users: fetch from wrappedKeys collection
     const auth = getAuth();
     const db = getFirestore();
     const user = auth.currentUser;

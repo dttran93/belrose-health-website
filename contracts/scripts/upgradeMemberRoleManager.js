@@ -17,12 +17,29 @@ async function main() {
     kind: 'uups',
     redeployImplementation: 'always', // force fresh deployment every time
   });
+
+  const deployTx = upgraded.deploymentTransaction();
+  console.log('📍 Upgrade tx hash:', deployTx?.hash);
+
   await upgraded.waitForDeployment();
 
-  const newImplAddress = await upgrades.erc1967.getImplementationAddress(
-    await upgraded.getAddress(),
-    { provider: ethers.provider } // forces on-chain lookup
-  );
+  // Poll until slot value changes from old implementation
+  /**
+   * NOTE YOU HAD ISSUES WITH THIS PREVIOUSLY. THE IMPLEMENTATION ADDRESS WAS UPGRADE ON CHAIN
+   * BUT THIS SCRIPT RELAYED THE OLD IMPLEMENTATION ADDRESS CAUSING CONFUSION. PROBABLY A CACHING ISSUE
+   * NEXT TIME EXPERIMENT WITH USING THE SCRIPT BELOW TO PULL THE SLOT DIRECTLY AND VERIFY THERE'S A CHANGE
+   * CALL checkImpl.js JUST IN CASE
+   */
+  console.log('⏳ Waiting for RPC to reflect new implementation...');
+  let newImplAddress = '';
+  const slot = '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc';
+  for (let i = 0; i < 10; i++) {
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    const value = await ethers.provider.getStorage(MEMBER_ROLE_MANAGER_PROXY, slot);
+    newImplAddress = '0x' + value.slice(-40);
+    console.log(`   Attempt ${i + 1}: ${newImplAddress}`);
+    if (newImplAddress.toLowerCase() !== '0xa2eb35c3db09283847def81e3a9cc0f41204fe85') break;
+  }
 
   console.log('✅ Proxy upgraded successfully!');
   console.log('📍 Proxy address (unchanged):', await upgraded.getAddress());
@@ -44,6 +61,9 @@ async function main() {
 
   console.log('\n📝 ACTION REQUIRED — update blockchainAddresses.ts:');
   console.log(`   implementation: '${newImplAddress}',`);
+  console.log(
+    `\n📝 ACTION REQUIRED — verify on network: npx hardhat verify --network sepolia '${newImplAddress}'`
+  );
 }
 
 main()

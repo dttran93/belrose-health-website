@@ -45,7 +45,7 @@ export const PAYMASTER = {
 
 export const MEMBER_ROLE_MANAGER = {
   proxy: '0xC31477f563dC8f7529Ba6AE7E410ABdB84C27d7C',
-  implementation: '0xdE43f36806229CE17A5351E369D0b3acDc694a18',
+  implementation: '0x936cf99beacc5ded69c6630a9d83142ec78332cf',
   deploymentBlock: 10190794,
 } as const;
 

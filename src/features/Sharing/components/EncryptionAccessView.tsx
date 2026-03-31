@@ -13,6 +13,8 @@ import UserSearch from '@/features/Users/components/UserSearch';
 import type { Role } from '@/features/Permissions/services/permissionsService';
 import AccessUserCard from './ui/AccessUserCard';
 import RecordSectionPanel from '@/components/ui/RecordSectionPanel';
+import useAuth from '@/features/Auth/hooks/useAuth';
+import { GuestSharePanel } from '../../GuestAccess/components/GuestSharePanel';
 
 interface WrappedKeyInfo {
   userId: string;
@@ -38,11 +40,13 @@ interface EncryptionAccessViewProps {
 }
 
 export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ record, onBack }) => {
+  const { user } = useAuth();
   const [accessEntries, setAccessEntries] = useState<AccessEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
   const [selectedUserForGrant, setSelectedUserForGrant] = useState<BelroseUserProfile | null>(null);
+  const patientName = user?.displayName || user?.email || 'A Belrose user';
 
   const {
     dialogProps,
@@ -276,6 +280,8 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
 
       {/* Permission Action Dialog - handles preparation, confirmation, and execution */}
       <PermissionActionDialog {...dialogProps} />
+
+      <GuestSharePanel record={record} patientName={patientName} />
     </div>
   );
 };

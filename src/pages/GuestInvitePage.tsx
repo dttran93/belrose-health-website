@@ -25,19 +25,9 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getAuth, signInWithCustomToken } from 'firebase/auth';
-import {
-  getFirestore,
-  collection,
-  query,
-  where,
-  getDocs,
-  updateDoc,
-  doc,
-} from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
 import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
-import { EncryptionService } from '@/features/Encryption/services/encryptionService';
-import { arrayBufferToBase64 } from '@/utils/dataFormattingUtils';
 import { AlertTriangle, Loader2, Lock, UserPlus } from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -67,7 +57,6 @@ const GuestInvitePage: React.FC = () => {
     try {
       // ── Step 1: Read token + private key from URL ──────────────────────────
       const token = searchParams.get('token');
-      // window.location.hash includes the leading '#', strip it
       const privateKeyBase64 = window.location.hash.replace('#', '');
 
       if (!token || !privateKeyBase64) {
@@ -85,30 +74,49 @@ const GuestInvitePage: React.FC = () => {
 
       setStatus('bridging');
 
-      // ── Step 3: Import the RSA private key from the URL fragment ───────────
+      // ── Step 3: Import RSA private key from URL fragment ───────────────────
       const rsaPrivateKey = await SharingKeyManagementService.importPrivateKey(privateKeyBase64);
 
-      // ── Step 4: Generate a throwaway AES master key ────────────────────────
-      // This key is never stored anywhere — it lives only in memory for this
-      // browser session. Its sole job is to satisfy EncryptionKeyManager so
-      // the normal decryption path works.
+      // ── Step 4: Generate throwaway AES master key ──────────────────────────
+      // Never stored anywhere — only satisfies EncryptionGate's session check.
+      // Actual decryption uses the pre-loaded file keys injected below.
       const throwawayMasterKey = await crypto.subtle.generateKey(
         { name: 'AES-GCM', length: 256 },
         true,
         ['encrypt', 'decrypt']
       );
 
-      // ── Step 5: Re-wrap each record's file key ─────────────────────────────
-      // Each wrappedKey doc has the record's AES file key wrapped with the
-      // guest's RSA public key. We:
-      //   a) Unwrap it with the RSA private key → get the raw file key
-      //   b) Re-wrap it with the throwaway master key (AES, same as a normal creator)
-      //   c) Update the Firestore doc so getRecordKey() finds it as isCreator: true
-      //
-      // This means the existing RecordDecryptionService.getRecordKey() takes the
-      // normal "creator" path: decryptKeyWithMasterKey(wrappedKey, masterKey)
+      // ── Step 5: Fetch wrappedKeys and unwrap with RSA ──────────────────────
+      // Nothing is written to Firestore — the RSA-wrapped key is preserved
+      // so every link visit freshly unwraps it. File keys live in memory only.
       const db = getFirestore();
 
+      const inviteSnap = await getDocs(
+        query(
+          collection(db, 'guestInvites'),
+          where('guestUserId', '==', guestUid),
+          where('status', '==', 'pending')
+        )
+      );
+
+      if (inviteSnap.empty) {
+        setStatus('expired');
+        return;
+      }
+
+      // Check expiry — find the most recent invite for this guest
+      const now = new Date();
+      const validInvite = inviteSnap.docs.find(d => {
+        const expiresAt = d.data().expiresAt?.toDate();
+        return expiresAt && expiresAt > now;
+      });
+
+      if (!validInvite) {
+        setStatus('expired');
+        return;
+      }
+
+      // Step 6: Fetch wrappedKeys and unwrap with RSA
       const wrappedKeysSnap = await getDocs(
         query(
           collection(db, 'wrappedKeys'),
@@ -123,59 +131,36 @@ const GuestInvitePage: React.FC = () => {
         return;
       }
 
-      // Track the patient's subjectId so we know where to navigate
       let patientSubjectId: string | null = null;
+      const fileKeys = new Map<string, CryptoKey>();
 
       for (const keyDoc of wrappedKeysSnap.docs) {
         const keyData = keyDoc.data();
-
         try {
-          // a) Unwrap the file key using the RSA private key from the URL
           const fileKey = await SharingKeyManagementService.unwrapKey(
             keyData.wrappedKey,
             rsaPrivateKey
           );
+          fileKeys.set(keyData.recordId, fileKey);
 
-          // b) Re-wrap the file key with the throwaway master key (AES-GCM)
-          const reWrappedKeyBuffer = await EncryptionService.encryptKeyWithMasterKey(
-            fileKey,
-            throwawayMasterKey
-          );
-          const reWrappedKeyBase64 = arrayBufferToBase64(reWrappedKeyBuffer);
-
-          // c) Update the Firestore wrappedKey doc.
-          // We flip isCreator: true so getRecordKey() uses the AES path,
-          // and store the re-wrapped key in place of the RSA-wrapped one.
-          await updateDoc(doc(db, 'wrappedKeys', keyDoc.id), {
-            wrappedKey: reWrappedKeyBase64,
-            isCreator: true,
-            guestBridgedAt: new Date(),
-          });
-
-          // Grab the patient's subjectId from the record for navigation
+          // Grab patientSubjectId for navigation
           if (!patientSubjectId) {
             const recordSnap = await getDocs(
               query(collection(db, 'records'), where('__name__', '==', keyData.recordId))
             );
             if (!recordSnap.empty) {
-              const recordDoc = recordSnap.docs[0];
-              if (!recordDoc) continue;
-              const recordData = recordDoc.data();
-              // subjects[0] is the patient whose profile we want to view
-              patientSubjectId = recordData.subjects?.[0] ?? null;
+              const recordData = recordSnap.docs[0]?.data();
+              patientSubjectId = recordData?.subjects?.[0] ?? null;
 
-              // Fetch the patient's display name for the loading message
               if (patientSubjectId) {
                 const patientSnap = await getDocs(
                   query(collection(db, 'users'), where('__name__', '==', patientSubjectId))
                 );
                 if (!patientSnap.empty) {
-                  const patientDoc = patientSnap.docs[0];
-                  if (!patientDoc) continue;
-                  const p = patientDoc.data();
+                  const p = patientSnap.docs[0]?.data();
                   setPatientName(
-                    p.displayName ||
-                      `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim() ||
+                    p?.displayName ||
+                      `${p?.firstName ?? ''} ${p?.lastName ?? ''}`.trim() ||
                       'your patient'
                   );
                 }
@@ -183,36 +168,35 @@ const GuestInvitePage: React.FC = () => {
             }
           }
         } catch (err) {
-          // Log and continue — partial access is better than none
-          console.error(`⚠️ Failed to bridge key for record ${keyData.recordId}:`, err);
+          console.error(`⚠️ Failed to unwrap key for record ${keyData.recordId}:`, err);
         }
       }
 
-      // ── Step 6: Set the throwaway key as the active session ────────────────
-      // From this point, EncryptionKeyManager.getSessionKey() returns this key,
-      // and all downstream decryption (useUserRecords → RecordDecryptionService)
-      // works exactly as it does for a normal logged-in user.
+      if (fileKeys.size === 0) {
+        setErrorMessage('Failed to decrypt access keys. The link may be invalid.');
+        setStatus('error');
+        return;
+      }
+
+      // ── Step 6: Inject file keys and set session ───────────────────────────
+      // File keys injected into EncryptionKeyManager — RecordDecryptionService
+      // will find them via getGuestFileKey() and bypass the AES path entirely.
+      EncryptionKeyManager.setGuestFileKeys(fileKeys);
       EncryptionKeyManager.setSessionKey(throwawayMasterKey);
       console.log('✅ Guest encryption session established');
 
-      // ── Step 7: Redirect to HealthProfile ─────────────────────────────────
+      // ── Step 7: Redirect ───────────────────────────────────────────────────
       setStatus('redirecting');
 
-      if (patientSubjectId) {
-        // Small delay so the user sees the "redirecting" state briefly
-        setTimeout(() => {
+      setTimeout(() => {
+        if (patientSubjectId) {
           navigate(`/app/health-profile/${patientSubjectId}`);
-        }, 800);
-      } else {
-        // Fallback: we have a session but couldn't determine the patient —
-        // send them to the app root and let them find the records there
-        setTimeout(() => {
-          navigate('/app');
-        }, 800);
-      }
+        } else {
+          navigate('/app/all-records');
+        }
+      }, 800);
     } catch (err: any) {
       console.error('❌ Guest invite error:', err);
-
       if (err.code === 'auth/invalid-custom-token' || err.code === 'auth/custom-token-mismatch') {
         setStatus('expired');
       } else {
@@ -221,8 +205,6 @@ const GuestInvitePage: React.FC = () => {
       }
     }
   };
-
-  // ── Render ─────────────────────────────────────────────────────────────────
 
   if (status === 'expired') {
     return (
@@ -252,7 +234,6 @@ const GuestInvitePage: React.FC = () => {
     );
   }
 
-  // loading / bridging / redirecting
   const statusMessages: Record<string, string> = {
     loading: 'Verifying your access...',
     bridging: 'Preparing secure session...',
@@ -270,7 +251,6 @@ const GuestInvitePage: React.FC = () => {
           <p className="text-xs text-slate-400 mt-1">Your connection is end-to-end encrypted</p>
         </div>
 
-        {/* Subtle sign-up nudge even on the loading screen */}
         {(status === 'bridging' || status === 'redirecting') && (
           <div
             className="mt-6 flex items-center gap-3 bg-slate-50 border border-slate-200
@@ -315,8 +295,7 @@ const StatusCard: React.FC<{
   border: string;
 }> = ({ icon, title, description, bg, border }) => (
   <div
-    className={`${bg} ${border} border rounded-xl p-8 flex flex-col items-center
-                   text-center gap-3`}
+    className={`${bg} ${border} border rounded-xl p-8 flex flex-col items-center text-center gap-3`}
   >
     {icon}
     <h2 className="text-lg font-semibold text-slate-800">{title}</h2>

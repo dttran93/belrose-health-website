@@ -14,6 +14,7 @@ interface AuthState {
   loading: boolean;
 }
 
+// Helper function to ensure the user's Signal key bundle is set up in the background
 async function ensureSignalKeyBundle(userId: string): Promise<void> {
   try {
     const [hasBundle, hasLocalKeys] = await Promise.all([
@@ -35,7 +36,6 @@ async function ensureSignalKeyBundle(userId: string): Promise<void> {
   }
 }
 
-// Define the return type of the useAuth hook, matching AuthContextData
 export const useAuth = (): AuthContextData => {
   // Initialize state with the AuthState interface
   const [authState, setAuthState] = useState<AuthState>({

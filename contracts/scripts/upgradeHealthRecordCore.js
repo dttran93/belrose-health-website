@@ -45,6 +45,9 @@ async function main() {
   console.log('\n📝 ACTION REQUIRED — update blockchainAddresses.ts:');
   console.log(`   implementation: '${newImplAddress}',`);
   console.log('   (proxy address stays the same — no frontend changes needed)');
+  console.log(
+    `\n📝 ACTION REQUIRED — verify on network: npx hardhat verify --network sepolia '${newImplAddress}'`
+  );
 }
 
 main()

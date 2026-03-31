@@ -71,6 +71,7 @@ var sendWaitlistConfirmationEmail_1 = require("./handlers/sendWaitlistConfirmati
 Object.defineProperty(exports, "sendWaitlistConfirmationEmail", { enumerable: true, get: function () { return sendWaitlistConfirmationEmail_1.sendWaitlistConfirmationEmail; } });
 var sendPasswordChangeEmail_1 = require("./handlers/sendPasswordChangeEmail");
 Object.defineProperty(exports, "sendPasswordChangeEmail", { enumerable: true, get: function () { return sendPasswordChangeEmail_1.sendPasswordChangeEmail; } });
+// ==================== GUEST INVITE ====================
 var createGuestInvite_1 = require("./handlers/createGuestInvite");
 Object.defineProperty(exports, "createGuestInvite", { enumerable: true, get: function () { return createGuestInvite_1.createGuestInvite; } });
 // ==================== HEALTH CHECK ====================

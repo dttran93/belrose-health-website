@@ -7,6 +7,26 @@ import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormatting
  * Handles key generation, password wrapping, recovery keys, and session storage
  */
 export class EncryptionKeyManager {
+  // ============= GUEST FILE KEYS (in-memory only, never persisted) ================
+
+  // Populated by GuestInvitePage after RSA unwrapping. Cleared on session clear.
+  private static guestFileKeys: Map<string, CryptoKey> | null = null;
+
+  static setGuestFileKeys(fileKeys: Map<string, CryptoKey>): void {
+    this.guestFileKeys = fileKeys;
+    console.log(`🔑 Guest file keys loaded for ${fileKeys.size} records`);
+  }
+
+  static getGuestFileKey(recordId: string): CryptoKey | undefined {
+    return this.guestFileKeys?.get(recordId);
+  }
+
+  static hasGuestFileKeys(): boolean {
+    return this.guestFileKeys !== null && this.guestFileKeys.size > 0;
+  }
+
+  // ================= USER ENCRYPTION SESSION MANAGEMENT =================
+
   private static sessionKey: CryptoKey | null = null;
   private static lastActivityTime: number = Date.now();
   private static SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
@@ -288,6 +308,7 @@ export class EncryptionKeyManager {
   static clearSession(): void {
     this.sessionKey = null;
     this.lastActivityTime = 0;
+    this.guestFileKeys = null;
 
     // Clear from sessionStorage
     sessionStorage.removeItem('encryptionKey');

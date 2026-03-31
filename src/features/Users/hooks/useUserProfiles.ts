@@ -1,7 +1,25 @@
-// src/features/ViewEditRecord/hooks/useUserProfiles.ts
+// src/features/Users/hooks/useUserProfiles.ts
 
 /**
- * useUserProfiles.ts - Custom hook to manage loading and caching of user profiles for record subjects
+ * useUserProfiles - Loads and caches display profiles for a list of Belrose user IDs.
+ *
+ * Solves a different problem than useAuth: while useAuth tells you WHO the logged-in
+ * user is, this hook answers "given these other user IDs, what are their names/profiles?"
+ *
+ * Primary use case: health records store subjects as raw user IDs (e.g. ["uid_abc", "uid_xyz"]).
+ * This hook fetches their profiles so the UI can show human-readable names instead.
+ *
+ * @param subjectIds - Array of Belrose user IDs to load profiles for.
+ *
+ * @returns
+ *  - profiles   - Map of userId → BelroseUserProfile for direct access
+ *  - loading    - True while profiles are being fetched
+ *  - getDisplayName(id) - Helper that resolves a userId to a display name,
+ *                         falling back to firstName+lastName, then the raw ID
+ *
+ * @example
+ *  const { loading, getDisplayName } = useUserProfiles(uniqueSubjectIds);
+ *  // "uid_abc123" → "Sarah Johnson"
  */
 
 import { useState, useEffect } from 'react';

@@ -40,6 +40,7 @@ const admin = __importStar(require("firebase-admin"));
 const params_1 = require("firebase-functions/params");
 const crypto = __importStar(require("crypto"));
 const resend_1 = require("resend");
+const ethers_1 = require("ethers");
 const resendKey = (0, params_1.defineSecret)('RESEND_API_KEY');
 // ==================== HELPERS ====================
 /**
@@ -71,14 +72,14 @@ exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async 
         throw new https_1.HttpsError('unauthenticated', 'You must be logged in to share records.');
     }
     const patientUid = request.auth.uid;
-    const { doctorEmail, recordIds, patientName } = request.data;
+    const { guestEmail, recordIds, patientName } = request.data;
     // ── Input validation ─────────────────────────────────────────────────────
-    if (!doctorEmail || !recordIds?.length || !patientName) {
-        throw new https_1.HttpsError('invalid-argument', 'doctorEmail, recordIds, and patientName are required.');
+    if (!guestEmail || !recordIds?.length || !patientName) {
+        throw new https_1.HttpsError('invalid-argument', 'guestEmail, recordIds, and patientName are required.');
     }
     // Basic email format check
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(doctorEmail)) {
+    if (!emailRegex.test(guestEmail)) {
         throw new https_1.HttpsError('invalid-argument', 'Invalid email address.');
     }
     const db = admin.firestore();
@@ -104,9 +105,9 @@ exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async 
     let guestUid;
     let isNewGuest = false;
     try {
-        const existingUser = await admin.auth().getUserByEmail(doctorEmail);
+        const existingUser = await admin.auth().getUserByEmail(guestEmail);
         guestUid = existingUser.uid;
-        console.log(`ℹ️  Reusing existing guest account for ${doctorEmail}: ${guestUid}`);
+        console.log(`ℹ️  Reusing existing guest account for ${guestEmail}: ${guestUid}`);
     }
     catch (err) {
         // 'auth/user-not-found' is expected — create a new guest account
@@ -116,10 +117,10 @@ exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async 
         isNewGuest = true;
         // ── Create Firebase Auth account ──────────────────────────────────────
         const newUser = await admin.auth().createUser({
-            email: doctorEmail,
+            email: guestEmail,
             emailVerified: true, // clicking the link confirms the address is valid
             // No password — this account can only be accessed via custom token
-            displayName: doctorEmail,
+            displayName: guestEmail,
         });
         guestUid = newUser.uid;
         console.log(`✅ Created guest Firebase Auth account: ${guestUid}`);
@@ -127,22 +128,36 @@ exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async 
     // ── Generate RSA key pair for the guest ──────────────────────────────────
     // We always regenerate on each invite so each invite link has a fresh key.
     const { publicKeyBase64, privateKeyBase64 } = generateRsaKeyPair();
+    // Derive guestIdHash and guestWallet from UID for blockchain transactions
+    const guestIdHash = ethers_1.ethers.keccak256(ethers_1.ethers.toUtf8Bytes(guestUid));
+    const guestWallet = ethers_1.ethers.getAddress('0x' + ethers_1.ethers.keccak256(ethers_1.ethers.toUtf8Bytes(`guest:${guestUid}`)).slice(-40));
     // ── Write/update guest user profile in Firestore ─────────────────────────
     // This is the minimal profile that sharingService.grantEncryptionAccess
     // needs — specifically encryption.publicKey.
     const guestProfile = {
         uid: guestUid,
-        email: doctorEmail,
-        displayName: doctorEmail,
+        email: guestEmail,
+        displayName: guestEmail,
         emailVerified: true,
         isGuest: true,
-        isClaimed: false,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         encryption: {
             publicKey: publicKeyBase64,
-            // We do NOT store the private key on the server.
-            // It travels only in the invite URL fragment.
+        },
+        onChainIdentity: {
+            userIdHash: guestIdHash,
+            status: 'Active',
+            linkedWallets: [
+                {
+                    address: guestWallet,
+                    type: 'eoa', // placeholder EOA, never holds funds
+                    txHash: '', // no tx — registered via grantGuestAccess
+                    blockNumber: 0,
+                    linkedAt: new Date(),
+                    isWalletActive: true,
+                },
+            ],
         },
     };
     await db.collection('users').doc(guestUid).set(guestProfile, { merge: true });
@@ -150,17 +165,27 @@ exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async 
     // ── Create a guestInvites document ───────────────────────────────────────
     // This is the server-side record of the invite. Used to validate the
     // invite link and to clean up expired invites later.
+    const durationSeconds = request.data.durationSeconds ?? 604800;
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7-day expiry
+    expiresAt.setSeconds(expiresAt.getSeconds() + durationSeconds);
+    const durationLabel = durationSeconds <= 86400
+        ? '1 day'
+        : durationSeconds <= 259200
+            ? '3 days'
+            : durationSeconds <= 604800
+                ? '7 days'
+                : '30 days';
     await db.collection('guestInvites').add({
         guestUserId: guestUid,
         invitedBy: patientUid,
-        doctorEmail,
+        guestEmail,
         recordIds,
         status: 'pending', // pending | accepted | revoked | expired
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
         isNewGuest,
+        guestIdHash,
+        guestWallet,
     });
     console.log(`✅ guestInvites document created`);
     // ── Mint a Firebase Custom Token ─────────────────────────────────────────
@@ -177,17 +202,17 @@ exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async 
     // intercepts the URL in transit, the key isn't in the logged path.
     //
     // URL format: /invite?token=<customToken>#<privateKeyBase64>
-    const appUrl = 'https://belrosehealth.com/app';
+    const appUrl = 'https://belrosehealth.com';
     const inviteUrl = `${appUrl}/invite?token=${customToken}#${privateKeyBase64}`;
     const resend = new resend_1.Resend(resendKey.value());
     try {
         await resend.emails.send({
-            to: doctorEmail,
+            to: guestEmail,
             from: 'Belrose Health <noreply@belrosehealth.com>',
             subject: `${patientName} has shared their health records with you`,
-            html: buildInviteEmail(patientName, inviteUrl),
+            html: buildInviteEmail(patientName, inviteUrl, durationLabel),
         });
-        console.log(`✅ Invite email sent to ${doctorEmail}`);
+        console.log(`✅ Invite email sent to ${guestEmail}`);
     }
     catch (emailError) {
         // Log but don't fail the whole function — invite doc and token are already created
@@ -204,7 +229,7 @@ exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async 
     };
 });
 // ==================== EMAIL TEMPLATE ====================
-function buildInviteEmail(patientName, inviteUrl) {
+function buildInviteEmail(patientName, inviteUrl, durationLabel) {
     const year = new Date().getFullYear();
     const marketingUrl = 'https://www.belrosehealth.com';
     return `
@@ -232,7 +257,7 @@ function buildInviteEmail(patientName, inviteUrl) {
     .pillars { margin:28px 0; }
     .pillars h3 { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#94a3b8; margin:0 0 16px; }
     .pillar { display:flex; align-items:flex-start; gap:14px; margin-bottom:16px; }
-    .pillar-icon { flex-shrink:0; width:36px; height:36px; background:#f1f5f9; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; }
+    .pillar-icon { flex-shrink:0; width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; }
     .pillar-text h4 { font-size:14px; font-weight:600; color:#0f172a; margin:0 0 2px; }
     .pillar-text p { font-size:13px; color:#64748b; margin:0; line-height:1.5; }
     .divider { height:1px; background:#f1f5f9; margin:24px 0; }
@@ -252,9 +277,9 @@ function buildInviteEmail(patientName, inviteUrl) {
   <div class="body">
     <p>Hi there,</p>
       <p>
-      Your patient, <strong>${patientName}</strong>, has shared their health records
+      <strong>${patientName}</strong> has shared their health records
       with you via Belrose Health. Click below to view them.
-      This link expires in <strong>7 days</strong>.
+      This link expires in <strong>${durationLabel}</strong>.
     </p>
 
     <div class="cta-block">
@@ -271,7 +296,7 @@ function buildInviteEmail(patientName, inviteUrl) {
     <div class="mission-block">
       <p><strong>What is Belrose Health?</strong></p>
       <p>
-        Belrose Health enables and incentivizes patients to collect records
+        Belrose Health enables and incentivizes people to collect records
         from providers and standardize them into a single verified record.
       </p>
       <p>
@@ -285,7 +310,7 @@ function buildInviteEmail(patientName, inviteUrl) {
       <div class="pillar">
         <div class="pillar-icon">🗂️</div>
         <div class="pillar-text">
-          <h4>Complete patient history</h4>
+          <h4>Complete health history</h4>
           <p>Records are compiled by the patient from their prior providers, standardised, and ready to review.</p>
         </div>
       </div>

@@ -366,6 +366,62 @@ const MEMBER_ROLE_MANAGER_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
+
+  // ============================================================================
+  // GUEST ACCESS - WRITE FUNCTIONS
+  // ============================================================================
+  {
+    inputs: [
+      { internalType: 'string[]', name: 'recordIds', type: 'string[]' },
+      { internalType: 'address', name: 'guestWallet', type: 'address' },
+      { internalType: 'bytes32', name: 'guestIdHash', type: 'bytes32' },
+      { internalType: 'bytes32', name: 'guestEmailHash', type: 'bytes32' },
+      { internalType: 'uint256', name: 'durationSeconds', type: 'uint256' },
+    ],
+    name: 'grantGuestAccess',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'string[]', name: 'recordIds', type: 'string[]' },
+      { internalType: 'bytes32', name: 'guestIdHash', type: 'bytes32' },
+    ],
+    name: 'revokeGuestAccess',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+
+  // ============================================================================
+  // GUEST ACCESS - VIEW FUNCTIONS
+  // ============================================================================
+  {
+    inputs: [
+      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'guestIdHash', type: 'bytes32' },
+    ],
+    name: 'hasActiveGuestAccess',
+    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'guestIdHash', type: 'bytes32' },
+    ],
+    name: 'getGuestAccess',
+    outputs: [
+      { internalType: 'uint256', name: 'grantedAt', type: 'uint256' },
+      { internalType: 'uint256', name: 'expiresAt', type: 'uint256' },
+      { internalType: 'bytes32', name: 'grantedByIdHash', type: 'bytes32' },
+      { internalType: 'bytes32', name: 'guestEmailHash', type: 'bytes32' },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
 ];
 
 // ============================================================================
@@ -384,6 +440,8 @@ export enum MemberStatus {
   Inactive = 1,
   Active = 2,
   Verified = 3,
+  VerifiedProvider = 4,
+  Guest = 5,
 }
 
 export type RoleType = 'owner' | 'administrator' | 'viewer';
@@ -431,6 +489,14 @@ export type TrusteeStatusName = 'None' | 'Pending' | 'Active' | 'Revoked';
 export interface TrusteeRelationship {
   status: TrusteeStatusName;
   level: TrusteeLevelName;
+}
+
+export interface GuestAccessInfo {
+  grantedAt: Date;
+  expiresAt: Date;
+  grantedByIdHash: string;
+  guestEmailHash: string;
+  isExpired: boolean;
 }
 
 // ============================================================================
@@ -1054,6 +1120,100 @@ export class BlockchainRoleManagerService {
     } catch (error) {
       console.error('Error getting trustee relationship:', error);
       return { status: 'None', level: 'Observer' };
+    }
+  }
+
+  // ==========================================================================
+  // GUEST ACCESS - WRITE FUNCTIONS
+  // ==========================================================================
+
+  /**
+   * Grant a guest temporary viewer access to one or more records.
+   * @param recordIds One or more record IDs
+   * @param guestWallet Deterministic placeholder address derived from guest UID
+   * @param guestIdHash keccak256 of guest Firebase UID
+   * @param guestEmailHash keccak256 of guest email (lowercased)
+   * @param durationSeconds How long access lasts (default 7 days = 604800)
+   */
+  static async grantGuestAccess(
+    recordIds: string[],
+    guestWallet: string,
+    guestIdHash: string,
+    guestEmailHash: string,
+    durationSeconds: number = 604800
+  ): Promise<TransactionResult> {
+    console.log('🔗 Granting guest access on blockchain...', { recordIds, guestWallet });
+    const result = await this.executeWrite('grantGuestAccess', [
+      recordIds,
+      guestWallet,
+      guestIdHash,
+      guestEmailHash,
+      durationSeconds,
+    ]);
+    console.log('✅ Guest access granted:', result.txHash);
+    return result;
+  }
+
+  /**
+   * Revoke a guest's access to one or more records.
+   * Can be called by the granter or any owner/admin of the record.
+   */
+  static async revokeGuestAccess(
+    recordIds: string[],
+    guestIdHash: string
+  ): Promise<TransactionResult> {
+    console.log('🔗 Revoking guest access on blockchain...', { recordIds, guestIdHash });
+    const result = await this.executeWrite('revokeGuestAccess', [recordIds, guestIdHash]);
+    console.log('✅ Guest access revoked:', result.txHash);
+    return result;
+  }
+
+  // ==========================================================================
+  // GUEST ACCESS - VIEW FUNCTIONS
+  // ==========================================================================
+
+  /**
+   * Check if a guest has active non-expired access to a record
+   */
+  static async hasActiveGuestAccess(recordId: string, guestIdHash: string): Promise<boolean> {
+    try {
+      const contract = this.getReadOnlyContract();
+      const fn = contract.getFunction('hasActiveGuestAccess');
+      return await fn(recordId, guestIdHash);
+    } catch (error) {
+      console.error('Error checking guest access:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get full guest access details for a record
+   */
+  static async getGuestAccess(
+    recordId: string,
+    guestIdHash: string
+  ): Promise<GuestAccessInfo | null> {
+    try {
+      const contract = this.getReadOnlyContract();
+      const fn = contract.getFunction('getGuestAccess');
+      const result = await fn(recordId, guestIdHash);
+
+      const grantedAt = new Date(Number(result[0]) * 1000);
+      const expiresAt = new Date(Number(result[1]) * 1000);
+
+      // grantedAt of 0 means no access was ever granted
+      if (Number(result[0]) === 0) return null;
+
+      return {
+        grantedAt,
+        expiresAt,
+        grantedByIdHash: result[2],
+        guestEmailHash: result[3],
+        isExpired: new Date() > expiresAt,
+      };
+    } catch (error) {
+      console.error('Error getting guest access:', error);
+      return null;
     }
   }
 
