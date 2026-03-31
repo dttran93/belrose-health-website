@@ -697,6 +697,24 @@ service cloud.firestore {
     }
 
   // ============================================
+  // GUEST INVITES
+  // ============================================
+
+  match /guestInvites/{inviteId} {
+    // Guest can read their own invites (to validate expiry on link click)
+    allow read: if request.auth != null && (
+      resource.data.guestUserId == request.auth.uid ||
+      resource.data.invitedBy == request.auth.uid
+    );
+
+    // Only server can create/update invites
+    allow create, update: if isServerWrite();
+
+    // Not deletable — permanent audit trail
+    allow delete: if false;
+  }
+
+  // ============================================
   // MESSAGING
   // ============================================
   

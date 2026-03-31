@@ -21,6 +21,7 @@ interface WrappedKeyInfo {
   recordId: string;
   isActive: boolean;
   isCreator: boolean;
+  isGuest: boolean;
   createdAt: Date;
   revokedAt?: Date;
   reactivatedAt?: Date;

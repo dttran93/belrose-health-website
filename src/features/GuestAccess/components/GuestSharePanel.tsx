@@ -2,24 +2,24 @@
 
 import React, { useState } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { getUserProfile } from '@/features/Users/services/userProfileService';
 import { FileObject } from '@/types/core';
-import { Button } from '@/components/ui/Button';
-import { Send, CheckCircle, AlertTriangle, Stethoscope } from 'lucide-react';
+import { Stethoscope } from 'lucide-react';
 import { ethers } from 'ethers';
 import { getAuth } from 'firebase/auth';
 import { BlockchainRoleManagerService } from '@/features/Permissions/services/blockchainRoleManagerService';
 import { arrayUnion, doc, getFirestore, updateDoc } from 'firebase/firestore';
-import { SharingService } from '../../Sharing/services/sharingService';
+import { SharingService } from '@/features/Sharing/services/sharingService';
+import {
+  PermissionActionDialog,
+  DialogPhase,
+} from '@/features/Permissions/component/ui/PermissionActionDialog';
 
 interface GuestSharePanelProps {
   record: FileObject;
   patientName: string;
 }
 
-type PanelState = 'idle' | 'loading' | 'success' | 'error';
-
-type DurationOption = (typeof DURATION_OPTIONS)[number];
+type DurationOption = { label: string; seconds: number };
 
 const DURATION_OPTIONS = [
   { label: '1 day', seconds: 86400 },
@@ -28,11 +28,10 @@ const DURATION_OPTIONS = [
   { label: '30 days', seconds: 2592000 },
 ] as const;
 
-const DEFAULT_DURATION = DURATION_OPTIONS[2]; // 7 days
+const DEFAULT_DURATION = DURATION_OPTIONS[2]; // 7 days is default
 
 function deriveGuestWallet(guestUid: string): string {
   const hash = ethers.keccak256(ethers.toUtf8Bytes(`guest:${guestUid}`));
-  // keccak256 returns 32 bytes — take the last 20 bytes as an address
   return ethers.getAddress('0x' + hash.slice(-40));
 }
 
@@ -42,15 +41,31 @@ function hashEmail(email: string): string {
 }
 
 export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({ record, patientName }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [phase, setPhase] = useState<DialogPhase>('confirming');
+  const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [duration, setDuration] = useState<DurationOption>(DEFAULT_DURATION);
-  const [state, setState] = useState<PanelState>('idle');
-  const [errorMsg, setErrorMsg] = useState('');
 
-  const handleSend = async () => {
+  const handleOpen = () => {
+    setEmail('');
+    setDuration(DEFAULT_DURATION);
+    setError(null);
+    setPhase('confirming');
+    setIsOpen(true);
+  };
+
+  const handleClose = () => {
+    setIsOpen(false);
+    setEmail('');
+    setError(null);
+    setPhase('confirming');
+  };
+
+  const handleConfirm = async () => {
     if (!email) return;
-    setState('loading');
-    setErrorMsg('');
+    setPhase('executing');
+    setError(null);
 
     try {
       const auth = getAuth();
@@ -92,10 +107,10 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({ record, patien
       // ── Step 3: Encryption access ─────────────────────────────────────────
       // Wraps the record's AES file key with the guest's RSA public key.
       // This is what allows GuestInvitePage to decrypt records on arrival.
-      const guestProfile = await getUserProfile(guestUid);
-      if (!guestProfile) throw new Error('Guest profile not found after creation.');
 
-      await SharingService.grantEncryptionAccess(record.id, guestUid, currentUser.uid);
+      await SharingService.grantEncryptionAccess(record.id, guestUid, currentUser.uid, {
+        isGuest: true,
+      });
       console.log('✅ Encryption access granted');
 
       // ── Step 4: Firestore viewers array ───────────────────────────────────
@@ -107,83 +122,51 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({ record, patien
       });
       console.log('✅ Added to Firestore viewers array');
 
-      setState('success');
-      setEmail('');
+      handleClose();
     } catch (err: any) {
       console.error('❌ Guest share failed:', err);
-      setErrorMsg(err.message || 'Failed to send invite. Please try again.');
-      setState('error');
+      setError(err.message || 'Failed to send invite. Please try again.');
+      setPhase('error');
     }
   };
 
   return (
-    <div className="mt-6 border border-dashed border-complement-4 rounded-lg p-4 bg-complement-4/20">
-      <div className="flex items-center gap-2 mb-3">
-        <Stethoscope className="w-4 h-4 text-foreground" />
-        <h4 className="text-sm font-semibold text-foreground">Share via Email</h4>
-      </div>
-
-      <p className="text-xs text-foreground mb-4">
-        They don't need a Belrose account. We'll email them a secure link.
-      </p>
-
-      {state === 'success' ? (
-        <div className="flex items-center gap-2 text-green-700 text-sm">
-          <CheckCircle className="w-4 h-4" />
-          Invite sent! The guest will receive an email with a secure link valid for {duration.label}
-          .
+    <>
+      {/* Trigger button */}
+      <button
+        onClick={handleOpen}
+        className="mt-4 w-full flex items-center gap-3 border border-dashed border-complement-4
+                   rounded-lg p-4 bg-complement-4/10 hover:bg-complement-4/20 transition-colors text-left"
+      >
+        <Stethoscope className="w-4 h-4 text-foreground shrink-0" />
+        <div>
+          <p className="text-sm font-semibold text-foreground">Share via Email</p>
+          <p className="text-xs text-foreground/60">
+            No Belrose account needed — sends a secure time-limited link
+          </p>
         </div>
-      ) : (
-        <div className="space-y-2">
-          {/* Email + Send row */}
-          <div className="flex gap-2">
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="doctor@clinic.com"
-              className="flex-1 text-sm border border-complement-4 rounded-lg px-3 py-2 
-                       bg-white focus:outline-none focus:ring-2 focus:ring-complement-4 focus:border-transparent"
-              onKeyDown={e => e.key === 'Enter' && handleSend()}
-            />
-            <Button
-              onClick={handleSend}
-              disabled={!email || state === 'loading'}
-              className="shrink-0"
-            >
-              <Send className="w-4 h-4 mr-1" />
-              {state === 'loading' ? 'Sending...' : 'Send'}
-            </Button>
-          </div>
+      </button>
 
-          {/* Duration selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-foreground/60">Link expires in:</span>
-            <div className="flex gap-1">
-              {DURATION_OPTIONS.map(option => (
-                <button
-                  key={option.seconds}
-                  onClick={() => setDuration(option)}
-                  className={`text-xs px-2 py-1 rounded-md border transition-colors ${
-                    duration.seconds === option.seconds
-                      ? 'bg-complement-4 border-complement-4 text-white font-medium'
-                      : 'border-complement-4/40 text-foreground/60 hover:border-complement-4 hover:text-foreground'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {state === 'error' && (
-        <div className="flex items-center gap-2 mt-2 text-red-600 text-xs">
-          <AlertTriangle className="w-3 h-3" />
-          {errorMsg}
-        </div>
-      )}
-    </div>
+      {/* Dialog */}
+      <PermissionActionDialog
+        isOpen={isOpen}
+        phase={phase}
+        operationType="guest-invite"
+        role="viewer"
+        user={null}
+        error={error}
+        onClose={handleClose}
+        onConfirmGrant={() => {}}
+        onConfirmRevoke={() => {}}
+        onConfirmGuestInvite={handleConfirm}
+        guestInviteProps={{
+          email,
+          setEmail,
+          duration,
+          setDuration,
+          durationOptions: DURATION_OPTIONS,
+        }}
+      />
+    </>
   );
 };

@@ -25,6 +25,7 @@ const AccessUserCard: React.FC<AccessUserCardProps> = ({
   const renderBadges = () => {
     const isSubject = record.subjects?.includes(entry.userId);
     const isCreator = entry.wrappedKey?.isCreator;
+    const isGuest = entry.wrappedKey?.isGuest;
 
     // Role Mapping
     const roleConfigs = {
@@ -68,6 +69,7 @@ const AccessUserCard: React.FC<AccessUserCardProps> = ({
     return (
       <div className="flex flex-wrap items-center gap-2">
         {isSubject && <UserBadge text="Subject" color="pink" />}
+        {isGuest && <UserBadge text="Guest" color="pink" />}
         {isCreator && <UserBadge text="Creator" color="purple" />}
         <UserBadge text={role.text} color={role.color as any} />
         <UserBadge

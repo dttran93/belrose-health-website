@@ -1,7 +1,16 @@
 // src/features/Permissions/components/PermissionActionDialog.tsx
 
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
-import { Shield, UserPlus, Loader2, XCircle, ShieldCheck, Crown, Key } from 'lucide-react';
+import {
+  Shield,
+  UserPlus,
+  Loader2,
+  XCircle,
+  ShieldCheck,
+  Crown,
+  Key,
+  Stethoscope,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { BelroseUserProfile } from '@/types/core';
 import { Role } from '@/features/Permissions/services/permissionsService';
@@ -14,7 +23,7 @@ import NetworkPreparingContent from '@/features/BlockchainWallet/components/Netw
 // ============================================================================
 
 export type DialogPhase = 'idle' | 'preparing' | 'confirming' | 'executing' | 'error';
-export type OperationType = 'grant' | 'revoke';
+export type OperationType = 'grant' | 'revoke' | 'guest-invite';
 export type RevokeAction = 'full-revoke' | 'demote-admin' | 'demote-viewer';
 export type GrantVariant = 'confirm' | 'select-role';
 
@@ -30,6 +39,14 @@ interface PermissionActionDialogProps {
   onClose: () => void;
   onConfirmGrant: (role?: Role) => void;
   onConfirmRevoke: (action: RevokeAction) => void;
+  onConfirmGuestInvite?: () => void;
+  guestInviteProps?: {
+    email: string;
+    setEmail: (email: string) => void;
+    duration: DurationOption;
+    setDuration: (duration: DurationOption) => void;
+    durationOptions: readonly DurationOption[];
+  };
 }
 
 // ============================================================================
@@ -94,6 +111,8 @@ export const PermissionActionDialog: React.FC<PermissionActionDialogProps> = ({
   onClose,
   onConfirmGrant,
   onConfirmRevoke,
+  onConfirmGuestInvite,
+  guestInviteProps,
 }) => {
   // Don't render if closed or no user
   if (!isOpen) return null;
@@ -140,6 +159,13 @@ export const PermissionActionDialog: React.FC<PermissionActionDialogProps> = ({
               onClose={onClose}
             />
           )}
+          {phase === 'confirming' && operationType === 'guest-invite' && guestInviteProps && (
+            <GuestInviteContent
+              {...guestInviteProps}
+              onConfirm={onConfirmGuestInvite}
+              onClose={onClose}
+            />
+          )}
         </AlertDialog.Content>
       </AlertDialog.Portal>
     </AlertDialog.Root>
@@ -154,10 +180,16 @@ const ExecutingContent: React.FC<{ operationType: OperationType }> = ({ operatio
   <div className="flex flex-col items-center gap-4 py-4">
     <Loader2 className="w-10 h-10 text-green-500 animate-spin" />
     <AlertDialog.Title className="text-lg font-bold text-center">
-      {operationType === 'grant' ? 'Granting Access' : 'Updating Access'}
+      {operationType === 'guest-invite'
+        ? 'Sending Invite'
+        : operationType === 'grant'
+          ? 'Granting Access'
+          : 'Updating Access'}
     </AlertDialog.Title>
     <AlertDialog.Description className="text-sm text-gray-600 text-center">
-      Writing to network and updating encryption keys...
+      {operationType === 'guest-invite'
+        ? 'Setting up guest access and sending email...'
+        : 'Writing to network and updating encryption keys...'}
     </AlertDialog.Description>
   </div>
 );
@@ -416,5 +448,84 @@ const ConfirmRevokeContent: React.FC<ConfirmRevokeContentProps> = ({
     </>
   );
 };
+
+// ============================================================================
+// GUEST INVITE CONTENT
+// ============================================================================
+
+type DurationOption = { label: string; seconds: number };
+
+interface GuestInviteContentProps {
+  email: string;
+  setEmail: (email: string) => void;
+  duration: DurationOption;
+  setDuration: (duration: DurationOption) => void;
+  durationOptions: readonly DurationOption[];
+  onConfirm: (() => void) | undefined;
+  onClose: () => void;
+}
+
+const GuestInviteContent: React.FC<GuestInviteContentProps> = ({
+  email,
+  setEmail,
+  duration,
+  setDuration,
+  durationOptions,
+  onConfirm,
+  onClose,
+}) => (
+  <>
+    <AlertDialog.Title className="text-lg font-bold flex items-center gap-2">
+      <Stethoscope className="w-5 h-5 text-complement-4" />
+      Share via Email
+    </AlertDialog.Title>
+
+    <AlertDialog.Description className="mt-3 text-sm text-gray-600">
+      Share your Belrose record with guests. We'll email them a secure link to view this record.
+    </AlertDialog.Description>
+
+    <div className="my-4 space-y-3">
+      <input
+        type="email"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        placeholder="doctor@clinic.com"
+        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2
+                   bg-white focus:outline-none focus:ring-2 focus:ring-complement-4 focus:border-transparent"
+        onKeyDown={e => e.key === 'Enter' && email && onConfirm?.()}
+      />
+
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-gray-500">Link expires in:</span>
+        <div className="flex gap-1">
+          {durationOptions.map(option => (
+            <button
+              key={option.seconds}
+              onClick={() => setDuration(option)}
+              className={`text-xs px-2 py-1 rounded-md border transition-colors ${
+                duration.seconds === option.seconds
+                  ? 'bg-complement-4 border-complement-4 text-white font-medium'
+                  : 'border-gray-200 text-gray-500 hover:border-gray-400'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    <div className="flex gap-3">
+      <AlertDialog.Cancel asChild>
+        <Button variant="outline" className="flex-1" onClick={onClose}>
+          Cancel
+        </Button>
+      </AlertDialog.Cancel>
+      <Button onClick={onConfirm} disabled={!email} className="flex-1">
+        Send Invite
+      </Button>
+    </div>
+  </>
+);
 
 export default PermissionActionDialog;
