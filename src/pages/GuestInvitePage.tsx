@@ -4,7 +4,7 @@
  * GuestInvitePage
  *
  * Handles the invite link doctors receive when a patient shares records with them.
- * URL format: /invite?token=<customToken>#<privateKeyBase64>
+ * URL format: /invite?code=<inviteCode>#<privateKeyBase64>
  *
  * The key challenge: HealthProfile (and all its hooks) decrypt records via
  * EncryptionKeyManager.getSessionKey(), which expects a master AES key in memory.
@@ -12,13 +12,14 @@
  * handing off to the normal HealthProfile view.
  *
  * Bridge approach:
- *   1. Sign in via custom token
- *   2. Import RSA private key from URL fragment
- *   3. Generate a throwaway AES master key (lives only in this browser session)
- *   4. For each wrappedKey doc: unwrap file key with RSA, re-wrap with throwaway master key,
- *      update wrappedKeys doc so getRecordKey() finds it as isCreator: true
- *   5. Set the throwaway master key as the session key
- *   6. Redirect to /app/health-profile/<patientSubjectId>
+ *   1. Read invite code + RSA private key from URL
+ *   2. Call redeemGuestInvite Cloud Function — validates expiry, mints fresh custom token
+ *   3. Sign in with fresh custom token
+ *   4. Import RSA private key from URL fragment
+ *   5. Generate throwaway AES master key (satisfies EncryptionGate session check only)
+ *   6. Fetch wrappedKeys, unwrap each with RSA private key → file keys stored in memory
+ *   7. Inject file keys into EncryptionKeyManager so RecordDecryptionService bypasses AES path
+ *   8. Redirect to /app/health-profile/<patientSubjectId>
  *      → HealthProfile loads normally, zero changes to existing hooks
  */
 
@@ -29,6 +30,7 @@ import { getFirestore, collection, query, where, getDocs } from 'firebase/firest
 import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { AlertTriangle, Loader2, Lock, UserPlus } from 'lucide-react';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,28 +58,52 @@ const GuestInvitePage: React.FC = () => {
   const initInvite = async () => {
     try {
       // ── Step 1: Read token + private key from URL ──────────────────────────
-      const token = searchParams.get('token');
+      const code = searchParams.get('code');
       const privateKeyBase64 = window.location.hash.replace('#', '');
 
-      if (!token || !privateKeyBase64) {
+      if (!code || !privateKeyBase64) {
         setStatus('expired');
         return;
       }
 
-      // ── Step 2: Sign in with the Firebase custom token ─────────────────────
-      // After this, auth.currentUser is the guest UID — Firestore security
-      // rules will allow reads on their wrappedKeys documents.
+      // ── Step 2: Redeem invite code for a fresh custom token ────────────────────
+      // The invite code is valid for the full duration (1 day/7 days/30 days).
+      // We mint a fresh custom token on click so the URL never expires early.
+      const functions = getFunctions();
+      const redeemFn = httpsCallable(functions, 'redeemGuestInvite');
+
+      let customToken: string;
+      let guestUid: string;
+
+      try {
+        const redeemResult = (await redeemFn({ inviteCode: code })) as {
+          data: { customToken: string; guestUid: string };
+        };
+        customToken = redeemResult.data.customToken;
+        guestUid = redeemResult.data.guestUid;
+      } catch (err: any) {
+        console.error('❌ Failed to redeem invite:', err);
+        if (err.code === 'functions/failed-precondition' || err.code === 'functions/not-found') {
+          setErrorMessage(err.message);
+          setStatus('expired');
+        } else {
+          setErrorMessage(err.message || 'Something went wrong.');
+          setStatus('error');
+        }
+        return;
+      }
+
+      // Step 3: Sign in with fresh custom token
       const auth = getAuth();
-      await signInWithCustomToken(auth, token);
-      const guestUid = auth.currentUser!.uid;
+      await signInWithCustomToken(auth, customToken);
       console.log('✅ Signed in as guest:', guestUid);
 
       setStatus('bridging');
 
-      // ── Step 3: Import RSA private key from URL fragment ───────────────────
+      // Step 4: Import RSA private key from URL fragment
       const rsaPrivateKey = await SharingKeyManagementService.importPrivateKey(privateKeyBase64);
 
-      // ── Step 4: Generate throwaway AES master key ──────────────────────────
+      // Step 5: Generate throwaway AES master key
       // Never stored anywhere — only satisfies EncryptionGate's session check.
       // Actual decryption uses the pre-loaded file keys injected below.
       const throwawayMasterKey = await crypto.subtle.generateKey(
@@ -86,37 +112,10 @@ const GuestInvitePage: React.FC = () => {
         ['encrypt', 'decrypt']
       );
 
-      // ── Step 5: Fetch wrappedKeys and unwrap with RSA ──────────────────────
+      // Step 6: Fetch wrappedKeys and unwrap with RSA
       // Nothing is written to Firestore — the RSA-wrapped key is preserved
       // so every link visit freshly unwraps it. File keys live in memory only.
       const db = getFirestore();
-
-      const inviteSnap = await getDocs(
-        query(
-          collection(db, 'guestInvites'),
-          where('guestUserId', '==', guestUid),
-          where('status', '==', 'pending')
-        )
-      );
-
-      if (inviteSnap.empty) {
-        setStatus('expired');
-        return;
-      }
-
-      // Check expiry — find the most recent invite for this guest
-      const now = new Date();
-      const validInvite = inviteSnap.docs.find(d => {
-        const expiresAt = d.data().expiresAt?.toDate();
-        return expiresAt && expiresAt > now;
-      });
-
-      if (!validInvite) {
-        setStatus('expired');
-        return;
-      }
-
-      // Step 6: Fetch wrappedKeys and unwrap with RSA
       const wrappedKeysSnap = await getDocs(
         query(
           collection(db, 'wrappedKeys'),
@@ -212,7 +211,7 @@ const GuestInvitePage: React.FC = () => {
         <StatusCard
           icon={<Lock className="w-8 h-8 text-amber-500" />}
           title="This link has expired"
-          description="Invite links are valid for 7 days. Ask your patient to send a new invite."
+          description={errorMessage || 'Ask your patient to send a new one.'}
           bg="bg-amber-50"
           border="border-amber-200"
         />

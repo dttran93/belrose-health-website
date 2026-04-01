@@ -110,6 +110,7 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({ record, patien
 
       await SharingService.grantEncryptionAccess(record.id, guestUid, currentUser.uid, {
         isGuest: true,
+        expiresAt: new Date(Date.now() + duration.seconds * 1000),
       });
       console.log('✅ Encryption access granted');
 

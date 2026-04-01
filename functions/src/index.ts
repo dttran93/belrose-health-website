@@ -35,6 +35,7 @@ export { sendPasswordChangeEmail } from './handlers/sendPasswordChangeEmail';
 
 // ==================== GUEST INVITE ====================
 export { createGuestInvite } from './handlers/createGuestInvite';
+export { redeemGuestInvite } from './handlers/redeemGuestInvite';
 
 // ==================== HEALTH CHECK ====================
 export { health, healthDetailed } from './handlers/healthCheck';

@@ -177,8 +177,7 @@ export const createGuestInvite = onCall(
     // This is the server-side record of the invite. Used to validate the
     // invite link and to clean up expired invites later.
     const durationSeconds = request.data.durationSeconds ?? 604800;
-    const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + durationSeconds);
+    const expiresAt = new Date(Date.now() + durationSeconds * 1000);
 
     const durationLabel =
       durationSeconds <= 86400
@@ -188,6 +187,11 @@ export const createGuestInvite = onCall(
           : durationSeconds <= 604800
             ? '7 days'
             : '30 days';
+
+    // ── Generate invite code ─────────────────────────────────────────────────────
+    // Random 32-byte hex string — goes in the URL instead of the custom token.
+    // Custom tokens expire in 1 hour; this code is valid for the full invite duration.
+    const inviteCode = crypto.randomBytes(32).toString('hex');
 
     await db.collection('guestInvites').add({
       guestUserId: guestUid,
@@ -200,17 +204,9 @@ export const createGuestInvite = onCall(
       isNewGuest,
       guestIdHash,
       guestWallet,
+      inviteCode,
     });
     console.log(`✅ guestInvites document created`);
-
-    // ── Mint a Firebase Custom Token ─────────────────────────────────────────
-    // This is what the invite link uses to sign the doctor in.
-    // We attach the guestUserId as a custom claim so the frontend knows
-    // this is a guest session.
-    const customToken = await admin.auth().createCustomToken(guestUid, {
-      isGuest: true,
-    });
-    console.log(`✅ Custom token minted for guest: ${guestUid}`);
 
     // ── Send invite email via SendGrid ───────────────────────────────────────
     // The private key goes in the URL fragment (#). Fragments are never sent
@@ -219,7 +215,7 @@ export const createGuestInvite = onCall(
     //
     // URL format: /invite?token=<customToken>#<privateKeyBase64>
     const appUrl = 'https://belrosehealth.com';
-    const inviteUrl = `${appUrl}/invite?token=${customToken}#${privateKeyBase64}`;
+    const inviteUrl = `${appUrl}/invite?code=${inviteCode}#${privateKeyBase64}`;
 
     const resend = new Resend(resendKey.value());
     try {

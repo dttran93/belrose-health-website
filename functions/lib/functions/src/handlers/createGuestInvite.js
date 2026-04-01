@@ -166,8 +166,7 @@ exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async 
     // This is the server-side record of the invite. Used to validate the
     // invite link and to clean up expired invites later.
     const durationSeconds = request.data.durationSeconds ?? 604800;
-    const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + durationSeconds);
+    const expiresAt = new Date(Date.now() + durationSeconds * 1000);
     const durationLabel = durationSeconds <= 86400
         ? '1 day'
         : durationSeconds <= 259200
@@ -175,6 +174,10 @@ exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async 
             : durationSeconds <= 604800
                 ? '7 days'
                 : '30 days';
+    // ── Generate invite code ─────────────────────────────────────────────────────
+    // Random 32-byte hex string — goes in the URL instead of the custom token.
+    // Custom tokens expire in 1 hour; this code is valid for the full invite duration.
+    const inviteCode = crypto.randomBytes(32).toString('hex');
     await db.collection('guestInvites').add({
         guestUserId: guestUid,
         invitedBy: patientUid,
@@ -186,16 +189,9 @@ exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async 
         isNewGuest,
         guestIdHash,
         guestWallet,
+        inviteCode,
     });
     console.log(`✅ guestInvites document created`);
-    // ── Mint a Firebase Custom Token ─────────────────────────────────────────
-    // This is what the invite link uses to sign the doctor in.
-    // We attach the guestUserId as a custom claim so the frontend knows
-    // this is a guest session.
-    const customToken = await admin.auth().createCustomToken(guestUid, {
-        isGuest: true,
-    });
-    console.log(`✅ Custom token minted for guest: ${guestUid}`);
     // ── Send invite email via SendGrid ───────────────────────────────────────
     // The private key goes in the URL fragment (#). Fragments are never sent
     // to servers — they exist only in the browser. This means even if someone
@@ -203,7 +199,7 @@ exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async 
     //
     // URL format: /invite?token=<customToken>#<privateKeyBase64>
     const appUrl = 'https://belrosehealth.com';
-    const inviteUrl = `${appUrl}/invite?token=${customToken}#${privateKeyBase64}`;
+    const inviteUrl = `${appUrl}/invite?code=${inviteCode}#${privateKeyBase64}`;
     const resend = new resend_1.Resend(resendKey.value());
     try {
         await resend.emails.send({

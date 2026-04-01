@@ -43,7 +43,7 @@ export class SharingService {
     recordId: string,
     userId: string,
     grantorId: string,
-    options?: { isActive?: boolean; isGuest?: boolean }
+    options?: { isActive?: boolean; isGuest?: boolean; expiresAt?: Date }
   ): Promise<void> {
     const auth = getAuth();
     const db = getFirestore();
@@ -62,6 +62,7 @@ export class SharingService {
 
     const isActive = options?.isActive ?? true;
     const isGuest = options?.isGuest ?? false;
+    const expiresAt = options?.expiresAt ?? null;
 
     // Step 1. Check for existing active wrapped key
     const wrappedKeyId = `${recordId}_${userId}`;
@@ -108,6 +109,7 @@ export class SharingService {
         wrappedKey: wrappedKeyForReceiver,
         isActive,
         isGuest,
+        ...(expiresAt && { expiresAt }),
         reactivatedAt: new Date(),
         reactivatedBy: grantorId,
       });
@@ -121,6 +123,7 @@ export class SharingService {
         isActive,
         isCreator: false,
         isGuest,
+        ...(expiresAt && { expiresAt }),
         grantedBy: grantorId,
       });
       console.log('✅ Wrapped key created');
