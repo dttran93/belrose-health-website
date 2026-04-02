@@ -29,7 +29,7 @@ import {
   NotificationType,
   SourceService,
 } from '../notificationUtils';
-import { FileObject } from '../../../../src/types/core';
+import { FileObject } from '@/index.types';
 
 // ============================================================================
 // TYPES

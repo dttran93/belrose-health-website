@@ -17,6 +17,7 @@ import {
 interface GuestSharePanelProps {
   record: FileObject;
   patientName: string;
+  onSuccess?: () => void; // Optional callback to refresh data after successful sharing
 }
 
 type DurationOption = { label: string; seconds: number };
@@ -40,7 +41,11 @@ function hashEmail(email: string): string {
   return ethers.keccak256(ethers.toUtf8Bytes(email.toLowerCase().trim()));
 }
 
-export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({ record, patientName }) => {
+export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
+  record,
+  patientName,
+  onSuccess,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [phase, setPhase] = useState<DialogPhase>('confirming');
   const [error, setError] = useState<string | null>(null);
@@ -124,6 +129,7 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({ record, patien
       console.log('✅ Added to Firestore viewers array');
 
       handleClose();
+      onSuccess?.();
     } catch (err: any) {
       console.error('❌ Guest share failed:', err);
       setError(err.message || 'Failed to send invite. Please try again.');

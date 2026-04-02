@@ -5,8 +5,7 @@ import type { Request, Response } from 'express';
 import { defineSecret } from 'firebase-functions/params';
 import { AnthropicService, MODELS } from '../services/anthropicService';
 import { getBelroseFieldsPrompt } from '../utils/prompts';
-import type { BelroseFieldProcessingRequest } from '../../../src/types/sharedApi';
-import { BelroseFields } from '../../../src/types/core';
+import { BelroseFieldProcessingRequest, BelroseFields } from '@/index.types';
 
 // Define the secret
 const anthropicKey = defineSecret('ANTHROPIC_KEY');

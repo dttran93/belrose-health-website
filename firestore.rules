@@ -707,8 +707,12 @@ service cloud.firestore {
       resource.data.invitedBy == request.auth.uid
     );
 
-    // Only server can create/update invites
-    allow create, update: if isServerWrite();
+    // Guest can mark their own invite as accepted when claiming
+    allow update: if request.auth != null &&
+      resource.data.guestUserId == request.auth.uid &&
+      request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['status', 'claimedAt']) &&
+      request.resource.data.status == 'accepted';
 
     // Not deletable — permanent audit trail
     allow delete: if false;

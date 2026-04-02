@@ -282,7 +282,11 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
       {/* Permission Action Dialog - handles preparation, confirmation, and execution */}
       <PermissionActionDialog {...dialogProps} />
 
-      <GuestSharePanel record={record} patientName={patientName} />
+      <GuestSharePanel
+        record={record}
+        patientName={patientName}
+        onSuccess={fetchEncryptionAccess}
+      />
     </div>
   );
 };

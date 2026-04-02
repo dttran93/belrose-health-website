@@ -1,5 +1,6 @@
 // functions/src/services/anthropicService.ts
-import { SupportedImageType } from '../../../src/types/sharedApi';
+
+import { SupportedImageType } from '@/index.types';
 
 /**
  * Service for interacting with the Anthropic Claude API

@@ -105,7 +105,7 @@ export const createWallet = onRequest({ cors: true }, async (req: Request, res: 
     }
 
     const userData = userDoc.data();
-    if (userData?.wallet?.address) {
+    if (userData?.wallet?.address && !userData?.isGuest) {
       res.status(400).json({
         error: 'Wallet already exists',
         details: 'User already has a wallet linked to their account',

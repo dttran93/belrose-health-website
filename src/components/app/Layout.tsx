@@ -10,6 +10,7 @@ import { authService } from '@/features/Auth/services/authServices';
 import { useLayout } from '@/components/app/LayoutProvider';
 import { useAIChatContext } from '@/features/Ai/components/AIChatContext';
 import { navigationSections } from './navigation';
+import { GuestBanner, GuestFooter } from './GuestBanner';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -20,6 +21,8 @@ function AppLayout({ children }: AppLayoutProps) {
   const { user } = useAuthContext();
   const { header, footer } = useLayout();
   const navigate = useNavigate();
+  const isGuest = user?.isGuest === true;
+  console.log('👤 Guest Status:', isGuest);
 
   // Pull chat history + current chat state from context
   const { chats, chatsLoading, currentChatId, handleLoadChat, handleNewChat, deleteChat } =
@@ -104,6 +107,7 @@ function AppLayout({ children }: AppLayoutProps) {
 
         {/* Main Content Area */}
         <div className="flex flex-col flex-1 overflow-hidden">
+          {isGuest && <GuestBanner />}
           {/* Conditional Header */}
           {header && <div>{header}</div>}
 
@@ -113,6 +117,7 @@ function AppLayout({ children }: AppLayoutProps) {
           </div>
 
           {/* Conditional Footer */}
+          {isGuest && <GuestFooter />}
           {footer && <div>{footer}</div>}
         </div>
       </div>
@@ -128,6 +133,8 @@ function AppLayout({ children }: AppLayoutProps) {
         onMenuToggle={() => setIsMobileOpen(true)}
         additionalContent={header}
       />
+
+      {isGuest && <GuestBanner />}
 
       {/* Mobile Sidebar */}
       <MobileSidebar
@@ -152,6 +159,7 @@ function AppLayout({ children }: AppLayoutProps) {
       </div>
 
       {/* Conditional Footer */}
+      {isGuest && <GuestFooter />}
       {footer && <div className="border-t border-gray-200 bg-white shadow-sm">{footer}</div>}
     </div>
   );

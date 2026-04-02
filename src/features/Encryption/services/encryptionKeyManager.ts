@@ -25,6 +25,10 @@ export class EncryptionKeyManager {
     return this.guestFileKeys !== null && this.guestFileKeys.size > 0;
   }
 
+  static getGuestFileKeys(): Map<string, CryptoKey> | null {
+    return this.guestFileKeys;
+  }
+
   // ================= USER ENCRYPTION SESSION MANAGEMENT =================
 
   private static sessionKey: CryptoKey | null = null;

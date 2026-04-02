@@ -57,7 +57,7 @@ export const useAuth = (): AuthContextData => {
         mergedUser = {
           uid: user.uid,
           email: user.email,
-          displayName: user.displayName,
+          displayName: profile.displayName || user.displayName,
           firstName: profile.firstName || null, // From Firestore Profile
           lastName: profile.lastName || null, // From Firestore Profile
           photoURL: user.photoURL,
@@ -71,6 +71,7 @@ export const useAuth = (): AuthContextData => {
           identityVerifiedAt: profile.identityVerifiedAt || null,
           onChainIdentity: profile.onChainIdentity || undefined,
           affiliations: profile.affiliations || [],
+          isGuest: profile.isGuest || false,
         } as BelroseUserProfile;
 
         if (profile.email !== user.email && user.email) {
