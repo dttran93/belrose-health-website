@@ -25,6 +25,7 @@ import {
 import { RecordPicker } from '@/features/Ai/components/ui/RecordPicker';
 import { getShareableRecords } from '../services/guestShareableRecords';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
+import { GuestFeatureGate } from './GuestFeatureGate';
 
 interface GuestSharePanelProps {
   record?: FileObject; // optional — pre-selects this record if provided
@@ -198,55 +199,60 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
 
   return (
     <>
-      {/* Trigger button */}
-      <button
-        onClick={handleOpen}
-        className="mt-4 w-full flex items-center gap-3 border border-dashed border-complement-4
-                   rounded-lg p-4 bg-complement-4/10 hover:bg-complement-4/20 transition-colors text-left"
+      <GuestFeatureGate
+        featureName="share records with guests"
+        featureDescription="Share records with anyone via secure time-limited links, no Belrose account needed."
       >
-        <Stethoscope className="w-4 h-4 text-foreground shrink-0" />
-        <div>
-          <p className="text-sm font-semibold text-foreground">Share via Email</p>
-          <p className="text-xs text-foreground/60">
-            No Belrose account needed — sends a secure time-limited link
-          </p>
-        </div>
-      </button>
+        {/* Trigger button */}
+        <button
+          onClick={handleOpen}
+          className="mt-4 w-full flex items-center gap-3 border border-dashed border-complement-4
+                   rounded-lg p-4 bg-complement-4/10 hover:bg-complement-4/20 transition-colors text-left"
+        >
+          <Stethoscope className="w-4 h-4 text-foreground shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-foreground">Share via Email</p>
+            <p className="text-xs text-foreground/60">
+              No Belrose account needed — sends a secure time-limited link
+            </p>
+          </div>
+        </button>
 
-      {/* Main invite dialog */}
-      <PermissionActionDialog
-        isOpen={isOpen && !isRecordPickerOpen}
-        phase={phase}
-        operationType="guest-invite"
-        role="viewer"
-        user={null}
-        error={error}
-        onClose={handleClose}
-        onConfirmGrant={() => {}}
-        onConfirmRevoke={() => {}}
-        onConfirmGuestInvite={handleConfirm}
-        guestInviteProps={{
-          email,
-          setEmail,
-          duration,
-          setDuration,
-          durationOptions: DURATION_OPTIONS,
-          selectedRecords,
-          loadingRecords,
-          onOpenRecordPicker: () => setIsRecordPickerOpen(true),
-          onRemoveRecord: handleRemoveRecord,
-        }}
-      />
-
-      {/* Record picker — shown on top of main dialog */}
-      {isRecordPickerOpen && (
-        <RecordPicker
-          records={availableRecords}
-          selectedRecordIds={selectedRecords.map(r => r.id)}
-          onSelectionChange={handleRecordPickerApply}
-          onClose={() => setIsRecordPickerOpen(false)}
+        {/* Main invite dialog */}
+        <PermissionActionDialog
+          isOpen={isOpen && !isRecordPickerOpen}
+          phase={phase}
+          operationType="guest-invite"
+          role="viewer"
+          user={null}
+          error={error}
+          onClose={handleClose}
+          onConfirmGrant={() => {}}
+          onConfirmRevoke={() => {}}
+          onConfirmGuestInvite={handleConfirm}
+          guestInviteProps={{
+            email,
+            setEmail,
+            duration,
+            setDuration,
+            durationOptions: DURATION_OPTIONS,
+            selectedRecords,
+            loadingRecords,
+            onOpenRecordPicker: () => setIsRecordPickerOpen(true),
+            onRemoveRecord: handleRemoveRecord,
+          }}
         />
-      )}
+
+        {/* Record picker — shown on top of main dialog */}
+        {isRecordPickerOpen && (
+          <RecordPicker
+            records={availableRecords}
+            selectedRecordIds={selectedRecords.map(r => r.id)}
+            onSelectionChange={handleRecordPickerApply}
+            onClose={() => setIsRecordPickerOpen(false)}
+          />
+        )}
+      </GuestFeatureGate>{' '}
     </>
   );
 };

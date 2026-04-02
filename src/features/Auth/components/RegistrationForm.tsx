@@ -236,7 +236,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         step: 'smart_account_registration',
         message: 'Computing your smart account for network automation...',
       });
-      const smartAccountAddress = await SmartAccountService.ensureFullyInitialized();
+      await SmartAccountService.ensureFullyInitialized();
 
       // 3. Save core account data to Firestore
       setRegistrationProgress({

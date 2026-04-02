@@ -1,8 +1,7 @@
 // src/features/ViewEditRecord/components/VersionHistory.tsx
 
 import React, { useState, useEffect } from 'react';
-import { FileText, AlertTriangle, ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { FileText, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { VersionControlService } from '../../services/versionControlService';
 import {

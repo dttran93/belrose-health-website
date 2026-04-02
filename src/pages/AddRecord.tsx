@@ -5,6 +5,7 @@ import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionServi
 import { FileObject } from '@/types/core';
 import CombinedUploadFHIR from '@/features/AddRecord/components/CombinedUploadFHIR';
 import { useNavigate } from 'react-router-dom';
+import { GuestFeatureGate } from '@/features/GuestAccess/components/GuestFeatureGate';
 
 interface AddRecordProps {
   className?: string;
@@ -81,27 +82,32 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
   // ==================== RENDER JSX ====================
 
   return (
-    <div className={`min-h-screen bg-gray-50 ${className || ''}`}>
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Main Upload Interface */}
-        <CombinedUploadFHIR
-          files={files}
-          addFiles={addFiles}
-          removeFile={removeFileComplete}
-          removeFileFromLocal={removeFileFromLocal}
-          retryFile={retryFile}
-          getStats={getStats}
-          addFhirAsVirtualFile={processVirtualRecord}
-          uploadFiles={uploadFiles}
-          fhirData={fhirData}
-          onFHIRConverted={handleFHIRConverted}
-          convertTextToFHIR={convertToFHIR}
-          savingToFirestore={savingToFirestore}
-          onReview={handleReviewFile}
-          processFile={processFile}
-        />
+    <GuestFeatureGate
+      featureName="add records"
+      featureDescription="Upload and manage health records by creating a free Belrose account."
+    >
+      <div className={`min-h-screen bg-gray-50 ${className || ''}`}>
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          {/* Main Upload Interface */}
+          <CombinedUploadFHIR
+            files={files}
+            addFiles={addFiles}
+            removeFile={removeFileComplete}
+            removeFileFromLocal={removeFileFromLocal}
+            retryFile={retryFile}
+            getStats={getStats}
+            addFhirAsVirtualFile={processVirtualRecord}
+            uploadFiles={uploadFiles}
+            fhirData={fhirData}
+            onFHIRConverted={handleFHIRConverted}
+            convertTextToFHIR={convertToFHIR}
+            savingToFirestore={savingToFirestore}
+            onReview={handleReviewFile}
+            processFile={processFile}
+          />
+        </div>
       </div>
-    </div>
+    </GuestFeatureGate>
   );
 };
 

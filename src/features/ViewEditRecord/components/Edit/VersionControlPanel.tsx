@@ -3,18 +3,18 @@
 import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
-import { VersionHistory } from './Edit/VersionHistory';
-import { VersionDiffViewer } from './Edit/VersionDiffViewer';
-import { VersionControlService } from '../services/versionControlService';
+import { VersionHistory } from './VersionHistory';
+import { VersionDiffViewer } from './VersionDiffViewer';
+import { VersionControlService } from '../../services/versionControlService';
 import {
   VersionDiff,
   VersionControlPanelProps,
   RecordVersion,
-} from '../services/versionControlService.types';
+} from '../../services/versionControlService.types';
 import { ArrowLeft, GitBranch } from 'lucide-react';
 import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
-import { CredibilityStats } from './Edit/VersionReviewBadge';
-import VersionDetailPage from './Edit/VersionDetailPage';
+import { CredibilityStats } from './VersionReviewBadge';
+import VersionDetailPage from './VersionDetailPage';
 
 export const VersionControlPanel: React.FC<VersionControlPanelProps> = ({
   documentId,

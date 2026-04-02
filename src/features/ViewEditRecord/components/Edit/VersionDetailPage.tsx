@@ -15,7 +15,7 @@ import { ArrowLeft, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import { RecordVersion } from '../../services/versionControlService.types';
-import { VersionReviewBadge, CredibilityStats } from './VersionReviewBadge';
+import { CredibilityStats } from './VersionReviewBadge';
 import { useAuth } from '@/features/Auth/hooks/useAuth';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 
@@ -507,7 +507,6 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
               userReaction: null,
             }
           }
-          isLoadingStats={false}
         />
       )}
 

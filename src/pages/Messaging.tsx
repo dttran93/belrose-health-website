@@ -1,5 +1,6 @@
 // src/pages/Messaging.tsx
 
+import { GuestFeatureGate } from '@/features/GuestAccess/components/GuestFeatureGate';
 import MessagingView from '@/features/Messaging/components/MessagingView';
 import React from 'react';
 
@@ -14,9 +15,14 @@ import React from 'react';
  */
 const Messaging: React.FC = () => {
   return (
-    <div className="h-full p-4 md:p-6">
-      <MessagingView />
-    </div>
+    <GuestFeatureGate
+      featureName="message users"
+      featureDescription="End-to-end encrypted messaging with any other Belrose users."
+    >
+      <div className="h-full p-4 md:p-6">
+        <MessagingView />
+      </div>
+    </GuestFeatureGate>
   );
 };
 

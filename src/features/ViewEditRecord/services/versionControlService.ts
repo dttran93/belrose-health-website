@@ -275,11 +275,17 @@ export class VersionControlService {
     const recordData = recordSnap.data();
     const owners: string[] = recordData.owners || [recordData.uploadedBy];
     const administrators: string[] = recordData.administrators || [];
+    const viewers: string[] = recordData.viewers || [];
+    const subjects: string[] = recordData.subjects || [];
 
-    const isOwner = owners.includes(this.userId);
-    const isAdmin = administrators.includes(this.userId);
+    const hasAccess =
+      owners.includes(this.userId) ||
+      administrators.includes(this.userId) ||
+      viewers.includes(this.userId) ||
+      subjects.includes(this.userId) ||
+      recordData.uploadedBy === this.userId;
 
-    if (!isOwner && !isAdmin) {
+    if (!hasAccess) {
       throw new Error("You do not have permission to view this record's history");
     }
 

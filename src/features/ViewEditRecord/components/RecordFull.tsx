@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/Button';
 import { X, Save, Ellipsis, Info } from 'lucide-react';
 import { FileObject, BelroseFields } from '@/types/core';
 import { LayoutSlot } from '@/components/app/LayoutProvider';
-import VersionControlPanel from './VersionControlPanel';
+import VersionControlPanel from './Edit/VersionControlPanel';
 import { RecordVersion } from '../services/versionControlService.types';
 import { CredibilityView } from '@/features/Credibility/components/CredibilityView';
 import HealthRecordMenu from './View/RecordMenu';

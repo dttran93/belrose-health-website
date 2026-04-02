@@ -448,6 +448,10 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
                 </div>
 
                 <div>
+                  <PasswordStrengthIndicator password={password} /> {/* ← add here */}
+                </div>
+
+                <div>
                   <label className="text-xs font-medium text-slate-700 block mb-1">
                     Confirm Password
                   </label>
@@ -459,17 +463,6 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
                     placeholder="Repeat your password"
                     onKeyDown={e => e.key === 'Enter' && handleCredentialsSubmit()}
                   />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">Password</label>
-                  <InputField
-                    type="password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="px-3 py-2 text-sm"
-                    placeholder="At least 8 characters"
-                  />
-                  <PasswordStrengthIndicator password={password} /> {/* ← add here */}
                 </div>
 
                 {error && (
