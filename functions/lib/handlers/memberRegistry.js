@@ -121,7 +121,7 @@ exports.registerMemberOnChain = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_PR
  */
 exports.updateMemberStatus = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_PRIVATE_KEY', 'RPC_URL'] }, async (request) => {
     const { userId, status } = request.data;
-    if (!userId || ![1, 2, 3].includes(status)) {
+    if (!userId || ![1, 2, 3, 4, 5].includes(status)) {
         throw new https_1.HttpsError('invalid-argument', 'Invalid userId or status');
     }
     try {
@@ -130,7 +130,13 @@ exports.updateMemberStatus = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_PRIVA
         const tx = await contract.setUserStatus(userIdHash, status);
         const receipt = await tx.wait();
         // Sync the status change to Firestore
-        const statusMap = { 1: 'Inactive', 2: 'Active', 3: 'Verified' };
+        const statusMap = {
+            1: 'Inactive',
+            2: 'Active',
+            3: 'Verified',
+            4: 'VerifiedProvider',
+            5: 'Guest',
+        };
         await (0, firestore_1.getFirestore)().collection('users').doc(userId).update({
             'onChainIdentity.status': statusMap[status],
             'onChainIdentity.statusUpdatedAt': firestore_1.Timestamp.now(),

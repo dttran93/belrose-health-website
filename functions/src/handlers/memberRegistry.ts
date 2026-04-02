@@ -152,7 +152,7 @@ export const updateMemberStatus = onCall(
   async request => {
     const { userId, status } = request.data;
 
-    if (!userId || ![1, 2, 3].includes(status)) {
+    if (!userId || ![1, 2, 3, 4, 5].includes(status)) {
       throw new HttpsError('invalid-argument', 'Invalid userId or status');
     }
 
@@ -163,7 +163,13 @@ export const updateMemberStatus = onCall(
       const receipt = await tx.wait();
 
       // Sync the status change to Firestore
-      const statusMap: Record<number, string> = { 1: 'Inactive', 2: 'Active', 3: 'Verified' };
+      const statusMap: Record<number, string> = {
+        1: 'Inactive',
+        2: 'Active',
+        3: 'Verified',
+        4: 'VerifiedProvider',
+        5: 'Guest',
+      };
       await getFirestore().collection('users').doc(userId).update({
         'onChainIdentity.status': statusMap[status],
         'onChainIdentity.statusUpdatedAt': Timestamp.now(),

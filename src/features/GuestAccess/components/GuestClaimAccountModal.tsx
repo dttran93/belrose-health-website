@@ -270,7 +270,11 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
       setProgress({ message: 'Setting up your smart account...' });
       await SmartAccountService.ensureFullyInitialized();
 
-      // ── Step 8: Deactivate placeholder guest wallet on-chain (nice-to-have) ──
+      // ── Step 8: Updating user status on chain to Active ────────────────────────────────────
+      setProgress({ message: 'Updating status on distributed network...' });
+      await MemberRegistryBlockchain.setUserStatus(guestUid, 2);
+
+      // ── Step 9: Deactivate placeholder guest wallet on-chain (nice-to-have) ──
       // The placeholder wallet has no real private key so it can't do anything
       // harmful, but deactivating it keeps the on-chain identity clean.
       try {
@@ -286,15 +290,15 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         console.warn('⚠️ Could not deactivate placeholder wallet:', err);
       }
 
-      // ── Step 9: Generate Signal keys ─────────────────────────────────────────
+      // ── Step 10: Generate Signal keys ─────────────────────────────────────────
       setProgress({ message: 'Setting up secure messaging...' });
       const signalKeyBundle = await generateKeyBundle(guestUid);
       await KeyBundleService.uploadKeyBundle(guestUid, signalKeyBundle);
 
-      // ── Step 10: Clear guest key ───────────────
+      // ── Step 11: Clear guest key ───────────────
       EncryptionKeyManager.setGuestFileKeys(new Map());
 
-      // ── Step 11: Refresh auth context so banner disappears ───────────────────
+      // ── Step 12: Refresh auth context so banner disappears ───────────────────
       setProgress({ message: 'Finalizing...' });
 
       // Update display name in Firebase Auth profile (optional, since we have it in Firestore, but good for consistency)

@@ -12,7 +12,7 @@ import type {
   UserData,
   DashboardStats,
   RoleAssignment,
-  UserStatus,
+  MemberStatus,
   TrusteeRelationshipOnChain,
 } from '../lib/types';
 
@@ -40,9 +40,9 @@ interface UseMemberDashboardReturn {
   // Filters
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  statusFilter: 'all' | UserStatus;
-  setStatusFilter: (status: 'all' | UserStatus) => void;
-  statusCounts: Record<'all' | UserStatus, number>;
+  statusFilter: 'all' | MemberStatus;
+  setStatusFilter: (status: 'all' | MemberStatus) => void;
+  statusCounts: Record<'all' | MemberStatus, number>;
 
   // Role filter (for roles view)
   roleFilter: 'all' | 'owner' | 'administrator' | 'viewer';
@@ -107,7 +107,7 @@ export function useMemberDashboard(): UseMemberDashboardReturn {
   // Filter state
   // ============================================
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | UserStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | MemberStatus>('all');
   const [roleFilter, setRoleFilter] = useState<'all' | 'owner' | 'administrator' | 'viewer'>('all');
 
   // ============================================
@@ -204,7 +204,9 @@ export function useMemberDashboard(): UseMemberDashboardReturn {
     1: users.filter(u => u.status === 1).length,
     2: users.filter(u => u.status === 2).length,
     3: users.filter(u => u.status === 3).length,
-  } as Record<'all' | UserStatus, number>;
+    4: users.filter(u => u.status === 4).length,
+    5: users.filter(u => u.status === 5).length,
+  } as Record<'all' | MemberStatus, number>;
 
   // ============================================
   // Filtering - Role Assignments

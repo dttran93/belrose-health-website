@@ -17,11 +17,13 @@ import { ethers } from 'ethers';
  * Maps to the MemberStatus enum in the smart contract
  * Note: Order matters! Must match contract exactly.
  */
-export enum UserStatus {
+export enum MemberStatus {
   NotRegistered = 0,
   Inactive = 1,
   Active = 2,
   Verified = 3,
+  VerifiedProvider = 4,
+  Guest = 5,
 }
 
 // ============================================================================
@@ -88,7 +90,7 @@ export interface UserProfile {
  */
 export interface UserData {
   userIdHash: string;
-  status: UserStatus;
+  status: MemberStatus;
   wallets: WalletInfo[];
   records: string[];
   profile?: UserProfile;

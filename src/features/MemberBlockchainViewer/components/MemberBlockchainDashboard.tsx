@@ -17,7 +17,7 @@ import { StatsCard } from '@/features/MemberBlockchainViewer/components/StatsCar
 import { UsersTable } from '@/features/MemberBlockchainViewer/components/UsersTable';
 import { WalletsPanel } from '@/features/MemberBlockchainViewer/components/WalletsPanel';
 import { RoleDetailsPanel } from '@/features/MemberBlockchainViewer/components/RoleDetailsPanel';
-import { UserStatus } from '@/features/MemberBlockchainViewer/lib/types';
+import { MemberStatus } from '@/features/MemberBlockchainViewer/lib/types';
 import { getStatusInfo } from '@/features/MemberBlockchainViewer/lib/utils';
 import { useMemberDashboard } from '@/features/MemberBlockchainViewer/hooks/useMemberDashboards';
 import { RoleAssignmentsTable } from '@/features/MemberBlockchainViewer/components/RoleAssignmentTable';
@@ -31,9 +31,9 @@ interface SearchInputProps {
 }
 
 interface StatusFilterProps {
-  currentFilter: 'all' | UserStatus;
-  onFilterChange: (status: 'all' | UserStatus) => void;
-  counts: Record<'all' | UserStatus, number>;
+  currentFilter: 'all' | MemberStatus;
+  onFilterChange: (status: 'all' | MemberStatus) => void;
+  counts: Record<'all' | MemberStatus, number>;
 }
 
 interface ErrorAlertProps {
@@ -145,11 +145,13 @@ export const StatusFilter: React.FC<StatusFilterProps> = ({
   onFilterChange,
   counts,
 }) => {
-  const filters: Array<'all' | UserStatus> = [
+  const filters: Array<'all' | MemberStatus> = [
     'all',
-    UserStatus.Verified,
-    UserStatus.Active,
-    UserStatus.Inactive,
+    MemberStatus.VerifiedProvider,
+    MemberStatus.Guest,
+    MemberStatus.Verified,
+    MemberStatus.Active,
+    MemberStatus.Inactive,
   ];
 
   return (
@@ -294,7 +296,7 @@ const MemberDashboard: React.FC = () => {
           >
             <StatsCard
               title="Verified Users"
-              value={statusCounts[UserStatus.Verified]}
+              value={statusCounts[MemberStatus.Verified]}
               icon={<CheckCircle className="w-6 h-6 text-emerald-600" />}
               color={`${currentView === 'verified' ? 'ring-2 ring-emerald-500' : ''} bg-emerald-50 border-emerald-200 text-emerald-900`}
             />

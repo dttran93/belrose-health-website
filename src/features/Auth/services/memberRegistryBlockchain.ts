@@ -2,17 +2,10 @@
 // Frontend service for member registry blockchain operations.
 // Calls backend Cloud Functions which use the admin wallet to write to blockchain.
 
+import { MemberStatus } from '@/features/MemberBlockchainViewer/lib/types';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // ==================== TYPES ====================
-export enum MemberStatus {
-  NotRegistered = 0,
-  Inactive = 1,
-  Active = 2,
-  Verified = 3,
-  VerifiedProvider = 4,
-}
-
 interface RegisterMemberResult {
   success: boolean;
   txHash?: string;
