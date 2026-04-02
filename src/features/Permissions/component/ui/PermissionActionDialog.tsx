@@ -10,9 +10,12 @@ import {
   Crown,
   Key,
   Stethoscope,
+  FileText,
+  Plus,
+  X as XIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { BelroseUserProfile } from '@/types/core';
+import { BelroseUserProfile, FileObject } from '@/types/core';
 import { Role } from '@/features/Permissions/services/permissionsService';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { useState } from 'react';
@@ -46,6 +49,10 @@ interface PermissionActionDialogProps {
     duration: DurationOption;
     setDuration: (duration: DurationOption) => void;
     durationOptions: readonly DurationOption[];
+    selectedRecords: FileObject[];
+    loadingRecords: boolean;
+    onOpenRecordPicker: () => void;
+    onRemoveRecord: (id: string) => void;
   };
 }
 
@@ -461,6 +468,10 @@ interface GuestInviteContentProps {
   duration: DurationOption;
   setDuration: (duration: DurationOption) => void;
   durationOptions: readonly DurationOption[];
+  selectedRecords: FileObject[];
+  loadingRecords: boolean;
+  onOpenRecordPicker: () => void;
+  onRemoveRecord: (id: string) => void;
   onConfirm: (() => void) | undefined;
   onClose: () => void;
 }
@@ -471,6 +482,10 @@ const GuestInviteContent: React.FC<GuestInviteContentProps> = ({
   duration,
   setDuration,
   durationOptions,
+  selectedRecords,
+  loadingRecords,
+  onOpenRecordPicker,
+  onRemoveRecord,
   onConfirm,
   onClose,
 }) => (
@@ -481,20 +496,62 @@ const GuestInviteContent: React.FC<GuestInviteContentProps> = ({
     </AlertDialog.Title>
 
     <AlertDialog.Description className="mt-3 text-sm text-gray-600">
-      Share your Belrose record with guests. We'll email them a secure link to view this record.
+      Share your Belrose records with guests. We'll email them a secure link.
     </AlertDialog.Description>
 
     <div className="my-4 space-y-3">
+      {/* Email input */}
       <input
         type="email"
         value={email}
         onChange={e => setEmail(e.target.value)}
         placeholder="doctor@clinic.com"
         className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2
-                   bg-white focus:outline-none focus:ring-2 focus:ring-complement-4 focus:border-transparent"
+                   bg-white focus:outline-none focus:ring-2 focus:ring-complement-4"
         onKeyDown={e => e.key === 'Enter' && email && onConfirm?.()}
       />
 
+      {/* Selected records */}
+      <div>
+        <p className="text-xs text-gray-500 mb-1.5">Sharing records:</p>
+        {loadingRecords ? (
+          <p className="text-xs text-gray-400">Loading your records...</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {selectedRecords.map(r => (
+              <div
+                key={r.id}
+                className="flex items-center gap-1 bg-slate-100 border border-slate-200 
+                   rounded-md px-2 py-1 text-xs text-slate-700"
+              >
+                <FileText className="w-3 h-3 shrink-0" />
+                <span className="max-w-[140px] truncate">
+                  {r.belroseFields?.title || r.fileName || r.id}
+                </span>
+                {selectedRecords.length > 1 && (
+                  <button
+                    onClick={() => onRemoveRecord(r.id)}
+                    className="ml-0.5 text-slate-400 hover:text-slate-600"
+                  >
+                    <XIcon className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              onClick={onOpenRecordPicker}
+              className="flex items-center gap-1 border border-dashed border-slate-300 
+                         rounded-md px-2 py-1 text-xs text-slate-500
+                         hover:border-slate-400 hover:text-slate-700 transition-colors"
+            >
+              <Plus className="w-3 h-3" />
+              Add record
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Duration selector */}
       <div className="flex items-center gap-2">
         <span className="text-xs text-gray-500">Link expires in:</span>
         <div className="flex gap-1">
@@ -521,7 +578,11 @@ const GuestInviteContent: React.FC<GuestInviteContentProps> = ({
           Cancel
         </Button>
       </AlertDialog.Cancel>
-      <Button onClick={onConfirm} disabled={!email} className="flex-1">
+      <Button
+        onClick={() => onConfirm?.()}
+        disabled={!email || selectedRecords.length === 0}
+        className="flex-1"
+      >
         Send Invite
       </Button>
     </div>

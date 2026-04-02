@@ -7,17 +7,29 @@ import { Stethoscope } from 'lucide-react';
 import { ethers } from 'ethers';
 import { getAuth } from 'firebase/auth';
 import { BlockchainRoleManagerService } from '@/features/Permissions/services/blockchainRoleManagerService';
-import { arrayUnion, doc, getFirestore, updateDoc } from 'firebase/firestore';
+import {
+  arrayUnion,
+  collection,
+  doc,
+  getDocs,
+  getFirestore,
+  query,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
 import { SharingService } from '@/features/Sharing/services/sharingService';
 import {
   PermissionActionDialog,
   DialogPhase,
 } from '@/features/Permissions/component/ui/PermissionActionDialog';
+import { RecordPicker } from '@/features/Ai/components/ui/RecordPicker';
+import { getShareableRecords } from '../services/guestShareableRecords';
+import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 
 interface GuestSharePanelProps {
-  record: FileObject;
+  record?: FileObject; // optional — pre-selects this record if provided
   patientName: string;
-  onSuccess?: () => void; // Optional callback to refresh data after successful sharing
+  onSuccess?: () => void;
 }
 
 type DurationOption = { label: string; seconds: number };
@@ -51,13 +63,48 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [duration, setDuration] = useState<DurationOption>(DEFAULT_DURATION);
+  const [selectedRecords, setSelectedRecords] = useState<FileObject[]>(record ? [record] : []);
+  const [availableRecords, setAvailableRecords] = useState<FileObject[]>([]);
+  const [loadingRecords, setLoadingRecords] = useState(false);
+  const [isRecordPickerOpen, setIsRecordPickerOpen] = useState(false);
 
-  const handleOpen = () => {
+  const fetchShareableRecords = async () => {
+    const auth = getAuth();
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    setLoadingRecords(true);
+    try {
+      // Fetch encrypted records
+      const records = await getShareableRecords(uid);
+
+      // Decrypt so RecordPicker can display titles, providers, dates
+      const decrypted = await RecordDecryptionService.decryptRecords(records);
+      setAvailableRecords(decrypted);
+
+      // If a primary record was pre-selected but came in encrypted,
+      // replace it with the decrypted version so the chip shows the title
+      if (record) {
+        const decryptedPrimary = decrypted.find(r => r.id === record.id);
+        if (decryptedPrimary) {
+          setSelectedRecords([decryptedPrimary]);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch shareable records:', err);
+    } finally {
+      setLoadingRecords(false);
+    }
+  };
+
+  const handleOpen = async () => {
     setEmail('');
     setDuration(DEFAULT_DURATION);
     setError(null);
     setPhase('confirming');
+    setSelectedRecords(record ? [record] : []);
     setIsOpen(true);
+    await fetchShareableRecords();
   };
 
   const handleClose = () => {
@@ -65,10 +112,21 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
     setEmail('');
     setError(null);
     setPhase('confirming');
+    setIsRecordPickerOpen(false);
+  };
+
+  const handleRemoveRecord = (id: string) => {
+    setSelectedRecords(prev => prev.filter(r => r.id !== id));
+  };
+
+  const handleRecordPickerApply = (ids: string[]) => {
+    const picked = availableRecords.filter(r => ids.includes(r.id));
+    setSelectedRecords(picked);
+    setIsRecordPickerOpen(false);
   };
 
   const handleConfirm = async () => {
-    if (!email) return;
+    if (!email || selectedRecords.length === 0) return;
     setPhase('executing');
     setError(null);
 
@@ -84,7 +142,7 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
       const createGuestInvite = httpsCallable(functions, 'createGuestInvite');
       const result = (await createGuestInvite({
         guestEmail: email,
-        recordIds: [record.id],
+        recordIds: selectedRecords.map(r => r.id),
         patientName,
         durationSeconds: duration.seconds,
       })) as { data: { guestUid: string } };
@@ -101,7 +159,7 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
 
       console.log('🔗 Granting guest access on blockchain...');
       await BlockchainRoleManagerService.grantGuestAccess(
-        [record.id],
+        selectedRecords.map(r => r.id),
         guestWallet,
         guestIdHash,
         guestEmailHash,
@@ -109,24 +167,25 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
       );
       console.log('✅ Blockchain: Guest access granted');
 
-      // ── Step 3: Encryption access ─────────────────────────────────────────
-      // Wraps the record's AES file key with the guest's RSA public key.
-      // This is what allows GuestInvitePage to decrypt records on arrival.
+      // ── Step 3: Encryption access for all selected records ────────────────
+      await Promise.all(
+        selectedRecords.map(r =>
+          SharingService.grantEncryptionAccess(r.id, guestUid, currentUser.uid, {
+            isGuest: true,
+            expiresAt: new Date(Date.now() + duration.seconds * 1000),
+          })
+        )
+      );
+      console.log('✅ Encryption access granted for all records');
 
-      await SharingService.grantEncryptionAccess(record.id, guestUid, currentUser.uid, {
-        isGuest: true,
-        expiresAt: new Date(Date.now() + duration.seconds * 1000),
-      });
-      console.log('✅ Encryption access granted');
-
-      // ── Step 4: Firestore viewers array ───────────────────────────────────
-      // Adds guest UID to the record's viewers array so Firestore security
-      // rules allow them to read the record document.
+      // ── Step 4: Firestore viewers array for all selected records ──────────
       const db = getFirestore();
-      await updateDoc(doc(db, 'records', record.id), {
-        viewers: arrayUnion(guestUid),
-      });
-      console.log('✅ Added to Firestore viewers array');
+      await Promise.all(
+        selectedRecords.map(r =>
+          updateDoc(doc(db, 'records', r.id), { viewers: arrayUnion(guestUid) })
+        )
+      );
+      console.log('✅ Added to viewers array for all records');
 
       handleClose();
       onSuccess?.();
@@ -154,9 +213,9 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
         </div>
       </button>
 
-      {/* Dialog */}
+      {/* Main invite dialog */}
       <PermissionActionDialog
-        isOpen={isOpen}
+        isOpen={isOpen && !isRecordPickerOpen}
         phase={phase}
         operationType="guest-invite"
         role="viewer"
@@ -172,8 +231,22 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
           duration,
           setDuration,
           durationOptions: DURATION_OPTIONS,
+          selectedRecords,
+          loadingRecords,
+          onOpenRecordPicker: () => setIsRecordPickerOpen(true),
+          onRemoveRecord: handleRemoveRecord,
         }}
       />
+
+      {/* Record picker — shown on top of main dialog */}
+      {isRecordPickerOpen && (
+        <RecordPicker
+          records={availableRecords}
+          selectedRecordIds={selectedRecords.map(r => r.id)}
+          onSelectionChange={handleRecordPickerApply}
+          onClose={() => setIsRecordPickerOpen(false)}
+        />
+      )}
     </>
   );
 };

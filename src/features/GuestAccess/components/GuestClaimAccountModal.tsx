@@ -29,6 +29,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
+import PasswordStrengthIndicator from '@/features/Auth/components/ui/PasswordStrengthIndicator';
 
 type ClaimStep = 'credentials' | 'recovery' | 'processing' | 'done';
 
@@ -458,6 +459,17 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
                     placeholder="Repeat your password"
                     onKeyDown={e => e.key === 'Enter' && handleCredentialsSubmit()}
                   />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-700 block mb-1">Password</label>
+                  <InputField
+                    type="password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    className="px-3 py-2 text-sm"
+                    placeholder="At least 8 characters"
+                  />
+                  <PasswordStrengthIndicator password={password} /> {/* ← add here */}
                 </div>
 
                 {error && (
