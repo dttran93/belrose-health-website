@@ -719,6 +719,44 @@ service cloud.firestore {
   }
 
   // ============================================
+  // RECORD REQUESTS
+  // ============================================
+
+  match /recordRequests/{requestId} {
+
+    // Requester can read their own requests
+    // Fulfill page can read by inviteCode (unauthenticated)
+    allow read: if request.auth != null && request.auth.uid == resource.data.requesterId
+                || (request.auth == null && resource.data.status == 'pending');
+
+    // Only the requester can create, and they must be setting themselves as requesterId
+    allow create: if request.auth != null
+                  && request.auth.uid == request.resource.data.requesterId
+                  && request.resource.data.status == 'pending';
+
+    // Path 1: Requester cancels (must be pending, can only set cancelled)
+    allow update: if request.auth != null
+                  && request.auth.uid == resource.data.requesterId
+                  && resource.data.status == 'pending'
+                  && request.resource.data.status == 'cancelled';
+
+    // Path 2: Provider fulfils via inviteCode (unauthenticated)
+    // inviteCode must be unchanged, status must go pending → fulfilled
+    allow update: if resource.data.inviteCode == request.resource.data.inviteCode
+                  && resource.data.status == 'pending'
+                  && request.resource.data.status == 'fulfilled'
+                  && request.resource.data.keys().hasOnly([
+                      'status', 'fulfilledRecordId', 'fulfilledAt'
+                    ].concat(resource.data.keys().toList()));
+
+    // Path 3: Provider reads the request (useful for understanding if the document was read or not)
+    allow update: if resource.data.inviteCode == request.resource.data.inviteCode
+              && resource.data.status == 'pending'
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['readAt']);
+  }
+
+  // ============================================
   // MESSAGING
   // ============================================
   
@@ -838,6 +876,18 @@ service cloud.firestore {
     
       // DELETE: Users can delete their own key bundle (e.g. account deletion)
       allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ============================================
+    // PROVIDER DIRECTORY
+    // ============================================
+
+    match /providers_england/{providerId} {
+      // Any authenticated user can read — needed for institution search in the request form
+      allow read: if request.auth != null;
+
+      // Writes are admin SDK only — data comes from ingestion scripts and sync functions
+      allow write: if isServerWrite();
     }
 
     // ============================================

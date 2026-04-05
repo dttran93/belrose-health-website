@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Bell,
   Sparkles,
+  TextSearch,
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -54,6 +55,7 @@ export const navigationSections: NavigationSection[] = [
       { title: 'Health Profile', url: '/app/health-profile/me', icon: CircleUser },
       { title: 'All Records', url: '/app/all-records', icon: Clipboard },
       { title: 'Add Record', url: '/app/add-record', icon: FilePlus2 },
+      { title: 'Request Records', url: '/app/record-requests', icon: TextSearch },
     ],
   },
 ];

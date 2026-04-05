@@ -26,7 +26,8 @@
     "vite.config.ts",
     "contracts/scripts/**/*",
     "test/**/*",
-    "functions/src/handlers/sendAlphaApprovalEmail.ts"
+    "functions/src/handlers/sendAlphaApprovalEmail.ts",
+    "functions/scripts/IngestGPPractices.ts"
   ],
   "exclude": ["node_modules", "dist", "functions/**/*"]
 }

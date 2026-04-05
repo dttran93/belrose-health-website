@@ -30,6 +30,8 @@ import GuestInvitePage from './pages/GuestInvitePage';
 import Messaging from './pages/Messaging';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import { RequiresPlatformAdmin } from './features/Users/components/RequirePlatformAdmin';
+import FulfillRequestPage from './pages/FulfillRequestPage';
+import RecordRequestsPage from './pages/RecordRequestsPage';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
@@ -57,6 +59,7 @@ const App: React.FC = (): React.JSX.Element => {
 
                 {/* ── Auth & verification ── */}
                 <Route path="/invite" element={<GuestInvitePage />} />
+                <Route path="/fulfill-request" element={<FulfillRequestPage />} />
 
                 {/* ── Protected app ── */}
                 <Route
@@ -86,6 +89,7 @@ const App: React.FC = (): React.JSX.Element => {
                                 <Route path="ai/chat/:chatId" element={<AppPortal />} />
                                 <Route path="ai/history" element={<ChatHistoryPage />} />
                                 <Route path="all-records" element={<AllRecords />} />
+                                <Route path="record-requests" element={<RecordRequestsPage />} />
                                 <Route path="records/:recordId" element={<RecordDetail />} />
                                 <Route path="add-record" element={<AddRecord />} />
                                 <Route path="settings/*" element={<SettingsPage />} />

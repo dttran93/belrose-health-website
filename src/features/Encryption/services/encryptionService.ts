@@ -163,7 +163,8 @@ export class EncryptionService {
     fhirData: any | null,
     belroseFields: any | null,
     customData: any | null,
-    userKey: CryptoKey
+    userKey: CryptoKey,
+    externalFileKey?: CryptoKey // Optional for guest case where user key is provided
   ): Promise<{
     fileName: {
       encrypted: ArrayBuffer;
@@ -198,19 +199,10 @@ export class EncryptionService {
       iv: string;
     };
     encryptedKey: string; // Single key for all data
+    fileKey: CryptoKey; // Return the file key so it can be rewrapped in the guest process
   }> {
-    console.log('🔐 Starting complete record encryption...');
-    console.log('  - FileName:', fileName ? 'Yes' : 'No');
-    console.log('  - File:', file ? 'Yes' : 'No');
-    console.log('  - ExtractedText:', extractedText ? 'Yes' : 'No');
-    console.log('  - OriginalText:', originalText ? 'Yes' : 'No');
-    console.log('  - contextText:', contextText ? 'Yes' : 'No');
-    console.log('  - FHIR:', fhirData ? 'Yes' : 'No');
-    console.log('  - BelroseFields:', belroseFields ? 'Yes' : 'No');
-    console.log('  - CustomData:', customData ? 'Yes' : 'No');
-
     //Generate key for all data in this record
-    const fileKey = await this.generateFileKey();
+    const fileKey = externalFileKey ?? (await this.generateFileKey());
 
     const result: any = {};
 
@@ -310,6 +302,7 @@ export class EncryptionService {
     console.log('    ✓ File key encrypted');
 
     console.log('✅ Complete record encryption finished');
+    result.fileKey = fileKey; // Return the file key for potential reuse in sharing, etc.
     return result;
   }
 
