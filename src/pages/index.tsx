@@ -134,10 +134,8 @@ const Index: React.FC = () => {
           ══════════════════════════════════════════════ */}
       <div className="hidden md:flex fixed inset-0 flex-col bg-white">
         {/* Navbar */}
-        <div className="flex-shrink-0 z-40 relative">
-          <WaitlistBanner />
-          <Navbar />
-        </div>
+        <WaitlistBanner />
+        <Navbar />
 
         {/* Section panels */}
         <div className="relative flex-1 overflow-hidden">

@@ -367,4 +367,53 @@ export const citations: Record<string, Citation> = {
       "SingHealth’s IT system target of cyberattack. (2018, July 20). Ministry of Health. https://www.moh.gov.sg/newsroom/singhealth's-it-system-target-of-cyberattack/",
     url: "https://www.moh.gov.sg/newsroom/singhealth's-it-system-target-of-cyberattack/",
   },
+  'gdpr-text': {
+    num: 38,
+    year: '2016',
+    title:
+      'GDPR Article 15(3) states "the controller shall provide a copy of personal data... in a commonly used electronic form"',
+    source: 'UK/EU Parliament',
+    apaCitation:
+      'European Parliament. (2016, April 27). Regulation (EU) 2016/679 of the European Parliament and of the Council of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data (United Kingdom General Data Protection Regulation) (Text with EEA relevance). https://www.legislation.gov.uk/eur/2016/679/article/15',
+    url: 'https://www.legislation.gov.uk/eur/2016/679/article/15',
+  },
+  'ico-deadline': {
+    num: 39,
+    year: '2025',
+    title:
+      'Per ICO: "[Controllers] must comply with a SAR... within one month of receipt of the request"',
+    source: "Information Commissioner's Office",
+    apaCitation:
+      'Information Commissioner’s Office. (2025, December 8). What should we consider when responding to a request? ICO. https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/individual-rights/right-of-access/what-should-we-consider-when-responding-to-a-request/#HowLongToComply',
+    url: 'https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/individual-rights/right-of-access/what-should-we-consider-when-responding-to-a-request/#HowLongToComply',
+  },
+  'ico-how': {
+    num: 40,
+    year: '2025',
+    title: 'ICO guidance references controllers "[asking] the person for their preferred format"',
+    source: "Information Commissioner's Office",
+    apaCitation:
+      'Information Commissioner’s Office. (2025, December 8). How can we supply information to the requester? Information Commissioner’s Office. https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/individual-rights/right-of-access/how-can-we-supply-information-to-the-requester/',
+    url: 'https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/individual-rights/right-of-access/how-can-we-supply-information-to-the-requester/?search=burden',
+  },
+  'cures-act-fhir': {
+    num: 41,
+    year: '2020',
+    title:
+      'ONC 21st Century Cures Act Final Rule establishes FHIR R4 as mandatory standard for health IT certification',
+    source: 'Department of Health and Human Services',
+    apaCitation:
+      'Department of Health and Human Services. (2020, August 4). 21st Century Cures Act: Interoperability, information blocking, and the ONC Health IT Certification Program. Federal Register. https://www.federalregister.gov/documents/2020/05/01/2020-07419/21st-century-cures-act-interoperability-information-blocking-and-the-onc-health-it-certification',
+    url: 'https://www.federalregister.gov/documents/2020/05/01/2020-07419/21st-century-cures-act-interoperability-information-blocking-and-the-onc-health-it-certification',
+  },
+  'dua-act-2025': {
+    num: 42,
+    year: '2025',
+    title:
+      'Data (Use and Access) Act 2025 mandates standardised data frameworks across NHS and social care in England, including FHIR',
+    source: 'National Health Service',
+    apaCitation:
+      'UK Core FHIR Release 4 - Governance - NHS Standards Directory. (2025, December 1). https://standards.nhs.uk/published-standards/uk-core-fhir-release-4-governance',
+    url: 'https://standards.nhs.uk/published-standards/uk-core-fhir-release-4-governance',
+  },
 };

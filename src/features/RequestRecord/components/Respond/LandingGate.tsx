@@ -85,16 +85,16 @@ const LandingGate: React.FC<LandingGateProps> = ({
             <p>
               Your patient, <strong className="text-primary">{recordRequest.requesterName}</strong>{' '}
               (cc'd on this email), has submitted a <strong>GDPR Article 15</strong> subject access
-              request for their personal health records held by your organisation via the Belrose
-              Health platform. Under GDPR, covered entities are required to provide patients with
-              access to their records within 30 days of a written request.
+              request via the Belrose Health platform for their personal health records. Under GDPR,
+              covered entities are required to provide patients with access to their records within
+              30 days of a written request.
             </p>
 
             <p>
               This request was submitted on <strong className="text-primary">{requestDate}</strong>.
-              Respond by <strong className="text-primary">{deadline}</strong>. Our platform can
-              accept PDFs, handwritten notes, images, and any other format as long as it is accurate
-              and legible.
+              Please respond by <strong className="text-primary">{deadline}</strong>. Our platform
+              can accept PDFs, handwritten notes, images, and any other format as long as it is
+              accurate and legible.
             </p>
           </div>
 

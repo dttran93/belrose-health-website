@@ -238,8 +238,8 @@ const countryData: CountryEntry[] = [
           Estonia's success should not be diminished; it proves that when the conditions are right,
           centralized health infrastructure can unlock profound benefits. However, it does not prove
           those conditions can be easily replicated. For countries that are significantly larger,
-          older, and more skeptical, Estonia is less an aspirational model than a reminder of what
-          could never be.
+          older, and more skeptical, Estonia is less an aspirational model than a reminder of a ship
+          that has long since sailed.
         </p>
       </>
     ),

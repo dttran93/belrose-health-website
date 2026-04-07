@@ -57,6 +57,11 @@ export const createRecordRequest = onCall(
     const requesterData = requesterDoc.data()!;
     const requesterPublicKey = requesterData.encryption?.publicKey;
     const requesterEmail = requesterData.email ?? '';
+    const now = new Date();
+    const deadline = new Date(now);
+    deadline.setDate(deadline.getDate() + 30);
+
+    const createdAt = admin.firestore.FieldValue.serverTimestamp();
 
     if (!requesterPublicKey) {
       throw new HttpsError(
@@ -93,7 +98,8 @@ export const createRecordRequest = onCall(
       requestNote: requestNote ?? null,
       inviteCode,
       status: 'pending', // pending | fulfilled | declined
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt,
+      deadline,
       fulfilledRecordId: null,
     };
 
@@ -116,7 +122,7 @@ export const createRecordRequest = onCall(
         cc: requesterEmail,
         from: 'Belrose Health <noreply@belrosehealth.com>',
         subject: `${requesterName} is requesting their health records`,
-        html: buildRequestEmail(requesterName, fulfillUrl, requestNote),
+        html: buildRequestEmail(requesterName, fulfillUrl, requesterEmail, now, deadline),
       });
       console.log(`✅ Record request email sent to ${targetEmail}`);
     } catch (emailError) {
@@ -135,180 +141,144 @@ export const createRecordRequest = onCall(
 function buildRequestEmail(
   requesterName: string,
   fulfillUrl: string,
-  requestNote?: string | null
+  requesterEmail: string,
+  requestedDate: Date,
+  deadline: Date
 ): string {
   const year = new Date().getFullYear();
   const marketingUrl = 'https://www.belrosehealth.com';
-
-  const noteBlock = requestNote
-    ? `
-    <div style="background:#f8fafc; border-left:4px solid #3b82f6; border-radius:0 8px 8px 0; padding:16px 20px; margin:20px 0;">
-      <p style="font-size:13px; font-weight:600; color:#1e3a5f; margin:0 0 6px;">Message from ${requesterName}:</p>
-      <p style="font-size:14px; color:#334155; margin:0; line-height:1.6;">${requestNote}</p>
-    </div>`
-    : '';
+  const formattedRequest = requestedDate.toLocaleDateString('en-GB', { dateStyle: 'long' });
+  const formattedDeadline = deadline.toLocaleDateString('en-GB', { dateStyle: 'long' });
 
   return `
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${requesterName} is requesting their health records</title>
-    <style>
-      body {
-        margin: 0;
-        padding: 0;
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        background: #f4f4f5;
-        color: #18181b;
-      }
-      .wrapper {
-        max-width: 560px;
-        margin: 40px auto;
-        background: #fff;
-        border-radius: 16px;
-        overflow: hidden;
-        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-      }
-      .header {
-        background: #0f172a;
-        padding: 40px 40px 32px;
-        text-align: center;
-      }
-      .badge {
-        display: inline-block;
-        background: #3b82f620;
-        color: #60a5fa;
-        font-size: 12px;
-        font-weight: 600;
-        letter-spacing: 0.5px;
-        text-transform: uppercase;
-        padding: 4px 12px;
-        border-radius: 100px;
-        border: 1px solid #3b82f640;
-      }
-      .header h1 {
-        color: #f8fafc;
-        font-size: 24px;
-        font-weight: 700;
-        margin: 16px 0 8px;
-        letter-spacing: -0.5px;
-      }
-      .header p {
-        color: #94a3b8;
-        font-size: 14px;
-        margin: 0;
-      }
-      .body {
-        padding: 36px 40px;
-      }
-      .body p {
-        font-size: 15px;
-        line-height: 1.7;
-        color: #3f3f46;
-        margin: 0 0 16px;
-      }
-      .cta-block {
-        text-align: center;
-        margin: 28px 0;
-      }
-      .cta-button {
-        display: inline-block;
-        background: #0f172a;
-        color: #ffffff !important;
-        text-decoration: none;
-        padding: 14px 36px;
-        border-radius: 10px;
-        font-size: 15px;
-        font-weight: 600;
-      }
-      .info-block {
-        background: #f0f9ff;
-        border: 1px solid #bae6fd;
-        border-radius: 12px;
-        padding: 20px 24px;
-        margin: 24px 0;
-      }
-      .info-block p {
-        font-size: 14px;
-        color: #0c4a6e;
-        margin: 0;
-        line-height: 1.7;
-      }
-      .divider {
-        height: 1px;
-        background: #f1f5f9;
-        margin: 24px 0;
-      }
-      .footer {
-        background: #f8fafc;
-        padding: 20px 40px;
-        text-align: center;
-      }
-      .footer p {
-        font-size: 12px;
-        color: #94a3b8;
-        margin: 0;
-        line-height: 1.6;
-      }
-    </style>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Subject Access Request — ${requesterName}</title>
   </head>
-  <body>
-    <div class="wrapper">
-      <div class="header">
-        <span class="badge">Record Requested</span>
-        <h1>You have a record request</h1>
-        <p>${requesterName} has requested their health records via Belrose Health</p>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      background: #f1f5f9;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      color: #18181b;
+    "
+  >
+    <div style="max-width: 580px; margin: 40px auto">
+      <!-- Letterhead -->
+      <table style="background: #0f172a; border-radius: 16px 16px 0 0; width: 100%;
+        border-collapse: collapse;">
+        <tr>
+          <td style="padding: 24px 40px;">
+            <p style="margin: 0; font-size: 13px; font-weight: 700; color: #f8fafc;
+              letter-spacing: 1px; text-transform: uppercase;">Belrose Health</p>
+            <p style="margin: 3px 0 0; font-size: 11px; color: #64748b;">Secure Health Record Platform</p>
+          </td>
+          <td style="padding: 24px 40px; text-align: right; white-space: nowrap;">
+            <span style="background: #ffffff15; border: 1px solid #ffffff20; border-radius: 100px;
+              padding: 5px 12px; font-size: 11px; color: #94a3b8;">🔒 End-to-end encrypted</span>
+          </td>
+        </tr>
+      </table>
+
+      <!-- Legal classification band -->
+      <div style="background: #1e3a5f; padding: 12px 40px">
+        <p
+          style="
+            margin: 0;
+            font-size: 11px;
+            color: #93c5fd;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+          "
+        >
+          GDPR Article 15 &nbsp;·&nbsp; Subject Access Request
+        </p>
       </div>
 
-      <div class="body">
-        <p>Hi there,</p>
-        <p>
-          <strong>${requesterName}</strong> (cc'd on this email) has requested that you share their health records with
-          them securely via Belrose Health.
+      <!-- Body -->
+      <div style="background: #ffffff; padding: 36px 40px">
+        <p style="font-size: 12px; color: #94a3b8; margin: 0 0 20px">${formattedRequest}</p>
+
+        <p style="font-size: 15px; color: #0f172a; line-height: 1.7; margin: 0 0 16px">
+          Dear healthcare provider,
         </p>
 
-        ${noteBlock}
-
-        <div class="cta-block">
-          <a href="${fulfillUrl}" class="cta-button">Upload Your Records →</a>
-        </div>
-
-        <p style="font-size: 13px; color: #94a3b8; text-align: center; margin-top: -12px">
-          Under GDPR Article 15 (UK/EU) and HIPAA 45 CFR §164.524 (US), covered entities are legally
-          required to provide patients with their records within 30 days of request.
+        <!-- Lead with the legal obligation immediately -->
+        <p style="font-size: 15px; color: #0f172a; line-height: 1.7; margin: 0 0 16px">
+          This is a <strong>Subject Access Request</strong> via Belrose Health from your patient,
+          <strong style="color: #0f172a">${requesterName}</strong>
+          (cc'd on this email: ${requesterEmail}), for a copy of their personal health records
+          held by your organisation.
         </p>
 
-        <div class="divider"></div>
+        <p style="font-size: 15px; color: #0f172a; line-height: 1.7; margin: 0 0 20px">
+          Under <strong>GDPR Article 15</strong> covered entities are obligated to provide patients
+          with their records within <strong>30 days</strong> of a written request. This request was
+          submitted on <strong style="color: #0f172a">${formattedRequest}</strong>. Please respond by
+          <strong style="color: #0f172a">${formattedDeadline}</strong>.
+        </p>
 
-        <div class="info-block">
-          <p><strong>How it works</strong></p>
-          <p>
-            Clicking the link above takes you to a secure upload page. Your file is encrypted in
-            your browser using ${requesterName}'s public key before it ever leaves your device —
-            meaning only they can read it. Belrose cannot access the contents.
-          </p>
-        </div>
+        <p style="font-size: 15px; color: #0f172a; line-height: 1.7; margin: 0 0 20px">
+          Click <a href="${marketingUrl}/for-providers">here</a> for more information on your legal
+          obligations and to learn how Belrose Health works.
+        </p>
 
-        <div class="divider"></div>
-        <p style="text-align: center; font-size: 13px; color: #94a3b8">
-          Questions? Reach us at
-          <a href="mailto:hello@belrosehealth.com" style="color: #64748b"
-            >hello@belrosehealth.com</a
+        <!-- CTA -->
+        <div style="text-align: center; margin: 28px 0 10px">
+          <a
+            href="${fulfillUrl}"
+            style="
+              display: inline-block;
+              background: #0f172a;
+              color: #ffffff;
+              text-decoration: none;
+              padding: 14px 40px;
+              border-radius: 10px;
+              font-size: 15px;
+              font-weight: 600;
+            "
           >
-          or learn more at <a href="${marketingUrl}" style="color: #64748b">belrosehealth.com</a>.
+            Upload Records Securely →
+          </a>
+        </div>
+
+        <div style="height: 1px; background: #f1f5f9; margin: 0 0 24px"></div>
+
+        <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0">
+          Questions?
+          <a href="mailto:requests@belrosehealth.com" style="color: #64748b"
+            >requests@belrosehealth.com</a
+          >
+          &nbsp;·&nbsp; <a href="${marketingUrl}" style="color: #64748b">belrosehealth.com</a>
         </p>
       </div>
 
-      <div class="footer">
-        <p>
-          © ${year} Belrose Health. All rights reserved.<br />
-          You received this because someone requested their records from you via Belrose.
+      <!-- Footer -->
+      <div
+        style="
+          background: #f8fafc;
+          border-radius: 0 0 16px 16px;
+          padding: 16px 40px;
+          border-top: 1px solid #e2e8f0;
+        "
+      >
+        <p style="font-size: 11px; color: #94a3b8; margin: 0 0 4px">
+          © ${year} Belrose Health Ltd. All rights reserved.
+        </p>
+        <p style="font-size: 11px; color: #94a3b8; margin: 0">
+          You received this because a patient submitted a Subject Access Request via Belrose.
+          Belrose Health is a designated recipient and is not acting on behalf of the patient in a
+          legal capacity.
         </p>
       </div>
     </div>
   </body>
 </html>
+
 `;
 }

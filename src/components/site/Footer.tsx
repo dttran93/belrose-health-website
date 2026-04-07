@@ -1,5 +1,5 @@
-import React from 'react';
 import { HeartPulse } from 'lucide-react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 
 interface LinkItem {
@@ -11,17 +11,20 @@ const Footer: React.FC = () => {
   const currentYear: number = new Date().getFullYear();
 
   const links = {
+    users: [
+      { name: 'Privacy', href: '/privacy' },
+      { name: 'For Providers', href: '/for-providers' },
+      { name: 'FAQ', href: '/#faq' },
+    ],
+    product: [
+      { name: 'How It Works', href: '/#how' },
+      { name: 'Login', href: '/auth' },
+      { name: 'Register', href: '/auth/register' },
+    ],
     company: [
       { name: 'About Us', href: '/#about' },
       { name: 'Careers', href: '/#who' },
       { name: 'Contact', href: '/#who/contact' },
-      { name: 'Privacy', href: '/privacy' },
-    ],
-    product: [
-      { name: 'How It Works', href: '/#how' },
-      { name: 'FAQ', href: '/#faq' },
-      { name: 'Login', href: '/auth' },
-      { name: 'Register', href: '/auth/register' },
     ],
   };
 
@@ -44,9 +47,9 @@ const Footer: React.FC = () => {
 
           <div className="flex gap-12 md:gap-16 justify-center">
             <div>
-              <h3 className="font-semibold text-white mb-4">Company</h3>
+              <h3 className="font-semibold text-white mb-4">For Users</h3>
               <ul className="space-y-2">
-                {links.company.map((link: LinkItem, index: number) => (
+                {links.users.map((link: LinkItem, index: number) => (
                   <li key={index}>
                     <a
                       href={link.href}
@@ -63,6 +66,21 @@ const Footer: React.FC = () => {
               <h3 className="font-semibold text-white mb-4">Product</h3>
               <ul className="space-y-2">
                 {links.product.map((link: LinkItem, index: number) => (
+                  <li key={index}>
+                    <Link
+                      to={link.href}
+                      className="text-gray-400 hover:text-white transition-colors"
+                    >
+                      {link.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold text-white mb-4">Company</h3>
+              <ul className="space-y-2">
+                {links.company.map((link: LinkItem, index: number) => (
                   <li key={index}>
                     <Link
                       to={link.href}

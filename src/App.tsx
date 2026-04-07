@@ -32,6 +32,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import { RequiresPlatformAdmin } from './features/Users/components/RequirePlatformAdmin';
 import FulfillRequestPage from './pages/FulfillRequestPage';
 import RecordRequestsPage from './pages/RecordRequestsPage';
+import ForProviders from './pages/ForProviders';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
@@ -48,6 +49,7 @@ const App: React.FC = (): React.JSX.Element => {
                 {/* ── Public site shell ── */}
                 <Route path="/" element={<Index />} />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/for-providers" element={<ForProviders />} />
 
                 {/* ── Auth & verification ── */}
                 <Route path="/auth" element={<Auth />} />
