@@ -1,166 +1,172 @@
-'use strict';
+"use strict";
 // functions/src/handlers/createRecordRequest.ts
-var __createBinding =
-  (this && this.__createBinding) ||
-  (Object.create
-    ? function (o, m, k, k2) {
-        if (k2 === undefined) k2 = k;
-        var desc = Object.getOwnPropertyDescriptor(m, k);
-        if (!desc || ('get' in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-          desc = {
-            enumerable: true,
-            get: function () {
-              return m[k];
-            },
-          };
-        }
-        Object.defineProperty(o, k2, desc);
-      }
-    : function (o, m, k, k2) {
-        if (k2 === undefined) k2 = k;
-        o[k2] = m[k];
-      });
-var __setModuleDefault =
-  (this && this.__setModuleDefault) ||
-  (Object.create
-    ? function (o, v) {
-        Object.defineProperty(o, 'default', { enumerable: true, value: v });
-      }
-    : function (o, v) {
-        o['default'] = v;
-      });
-var __importStar =
-  (this && this.__importStar) ||
-  (function () {
-    var ownKeys = function (o) {
-      ownKeys =
-        Object.getOwnPropertyNames ||
-        function (o) {
-          var ar = [];
-          for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-          return ar;
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
         };
-      return ownKeys(o);
+        return ownKeys(o);
     };
     return function (mod) {
-      if (mod && mod.__esModule) return mod;
-      var result = {};
-      if (mod != null)
-        for (var k = ownKeys(mod), i = 0; i < k.length; i++)
-          if (k[i] !== 'default') __createBinding(result, mod, k[i]);
-      __setModuleDefault(result, mod);
-      return result;
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
     };
-  })();
-Object.defineProperty(exports, '__esModule', { value: true });
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 exports.createRecordRequest = void 0;
-const https_1 = require('firebase-functions/v2/https');
-const admin = __importStar(require('firebase-admin'));
-const params_1 = require('firebase-functions/params');
-const crypto = __importStar(require('crypto'));
-const resend_1 = require('resend');
+const https_1 = require("firebase-functions/v2/https");
+const admin = __importStar(require("firebase-admin"));
+const params_1 = require("firebase-functions/params");
+const crypto = __importStar(require("crypto"));
+const resend_1 = require("resend");
+const guestAccountUtils_1 = require("../utils/guestAccountUtils");
 const resendKey = (0, params_1.defineSecret)('RESEND_API_KEY');
 // ==================== MAIN FUNCTION ====================
-exports.createRecordRequest = (0, https_1.onCall)({ secrets: [resendKey] }, async request => {
-  // ── Auth check ──────────────────────────────────────────────────────────
-  if (!request.auth) {
-    throw new https_1.HttpsError('unauthenticated', 'You must be logged in to request records.');
-  }
-  const requesterId = request.auth.uid;
-  const { targetEmail, requesterName, requestNote } = request.data;
-  // ── Input validation ─────────────────────────────────────────────────────
-  if (!targetEmail || !requesterName) {
-    throw new https_1.HttpsError('invalid-argument', 'targetEmail and requesterName are required.');
-  }
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(targetEmail)) {
-    throw new https_1.HttpsError('invalid-argument', 'Invalid email address.');
-  }
-  const db = admin.firestore();
-  // ── Fetch requester's public key ─────────────────────────────────────────
-  // We snapshot it now so the fulfill page never needs a second Firestore
-  // read — everything it needs is in the single recordRequests document.
-  const requesterDoc = await db.collection('users').doc(requesterId).get();
-  if (!requesterDoc.exists) {
-    throw new https_1.HttpsError('not-found', 'Requester profile not found.');
-  }
-  const requesterData = requesterDoc.data();
-  const requesterPublicKey = requesterData.encryption?.publicKey;
-  const requesterEmail = requesterData.email ?? '';
-  const now = new Date();
-  const deadline = new Date(now);
-  deadline.setDate(deadline.getDate() + 30);
-  const createdAt = admin.firestore.FieldValue.serverTimestamp();
-  if (!requesterPublicKey) {
-    throw new https_1.HttpsError(
-      'failed-precondition',
-      'Your encryption keys are not set up. Please complete account setup first.'
-    );
-  }
-  // ── Check if target is already a Belrose user ────────────────────────────
-  // Purely informational — we still send the magic link either way, but
-  // storing targetUserId lets the fulfill page skip creating a guest session
-  // if they're already logged in.
-  let targetUserId = null;
-  try {
-    const targetAuthUser = await admin.auth().getUserByEmail(targetEmail);
-    targetUserId = targetAuthUser.uid;
-  } catch (err) {
-    if (err.code !== 'auth/user-not-found') {
-      throw new https_1.HttpsError('internal', 'Failed to check for existing user.');
+exports.createRecordRequest = (0, https_1.onCall)({ secrets: [resendKey] }, async (request) => {
+    // ── Auth check ──────────────────────────────────────────────────────────
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'You must be logged in to request records.');
     }
-    // Not found is fine — targetUserId stays null
-  }
-  // ── Build the request document ───────────────────────────────────────────
-  const inviteCode = crypto.randomBytes(32).toString('hex');
-  const requestDoc = {
-    requesterId,
-    requesterEmail,
-    requesterName,
-    requesterPublicKey, // Snapshotted — fulfil page reads this directly
-    targetEmail,
-    targetUserId, // null if non-user
-    requestNote: requestNote ?? null,
-    inviteCode,
-    status: 'pending', // pending | fulfilled | declined
-    createdAt,
-    deadline,
-    fulfilledRecordId: null,
-  };
-  const docRef = db.collection('recordRequests').doc(inviteCode);
-  await docRef.set(requestDoc);
-  console.log(`✅ recordRequests document created: ${docRef.id}`);
-  // ── Send email ───────────────────────────────────────────────────────────
-  const appUrl = 'https://belrosehealth.com';
-  // The inviteCode is the only thing in the URL — no sensitive data in transit.
-  // The fulfill page reads the requesterPublicKey from the Firestore document
-  // after validating the code, which is safer than putting it in the URL.
-  const fulfillUrl = `${appUrl}/fulfill-request?code=${inviteCode}`;
-  const resend = new resend_1.Resend(resendKey.value());
-  try {
-    await resend.emails.send({
-      to: targetEmail,
-      cc: requesterEmail,
-      from: 'Belrose Health <noreply@belrosehealth.com>',
-      subject: `${requesterName} is requesting their health records`,
-      html: buildRequestEmail(requesterName, fulfillUrl, requesterEmail, now, deadline),
+    const requesterId = request.auth.uid;
+    const { targetEmail, requesterName, requestNote } = request.data;
+    // ── Input validation ─────────────────────────────────────────────────────
+    if (!targetEmail || !requesterName) {
+        throw new https_1.HttpsError('invalid-argument', 'targetEmail and requesterName are required.');
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(targetEmail)) {
+        throw new https_1.HttpsError('invalid-argument', 'Invalid email address.');
+    }
+    const db = admin.firestore();
+    // ── Fetch requester's public key ─────────────────────────────────────────
+    // We snapshot it now so the fulfill page never needs a second Firestore
+    // read — everything it needs is in the single recordRequests document.
+    const requesterDoc = await db.collection('users').doc(requesterId).get();
+    if (!requesterDoc.exists) {
+        throw new https_1.HttpsError('not-found', 'Requester profile not found.');
+    }
+    const requesterData = requesterDoc.data();
+    const requesterPublicKey = requesterData.encryption?.publicKey;
+    const requesterEmail = requesterData.email ?? '';
+    if (!requesterPublicKey) {
+        throw new https_1.HttpsError('failed-precondition', 'Your encryption keys are not set up. Please complete account setup first.');
+    }
+    // ── Create or retrieve guest account for the provider ────────────────────
+    // We create the guest account at request-send time so:
+    //   1. The private key can go in the email link fragment immediately
+    //   2. redeemGuestInvite can be reused as-is for token minting
+    //   3. The provider's public key is ready to wrap the file key on upload
+    const { guestUid: providerGuestUid, privateKeyBase64: providerPrivateKey, isNewGuest, guestIdHash, guestWallet, publicKeyBase64: providerPublicKey, } = await (0, guestAccountUtils_1.createOrRetrieveGuestAccount)(targetEmail);
+    // ── Check if provider is already a full Belrose user ────────────────────
+    let targetUserId = null;
+    try {
+        const targetAuthUser = await admin.auth().getUserByEmail(targetEmail);
+        const targetProfile = await db.collection('users').doc(targetAuthUser.uid).get();
+        const isFullAccount = targetProfile.exists && !targetProfile.data()?.isGuest;
+        if (isFullAccount) {
+            targetUserId = targetAuthUser.uid;
+        }
+    }
+    catch {
+        // Not found — providerGuestUid covers this case
+    }
+    // ── Compute dates ─────────────────────────────────────────────────────────
+    const requestDate = new Date();
+    const deadline = new Date(requestDate);
+    deadline.setDate(deadline.getDate() + 30);
+    // ── Write recordRequests document ────────────────────────────────────────
+    const inviteCode = crypto.randomBytes(32).toString('hex');
+    const requestDoc = {
+        requesterId,
+        requesterEmail,
+        requesterName,
+        requesterPublicKey, // Snapshotted — fulfil page reads this directly
+        targetEmail,
+        targetUserId,
+        providerGuestUid,
+        providerPublicKey,
+        requestNote: requestNote ?? null,
+        inviteCode,
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        deadline: admin.firestore.Timestamp.fromDate(deadline),
+        fulfilledRecordId: null,
+    };
+    const docRef = db.collection('recordRequests').doc(inviteCode);
+    await docRef.set(requestDoc);
+    console.log(`✅ recordRequests document created: ${docRef.id}`);
+    // ── Write guestInvites document ──────────────────────────────────────────
+    // recordIds is empty — provider is uploading a new record, not accessing
+    // existing ones. recordRequestId links back for context.
+    const { inviteCode: guestInviteCode } = await (0, guestAccountUtils_1.writeGuestInviteDoc)({
+        guestUid: providerGuestUid,
+        invitedBy: requesterId,
+        guestEmail: targetEmail,
+        recordIds: [],
+        guestIdHash,
+        guestWallet,
+        isNewGuest,
+        durationSeconds: 2 * 365 * 24 * 60 * 60, // 2 years - provider may delay, but if more than 2 years probably a ghost account, should be cleaned up
+        context: 'record_request',
+        recordRequestId: inviteCode,
     });
-    console.log(`✅ Record request email sent to ${targetEmail}`);
-  } catch (emailError) {
-    // Don't fail the whole function — the Firestore doc is created and the
-    // requester can resend manually. Log for debugging.
-    console.error('⚠️  Failed to send request email:', emailError);
-    console.log(`🔗 Fulfill URL (dev only): ${fulfillUrl}`);
-  }
-  return { success: true, requestId: inviteCode };
+    // ── Send email ────────────────────────────────────────────────────────────
+    // Private key in URL fragment — never hits the server, never logged.
+    // FulfillRequestPage reads window.location.hash to get the private key,
+    // then calls redeemGuestInvite with guestCode to get the custom token.
+    const appUrl = 'https://belrosehealth.com';
+    // The inviteCode is the only thing in the URL — no sensitive data in transit.
+    // The fulfill page reads the requesterPublicKey from the Firestore document
+    // after validating the code, which is safer than putting it in the URL.
+    const fulfillUrl = `${appUrl}/fulfill-request?code=${inviteCode}&guestCode=${guestInviteCode}` +
+        `#${providerPrivateKey}`;
+    const resend = new resend_1.Resend(resendKey.value());
+    try {
+        await resend.emails.send({
+            to: targetEmail,
+            cc: requesterEmail,
+            from: 'Belrose Health <noreply@belrosehealth.com>',
+            subject: `${requesterName} is requesting their health records`,
+            html: buildRequestEmail(requesterName, fulfillUrl, requesterEmail, requestDate, deadline),
+        });
+        console.log(`✅ Record request email sent to ${targetEmail}, CC: ${requesterEmail}`);
+    }
+    catch (emailError) {
+        // Don't fail the whole function — the Firestore doc is created and the
+        // requester can resend manually. Log for debugging.
+        console.error('⚠️  Failed to send request email:', emailError);
+        console.log(`🔗 Fulfill URL (dev only): ${fulfillUrl}`);
+    }
+    return { success: true, requestId: inviteCode };
 });
 // ==================== EMAIL TEMPLATE ====================
 function buildRequestEmail(requesterName, fulfillUrl, requesterEmail, requestedDate, deadline) {
-  const year = new Date().getFullYear();
-  const marketingUrl = 'https://www.belrosehealth.com';
-  const formattedRequest = requestedDate.toLocaleDateString('en-GB', { dateStyle: 'long' });
-  const formattedDeadline = deadline.toLocaleDateString('en-GB', { dateStyle: 'long' });
-  return `
+    const year = new Date().getFullYear();
+    const marketingUrl = 'https://www.belrosehealth.com';
+    const formattedRequest = requestedDate.toLocaleDateString('en-GB', { dateStyle: 'long' });
+    const formattedDeadline = deadline.toLocaleDateString('en-GB', { dateStyle: 'long' });
+    return `
 <!doctype html>
 <html lang="en">
   <head>
@@ -268,6 +274,7 @@ function buildRequestEmail(requesterName, fulfillUrl, requesterEmail, requestedD
         </p>
       </div>
 
+      <!-- Footer -->
       <div
         style="
           background: #f8fafc;

@@ -37,7 +37,7 @@ const HowRequestsWork: React.FC<HowRequestsWorkProps> = ({ onBack }) => (
         </h3>
         <p className="text-sm text-slate-700 leading-relaxed mb-1">
           Upload whatever you have, PDFs, Word docs, scanned images, handwritten notes anything
-          legible works. There is no required format and no new documents to create.
+          legible works. There is no required format.
         </p>
         <p className="text-sm text-slate-700 leading-relaxed">
           Once received, Belrose's converts the record into <strong>FHIR format</strong> — the
@@ -51,9 +51,8 @@ const HowRequestsWork: React.FC<HowRequestsWorkProps> = ({ onBack }) => (
       <section className="text-left">
         <h3 className="text-base font-bold text-slate-900 mb-2">2. Your upload is private</h3>
         <p className="text-sm text-slate-700 leading-relaxed mb-1">
-          Before your file leaves your browser, it is encrypted using the patient's cryptographic
-          key. Only the patient and you (if you make an account) have the key. No third-party,
-          including Belrose, can read the contents.
+          Your file is encrypted before it leaves your browser. Only the patient and you (if you
+          make an account) have the key. No third-party, including Belrose, can read the contents.
         </p>
       </section>
 

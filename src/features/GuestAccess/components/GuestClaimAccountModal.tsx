@@ -40,11 +40,15 @@ interface ClaimProgress {
 interface GuestClaimAccountModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onComplete?: () => void;
+  guestContext?: 'sharing' | 'record_request';
 }
 
 export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
   isOpen,
   onClose,
+  onComplete,
+  guestContext,
 }) => {
   const { user, refreshUser } = useAuthContext();
 
@@ -91,7 +95,7 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
       setError('Password must be at least 8 characters.');
       return;
     }
-    if (!EncryptionKeyManager.hasGuestFileKeys()) {
+    if (guestContext !== 'record_request' && !EncryptionKeyManager.hasGuestFileKeys()) {
       setError(
         'Your session has expired. Please click the invite link again before creating an account.'
       );
@@ -158,33 +162,33 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
       const db = getFirestore();
       const batch = writeBatch(db);
 
-      if (!guestFileKeys || guestFileKeys.size === 0) {
+      const shouldCheckKeys = guestContext !== 'record_request';
+      const hasKeys = guestFileKeys !== null && guestFileKeys.size > 0;
+
+      if (shouldCheckKeys && !hasKeys) {
         setError('Your session has expired. Please click the invite link again.');
         setStep('recovery');
         return;
       }
 
-      // ── Step 1: Re-wrap all guest file keys with new RSA public key ──────────
-      setProgress({ message: 'Re-encrypting record access keys...' });
+      // ── Step 1: Re-wrap guest file keys (sharing flow only) ───────────────────
       const newRsaPublicKey = await SharingKeyManagementService.importPublicKey(
         cryptoData.publicKey
       );
 
-      const reWrappedKeys: Record<string, string> = {};
-      for (const [recordId, fileKey] of guestFileKeys) {
-        const docId = `${recordId}_${guestUid}`;
-        reWrappedKeys[docId] = await SharingKeyManagementService.wrapKey(fileKey, newRsaPublicKey);
-      }
-
-      for (const [docId, newWrappedKey] of Object.entries(reWrappedKeys)) {
-        const wrappedKeyRef = doc(db, 'wrappedKeys', docId);
-        batch.update(wrappedKeyRef, {
-          wrappedKey: newWrappedKey,
-          isCreator: false,
-          isGuest: false,
-          expiresAt: deleteField(),
-          claimedAt: serverTimestamp(),
-        });
+      if (hasKeys) {
+        setProgress({ message: 'Re-encrypting record access keys...' });
+        for (const [recordId, fileKey] of guestFileKeys!) {
+          const docId = `${recordId}_${guestUid}`;
+          const rewrapped = await SharingKeyManagementService.wrapKey(fileKey, newRsaPublicKey);
+          batch.update(doc(db, 'wrappedKeys', docId), {
+            wrappedKey: rewrapped,
+            isCreator: false,
+            isGuest: false,
+            expiresAt: deleteField(),
+            claimedAt: serverTimestamp(),
+          });
+        }
       }
 
       // ── Step 2: Set password on Firebase Auth account ────────────────────────
@@ -272,23 +276,32 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
       await SmartAccountService.ensureFullyInitialized();
 
       // ── Step 8: Updating user status on chain to Active ────────────────────────────────────
-      setProgress({ message: 'Updating status on distributed network...' });
-      await MemberRegistryBlockchain.setUserStatus(guestUid, 2);
+      // In the sharing flow, grantGuestAccess sets status to Guest on-chain.
+      // registerMemberWallet (step 6) doesn't override it since the identity
+      // already exists. So we need to explicitly set Active here.
+      //
+      // In the request flow, registerMemberWallet creates a new identity and
+      // automatically sets Active — calling setUserStatus would revert.
+      if (guestContext !== 'record_request') {
+        setProgress({ message: 'Updating status on distributed network...' });
+        await MemberRegistryBlockchain.setUserStatus(guestUid, 2);
+      }
 
       // ── Step 9: Deactivate placeholder guest wallet on-chain (nice-to-have) ──
-      // The placeholder wallet has no real private key so it can't do anything
-      // harmful, but deactivating it keeps the on-chain identity clean.
-      try {
-        const placeholderWallet = user.onChainIdentity?.linkedWallets?.find(
-          w => w.address !== walletData.walletAddress
-        )?.address;
-        if (placeholderWallet) {
-          await MemberRegistryBlockchain.deactivateWallet(placeholderWallet);
-          console.log('✅ Placeholder wallet deactivated');
+      // Sharing flow only — in the request flow no placeholder wallet was ever
+      // registered on-chain so there's nothing to deactivate.
+      if (guestContext !== 'record_request') {
+        try {
+          const placeholderWallet = user.onChainIdentity?.linkedWallets?.find(
+            w => w.address !== walletData.walletAddress
+          )?.address;
+          if (placeholderWallet) {
+            await MemberRegistryBlockchain.deactivateWallet(placeholderWallet);
+            console.log('✅ Placeholder wallet deactivated');
+          }
+        } catch (err) {
+          console.warn('⚠️ Could not deactivate placeholder wallet:', err);
         }
-      } catch (err) {
-        // Non-fatal — placeholder can't do anything harmful anyway
-        console.warn('⚠️ Could not deactivate placeholder wallet:', err);
       }
 
       // ── Step 10: Generate Signal keys ─────────────────────────────────────────
@@ -328,6 +341,21 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
     setCryptoData(null);
     setAcknowledged(false);
     onClose();
+  };
+
+  const handleDone = () => {
+    setStep('credentials');
+    setError(null);
+    setPassword('');
+    setConfirmPassword('');
+    setCryptoData(null);
+    setAcknowledged(false);
+    // If caller provided onComplete, use it — otherwise fall back to onClose
+    if (onComplete) {
+      onComplete();
+    } else {
+      onClose();
+    }
   };
 
   return (
@@ -534,7 +562,7 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
                 <p className="text-sm text-slate-500 max-w-xs">
                   Your account is ready. You now have full access to all features.
                 </p>
-                <Button onClick={handleClose} className="mt-2">
+                <Button onClick={handleDone} className="mt-2">
                   Get Started
                 </Button>
               </div>

@@ -12,7 +12,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { Scale } from 'lucide-react';
+import { Cross } from 'lucide-react';
 import Navbar from '@/components/site/Navbar';
 import Footer from '@/components/site/Footer';
 import WaitlistBanner from '@/components/site/WaitlistBanner';
@@ -78,7 +78,7 @@ const ForProviders: React.FC = () => {
       <div className="bg-primary px-6 py-14">
         <div className="max-w-4xl mx-auto flex flex-col items-center gap-4 text-center">
           <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 text-white/70 text-xs font-medium px-3 py-1.5 rounded-full">
-            <Scale className="w-3.5 h-3.5" />
+            <Cross className="w-3.5 h-3.5" />
             For Healthcare Professionals
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight tracking-tight">
@@ -106,7 +106,7 @@ const ForProviders: React.FC = () => {
         <div className="max-w-4xl m-auto bg-primary rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-left">
             <p className="text-white font-semibold text-sm">
-              Let's change the world's medical system together
+              Let's change the world's health infrastructure together
             </p>
             <p className="text-white/60 text-xs mt-0.5">
               Creating an account takes under 2 minutes. No payment required.

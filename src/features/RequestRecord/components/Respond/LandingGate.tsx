@@ -13,36 +13,30 @@
  */
 
 import React from 'react';
-import { ArrowRight, Lock, ExternalLink, UserPlus, Shield } from 'lucide-react';
+import { ArrowRight, Lock, ExternalLink, UserPlus, Loader2, Upload, LogIn } from 'lucide-react';
 import type { RecordRequest } from '../../services/fulfillRequestService';
 
 interface LandingGateProps {
   recordRequest: RecordRequest;
+  // State 1: matching email already signed in
   isAlreadyLoggedIn: boolean;
-  onContinueWithAccount: () => void;
-  onContinueWithoutAccount: () => void;
+  // State 2: target email has a full Belrose account but isn't signed in
+  targetIsRegistered: boolean;
+  signingIn?: boolean;
+  onContinueWithAccount: () => void; // State 3: new provider — guest + modal
+  onContinueWithoutAccount: () => void; // Anonymous path
+  onContinueAsExistingUser: () => void; // State 1: already signed in → upload
 }
 
 const LandingGate: React.FC<LandingGateProps> = ({
   recordRequest,
   isAlreadyLoggedIn,
+  targetIsRegistered,
+  signingIn = false,
   onContinueWithAccount,
   onContinueWithoutAccount,
+  onContinueAsExistingUser,
 }) => {
-  const today = new Date().toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-
-  const requestDate = recordRequest.createdAt
-    ? new Date(recordRequest.createdAt.seconds * 1000).toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      })
-    : today;
-
   const deadline = recordRequest.createdAt
     ? new Date((recordRequest.createdAt.seconds + 30 * 24 * 60 * 60) * 1000).toLocaleDateString(
         'en-GB',
@@ -54,146 +48,131 @@ const LandingGate: React.FC<LandingGateProps> = ({
       )
     : null;
 
+  const loginUrl = `/auth`;
+
+  // ── Derive primary button config from state ───────────────────────────────
+  const primaryConfig = isAlreadyLoggedIn
+    ? {
+        label: 'Continue with your account',
+        sublabel: "You're signed in — you'll retain record access",
+        icon: <UserPlus className="w-4 h-4 text-white" />,
+        onClick: onContinueAsExistingUser,
+        disabled: false,
+      }
+    : targetIsRegistered
+      ? {
+          label: 'Sign in to your Belrose account',
+          sublabel: 'You already have an account — sign in to upload and retain record access',
+          icon: <LogIn className="w-4 h-4 text-white" />,
+          onClick: () => {
+            window.location.href = loginUrl;
+          },
+          disabled: false,
+        }
+      : {
+          label: signingIn ? 'Setting up your account...' : 'Create a free account & upload',
+          sublabel: signingIn ? '' : 'Recommended · keep record access · verified compliance',
+          icon: signingIn ? (
+            <Loader2 className="w-4 h-4 text-white animate-spin" />
+          ) : (
+            <UserPlus className="w-4 h-4 text-white" />
+          ),
+          onClick: onContinueWithAccount,
+          disabled: signingIn,
+        };
+
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
-      {/* ── Letter card ───────────────────────────────────────────────────── */}
+    <div className="max-w-md mx-auto">
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        {/* Letterhead */}
-        <div className="bg-primary px-8 py-6 flex items-center justify-between">
-          <div className="text-left">
-            <span className="text-xs font-semibold tracking-widest text-slate-400 uppercase">
-              Belrose Health
+        {/* Hero header */}
+        <div className="bg-primary px-8 py-7 text-center">
+          <p className="text-xs font-semibold tracking-widest text-white/40 uppercase mb-4">
+            Belrose Health · Record Request
+          </p>
+          <h1 className="text-xl font-semibold text-white leading-snug mb-2">
+            {recordRequest.requesterName} is requesting their health records
+          </h1>
+          <div className="flex items-center justify-center gap-3 mt-3 flex-wrap">
+            {deadline && <span className="text-xs text-white/50">Respond by {deadline}</span>}
+            <span className="text-white/20">·</span>
+            <span className="text-xs text-white/50">GDPR Art. 15</span>
+            <span className="text-white/20">·</span>
+            <span className="inline-flex items-center gap-1 text-xs text-white/50">
+              <Lock className="w-2.5 h-2.5" />
+              End-to-End Encryption
             </span>
-            <p className="text-white/60 text-xs mt-0.5">Secure Health Record Transfer</p>
-          </div>
-          <div className="flex items-center gap-1.5 bg-white/10 text-white/70 text-xs px-3 py-1.5 rounded-full">
-            <Lock className="w-3 h-3" />
-            End-to-end encrypted
           </div>
         </div>
 
-        {/* Letter body */}
-        <div className="text-left px-8 py-7 space-y-5">
-          {/* Date + salutation */}
-          <div className="space-y-4">
-            <p className="text-xs text-slate-400">{requestDate}</p>
-            <p className="text-slate-700 text-sm leading-relaxed">Dear healthcare provider,</p>
-          </div>
-
-          {/* Core legal statement */}
-          <div className="space-y-3 text-sm text-slate-700 leading-relaxed">
-            <p>
-              Your patient, <strong className="text-primary">{recordRequest.requesterName}</strong>{' '}
-              (cc'd on this email), has submitted a <strong>GDPR Article 15</strong> subject access
-              request via the Belrose Health platform for their personal health records. Under GDPR,
-              covered entities are required to provide patients with access to their records within
-              30 days of a written request.
-            </p>
-
-            <p>
-              This request was submitted on <strong className="text-primary">{requestDate}</strong>.
-              Please respond by <strong className="text-primary">{deadline}</strong>. Our platform
-              can accept PDFs, handwritten notes, images, and any other format as long as it is
-              accurate and legible.
-            </p>
-          </div>
-
-          {/* Security note */}
-          <div className="bg-complement-3/5 border border-complement-3/20 rounded-xl px-4 py-3 flex gap-3">
-            <Shield className="w-4 h-4 text-complement-3 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs font-semibold text-slate-700 mb-0.5">
-                Your upload is protected
-              </p>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Files are encrypted in your browser before leaving your device. Only you and{' '}
-                {recordRequest.requesterName} can decrypt and read the contents — Belrose cannot
-                access them.
-              </p>
-            </div>
-          </div>
-
-          {/* Learn more */}
+        <div className="px-8 py-7 space-y-4">
+          {/* Info link */}
           <a
-            href="https://www.belrosehealth.com"
+            href="https://belrosehealth.com/for-providers"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+            className="text-xs text-primary hover:underline font-medium inline-flex items-center gap-1"
           >
-            Learn more about Belrose Health
+            Have questions? More information for healthcare professionals
             <ExternalLink className="w-3 h-3" />
           </a>
-        </div>
-      </div>
 
-      {/* ── Account CTA card ──────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-100">
-          <h2 className="text-sm font-semibold text-slate-900">How would you like to proceed?</h2>
-        </div>
-
-        <div className="p-5 space-y-3">
-          {/* Primary CTA — create account / continue with account */}
+          {/* Primary button — varies by state */}
           <button
-            onClick={isAlreadyLoggedIn ? onContinueWithoutAccount : onContinueWithAccount}
-            className="w-full text-left border-2 border-complement-3 bg-complement-3/5 rounded-xl p-5 hover:bg-complement-3/10 transition-colors group"
+            onClick={primaryConfig.onClick}
+            disabled={primaryConfig.disabled}
+            className="w-full bg-complement-3 hover:bg-complement-3/90 disabled:opacity-70 disabled:cursor-not-allowed transition-colors rounded-xl px-5 py-4 text-left flex items-center gap-4 group"
           >
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-complement-3 rounded-full flex items-center justify-center flex-shrink-0 group-hover:bg-complement-3/90 transition-colors">
-                <UserPlus className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex justify-between">
-                  <p className="font-semibold text-slate-900">
-                    {isAlreadyLoggedIn
-                      ? 'Continue with your Belrose account'
-                      : 'Create a free Belrose account first'}
-                  </p>
-                  {!isAlreadyLoggedIn && (
-                    <div className="rounded-xl border border-complement-3 px-1 bg-complement-3 text-white text-xs flex items-center font-bold">
-                      Recommended
-                    </div>
-                  )}
-                </div>
-                <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-                  {isAlreadyLoggedIn
-                    ? "You're signed in — you'll keep full access to the record you upload."
-                    : "You'll have verifiable compliance with GDPR regulations, keep access to records you upload, and patients can send their other records directly to you."}
-                </p>
-                {!isAlreadyLoggedIn && (
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {[
-                      'Keep record access',
-                      'Reduced admin overhead',
-                      'Compliance verification',
-                    ].map(f => (
-                      <span
-                        key={f}
-                        className="text-xs bg-complement-3/10 text-complement-3 px-2 py-0.5 rounded-full font-medium"
-                      >
-                        {f}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <ArrowRight className="w-5 h-5 text-complement-3 flex-shrink-0 mt-0.5 group-hover:translate-x-0.5 transition-transform" />
+            <div className="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+              {primaryConfig.icon}
             </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white">{primaryConfig.label}</p>
+              {primaryConfig.sublabel && (
+                <p className="text-xs text-white/70 mt-0.5">{primaryConfig.sublabel}</p>
+              )}
+            </div>
+            {!signingIn && (
+              <ArrowRight className="w-4 h-4 text-white/70 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
+            )}
           </button>
 
-          {/* Secondary — upload without account */}
-          {!isAlreadyLoggedIn && (
-            <div className="text-center">
+          {/* Divider + anonymous path — only for non-logged-in states */}
+          {!isAlreadyLoggedIn && !targetIsRegistered && (
+            <>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-slate-100" />
+                <p className="text-xs text-slate-400">or</p>
+                <div className="flex-1 h-px bg-slate-100" />
+              </div>
+
               <button
                 onClick={onContinueWithoutAccount}
-                className="text-xs text-slate-400 hover:text-slate-600 transition-colors py-1"
+                disabled={signingIn}
+                className="w-full bg-slate-50 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors rounded-xl px-5 py-4 text-left flex items-center gap-4 border border-slate-200 group"
               >
-                Upload without creating an account →
+                <div className="w-9 h-9 bg-slate-200 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Upload className="w-4 h-4 text-slate-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-700">Upload without an account</p>
+                  <p className="text-xs text-slate-400 mt-0.5">No record access after upload</p>
+                </div>
+                <ArrowRight className="w-4 h-4 text-slate-300 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
               </button>
-              <p className="text-xs text-slate-300 mt-0.5">
-                You won't be able to access this record on Belrose after uploading
-              </p>
-            </div>
+            </>
+          )}
+
+          {/* Sign-in nudge for new providers who actually have an account
+              (edge case: targetIsRegistered was false but they do have one) */}
+          {!isAlreadyLoggedIn && !targetIsRegistered && (
+            <p className="text-center">
+              <a
+                href={loginUrl}
+                className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                Already have a Belrose account? Sign in →
+              </a>
+            </p>
           )}
         </div>
       </div>

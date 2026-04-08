@@ -5,6 +5,7 @@ import * as admin from 'firebase-admin';
 import { defineSecret } from 'firebase-functions/params';
 import * as crypto from 'crypto';
 import { Resend } from 'resend';
+import { createOrRetrieveGuestAccount, writeGuestInviteDoc } from '../utils/guestAccountUtils';
 
 const resendKey = defineSecret('RESEND_API_KEY');
 
@@ -57,11 +58,6 @@ export const createRecordRequest = onCall(
     const requesterData = requesterDoc.data()!;
     const requesterPublicKey = requesterData.encryption?.publicKey;
     const requesterEmail = requesterData.email ?? '';
-    const now = new Date();
-    const deadline = new Date(now);
-    deadline.setDate(deadline.getDate() + 30);
-
-    const createdAt = admin.firestore.FieldValue.serverTimestamp();
 
     if (!requesterPublicKey) {
       throw new HttpsError(
@@ -70,22 +66,39 @@ export const createRecordRequest = onCall(
       );
     }
 
-    // ── Check if target is already a Belrose user ────────────────────────────
-    // Purely informational — we still send the magic link either way, but
-    // storing targetUserId lets the fulfill page skip creating a guest session
-    // if they're already logged in.
+    // ── Create or retrieve guest account for the provider ────────────────────
+    // We create the guest account at request-send time so:
+    //   1. The private key can go in the email link fragment immediately
+    //   2. redeemGuestInvite can be reused as-is for token minting
+    //   3. The provider's public key is ready to wrap the file key on upload
+    const {
+      guestUid: providerGuestUid,
+      privateKeyBase64: providerPrivateKey,
+      isNewGuest,
+      guestIdHash,
+      guestWallet,
+      publicKeyBase64: providerPublicKey,
+    } = await createOrRetrieveGuestAccount(targetEmail);
+
+    // ── Check if provider is already a full Belrose user ────────────────────
     let targetUserId: string | null = null;
     try {
       const targetAuthUser = await admin.auth().getUserByEmail(targetEmail);
-      targetUserId = targetAuthUser.uid;
-    } catch (err: any) {
-      if (err.code !== 'auth/user-not-found') {
-        throw new HttpsError('internal', 'Failed to check for existing user.');
+      const targetProfile = await db.collection('users').doc(targetAuthUser.uid).get();
+      const isFullAccount = targetProfile.exists && !targetProfile.data()?.isGuest;
+      if (isFullAccount) {
+        targetUserId = targetAuthUser.uid;
       }
-      // Not found is fine — targetUserId stays null
+    } catch {
+      // Not found — providerGuestUid covers this case
     }
 
-    // ── Build the request document ───────────────────────────────────────────
+    // ── Compute dates ─────────────────────────────────────────────────────────
+    const requestDate = new Date();
+    const deadline = new Date(requestDate);
+    deadline.setDate(deadline.getDate() + 30);
+
+    // ── Write recordRequests document ────────────────────────────────────────
     const inviteCode = crypto.randomBytes(32).toString('hex');
 
     const requestDoc = {
@@ -94,12 +107,14 @@ export const createRecordRequest = onCall(
       requesterName,
       requesterPublicKey, // Snapshotted — fulfil page reads this directly
       targetEmail,
-      targetUserId, // null if non-user
+      targetUserId,
+      providerGuestUid,
+      providerPublicKey,
       requestNote: requestNote ?? null,
       inviteCode,
-      status: 'pending', // pending | fulfilled | declined
-      createdAt,
-      deadline,
+      status: 'pending',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      deadline: admin.firestore.Timestamp.fromDate(deadline),
       fulfilledRecordId: null,
     };
 
@@ -107,13 +122,34 @@ export const createRecordRequest = onCall(
     await docRef.set(requestDoc);
     console.log(`✅ recordRequests document created: ${docRef.id}`);
 
-    // ── Send email ───────────────────────────────────────────────────────────
+    // ── Write guestInvites document ──────────────────────────────────────────
+    // recordIds is empty — provider is uploading a new record, not accessing
+    // existing ones. recordRequestId links back for context.
+    const { inviteCode: guestInviteCode } = await writeGuestInviteDoc({
+      guestUid: providerGuestUid,
+      invitedBy: requesterId,
+      guestEmail: targetEmail,
+      recordIds: [],
+      guestIdHash,
+      guestWallet,
+      isNewGuest,
+      durationSeconds: 2 * 365 * 24 * 60 * 60, // 2 years - provider may delay, but if more than 2 years probably a ghost account, should be cleaned up
+      context: 'record_request',
+      recordRequestId: inviteCode,
+    });
+
+    // ── Send email ────────────────────────────────────────────────────────────
+    // Private key in URL fragment — never hits the server, never logged.
+    // FulfillRequestPage reads window.location.hash to get the private key,
+    // then calls redeemGuestInvite with guestCode to get the custom token.
     const appUrl = 'https://belrosehealth.com';
 
     // The inviteCode is the only thing in the URL — no sensitive data in transit.
     // The fulfill page reads the requesterPublicKey from the Firestore document
     // after validating the code, which is safer than putting it in the URL.
-    const fulfillUrl = `${appUrl}/fulfill-request?code=${inviteCode}`;
+    const fulfillUrl =
+      `${appUrl}/fulfill-request?code=${inviteCode}&guestCode=${guestInviteCode}` +
+      `#${providerPrivateKey}`;
 
     const resend = new Resend(resendKey.value());
     try {
@@ -122,9 +158,9 @@ export const createRecordRequest = onCall(
         cc: requesterEmail,
         from: 'Belrose Health <noreply@belrosehealth.com>',
         subject: `${requesterName} is requesting their health records`,
-        html: buildRequestEmail(requesterName, fulfillUrl, requesterEmail, now, deadline),
+        html: buildRequestEmail(requesterName, fulfillUrl, requesterEmail, requestDate, deadline),
       });
-      console.log(`✅ Record request email sent to ${targetEmail}`);
+      console.log(`✅ Record request email sent to ${targetEmail}, CC: ${requesterEmail}`);
     } catch (emailError) {
       // Don't fail the whole function — the Firestore doc is created and the
       // requester can resend manually. Log for debugging.

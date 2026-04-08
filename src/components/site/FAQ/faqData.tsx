@@ -112,9 +112,9 @@ export const faqs: FAQData = {
       a: (
         <>
           No. Your records are encrypted on your device before they ever reach our servers — a
-          process called <strong>client-side encryption</strong>. This means even Belrose staff
-          cannot read your data. We are designed from the ground up to not want your data in plain
-          text.
+          process called <strong>end-to-end/client-side encryption</strong>. This means even Belrose
+          staff cannot read your data. We are designed from the ground up to not want your data in
+          plain text.
         </>
       ),
       homepage: true,
@@ -236,9 +236,10 @@ export const faqs: FAQData = {
       a: (
         <>
           Your upload is encrypted in your browser before it leaves your device using the patient's
-          cryptographic public key — a process called <strong>end-to-end encryption</strong>. Only
-          the patient can decrypt and read the contents. Belrose cannot access the file at any
-          point. No file data is stored unencrypted on our servers.
+          cryptographic public key — a process called{' '}
+          <strong>end-to-end or client-side encryption</strong>. Only the patient can decrypt and
+          read the contents. Belrose cannot access the file at any point. No file data is stored
+          unencrypted on our servers.
         </>
       ),
     },
@@ -247,16 +248,43 @@ export const faqs: FAQData = {
       a: "The encrypted file is delivered directly to the patient's Belrose account. They are notified immediately. The request is marked fulfilled and the 30-day compliance deadline is met.",
     },
     {
+      q: 'How can I rely on a record that is completely controlled by the patient? The patient could be lying.',
+      a: "One of Belrose's main innovations is a public credibility system. Records can be verified, disputed, or completely self-reported. These data points determine each record's credibility score 0-1000. The higher the score, the more reliable the record. But as usual, it is up to your clinical judgement to determine the right course of action and what you choose to rely on.",
+    },
+    {
       q: 'Does Belrose require access to our EHR system?',
       a: 'No. You can upload whatever you have — a PDF export, a printed scan, a photo of handwritten notes. We do offer EHR integrations for organisations that want them, but they are never required.',
     },
     {
       q: "Can Belrose records be imported back into our clinic's EHR?",
-      a: 'Yes. We can build a two-way integration with any EHR system. Contact us at hello@belrosehealth.com for more information.',
+      a: (
+        <>
+          'Yes. We can build a two-way integration with any EHR system.{' '}
+          <a
+            href="mailto:hello@belrosehealth.com"
+            className="text-blue-600 hover:underline font-medium"
+          >
+            Contact us
+          </a>{' '}
+          at for more information.
+        </>
+      ),
     },
     {
       q: "Can Belrose integrate with our EHR's APIs to pull data directly?",
-      a: 'Yes — that would be our preferred method. We recognise the complexity of such integrations and have built manual workarounds until they can be achieved at scale. Get in touch to discuss your specific system.',
+      a: (
+        <>
+          'Yes — that would be our preferred method. We recognise the complexity of such
+          integrations and have built manual workarounds until they can be achieved at scale.{' '}
+          <a
+            href="mailto:hello@belrosehealth.com"
+            className="text-blue-600 hover:underline font-medium"
+          >
+            Get in touch
+          </a>{' '}
+          to discuss your specific system.{' '}
+        </>
+      ),
     },
   ],
 

@@ -38,33 +38,9 @@ exports.createGuestInvite = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
 const params_1 = require("firebase-functions/params");
-const crypto = __importStar(require("crypto"));
 const resend_1 = require("resend");
-const ethers_1 = require("ethers");
+const guestAccountUtils_1 = require("../utils/guestAccountUtils");
 const resendKey = (0, params_1.defineSecret)('RESEND_API_KEY');
-// ==================== HELPERS ====================
-/**
- * Generate an RSA-OAEP key pair using Node's crypto module.
- * Returns keys in the same base64/SPKI+PKCS8 format that the frontend
- * SharingKeyManagementService expects.
- */
-function generateRsaKeyPair() {
-    const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
-        modulusLength: 2048,
-        publicKeyEncoding: {
-            type: 'spki', // Same format frontend imports with importKey('spki', ...)
-            format: 'der', // Raw bytes, we'll base64 encode manually
-        },
-        privateKeyEncoding: {
-            type: 'pkcs8', // Same format frontend imports with importKey('pkcs8', ...)
-            format: 'der',
-        },
-    });
-    return {
-        publicKeyBase64: publicKey.toString('base64'),
-        privateKeyBase64: privateKey.toString('base64'),
-    };
-}
 // ==================== MAIN FUNCTION ====================
 exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async (request) => {
     // ── Auth check ──────────────────────────────────────────────────────────
@@ -99,69 +75,8 @@ exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async 
             throw new https_1.HttpsError('permission-denied', `You do not have permission to share record ${recordId}.`);
         }
     }
-    // ── Check if a guest account already exists for this email ───────────────
-    // If the patient re-sends an invite to the same doctor, we reuse the
-    // existing guest account instead of creating a duplicate.
-    let guestUid;
-    let isNewGuest = false;
-    try {
-        const existingUser = await admin.auth().getUserByEmail(guestEmail);
-        guestUid = existingUser.uid;
-        console.log(`ℹ️  Reusing existing guest account for ${guestEmail}: ${guestUid}`);
-    }
-    catch (err) {
-        // 'auth/user-not-found' is expected — create a new guest account
-        if (err.code !== 'auth/user-not-found') {
-            throw new https_1.HttpsError('internal', 'Failed to check for existing user.');
-        }
-        isNewGuest = true;
-        // ── Create Firebase Auth account ──────────────────────────────────────
-        const newUser = await admin.auth().createUser({
-            email: guestEmail,
-            emailVerified: true, // clicking the link confirms the address is valid
-            // No password — this account can only be accessed via custom token
-            displayName: guestEmail,
-        });
-        guestUid = newUser.uid;
-        console.log(`✅ Created guest Firebase Auth account: ${guestUid}`);
-    }
-    // ── Generate RSA key pair for the guest ──────────────────────────────────
-    // We always regenerate on each invite so each invite link has a fresh key.
-    const { publicKeyBase64, privateKeyBase64 } = generateRsaKeyPair();
-    // Derive guestIdHash and guestWallet from UID for blockchain transactions
-    const guestIdHash = ethers_1.ethers.keccak256(ethers_1.ethers.toUtf8Bytes(guestUid));
-    const guestWallet = ethers_1.ethers.getAddress('0x' + ethers_1.ethers.keccak256(ethers_1.ethers.toUtf8Bytes(`guest:${guestUid}`)).slice(-40));
-    // ── Write/update guest user profile in Firestore ─────────────────────────
-    // This is the minimal profile that sharingService.grantEncryptionAccess
-    // needs — specifically encryption.publicKey.
-    const guestProfile = {
-        uid: guestUid,
-        email: guestEmail,
-        displayName: guestEmail,
-        emailVerified: true,
-        isGuest: true,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        encryption: {
-            publicKey: publicKeyBase64,
-        },
-        onChainIdentity: {
-            userIdHash: guestIdHash,
-            status: 'Active',
-            linkedWallets: [
-                {
-                    address: guestWallet,
-                    type: 'eoa', // placeholder EOA, never holds funds
-                    txHash: '', // no tx — registered via grantGuestAccess
-                    blockNumber: 0,
-                    linkedAt: new Date(),
-                    isWalletActive: true,
-                },
-            ],
-        },
-    };
-    await db.collection('users').doc(guestUid).set(guestProfile, { merge: true });
-    console.log(`✅ Guest user profile written to Firestore: ${guestUid}`);
+    // ── Create or retrieve guest account ──────────────────────────────────────
+    const { guestUid, privateKeyBase64, isNewGuest, guestIdHash, guestWallet } = await (0, guestAccountUtils_1.createOrRetrieveGuestAccount)(guestEmail);
     // ── Create a guestInvites document ───────────────────────────────────────
     // This is the server-side record of the invite. Used to validate the
     // invite link and to clean up expired invites later.
@@ -174,25 +89,18 @@ exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async 
             : durationSeconds <= 604800
                 ? '7 days'
                 : '30 days';
-    // ── Generate invite code ─────────────────────────────────────────────────────
-    // Random 32-byte hex string — goes in the URL instead of the custom token.
-    // Custom tokens expire in 1 hour; this code is valid for the full invite duration.
-    const inviteCode = crypto.randomBytes(32).toString('hex');
-    await db.collection('guestInvites').add({
-        guestUserId: guestUid,
+    const { inviteCode } = await (0, guestAccountUtils_1.writeGuestInviteDoc)({
+        guestUid,
         invitedBy: patientUid,
         guestEmail,
         recordIds,
-        status: 'pending', // pending | accepted | revoked | expired
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
-        isNewGuest,
         guestIdHash,
         guestWallet,
-        inviteCode,
+        isNewGuest,
+        durationSeconds,
+        context: 'sharing',
     });
-    console.log(`✅ guestInvites document created`);
-    // ── Send invite email via SendGrid ───────────────────────────────────────
+    // ── Send invite email via Resend ───────────────────────────────────────
     // The private key goes in the URL fragment (#). Fragments are never sent
     // to servers — they exist only in the browser. This means even if someone
     // intercepts the URL in transit, the key isn't in the logged path.

@@ -724,10 +724,11 @@ service cloud.firestore {
 
   match /recordRequests/{requestId} {
 
-    // Requester can read their own requests
-    // Fulfill page can read by inviteCode (unauthenticated)
-    allow read: if request.auth != null && request.auth.uid == resource.data.requesterId
-                || (request.auth == null && resource.data.status == 'pending');
+    // 1. READ RULES
+    // 'get' allows individual document lookups via the inviteCode.
+    // 'list' allows the requester to see their dashboard.
+    allow get: if true; 
+    allow list: if request.auth != null && request.auth.uid == resource.data.requesterId;
 
     // Only the requester can create, and they must be setting themselves as requesterId
     allow create: if request.auth != null
@@ -735,10 +736,8 @@ service cloud.firestore {
                   && request.resource.data.status == 'pending';
 
     // Path 1: Requester cancels (must be pending, can only set cancelled)
-    allow update: if request.auth != null
-                  && request.auth.uid == resource.data.requesterId
-                  && resource.data.status == 'pending'
-                  && request.resource.data.status == 'cancelled';
+    allow update: if resource.data.status == 'pending' 
+                  && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt']);
 
     // Path 2: Provider fulfils via inviteCode (unauthenticated)
     // inviteCode must be unchanged, status must go pending → fulfilled

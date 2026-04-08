@@ -112,8 +112,8 @@ const AccordionTrigger: React.FC<AccordionTriggerProps> = ({
 
   return (
     <button
-      className={`accordion-trigger w-full text-left flex justify-between items-center gap-4
-        transition-all duration-200
+      className={`accordion-trigger group w-full text-left flex justify-between items-center gap-4
+        transition-all duration-200 py-4
         ${className}`}
       onClick={handleClick}
       type="button"
@@ -124,11 +124,19 @@ const AccordionTrigger: React.FC<AccordionTriggerProps> = ({
       {/* Circle icon: filled blue when open, light gray when closed; + rotates to × */}
       <span
         className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center
-          text-lg font-light transition-all duration-200
+          transition-all duration-300 ease-in-out
           ${isOpen ? 'bg-primary text-white rotate-45' : 'bg-gray-100 text-gray-500'}`}
         aria-hidden="true"
       >
-        +
+        <span
+          className="relative"
+          style={{
+            top: '-1px', // Vertical nudge: Adjust this if it still looks low/high
+            lineHeight: 0, // Prevents the character box from pushing the icon down
+          }}
+        >
+          +
+        </span>
       </span>
     </button>
   );
