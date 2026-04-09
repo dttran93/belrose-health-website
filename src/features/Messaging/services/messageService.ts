@@ -68,6 +68,7 @@ export interface Conversation {
   createdAt: Timestamp;
   lastMessageAt: Timestamp | null;
   /** AES-GCM encrypted preview text (base64) — never stores plaintext */
+  lastReadAt?: Record<string, Timestamp>;
 }
 
 /**
@@ -126,6 +127,10 @@ export class MessageService {
         participants: [currentUser.uid, recipientUserId],
         createdAt: serverTimestamp(),
         lastMessageAt: null,
+        lastReadAt: {
+          [currentUser.uid]: serverTimestamp(),
+          [recipientUserId]: serverTimestamp(),
+        },
       });
 
       console.log('✅ Conversation created:', conversationId);
@@ -374,6 +379,10 @@ export class MessageService {
 
     // Batch the updates — avoids multiple sequential writes
     await Promise.all(snapshot.docs.map(d => updateDoc(d.ref, { readAt: serverTimestamp() })));
+
+    await updateDoc(doc(db, 'conversations', conversationId), {
+      [`lastReadAt.${currentUserId}`]: serverTimestamp(),
+    });
 
     console.log(`✅ Marked ${snapshot.docs.length} messages as read`);
   }

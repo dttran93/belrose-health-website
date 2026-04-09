@@ -23,6 +23,7 @@ interface MobileSidebarProps {
   onNewChat: () => void;
   onDeleteChat: (chatId: string) => void;
   onViewAllChats: () => void;
+  unreadNotifications: number;
 }
 
 function MobileSidebar({
@@ -40,6 +41,7 @@ function MobileSidebar({
   onNewChat,
   onDeleteChat,
   onViewAllChats,
+  unreadNotifications,
 }: MobileSidebarProps) {
   const handleNewAiChat = () => {
     onNewAiChat();
@@ -83,7 +85,7 @@ function MobileSidebar({
         </div>
 
         {/* Quick action buttons */}
-        <QuickActions onNewAiChat={handleNewAiChat} />
+        <QuickActions onNewAiChat={handleNewAiChat} unreadNotifications={unreadNotifications} />
 
         {/* Navigation - Scrollable */}
         <div className="flex-1 overflow-y-auto dark-scroll">

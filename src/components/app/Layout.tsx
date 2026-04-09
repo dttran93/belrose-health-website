@@ -11,6 +11,9 @@ import { useLayout } from '@/components/app/LayoutProvider';
 import { useAIChatContext } from '@/features/Ai/components/AIChatContext';
 import { navigationSections } from './navigation';
 import { GuestBanner, GuestFooter } from './GuestBanner';
+import useNotifications from '@/features/Notifications/hooks/useNotifications';
+import { usePendingInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
+import { useUnreadMessageCount } from '@/features/Messaging/hooks/useUnreadMessageCount';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -22,7 +25,22 @@ function AppLayout({ children }: AppLayoutProps) {
   const { header, footer } = useLayout();
   const navigate = useNavigate();
   const isGuest = user?.isGuest === true;
-  console.log('👤 Guest Status:', isGuest);
+
+  // Pull unread notifications count for notifications quick action item
+  const { unreadCount } = useNotifications(user?.uid);
+
+  // Pull inbound requests for requestRecords notification
+  const pendingRequests = usePendingInboundRequests();
+
+  const navSectionsWithBadges = navigationSections.map(section => ({
+    ...section,
+    items: section.items.map(item =>
+      item.url === '/app/record-requests' ? { ...item, badge: pendingRequests } : item
+    ),
+  }));
+
+  // Pull unread messages for Message Badge
+  const unreadMessages = useUnreadMessageCount(user?.uid);
 
   // Pull chat history + current chat state from context
   const { chats, chatsLoading, currentChatId, handleLoadChat, handleNewChat, deleteChat } =
@@ -90,7 +108,7 @@ function AppLayout({ children }: AppLayoutProps) {
             isCollapsed={isDesktopCollapsed}
             onToggle={() => setIsDesktopCollapsed(!isDesktopCollapsed)}
             onLogout={handleLogout}
-            navigationSections={navigationSections}
+            navigationSections={navSectionsWithBadges}
             onSettings={handleSettings}
             onNotifications={handleNotifications}
             onHelp={handleHelp}
@@ -102,6 +120,8 @@ function AppLayout({ children }: AppLayoutProps) {
             onNewChat={handleNewChatClick}
             onDeleteChat={deleteChat}
             onViewAllChats={handleViewAllChats}
+            unreadNotifications={unreadCount}
+            unreadMessages={unreadMessages}
           />
         </div>
 
@@ -140,7 +160,7 @@ function AppLayout({ children }: AppLayoutProps) {
       <MobileSidebar
         isOpen={isMobileOpen}
         onClose={() => setIsMobileOpen(false)}
-        navigationSections={navigationSections}
+        navigationSections={navSectionsWithBadges}
         onLogout={handleLogout}
         onSettings={handleSettings}
         onHelp={handleHelp}
@@ -152,6 +172,7 @@ function AppLayout({ children }: AppLayoutProps) {
         onNewChat={handleNewChatClick}
         onDeleteChat={deleteChat}
         onViewAllChats={handleViewAllChats}
+        unreadNotifications={unreadCount}
       />
 
       <div className="flex flex-1 overflow-hidden">

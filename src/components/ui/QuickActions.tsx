@@ -25,13 +25,20 @@ interface QuickActionsProps {
   onNewAiChat: () => void;
   /** When true (desktop collapsed), stacks buttons vertically instead of horizontally */
   isCollapsed?: boolean;
+  unreadNotifications?: number;
+  unreadMessages?: number;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export const QuickActions: React.FC<QuickActionsProps> = ({ onNewAiChat, isCollapsed = false }) => {
+export const QuickActions: React.FC<QuickActionsProps> = ({
+  onNewAiChat,
+  isCollapsed = false,
+  unreadNotifications = 0,
+  unreadMessages = 0,
+}) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -56,6 +63,12 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onNewAiChat, isColla
     >
       {quickActions.map(action => {
         const Icon = action.icon;
+        const badge =
+          action.id === 'notifications'
+            ? unreadNotifications
+            : action.id === 'messages'
+              ? unreadMessages
+              : 0;
         const isActive = action.url
           ? action.url === '/app'
             ? location.pathname === '/app' // exact match for home
@@ -78,6 +91,11 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onNewAiChat, isColla
               `}
             >
               <Icon className="w-5 h-5" />
+              {badge > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold px-0.5">
+                  {badge > 99 ? '99+' : badge}
+                </span>
+              )}
             </button>
 
             {/* Tooltip */}

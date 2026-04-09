@@ -23,6 +23,8 @@ interface DesktopSidebarProps {
   onNewChat: () => void;
   onDeleteChat: (chatId: string) => void;
   onViewAllChats: () => void;
+  unreadNotifications: number;
+  unreadMessages: number;
 }
 
 function DesktopSidebar({
@@ -41,6 +43,8 @@ function DesktopSidebar({
   onNewChat,
   onDeleteChat,
   onViewAllChats,
+  unreadNotifications,
+  unreadMessages,
 }: DesktopSidebarProps) {
   const { user } = useAuthContext(); // already imported, just use it
 
@@ -97,7 +101,12 @@ function DesktopSidebar({
       </div>
 
       {/* Quick action buttons — stacks vertically when sidebar is collapsed */}
-      <QuickActions onNewAiChat={onNewAiChat} isCollapsed={isCollapsed} />
+      <QuickActions
+        onNewAiChat={onNewAiChat}
+        isCollapsed={isCollapsed}
+        unreadNotifications={unreadNotifications}
+        unreadMessages={unreadMessages}
+      />
 
       {/* Navigation — hidden labels when collapsed */}
       <div className="flex-1 p-4 space-y-6 overflow-y-auto dark-scroll">

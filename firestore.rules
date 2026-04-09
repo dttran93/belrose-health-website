@@ -728,31 +728,42 @@ service cloud.firestore {
     // 'get' allows individual document lookups via the inviteCode.
     // 'list' allows the requester to see their dashboard.
     allow get: if true; 
-    allow list: if request.auth != null && request.auth.uid == resource.data.requesterId;
+    allow list: if request.auth != null && (
+      request.auth.uid == resource.data.requesterId ||
+      request.auth.uid == resource.data.targetUserId ||
+      request.auth.token.email == resource.data.targetEmail
+    );
 
-    // Only the requester can create, and they must be setting themselves as requesterId
+    // 2. CREATE RULES
     allow create: if request.auth != null
                   && request.auth.uid == request.resource.data.requesterId
                   && request.resource.data.status == 'pending';
 
-    // Path 1: Requester cancels (must be pending, can only set cancelled)
-    allow update: if resource.data.status == 'pending' 
-                  && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt']);
+    // 3. UPDATE RULES (Combined logic)
+    allow update: if (
+      // Path A: Public "Read Receipt" (stamping readAt)
+      (
+        resource.data.status == 'pending' && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt'])
+      ) ||
+      
+      // Path B: Provider fulfills (anonymous upload)
+      (
+        resource.data.status == 'pending' &&
+        request.resource.data.status == 'fulfilled' &&
+        request.resource.data.inviteCode == resource.data.inviteCode &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'fulfilledRecordId', 'fulfilledAt'])
+      ) ||
 
-    // Path 2: Provider fulfils via inviteCode (unauthenticated)
-    // inviteCode must be unchanged, status must go pending → fulfilled
-    allow update: if resource.data.inviteCode == request.resource.data.inviteCode
-                  && resource.data.status == 'pending'
-                  && request.resource.data.status == 'fulfilled'
-                  && request.resource.data.keys().hasOnly([
-                      'status', 'fulfilledRecordId', 'fulfilledAt'
-                    ].concat(resource.data.keys().toList()));
-
-    // Path 3: Provider reads the request (useful for understanding if the document was read or not)
-    allow update: if resource.data.inviteCode == request.resource.data.inviteCode
-              && resource.data.status == 'pending'
-              && request.resource.data.diff(resource.data).affectedKeys()
-                   .hasOnly(['readAt']);
+      // Path C: Requester cancels (requires Auth)
+      (
+        request.auth != null &&
+        request.auth.uid == resource.data.requesterId &&
+        resource.data.status == 'pending' &&
+        request.resource.data.status == 'cancelled'
+      )
+    );
   }
 
   // ============================================
@@ -795,7 +806,7 @@ service cloud.firestore {
         request.resource.data.createdAt == resource.data.createdAt &&
         // Only these fields can change
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['lastMessageAt']);
+          .hasOnly(['lastMessageAt', 'lastReadAt']);
     
       // DELETE: Not allowed — conversations are permanent records
       // (soft delete via a field could be added later if needed)
