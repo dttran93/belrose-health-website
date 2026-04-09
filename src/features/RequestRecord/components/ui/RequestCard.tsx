@@ -1,6 +1,6 @@
-// ── RequestCard ───────────────────────────────────────────────────────────────
+// src/features/RequestRecord/components/ui/RequestCard.tsx
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { RecordRequest } from '../../services/fulfillRequestService';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import {
@@ -13,6 +13,18 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { RequestNoteService } from '../../services/requestNoteService';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface RequestNote {
+  practice?: string;
+  provider?: string;
+  dateOfBirth?: string;
+  patientIdNumber?: string;
+  dateRange?: { from?: string; to?: string };
+  freeText?: string;
+}
 
 interface RequestCardProps {
   request: RecordRequest;
@@ -54,6 +66,8 @@ function getStatusKey(r: RecordRequest): string {
   return r.readAt ? 'pending_read' : 'pending_unread';
 }
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 const RequestCard: React.FC<RequestCardProps> = ({
   request,
   isExpanded,
@@ -64,12 +78,25 @@ const RequestCard: React.FC<RequestCardProps> = ({
 }) => {
   const [cancelling, setCancelling] = useState(false);
   const [resending, setResending] = useState(false);
+  const [note, setNote] = useState<RequestNote | null>(null);
+  const [noteLoading, setNoteLoading] = useState(false);
+  const [noteError, setNoteError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isExpanded || note || noteLoading || !request.encryptedRequestNote) return;
+
+    setNoteLoading(true);
+    setNoteError(null);
+    RequestNoteService.decryptAsRequester(request)
+      .then(setNote)
+      .catch(err => setNoteError(err.message ?? 'Failed to decrypt note.'))
+      .finally(() => setNoteLoading(false));
+  }, [isExpanded]);
 
   const statusKey = getStatusKey(request);
   const config = STATUS_CONFIG[statusKey];
-  if (!config) {
-    throw new Error('Status Config Missing');
-  }
+  if (!config) throw new Error('Status Config Missing');
+
   const isPending = request.status === 'pending';
   const isFulfilled = request.status === 'fulfilled';
   const initials = request.targetEmail.slice(0, 2).toUpperCase();
@@ -125,9 +152,7 @@ const RequestCard: React.FC<RequestCardProps> = ({
           <div className="mt-3 flex items-center gap-2">
             <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all ${
-                  request.readAt ? 'w-2/3 bg-blue-400' : 'w-1/3 bg-amber-400'
-                }`}
+                className={`h-full rounded-full transition-all ${request.readAt ? 'w-2/3 bg-blue-400' : 'w-1/3 bg-amber-400'}`}
               />
             </div>
             <span className="text-xs text-slate-400 flex-shrink-0">
@@ -146,13 +171,38 @@ const RequestCard: React.FC<RequestCardProps> = ({
 
       {isExpanded && (
         <div className="border-t border-slate-100 px-5 py-4 space-y-4">
-          {request.requestNote && (
+          {/* Decrypted note */}
+          {request.encryptedRequestNote && (
             <div className="bg-slate-50 border-l-4 border-slate-300 rounded-r-lg px-3 py-2.5">
-              <p className="text-xs font-medium text-slate-500 mb-0.5">Your note</p>
-              <p className="text-sm text-slate-700 whitespace-pre-line">{request.requestNote}</p>
+              <p className="text-xs font-medium text-slate-500 mb-2">Request Notes</p>
+              {noteLoading && (
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Decrypting...
+                </div>
+              )}
+              {noteError && <p className="text-xs text-red-500">{noteError}</p>}
+              {note && (
+                <div className="space-y-1.5 text-left">
+                  {note.practice && <NoteRow label="Practice" value={note.practice} />}
+                  {note.provider && <NoteRow label="Provider" value={note.provider} />}
+                  {note.dateOfBirth && <NoteRow label="Date of Birth" value={note.dateOfBirth} />}
+                  {note.patientIdNumber && (
+                    <NoteRow label="ID number" value={note.patientIdNumber} />
+                  )}
+                  {note.dateRange && (
+                    <NoteRow
+                      label="Date range"
+                      value={[note.dateRange.from, note.dateRange.to].filter(Boolean).join(' – ')}
+                    />
+                  )}
+                  {note.freeText && <NoteRow label="Note" value={note.freeText} />}
+                </div>
+              )}
             </div>
           )}
 
+          {/* Timeline */}
           <div className="flex gap-4">
             <div className="flex flex-col items-center w-4 pt-0.5">
               <TimelineDot done />
@@ -188,6 +238,7 @@ const RequestCard: React.FC<RequestCardProps> = ({
             </div>
           </div>
 
+          {/* Actions */}
           <div className="flex gap-2 justify-end pt-2 border-t border-slate-100">
             {isFulfilled && request.fulfilledRecordId && (
               <Button
@@ -239,13 +290,20 @@ const RequestCard: React.FC<RequestCardProps> = ({
   );
 };
 
-// ── Timeline + Empty state ────────────────────────────────────────────────────
+// ── Note row ──────────────────────────────────────────────────────────────────
+
+const NoteRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className="flex items-baseline gap-2">
+    <span className="text-xs text-slate-400 w-24 flex-shrink-0">{label}</span>
+    <span className="text-sm text-slate-700">{value}</span>
+  </div>
+);
+
+// ── Timeline ──────────────────────────────────────────────────────────────────
 
 const TimelineDot: React.FC<{ done: boolean }> = ({ done }) => (
   <div
-    className={`w-2 h-2 rounded-full flex-shrink-0 ${
-      done ? 'bg-slate-700' : 'border border-slate-300 bg-white'
-    }`}
+    className={`w-2 h-2 rounded-full flex-shrink-0 ${done ? 'bg-slate-700' : 'border border-slate-300 bg-white'}`}
   />
 );
 

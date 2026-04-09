@@ -24,13 +24,14 @@ import {
 import { getAuth } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { RecordRequest } from './fulfillRequestService';
+import { RequestNote } from '../components/Request/NewRequestForm';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface CreateRequestInput {
   targetEmail: string;
   requesterName: string;
-  requestNote?: string;
+  requestNote?: RequestNote;
 }
 
 interface CreateRequestResult {

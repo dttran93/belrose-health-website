@@ -12,8 +12,8 @@ import { useAIChatContext } from '@/features/Ai/components/AIChatContext';
 import { navigationSections } from './navigation';
 import { GuestBanner, GuestFooter } from './GuestBanner';
 import useNotifications from '@/features/Notifications/hooks/useNotifications';
-import { usePendingInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
 import { useUnreadMessageCount } from '@/features/Messaging/hooks/useUnreadMessageCount';
+import { useInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -30,7 +30,8 @@ function AppLayout({ children }: AppLayoutProps) {
   const { unreadCount } = useNotifications(user?.uid);
 
   // Pull inbound requests for requestRecords notification
-  const pendingRequests = usePendingInboundRequests();
+  const { counts } = useInboundRequests();
+  const pendingRequests = counts.pending;
 
   const navSectionsWithBadges = navigationSections.map(section => ({
     ...section,

@@ -1,4 +1,4 @@
-// ── LIST VIEW ─────────────────────────────────────────────────────────────────
+// src/features/RequestRecord/components/Request/RequestListView
 
 import { AlertCircle, Inbox, Loader2, Plus, RefreshCw } from 'lucide-react';
 import { RequestFilter } from '../../hooks/useRecordRequests';
@@ -37,20 +37,7 @@ const RequestListView: React.FC<RequestListViewProps> = ({
   onNew,
   onViewRecord,
 }) => (
-  <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-    <div className="flex items-start justify-between">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Record requests</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Request your health records from providers via a secure upload link.
-        </p>
-      </div>
-      <Button onClick={onNew} className="gap-2 flex-shrink-0">
-        <Plus className="w-4 h-4" />
-        New request
-      </Button>
-    </div>
-
+  <div className="max-w-3xl mx-auto space-y-6">
     <div className="grid grid-cols-3 gap-3">
       <StatCard label="Pending" value={counts.pending} color="amber" />
       <StatCard label="Opened" value={counts.opened} color="blue" />

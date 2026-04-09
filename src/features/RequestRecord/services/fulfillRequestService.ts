@@ -44,31 +44,32 @@ import { FileObject } from '@/types/core';
 export type RecordRequestStatus = 'pending' | 'fulfilled' | 'cancelled';
 
 export interface RecordRequest {
-  // The document ID in Firestore IS the inviteCode — so this field is
-  // redundant when read from Firestore, but useful to have on the type
-  // for passing the object around in the UI without losing the code.
   inviteCode: string;
 
   // Requester (the Belrose user who wants the records)
   requesterId: string;
   requesterEmail: string;
   requesterName: string;
-  requesterPublicKey: string; // RSA public key, snapshotted at creation time
+  requesterPublicKey: string;
 
   // Target (the provider receiving the email)
   targetEmail: string;
-  targetUserId: string | null; // Populated if they already have a Belrose account
+  targetUserId: string | null;
 
-  // Content
-  requestNote: string | null;
+  // Encrypted note — AES-256-GCM, key wrapped separately for each party
+  encryptedRequestNote: string | null;
+  encryptedNoteKeyForRequester: string | null;
+  encryptedNoteKeyForProvider: string | null;
+  encryptedNoteIv: string | null;
 
   // Lifecycle
   status: RecordRequestStatus;
   createdAt: Timestamp;
   readAt: Timestamp | null;
-  fulfilledRecordId: string | null; // Populated on fulfillment
-  fulfilledAt?: Timestamp; // Populated on fulfillment
-  cancelledAt?: Timestamp; // Populated on cancellation
+  deadline: Timestamp;
+  fulfilledRecordId: string | null;
+  fulfilledAt?: Timestamp;
+  cancelledAt?: Timestamp;
 }
 
 // ── Service result types ──────────────────────────────────────────────────────

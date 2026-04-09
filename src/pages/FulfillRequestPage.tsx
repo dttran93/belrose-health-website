@@ -26,17 +26,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import {
-  getDoc,
-  doc,
-  getFirestore,
-  updateDoc,
-  serverTimestamp,
-  getDocs,
-  query,
-  collection,
-  where,
-} from 'firebase/firestore';
+import { getDoc, doc, getFirestore, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import useFileManager from '@/features/AddRecord/hooks/useFileManager';
 import { useFHIRConversion } from '@/features/AddRecord/hooks/useFHIRConversion';
@@ -55,7 +45,7 @@ import SuccessView from '@/features/RequestRecord/components/Respond/SuccessView
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getAuth, signInWithCustomToken, signOut } from 'firebase/auth';
 import { GuestClaimAccountModal } from '@/features/GuestAccess/components/GuestClaimAccountModal';
-import { db } from '@/firebase/config';
+import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -126,7 +116,8 @@ const FulfillRequestPage: React.FC = () => {
     const hash = window.location.hash.slice(1); // strip leading #
     if (hash) {
       providerPrivateKeyRef.current = hash;
-      // Replace URL without the hash, no page reload
+      EncryptionKeyManager.setGuestRsaPrivateKey(hash);
+      console.log('🔑 Guest RSA private key stored from URL hash');
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
     }
 

@@ -29,6 +29,24 @@ export class EncryptionKeyManager {
     return this.guestFileKeys;
   }
 
+  // Populated by FulfillRequestPage after reading from URL hash.
+  // Used at claim time to rewrap encryptedNoteKeyForProvider with the new RSA key.
+  // Cleared on session clear.
+  private static guestRsaPrivateKeyBase64: string | null = null;
+
+  static setGuestRsaPrivateKey(privateKeyBase64: string): void {
+    this.guestRsaPrivateKeyBase64 = privateKeyBase64;
+    console.log('🔑 Guest RSA private key stored in memory');
+  }
+
+  static getGuestRsaPrivateKey(): string | null {
+    return this.guestRsaPrivateKeyBase64;
+  }
+
+  static hasGuestRsaPrivateKey(): boolean {
+    return this.guestRsaPrivateKeyBase64 !== null;
+  }
+
   // ================= USER ENCRYPTION SESSION MANAGEMENT =================
 
   private static sessionKey: CryptoKey | null = null;
@@ -313,6 +331,7 @@ export class EncryptionKeyManager {
     this.sessionKey = null;
     this.lastActivityTime = 0;
     this.guestFileKeys = null;
+    this.guestRsaPrivateKeyBase64 = null;
 
     // Clear from sessionStorage
     sessionStorage.removeItem('encryptionKey');

@@ -15,24 +15,33 @@ interface NewRequestFormProps {
   onSuccess: () => void;
 }
 
+export interface RequestNote {
+  practice?: string;
+  provider?: string;
+  dateOfBirth?: string;
+  patientIdNumber?: string;
+  dateRange?: { from?: string; to?: string };
+  freeText?: string;
+}
+
 const NewRequestForm: React.FC<NewRequestFormProps> = ({ user, onBack, onSuccess }) => {
   const [step, setStep] = useState<1 | 2>(1);
 
   // ── Step 1 state ────────────────────────────────────────────────────────────
   const [region, setRegion] = useState<ProviderRegion>('england');
-  const [doctorName, setDoctorName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
-  const [manualMode, setManualMode] = useState(false); // escape hatch from search
-
-  // When a closed practice is selected, we fetch and store the ICB details
+  const [manualMode, setManualMode] = useState(false);
   const [icbLoading, setIcbLoading] = useState(false);
   const [icbName, setIcbName] = useState<string | null>(null);
 
   // ── Step 2 state ────────────────────────────────────────────────────────────
   const [requesterName, setRequesterName] = useState(user?.displayName ?? '');
+  const [providerName, setProviderName] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [patientIdNumber, setPatientIdNumber] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [requestNote, setRequestNote] = useState('');
+  const [freeText, setFreeText] = useState('');
 
   // ── Submission ──────────────────────────────────────────────────────────────
   const [submitting, setSubmitting] = useState(false);
@@ -113,30 +122,25 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ user, onBack, onSuccess
 
     setSubmitting(true);
     try {
-      const noteParts: string[] = [];
+      const noteObj: RequestNote = {};
 
-      // Prefix with institution context
       if (selected) {
-        if (selected.status === 'closed' && icbName) {
-          noteParts.push(
-            `Practice: ${selected.institutionName} (closed — escalated to ${icbName})`
-          );
-        } else if (selected.institutionName) {
-          noteParts.push(`Practice: ${selected.institutionName}`);
-        }
+        noteObj.practice =
+          selected.status === 'closed' && icbName
+            ? `${selected.institutionName} (closed — via ${icbName})`
+            : selected.institutionName;
       }
-
-      if (doctorName.trim()) noteParts.push(`Doctor: ${doctorName.trim()}`);
-      if (dateFrom || dateTo) {
-        const range = [dateFrom, dateTo].filter(Boolean).join(' to ');
-        noteParts.push(`Date range: ${range}`);
-      }
-      if (requestNote.trim()) noteParts.push(requestNote.trim());
+      if (providerName.trim()) noteObj.provider = providerName.trim();
+      if (dateOfBirth) noteObj.dateOfBirth = dateOfBirth;
+      if (patientIdNumber.trim()) noteObj.patientIdNumber = patientIdNumber.trim();
+      if (dateFrom || dateTo)
+        noteObj.dateRange = { from: dateFrom || undefined, to: dateTo || undefined };
+      if (freeText.trim()) noteObj.freeText = freeText.trim();
 
       await RecordRequestService.createRequest({
         targetEmail: contactEmail.trim(),
         requesterName: requesterName.trim(),
-        requestNote: noteParts.join('\n') || undefined,
+        requestNote: Object.keys(noteObj).length > 0 ? noteObj : undefined,
       });
 
       onSuccess();
@@ -213,7 +217,7 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ user, onBack, onSuccess
             </div>
           </div>
 
-          {/* Institution search — always shown first */}
+          {/* Institution search */}
           {!manualMode && (
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1.5">Institution</label>
@@ -231,7 +235,7 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ user, onBack, onSuccess
             </div>
           )}
 
-          {/* Manual mode — shown when user clicks escape hatch */}
+          {/* Manual mode */}
           {manualMode && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -258,7 +262,7 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ user, onBack, onSuccess
             </div>
           )}
 
-          {/* ICB loading state */}
+          {/* ICB loading */}
           {icbLoading && (
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -266,26 +270,7 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ user, onBack, onSuccess
             </div>
           )}
 
-          {/* Doctor name — only shown after a selection is made */}
-          {(selected || manualMode) && !icbLoading && (
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                Doctor name <span className="text-slate-400 font-normal">(optional)</span>
-              </label>
-              <input
-                type="text"
-                value={doctorName}
-                onChange={e => setDoctorName(e.target.value)}
-                placeholder="e.g. Dr. Sarah Johnson"
-                className="w-full h-9 px-3 text-sm border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
-              />
-              <p className="text-xs text-slate-400 mt-1">
-                Helps the practice find the right records for you.
-              </p>
-            </div>
-          )}
-
-          {/* Contact email — only shown after selection or manual mode */}
+          {/* Contact email */}
           {(selected || manualMode) && !icbLoading && (
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1.5">
@@ -301,17 +286,13 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ user, onBack, onSuccess
                   </span>
                 )}
               </label>
-              <div className="relative">
-                <input
-                  type="email"
-                  value={contactEmail}
-                  onChange={e => setContactEmail(e.target.value)}
-                  placeholder="practice@nhs.net"
-                  className="w-full h-9 px-3 text-sm border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
-                />
-              </div>
-
-              {/* Contextual hints */}
+              <input
+                type="email"
+                value={contactEmail}
+                onChange={e => setContactEmail(e.target.value)}
+                placeholder="practice@nhs.net"
+                className="w-full h-9 px-3 text-sm border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
+              />
               {selected?.status === 'active' && !selected.email && (
                 <p className="text-xs text-amber-600 mt-1">
                   No email found in the NHS directory. Check the practice website or call them.
@@ -340,7 +321,7 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ user, onBack, onSuccess
         </div>
       )}
 
-      {/* ── STEP 2: Your request details ── */}
+      {/* ── STEP 2 ── */}
       {step === 2 && (
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
@@ -376,10 +357,10 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ user, onBack, onSuccess
             </button>
           </div>
 
-          {/* Requester name */}
+          {/* Your name */}
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1.5">
-              Your name <span className="text-slate-400 font-normal">(shown to the provider)</span>
+              Your name <span className="text-slate-400 font-normal">(required)</span>
             </label>
             <input
               type="text"
@@ -391,49 +372,107 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ user, onBack, onSuccess
             />
           </div>
 
-          {/* Date range */}
+          {/* Encrypted fields section */}
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">
-              Date range <span className="text-slate-400 font-normal">(optional)</span>
-            </label>
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex-1 border-t border-slate-200" />
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">
+                Help the provider find your records
+              </p>
+              <div className="flex-1 border-t border-slate-200" />
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 mb-4">
+              <p className="text-xs text-blue-700 leading-relaxed">
+                These fields are encrypted — only you and the provider can read them. All fields are
+                optional; include anything that may help them locate your records.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {/* DOB + Id number */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                    Date of birth
+                  </label>
+                  <input
+                    type="date"
+                    value={dateOfBirth}
+                    onChange={e => setDateOfBirth(e.target.value)}
+                    className="w-full h-9 px-3 text-sm border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                    Patient ID number
+                  </label>
+                  <input
+                    type="text"
+                    value={patientIdNumber}
+                    onChange={e => setPatientIdNumber(e.target.value)}
+                    placeholder="e.g. your NHS number"
+                    className="w-full h-9 px-3 text-sm border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
+                  />
+                </div>
+              </div>
+
+              {/* Provider name */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                  Provider name
+                </label>
                 <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={e => setDateFrom(e.target.value)}
-                  className="w-full h-9 pl-8 pr-3 text-sm border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
+                  type="text"
+                  value={providerName}
+                  onChange={e => setProviderName(e.target.value)}
+                  placeholder="e.g. Dr. Sarah Johnson"
+                  className="w-full h-9 px-3 text-sm border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
                 />
               </div>
-              <span className="text-xs text-slate-400">to</span>
-              <div className="relative flex-1">
-                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={e => setDateTo(e.target.value)}
-                  className="w-full h-9 pl-8 pr-3 text-sm border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
+
+              {/* Date range */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                  Date range
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={e => setDateFrom(e.target.value)}
+                      className="w-full h-9 pl-8 pr-3 text-sm border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
+                    />
+                  </div>
+                  <span className="text-xs text-slate-400">to</span>
+                  <div className="relative flex-1">
+                    <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={e => setDateTo(e.target.value)}
+                      className="w-full h-9 pl-8 pr-3 text-sm border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional note */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                  Additional note
+                </label>
+                <textarea
+                  value={freeText}
+                  onChange={e => setFreeText(e.target.value)}
+                  placeholder="e.g. Please include the blood test results from my January appointment..."
+                  rows={3}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 resize-none"
                 />
               </div>
             </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Helps the practice locate the right records faster.
-            </p>
-          </div>
-
-          {/* Note */}
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">
-              Additional note <span className="text-slate-400 font-normal">(optional)</span>
-            </label>
-            <textarea
-              value={requestNote}
-              onChange={e => setRequestNote(e.target.value)}
-              placeholder="e.g. Please include the blood test results from my January appointment..."
-              rows={3}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 resize-none"
-            />
           </div>
 
           {formError && (

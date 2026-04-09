@@ -151,6 +151,8 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
 
   const handleClaim = async () => {
     if (!acknowledged || !cryptoData) return;
+    console.log('🔑 Guest RSA key at handleClaim:', EncryptionKeyManager.hasGuestRsaPrivateKey());
+    console.log('🔑 Guest RSA key length:', EncryptionKeyManager.getGuestRsaPrivateKey()?.length);
 
     setStep('processing');
     setError(null);
@@ -171,7 +173,7 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         return;
       }
 
-      // ── Step 1: Re-wrap guest file keys (sharing flow only) ───────────────────
+      // ── Step 1a: Re-wrap guest file keys (Sharing Flow) ───────────────────
       const newRsaPublicKey = await SharingKeyManagementService.importPublicKey(
         cryptoData.publicKey
       );
@@ -188,6 +190,54 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
             expiresAt: deleteField(),
             claimedAt: serverTimestamp(),
           });
+        }
+      }
+
+      // ── Step 1b: Rewrap record Note keys (Request Flow) ───────────────────────────
+      // The note key was wrapped with the ephemeral guest RSA key. Now that the
+      // provider has a real RSA key pair, rewrap it so they can decrypt the note
+      // going forward. The guest private key was stored in EncryptionKeyManager
+      // when the provider first opened the fulfill URL.
+      const guestPrivateKeyBase64 = EncryptionKeyManager.getGuestRsaPrivateKey();
+
+      if (guestPrivateKeyBase64) {
+        setProgress({ message: 'Re-encrypting request note access...' });
+
+        try {
+          const guestRsaPrivateKey =
+            await SharingKeyManagementService.importPrivateKey(guestPrivateKeyBase64);
+
+          // Find all record requests where this guest was the provider
+          const requestSnap = await getDocs(
+            query(collection(db, 'recordRequests'), where('providerGuestUid', '==', guestUid))
+          );
+
+          for (const requestDoc of requestSnap.docs) {
+            const data = requestDoc.data();
+            if (!data.encryptedNoteKeyForProvider || !data.encryptedNoteIv) continue;
+
+            // Unwrap the AES note key with the old guest RSA private key
+            const aesNoteKey = await SharingKeyManagementService.unwrapKey(
+              data.encryptedNoteKeyForProvider,
+              guestRsaPrivateKey
+            );
+
+            // Rewrap with the new RSA public key
+            const rewrappedNoteKey = await SharingKeyManagementService.wrapKey(
+              aesNoteKey,
+              newRsaPublicKey
+            );
+
+            batch.update(doc(db, 'recordRequests', requestDoc.id), {
+              encryptedNoteKeyForProvider: rewrappedNoteKey,
+            });
+          }
+
+          console.log('✅ Note keys rewrapped for', requestSnap.docs.length, 'request(s)');
+        } catch (err) {
+          // Non-fatal — log and continue. The provider loses note access for
+          // this request but the fulfill flow and record access are unaffected.
+          console.warn('⚠️ Failed to rewrap note key:', err);
         }
       }
 

@@ -731,7 +731,8 @@ service cloud.firestore {
     allow list: if request.auth != null && (
       request.auth.uid == resource.data.requesterId ||
       request.auth.uid == resource.data.targetUserId ||
-      request.auth.token.email == resource.data.targetEmail
+      request.auth.token.email == resource.data.targetEmail ||
+      request.auth.uid == resource.data.providerGuestUid
     );
 
     // 2. CREATE RULES
@@ -762,6 +763,19 @@ service cloud.firestore {
         request.auth.uid == resource.data.requesterId &&
         resource.data.status == 'pending' &&
         request.resource.data.status == 'cancelled'
+      ) || 
+
+      // Path D: Provider rewraps note key after claiming account
+      // Only the provider (matched by uid or email) can update this field,
+      // and only if they are the intended target of the request.
+      (
+        request.auth != null &&
+        (
+          request.auth.uid == resource.data.targetUserId ||
+          request.auth.token.email == resource.data.targetEmail
+        ) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['encryptedNoteKeyForProvider'])
       )
     );
   }

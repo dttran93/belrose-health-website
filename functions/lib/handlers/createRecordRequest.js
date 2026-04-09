@@ -73,23 +73,68 @@ exports.createRecordRequest = (0, https_1.onCall)({ secrets: [resendKey] }, asyn
         throw new https_1.HttpsError('failed-precondition', 'Your encryption keys are not set up. Please complete account setup first.');
     }
     // ── Create or retrieve guest account for the provider ────────────────────
-    // We create the guest account at request-send time so:
-    //   1. The private key can go in the email link fragment immediately
-    //   2. redeemGuestInvite can be reused as-is for token minting
-    //   3. The provider's public key is ready to wrap the file key on upload
-    const { guestUid: providerGuestUid, privateKeyBase64: providerPrivateKey, isNewGuest, guestIdHash, guestWallet, publicKeyBase64: providerPublicKey, } = await (0, guestAccountUtils_1.createOrRetrieveGuestAccount)(targetEmail);
-    // ── Check if provider is already a full Belrose user ────────────────────
+    // Always created so the invite/fulfill URL flow works regardless of whether
+    // the provider is a full user. For full users, we override providerPublicKey
+    // below with their actual RSA key so they can decrypt the note in-app.
+    const { guestUid: providerGuestUid, privateKeyBase64: providerPrivateKey, isNewGuest, guestIdHash, guestWallet, publicKeyBase64: guestPublicKey, } = await (0, guestAccountUtils_1.createOrRetrieveGuestAccount)(targetEmail);
+    // ── Check if provider is already a full Belrose user ─────────────────────
+    // If so, use their actual RSA public key instead of the guest one so they
+    // can decrypt the note using their normal session private key.
     let targetUserId = null;
+    let providerPublicKey = guestPublicKey;
     try {
         const targetAuthUser = await admin.auth().getUserByEmail(targetEmail);
         const targetProfile = await db.collection('users').doc(targetAuthUser.uid).get();
         const isFullAccount = targetProfile.exists && !targetProfile.data()?.isGuest;
         if (isFullAccount) {
             targetUserId = targetAuthUser.uid;
+            const fullUserPublicKey = targetProfile.data()?.encryption?.publicKey;
+            if (fullUserPublicKey) {
+                providerPublicKey = fullUserPublicKey;
+            }
         }
     }
     catch {
-        // Not found — providerGuestUid covers this case
+        // Not found — guestPublicKey covers this case
+    }
+    // ── Encrypt the request note ──────────────────────────────────────────────
+    // The note is encrypted with a one-off AES-256-GCM key.
+    // That AES key is then RSA-OAEP wrapped separately for the requester and
+    // the provider, so both parties can decrypt the note independently.
+    let encryptedRequestNote = null;
+    let encryptedNoteKeyForRequester = null;
+    let encryptedNoteKeyForProvider = null;
+    let encryptedNoteIv = null;
+    if (requestNote) {
+        const { webcrypto } = await import('crypto');
+        const subtle = webcrypto.subtle;
+        // 1. Generate one-off AES-256-GCM key
+        const aesKey = await subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, [
+            'encrypt',
+            'decrypt',
+        ]);
+        // 2. Encrypt the note JSON
+        const iv = webcrypto.getRandomValues(new Uint8Array(12));
+        const noteBytes = new TextEncoder().encode(JSON.stringify(requestNote));
+        const encryptedNote = await subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, noteBytes);
+        encryptedRequestNote = Buffer.from(encryptedNote).toString('base64');
+        encryptedNoteIv = Buffer.from(iv).toString('base64');
+        // 3. Wrap the AES key with the requester's RSA public key
+        const requesterKeyBuffer = Buffer.from(requesterPublicKey, 'base64');
+        const rsaRequesterKey = await subtle.importKey('spki', requesterKeyBuffer, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['wrapKey']);
+        const wrappedForRequester = await subtle.wrapKey('raw', aesKey, rsaRequesterKey, {
+            name: 'RSA-OAEP',
+        });
+        encryptedNoteKeyForRequester = Buffer.from(wrappedForRequester).toString('base64');
+        // 4. Wrap the same AES key with the provider's RSA public key
+        // For full Belrose users this is their real key; for guests it's the
+        // ephemeral key whose private half is in the fulfill URL fragment.
+        const providerKeyBuffer = Buffer.from(providerPublicKey, 'base64');
+        const rsaProviderKey = await subtle.importKey('spki', providerKeyBuffer, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['wrapKey']);
+        const wrappedForProvider = await subtle.wrapKey('raw', aesKey, rsaProviderKey, {
+            name: 'RSA-OAEP',
+        });
+        encryptedNoteKeyForProvider = Buffer.from(wrappedForProvider).toString('base64');
     }
     // ── Compute dates ─────────────────────────────────────────────────────────
     const requestDate = new Date();
@@ -101,12 +146,15 @@ exports.createRecordRequest = (0, https_1.onCall)({ secrets: [resendKey] }, asyn
         requesterId,
         requesterEmail,
         requesterName,
-        requesterPublicKey, // Snapshotted — fulfil page reads this directly
+        requesterPublicKey,
         targetEmail,
         targetUserId,
         providerGuestUid,
         providerPublicKey,
-        requestNote: requestNote ?? null,
+        encryptedRequestNote,
+        encryptedNoteKeyForRequester,
+        encryptedNoteKeyForProvider,
+        encryptedNoteIv,
         inviteCode,
         status: 'pending',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -117,8 +165,6 @@ exports.createRecordRequest = (0, https_1.onCall)({ secrets: [resendKey] }, asyn
     await docRef.set(requestDoc);
     console.log(`✅ recordRequests document created: ${docRef.id}`);
     // ── Write guestInvites document ──────────────────────────────────────────
-    // recordIds is empty — provider is uploading a new record, not accessing
-    // existing ones. recordRequestId links back for context.
     const { inviteCode: guestInviteCode } = await (0, guestAccountUtils_1.writeGuestInviteDoc)({
         guestUid: providerGuestUid,
         invitedBy: requesterId,
@@ -153,8 +199,6 @@ exports.createRecordRequest = (0, https_1.onCall)({ secrets: [resendKey] }, asyn
         console.log(`✅ Record request email sent to ${targetEmail}, CC: ${requesterEmail}`);
     }
     catch (emailError) {
-        // Don't fail the whole function — the Firestore doc is created and the
-        // requester can resend manually. Log for debugging.
         console.error('⚠️  Failed to send request email:', emailError);
         console.log(`🔗 Fulfill URL (dev only): ${fulfillUrl}`);
     }
