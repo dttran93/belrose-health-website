@@ -120,13 +120,13 @@ async function processDataForBelroseFields(
   try {
     // Use Haiku model - it's faster and cheaper for this task
     const responseText = await anthropicService.sendTextMessage(prompt, {
-      model: MODELS.HAIKU,
-      maxTokens: 1000,
+      model: MODELS.SONNET,
+      maxTokens: 3000,
       temperature: 0.1,
     });
 
     // Try to extract JSON from the response
-    const jsonMatch = responseText.match(/\{[\s\S]*?\}/);
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       console.warn('⚠️ No JSON found in AI response, using fallback');
       return createFallbackResponse(fileName);
@@ -151,10 +151,11 @@ function validateAndCleanResult(result: Partial<BelroseFields>, fileName?: strin
     visitType: result.visitType || 'Medical Record',
     title: result.title || fileName || 'Health Record',
     summary: result.summary || 'Medical record processed.',
-    completedDate: validateDate(result.completedDate) || today,
+    completedDate: validateDate(result.completedDate) || 'No Date',
     provider: result.provider || 'Healthcare Provider',
     institution: result.institution || 'Medical Center',
     patient: result.patient || 'Patient',
+    detailedNarrative: result.detailedNarrative || result.summary || 'Medical record processed.',
   };
 }
 

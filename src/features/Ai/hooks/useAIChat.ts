@@ -27,9 +27,9 @@ import { AIModel } from '@/features/Ai/components/ui/ModelSelector';
 import { ContextBuilder } from '@/features/Ai/service/contextBuilder';
 import { ContextFormatter, MediaPart } from '@/features/Ai/service/contextFormatter';
 import { fileToBase64 } from '@/utils/dataFormattingUtils';
-import visionExtractionService from '@/features/AddRecord/services/visionExtractionService';
 import textExtractionService from '@/features/AddRecord/services/textExtractionService';
 import { ChatAttachment, isPastedText } from '../components/ui/AttachmentBadge';
+import { aiImageService } from '@/features/AddRecord/services/aiImageService';
 
 interface UseAIChatProps {
   user: BelroseUserProfile | null;
@@ -130,7 +130,7 @@ export function useAIChat({
 
         // Extract text using vision service
         console.log(`👁️ Running OCR on page ${pageNum}...`);
-        const visionResult = await visionExtractionService.extractImageText(imageFile);
+        const visionResult = await aiImageService.extractTextFromImage(imageFile);
 
         if (visionResult.text && visionResult.text.trim().length > 0) {
           allText += `\n[Page ${pageNum}]\n${visionResult.text}\n`;
@@ -342,7 +342,7 @@ export function useAIChat({
                 console.log(`👁️ Extracting text from image using AI Vision...`);
 
                 try {
-                  const visionResult = await visionExtractionService.extractImageText(file);
+                  const visionResult = await aiImageService.extractTextFromImage(file);
                   const base64 = await fileToBase64(file);
 
                   builder.addImageAttachment(file.name, {

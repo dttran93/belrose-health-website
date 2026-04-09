@@ -5,7 +5,10 @@ import { BelroseFieldProcessingRequest } from '@/types/sharedApi';
  * Error class for AI processing failures
  */
 class AIProcessingError extends Error {
-  constructor(message: string, public originalError?: any) {
+  constructor(
+    message: string,
+    public originalError?: any
+  ) {
     super(message);
     this.name = 'AIProcessingError';
   }
@@ -40,13 +43,6 @@ export async function createBelroseFields(
   console.log('🧠 Calling AI service...');
 
   try {
-    console.log('Client sending JSON:', {
-      fhirData: input.fhirData,
-      fileName: input.fileName,
-      extractedText: input.extractedText,
-      contextText: input.contextText,
-    });
-
     const response = await fetch(AI_ENDPOINT, {
       method: 'POST',
       headers: {
@@ -93,7 +89,8 @@ function isValidBelroseFields(result: any): result is BelroseFields {
     typeof result.completedDate === 'string' &&
     typeof result.provider === 'string' &&
     typeof result.institution === 'string' &&
-    typeof result.patient === 'string'
+    typeof result.patient === 'string' &&
+    typeof result.detailedNarrative === 'string'
   );
 }
 

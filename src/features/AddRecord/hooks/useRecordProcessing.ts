@@ -24,7 +24,6 @@ import {
   RecordHashService,
   HashableFileContent,
 } from '@/features/ViewEditRecord/services/generateRecordHash';
-import { generateDetailedNarrative } from '../services/belroseNarrativeService';
 
 export interface ProcessedRecord {
   extractedText?: string | null;
@@ -115,6 +114,7 @@ export class CombinedRecordProcessingService {
             provider: aiResult.provider,
             patient: aiResult.patient,
             institution: aiResult.institution,
+            detailedNarrative: aiResult.detailedNarrative,
           };
 
           result.aiProcessingStatus = 'completed';
@@ -133,35 +133,6 @@ export class CombinedRecordProcessingService {
       } else {
         result.aiProcessingStatus = 'not_needed';
         onStageUpdate?.('Completing...', { aiProcessingStatus: 'not_needed' });
-      }
-
-      //Generate Detailed Narrative from BelroseFields/FHIR Data/OriginalOrExtracted Text
-      if (result.belroseFields && result.fhirData) {
-        console.log(`📖 Step 3B: Generating detailed narrative for: ${fileObj.fileName}`);
-
-        try {
-          const detailedNarrativeInput = {
-            fhirData: result.fhirData,
-            belroseFields: result.belroseFields,
-            fileName: fileObj.fileName,
-            extractedText: result.extractedText || undefined,
-            contextText: fileObj.contextText || undefined,
-          };
-          const narrativeResult = await generateDetailedNarrative(detailedNarrativeInput);
-
-          // Add the detailed narrative to belroseFields
-          result.belroseFields.detailedNarrative = narrativeResult.detailedNarrative;
-
-          console.log(
-            `✅ Detailed narrative generated for: ${fileObj.fileName} (${narrativeResult.detailedNarrative.length} chars)`
-          );
-
-          toast.success(`🤖 AI analysis and detailed narrative completed for ${fileObj.fileName}`, {
-            duration: 3000,
-          });
-        } catch (error: any) {
-          console.error(`❌ Narrative generation failed for ${fileObj.fileName}:`, error);
-        }
       }
 
       // STEP 4: Generate record hash (plaintext, before encryption)
@@ -296,6 +267,7 @@ export class CombinedRecordProcessingService {
           provider: aiResult.provider,
           patient: aiResult.patient,
           institution: aiResult.institution,
+          detailedNarrative: aiResult.detailedNarrative,
         };
 
         result.aiProcessingStatus = 'completed';
@@ -314,29 +286,6 @@ export class CombinedRecordProcessingService {
       result.aiProcessingStatus = virtualData.aiProcessingStatus || 'completed';
     } else {
       result.aiProcessingStatus = 'not_needed';
-    }
-
-    // Generate Detailed Narrative for Virtual Files
-    if (result.belroseFields && virtualData.fhirData) {
-      console.log(`📖 Generating detailed narrative for virtual file: ${fileName}`);
-
-      try {
-        const virtualDetailedNarrativeInput = {
-          fhirData: virtualData.fhirData,
-          belroseFields: result.belroseFields,
-          originalText: virtualData.originalText || undefined,
-          contextText: virtualData.contextText || undefined,
-        };
-        const narrativeResult = await generateDetailedNarrative(virtualDetailedNarrativeInput);
-
-        result.belroseFields.detailedNarrative = narrativeResult.detailedNarrative;
-
-        console.log(
-          `✅ Detailed narrative generated for virtual file: ${fileName} (${narrativeResult.detailedNarrative.length} chars)`
-        );
-      } catch (error: any) {
-        console.error(`❌ Narrative generation failed for virtual file ${fileName}:`, error);
-      }
     }
 
     // Marks AI analysis as complete for UI/UX

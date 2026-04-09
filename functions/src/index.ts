@@ -15,7 +15,6 @@ export { analyzeImageWithAI } from './handlers/image';
 // ==================== MEDICAL DATA PROCESSING FUNCTIONS ====================
 export { convertToFHIR } from './handlers/convertToFHIR';
 export { createBelroseFields } from './handlers/belroseFields';
-export { createDetailedNarrative } from './handlers/belroseNarrative';
 
 // ==================== WALLET FUNCTIONS ====================
 export { createWallet, getEncryptedWallet } from './handlers/wallet';

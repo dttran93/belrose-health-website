@@ -1,4 +1,4 @@
-import { ImageData, ImageAnalysisRequest, SUPPORTED_IMAGE_TYPES } from '@/types/sharedApi';
+import { ImageAnalysisRequest, SUPPORTED_IMAGE_TYPES } from '@/types/sharedApi';
 
 export interface ApiErrorResponse {
   error: string;
@@ -7,37 +7,13 @@ export interface ApiErrorResponse {
 export type SupportedImageType = (typeof SUPPORTED_IMAGE_TYPES)[number];
 
 import type { TextExtractionResult } from './shared.types';
+import { fileToBase64 } from '@/utils/dataFormattingUtils';
 
 export class AiImageService {
   private readonly apiUrl: string;
 
   constructor() {
     this.apiUrl = 'https://us-central1-belrose-757fe.cloudfunctions.net/analyzeImageWithAI';
-  }
-
-  //Convert file to base64 for AI Vision API
-  async fileToBase64(file: File): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (): void => {
-        const result = reader.result;
-        if (typeof result === 'string' && result.includes(',')) {
-          // Find the comma and extract everything after it
-          const commaIndex = result.indexOf(',');
-          const base64Data = result.substring(commaIndex + 1);
-
-          if (base64Data.length > 0) {
-            resolve(base64Data);
-          } else {
-            reject(new Error('Empty base64 data'));
-          }
-        } else {
-          reject(new Error('Failed to read file as data URL or invalid format'));
-        }
-      };
-      reader.onerror = error => reject(error);
-      reader.readAsDataURL(file);
-    });
   }
 
   //Get media type for API
@@ -69,7 +45,12 @@ export class AiImageService {
     }
 
     try {
-      const base64Image = await this.fileToBase64(file);
+      const dataUrl = await fileToBase64(file);
+      const base64Image = dataUrl.split(',')[1]; // strip the prefix
+
+      if (!base64Image) {
+        throw new Error('Missing Image');
+      }
       console.log('📸 Base64 length:', base64Image.length);
 
       const mediaType = this.getMediaType(file.type);
@@ -129,11 +110,6 @@ export class AiImageService {
   //Check if file type is supported for text extraction
   isImageFile(fileType: string): boolean {
     return SUPPORTED_IMAGE_TYPES.includes(fileType as SupportedImageType);
-  }
-
-  //Get file extension from filename
-  getFileExtension(fileName: string): string {
-    return fileName.toLowerCase().split('.').pop() || '';
   }
 
   //Validate if file can be processed

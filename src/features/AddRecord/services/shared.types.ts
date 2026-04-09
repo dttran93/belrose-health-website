@@ -28,25 +28,10 @@ export interface ProcessingResult {
   fileName: string;
   fileType: string;
   fileSize: number;
-  processingSteps: string[];
   extractedText: string | null;
   wordCount: number;
-  processingMethod: string | null | undefined;
   success: boolean;
   error: string | null;
-  processingTime: number;
-  // Optional field from DocumentProcessingResult
-}
-
-export interface FileValidationResult {
-  valid: boolean;
-  error?: string;
-}
-
-export interface ProcessingOptions {
-  enableVisionAI?: boolean;
-  compressionThreshold?: number;
-  signal?: AbortSignal;
 }
 
 export interface UploadResult {

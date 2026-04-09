@@ -124,7 +124,6 @@ export interface BelroseFieldProcessingRequest {
   extractedText?: string;
   originalText?: string;
   fileName?: string;
-  analysis?: FHIRAnalysis;
   contextText?: string;
 }
 

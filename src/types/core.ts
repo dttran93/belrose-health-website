@@ -123,7 +123,7 @@ export interface BelroseFields {
   provider: string; // Primary provider name
   institution: string; // Healthcare institution/facility
   patient: string; // Patient Name
-  detailedNarrative?: string; //detailed information on the medical interaction. derived from FHIR, but human readable
+  detailedNarrative: string; //detailed information on the medical interaction
 }
 
 export interface RoleInitialization {
@@ -179,7 +179,7 @@ export type ProcessingStages =
 export interface VirtualFileInput {
   fileName?: string;
   sourceType?: SourceType;
-  extractedText?: string;
+  originalText?: string;
   fhirData?: any;
   wordCount?: number;
   [key: string]: any;
