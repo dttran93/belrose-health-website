@@ -172,6 +172,17 @@ export class AnthropicService {
   }
 
   /**
+   * Method to send array of messages
+   */
+  async sendConversation(
+    messages: ClaudeMessage[],
+    options: AnthropicRequestOptions = {}
+  ): Promise<string> {
+    const response = await this.sendMessage(messages, options);
+    return this.extractTextFromResponse(response);
+  }
+
+  /**
    * Extract text content from Claude's response
    */
   private extractTextFromResponse(response: ClaudeResponse): string {

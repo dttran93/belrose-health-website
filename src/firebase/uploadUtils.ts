@@ -528,6 +528,79 @@ export async function deleteWrappedKeys(documentId: string): Promise<void> {
 }
 
 /**
+ * Cancel-safe record deletion for the AddRecord flow.
+ * Cleans up Storage, Firestore, and wrapped keys.
+ * No notifications or version history — this is for cancelling an in-progress upload,
+ * not a permanent deletion of an established record.
+ */
+export async function deleteRecordComplete(documentId: string): Promise<DeleteResult> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('User not authenticated');
+
+  let deletedFromStorage = false;
+  let deletedFromFirestore = false;
+  let deletedVersions = false;
+  let deletedWrappedKeys = false;
+
+  try {
+    // Get the record to find storage path
+    const docRef = doc(db, 'records', documentId);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+
+      // Delete from storage if a file was uploaded
+      if (data.storagePath) {
+        try {
+          await deleteFromStorage(data.storagePath);
+          deletedFromStorage = true;
+        } catch (storageError) {
+          console.warn('⚠️ Storage deletion failed, continuing:', storageError);
+        }
+      } else {
+        deletedFromStorage = true; // Virtual file, nothing to delete
+      }
+
+      // Delete from Firestore
+      await deleteDoc(docRef);
+      deletedFromFirestore = true;
+    } else {
+      // Document doesn't exist, nothing to do
+      deletedFromFirestore = true;
+      deletedFromStorage = true;
+    }
+
+    // Delete wrapped keys
+    try {
+      await deleteWrappedKeys(documentId);
+      deletedWrappedKeys = true;
+    } catch (keyError) {
+      console.warn('⚠️ Wrapped key deletion failed, continuing:', keyError);
+    }
+
+    // No version history on brand new records, but clean up just in case
+    try {
+      await deleteRecordVersions(documentId);
+      deletedVersions = true;
+    } catch {
+      deletedVersions = true; // Non-fatal
+    }
+
+    return {
+      success: true,
+      deletedFromStorage,
+      deletedFromFirestore,
+      deletedVersions,
+      deletedWrappedKeys,
+    };
+  } catch (error: any) {
+    console.error('❌ deleteRecordComplete failed:', error);
+    throw new Error(`Failed to delete record: ${error.message}`);
+  }
+}
+
+/**
  * Helper function to update Firestore document with storage information.
  * Needed because we want to organize storage by Firestore document ID (records/{docId}/...).
  * But we don't have documentID until we create the firestore doc

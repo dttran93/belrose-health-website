@@ -356,3 +356,30 @@ export interface FileObject {
     };
   };
 }
+
+export interface RecordReviewStatus {
+  // ── Verification ────────────────────────────────────────────────────────────
+  hasVerification: boolean;
+  verificationIsCurrentHash: boolean; // false if verified against an older hash
+  verificationLevel?: VerificationLevelOptions;
+
+  // ── Dispute ─────────────────────────────────────────────────────────────────
+  hasDispute: boolean;
+  disputeIsCurrentHash: boolean; // false if disputed against an older hash
+  disputeSeverity?: DisputeSeverityOptions;
+
+  // ── Reaction ─────────────────────────────────────────────────────────────────
+  // A reaction is tied to a specific dispute, so staleness is inherited:
+  // if the dispute it was made against is stale, the reaction is stale too.
+  hasReaction: boolean;
+  reactionIsCurrentHash: boolean;
+  reactionSupportsDispute?: boolean; // true = supported, false = opposed
+
+  // ── Derived convenience flags ────────────────────────────────────────────────
+  hasAnyActiveReview: boolean; // any of the three is active
+  hasStaleReview: boolean; // any review exists but against an old hash
+  currentHashReviewed: boolean; // at least one review is against current hash
+}
+
+export type VerificationLevelOptions = 1 | 2 | 3;
+export type DisputeSeverityOptions = 1 | 2 | 3;

@@ -22,6 +22,8 @@ const anthropicKey = (0, params_1.defineSecret)('ANTHROPIC_KEY');
 exports.convertToFHIR = (0, https_1.onRequest)({
     secrets: [anthropicKey],
     cors: true,
+    timeoutSeconds: 300,
+    memory: '1GiB',
 }, async (req, res) => {
     // Validate HTTP method
     if (req.method !== 'POST') {

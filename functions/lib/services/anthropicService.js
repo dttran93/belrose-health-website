@@ -104,6 +104,13 @@ class AnthropicService {
         }
     }
     /**
+     * Method to send array of messages
+     */
+    async sendConversation(messages, options = {}) {
+        const response = await this.sendMessage(messages, options);
+        return this.extractTextFromResponse(response);
+    }
+    /**
      * Extract text content from Claude's response
      */
     extractTextFromResponse(response) {

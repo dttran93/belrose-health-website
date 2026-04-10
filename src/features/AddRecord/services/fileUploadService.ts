@@ -1,4 +1,8 @@
-import { createFirestoreRecord, uploadFileComplete } from '@/firebase/uploadUtils';
+import {
+  createFirestoreRecord,
+  deleteRecordComplete,
+  uploadFileComplete,
+} from '@/firebase/uploadUtils';
 import { FileObject } from '@/types/core';
 import { Timestamp } from 'firebase/firestore';
 
@@ -277,8 +281,7 @@ export class FileUploadService implements IFileUploadService {
     try {
       console.log('🗑️ FileUploadService deleting from Firebase:', documentId);
 
-      const { deleteFileComplete } = await import('@/firebase/uploadUtils');
-      const result = await deleteFileComplete(documentId);
+      const result = await deleteRecordComplete(documentId);
 
       console.log('✅ Firebase deletion completed:', {
         documentId,

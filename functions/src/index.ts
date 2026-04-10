@@ -71,3 +71,6 @@ export { getKeyBundle } from './handlers/getKeyBundle';
 
 // ==================== COLLECTION QUERY FUNCTIONS =====================
 export { checkEmailRegistrationStatus } from './handlers/checkEmailRegistrationStatus';
+
+// ==================== RECORD REFINEMENT FUNCTIONS ====================
+export { refineRecord } from './handlers/refineRecord';

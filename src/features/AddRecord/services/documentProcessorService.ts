@@ -39,6 +39,24 @@ export async function processDocument(file: File): Promise<ProcessingResult> {
       }
     } else {
       extractedText = await TextExtractionService.extractText(file);
+
+      if (
+        file.type === 'application/pdf' &&
+        (!extractedText || extractedText.trim().split(/\s+/).length < 50)
+      ) {
+        console.log(
+          `⚠️ PDF has little/no text (${extractedText?.length || 0} chars), attempting vision OCR...`
+        );
+        try {
+          extractedText = await extractScannedPDF(file);
+          console.log(
+            `✅ Vision OCR extracted ${extractedText?.length || 0} chars from scanned PDF`
+          );
+        } catch (ocrError: any) {
+          console.warn(`⚠️ Vision OCR fallback failed:`, ocrError.message);
+          // Keep whatever pdf.js returned, even if empty
+        }
+      }
     }
 
     return {
@@ -62,6 +80,50 @@ export async function processDocument(file: File): Promise<ProcessingResult> {
       error: error.message,
     };
   }
+}
+
+async function extractScannedPDF(file: File): Promise<string> {
+  const pdfjsLib = await import('pdfjs-dist');
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+  let allText = '';
+  const maxPages = 10;
+  const pagesToProcess = Math.min(pdf.numPages, maxPages);
+
+  for (let pageNum = 1; pageNum <= pagesToProcess; pageNum++) {
+    try {
+      const page = await pdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 2.0 });
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      if (!context) continue;
+
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      await page.render({ canvasContext: context, viewport, canvas }).promise;
+
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(b => (b ? resolve(b) : reject(new Error('Canvas blob failed'))), 'image/png');
+      });
+
+      const imageFile = new File([blob], `page-${pageNum}.png`, { type: 'image/png' });
+      const visionResult = await aiImageService.extractTextFromImage(imageFile);
+
+      if (visionResult.text?.trim()) {
+        allText += `\n[Page ${pageNum}]\n${visionResult.text}\n`;
+      }
+    } catch (pageError) {
+      console.warn(`Failed to OCR page ${pageNum}:`, pageError);
+    }
+  }
+
+  if (pdf.numPages > maxPages) {
+    allText += `\n[Note: Only first ${maxPages} of ${pdf.numPages} pages were processed]\n`;
+  }
+
+  return allText.trim();
 }
 
 export default { processDocument };

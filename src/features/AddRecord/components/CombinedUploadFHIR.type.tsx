@@ -1,6 +1,11 @@
 import type { FHIRWithValidation } from '../services/fhirConversionService.type';
 import { FileObject, VirtualFileInput } from '@/types/core';
 import { UploadResult } from '../services/shared.types';
+import {
+  RefinementAnswer,
+  RefinementQuestion,
+  RefinementStatus,
+} from '@/features/RefineRecord/types';
 
 // ============================================================================
 // FILE MANAGEMENT TYPES
@@ -67,4 +72,13 @@ export interface CombinedUploadFHIRProps {
   className?: string;
 
   convertTextToFHIR?: (text: string, patientName?: string) => Promise<FHIRWithValidation>;
+
+  //RefinementProps
+  refinementStatus?: RefinementStatus;
+  refinementQuestions?: RefinementQuestion[];
+  refinementError?: string | null;
+  onStartRefinement?: () => void;
+  onSubmitRefinementAnswers?: (answers: RefinementAnswer[]) => void;
+  onSkipRefinement?: () => void;
+  onRefinementDone?: () => void;
 }

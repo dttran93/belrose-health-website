@@ -29,6 +29,7 @@ import {
 import { db } from '@/firebase/config';
 
 export type ContextType = 'my-records' | 'subject' | 'all-accessible' | 'specific-records';
+export type ChatType = 'ai-chat' | 'record-refinement';
 
 export interface Chat {
   id: string;
@@ -40,6 +41,7 @@ export interface Chat {
   recordIds?: string[];
   recordCount: number;
   messageCount: number;
+  chatType?: ChatType;
 }
 
 export interface Message {
@@ -78,6 +80,7 @@ export interface CreateChatInput {
   userId: string;
   recordIds?: string[];
   recordCount: number;
+  chatType?: ChatType;
 }
 
 // For creating new messages

@@ -8,6 +8,7 @@ import TextTab from './ui/TextTab';
 import FHIRTab from './ui/FHIRTab';
 
 import type { CombinedUploadFHIRProps } from './CombinedUploadFHIR.type';
+import RefinementPanel from '@/features/RefineRecord/components/RefinementPanel';
 
 export type TabType = 'upload' | 'text' | 'fhir';
 
@@ -125,8 +126,9 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
                     <span className="font-medium">All files processed successfully!</span>
                   </div>
                   <a
-                    href="/edit-fhir"
-                    className="flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                    href="/app/records"
+                    className="flex items-center space-x-1 text-sm text-blue-600 
+                       hover:text-blue-800 font-medium"
                   >
                     <span>View Records</span>
                     <ExternalLink className="w-4 h-4" />

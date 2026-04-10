@@ -5,7 +5,6 @@ import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionServi
 import { FileObject } from '@/types/core';
 import CombinedUploadFHIR from '@/features/AddRecord/components/CombinedUploadFHIR';
 import { useNavigate } from 'react-router-dom';
-import { GuestFeatureGate } from '@/features/GuestAccess/components/GuestFeatureGate';
 
 interface AddRecordProps {
   className?: string;

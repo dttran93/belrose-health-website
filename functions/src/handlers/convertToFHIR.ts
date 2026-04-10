@@ -26,6 +26,8 @@ export const convertToFHIR = onRequest(
   {
     secrets: [anthropicKey],
     cors: true,
+    timeoutSeconds: 300,
+    memory: '1GiB',
   },
   async (req: Request, res: Response) => {
     // Validate HTTP method
