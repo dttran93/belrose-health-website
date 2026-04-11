@@ -8,6 +8,7 @@ import { TabNavigation } from '@/components/ui/TabNavigation';
 import FHIRRecord from '@/features/ViewEditRecord/components/View/FHIRRecord';
 import BelroseRecord from './BelroseRecord';
 import { DecryptedFileViewer } from '@/features/Encryption/components/DecryptedFileViewer';
+import AIEditPanel from '@/features/RefineRecord/components/AIEditPanel';
 
 export type TabType = 'record' | 'fhir' | 'data' | 'original';
 

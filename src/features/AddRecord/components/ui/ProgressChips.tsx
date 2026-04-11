@@ -4,7 +4,7 @@ import { FileObject } from '@/types/core';
 export interface ProcessingStep {
   id: string;
   label: string;
-  status: 'pending' | 'active' | 'completed' | 'error';
+  status: 'pending' | 'active' | 'completed' | 'error' | 'needs-attention';
 }
 
 export interface ProgressChipsProps {
@@ -22,6 +22,15 @@ const ProcessingChip: React.FC<{ step: ProcessingStep }> = ({ step }) => {
           icon: (
             <div className="w-4 h-4 bg-white rounded-full flex items-center justify-center">
               <span className="text-green-600 text-xs font-bold">✓</span>
+            </div>
+          ),
+        };
+      case 'needs-attention':
+        return {
+          container: 'bg-gradient-to-r from-amber-400 to-yellow-500 text-white shadow-lg',
+          icon: (
+            <div className="w-4 h-4 bg-white rounded-full flex items-center justify-center">
+              <span className="text-amber-500 text-xs font-bold">!</span>
             </div>
           ),
         };
@@ -86,7 +95,10 @@ export const ProgressChips: React.FC<ProgressChipsProps> = ({ steps, className =
   );
 };
 
-export const createFileProcessingSteps = (fileObj: FileObject): ProcessingStep[] => {
+export const createFileProcessingSteps = (
+  fileObj: FileObject,
+  hasFollowUps: boolean = false
+): ProcessingStep[] => {
   const uploadType = getUploadType(fileObj);
   const steps = [];
 
@@ -107,7 +119,6 @@ export const createFileProcessingSteps = (fileObj: FileObject): ProcessingStep[]
     );
   }
 
-  // Get current state
   const hasTextContent = !!fileObj.extractedText || !!fileObj.originalText;
   const hasFhirData = !!fileObj.fhirData;
   const hasDocumentId = !!fileObj.id;
@@ -118,121 +129,74 @@ export const createFileProcessingSteps = (fileObj: FileObject): ProcessingStep[]
   const aiStatus = fileObj.aiProcessingStatus || 'not_needed';
   const hasBelroseFields = !!fileObj.belroseFields && Object.keys(fileObj.belroseFields).length > 0;
 
-  console.log('🔍 ProgressChips Debug:', {
-    fileName: fileObj.fileName,
-    status: `"${fileObj.status}"`,
-    processingStage: `"${processingStage}"`,
-    aiStatus: aiStatus,
-    hasFhirData: hasFhirData,
-    hasBelroseFields: hasBelroseFields,
-    hasDocumentId: hasDocumentId,
-    hasTextContent: hasTextContent,
-    isProcessing: isProcessing,
-    isCompleted: isCompleted,
-  });
-
   return steps.map(step => {
-    // Handle error states first
     if (hasError) {
-      if (step.id === 'received') return { ...step, status: 'completed' };
-
+      if (step.id === 'received') return { ...step, status: 'completed' as const };
       if (uploadType === 'json') {
-        if (step.id === 'validate' && !hasFhirData) return { ...step, status: 'error' };
+        if (step.id === 'validate' && !hasFhirData) return { ...step, status: 'error' as const };
         if (step.id === 'ai' && hasFhirData && aiStatus === 'failed')
-          return { ...step, status: 'error' };
-        if (step.id === 'save' && !hasDocumentId) return { ...step, status: 'error' };
+          return { ...step, status: 'error' as const };
+        if (step.id === 'save' && !hasDocumentId) return { ...step, status: 'error' as const };
       } else {
-        if (step.id === 'extract' && !hasTextContent) return { ...step, status: 'error' };
+        if (step.id === 'extract' && !hasTextContent) return { ...step, status: 'error' as const };
         if (step.id === 'fhir' && hasTextContent && !hasFhirData)
-          return { ...step, status: 'error' };
+          return { ...step, status: 'error' as const };
         if (step.id === 'ai' && hasFhirData && aiStatus === 'failed')
-          return { ...step, status: 'error' };
-        if (step.id === 'save' && !hasDocumentId) return { ...step, status: 'error' };
+          return { ...step, status: 'error' as const };
+        if (step.id === 'save' && !hasDocumentId) return { ...step, status: 'error' as const };
       }
-      return { ...step, status: 'pending' };
+      return { ...step, status: 'pending' as const };
     }
 
-    // Handle each step with SIMPLE, NON-OVERLAPPING logic
     switch (step.id) {
       case 'received':
-        return { ...step, status: 'completed' }; // Always completed once file is added
+        return { ...step, status: 'completed' as const };
 
-      case 'extract': // For file and text uploads
-        if (hasTextContent) {
-          console.log(`🔍 Extract step: COMPLETED (has text)`);
-          return { ...step, status: 'completed' }; // ✅ Once text exists, ALWAYS completed
-        } else if (
+      case 'extract':
+        if (hasTextContent) return { ...step, status: 'completed' as const };
+        if (
           isProcessing &&
           (processingStage === 'Starting processing...' || processingStage === 'Extracting text...')
-        ) {
-          console.log(`🔍 Extract step: ACTIVE`);
-          return { ...step, status: 'active' }; // 🔄 Only active during specific stages
-        } else {
-          console.log(`🔍 Extract step: PENDING`);
-          return { ...step, status: 'pending' }; // ⏳ Default state
-        }
+        )
+          return { ...step, status: 'active' as const };
+        return { ...step, status: 'pending' as const };
 
-      case 'validate': // For JSON uploads only
-        if (hasFhirData) {
-          return { ...step, status: 'completed' };
-        } else if (isProcessing) {
-          return { ...step, status: 'active' };
-        } else {
-          return { ...step, status: 'pending' };
-        }
+      case 'validate':
+        if (hasFhirData) return { ...step, status: 'completed' as const };
+        if (isProcessing) return { ...step, status: 'active' as const };
+        return { ...step, status: 'pending' as const };
 
-      case 'fhir': // For file and text uploads
-        if (hasFhirData) {
-          console.log(`🔍 FHIR step: COMPLETED (has FHIR data)`);
-          return { ...step, status: 'completed' }; // ✅ Once FHIR exists, ALWAYS completed
-        } else if (hasTextContent && isProcessing && processingStage === 'Converting to FHIR...') {
-          console.log(`🔍 FHIR step: ACTIVE (converting)`);
-          return { ...step, status: 'active' }; // 🔄 Only active during exact FHIR stage
-        } else if (hasTextContent) {
-          console.log(`🔍 FHIR step: PENDING (ready for conversion)`);
-          return { ...step, status: 'pending' }; // ⏳ Ready for conversion
-        } else {
-          console.log(`🔍 FHIR step: PENDING (waiting for text)`);
-          return { ...step, status: 'pending' }; // ⏳ Waiting for text
-        }
+      case 'fhir':
+        if (hasFhirData) return { ...step, status: 'completed' as const };
+        if (hasTextContent && isProcessing && processingStage === 'Converting to FHIR...')
+          return { ...step, status: 'active' as const };
+        return { ...step, status: 'pending' as const };
 
-      case 'ai': // SIMPLE: Check AI status first
-        if (aiStatus === 'completed' || hasBelroseFields) {
-          console.log(`🔍 AI step: COMPLETED`);
-          return { ...step, status: 'completed' }; // ✅ AI complete
-        } else if (aiStatus === 'failed') {
-          console.log(`🔍 AI step: ERROR`);
-          return { ...step, status: 'error' }; // ❌ AI failed
-        } else if (
+      case 'ai':
+        if (aiStatus === 'completed' || hasBelroseFields)
+          return { ...step, status: 'completed' as const };
+        if (aiStatus === 'failed') return { ...step, status: 'error' as const };
+        if (
           aiStatus === 'processing' ||
           (isProcessing &&
             (processingStage === 'AI processing...' ||
               processingStage === 'AI analyzing content...'))
-        ) {
-          console.log(`🔍 AI step: ACTIVE`);
-          return { ...step, status: 'active' }; // 🔄 AI processing
-        } else if (hasFhirData || aiStatus === 'not_needed') {
-          console.log(`🔍 AI step: PENDING (ready)`);
-          return { ...step, status: 'pending' }; // ⏳ Ready or not needed
-        } else {
-          console.log(`🔍 AI step: PENDING (waiting)`);
-          return { ...step, status: 'pending' }; // ⏳ Waiting
-        }
+        )
+          return { ...step, status: 'active' as const };
+        return { ...step, status: 'pending' as const };
 
       case 'save':
         if (isCompleted) {
-          console.log(`🔍 Save step: COMPLETED`);
-          return { ...step, status: 'completed' }; // ✅ Saved
-        } else if (fileObj.status === 'uploading') {
-          console.log(`🔍 Save step: ACTIVE`);
-          return { ...step, status: 'active' }; // 🔄 Uploading
-        } else {
-          console.log(`🔍 Save step: PENDING`);
-          return { ...step, status: 'pending' }; // ⏳ Waiting to upload
+          return {
+            ...step,
+            status: 'completed' as const,
+          };
         }
+        if (fileObj.status === 'uploading') return { ...step, status: 'active' as const };
+        return { ...step, status: 'pending' as const };
 
       default:
-        return { ...step, status: 'pending' };
+        return { ...step, status: 'pending' as const };
     }
   });
 };

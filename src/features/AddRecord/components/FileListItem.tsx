@@ -1,6 +1,6 @@
-// Updated FileListItem.tsx
+//src/features/AddRecord/components/FileListItem.tsx
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { FileText, X, Eye, EyeOff, Check, HardDriveUpload } from 'lucide-react';
 import { EnhancedFHIRResults } from '@/features/AddRecord/components/FHIRValidation';
 import { ProgressChips, createFileProcessingSteps } from './ui/ProgressChips';
@@ -8,7 +8,8 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import { Button } from '@/components/ui/Button';
 import { FileObject } from '@/types/core';
 import { FHIRWithValidation } from '../services/fhirConversionService.type';
-import SubjectBadge from '@/features/Subject/components/SubjectBadge';
+import useRecordFollowUps from '@/features/RefineRecord/hooks/useRecordFollowUps';
+import FollowUpItems from '@/features/RefineRecord/components/FollowUpItems';
 
 export interface FileListItemProps {
   fileItem: FileObject;
@@ -19,9 +20,6 @@ export interface FileListItemProps {
   };
   onRemove: (fileId: string) => void;
   onConfirm: (fileId: string) => void;
-
-  // Updated: FileListItem should pass FileItem, but retryFile expects fileId
-  // We'll handle the conversion in the component
   onRetry: (fileItem: FileObject) => void;
   onForceConvert?: (fileItem: FileObject) => void;
   showFHIRResults?: boolean;
@@ -37,65 +35,75 @@ export const FileListItem: React.FC<FileListItemProps> = ({
   showFHIRResults = true,
   onReview,
 }) => {
-  const [isExpanded, setIsExpanded] = useState<boolean>(false);
-  const [hideSubjectBadge, setHideSubjectBadge] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [followUpDismissed, setFollowUpDismissed] = useState(false);
 
-  //utility functions
+  // ── Derived state ────────────────────────────────────────────────────────────
+
+  const isFullyProcessed = fileItem.status === 'completed' && !!fileItem.firestoreId;
+  const canRetry = fileItem.status.includes('error');
+  const hasExpandableContent = fileItem.extractedText || fhirResult;
+
+  // ── Follow-up items ───────────────────────────────────────────────────────────
+  // The hook checks the FileObject and returns only items that genuinely need action.
+
+  const { followUpItems, isLoading: followUpsLoading } = useRecordFollowUps(fileItem, {
+    onAction: onReview,
+  });
+  const showFollowUp = !followUpDismissed && followUpItems.length > 0;
+  const isRecordComplete =
+    isFullyProcessed && !followUpsLoading && (followUpItems.length === 0 || followUpDismissed);
+  const showChipOverlay =
+    isFullyProcessed && !followUpDismissed && (followUpsLoading || followUpItems.length > 0);
+
+  // ── Container styles ─────────────────────────────────────────────────────────
 
   const getContainerStyles = () => {
     if (fileItem.status === 'error') {
       return 'border-2 border-red-200 bg-gradient-to-r from-red-50 to-pink-50';
-    } else if (fileItem.status === 'completed' && fhirResult?.success) {
-      return 'border-2 border-green-200 bg-gradient-to-r from-green-50 to-emerald-50';
-    } else if (fileItem.status === 'processing') {
+    }
+    if (fileItem.status === 'processing') {
       return 'border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50';
     }
+    if (showFollowUp) {
+      return 'border-2 border-amber-300 bg-white';
+    }
+    if (isRecordComplete) {
+      return 'border-2 border-green-200 bg-gradient-to-r from-green-50 to-emerald-50';
+    }
+    // Covers: still loading follow-up check, or completed but no fhirResult
     return 'border border-gray-200 bg-white';
   };
 
-  // Create processing steps using utility function
-  const processingSteps = createFileProcessingSteps(fileItem);
+  // ── Sub-components ────────────────────────────────────────────────────────────
 
-  // Event handlers
-  const handleRemove = () => onRemove(fileItem.id);
-  const handleConfirm = () => onConfirm(fileItem.id);
-  const handleRetry = () => onRetry(fileItem);
-  const handleToggleExpanded = () => setIsExpanded(!isExpanded);
-
-  //Function to show expanded text in originalText/extractedText preview
   function ExpandableText({ text, maxLength = 500 }: { text: string; maxLength?: number }) {
-    const [isExpanded, setIsExpanded] = useState(false);
-    const isLongText = text.length > maxLength;
-    const displayText = isExpanded ? text : text.slice(0, maxLength);
-
+    const [expanded, setExpanded] = useState(false);
+    const isLong = text.length > maxLength;
     return (
       <div className="bg-white p-3 rounded text-sm text-gray-600 border">
-        <div className={`${isExpanded ? '' : 'max-h-32'} overflow-y-auto`}>
-          {displayText}
-          {!isExpanded && isLongText && '...'}
+        <div className={`${expanded ? '' : 'max-h-32'} overflow-y-auto`}>
+          {expanded ? text : text.slice(0, maxLength)}
+          {!expanded && isLong && '...'}
         </div>
-
-        {isLongText && (
+        {isLong && (
           <button
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={() => setExpanded(!expanded)}
             className="mt-2 text-foreground hover:text-destructive text-xs font-medium"
           >
-            {isExpanded ? 'Show Less' : 'Show More'}
+            {expanded ? 'Show Less' : 'Show More'}
           </button>
         )}
       </div>
     );
   }
 
-  // Derived state
-  const canRetry = fileItem.status.includes('error');
-  const hasExpandableContent = fileItem.extractedText || fhirResult;
-  const isFullyProcessed = fileItem.status === 'completed' && fileItem.firestoreId;
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <Tooltip.Provider>
       <div className={`rounded-xl shadow-sm ${getContainerStyles()}`}>
-        {/* File Header */}
+        {/* Header */}
         <div className="p-5 flex items-center justify-between">
           <div className="flex items-center space-x-3 flex-1 min-w-0">
             <HardDriveUpload />
@@ -104,20 +112,11 @@ export const FileListItem: React.FC<FileListItemProps> = ({
                 <p className="font-semibold text-gray-900 truncate">{fileItem.fileName}</p>
 
                 <div className="flex items-center">
-                  {isFullyProcessed && !hideSubjectBadge && (
-                    <div className="mr-2">
-                      <SubjectBadge
-                        record={fileItem}
-                        onOpenManager={() => onReview?.(fileItem)}
-                        onSuccess={() => setHideSubjectBadge(true)}
-                      />
-                    </div>
-                  )}
                   {hasExpandableContent && (
                     <Tooltip.Root>
                       <Tooltip.Trigger asChild>
                         <button
-                          onClick={handleToggleExpanded}
+                          onClick={() => setIsExpanded(!isExpanded)}
                           className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
                         >
                           {isExpanded ? (
@@ -142,7 +141,7 @@ export const FileListItem: React.FC<FileListItemProps> = ({
                   <Tooltip.Root>
                     <Tooltip.Trigger asChild>
                       <button
-                        onClick={handleRemove}
+                        onClick={() => onRemove(fileItem.id)}
                         className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition-colors"
                       >
                         <X className="w-4 h-4" />
@@ -162,7 +161,7 @@ export const FileListItem: React.FC<FileListItemProps> = ({
                   <Tooltip.Root>
                     <Tooltip.Trigger asChild>
                       <button
-                        onClick={handleConfirm}
+                        onClick={() => onConfirm(fileItem.id)}
                         className="text-gray-400 hover:text-green-700 p-1 rounded-full hover:bg-green-300 transition-colors"
                       >
                         <Check className="w-4 h-4" />
@@ -182,12 +181,17 @@ export const FileListItem: React.FC<FileListItemProps> = ({
               </div>
 
               <div className="flex items-center justify-between mt-3">
-                <ProgressChips steps={processingSteps} />
-
+                <div className="relative">
+                  <ProgressChips steps={createFileProcessingSteps(fileItem)} />
+                  {/*// Overlay to dim the chips if there are follow-up actions*/}
+                  {showChipOverlay && (
+                    <div className="absolute inset-0 bg-amber-50 opacity-60 rounded-full pointer-events-none" />
+                  )}
+                </div>
                 <div>
                   {canRetry && (
                     <button
-                      onClick={handleRetry}
+                      onClick={() => onRetry(fileItem)}
                       className="bg-orange-500 text-white px-3 py-1 rounded-full text-sm hover:bg-orange-600 transition-colors"
                     >
                       Retry
@@ -195,8 +199,8 @@ export const FileListItem: React.FC<FileListItemProps> = ({
                   )}
                   <Button
                     variant="default"
-                    onClick={() => onReview?.(fileItem)}
-                    disabled={!isFullyProcessed}
+                    onClick={() => onReview(fileItem)}
+                    disabled={!isFullyProcessed || followUpsLoading}
                   >
                     Review
                   </Button>
@@ -204,11 +208,10 @@ export const FileListItem: React.FC<FileListItemProps> = ({
               </div>
             </div>
           </div>
-
-          <div className="flex items-center space-x-2 ml-4"></div>
+          <div className="flex items-center space-x-2 ml-4" />
         </div>
 
-        {/* Error Messages */}
+        {/* Error message */}
         {fileItem.error && (
           <div className="px-5 pb-3">
             <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">
@@ -217,7 +220,7 @@ export const FileListItem: React.FC<FileListItemProps> = ({
           </div>
         )}
 
-        {/* Expanded Content */}
+        {/* Expanded content */}
         {isExpanded && (
           <div className="border-t bg-gray-50">
             {fileItem.extractedText && (
@@ -226,9 +229,7 @@ export const FileListItem: React.FC<FileListItemProps> = ({
                   <FileText className="w-4 h-4 mr-1" />
                   Extracted Text Preview
                 </h4>
-                <div className="bg-white p-3 rounded text-sm text-gray-600 max-h-32 overflow-y-auto border">
-                  <ExpandableText text={fileItem.extractedText} maxLength={500} />
-                </div>
+                <ExpandableText text={fileItem.extractedText} maxLength={500} />
               </div>
             )}
             {fileItem.originalText && (
@@ -237,12 +238,9 @@ export const FileListItem: React.FC<FileListItemProps> = ({
                   <FileText className="w-4 h-4 mr-1" />
                   Original Text Preview
                 </h4>
-                <div className="bg-white p-3 rounded text-sm text-gray-600 max-h-32 overflow-y-auto">
-                  <ExpandableText text={fileItem.originalText} maxLength={500} />
-                </div>
+                <ExpandableText text={fileItem.originalText} maxLength={500} />
               </div>
             )}
-
             {showFHIRResults && fhirResult && (
               <div className="p-4">
                 <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
@@ -253,6 +251,11 @@ export const FileListItem: React.FC<FileListItemProps> = ({
               </div>
             )}
           </div>
+        )}
+
+        {/* Follow-up items — only rendered when hook finds outstanding actions */}
+        {showFollowUp && (
+          <FollowUpItems items={followUpItems} onDismiss={() => setFollowUpDismissed(true)} />
         )}
       </div>
     </Tooltip.Provider>

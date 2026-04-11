@@ -6,9 +6,7 @@ import { FileObject } from '@/types/core';
 import UploadTab from './ui/UploadTab';
 import TextTab from './ui/TextTab';
 import FHIRTab from './ui/FHIRTab';
-
 import type { CombinedUploadFHIRProps } from './CombinedUploadFHIR.type';
-import RefinementPanel from '@/features/RefineRecord/components/RefinementPanel';
 
 export type TabType = 'upload' | 'text' | 'fhir';
 
@@ -117,25 +115,6 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
                 />
               ))}
             </div>
-
-            {allFilesCompleted && (
-              <div className="bg-green-50 px-4 py-3 border-t border-green-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2 text-green-800">
-                    <CheckCircle className="w-5 h-5" />
-                    <span className="font-medium">All files processed successfully!</span>
-                  </div>
-                  <a
-                    href="/app/records"
-                    className="flex items-center space-x-1 text-sm text-blue-600 
-                       hover:text-blue-800 font-medium"
-                  >
-                    <span>View Records</span>
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                </div>
-              </div>
-            )}
           </>
         ) : (
           /* INPUT INTERFACE */
