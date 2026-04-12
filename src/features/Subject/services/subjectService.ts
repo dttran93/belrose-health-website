@@ -470,7 +470,7 @@ export class SubjectService {
 
       // Step 3: Remove any trustees that have access through the removed subject
       try {
-        await TrusteePermissionService.revokeAccessOnSubjectRemoval(user.uid, recordId);
+        await TrusteePermissionService.revokeTrusteeAccess(user.uid, recordId);
         console.log('✅ Subject trustees removed from record');
       } catch (trusteeError) {
         // Non-fatal — subject removal already succeeded

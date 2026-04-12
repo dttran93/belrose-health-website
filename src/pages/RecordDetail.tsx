@@ -18,7 +18,6 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { FileObject } from '@/types/core';
-import { useAuthContext } from '@/features/Auth/AuthContext';
 import RecordFull from '@/features/ViewEditRecord/components/RecordFull';
 import RecordDeletionDialog from '@/features/ViewEditRecord/components/RecordDeletionDialog';
 import { useRecordFileActions } from '@/features/ViewEditRecord/hooks/useRecordFileActions';
@@ -86,7 +85,6 @@ type ValidView = (typeof VALID_VIEWS)[number];
 const RecordDetail: React.FC = () => {
   const { recordId } = useParams<{ recordId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuthContext();
   const { updateFirestoreRecord } = useFileManager();
   const { handleDownloadRecord, handleCopyRecord } = useRecordFileActions();
 

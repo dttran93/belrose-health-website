@@ -25,7 +25,6 @@ export const SubjectBadge: React.FC<SubjectBadgeProps> = ({
   onOpenManager,
   onSuccess,
 }) => {
-  const [showSetSubjectModal, setShowSetSubjectModal] = useState(false);
   const [firstSubjectName, setFirstSubjectName] = useState<string | null>(null);
   const [loadingName, setLoadingName] = useState(false);
 
@@ -71,19 +70,7 @@ export const SubjectBadge: React.FC<SubjectBadgeProps> = ({
     if (hasSubject && onOpenManager) {
       // Navigate to SubjectManager to view/manage subjects
       onOpenManager();
-    } else if (!hasSubject) {
-      // Open SetSubject modal to add a subject
-      setShowSetSubjectModal(true);
     }
-  };
-
-  const handleModalClose = () => {
-    setShowSetSubjectModal(false);
-  };
-
-  const handleSuccess = () => {
-    setShowSetSubjectModal(false);
-    onSuccess?.();
   };
 
   // Size classes
@@ -133,8 +120,7 @@ export const SubjectBadge: React.FC<SubjectBadgeProps> = ({
     return `${subjects.length} subjects assigned. Click to manage.`;
   };
 
-  // Warning state (no subject set)
-  if (!hasSubject) {
+  if (hasSubject) {
     return (
       <>
         <Tooltip.Provider>
@@ -143,14 +129,18 @@ export const SubjectBadge: React.FC<SubjectBadgeProps> = ({
               <button
                 onClick={handleClick}
                 className={`
-                  inline-flex items-center rounded-full border font-medium
-                  bg-amber-50 text-amber-700 border-amber-200
-                  hover:bg-amber-100 hover:border-amber-300
-                  transition-colors cursor-pointer
-                  ${sizeClasses[size]}
-                `}
+                inline-flex items-center rounded-full border font-medium
+                bg-white text-primary border-primary
+                hover:bg-secondary
+                transition-colors cursor-pointer
+                ${sizeClasses[size]}
+              `}
               >
-                <AlertTriangle className={iconSizes[size]} />
+                {loadingName ? (
+                  <Loader2 className={`${iconSizes[size]} animate-spin`} />
+                ) : (
+                  <FileUser className={iconSizes[size]} />
+                )}
                 <span>{getDisplayText()}</span>
               </button>
             </Tooltip.Trigger>
@@ -165,53 +155,9 @@ export const SubjectBadge: React.FC<SubjectBadgeProps> = ({
             </Tooltip.Portal>
           </Tooltip.Root>
         </Tooltip.Provider>
-
-        {/* Subject Action Modal - can still open from here if needed */}
-        <SubjectActionDialog {...dialogProps} />
       </>
     );
   }
-
-  // Subject(s) set - use primary color
-  return (
-    <>
-      <Tooltip.Provider>
-        <Tooltip.Root>
-          <Tooltip.Trigger asChild>
-            <button
-              onClick={handleClick}
-              className={`
-                inline-flex items-center rounded-full border font-medium
-                bg-white text-primary border-primary
-                hover:bg-secondary
-                transition-colors cursor-pointer
-                ${sizeClasses[size]}
-              `}
-            >
-              {loadingName ? (
-                <Loader2 className={`${iconSizes[size]} animate-spin`} />
-              ) : (
-                <FileUser className={iconSizes[size]} />
-              )}
-              <span>{getDisplayText()}</span>
-            </button>
-          </Tooltip.Trigger>
-          <Tooltip.Portal>
-            <Tooltip.Content
-              className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 max-w-xs z-50"
-              sideOffset={5}
-            >
-              {getTooltipContent()}
-              <Tooltip.Arrow className="fill-gray-900" />
-            </Tooltip.Content>
-          </Tooltip.Portal>
-        </Tooltip.Root>
-      </Tooltip.Provider>
-
-      {/* Subject Action Modal - can still open from here if needed */}
-      <SubjectActionDialog {...dialogProps} />
-    </>
-  );
 };
 
 export default SubjectBadge;

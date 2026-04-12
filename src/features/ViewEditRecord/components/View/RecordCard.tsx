@@ -6,6 +6,7 @@ import HealthRecordMenu from '@/features/ViewEditRecord/components/View/RecordMe
 import { CredibilityBadge } from '@/features/Credibility/components/ui/CredibilityBadge';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import SubjectBadge from '@/features/Subject/components/SubjectBadge';
+import FollowUpBadge from '@/features/RefineRecord/components/FollowUpBadge';
 
 interface HealthRecordCardProps {
   record: FileObject;
@@ -19,6 +20,7 @@ interface HealthRecordCardProps {
   onDownload?: (record: FileObject) => void;
   onCopy?: (record: FileObject) => void;
   onDelete?: (record: FileObject) => void;
+  onFollowUps?: (record: FileObject) => void;
   className?: string;
 }
 
@@ -39,6 +41,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
   onDownload,
   onCopy,
   onDelete,
+  onFollowUps,
   className = '',
 }) => {
   const displayName = record.fileName || 'Unknown Document';
@@ -62,13 +65,10 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
 
           {/* Right: credibility + divider + menu — always visible, never scrolls */}
           <div className="flex items-center gap-1 flex-shrink-0">
+            <FollowUpBadge record={record} onClick={() => onFollowUps?.(record)} />
             {/* SubjectBadge: hidden on mobile, shown md+ */}
             <div className="hidden md:flex items-center">
-              <SubjectBadge
-                record={record}
-                onOpenManager={() => onSubject?.(record)}
-                onSuccess={() => {}}
-              />
+              <SubjectBadge record={record} onOpenManager={() => onSubject?.(record)} />
             </div>
             <CredibilityBadge score={record.credibility?.score} />
             <HealthRecordMenu
@@ -121,11 +121,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
           <span>{record.belroseFields?.patient}</span>
           {/* SubjectBadge sits here on mobile, hidden on md+ (shown in top bar instead) */}
           <div className="md:hidden ml-1">
-            <SubjectBadge
-              record={record}
-              onOpenManager={() => onSubject?.(record)}
-              onSuccess={() => {}}
-            />
+            <SubjectBadge record={record} onOpenManager={() => onSubject?.(record)} />
           </div>
         </div>
 

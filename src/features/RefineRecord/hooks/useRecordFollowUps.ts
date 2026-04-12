@@ -20,15 +20,17 @@
  */
 
 import { FileObject } from '@/types/core';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { FollowUpItem } from '../components/FollowUpItems';
 import { useReviewedByCurrentUser } from '@/features/Credibility/hooks/useVerifiedByCurrentUser';
 import { LinkIcon, ShieldCheck, User } from 'lucide-react';
+import SubjectQueryService from '@/features/Subject/services/subjectQueryService';
+import { useInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
 
 // ─── Options ─────────────────────────────────────────────────────────────────
 
 export interface UseRecordFollowUpsOptions {
-  onAction: (fileItem: FileObject) => void;
+  onAction: (fileItem: FileObject, itemId: string) => void;
 }
 
 // ─── Return type ─────────────────────────────────────────────────────────────
@@ -53,11 +55,29 @@ export function useRecordFollowUps(
   const { onAction } = options;
 
   // Only run async checks when the record is fully saved to Firestore
-  const isEligible = fileItem.status === 'completed' && !!fileItem.firestoreId;
+  const isEligible = fileItem.status === 'completed' && (!!fileItem.firestoreId || !!fileItem.id);
 
   // ── Check 1: Subject ───────────────────────────────────────────────────────
   // Synchronous — subjects array is already on the FileObject
   const hasSubject = (fileItem.subjects ?? []).length > 0;
+
+  // Also check if a consent request is already pending (request sent, not yet accepted)
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
+  const [isLoadingPendingRequest, setIsLoadingPendingRequest] = useState(false);
+
+  useEffect(() => {
+    if (!isEligible || hasSubject) return; // no need to check if subject already set
+
+    const recordId = fileItem.firestoreId ?? fileItem.id;
+    setIsLoadingPendingRequest(true);
+
+    SubjectQueryService.getPendingConsentRequestsForRecord(recordId)
+      .then(requests => setHasPendingRequest(requests.length > 0))
+      .catch(() => setHasPendingRequest(false))
+      .finally(() => setIsLoadingPendingRequest(false));
+  }, [isEligible, hasSubject, fileItem.firestoreId, fileItem.id]);
+
+  // Add isLoadingPendingRequest to the overall loading state
 
   // ── Check 2: Verification ─────────────────────────────────────────────────
   // Async — queries Firestore for an active verification or dispute doc
@@ -65,21 +85,19 @@ export function useRecordFollowUps(
   const { hasReviewed, isLoading: isLoadingReview } = useReviewedByCurrentUser(fileItem);
 
   // ── Check 3: Linked request ───────────────────────────────────────────────
-  // TODO: swap `true` for `!fileItem.linkedRequestId` once that field is added
-  // to FileObject. The RequestRecord feature stores fulfilledRecordId on the
-  // request side, so you'll want a field on the record pointing back.
-  const needsLinkedRequest = true;
+  const { requests: inboundRequests, loading: isLoadingRequests } = useInboundRequests();
+  const hasPendingRequests = inboundRequests.some(r => r.status === 'pending');
 
   // ── Build list ────────────────────────────────────────────────────────────
   // Don't build anything until the record is eligible and async checks resolve
-  const isLoading = isEligible && isLoadingReview;
+  const isLoading = isEligible && (isLoadingReview || isLoadingPendingRequest || isLoadingRequests);
 
   const followUpItems = React.useMemo<FollowUpItem[]>(() => {
     if (!isEligible || isLoading) return [];
 
     const items: FollowUpItem[] = [];
 
-    if (!hasSubject) {
+    if (!hasSubject && !hasPendingRequest) {
       items.push({
         id: 'subject',
         label: 'Tag a subject',
@@ -88,7 +106,7 @@ export function useRecordFollowUps(
         icon: User,
         status: 'pending',
         ctaLabel: 'Send request',
-        onAction: () => onAction(fileItem),
+        onAction: () => onAction(fileItem, 'subject'),
       });
     }
 
@@ -101,11 +119,11 @@ export function useRecordFollowUps(
         icon: ShieldCheck,
         status: 'pending',
         ctaLabel: 'Review',
-        onAction: () => onAction(fileItem),
+        onAction: () => onAction(fileItem, 'verify'),
       });
     }
 
-    if (needsLinkedRequest) {
+    if (hasPendingRequests) {
       items.push({
         id: 'link-request',
         label: 'Relate to a request',
@@ -113,12 +131,12 @@ export function useRecordFollowUps(
         icon: LinkIcon,
         status: 'pending',
         ctaLabel: 'Link',
-        onAction: () => onAction(fileItem),
+        onAction: () => onAction(fileItem, 'link-request'),
       });
     }
 
     return items;
-  }, [isEligible, isLoading, hasSubject, hasReviewed, needsLinkedRequest, fileItem, onAction]);
+  }, [isEligible, isLoading, hasSubject, hasReviewed, hasPendingRequests, fileItem, onAction]);
 
   return { followUpItems, isLoading };
 }

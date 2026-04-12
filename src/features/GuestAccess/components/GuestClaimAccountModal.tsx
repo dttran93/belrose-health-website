@@ -302,6 +302,23 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         });
       });
 
+      // ── Step 4b: Backfill targetUserId on any recordRequests matched by email ──
+      // useInboundRequests queries by both userId and email, but setting targetUserId
+      // ensures future queries by ID alone (e.g. useRecordFollowUps) still find them.
+      const requestSnap = await getDocs(
+        query(
+          collection(db, 'recordRequests'),
+          where('targetEmail', '==', user.email),
+          where('status', '==', 'pending')
+        )
+      );
+
+      requestSnap.docs.forEach(requestDoc => {
+        batch.update(requestDoc.ref, {
+          targetUserId: guestUid,
+        });
+      });
+
       await batch.commit();
 
       // ── Step 5: Generate real wallet ─────────────────────────────────────────

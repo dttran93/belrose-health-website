@@ -30,6 +30,9 @@ import SubjectService from '@/features/Subject/services/subjectService';
 import SubjectRemovalService from '@/features/Subject/services/subjectRemovalService';
 import { useNavigate } from 'react-router-dom';
 import { useReviewedByCurrentUser } from '@/features/Credibility/hooks/useVerifiedByCurrentUser';
+import FollowUpItems from '@/features/RefineRecord/components/FollowUpItems';
+import useRecordFollowUps from '@/features/RefineRecord/hooks/useRecordFollowUps';
+import FollowUpBadge from '@/features/RefineRecord/components/FollowUpBadge';
 
 type ViewMode =
   | 'record'
@@ -39,7 +42,8 @@ type ViewMode =
   | 'credibility'
   | 'access'
   | 'permissions'
-  | 'subject';
+  | 'subject'
+  | 'follow-ups';
 
 type UrlViewMode = Exclude<ViewMode, 'version-detail'>; //Initial view mode is never version-detail
 
@@ -125,6 +129,14 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   const [enterDisputeInModifyMode, setEnterDisputeinModifyMode] = useState(false);
   const { hasReviewed, isLoading: isCheckingReview } = useReviewedByCurrentUser(record);
   const navigate = useNavigate();
+
+  const { followUpItems } = useRecordFollowUps(record, {
+    onAction: (_, itemId) => {
+      if (itemId === 'subject') setViewMode('subject');
+      else if (itemId === 'verify') setViewMode('credibility');
+      else if (itemId === 'link-request') setViewMode('follow-ups');
+    },
+  });
 
   // For managing subject banner
   const hasSubject = (record.subjects || []).length > 0;
@@ -237,6 +249,10 @@ export const RecordFull: React.FC<RecordFullProps> = ({
 
   const handleSubjectPage = () => {
     setViewMode('subject');
+  };
+
+  const handleFollowUpsPage = () => {
+    setViewMode('follow-ups');
   };
 
   const handleViewVersion = async (version: RecordVersion) => {
@@ -466,12 +482,9 @@ export const RecordFull: React.FC<RecordFullProps> = ({
 
             {/**Right: credibility + divider + subject (md+) + menu + close */}
             <div className="flex items-center gap-1 flex-shrink-0">
+              <FollowUpBadge record={record} onClick={handleFollowUpsPage} />
               <div className="hidden md:flex items-center">
-                <SubjectBadge
-                  record={record}
-                  onOpenManager={handleSubjectPage}
-                  onSuccess={() => {}}
-                />
+                <SubjectBadge record={record} onOpenManager={handleSubjectPage} />
               </div>
               <CredibilityBadge score={record.credibility?.score} />
               {!readOnly && (
@@ -535,11 +548,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
                 <span className="text-white/30">•</span>
                 <span>{displayRecord.belroseFields?.institution}</span>
                 <div className="flex items-center gap-1 md:hidden">
-                  <SubjectBadge
-                    record={record}
-                    onOpenManager={handleSubjectPage}
-                    onSuccess={() => {}}
-                  />
+                  <SubjectBadge record={record} onOpenManager={handleSubjectPage} />
                 </div>
               </div>
 
@@ -640,6 +649,16 @@ export const RecordFull: React.FC<RecordFullProps> = ({
           startModVerifyFromVersions={enterVerificationInModifyMode}
           startModDisputeFromVersions={enterDisputeInModifyMode}
         />
+      )}
+
+      {viewMode === 'follow-ups' && (
+        <div className="p-6">
+          <FollowUpItems
+            items={followUpItems}
+            // No onDismiss here — dismissing is a per-session UI concern
+            // that lives in FileListItem, not in the persistent record view
+          />
+        </div>
       )}
 
       {/* Subject Action Dialog for accept/decline flows */}
