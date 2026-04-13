@@ -30,9 +30,8 @@ import SubjectService from '@/features/Subject/services/subjectService';
 import SubjectRemovalService from '@/features/Subject/services/subjectRemovalService';
 import { useNavigate } from 'react-router-dom';
 import { useReviewedByCurrentUser } from '@/features/Credibility/hooks/useVerifiedByCurrentUser';
-import FollowUpItems from '@/features/RefineRecord/components/FollowUpItems';
-import useRecordFollowUps from '@/features/RefineRecord/hooks/useRecordFollowUps';
 import FollowUpBadge from '@/features/RefineRecord/components/FollowUpBadge';
+import RecordFollowUpsView from '@/features/RefineRecord/components/RecordFollowUpsView';
 
 type ViewMode =
   | 'record'
@@ -43,9 +42,21 @@ type ViewMode =
   | 'access'
   | 'permissions'
   | 'subject'
-  | 'follow-ups';
+  | 'follow-up';
 
-type UrlViewMode = Exclude<ViewMode, 'version-detail'>; //Initial view mode is never version-detail
+export type UrlViewMode = Exclude<ViewMode, 'version-detail'>; //Initial view mode is never version-detail
+
+// Used in RecordDetail.tsx page
+export const VALID_VIEWS: UrlViewMode[] = [
+  'record',
+  'edit',
+  'versions',
+  'credibility',
+  'access',
+  'permissions',
+  'subject',
+  'follow-up',
+];
 
 interface RecordFullProps {
   record: FileObject;
@@ -129,14 +140,6 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   const [enterDisputeInModifyMode, setEnterDisputeinModifyMode] = useState(false);
   const { hasReviewed, isLoading: isCheckingReview } = useReviewedByCurrentUser(record);
   const navigate = useNavigate();
-
-  const { followUpItems } = useRecordFollowUps(record, {
-    onAction: (_, itemId) => {
-      if (itemId === 'subject') setViewMode('subject');
-      else if (itemId === 'verify') setViewMode('credibility');
-      else if (itemId === 'link-request') setViewMode('follow-ups');
-    },
-  });
 
   // For managing subject banner
   const hasSubject = (record.subjects || []).length > 0;
@@ -252,7 +255,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   };
 
   const handleFollowUpsPage = () => {
-    setViewMode('follow-ups');
+    setViewMode('follow-up');
   };
 
   const handleViewVersion = async (version: RecordVersion) => {
@@ -499,6 +502,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
                   onAccess={viewMode !== 'access' ? handleAccessPage : undefined}
                   onCredibility={viewMode !== 'credibility' ? handleViewCredibility : undefined}
                   onPermissions={viewMode !== 'permissions' ? handlePermissionManager : undefined}
+                  onFollowUp={viewMode !== 'follow-up' ? handleFollowUpsPage : undefined}
                   onDownload={onDownload}
                   onCopy={onCopy}
                   onDelete={onDelete}
@@ -651,14 +655,16 @@ export const RecordFull: React.FC<RecordFullProps> = ({
         />
       )}
 
-      {viewMode === 'follow-ups' && (
-        <div className="p-6">
-          <FollowUpItems
-            items={followUpItems}
-            // No onDismiss here — dismissing is a per-session UI concern
-            // that lives in FileListItem, not in the persistent record view
-          />
-        </div>
+      {viewMode === 'follow-up' && (
+        <RecordFollowUpsView
+          record={record}
+          onBack={handleBackToRecord}
+          onAction={(_, itemId) => {
+            if (itemId === 'subject') setViewMode('subject');
+            else if (itemId === 'verify') setViewMode('credibility');
+            else if (itemId === 'link-request') setViewMode('follow-up');
+          }}
+        />
       )}
 
       {/* Subject Action Dialog for accept/decline flows */}

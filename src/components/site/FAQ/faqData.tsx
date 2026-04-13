@@ -259,7 +259,7 @@ export const faqs: FAQData = {
       q: "Can Belrose records be imported back into our clinic's EHR?",
       a: (
         <>
-          'Yes. We can build a two-way integration with any EHR system.{' '}
+          Yes. We can build a two-way integration with any EHR system.{' '}
           <a
             href="mailto:hello@belrosehealth.com"
             className="text-blue-600 hover:underline font-medium"
@@ -274,8 +274,8 @@ export const faqs: FAQData = {
       q: "Can Belrose integrate with our EHR's APIs to pull data directly?",
       a: (
         <>
-          'Yes — that would be our preferred method. We recognise the complexity of such
-          integrations and have built manual workarounds until they can be achieved at scale.{' '}
+          Yes — that would be our preferred method. We recognise the complexity of such integrations
+          and have built manual workarounds until they can be achieved at scale.{' '}
           <a
             href="mailto:hello@belrosehealth.com"
             className="text-blue-600 hover:underline font-medium"
@@ -295,7 +295,7 @@ export const faqs: FAQData = {
     },
     {
       q: 'Can I earn money from my health data?',
-      a: 'Yes — if you choose to. Belrose enables you to opt into sharing anonymised data with researchers, pharmaceutical companies, or other organisations. You set the terms, you control who sees what, and any compensation flows directly to you. Participation is entirely voluntary.',
+      a: 'Yes — if you choose to. Belrose enables you to opt into sharing data with researchers, pharmaceutical companies, or other organisations. You set the terms, you control who sees what, and any compensation flows directly to you. Participation is entirely voluntary.',
     },
     {
       q: 'How much can I earn?',

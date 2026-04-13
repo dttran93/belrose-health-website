@@ -113,7 +113,7 @@ export function useRecordFollowUps(
     if (!hasReviewed) {
       items.push({
         id: 'verify',
-        label: 'Verify this record',
+        label: 'Review this record',
         subtext:
           'Credibility of records is vital for future doctors and users of this data. Please review the record and submit a verification or dispute.',
         icon: ShieldCheck,

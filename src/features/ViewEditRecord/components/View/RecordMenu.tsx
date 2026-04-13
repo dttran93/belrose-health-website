@@ -12,6 +12,7 @@ import {
   UserLock,
   FileUser,
   HeartHandshake,
+  ListChecks,
 } from 'lucide-react';
 
 // Types for the menu system
@@ -45,6 +46,7 @@ interface RecordMenuProps {
   onPermissions?: (record: any) => void;
   onSubject?: (record: any) => void;
   onCredibility?: (record: any) => void;
+  onFollowUp?: (record: any) => void;
 
   //File Management Props
   onDownload?: (record: any) => void;
@@ -68,6 +70,7 @@ interface RecordMenuProps {
   showCredibility?: boolean;
   showPermissions?: boolean;
   showSubject?: boolean;
+  showFollowUp?: boolean;
 
   // Additional menu items from parent
   additionalItems?: MenuItem[];
@@ -96,6 +99,7 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
   onCredibility,
   onPermissions,
   onSubject,
+  onFollowUp,
   onDownload,
   onCopy,
   onDelete,
@@ -112,6 +116,7 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
   showCredibility = true,
   showPermissions = true,
   showSubject = true,
+  showFollowUp = true,
   additionalItems = [],
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -213,6 +218,15 @@ const RecordMenu: React.FC<RecordMenuProps> = ({
         label: 'Credibility',
         icon: HeartHandshake,
         onClick: createHandler(onCredibility),
+      });
+    }
+
+    if (showFollowUp && onFollowUp) {
+      items.push({
+        key: 'followup',
+        label: 'Follow-Ups',
+        icon: ListChecks,
+        onClick: createHandler(onFollowUp),
       });
     }
 

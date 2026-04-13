@@ -16,6 +16,7 @@ interface RecordsListProps {
   onAccess: (record: FileObject) => void;
   onCredibility: (record: FileObject) => void;
   onPermissions: (record: FileObject) => void;
+  onFollowUp: (record: FileObject) => void;
   onDelete?: (record: FileObject) => void;
   onCopy: (record: FileObject) => void;
   onDownload: (record: FileObject) => void;
@@ -44,6 +45,7 @@ export const RecordsList: React.FC<RecordsListProps> = ({ records, ...handlers }
           onAccess={handlers.onAccess}
           onCredibility={handlers.onCredibility}
           onPermissions={handlers.onPermissions}
+          onFollowUp={handlers.onFollowUp}
           onDelete={handlers.onDelete}
           onCopy={handlers.onCopy}
           onDownload={handlers.onDownload}

@@ -22,19 +22,7 @@ import { useRecordDeletion } from '@/features/ViewEditRecord/hooks/useRecordDele
 import { AlertCircle, Loader2, Upload } from 'lucide-react';
 import RecordDeletionDialog from '@/features/ViewEditRecord/components/RecordDeletionDialog';
 import FilterTabs from '@/features/ViewEditRecord/components/View/FilterTabs';
-
-// ============================================================================
-// TYPES
-// ============================================================================
-
-type RecordView =
-  | 'record'
-  | 'edit'
-  | 'versions'
-  | 'credibility'
-  | 'permissions'
-  | 'access'
-  | 'subject';
+import { UrlViewMode } from '@/features/ViewEditRecord/components/RecordFull';
 
 // ============================================================================
 // COMPONENT
@@ -85,7 +73,7 @@ export const AllRecords: React.FC = () => {
 
   // All record opens are now just navigations to RecordDetail.
   // ?view= maps 1:1 to the ViewMode in RecordFull.
-  const openRecord = (record: FileObject, view: RecordView = 'record') => {
+  const openRecord = (record: FileObject, view: UrlViewMode = 'record') => {
     navigate(`/app/records/${record.id}?view=${view}`);
   };
 
@@ -248,6 +236,7 @@ export const AllRecords: React.FC = () => {
           onAccess={record => openRecord(record, 'access')}
           onCredibility={record => openRecord(record, 'credibility')}
           onPermissions={record => openRecord(record, 'permissions')}
+          onFollowUp={record => openRecord(record, 'follow-up')}
           onDelete={handleDeleteRecord}
           onCopy={handleCopyRecord}
           onDownload={handleDownloadRecord}

@@ -20,7 +20,7 @@ interface HealthRecordCardProps {
   onDownload?: (record: FileObject) => void;
   onCopy?: (record: FileObject) => void;
   onDelete?: (record: FileObject) => void;
-  onFollowUps?: (record: FileObject) => void;
+  onFollowUp?: (record: FileObject) => void;
   className?: string;
 }
 
@@ -41,7 +41,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
   onDownload,
   onCopy,
   onDelete,
-  onFollowUps,
+  onFollowUp,
   className = '',
 }) => {
   const displayName = record.fileName || 'Unknown Document';
@@ -65,7 +65,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
 
           {/* Right: credibility + divider + menu — always visible, never scrolls */}
           <div className="flex items-center gap-1 flex-shrink-0">
-            <FollowUpBadge record={record} onClick={() => onFollowUps?.(record)} />
+            <FollowUpBadge record={record} onClick={() => onFollowUp?.(record)} />
             {/* SubjectBadge: hidden on mobile, shown md+ */}
             <div className="hidden md:flex items-center">
               <SubjectBadge record={record} onOpenManager={() => onSubject?.(record)} />
@@ -82,6 +82,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
               onAccess={onAccess}
               onCredibility={onCredibility}
               onPermissions={onPermissions}
+              onFollowUp={onFollowUp}
               onDownload={onDownload}
               onCopy={onCopy}
               onDelete={onDelete}

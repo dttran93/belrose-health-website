@@ -107,22 +107,13 @@ const FollowUpRow: React.FC<{ item: FollowUpItem }> = ({ item }) => {
 // ─── Container ───────────────────────────────────────────────────────────────
 
 export const FollowUpItems: React.FC<FollowUpItemsProps> = ({ items, onDismiss }) => {
-  const pendingCount = items.filter(i => i.status === 'pending').length;
-
   // Don't render if everything is done and there's nothing to show
   if (items.length === 0) return null;
 
-  const headerText =
-    pendingCount === items.length
-      ? 'File Uploaded! There are a few follow-up steps to complete this record'
-      : `${pendingCount} of ${items.length} steps remaining`;
-
   return (
-    <div className="bg-amber-50 border-t border-amber-200 px-4 py-3 rounded-xl">
+    <div>
       {/* Header row */}
-      <div className="flex items-center gap-2 mb-2.5">
-        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-        <span className="text-xs font-medium text-amber-800 flex-1">{headerText}</span>
+      <div className="flex items-center gap-2">
         {onDismiss && (
           <button
             onClick={onDismiss}

@@ -18,7 +18,10 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { FileObject } from '@/types/core';
-import RecordFull from '@/features/ViewEditRecord/components/RecordFull';
+import RecordFull, {
+  UrlViewMode,
+  VALID_VIEWS,
+} from '@/features/ViewEditRecord/components/RecordFull';
 import RecordDeletionDialog from '@/features/ViewEditRecord/components/RecordDeletionDialog';
 import { useRecordFileActions } from '@/features/ViewEditRecord/hooks/useRecordFileActions';
 import { useRecordDeletion } from '@/features/ViewEditRecord/hooks/useRecordDeletion';
@@ -63,22 +66,6 @@ const ErrorState: React.FC<{ message: string }> = ({ message }) => {
 };
 
 // ============================================================================
-// VALID VIEWS
-// ============================================================================
-
-const VALID_VIEWS = [
-  'record',
-  'edit',
-  'versions',
-  'credibility',
-  'permissions',
-  'access',
-  'subject',
-] as const;
-
-type ValidView = (typeof VALID_VIEWS)[number];
-
-// ============================================================================
 // PAGE
 // ============================================================================
 
@@ -98,8 +85,8 @@ const RecordDetail: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const viewParam = searchParams.get('view');
-  const initialViewMode: ValidView = VALID_VIEWS.includes(viewParam as ValidView)
-    ? (viewParam as ValidView)
+  const initialViewMode: UrlViewMode = VALID_VIEWS.includes(viewParam as UrlViewMode)
+    ? (viewParam as UrlViewMode)
     : 'record';
 
   // Called by RecordFull whenever the active panel changes.
