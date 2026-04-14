@@ -1,16 +1,22 @@
-// src/features/Notifications/pages/NotificationsPage.tsx
+// src/features/Notifications/pages/NotificationsTab.tsx
+
+/**
+ * NotificationsTab
+ *
+ * The notifications content extracted from the old NotificationsManager page,
+ * now used as the "Notifications" tab inside ActivityHub.
+ *
+ * The page-level chrome (header, sticky positioning) is owned by ActivityHub.
+ * This component only renders the filter bar + notification list.
+ */
 
 import React, { useState, useMemo } from 'react';
-import { Bell, BellOff, CheckCheck, Filter, Loader2, AlertCircle, Inbox } from 'lucide-react';
+import { Bell, CheckCheck, Filter, Loader2, AlertCircle, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { useNotifications, SourceService } from '../hooks/useNotifications';
 import NotificationItem from './ui/NotificationItem';
 import { toast } from 'sonner';
-
-// ============================================================================
-// TYPES
-// ============================================================================
 
 type FilterOption = 'all' | 'unread' | SourceService;
 
@@ -22,13 +28,6 @@ interface FilterButtonProps {
   count?: number;
 }
 
-// ============================================================================
-// SUB-COMPONENTS
-// ============================================================================
-
-/**
- * Filter button component for notification filtering.
- */
 const FilterButton: React.FC<FilterButtonProps> = ({
   label,
   value,
@@ -37,7 +36,6 @@ const FilterButton: React.FC<FilterButtonProps> = ({
   count,
 }) => {
   const isActive = activeFilter === value;
-
   return (
     <button
       onClick={() => onClick(value)}
@@ -53,10 +51,7 @@ const FilterButton: React.FC<FilterButtonProps> = ({
       {label}
       {count !== undefined && count > 0 && (
         <span
-          className={`
-            ml-2 px-1.5 py-0.5 text-xs rounded-full
-            ${isActive ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-complement-1/10 text-complement-1'}
-          `}
+          className={`ml-2 px-1.5 py-0.5 text-xs rounded-full ${isActive ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-complement-1/10 text-complement-1'}`}
         >
           {count}
         </span>
@@ -65,9 +60,6 @@ const FilterButton: React.FC<FilterButtonProps> = ({
   );
 };
 
-/**
- * Empty state component shown when no notifications match the filter.
- */
 const EmptyState: React.FC<{ filter: FilterOption }> = ({ filter }) => {
   const getMessage = () => {
     switch (filter) {
@@ -83,7 +75,6 @@ const EmptyState: React.FC<{ filter: FilterOption }> = ({ filter }) => {
         return "You don't have any notifications yet.";
     }
   };
-
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4">
       <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
@@ -95,9 +86,6 @@ const EmptyState: React.FC<{ filter: FilterOption }> = ({ filter }) => {
   );
 };
 
-/**
- * Loading state skeleton component.
- */
 const LoadingSkeleton: React.FC = () => (
   <div className="space-y-3 p-4">
     {[1, 2, 3, 4, 5].map(i => (
@@ -112,9 +100,6 @@ const LoadingSkeleton: React.FC = () => (
   </div>
 );
 
-/**
- * Error state component.
- */
 const ErrorState: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
   <div className="flex flex-col items-center justify-center py-16 px-4">
     <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
@@ -130,19 +115,7 @@ const ErrorState: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
   </div>
 );
 
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
-
-/**
- * Full-page notifications view.
- *
- * Displays all user notifications with filtering options,
- * mark all as read functionality, and real-time updates.
- *
- * Similar to Facebook's full notifications page experience.
- */
-export const NotificationsManager: React.FC = () => {
+export const NotificationsTab: React.FC = () => {
   const { user } = useAuthContext();
   const {
     notifications,
@@ -153,11 +126,9 @@ export const NotificationsManager: React.FC = () => {
     markAllAsRead,
     refreshNotifications,
   } = useNotifications(user?.uid);
-
   const [activeFilter, setActiveFilter] = useState<FilterOption>('all');
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
 
-  // Filter notifications based on active filter
   const filteredNotifications = useMemo(() => {
     switch (activeFilter) {
       case 'unread':
@@ -171,7 +142,6 @@ export const NotificationsManager: React.FC = () => {
     }
   }, [notifications, activeFilter]);
 
-  // Calculate counts for filter badges
   const filterCounts = useMemo(
     () => ({
       all: notifications.length,
@@ -183,19 +153,8 @@ export const NotificationsManager: React.FC = () => {
     [notifications, unreadCount]
   );
 
-  // Handle marking a single notification as read
-  const handleMarkAsRead = async (notificationId: string) => {
-    try {
-      await markAsRead(notificationId);
-    } catch {
-      toast.error('Failed to mark notification as read');
-    }
-  };
-
-  // Handle marking all notifications as read
   const handleMarkAllAsRead = async () => {
     if (unreadCount === 0) return;
-
     setIsMarkingAllRead(true);
     try {
       await markAllAsRead();
@@ -208,115 +167,84 @@ export const NotificationsManager: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background border-b border-border">
-        <div className="max-w-3xl mx-auto px-4 py-6">
-          {/* Title Row */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-                <Bell className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-primary">Notifications</h1>
-                {unreadCount > 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Mark all as read button */}
-            {unreadCount > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleMarkAllAsRead}
-                disabled={isMarkingAllRead}
-                className="gap-2"
-              >
-                {isMarkingAllRead ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <CheckCheck className="w-4 h-4" />
-                )}
-                Mark all as read
-              </Button>
-            )}
-          </div>
-
-          {/* Filter Bar */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            <Filter className="w-4 h-4 text-muted-foreground flex-shrink-0 mr-1" />
-            <FilterButton
-              label="All"
-              value="all"
-              activeFilter={activeFilter}
-              onClick={setActiveFilter}
-            />
-            <FilterButton
-              label="Unread"
-              value="unread"
-              activeFilter={activeFilter}
-              onClick={setActiveFilter}
-              count={filterCounts.unread}
-            />
-            <FilterButton
-              label="Subject"
-              value="Subject"
-              activeFilter={activeFilter}
-              onClick={setActiveFilter}
-            />
-            <FilterButton
-              label="Messages"
-              value="Messaging"
-              activeFilter={activeFilter}
-              onClick={setActiveFilter}
-            />
-            <FilterButton
-              label="System"
-              value="System"
-              activeFilter={activeFilter}
-              onClick={setActiveFilter}
-            />
-          </div>
+    <div className="max-w-3xl mx-auto">
+      {/* Sub-header: filter bar + mark all read */}
+      <div className="px-4 py-4 flex items-center justify-between gap-4 border-b border-border">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          <Filter className="w-4 h-4 text-muted-foreground flex-shrink-0 mr-1" />
+          <FilterButton
+            label="All"
+            value="all"
+            activeFilter={activeFilter}
+            onClick={setActiveFilter}
+          />
+          <FilterButton
+            label="Unread"
+            value="unread"
+            activeFilter={activeFilter}
+            onClick={setActiveFilter}
+            count={filterCounts.unread}
+          />
+          <FilterButton
+            label="Subject"
+            value="Subject"
+            activeFilter={activeFilter}
+            onClick={setActiveFilter}
+          />
+          <FilterButton
+            label="Messages"
+            value="Messaging"
+            activeFilter={activeFilter}
+            onClick={setActiveFilter}
+          />
+          <FilterButton
+            label="System"
+            value="System"
+            activeFilter={activeFilter}
+            onClick={setActiveFilter}
+          />
         </div>
+
+        {unreadCount > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleMarkAllAsRead}
+            disabled={isMarkingAllRead}
+            className="gap-2 flex-shrink-0"
+          >
+            {isMarkingAllRead ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <CheckCheck className="w-4 h-4" />
+            )}
+            Mark all read
+          </Button>
+        )}
       </div>
 
       {/* Content */}
-      <div className="max-w-3xl mx-auto">
-        {/* Loading State */}
-        {loading && <LoadingSkeleton />}
+      {loading && <LoadingSkeleton />}
+      {error && !loading && <ErrorState onRetry={refreshNotifications} />}
+      {!loading &&
+        !error &&
+        (filteredNotifications.length === 0 ? (
+          <EmptyState filter={activeFilter} />
+        ) : (
+          <div className="divide-y divide-border">
+            {filteredNotifications.map(notification => (
+              <NotificationItem
+                key={notification.id}
+                notification={notification}
+                onMarkAsRead={markAsRead}
+              />
+            ))}
+          </div>
+        ))}
 
-        {/* Error State */}
-        {error && !loading && <ErrorState onRetry={refreshNotifications} />}
-
-        {/* Notifications List */}
-        {!loading && !error && (
-          <>
-            {filteredNotifications.length === 0 ? (
-              <EmptyState filter={activeFilter} />
-            ) : (
-              <div className="divide-y divide-border">
-                {filteredNotifications.map(notification => (
-                  <NotificationItem
-                    key={notification.id}
-                    notification={notification}
-                    onMarkAsRead={handleMarkAsRead}
-                  />
-                ))}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Bottom Padding for mobile */}
-        <div className="h-20" />
-      </div>
+      <div className="h-20" />
     </div>
   );
 };
 
-export default NotificationsManager;
+export default NotificationsTab;

@@ -17,7 +17,6 @@ import SettingsPage from './pages/Settings';
 import { EncryptionGate } from './features/Encryption/components/EncryptionGate';
 import VerificationHub from './pages/VerificationHub';
 import EmailVerifiedPage from './pages/EmailVerified';
-import NotificationsManager from './features/Notifications/component/NotificationsManager';
 import BlockchainAdminDashboard from './pages/BlockchainAdminDashboard';
 import HashTester from './pages/HashTester';
 import Index from './pages';
@@ -33,6 +32,7 @@ import { RequiresPlatformAdmin } from './features/Users/components/RequirePlatfo
 import FulfillRequestPage from './pages/FulfillRequestPage';
 import RecordRequestsPage from './pages/RecordRequestsPage';
 import ForProviders from './pages/ForProviders';
+import ActivityHub from './pages/ActivityHub';
 
 // Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
@@ -95,7 +95,7 @@ const App: React.FC = (): React.JSX.Element => {
                                 <Route path="records/:recordId" element={<RecordDetail />} />
                                 <Route path="add-record" element={<AddRecord />} />
                                 <Route path="settings/*" element={<SettingsPage />} />
-                                <Route path="notifications" element={<NotificationsManager />} />
+                                <Route path="activity" element={<ActivityHub />} />
                                 <Route path="messages" element={<Messaging />} />
                                 <Route path="messages/:recipientId" element={<Messaging />} />
                               </Routes>

@@ -13,8 +13,6 @@ import {
   Circle,
 } from 'lucide-react';
 import { Notification, NotificationType } from '@/features/Notifications/hooks/useNotifications';
-import { formatDistanceToNow } from 'date-fns/formatDistanceToNow';
-import { Timestamp } from 'firebase/firestore';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 
 // ============================================================================
@@ -120,7 +118,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
     <div
       onClick={handleClick}
       className={`
-        relative flex items-start gap-4 p-4 rounded-lg cursor-pointer
+        relative flex items-start gap-4 p-4 cursor-pointer
         transition-all duration-200 ease-in-out
         hover:bg-muted/50
         ${notification.read ? 'bg-background' : 'bg-secondary/30'}

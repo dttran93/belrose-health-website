@@ -30,7 +30,7 @@ import SubjectService from '@/features/Subject/services/subjectService';
 import SubjectRemovalService from '@/features/Subject/services/subjectRemovalService';
 import { useNavigate } from 'react-router-dom';
 import { useReviewedByCurrentUser } from '@/features/Credibility/hooks/useVerifiedByCurrentUser';
-import FollowUpBadge from '@/features/RefineRecord/components/FollowUpBadge';
+import FollowUpBadge from '@/features/RefineRecord/components/ui/FollowUpBadge';
 import RecordFollowUpsView from '@/features/RefineRecord/components/RecordFollowUpsView';
 
 type ViewMode =

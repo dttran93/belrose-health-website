@@ -16,7 +16,7 @@ import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { FileObject } from '@/types/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import useRecordFollowUps from '../hooks/useRecordFollowUps';
+import useRecordFollowUps from '../../hooks/useRecordFollowUps';
 
 interface FollowUpBadgeProps {
   record: FileObject;
@@ -59,8 +59,7 @@ export const FollowUpBadge: React.FC<FollowUpBadgeProps> = ({ record, onClick, s
 
   if (followUpItems.length === 0) return null;
 
-  const label =
-    followUpItems.length === 1 ? '1 action needed' : `${followUpItems.length} actions needed`;
+  const label = followUpItems.length === 1 ? '1 Follow-Up' : `${followUpItems.length} Follow-Ups`;
 
   const tooltipText = followUpItems.map(i => `• ${i.label}`).join('\n');
 

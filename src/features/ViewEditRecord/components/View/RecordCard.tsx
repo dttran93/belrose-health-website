@@ -6,7 +6,7 @@ import HealthRecordMenu from '@/features/ViewEditRecord/components/View/RecordMe
 import { CredibilityBadge } from '@/features/Credibility/components/ui/CredibilityBadge';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import SubjectBadge from '@/features/Subject/components/SubjectBadge';
-import FollowUpBadge from '@/features/RefineRecord/components/FollowUpBadge';
+import FollowUpBadge from '@/features/RefineRecord/components/ui/FollowUpBadge';
 
 interface HealthRecordCardProps {
   record: FileObject;

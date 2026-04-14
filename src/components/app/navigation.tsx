@@ -16,6 +16,7 @@ export interface NavigationItem {
   title: string;
   url: string;
   icon: LucideIcon;
+  badge?: number;
 }
 
 export interface NavigationSection {
@@ -29,7 +30,7 @@ export interface NavigationSection {
  * Some are simple routes (url provided); AI triggers a context callback.
  */
 export interface QuickActionItem {
-  id: 'home' | 'notifications' | 'messages' | 'ai';
+  id: 'home' | 'activity' | 'messages' | 'ai';
   title: string;
   url?: string;
   icon: LucideIcon;
@@ -37,7 +38,7 @@ export interface QuickActionItem {
 
 export const quickActions: QuickActionItem[] = [
   { id: 'home', title: 'Home', url: '/app', icon: House },
-  { id: 'notifications', title: 'Notifications', url: '/app/notifications', icon: Bell },
+  { id: 'activity', title: 'Activity Hub', url: '/app/activity', icon: Bell },
   { id: 'messages', title: 'Messages', url: '/app/messages', icon: MessageSquare },
   { id: 'ai', title: 'AI Assistant', icon: Sparkles },
 ];

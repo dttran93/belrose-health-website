@@ -14,6 +14,7 @@ import { GuestBanner, GuestFooter } from './GuestBanner';
 import useNotifications from '@/features/Notifications/hooks/useNotifications';
 import { useUnreadMessageCount } from '@/features/Messaging/hooks/useUnreadMessageCount';
 import { useInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
+import { useActionsCount } from '@/features/RefineRecord/hooks/useActionsCount';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -27,6 +28,7 @@ function AppLayout({ children }: AppLayoutProps) {
   const isGuest = user?.isGuest === true;
 
   // Pull unread notifications count for notifications quick action item
+  const { count: actionsCount } = useActionsCount();
   const { unreadCount } = useNotifications(user?.uid);
 
   // Pull inbound requests for requestRecords notification
@@ -121,7 +123,7 @@ function AppLayout({ children }: AppLayoutProps) {
             onNewChat={handleNewChatClick}
             onDeleteChat={deleteChat}
             onViewAllChats={handleViewAllChats}
-            unreadNotifications={unreadCount}
+            unreadNotifications={unreadCount + actionsCount}
             unreadMessages={unreadMessages}
           />
         </div>

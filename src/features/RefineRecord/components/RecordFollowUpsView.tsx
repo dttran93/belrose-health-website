@@ -13,7 +13,7 @@ import { ArrowLeft, ListChecks } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { FileObject } from '@/types/core';
 import useRecordFollowUps from '../hooks/useRecordFollowUps';
-import FollowUpItems from './FollowUpItems';
+import FollowUpItems from './ui/FollowUpItems';
 
 interface RecordFollowUpsViewProps {
   record: FileObject;

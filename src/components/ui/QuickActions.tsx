@@ -64,7 +64,7 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
       {quickActions.map(action => {
         const Icon = action.icon;
         const badge =
-          action.id === 'notifications'
+          action.id === 'activity'
             ? unreadNotifications
             : action.id === 'messages'
               ? unreadMessages

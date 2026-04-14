@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { FileObject } from '@/types/core';
 import { FHIRWithValidation } from '../services/fhirConversionService.type';
 import useRecordFollowUps from '@/features/RefineRecord/hooks/useRecordFollowUps';
-import FollowUpItems from '@/features/RefineRecord/components/FollowUpItems';
+import FollowUpItems from '@/features/RefineRecord/components/ui/FollowUpItems';
 
 export interface FileListItemProps {
   fileItem: FileObject;

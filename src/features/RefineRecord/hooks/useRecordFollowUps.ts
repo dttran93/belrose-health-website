@@ -21,11 +21,13 @@
 
 import { FileObject } from '@/types/core';
 import React, { useEffect, useState } from 'react';
-import { FollowUpItem } from '../components/FollowUpItems';
+import { FollowUpItem } from '../components/ui/FollowUpItems';
 import { useReviewedByCurrentUser } from '@/features/Credibility/hooks/useVerifiedByCurrentUser';
-import { LinkIcon, ShieldCheck, User } from 'lucide-react';
+import { LinkIcon, ShieldCheck, User, UserX } from 'lucide-react';
 import SubjectQueryService from '@/features/Subject/services/subjectQueryService';
 import { useInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
+import useAuth from '@/features/Auth/hooks/useAuth';
+import { useSubjectAlerts } from '@/features/Subject/hooks/useSubjectAlerts';
 
 // ─── Options ─────────────────────────────────────────────────────────────────
 
@@ -56,6 +58,7 @@ export function useRecordFollowUps(
 
   // Only run async checks when the record is fully saved to Firestore
   const isEligible = fileItem.status === 'completed' && (!!fileItem.firestoreId || !!fileItem.id);
+  const recordId = fileItem.firestoreId ?? fileItem.id;
 
   // ── Check 1: Subject ───────────────────────────────────────────────────────
   // Synchronous — subjects array is already on the FileObject
@@ -67,8 +70,6 @@ export function useRecordFollowUps(
 
   useEffect(() => {
     if (!isEligible || hasSubject) return; // no need to check if subject already set
-
-    const recordId = fileItem.firestoreId ?? fileItem.id;
     setIsLoadingPendingRequest(true);
 
     SubjectQueryService.getPendingConsentRequestsForRecord(recordId)
@@ -77,12 +78,23 @@ export function useRecordFollowUps(
       .finally(() => setIsLoadingPendingRequest(false));
   }, [isEligible, hasSubject, fileItem.firestoreId, fileItem.id]);
 
-  // Add isLoadingPendingRequest to the overall loading state
+  const { hasPendingRejectionResponse, isLoading: isLoadingAlerts } = useSubjectAlerts({
+    recordId,
+  });
 
   // ── Check 2: Verification ─────────────────────────────────────────────────
   // Async — queries Firestore for an active verification or dispute doc
   // useReviewedByCurrentUser safely no-ops when record.recordHash is missing
-  const { hasReviewed, isLoading: isLoadingReview } = useReviewedByCurrentUser(fileItem);
+  const { user } = useAuth();
+
+  const isSubject = (fileItem.subjects ?? []).includes(user?.uid || '');
+  const isCreator = fileItem.uploadedBy === user?.uid;
+
+  const {
+    hasReviewed,
+    reviewedCurrentVersion,
+    isLoading: isLoadingReview,
+  } = useReviewedByCurrentUser(fileItem);
 
   // ── Check 3: Linked request ───────────────────────────────────────────────
   const { requests: inboundRequests, loading: isLoadingRequests } = useInboundRequests();
@@ -90,7 +102,9 @@ export function useRecordFollowUps(
 
   // ── Build list ────────────────────────────────────────────────────────────
   // Don't build anything until the record is eligible and async checks resolve
-  const isLoading = isEligible && (isLoadingReview || isLoadingPendingRequest || isLoadingRequests);
+  const isLoading =
+    isEligible &&
+    (isLoadingReview || isLoadingPendingRequest || isLoadingRequests || isLoadingAlerts);
 
   const followUpItems = React.useMemo<FollowUpItem[]>(() => {
     if (!isEligible || isLoading) return [];
@@ -110,17 +124,41 @@ export function useRecordFollowUps(
       });
     }
 
-    if (!hasReviewed) {
+    if (hasPendingRejectionResponse) {
       items.push({
-        id: 'verify',
-        label: 'Review this record',
-        subtext:
-          'Credibility of records is vital for future doctors and users of this data. Please review the record and submit a verification or dispute.',
-        icon: ShieldCheck,
+        id: 'subject-rejection',
+        label: 'Respond to subject rejection',
+        subtext: 'A subject has declined or removed themselves — review and decide how to proceed',
+        icon: UserX,
         status: 'pending',
         ctaLabel: 'Review',
-        onAction: () => onAction(fileItem, 'verify'),
+        onAction: () => onAction(fileItem, 'subject-rejection'),
       });
+    }
+
+    // Only show verification item if user is not the subject (they don't need to verify their own record)
+    if (!isSubject) {
+      if (!hasReviewed) {
+        items.push({
+          id: 'verify',
+          label: 'Verify this record',
+          subtext: 'Confirm the data looks correct',
+          icon: ShieldCheck,
+          status: 'pending',
+          ctaLabel: 'Review',
+          onAction: () => onAction(fileItem, 'verify'),
+        });
+      } else if (!reviewedCurrentVersion) {
+        items.push({
+          id: 'verify',
+          label: 'Re-verify this record',
+          subtext: 'This record has been edited since your last review',
+          icon: ShieldCheck,
+          status: 'pending',
+          ctaLabel: 'Re-verify',
+          onAction: () => onAction(fileItem, 'verify'),
+        });
+      }
     }
 
     if (hasPendingRequests) {
