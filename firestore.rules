@@ -742,32 +742,37 @@ service cloud.firestore {
 
     // 3. UPDATE RULES (Combined logic)
     allow update: if (
-      // Path A: Public "Read Receipt" (stamping readAt)
-      (
-        resource.data.status == 'pending' && 
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt'])
-      ) ||
-      
-      // Path B: Provider fulfills (anonymous upload)
+      // Path A: Read receipt (unauthenticated stamp of readAt)
       (
         resource.data.status == 'pending' &&
-        request.resource.data.status == 'fulfilled' &&
-        request.resource.data.inviteCode == resource.data.inviteCode &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'fulfilledRecordId', 'fulfilledAt'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt'])
       ) ||
-
-      // Path C: Requester cancels (requires Auth)
+  
+      // Path B: Provider links records — adds IDs to fulfilledRecordIds array.
+      //         Status stays 'pending'. Requires the provider to be the target.
+      (
+        request.auth != null &&
+        resource.data.status == 'pending' &&
+        (
+          request.auth.uid == resource.data.targetUserId ||
+          request.auth.token.email == resource.data.targetEmail
+        ) &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['fulfilledRecordIds'])
+      ) ||
+  
+      // Path C: Requester cancels
       (
         request.auth != null &&
         request.auth.uid == resource.data.requesterId &&
         resource.data.status == 'pending' &&
-        request.resource.data.status == 'cancelled'
-      ) || 
-
+        request.resource.data.status == 'cancelled' &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'cancelledAt'])
+      ) ||
+  
       // Path D: Provider rewraps note key after claiming account
-      // Only the provider (matched by uid or email) can update this field,
-      // and only if they are the intended target of the request.
       (
         request.auth != null &&
         (
@@ -777,16 +782,32 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['encryptedNoteKeyForProvider'])
       ) ||
-
-     // Path E: Guest claims account - backfills targetUserId so future
-     // userId based queries find the request without email matching.
+  
+      // Path E: Provider marks request complete (fulfilled)
+      //         At least one record must already be linked.
       (
         request.auth != null &&
-        request.auth.token.email == resource.data.targetEmail &&
         resource.data.status == 'pending' &&
+        (
+          request.auth.uid == resource.data.targetUserId ||
+          request.auth.token.email == resource.data.targetEmail
+        ) &&
+        request.resource.data.status == 'fulfilled' &&
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['targetUserId']) &&
-        request.resource.data.targetUserId == request.auth.uid
+          .hasOnly(['status', 'fulfilledAt'])
+      ) ||
+  
+      // Path F: Provider denies request
+      (
+        request.auth != null &&
+        resource.data.status == 'pending' &&
+        (
+          request.auth.uid == resource.data.targetUserId ||
+          request.auth.token.email == resource.data.targetEmail
+        ) &&
+        request.resource.data.status == 'denied' &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'deniedAt', 'deniedReason', 'deniedNote'])
       )
     );
   }

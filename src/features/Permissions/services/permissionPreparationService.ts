@@ -29,6 +29,8 @@ import {
   type ProgressCallback,
 } from '@/features/BlockchainWallet/services/blockchainPreparationService';
 import { MEMBER_ROLE_MANAGER } from '@/config/blockchainAddresses';
+import { getAuth } from 'firebase/auth';
+import { doc, getDoc, getFirestore } from 'firebase/firestore';
 
 // ==================== SMART CONTRACT CONFIG ====================
 
@@ -253,6 +255,103 @@ export class PermissionPreparationService {
         ready: false,
         reason: `Failed to verify network prerequisites: ${(error as Error).message}`,
       };
+    }
+  }
+
+  // ============================================================================
+  // ADD this method to PermissionPreparationService in permissionPreparationService.ts
+  //
+  // prepareBatch handles the same smart-account + record-initialization flow
+  // as prepare(), but for multiple records. Smart account setup runs once
+  // (BlockchainPreparationService.ensureReady is idempotent). Record
+  // initialization runs sequentially per record to avoid race conditions.
+  // Per-record initialRole is checked against Firestore so owners are
+  // initialized as 'owner' and admins as 'administrator', matching
+  // usePermissionFlow.getCurrentUserRole.
+  // ============================================================================
+
+  /**
+   * Prepare multiple records for permission operations in one call.
+   *
+   * - Smart account setup runs once (idempotent)
+   * - Each record is checked for on-chain initialization; uninitialized
+   *   records are initialized sequentially using the caller's Firestore role
+   * - Already-initialized records are a no-op
+   *
+   * @param recordIds  - Records to prepare
+   * @param onProgress - Optional progress callback (mirrors prepare())
+   */
+  static async prepareBatch(
+    recordIds: string[],
+    onProgress?: PermissionProgressCallback
+  ): Promise<void> {
+    if (recordIds.length === 0) return;
+
+    console.log(`🔄 PermissionPreparationService.prepareBatch: ${recordIds.length} records`);
+
+    // Step 1: Ensure smart account is ready — runs once for the whole batch
+    const smartAccountAddress = await BlockchainPreparationService.ensureReady(progress => {
+      onProgress?.(progress as PermissionPreparationProgress);
+    });
+    console.log('✅ Smart account ready:', smartAccountAddress);
+
+    // Step 2: Check and initialize each record sequentially.
+    // Sequential (not parallel) because initializeRecordRole hits a Cloud Function
+    // that writes to the blockchain — running them concurrently risks nonce conflicts
+    // on the admin wallet used by that function.
+    for (const recordId of recordIds) {
+      const roleStats = await this.getRecordRoleStats(recordId);
+      const isInitialized = roleStats.ownerCount > 0 || roleStats.adminCount > 0;
+
+      if (isInitialized) {
+        console.log(`ℹ️ Record already initialized: ${recordId}`);
+        continue;
+      }
+
+      onProgress?.({
+        step: 'initializing_record',
+        message: `Initializing record on network…`,
+      });
+
+      // Determine the caller's Firestore role on this record — same logic as
+      // getCurrentUserRole in usePermissionFlow
+      const initialRole = await this.getCallerInitialRoleForRecord(recordId);
+      console.log(`🚀 Initializing record ${recordId} as ${initialRole}…`);
+      await this.initializeRecordRole(recordId, smartAccountAddress, initialRole);
+      console.log(`✅ Record initialized: ${recordId}`);
+    }
+
+    // Step 3: Verify all records are ready
+    const finalStatuses = await Promise.all(recordIds.map(id => this.getStatus(id)));
+    const notReady = recordIds.filter((_, i) => !finalStatuses[i]?.isReady);
+    if (notReady.length > 0) {
+      throw new Error(
+        `Preparation failed for ${notReady.length} record(s): ${notReady.join(', ')}`
+      );
+    }
+
+    onProgress?.({ step: 'complete', message: 'Preparation complete!' });
+    console.log('✅ PermissionPreparationService.prepareBatch complete');
+  }
+
+  /**
+   * Determine the caller's InitialRole for a specific record by checking Firestore.
+   * Returns 'owner' if caller is in the owners array, otherwise 'administrator'.
+   * Mirrors getCurrentUserRole in usePermissionFlow.
+   */
+  private static async getCallerInitialRoleForRecord(recordId: string): Promise<InitialRole> {
+    const auth = getAuth();
+    const uid = auth.currentUser?.uid;
+    if (!uid) return 'administrator';
+
+    try {
+      const db = getFirestore();
+      const snap = await getDoc(doc(db, 'records', recordId));
+      if (!snap.exists()) return 'administrator';
+      const owners: string[] = snap.data().owners ?? [];
+      return owners.includes(uid) ? 'owner' : 'administrator';
+    } catch {
+      return 'administrator';
     }
   }
 

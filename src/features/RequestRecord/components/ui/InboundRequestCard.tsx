@@ -1,8 +1,29 @@
-// src/features/RecordRequest/components/InboundRequestCard.tsx
+// src/features/RequestRecord/components/ui/InboundRequestCard.tsx
+
+/**
+ * InboundRequestCard
+ *
+ * Shows a single inbound record request. When expanded, surfaces:
+ *   - Decrypted patient note
+ *   - Deadline detail
+ *   - Action buttons: Upload new | Link existing | Mark complete | Deny
+ *
+ * Mark complete and Deny are also available via a small action row inline
+ * in the collapsed header for fulfilled/denied status display.
+ */
 
 import { RecordRequest } from '../../services/fulfillRequestService';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
-import { ChevronDown, ChevronUp, FileText, Loader2, Upload } from 'lucide-react';
+import {
+  Ban,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  Link,
+  Loader2,
+  Upload,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Timestamp } from 'firebase/firestore';
 import { RequestNoteService } from '../../services/requestNoteService';
@@ -11,7 +32,12 @@ import { RequestNote } from '../Request/NewRequestForm';
 
 interface InboundRequestCardProps {
   request: RecordRequest;
-  onFulfill: (request: RecordRequest) => void;
+  onUploadNew: (request: RecordRequest) => void;
+  onLinkExisting: (request: RecordRequest) => void;
+  /** Opens the deny confirmation (can be inline or delegated to the modal) */
+  onDeny: (request: RecordRequest) => void;
+  /** Immediately marks the request complete without opening the modal */
+  onMarkComplete: (request: RecordRequest) => void;
 }
 
 function getDaysUntil(ts: Timestamp): number {
@@ -19,16 +45,47 @@ function getDaysUntil(ts: Timestamp): number {
   return Math.ceil(ms / (1000 * 60 * 60 * 24));
 }
 
-const InboundRequestCard: React.FC<InboundRequestCardProps> = ({ request, onFulfill }) => {
+// Status badge for terminal states
+const StatusBadge: React.FC<{ status: RecordRequest['status'] }> = ({ status }) => {
+  if (status === 'fulfilled') {
+    return (
+      <div className="flex items-center gap-1.5 text-green-700 text-xs font-medium">
+        <CheckCircle2 className="w-3.5 h-3.5" />
+        Fulfilled
+      </div>
+    );
+  }
+  if (status === 'denied') {
+    return (
+      <div className="flex items-center gap-1.5 text-red-600 text-xs font-medium">
+        <Ban className="w-3.5 h-3.5" />
+        Denied
+      </div>
+    );
+  }
+  return null;
+};
+
+const InboundRequestCard: React.FC<InboundRequestCardProps> = ({
+  request,
+  onUploadNew,
+  onLinkExisting,
+  onDeny,
+  onMarkComplete,
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [note, setNote] = useState<RequestNote | null>(null);
   const [noteLoading, setNoteLoading] = useState(false);
   const [noteError, setNoteError] = useState<string | null>(null);
 
-  const isFulfilled = request.status === 'fulfilled';
+  const isTerminal = request.status === 'fulfilled' || request.status === 'denied';
+  const isPending = request.status === 'pending';
   const daysLeft = request.deadline ? getDaysUntil(request.deadline) : null;
-  const isUrgent = daysLeft !== null && daysLeft <= 7 && !isFulfilled;
-  const isOverdue = daysLeft !== null && daysLeft < 0 && !isFulfilled;
+  const isUrgent = daysLeft !== null && daysLeft <= 7 && isPending;
+  const isOverdue = daysLeft !== null && daysLeft < 0 && isPending;
+
+  // How many records linked so far (from the array on the request doc)
+  const linkedCount = request.fulfilledRecordId?.length ?? 0;
 
   const initials = request.requesterName
     ? request.requesterName
@@ -41,27 +98,18 @@ const InboundRequestCard: React.FC<InboundRequestCardProps> = ({ request, onFulf
 
   useEffect(() => {
     if (!isExpanded || note || noteLoading || !request.encryptedRequestNote) return;
-
     setNoteLoading(true);
     setNoteError(null);
-
-    console.log('🔐 Starting decryption...');
     RequestNoteService.decryptAsProvider(request)
-      .then(result => {
-        console.log('✅ Decrypt result:', result);
-        setNote(result);
-      })
-      .catch(err => {
-        console.error('❌ Decrypt error:', err);
-        setNoteError(err.message ?? 'Failed to decrypt note.');
-      })
+      .then(result => setNote(result))
+      .catch(err => setNoteError(err.message ?? 'Failed to decrypt note.'))
       .finally(() => setNoteLoading(false));
   }, [isExpanded]);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      {/* Urgency bar */}
-      {!isFulfilled && daysLeft !== null && (
+      {/* Urgency bar — only for pending */}
+      {isPending && daysLeft !== null && (
         <div
           className={`px-5 py-2 flex items-center justify-between ${
             isOverdue
@@ -81,9 +129,7 @@ const InboundRequestCard: React.FC<InboundRequestCardProps> = ({ request, onFulf
               : `Due in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`}
           </span>
           <span
-            className={`text-xs ${
-              isOverdue ? 'text-red-500' : isUrgent ? 'text-amber-500' : 'text-slate-400'
-            }`}
+            className={`text-xs ${isOverdue ? 'text-red-500' : isUrgent ? 'text-amber-500' : 'text-slate-400'}`}
           >
             {request.deadline && formatTimestamp(request.deadline)}
           </span>
@@ -103,25 +149,32 @@ const InboundRequestCard: React.FC<InboundRequestCardProps> = ({ request, onFulf
           <p className="text-xs text-slate-500 mt-0.5">
             {request.requesterEmail} · Requested {formatTimestamp(request.createdAt)}
           </p>
+          {/* Linked records counter — visible even collapsed */}
+          {linkedCount > 0 && isPending && (
+            <p className="text-xs text-green-600 font-medium mt-0.5">
+              {linkedCount} record{linkedCount !== 1 ? 's' : ''} linked
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {isFulfilled ? (
-            <div className="flex items-center gap-1.5 text-green-700 text-xs font-medium">
-              <FileText className="w-3.5 h-3.5" />
-              Fulfilled
-            </div>
+          {isTerminal ? (
+            <StatusBadge status={request.status} />
           ) : (
-            <Button
-              size="sm"
-              className="gap-1.5 text-xs"
-              onClick={e => {
-                e.stopPropagation();
-                onFulfill(request);
-              }}
-            >
-              <Upload className="w-3.5 h-3.5" />
-              Upload records
-            </Button>
+            <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs"
+                onClick={() => onLinkExisting(request)}
+              >
+                <Link className="w-3.5 h-3.5" />
+                Link existing
+              </Button>
+              <Button size="sm" className="gap-1.5 text-xs" onClick={() => onUploadNew(request)}>
+                <Upload className="w-3.5 h-3.5" />
+                Upload new
+              </Button>
+            </div>
           )}
           {isExpanded ? (
             <ChevronUp className="w-4 h-4 text-slate-400" />
@@ -140,8 +193,7 @@ const InboundRequestCard: React.FC<InboundRequestCardProps> = ({ request, onFulf
               <p className="text-xs font-medium text-slate-500 mb-2">Patient note</p>
               {noteLoading && (
                 <div className="flex items-center gap-2 text-xs text-slate-400">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Decrypting...
+                  <Loader2 className="w-3 h-3 animate-spin" /> Decrypting...
                 </div>
               )}
               {noteError && <p className="text-xs text-red-500">{noteError}</p>}
@@ -167,27 +219,75 @@ const InboundRequestCard: React.FC<InboundRequestCardProps> = ({ request, onFulf
             <p className="text-xs text-slate-400">No additional note provided.</p>
           )}
 
+          {/* Denial info — shown when denied */}
+          {request.status === 'denied' && request.deniedReason && (
+            <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 space-y-1">
+              <p className="text-xs font-medium text-red-600">Denied</p>
+              <p className="text-sm text-red-800">{request.deniedReason.replace(/_/g, ' ')}</p>
+              {request.deniedNote && (
+                <p className="text-xs text-red-600 mt-1">"{request.deniedNote}"</p>
+              )}
+            </div>
+          )}
+
           {/* Deadline detail */}
-          {!isFulfilled && request.deadline && (
+          {isPending && request.deadline && (
             <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
               <span>Response deadline</span>
               <span
-                className={`font-medium ${
-                  isOverdue ? 'text-red-600' : isUrgent ? 'text-amber-600' : 'text-slate-700'
-                }`}
+                className={`font-medium ${isOverdue ? 'text-red-600' : isUrgent ? 'text-amber-600' : 'text-slate-700'}`}
               >
                 {formatTimestamp(request.deadline)}
               </span>
             </div>
           )}
 
-          {/* Upload CTA */}
-          {!isFulfilled && (
-            <div className="pt-2 border-t border-slate-100">
-              <Button className="w-full gap-2 justify-center" onClick={() => onFulfill(request)}>
-                <Upload className="w-4 h-4" />
-                Upload records
-              </Button>
+          {/* Action buttons in expanded panel */}
+          {isPending && (
+            <div className="pt-2 border-t border-slate-100 space-y-2">
+              {/* Add records row */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 gap-2 justify-center text-sm"
+                  onClick={() => onLinkExisting(request)}
+                >
+                  <Link className="w-4 h-4" />
+                  Link existing
+                </Button>
+                <Button
+                  className="flex-1 gap-2 justify-center text-sm"
+                  onClick={() => onUploadNew(request)}
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload new
+                </Button>
+              </div>
+
+              {/* Terminal actions row */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className={`flex-1 gap-1.5 justify-center text-sm ${
+                    linkedCount > 0
+                      ? 'text-green-700 border-green-300 hover:bg-green-50'
+                      : 'text-slate-400 cursor-not-allowed'
+                  }`}
+                  disabled={linkedCount === 0}
+                  onClick={() => onMarkComplete(request)}
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  Mark as complete
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 gap-1.5 justify-center text-sm text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={() => onDeny(request)}
+                >
+                  <Ban className="w-4 h-4" />
+                  Deny request
+                </Button>
+              </div>
             </div>
           )}
         </div>

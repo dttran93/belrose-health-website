@@ -22,6 +22,9 @@ import { Button } from '@/components/ui/Button';
 import { Plus } from 'lucide-react';
 import { RecordRequest } from '@/features/RequestRecord/services/fulfillRequestService';
 import { useInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
+import { markRequestComplete } from '@/features/RequestRecord/services/linkRecordService';
+import { toast } from 'sonner';
+import LinkRecordModal from '@/features/RequestRecord/components/Respond/LinkRecordModal';
 
 type PageView = 'list' | 'new';
 type Tab = 'sent' | 'received';
@@ -37,12 +40,46 @@ const RecordRequestsPage: React.FC = () => {
   const [tab, setTab] = useState<Tab>('sent');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // The request open in the modal (null = modal closed)
+  const [linkRequest, setLinkRequest] = useState<RecordRequest | null>(null);
+
   const toggleExpand = (id: string) => setExpandedId(prev => (prev === id ? null : id));
 
-  const handleFulfill = (request: RecordRequest) => {
-    // Pass the request context via router state so the add-record page
-    // can pre-populate and mark the request as fulfilled on upload
+  // ── Upload new: navigate to AddRecord ─────────────────────────────────────
+  const handleUploadNew = (request: RecordRequest) => {
     navigate('/app/add-record', { state: { fulfillRequest: request } });
+  };
+
+  // ── Link existing: open modal ──────────────────────────────────────────────
+  const handleLinkExisting = (request: RecordRequest) => {
+    setLinkRequest(request);
+  };
+
+  // ── Mark complete directly from card (no modal needed) ────────────────────
+  const handleMarkComplete = async (request: RecordRequest) => {
+    try {
+      await markRequestComplete(request);
+      toast.success('Request marked as complete');
+      inbound.refresh();
+    } catch (err: any) {
+      toast.error('Failed to mark complete', { description: err.message });
+    }
+  };
+
+  // ── Deny: open the modal on the deny phase ────────────────────────────────
+  // We reuse LinkRecordModal by opening it — the modal itself handles the
+  // deny flow internally via goToDenyConfirm on open.
+  // Simplest approach: open modal normally, user clicks "Deny request" inside.
+  const handleDeny = (request: RecordRequest) => {
+    setLinkRequest(request);
+    // The modal opens on pick-records; user reaches deny via the "Deny request" button
+    // If you want to jump straight to the deny phase, wire a separate prop into the
+    // modal — for now opening is enough since "Deny" is prominently surfaced there.
+  };
+
+  // ── Modal success: refresh list ────────────────────────────────────────────
+  const handleModalSuccess = () => {
+    inbound.refresh();
   };
 
   if (pageView === 'new') {
@@ -68,15 +105,9 @@ const RecordRequestsPage: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Record requests</h1>
             <p className="text-sm text-gray-500 mt-1">
-              {tab === 'sent' ? (
-                <>
-                  <span>Request your health records</span>
-                </>
-              ) : (
-                <>
-                  <span>Fulfill requests from other users.</span>
-                </>
-              )}
+              {tab === 'sent'
+                ? 'Request your health records'
+                : 'Fulfill requests from other users.'}
             </p>
           </div>
           {tab === 'sent' && (
@@ -147,10 +178,19 @@ const RecordRequestsPage: React.FC = () => {
             filter={inbound.filter}
             setFilter={inbound.setFilter}
             counts={inbound.counts}
-            onFulfill={handleFulfill}
+            onUploadNew={handleUploadNew}
+            onLinkExisting={handleLinkExisting}
+            onDeny={handleDeny}
+            onMarkComplete={handleMarkComplete}
           />
         )}
       </div>
+
+      <LinkRecordModal
+        request={linkRequest}
+        onClose={() => setLinkRequest(null)}
+        onSuccess={handleModalSuccess}
+      />
     </div>
   );
 };

@@ -31,7 +31,8 @@ interface PendingOperation {
 }
 
 interface UsePermissionFlowOptions {
-  recordId: string;
+  /** Single record ID (string) or multiple (string[]) for batch operations */
+  recordId: string | string[];
   onSuccess?: () => void;
 }
 
@@ -46,6 +47,12 @@ const roleLabels: Record<Role, string> = {
 // ============================================================================
 
 export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOptions) {
+  // Normalise to array once — everything below works with recordIds
+  const recordIds = Array.isArray(recordId) ? recordId : [recordId];
+  // For single-record operations (revoke, backwards-compat) keep the first ID handy
+  const primaryRecordId = recordIds[0] ?? '';
+  const isBatch = recordIds.length > 1;
+
   const [phase, setPhase] = useState<DialogPhase>('idle');
   const [error, setError] = useState<string | null>(null);
   const [pendingOperation, setPendingOperation] = useState<PendingOperation | null>(null);
@@ -56,9 +63,6 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
   // HELPERS
   // ==========================================================================
 
-  /**
-   * Reset to idle state
-   */
   const reset = useCallback(() => {
     setPhase('idle');
     setError(null);
@@ -67,22 +71,19 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
   }, []);
 
   /**
-   * Get current user's role on the record (for initialization)
+   * Get current user's role on the PRIMARY record (used for single-record
+   * revoke and as the fallback for batch initialization).
    */
   const getCurrentUserRole = useCallback(async (): Promise<InitialRole> => {
     try {
-      const roles = await PermissionsService.getRecordRoles(recordId);
-      const auth = getAuth();
-      const userId = auth.currentUser?.uid;
-
-      if (roles && userId && roles.owners.includes(userId)) {
-        return 'owner';
-      }
+      const roles = await PermissionsService.getRecordRoles(primaryRecordId);
+      const uid = getAuth().currentUser?.uid;
+      if (roles && uid && roles.owners.includes(uid)) return 'owner';
     } catch (err) {
       console.error('Error getting current user role:', err);
     }
     return 'administrator';
-  }, [recordId]);
+  }, [primaryRecordId]);
 
   // ==========================================================================
   // GRANT FLOW
@@ -116,29 +117,34 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
       setError(null);
 
       try {
-        // Check if prerequisites are already met
-        const prereqs = await PermissionPreparationService.verifyPrerequisites(
-          recordId,
-          walletAddress
-        );
-
-        if (!prereqs.ready) {
-          // Need to prepare - get caller's role for initialization
-          const initialRole = await getCurrentUserRole();
-          await PermissionPreparationService.prepare(recordId, initialRole, setPreparationProgress);
-
-          // Verify preparation succeeded
-          const finalCheck = await PermissionPreparationService.verifyPrerequisites(
-            recordId,
+        if (isBatch) {
+          // Batch path: prepareBatch handles smart account + per-record initialization
+          await PermissionPreparationService.prepareBatch(recordIds, setPreparationProgress);
+        } else {
+          // Single-record path: unchanged from original
+          const prereqs = await PermissionPreparationService.verifyPrerequisites(
+            primaryRecordId,
             walletAddress
           );
 
-          if (!finalCheck.ready) {
-            throw new Error(finalCheck.reason || 'Preparation failed');
+          if (!prereqs.ready) {
+            const initialRole = await getCurrentUserRole();
+            await PermissionPreparationService.prepare(
+              primaryRecordId,
+              initialRole,
+              setPreparationProgress
+            );
+
+            const finalCheck = await PermissionPreparationService.verifyPrerequisites(
+              primaryRecordId,
+              walletAddress
+            );
+            if (!finalCheck.ready) {
+              throw new Error(finalCheck.reason || 'Preparation failed');
+            }
           }
         }
 
-        // Ready for confirmation
         setPhase('confirming');
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Preparation failed';
@@ -146,13 +152,9 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
         setPhase('error');
       }
     },
-    [recordId, getCurrentUserRole]
+    [recordIds, primaryRecordId, isBatch, getCurrentUserRole]
   );
 
-  /**
-   * Execute a confirmed grant
-   * @param roleOverride - If provided, use this role instead of pendingOperation.role
-   */
   const confirmGrant = useCallback(
     async (roleOverride?: Role) => {
       if (!pendingOperation || pendingOperation.type !== 'grant') return;
@@ -163,19 +165,33 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
         const role = roleOverride || pendingOperation.role;
         const { targetUserId } = pendingOperation;
 
-        switch (role) {
-          case 'viewer':
-            await PermissionsService.grantViewer(recordId, targetUserId);
-            break;
-          case 'administrator':
-            await PermissionsService.grantAdmin(recordId, targetUserId);
-            break;
-          case 'owner':
-            await PermissionsService.grantOwner(recordId, targetUserId);
-            break;
+        if (isBatch) {
+          // Single blockchain tx for all records
+          await PermissionsService.grantRoleBatch(
+            recordIds,
+            targetUserId,
+            recordIds.map(() => role) // same role for all records in this flow
+          );
+        } else {
+          // Single-record path: unchanged
+          switch (role) {
+            case 'viewer':
+              await PermissionsService.grantViewer(primaryRecordId, targetUserId);
+              break;
+            case 'administrator':
+              await PermissionsService.grantAdmin(primaryRecordId, targetUserId);
+              break;
+            case 'owner':
+              await PermissionsService.grantOwner(primaryRecordId, targetUserId);
+              break;
+          }
         }
 
-        toast.success(`${roleLabels[role]} added successfully`);
+        toast.success(
+          isBatch
+            ? `${roleLabels[role]} access granted across ${recordIds.length} records`
+            : `${roleLabels[role]} added successfully`
+        );
         reset();
         onSuccess?.();
       } catch (err) {
@@ -185,11 +201,13 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
         toast.error(message);
       }
     },
-    [pendingOperation, recordId, reset, onSuccess]
+    [pendingOperation, recordIds, primaryRecordId, isBatch, reset, onSuccess]
   );
 
   // ==========================================================================
   // REVOKE FLOW
+  // Revoke always operates on the primary record — batch revoke is a separate
+  // concern handled by TrusteePermissionService / future bulk-action flows.
   // ==========================================================================
 
   /**
@@ -200,7 +218,6 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
   const initiateRevoke = useCallback(
     async (user: BelroseUserProfile, currentRole: Role) => {
       const walletAddress = user.wallet?.address;
-
       if (!walletAddress) {
         toast.error('User does not have a wallet address');
         return;
@@ -220,14 +237,12 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
       try {
         // For revokes, just verify prerequisites (no new preparation needed)
         const prereqs = await PermissionPreparationService.verifyPrerequisites(
-          recordId,
+          primaryRecordId,
           walletAddress
         );
-
         if (!prereqs.ready) {
           throw new Error(prereqs.reason || 'Prerequisites not met');
         }
-
         setPhase('confirming');
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Verification failed';
@@ -235,7 +250,7 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
         setPhase('error');
       }
     },
-    [recordId]
+    [primaryRecordId]
   );
 
   /**
@@ -253,17 +268,15 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
 
         switch (role) {
           case 'viewer':
-            await PermissionsService.removeViewer(recordId, targetUserId);
+            await PermissionsService.removeViewer(primaryRecordId, targetUserId);
             break;
-
           case 'administrator':
-            await PermissionsService.removeAdmin(recordId, targetUserId, {
+            await PermissionsService.removeAdmin(primaryRecordId, targetUserId, {
               demoteToViewer: action === 'demote-viewer',
             });
             break;
-
           case 'owner':
-            await PermissionsService.removeOwner(recordId, targetUserId, {
+            await PermissionsService.removeOwner(primaryRecordId, targetUserId, {
               demoteTo:
                 action === 'demote-admin'
                   ? 'administrator'
@@ -274,7 +287,6 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
             break;
         }
 
-        // Success message based on action
         const successMessage =
           action === 'full-revoke'
             ? 'Access revoked successfully'
@@ -292,7 +304,7 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
         toast.error(message);
       }
     },
-    [pendingOperation, recordId, reset, onSuccess]
+    [pendingOperation, primaryRecordId, reset, onSuccess]
   );
 
   // ==========================================================================

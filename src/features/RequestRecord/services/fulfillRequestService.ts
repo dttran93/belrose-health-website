@@ -32,7 +32,7 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
-import { arrayBufferToBase64, removeUndefinedValues } from '@/utils/dataFormattingUtils';
+import { removeUndefinedValues } from '@/utils/dataFormattingUtils';
 
 // src/features/RecordRequest/types.ts
 
@@ -41,7 +41,23 @@ import { FileObject } from '@/types/core';
 
 // ── Firestore document ────────────────────────────────────────────────────────
 
-export type RecordRequestStatus = 'pending' | 'fulfilled' | 'cancelled';
+export type RecordRequestStatus = 'pending' | 'fulfilled' | 'denied' | 'cancelled';
+
+export const DENY_REASONS = [
+  { value: 'wrong_recipient', label: 'Wrong recipient — I am not the stated provider' },
+  { value: 'never_held', label: 'Never saw this patient, never held these records' },
+  {
+    value: 'retention_lapsed',
+    label: 'Records were held but are no longer accessible',
+  },
+  {
+    value: 'cannot_identify',
+    label: 'I cannot confirm the identity of the patient and am withholding records',
+  },
+  { value: 'other', label: 'Other' },
+] as const;
+
+export type DenyReasonValue = (typeof DENY_REASONS)[number]['value'];
 
 export interface RecordRequest {
   inviteCode: string;
@@ -67,8 +83,11 @@ export interface RecordRequest {
   createdAt: Timestamp;
   readAt: Timestamp | null;
   deadline: Timestamp;
-  fulfilledRecordId: string | null;
+  fulfilledRecordId: string[];
   fulfilledAt?: Timestamp;
+  deniedAt?: Timestamp;
+  deniedReason?: DenyReasonValue;
+  deniedNote?: string;
   cancelledAt?: Timestamp;
 }
 

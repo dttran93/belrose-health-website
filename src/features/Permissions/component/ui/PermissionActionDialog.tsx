@@ -20,6 +20,7 @@ import { Role } from '@/features/Permissions/services/permissionsService';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { useState } from 'react';
 import NetworkPreparingContent from '@/features/BlockchainWallet/components/NetworkPreparingContent';
+import RoleSelector, { ROLE_CONFIG } from './RoleSelector';
 
 // ============================================================================
 // TYPES
@@ -55,52 +56,6 @@ interface PermissionActionDialogProps {
     onRemoveRecord: (id: string) => void;
   };
 }
-
-// ============================================================================
-// ROLE CONFIG
-// ============================================================================
-
-// Role configuration for display, matching the SetSubject style
-const ROLE_CONFIG: Record<
-  Role,
-  {
-    label: string;
-    description: string;
-    icon: React.ElementType;
-    textColor: string;
-    bgColor: string;
-    borderColor: string;
-    selectedBg: string;
-  }
-> = {
-  viewer: {
-    label: 'Viewer',
-    description: 'Can decrypt and view the record.',
-    icon: Shield,
-    textColor: 'text-yellow-600',
-    bgColor: 'bg-yellow-50',
-    borderColor: 'border-yellow-200',
-    selectedBg: 'bg-yellow-100',
-  },
-  administrator: {
-    label: 'Administrator',
-    description: 'Can view, edit, share, and manage the record.',
-    icon: ShieldCheck,
-    textColor: 'text-blue-600',
-    bgColor: 'bg-blue-50',
-    borderColor: 'border-blue-200',
-    selectedBg: 'bg-blue-100',
-  },
-  owner: {
-    label: 'Owner',
-    description: 'Full control including deletion and adding other owners.',
-    icon: Crown,
-    textColor: 'text-amber-600',
-    bgColor: 'bg-amber-50',
-    borderColor: 'border-amber-200',
-    selectedBg: 'bg-amber-100',
-  },
-};
 
 // ============================================================================
 // COMPONENT
@@ -285,7 +240,7 @@ const ConfirmGrantContent: React.FC<ConfirmGrantContentProps> = ({
 };
 
 // ============================================================================
-// SELECT ROLE GRANT (user picks the role - from GrantAccessModal)
+// SELECT ROLE GRANT
 // ============================================================================
 
 interface SelectRoleGrantContentProps {
@@ -309,50 +264,19 @@ const SelectRoleGrantContent: React.FC<SelectRoleGrantContentProps> = ({
         <Key className="w-5 h-5 text-primary" />
         Grant Encrypted Access
       </AlertDialog.Title>
-
       <AlertDialog.Description className="mt-3 text-sm text-gray-600">
         Select a permission level for{' '}
         <strong>{user?.displayName || user?.email || 'this user'}</strong>.
       </AlertDialog.Description>
-
       {user && (
         <div className="my-4">
           <UserCard user={user} variant="compact" color="primary" />
         </div>
       )}
 
-      {/* Role Selection */}
-      <div className="space-y-2 mb-4">
-        {(Object.entries(ROLE_CONFIG) as [Role, (typeof ROLE_CONFIG)['viewer']][]).map(
-          ([role, config]) => {
-            const Icon = config.icon;
-            const isSelected = selectedRole === role;
-
-            return (
-              <label
-                key={role}
-                className={`
-                  flex items-center gap-3 p-3 border rounded-lg transition-colors cursor-pointer
-                  ${isSelected ? `${config.borderColor} ${config.bgColor}/20` : 'border-gray-200 hover:border-gray-300'}
-                `}
-              >
-                <input
-                  type="radio"
-                  name="accessRole"
-                  value={role}
-                  checked={isSelected}
-                  onChange={() => setSelectedRole(role)}
-                  className="w-4 h-4 text-primary"
-                />
-                <Icon className={`w-5 h-5 ${config.bgColor}`} />
-                <div className="flex-1">
-                  <p className="font-medium text-gray-900">{config.label}</p>
-                  <p className="text-xs text-gray-500">{config.description}</p>
-                </div>
-              </label>
-            );
-          }
-        )}
+      {/* ↓ Replaced inline radio markup with the shared RoleSelector */}
+      <div className="mb-4">
+        <RoleSelector value={selectedRole} onChange={setSelectedRole} />
       </div>
 
       <div className="flex gap-3">

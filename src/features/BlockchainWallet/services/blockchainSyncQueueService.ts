@@ -30,8 +30,8 @@ export type SyncContext =
       type: 'permission';
       targetUserId: string;
       targetWalletAddress: string;
-      role: string;
-      recordId: string;
+      role: string | string[];
+      recordId: string | string[];
     }
   | { type: 'memberRegistry'; newStatus?: string }
   | { type: 'anchorRecord'; recordId: string; recordHash: string; subjectId: string }

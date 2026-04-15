@@ -894,63 +894,53 @@ export class PermissionsService {
     if (recordIds.length !== newRoles.length) throw new Error('Array length mismatch');
 
     const db = getFirestore();
-    const userWalletAddress = await this.getUserWalletAddress(currentUser.uid);
     const targetProfile = await getUserProfile(targetUserId);
-
     if (!targetProfile) throw new Error('Target user does not exist or has no profile');
 
     const targetWalletAddress = targetProfile.wallet?.address;
     if (!targetWalletAddress) throw new Error('Target user does not have a linked network account');
 
-    const succeededRecordIds: string[] = [];
-
     console.log(`🔄 Batch granting roles to ${targetUserId} across ${recordIds.length} records...`);
+
+    // ── Pre-flight: validate permissions and filter eligible records ──────────
+    // We check Firestore permissions up front so we only pass valid records
+    // to the blockchain call. The contract also validates but we want to avoid
+    // a failed tx that wastes gas on the sponsored paymaster.
+
+    const eligible: { recordId: string; role: Role }[] = [];
 
     for (let i = 0; i < recordIds.length; i++) {
       const recordId = recordIds[i];
       const role = newRoles[i];
+      if (!recordId || !role) continue;
 
-      if (!recordId || !role) {
-        console.warn(`⚠️ Missing recordId or role at index ${i} — skipping`);
-        continue;
-      }
-
-      const recordRef = doc(db, 'records', recordId);
-      const recordDoc = await getDoc(recordRef);
-
+      const recordDoc = await getDoc(doc(db, 'records', recordId));
       if (!recordDoc.exists()) {
         console.warn(`⚠️ Record ${recordId} not found — skipping`);
         continue;
       }
 
-      const recordData = recordDoc.data();
+      const data = recordDoc.data();
+      const isOwner = data.owners?.includes(currentUser.uid);
+      const isAdmin = data.administrators?.includes(currentUser.uid);
+      const isSubject = data.subjects?.includes(currentUser.uid);
 
-      // Permission check — mirrors single grant methods per role
-      const isOwner = recordData.owners?.includes(currentUser.uid);
-      const isAdmin = recordData.administrators?.includes(currentUser.uid);
-      const isSubject = recordData.subjects?.includes(currentUser.uid);
+      const canGrant =
+        role === 'owner'
+          ? data.owners?.length > 0
+            ? isOwner
+            : isOwner || isAdmin
+          : role === 'administrator'
+            ? isOwner || isAdmin
+            : isOwner || isAdmin || isSubject;
 
-      if (role === 'owner') {
-        const hasOwners = recordData.owners?.length > 0;
-        const canGrant = hasOwners ? isOwner : isAdmin || isSubject;
-        if (!canGrant) {
-          console.warn(`⚠️ No permission to grant owner on record ${recordId} — skipping`);
-          continue;
-        }
-      } else if (role === 'administrator') {
-        if (!isOwner && !isAdmin) {
-          console.warn(`⚠️ No permission to grant administrator on record ${recordId} — skipping`);
-          continue;
-        }
-      } else if (role === 'viewer') {
-        if (!isOwner && !isAdmin && !isSubject) {
-          console.warn(`⚠️ No permission to grant viewer on record ${recordId} — skipping`);
-          continue;
-        }
+      if (!canGrant) {
+        console.warn(`⚠️ No permission to grant ${role} on record ${recordId} — skipping`);
+        continue;
       }
 
-      // Check existing role — skip if already has equal or higher role
-      const existingRole = this.getUserRole(recordData, targetUserId);
+      // Skip if target already has equal or higher role
+      const existingRole = PermissionsService.getUserRole(data, targetUserId);
       if (existingRole === role) {
         console.warn(`⚠️ Target already has role ${role} on record ${recordId} — skipping`);
         continue;
@@ -960,66 +950,87 @@ export class PermissionsService {
         continue;
       }
       if (existingRole === 'administrator' && role === 'viewer') {
-        console.warn(
-          `⚠️ Cannot demote admin to viewer via grantRoleBatch on record ${recordId} — skipping`
-        );
+        console.warn(`⚠️ Cannot demote admin to viewer via batch on record ${recordId} — skipping`);
         continue;
       }
 
-      // Step 1: Blockchain — grant or change depending on existing role
-      try {
-        if (existingRole) {
-          await BlockchainRoleManagerService.changeRole(recordId, targetWalletAddress, role);
-        } else {
-          await BlockchainRoleManagerService.grantRole(recordId, targetWalletAddress, role);
-        }
-      } catch (blockchainError) {
-        const errorMessage =
-          blockchainError instanceof Error ? blockchainError.message : String(blockchainError);
-        await BlockchainSyncQueueService.logFailure({
-          contract: 'MemberRoleManager',
-          action: existingRole ? 'changeRole' : 'grantRole',
-          userId: currentUser.uid,
-          userWalletAddress,
-          error: errorMessage,
-          context: {
-            type: 'permission',
-            targetUserId,
-            targetWalletAddress,
-            role,
-            recordId,
-          },
-        });
-        console.error(`⚠️ Blockchain grant failed on record ${recordId} — logged to sync queue`);
-        continue;
-      }
-
-      // Step 2: Grant encryption access
-      await SharingService.grantEncryptionAccess(recordId, targetUserId, currentUser.uid);
-
-      // Step 3: Update Firestore arrays
-      if (role === 'owner') {
-        await updateDoc(recordRef, {
-          owners: arrayUnion(targetUserId),
-          administrators: arrayRemove(targetUserId),
-          viewers: arrayRemove(targetUserId),
-        });
-      } else if (role === 'administrator') {
-        await updateDoc(recordRef, {
-          administrators: arrayUnion(targetUserId),
-          viewers: arrayRemove(targetUserId),
-        });
-      } else {
-        await updateDoc(recordRef, {
-          viewers: arrayUnion(targetUserId),
-        });
-      }
-
-      succeededRecordIds.push(recordId);
-      console.log(`✅ Role ${role} granted on record ${recordId}`);
+      eligible.push({ recordId, role });
     }
 
-    console.log(`✅ Batch grant complete`);
+    if (eligible.length === 0) {
+      console.log('ℹ️ No eligible records after pre-flight checks');
+      return [];
+    }
+
+    // ── Step 1: Single blockchain transaction for all eligible records ────────
+    try {
+      await BlockchainRoleManagerService.grantRoleBatch(
+        eligible.map(e => e.recordId),
+        targetWalletAddress,
+        eligible.map(e => e.role)
+      );
+      console.log(`✅ Blockchain: batch grant complete (${eligible.length} records)`);
+    } catch (blockchainError) {
+      const errorMessage =
+        blockchainError instanceof Error ? blockchainError.message : String(blockchainError);
+      const userWalletAddress = await this.getUserWalletAddress(currentUser.uid);
+      await BlockchainSyncQueueService.logFailure({
+        contract: 'MemberRoleManager',
+        action: 'grantRoleBatch',
+        userId: currentUser.uid,
+        userWalletAddress,
+        error: errorMessage,
+        context: {
+          type: 'permission',
+          targetUserId,
+          targetWalletAddress,
+          role: eligible.map(e => e.role),
+          recordId: eligible.map(e => e.recordId),
+        },
+      });
+      throw blockchainError; // surface to caller — don't do partial Firestore updates
+    }
+
+    // ── Steps 2 & 3: Encryption + Firestore per record (off-chain, parallel) ─
+    const succeededRecordIds: string[] = [];
+
+    await Promise.all(
+      eligible.map(async ({ recordId, role }) => {
+        try {
+          // Encryption access
+          await SharingService.grantEncryptionAccess(recordId, targetUserId, currentUser.uid);
+
+          // Firestore role arrays
+          const recordRef = doc(db, 'records', recordId);
+          if (role === 'owner') {
+            await updateDoc(recordRef, {
+              owners: arrayUnion(targetUserId),
+              administrators: arrayRemove(targetUserId),
+              viewers: arrayRemove(targetUserId),
+            });
+          } else if (role === 'administrator') {
+            await updateDoc(recordRef, {
+              administrators: arrayUnion(targetUserId),
+              viewers: arrayRemove(targetUserId),
+            });
+          } else {
+            await updateDoc(recordRef, {
+              viewers: arrayUnion(targetUserId),
+            });
+          }
+
+          succeededRecordIds.push(recordId);
+          console.log(`✅ Encryption + Firestore updated for record ${recordId}`);
+        } catch (err) {
+          console.error(`❌ Post-blockchain update failed for record ${recordId}:`, err);
+          // Don't throw — blockchain already succeeded, log for manual reconciliation
+        }
+      })
+    );
+
+    console.log(
+      `✅ Batch grant complete — ${succeededRecordIds.length}/${eligible.length} records fully processed`
+    );
     return succeededRecordIds;
   }
 

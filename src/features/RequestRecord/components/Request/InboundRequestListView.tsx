@@ -12,7 +12,10 @@ interface InboundRequestListViewProps {
   filter: InboundRequestFilter;
   setFilter: (f: InboundRequestFilter) => void;
   counts: { pending: number; fulfilled: number };
-  onFulfill: (request: RecordRequest) => void;
+  onUploadNew: (request: RecordRequest) => void;
+  onLinkExisting: (request: RecordRequest) => void;
+  onDeny: (request: RecordRequest) => void;
+  onMarkComplete: (request: RecordRequest) => void;
 }
 
 const InboundRequestListView: React.FC<InboundRequestListViewProps> = ({
@@ -22,14 +25,17 @@ const InboundRequestListView: React.FC<InboundRequestListViewProps> = ({
   filter,
   setFilter,
   counts,
-  onFulfill,
+  onUploadNew,
+  onLinkExisting,
+  onDeny,
+  onMarkComplete,
 }) => (
   <div className="space-y-4">
     {/* Stat cards */}
     <div className="grid grid-cols-2 gap-3">
       <div className="bg-amber-50 rounded-xl p-4">
         <p className="text-2xl font-semibold text-amber-700">{counts.pending}</p>
-        <p className="text-xs text-slate-500 mt-0.5">Awaiting upload</p>
+        <p className="text-xs text-slate-500 mt-0.5">Awaiting action</p>
       </div>
       <div className="bg-green-50 rounded-xl p-4">
         <p className="text-2xl font-semibold text-green-700">{counts.fulfilled}</p>
@@ -54,7 +60,6 @@ const InboundRequestListView: React.FC<InboundRequestListViewProps> = ({
       ))}
     </div>
 
-    {/* States */}
     {loading && (
       <div className="bg-white rounded-2xl border border-slate-200 p-12 flex justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
@@ -83,7 +88,14 @@ const InboundRequestListView: React.FC<InboundRequestListViewProps> = ({
     {!loading &&
       !error &&
       filtered.map(r => (
-        <InboundRequestCard key={r.inviteCode} request={r} onFulfill={onFulfill} />
+        <InboundRequestCard
+          key={r.inviteCode}
+          request={r}
+          onUploadNew={onUploadNew}
+          onLinkExisting={onLinkExisting}
+          onDeny={onDeny}
+          onMarkComplete={onMarkComplete}
+        />
       ))}
   </div>
 );
