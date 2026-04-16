@@ -26,6 +26,7 @@ const anthropicKey = (0, params_1.defineSecret)('ANTHROPIC_KEY');
  * - provider: Doctor/provider name
  * - institution: Hospital/clinic name
  * - patient: Patient name
+ * - detailedNarrative:
  */
 exports.createBelroseFields = (0, https_1.onRequest)({
     secrets: [anthropicKey],
@@ -130,6 +131,7 @@ function createFallbackResponse(fileName) {
         provider: 'Healthcare Provider',
         institution: 'Medical Center',
         patient: 'Patient',
+        detailedNarrative: 'Medical record processed successfully.',
     };
 }
 /**

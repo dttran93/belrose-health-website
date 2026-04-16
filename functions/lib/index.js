@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.refineRecord = exports.checkEmailRegistrationStatus = exports.getKeyBundle = exports.aiChat = exports.getSponsorshipStatus = exports.signSponsorship = exports.onRecordDeletionEventUpdated = exports.onRecordDeletionEventCreated = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.createRecordRequest = exports.redeemGuestInvite = exports.createGuestInvite = exports.sendPasswordChangeEmail = exports.sendWaitlistConfirmationEmail = exports.sendAlphaApprovalEmail = exports.sendShareInvitationEmail = exports.personaWebhook = exports.checkVerificationStatus = exports.createVerificationSession = exports.getEncryptedWallet = exports.createWallet = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = exports.setPlatformAdmin = void 0;
+exports.refineRecord = exports.checkEmailRegistrationStatus = exports.getKeyBundle = exports.aiChat = exports.getSponsorshipStatus = exports.signSponsorship = exports.onRecordRequestUpdated = exports.onRecordRequestCreated = exports.onRecordDeletionEventUpdated = exports.onRecordDeletionEventCreated = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.createRecordRequest = exports.redeemGuestInvite = exports.createGuestInvite = exports.sendPasswordChangeEmail = exports.sendWaitlistConfirmationEmail = exports.sendAlphaApprovalEmail = exports.sendShareInvitationEmail = exports.personaWebhook = exports.checkVerificationStatus = exports.createVerificationSession = exports.getEncryptedWallet = exports.createWallet = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = exports.setPlatformAdmin = void 0;
 // functions/src/index.ts
 const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin
@@ -94,6 +94,9 @@ Object.defineProperty(exports, "onSubjectConsentRequestUpdated", { enumerable: t
 var deleteRecordNotificationTrigger_1 = require("./notifications/triggers/deleteRecordNotificationTrigger");
 Object.defineProperty(exports, "onRecordDeletionEventCreated", { enumerable: true, get: function () { return deleteRecordNotificationTrigger_1.onRecordDeletionEventCreated; } });
 Object.defineProperty(exports, "onRecordDeletionEventUpdated", { enumerable: true, get: function () { return deleteRecordNotificationTrigger_1.onRecordDeletionEventUpdated; } });
+var requestRecordNotificationTrigger_1 = require("./notifications/triggers/requestRecordNotificationTrigger");
+Object.defineProperty(exports, "onRecordRequestCreated", { enumerable: true, get: function () { return requestRecordNotificationTrigger_1.onRecordRequestCreated; } });
+Object.defineProperty(exports, "onRecordRequestUpdated", { enumerable: true, get: function () { return requestRecordNotificationTrigger_1.onRecordRequestUpdated; } });
 // ==================== PAYMASTER ====================
 var paymaster_1 = require("./handlers/paymaster");
 Object.defineProperty(exports, "signSponsorship", { enumerable: true, get: function () { return paymaster_1.signSponsorship; } });

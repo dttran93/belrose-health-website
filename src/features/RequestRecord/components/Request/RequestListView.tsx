@@ -19,7 +19,7 @@ interface RequestListViewProps {
   expandedId: string | null;
   toggleExpand: (id: string) => void;
   onNew: () => void;
-  onViewRecord: (id: string) => void;
+  onViewRecord: (recordIds: string[]) => void;
 }
 
 const RequestListView: React.FC<RequestListViewProps> = ({

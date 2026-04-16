@@ -1,11 +1,10 @@
-import { ImageAnalysisRequest, SUPPORTED_IMAGE_TYPES } from '@/types/sharedApi';
-
 export interface ApiErrorResponse {
   error: string;
 }
 
 export type SupportedImageType = (typeof SUPPORTED_IMAGE_TYPES)[number];
 
+import { ImageAnalysisRequest, SUPPORTED_IMAGE_TYPES } from '@belrose/shared';
 import type { TextExtractionResult } from './shared.types';
 import { fileToBase64 } from '@/utils/dataFormattingUtils';
 
@@ -60,7 +59,6 @@ export class AiImageService {
         image: { base64: base64Image, mediaType: mediaType },
         fileName: file.name,
         fileType: file.type,
-        analysisType: 'extraction',
       };
 
       console.log('📤 Sending request to:', this.apiUrl);

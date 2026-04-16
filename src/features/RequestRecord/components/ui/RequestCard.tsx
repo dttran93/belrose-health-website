@@ -32,7 +32,7 @@ interface RequestCardProps {
   onToggle: () => void;
   onCancel: (id: string) => Promise<void>;
   onResend: (id: string) => Promise<void>;
-  onViewRecord: (recordId: string) => void;
+  onViewRecord: (recordIds: string[]) => void;
 }
 
 // ── Status config ─────────────────────────────────────────────────────────────
@@ -161,7 +161,7 @@ const RequestCard: React.FC<RequestCardProps> = ({
           </div>
         )}
 
-        {isFulfilled && request.fulfilledRecordId && (
+        {isFulfilled && request.fulfilledRecordIds && request.fulfilledRecordIds.length > 0 && (
           <div className="mt-2 flex items-center gap-1.5">
             <FileText className="w-3.5 h-3.5 text-green-600" />
             <span className="text-xs text-green-700">Record received</span>
@@ -239,17 +239,30 @@ const RequestCard: React.FC<RequestCardProps> = ({
           </div>
 
           {/* Actions */}
-          <div className="flex gap-2 justify-end pt-2 border-t border-slate-100">
-            {isFulfilled && request.fulfilledRecordId && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 text-xs"
-                onClick={() => onViewRecord(request.fulfilledRecordId!)}
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                View record
-              </Button>
+          <div className="flex flex-col gap-3 pt-4 border-t border-slate-100">
+            {isFulfilled && request.fulfilledRecordIds && request.fulfilledRecordIds.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                  Received Records
+                </p>
+                <div>
+                  {request.fulfilledRecordIds.map((id, index) => (
+                    <Button
+                      key={id}
+                      variant="secondary"
+                      size="sm"
+                      className="justify-between text-xs bg-slate-50 hover:bg-slate-100 border-slate-200 h-9 w-full"
+                      onClick={() => onViewRecord([id])}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <FileText className="w-3.5 h-3.5 text-blue-600" />
+                        <span className="truncate">Record {index + 1}</span>
+                      </div>
+                      <ExternalLink className="w-3 h-3 text-slate-400" />
+                    </Button>
+                  ))}
+                </div>
+              </div>
             )}
             {isPending && (
               <>

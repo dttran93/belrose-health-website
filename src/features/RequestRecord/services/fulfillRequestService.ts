@@ -27,21 +27,17 @@ import {
   updateDoc,
   serverTimestamp,
   collection,
+  arrayUnion,
 } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
 import { removeUndefinedValues } from '@/utils/dataFormattingUtils';
-
-// src/features/RecordRequest/types.ts
-
-import { Timestamp } from 'firebase/firestore';
 import { FileObject } from '@/types/core';
+import { RecordRequest } from '@belrose/shared';
 
 // ── Firestore document ────────────────────────────────────────────────────────
-
-export type RecordRequestStatus = 'pending' | 'fulfilled' | 'denied' | 'cancelled';
 
 export const DENY_REASONS = [
   { value: 'wrong_recipient', label: 'Wrong recipient — I am not the stated provider' },
@@ -58,38 +54,6 @@ export const DENY_REASONS = [
 ] as const;
 
 export type DenyReasonValue = (typeof DENY_REASONS)[number]['value'];
-
-export interface RecordRequest {
-  inviteCode: string;
-
-  // Requester (the Belrose user who wants the records)
-  requesterId: string;
-  requesterEmail: string;
-  requesterName: string;
-  requesterPublicKey: string;
-
-  // Target (the provider receiving the email)
-  targetEmail: string;
-  targetUserId: string | null;
-
-  // Encrypted note — AES-256-GCM, key wrapped separately for each party
-  encryptedRequestNote: string | null;
-  encryptedNoteKeyForRequester: string | null;
-  encryptedNoteKeyForProvider: string | null;
-  encryptedNoteIv: string | null;
-
-  // Lifecycle
-  status: RecordRequestStatus;
-  createdAt: Timestamp;
-  readAt: Timestamp | null;
-  deadline: Timestamp;
-  fulfilledRecordId: string[];
-  fulfilledAt?: Timestamp;
-  deniedAt?: Timestamp;
-  deniedReason?: DenyReasonValue;
-  deniedNote?: string;
-  cancelledAt?: Timestamp;
-}
 
 // ── Service result types ──────────────────────────────────────────────────────
 
@@ -305,7 +269,7 @@ export class FulfillRequestService {
     // ── Step 10: Mark request fulfilled ──────────────────────────────────────
     await updateDoc(doc(db, 'recordRequests', recordRequest.inviteCode), {
       status: 'fulfilled',
-      fulfilledRecordId: recordId,
+      fulfilledRecordIds: arrayUnion(recordId),
       fulfilledAt: serverTimestamp(),
     });
     console.log('✅ recordRequest marked fulfilled');

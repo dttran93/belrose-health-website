@@ -23,7 +23,7 @@ exports.analyzeImageWithAI = (0, https_1.onRequest)({
     }
     try {
         // Extract and validate request body
-        const { image, fileName = '', fileType = '', analysisType = 'full', } = req.body;
+        const { image, fileName = '', fileType = '' } = req.body;
         if (!image || !image.base64 || !image.mediaType) {
             res.status(400).json({ error: 'Image data is required' });
             return;
@@ -38,13 +38,12 @@ exports.analyzeImageWithAI = (0, https_1.onRequest)({
         console.log('🖼️ Analyzing image...', {
             fileName,
             fileType,
-            analysisType,
             imageSize: image.base64.length,
         });
         // Create Anthropic service
         const anthropicService = new anthropicService_1.AnthropicService(apiKey);
         // Get the appropriate prompt for this analysis type
-        const prompt = (0, prompts_1.getImageAnalysisPrompt)(analysisType);
+        const prompt = (0, prompts_1.getImageAnalysisPrompt)();
         // Send image for analysis
         const responseText = await anthropicService.sendImageMessage(image.base64, image.mediaType, prompt, {
             model: anthropicService_1.MODELS.SONNET,
@@ -53,12 +52,6 @@ exports.analyzeImageWithAI = (0, https_1.onRequest)({
         });
         // Parse the response
         const analysisResult = anthropicService_1.AnthropicService.parseJSONResponse(responseText);
-        // Enrich the result with metadata
-        enrichAnalysisResult(analysisResult, fileName, fileType, analysisType);
-        console.log('✅ Image analysis successful', {
-            isMedical: analysisResult.isMedical,
-            confidence: analysisResult.confidence,
-        });
         res.json(analysisResult);
     }
     catch (error) {
@@ -67,52 +60,11 @@ exports.analyzeImageWithAI = (0, https_1.onRequest)({
     }
 });
 /**
- * Enrich analysis result with additional metadata
- */
-function enrichAnalysisResult(result, fileName, fileType, analysisType) {
-    // Add timestamp
-    result.analyzedAt = new Date().toISOString();
-    // Add file info
-    result.fileName = fileName;
-    result.fileType = fileType;
-    result.analysisType = analysisType;
-    // Ensure confidence is between 0 and 1
-    if (result.confidence !== undefined) {
-        result.confidence = Math.max(0, Math.min(1, result.confidence));
-    }
-    // Provide default values if missing
-    if (result.isMedical === undefined) {
-        result.isMedical = false;
-    }
-    if (!result.suggestion) {
-        result.suggestion = result.isMedical
-            ? 'Medical content detected in image'
-            : 'No medical content detected';
-    }
-}
-/**
  * Handle image analysis errors with appropriate fallback response
  */
 function handleImageAnalysisError(res, error) {
     console.error('❌ Image analysis failed:', error);
-    // Determine error type and response
-    let statusCode = 500;
-    let errorMessage = 'Failed to process image';
-    if (error.message?.includes('JSON') || error.message?.includes('parse')) {
-        errorMessage = 'Failed to parse AI response';
-    }
-    else if (error.message?.includes('Anthropic') || error.name === 'AnthropicAPIError') {
-        statusCode = 502;
-        errorMessage = 'External AI service error';
-    }
-    // Return error response with safe fallback values
-    res.status(statusCode).json({
-        error: errorMessage,
-        isMedical: false,
-        confidence: 0,
-        extractedText: '',
-        suggestion: 'Image analysis failed - please try again',
-        analyzedAt: new Date().toISOString(),
-    });
+    const message = error instanceof Error ? error.message : 'Failed to process image';
+    res.status(500).json({ error: message });
 }
 //# sourceMappingURL=image.js.map

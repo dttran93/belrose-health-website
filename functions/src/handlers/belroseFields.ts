@@ -5,7 +5,7 @@ import type { Request, Response } from 'express';
 import { defineSecret } from 'firebase-functions/params';
 import { AnthropicService, MODELS } from '../services/anthropicService';
 import { getBelroseFieldsPrompt } from '../utils/prompts';
-import { BelroseFieldProcessingRequest, BelroseFields } from '@/index.types';
+import { BelroseFieldProcessingRequest, BelroseFields } from '@belrose/shared';
 
 // Define the secret
 const anthropicKey = defineSecret('ANTHROPIC_KEY');
@@ -28,6 +28,7 @@ const anthropicKey = defineSecret('ANTHROPIC_KEY');
  * - provider: Doctor/provider name
  * - institution: Hospital/clinic name
  * - patient: Patient name
+ * - detailedNarrative:
  */
 export const createBelroseFields = onRequest(
   {
@@ -174,6 +175,7 @@ function createFallbackResponse(fileName?: string): BelroseFields {
     provider: 'Healthcare Provider',
     institution: 'Medical Center',
     patient: 'Patient',
+    detailedNarrative: 'Medical record processed successfully.',
   };
 }
 

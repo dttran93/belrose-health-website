@@ -14,16 +14,7 @@
 
 import { RecordRequest } from '../../services/fulfillRequestService';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
-import {
-  Ban,
-  CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  FileText,
-  Link,
-  Loader2,
-  Upload,
-} from 'lucide-react';
+import { Ban, CheckCircle2, ChevronDown, ChevronUp, Link, Loader2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Timestamp } from 'firebase/firestore';
 import { RequestNoteService } from '../../services/requestNoteService';
@@ -85,7 +76,7 @@ const InboundRequestCard: React.FC<InboundRequestCardProps> = ({
   const isOverdue = daysLeft !== null && daysLeft < 0 && isPending;
 
   // How many records linked so far (from the array on the request doc)
-  const linkedCount = request.fulfilledRecordId?.length ?? 0;
+  const linkedCount = request.fulfilledRecordIds?.length ?? 0;
 
   const initials = request.requesterName
     ? request.requesterName

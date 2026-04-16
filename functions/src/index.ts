@@ -60,6 +60,11 @@ export {
   onRecordDeletionEventUpdated,
 } from './notifications/triggers/deleteRecordNotificationTrigger';
 
+export {
+  onRecordRequestCreated,
+  onRecordRequestUpdated,
+} from './notifications/triggers/requestRecordNotificationTrigger';
+
 // ==================== PAYMASTER ====================
 export { signSponsorship, getSponsorshipStatus } from './handlers/paymaster';
 

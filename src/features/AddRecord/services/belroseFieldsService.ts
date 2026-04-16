@@ -1,5 +1,4 @@
-import { BelroseFields } from '@/types/core';
-import { BelroseFieldProcessingRequest } from '@/types/sharedApi';
+import { BelroseFieldProcessingRequest, BelroseFields } from '@belrose/shared';
 
 /**
  * Error class for AI processing failures

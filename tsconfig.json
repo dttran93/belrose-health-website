@@ -16,18 +16,13 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@belrose/shared": ["../packages/shared/src/index.ts"]
     },
     "incremental": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": [
-    "src/**/*",
-    "vite.config.ts",
-    "contracts/scripts/**/*",
-    "test/**/*",
-    "functions/src/handlers/sendAlphaApprovalEmail.ts",
-    "functions/scripts/IngestGPPractices.ts"
-  ],
-  "exclude": ["node_modules", "dist", "functions/**/*"]
+  "include": ["src/**/*", "vite.config.ts", "contracts/scripts/**/*", "test/**/*"],
+  "exclude": ["node_modules", "dist", "functions/**/*"],
+  "references": [{ "path": "./packages/shared" }]
 }

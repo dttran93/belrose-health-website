@@ -37,83 +37,19 @@ Requirements:
 Return the result as a FHIR Bundle resource containing all relevant resources.
   `.trim();
 }
-/**
- * Prompts for image analysis based on analysis type
- */
-function getImageAnalysisPrompt(analysisType) {
-    switch (analysisType) {
-        case 'detection':
-            return getImageDetectionPrompt();
-        case 'extraction':
-            return getImageExtractionPrompt();
-        case 'full':
-        default:
-            return getFullImageAnalysisPrompt();
-    }
-}
-/**
- * Prompt for detecting if an image contains medical information
- */
-function getImageDetectionPrompt() {
-    return `
-Analyze this image to determine if it contains medical information or is a medical document.
-
-Return a JSON response with this structure:
-{
-  "isMedical": boolean,
-  "confidence": number (0-1),
-  "documentType": string (e.g., "lab report", "prescription", "medical imaging", "not medical"),
-  "suggestion": string (brief description of what was detected)
-}
-
-Only return the JSON, no additional text.
-  `.trim();
-}
-/**
- * Prompt for extracting text from an image
- */
-function getImageExtractionPrompt() {
-    return `
-Extract ALL text content from this image. Include:
-- All visible text, numbers, labels, and headers
-- Preserve formatting where possible
-- Include any handwritten text if legible
-- Note any medical terminology, measurements, or values
-
-Return a JSON response with this structure:
-{
-  "extractedText": string (all text found in the image),
-  "isMedical": boolean,
-  "confidence": number (0-1),
-  "documentType": string,
-  "suggestion": string
-}
-
-Only return the JSON, no additional text.
-  `.trim();
-}
-/**
- * Prompt for comprehensive image analysis
- */
-function getFullImageAnalysisPrompt() {
+function getImageAnalysisPrompt() {
     return `
 Perform a comprehensive analysis of this medical image/document.
 
 Analyze and provide:
-1. Whether this is a medical document or image
-2. Type of medical document (if applicable)
-3. All visible text content
-4. Key medical information (diagnoses, medications, measurements, dates, etc.)
-5. Overall confidence in the analysis
+1. Type of medical document (if applicable)
+2. All visible text content
+3. Key medical information (diagnoses, medications, measurements, dates, etc.)
 
 Return a JSON response with this structure:
 {
-  "isMedical": boolean,
-  "confidence": number (0-1),
-  "documentType": string,
   "extractedText": string,
-  "keyFindings": string[],
-  "suggestion": string
+  "keyFindings": string[]
 }
 
 Only return the JSON, no additional text.

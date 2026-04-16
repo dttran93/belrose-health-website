@@ -166,7 +166,7 @@ const RecordRequestsPage: React.FC = () => {
             expandedId={expandedId}
             toggleExpand={toggleExpand}
             onNew={() => setPageView('new')}
-            onViewRecord={id => navigate('/app/all-records', { state: { openRecordId: id } })}
+            onViewRecord={id => navigate(`/app/records/${id}`)}
           />
         )}
 

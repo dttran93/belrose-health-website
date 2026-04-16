@@ -28,6 +28,11 @@ export type NotificationType =
   | 'REJECTION_PUBLICLY_LISTED'
   // Record Deletion
   | 'RECORD_DELETED'
+  // Record Request
+  | 'RECORD_REQUEST_RECEIVED'
+  | 'RECORD_REQUEST_VIEWED'
+  | 'RECORD_REQUEST_FULFILLED'
+  | 'RECORD_REQUEST_DENIED'
   // Generic fallback
   | 'GENERIC_NOTIFICATION';
 
@@ -35,7 +40,7 @@ export type NotificationType =
  * Source services - identifies which feature triggered the notification.
  * Useful for filtering and analytics.
  */
-export type SourceService = 'Subject' | 'Messaging' | 'Record' | 'System';
+export type SourceService = 'Subject' | 'Messaging' | 'Record' | 'RequestRecord' | 'System';
 
 /**
  * The shape of a notification document in Firestore.
@@ -57,13 +62,18 @@ export interface NotificationDoc {
  */
 export interface NotificationPayload {
   // Subject-related
-  recordId: string;
-  subjectId: string;
+  recordId?: string;
+  subjectId?: string;
   requestId?: string;
   requestedBy?: string;
   requestedSubjectRole?: string;
   // Deletion Related
   deletedBy?: string;
+
+  // Record Request Related
+  recordIds?: string[];
+  deniedReason?: string;
+
   // Messaging (future)
   conversationId?: string;
   senderId?: string;

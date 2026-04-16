@@ -26,15 +26,19 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { getDoc, doc, getFirestore, updateDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  getDoc,
+  doc,
+  getFirestore,
+  updateDoc,
+  serverTimestamp,
+  increment,
+} from 'firebase/firestore';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import useFileManager from '@/features/AddRecord/hooks/useFileManager';
 import { useFHIRConversion } from '@/features/AddRecord/hooks/useFHIRConversion';
 import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
-import {
-  FulfillRequestService,
-  RecordRequest,
-} from '../features/RequestRecord/services/fulfillRequestService';
+import { FulfillRequestService } from '../features/RequestRecord/services/fulfillRequestService';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import type { FileObject } from '@/types/core';
 import StatusCard from '@/features/RequestRecord/components/ui/StatusCard';
@@ -46,6 +50,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getAuth, signInWithCustomToken, signOut } from 'firebase/auth';
 import { GuestClaimAccountModal } from '@/features/GuestAccess/components/GuestClaimAccountModal';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
+import { RecordRequest } from '@belrose/shared';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -157,10 +162,19 @@ const FulfillRequestPage: React.FC = () => {
       }
 
       // Stamp readAt on first open — fire and forget
-      if (data.status === 'pending' && !data.readAt) {
-        updateDoc(doc(db, 'recordRequests', code), {
-          readAt: serverTimestamp(),
-        }).catch(err => console.warn('Failed to stamp readAt:', err));
+      if (data.status === 'pending') {
+        const updateData: any = {
+          viewCount: increment(1),
+        };
+
+        // Only set readAt if it's the very first time
+        if (!data.readAt) {
+          updateData.readAt = serverTimestamp();
+        }
+
+        updateDoc(doc(db, 'recordRequests', code), updateData).catch(err =>
+          console.warn('Failed to update engagement stats:', err)
+        );
       }
 
       // Check if targetEmail has already registered a full account

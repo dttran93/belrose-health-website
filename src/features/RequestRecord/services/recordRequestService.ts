@@ -23,8 +23,8 @@ import {
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { RecordRequest } from './fulfillRequestService';
 import { RequestNote } from '../components/Request/NewRequestForm';
+import type { RecordRequest } from '@belrose/shared';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

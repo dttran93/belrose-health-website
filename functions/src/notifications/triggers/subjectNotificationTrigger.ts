@@ -29,7 +29,6 @@ import {
   NotificationType,
   SourceService,
 } from '../notificationUtils';
-import { FileObject } from '@/index.types';
 
 // ============================================================================
 // TYPES
@@ -74,6 +73,12 @@ interface SubjectConsentRequest {
   rejection?: SubjectRejectionData;
 }
 
+interface RecordForNotification {
+  uploadedBy?: string;
+  owners?: string[];
+  administrators: string[];
+}
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -87,7 +92,7 @@ const SOURCE: SourceService = 'Subject';
 /**
  * Get record data from Firestore
  */
-async function getRecordData(recordId: string): Promise<FileObject | null> {
+async function getRecordData(recordId: string): Promise<RecordForNotification | null> {
   const db = getFirestore();
   const recordDoc = await db.collection('records').doc(recordId).get();
 
@@ -96,14 +101,14 @@ async function getRecordData(recordId: string): Promise<FileObject | null> {
     return null;
   }
 
-  return recordDoc.data() as FileObject;
+  return recordDoc.data() as RecordForNotification;
 }
 
 /**
  * Get all users who should be notified about record changes
  * (uploader + owners, deduplicated)
  */
-function getRecordNotificationTargets(record: FileObject): string[] {
+function getRecordNotificationTargets(record: RecordForNotification): string[] {
   const targets: string[] = [];
 
   if (record.uploadedBy) {

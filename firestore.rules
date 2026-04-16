@@ -745,7 +745,7 @@ service cloud.firestore {
       // Path A: Read receipt (unauthenticated stamp of readAt)
       (
         resource.data.status == 'pending' &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt', 'viewCount'])
       ) ||
   
       // Path B: Provider links records — adds IDs to fulfilledRecordIds array.
@@ -769,7 +769,7 @@ service cloud.firestore {
         resource.data.status == 'pending' &&
         request.resource.data.status == 'cancelled' &&
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'cancelledAt'])
+          .hasOnly(['status', 'cancelledAt', 'lastRemindedAt'])
       ) ||
   
       // Path D: Provider rewraps note key after claiming account

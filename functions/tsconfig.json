@@ -18,9 +18,11 @@
     "types": ["node"],
     "paths": {
       "@/*": ["./src/*"],
-      "@types/*": ["./src/types/*"]
+      "@types/*": ["./src/types/*"],
+      "@belrose/shared": ["./src/_shared/index.ts"]
     }
   },
+  "references": [{ "path": "../packages/shared" }],
   "compileOnSave": true,
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "lib"]

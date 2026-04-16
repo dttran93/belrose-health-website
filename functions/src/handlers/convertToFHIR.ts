@@ -5,7 +5,7 @@ import type { Request, Response } from 'express';
 import { defineSecret } from 'firebase-functions/params';
 import { AnthropicService, MODELS } from '../services/anthropicService';
 import { getFHIRConversionPrompt } from '../utils/prompts';
-import { FHIRConversionRequest, FHIRConversionResponse } from '@/index.types';
+import { FHIRConversionRequest, FHIRConversionResponse } from '@belrose/shared';
 
 /**
  * FHIR Conversion Handler
