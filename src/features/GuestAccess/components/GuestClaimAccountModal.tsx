@@ -319,6 +319,10 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         });
       });
 
+      console.log('About to commit batch, steps completed so far...');
+      console.log('hasKeys:', hasKeys);
+      console.log('guestPrivateKey present:', !!guestPrivateKeyBase64);
+
       await batch.commit();
 
       // ── Step 5: Generate real wallet ─────────────────────────────────────────

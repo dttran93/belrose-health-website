@@ -11,8 +11,8 @@ import { SharingKeyManagementService } from '@/features/Sharing/services/sharing
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 import { getAuth } from 'firebase/auth';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
-import { RecordRequest } from './fulfillRequestService';
 import { RequestNote } from '../components/Request/NewRequestForm';
+import { RecordRequest } from '@belrose/shared';
 
 // ── Service ───────────────────────────────────────────────────────────────────
 
@@ -86,6 +86,11 @@ export class RequestNoteService {
     if (!userData.encryption?.encryptedPrivateKey) {
       throw new Error('Encryption keys not set up. Please complete account setup.');
     }
+
+    console.log(
+      'userData.encryption.publicKey (first 150):',
+      userData.encryption?.publicKey?.slice(0, 150)
+    );
 
     // 4. Decrypt RSA private key with master key
     const privateKeyBytes = await EncryptionService.decryptFile(

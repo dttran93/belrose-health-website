@@ -12,14 +12,21 @@
  * in the collapsed header for fulfilled/denied status display.
  */
 
-import { RecordRequest } from '../../services/fulfillRequestService';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import { Ban, CheckCircle2, ChevronDown, ChevronUp, Link, Loader2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Timestamp } from 'firebase/firestore';
+import {
+  doc,
+  getFirestore,
+  increment,
+  serverTimestamp,
+  Timestamp,
+  updateDoc,
+} from 'firebase/firestore';
 import { RequestNoteService } from '../../services/requestNoteService';
 import { useEffect, useState } from 'react';
 import { RequestNote } from '../Request/NewRequestForm';
+import { RecordRequest } from '@belrose/shared';
 
 interface InboundRequestCardProps {
   request: RecordRequest;
@@ -89,11 +96,20 @@ const InboundRequestCard: React.FC<InboundRequestCardProps> = ({
 
   useEffect(() => {
     if (!isExpanded || note || noteLoading || !request.encryptedRequestNote) return;
+
+    updateDoc(doc(getFirestore(), 'recordRequests', request.inviteCode), {
+      ...(!request.readAt && { readAt: serverTimestamp() }),
+      ...(!isPending && { viewCount: increment(1) }),
+    });
     setNoteLoading(true);
     setNoteError(null);
     RequestNoteService.decryptAsProvider(request)
-      .then(result => setNote(result))
-      .catch(err => setNoteError(err.message ?? 'Failed to decrypt note.'))
+      .then(result => {
+        setNote(result);
+      })
+      .catch(err => {
+        setNoteError(err?.message ?? 'Failed to decrypt note.');
+      })
       .finally(() => setNoteLoading(false));
   }, [isExpanded]);
 
@@ -189,7 +205,7 @@ const InboundRequestCard: React.FC<InboundRequestCardProps> = ({
               )}
               {noteError && <p className="text-xs text-red-500">{noteError}</p>}
               {note && (
-                <div className="space-y-1.5">
+                <div className="text-left space-y-1.5">
                   {note.practice && <NoteRow label="Practice" value={note.practice} />}
                   {note.provider && <NoteRow label="Provider" value={note.provider} />}
                   {note.dateOfBirth && <NoteRow label="Date of birth" value={note.dateOfBirth} />}

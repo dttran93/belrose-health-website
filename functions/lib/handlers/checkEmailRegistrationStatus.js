@@ -47,19 +47,16 @@ exports.checkEmailRegistrationStatus = functions.https.onCall(async (request) =>
         throw new functions.https.HttpsError('invalid-argument', 'The function must be called with a valid email string.');
     }
     try {
-        const usersRef = admin.firestore().collection('users');
-        const snapshot = await usersRef
-            .where('email', '==', email.toLowerCase().trim())
-            .where('isGuest', '==', false)
-            .limit(1)
-            .select()
-            .get();
+        const userRecord = await admin.auth().getUserByEmail(email.toLowerCase().trim());
+        const userDoc = await admin.firestore().collection('users').doc(userRecord.uid).get();
         return {
-            isRegistered: !snapshot.empty,
+            isRegistered: userDoc.exists && !userDoc.data()?.isGuest,
         };
     }
     catch (error) {
-        console.error('Error checking user registration status:', error);
+        if (error.code === 'auth/user-not-found') {
+            return { isRegistered: false };
+        }
         throw new functions.https.HttpsError('internal', 'Unable to check registration status.');
     }
 });

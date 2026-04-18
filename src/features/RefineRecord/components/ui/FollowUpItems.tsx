@@ -37,8 +37,6 @@ export interface FollowUpItem {
 
 export interface FollowUpItemsProps {
   items: FollowUpItem[];
-  /** Called when the user clicks "dismiss" — hide the whole section */
-  onDismiss?: () => void;
 }
 
 // ─── Single row ──────────────────────────────────────────────────────────────
@@ -112,18 +110,6 @@ export const FollowUpItems: React.FC<FollowUpItemsProps> = ({ items, onDismiss }
 
   return (
     <div>
-      {/* Header row */}
-      <div className="flex items-center gap-2">
-        {onDismiss && (
-          <button
-            onClick={onDismiss}
-            className="text-xs text-amber-700 underline underline-offset-2 hover:text-amber-900"
-          >
-            Dismiss
-          </button>
-        )}
-      </div>
-
       {/* Items */}
       <div className="flex flex-col gap-1.5">
         {items.map(item => (

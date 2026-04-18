@@ -27,7 +27,8 @@ import {
   markRequestComplete,
   denyRequest,
 } from '../services/linkRecordService';
-import { DenyReasonValue, RecordRequest } from '../services/fulfillRequestService';
+import { DenyReasonValue } from '../services/fulfillRequestService';
+import { RecordRequest } from '@belrose/shared';
 
 export type LinkPhase = 'pick-records' | 'pick-role' | 'confirm-deny' | 'executing' | 'error';
 

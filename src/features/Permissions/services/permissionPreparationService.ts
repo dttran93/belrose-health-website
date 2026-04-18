@@ -299,6 +299,9 @@ export class PermissionPreparationService {
     // Sequential (not parallel) because initializeRecordRole hits a Cloud Function
     // that writes to the blockchain — running them concurrently risks nonce conflicts
     // on the admin wallet used by that function.
+
+    const justInitialized = new Set<string>();
+
     for (const recordId of recordIds) {
       const roleStats = await this.getRecordRoleStats(recordId);
       const isInitialized = roleStats.ownerCount > 0 || roleStats.adminCount > 0;
@@ -319,15 +322,20 @@ export class PermissionPreparationService {
       console.log(`🚀 Initializing record ${recordId} as ${initialRole}…`);
       await this.initializeRecordRole(recordId, smartAccountAddress, initialRole);
       console.log(`✅ Record initialized: ${recordId}`);
+      justInitialized.add(recordId);
     }
 
-    // Step 3: Verify all records are ready
-    const finalStatuses = await Promise.all(recordIds.map(id => this.getStatus(id)));
-    const notReady = recordIds.filter((_, i) => !finalStatuses[i]?.isReady);
-    if (notReady.length > 0) {
-      throw new Error(
-        `Preparation failed for ${notReady.length} record(s): ${notReady.join(', ')}`
-      );
+    // Step 3: Verify all records are ready. Don't need to verify records we just initialized
+    const toVerify = recordIds.filter(id => !justInitialized.has(id));
+
+    if (toVerify.length > 0) {
+      const finalStatuses = await Promise.all(toVerify.map(id => this.getStatus(id)));
+      const notReady = toVerify.filter((_, i) => !finalStatuses[i]?.isReady);
+      if (notReady.length > 0) {
+        throw new Error(
+          `Preparation failed for ${notReady.length} record(s): ${notReady.join(', ')}`
+        );
+      }
     }
 
     onProgress?.({ step: 'complete', message: 'Preparation complete!' });

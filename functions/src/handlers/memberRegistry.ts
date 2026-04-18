@@ -40,7 +40,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
  */
 function getAdminWallet(): ethers.Wallet {
   const privateKey = process.env.ADMIN_WALLET_PRIVATE_KEY;
-  const rpcUrl = process.env.RPC_URL || 'https://1rpc.io/sepolia';
+  const rpcUrl = process.env.RPC_URL || 'https://ethereum-sepolia.publicnode.com';
   if (!privateKey) throw new Error('Admin wallet private key not found');
   const provider = new ethers.JsonRpcProvider(rpcUrl);
   return new ethers.Wallet(privateKey, provider);

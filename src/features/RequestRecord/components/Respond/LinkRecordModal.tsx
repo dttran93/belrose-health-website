@@ -17,21 +17,27 @@
 
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowLeft, Link, Loader2, X, XCircle } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { useLinkRecord } from '../../hooks/useLinkRecord';
-import { FileObject } from '@/types/core';
-import { DENY_REASONS, DenyReasonValue, RecordRequest } from '../../services/fulfillRequestService';
+import { DENY_REASONS, DenyReasonValue } from '../../services/fulfillRequestService';
 import RoleSelector from '@/features/Permissions/component/ui/RoleSelector';
 import { RecordPickerContent } from '@/features/Ai/components/ui/RecordPicker';
+import { RecordRequest } from '@belrose/shared';
 
 interface LinkRecordModalProps {
   request: RecordRequest | null;
   onClose: () => void;
   onSuccess: () => void;
+  initialPhase?: 'pick-records' | 'confirm-deny';
 }
 
-const LinkRecordModal: React.FC<LinkRecordModalProps> = ({ request, onClose, onSuccess }) => {
+const LinkRecordModal: React.FC<LinkRecordModalProps> = ({
+  request,
+  onClose,
+  onSuccess,
+  initialPhase,
+}) => {
   const handleClose = () => {
     reset();
     onClose();
@@ -64,6 +70,12 @@ const LinkRecordModal: React.FC<LinkRecordModalProps> = ({ request, onClose, onS
     submitDeny,
     reset,
   } = hook;
+
+  useEffect(() => {
+    if (isOpen && initialPhase === 'confirm-deny') {
+      goToDenyConfirm();
+    }
+  });
 
   const isOpen = request !== null;
   const canDismiss = phase !== 'executing';
@@ -113,7 +125,7 @@ const LinkRecordModal: React.FC<LinkRecordModalProps> = ({ request, onClose, onS
               denyNote={denyNote}
               onReasonChange={setDenyReason}
               onNoteChange={setDenyNote}
-              onBack={goBackFromDeny}
+              onBack={initialPhase === 'confirm-deny' ? handleClose : goBackFromDeny}
               onConfirm={submitDeny}
             />
           )}
@@ -191,7 +203,7 @@ const PickRecordsPhase: React.FC<PickRecordsPhaseProps> = ({
   const hasLinkedSome = linkedThisSession.length > 0;
 
   return (
-    <>
+    <div className="flex flex-col h-[90vh]">
       {/* Modal header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 flex-shrink-0">
         <div className="flex items-center gap-2">
@@ -230,7 +242,7 @@ const PickRecordsPhase: React.FC<PickRecordsPhaseProps> = ({
           <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
         </div>
       ) : (
-        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-hidden h-full">
           <RecordPickerContent
             records={records}
             selectedRecordIds={selectedIds}
@@ -265,7 +277,7 @@ const PickRecordsPhase: React.FC<PickRecordsPhaseProps> = ({
           Deny request
         </Button>
       </div>
-    </>
+    </div>
   );
 };
 

@@ -40,17 +40,18 @@ import { RecordRequest } from '@belrose/shared';
 // ── Firestore document ────────────────────────────────────────────────────────
 
 export const DENY_REASONS = [
-  { value: 'wrong_recipient', label: 'Wrong recipient — I am not the stated provider' },
-  { value: 'never_held', label: 'Never saw this patient, never held these records' },
+  { value: 'wrong_recipient', label: 'Wrong recipient. I am not the stated provider' },
+  { value: 'never_held', label: 'I never saw this patient and never held their records' },
   {
-    value: 'retention_lapsed',
-    label: 'Records were held but are no longer accessible',
+    value: 'duplicate_request',
+    label: 'I have already provided these records to this patient in response to another request',
   },
   {
-    value: 'cannot_identify',
-    label: 'I cannot confirm the identity of the patient and am withholding records',
+    value: 'cannot_confirm',
+    label:
+      'I cannot confirm the identity or legitimacy of the requester and am withholding records',
   },
-  { value: 'other', label: 'Other' },
+  { value: 'other', label: 'Other (please specify)' },
 ] as const;
 
 export type DenyReasonValue = (typeof DENY_REASONS)[number]['value'];

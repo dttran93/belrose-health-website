@@ -16,6 +16,7 @@ export const NETWORK = {
   name: 'sepolia',
   rpcUrl: 'https://ethereum-sepolia.publicnode.com',
   rpcUrlFallback: 'https://1rpc.io/sepolia',
+  rpcUrlFallback2: 'https://rpc.sepolia.org',
   etherscanBaseUrl: 'https://sepolia.etherscan.io',
 } as const;
 

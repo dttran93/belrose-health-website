@@ -1,7 +1,7 @@
 //src/features/AddRecord/components/FileListItem.tsx
 
 import React, { useState } from 'react';
-import { FileText, X, Eye, EyeOff, Check, HardDriveUpload, AlertCircle } from 'lucide-react';
+import { FileText, X, Eye, EyeOff, Check, HardDriveUpload, AlertCircle, Ban } from 'lucide-react';
 import { EnhancedFHIRResults } from '@/features/AddRecord/components/FHIRValidation';
 import { ProgressChips, createFileProcessingSteps } from './ui/ProgressChips';
 import * as Tooltip from '@radix-ui/react-tooltip';
@@ -255,14 +255,21 @@ export const FileListItem: React.FC<FileListItemProps> = ({
 
         {/* Follow-up items — only rendered when hook finds outstanding actions */}
         {showFollowUp && (
-          <div className="bg-amber-50 border-t border-amber-200 px-4 py-3 rounded-xl">
-            <div className="flex items-center gap-2 mb-2.5">
+          <div className="flex flex-col px-4 py-3 m-2 rounded-xl">
+            <div className="flex items-center justify-between gap-2 mb-2.5">
               <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
               <span className="text-xs font-medium text-amber-800 flex-1">
                 File Uploaded! There are a few follow-up steps to complete this record.
               </span>
-              <FollowUpItems items={followUpItems} onDismiss={() => setFollowUpDismissed(true)} />
+              <button
+                onClick={() => setFollowUpDismissed(true)}
+                className="flex items-center gap-1 hover:bg-amber-400 rounded-xl p-1"
+              >
+                <Ban className="w-3 h-3 text-amber-600" />
+                <span className="text-xs text-amber-600">Dismiss</span>
+              </button>
             </div>
+            <FollowUpItems items={followUpItems} />
           </div>
         )}
       </div>

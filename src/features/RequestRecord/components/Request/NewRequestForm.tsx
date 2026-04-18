@@ -2,15 +2,26 @@
 
 import { useProviderSearch } from '@/features/ProviderDirectory/hooks/useProviderSearch';
 import { ProviderRegion, REGION_CONFIGS } from '@/features/ProviderDirectory/types';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { RecordRequestService } from '../../services/recordRequestService';
-import { AlertCircle, ArrowLeft, ArrowRight, Calendar, Loader2, Pencil, Send } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  Calendar,
+  CheckCircle,
+  Loader2,
+  Pencil,
+  Send,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import ProviderSearchOverlay from '@/features/ProviderDirectory/components/ProviderSearchOverlay';
 import { ProviderDirectoryFactory } from '@/features/ProviderDirectory/ProviderDirectoryFactory';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { BelroseUserProfile } from '@/types/core';
 
 interface NewRequestFormProps {
-  user: any;
+  user: BelroseUserProfile;
   onBack: () => void;
   onSuccess: () => void;
 }
@@ -46,6 +57,7 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ user, onBack, onSuccess
   // ── Submission ──────────────────────────────────────────────────────────────
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [isRegisteredProvider, setIsRegisteredProvider] = useState(false);
 
   // ── Provider search ─────────────────────────────────────────────────────────
   const {
@@ -108,6 +120,34 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ user, onBack, onSuccess
     setManualMode(false);
   }, [region]);
 
+  const checkFn = useMemo(
+    () =>
+      httpsCallable<{ email: string }, { isRegistered: boolean }>(
+        getFunctions(),
+        'checkEmailRegistrationStatus'
+      ),
+    []
+  );
+
+  // For displaying if the email is already associated with a Belrose account
+  useEffect(() => {
+    if (!contactEmail || !contactEmail.includes('@')) {
+      setIsRegisteredProvider(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await checkFn({ email: contactEmail });
+        setIsRegisteredProvider(data.isRegistered);
+      } catch (err) {
+        console.error('check failed:', err);
+        setIsRegisteredProvider(false);
+      }
+    }, 600); // wait 600ms after they stop typing
+
+    return () => clearTimeout(timer);
+  }, [contactEmail, checkFn]);
+
   // Can proceed when we have an email — either from directory, ICB lookup, or manual
   const canProceedToStep2 = contactEmail.trim().length > 0 && !icbLoading;
 
@@ -137,11 +177,14 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ user, onBack, onSuccess
         noteObj.dateRange = { from: dateFrom || undefined, to: dateTo || undefined };
       if (freeText.trim()) noteObj.freeText = freeText.trim();
 
-      await RecordRequestService.createRequest({
-        targetEmail: contactEmail.trim(),
-        requesterName: requesterName.trim(),
-        requestNote: Object.keys(noteObj).length > 0 ? noteObj : undefined,
-      });
+      await RecordRequestService.createRequest(
+        {
+          targetEmail: contactEmail.trim(),
+          requesterName: requesterName.trim(),
+          requestNote: Object.keys(noteObj).length > 0 ? noteObj : undefined,
+        },
+        user
+      );
 
       onSuccess();
     } catch (err: any) {
@@ -304,6 +347,13 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ user, onBack, onSuccess
                   manually.
                 </p>
               )}
+              {isRegisteredProvider && (
+                <div className="flex text-xs text-green-600 items-center gap-1 mt-1">
+                  <CheckCircle className="w-3 h-3 text-green-500 inline" />
+                  This email is associated with a registered Belrose account! They will receive an
+                  in-app notification as well as an email.
+                </div>
+              )}
             </div>
           )}
 
@@ -347,6 +397,12 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ user, onBack, onSuccess
               <p className="text-xs text-amber-700 mt-0.5">Via {icbName} (practice is closed)</p>
             )}
             <p className="text-xs text-slate-500 mt-0.5">{contactEmail}</p>
+            {isRegisteredProvider && (
+              <div className="flex text-xs text-green-600 items-center justify-center gap-1 mt-1 w-full">
+                <CheckCircle className="w-3 h-3 text-green-500 inline" />
+                Belrose account found for this email
+              </div>
+            )}
             <button
               type="button"
               onClick={() => setStep(1)}

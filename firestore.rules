@@ -777,7 +777,8 @@ service cloud.firestore {
         request.auth != null &&
         (
           request.auth.uid == resource.data.targetUserId ||
-          request.auth.token.email == resource.data.targetEmail
+          request.auth.token.email == resource.data.targetEmail ||
+          request.auth.uid == resource.data.providerGuestUid
         ) &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['encryptedNoteKeyForProvider'])
@@ -808,6 +809,15 @@ service cloud.firestore {
         request.resource.data.status == 'denied' &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['status', 'deniedAt', 'deniedReason', 'deniedNote'])
+      ) ||
+      // Path G: Guest claiming account — backfill their userId
+      (
+        request.auth != null &&
+        resource.data.status == 'pending' &&
+        request.auth.token.email == resource.data.targetEmail &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['targetUserId']) &&
+        request.resource.data.targetUserId == request.auth.uid
       )
     );
   }

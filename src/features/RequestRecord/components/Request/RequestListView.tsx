@@ -4,7 +4,7 @@ import { AlertCircle, Inbox, Loader2, Plus, RefreshCw } from 'lucide-react';
 import { RequestFilter } from '../../hooks/useRecordRequests';
 import { Button } from '@/components/ui/Button';
 import RequestCard from '../ui/RequestCard';
-import { RecordRequest } from '../../services/fulfillRequestService';
+import { RecordRequest } from '@belrose/shared';
 
 interface RequestListViewProps {
   filtered: RecordRequest[];
@@ -46,7 +46,7 @@ const RequestListView: React.FC<RequestListViewProps> = ({
 
     <div className="flex items-center justify-between">
       <div className="flex gap-1 bg-white border border-slate-200 rounded-lg p-1">
-        {(['active', 'fulfilled', 'all'] as RequestFilter[]).map(f => (
+        {(['active', 'fulfilled', 'denied', 'all'] as RequestFilter[]).map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -118,6 +118,7 @@ const EmptyState: React.FC<{ filter: RequestFilter; onNew: () => void }> = ({ fi
   const messages: Record<RequestFilter, string> = {
     active: 'No active requests.',
     fulfilled: 'No fulfilled requests yet.',
+    denied: 'No denied requests.',
     all: "You haven't sent any requests yet.",
   };
   return (

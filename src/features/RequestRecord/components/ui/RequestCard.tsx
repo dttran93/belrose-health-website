@@ -1,7 +1,6 @@
 // src/features/RequestRecord/components/ui/RequestCard.tsx
 
 import { useEffect, useState } from 'react';
-import { RecordRequest } from '../../services/fulfillRequestService';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import {
   ChevronDown,
@@ -14,6 +13,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { RequestNoteService } from '../../services/requestNoteService';
+import { RecordRequest } from '@belrose/shared';
+import { doc, getDoc, getFirestore } from 'firebase/firestore';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -58,11 +59,17 @@ const STATUS_CONFIG: Record<string, { label: string; dotClass: string; badgeClas
     dotClass: 'bg-slate-400',
     badgeClass: 'bg-slate-100 text-slate-600 border border-slate-200',
   },
+  denied: {
+    label: 'Denied',
+    dotClass: 'bg-red-500',
+    badgeClass: 'bg-red-50 text-red-800 border border-red-200',
+  },
 };
 
 function getStatusKey(r: RecordRequest): string {
   if (r.status === 'fulfilled') return 'fulfilled';
   if (r.status === 'cancelled') return 'cancelled';
+  if (r.status === 'denied') return 'denied';
   return r.readAt ? 'pending_read' : 'pending_unread';
 }
 
@@ -81,6 +88,29 @@ const RequestCard: React.FC<RequestCardProps> = ({
   const [note, setNote] = useState<RequestNote | null>(null);
   const [noteLoading, setNoteLoading] = useState(false);
   const [noteError, setNoteError] = useState<string | null>(null);
+  const [targetProfile, setTargetProfile] = useState<{
+    displayName: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!request.targetUserId) return;
+    getDoc(doc(getFirestore(), 'users', request.targetUserId))
+      .then(snap => {
+        if (snap.exists()) {
+          const data = snap.data();
+          setTargetProfile({
+            displayName: data.displayName,
+            email: data.email,
+            firstName: data.firstName,
+            lastName: data.lastName,
+          });
+        }
+      })
+      .catch(() => {}); // fail silently, fall back to email
+  }, [request.targetUserId]);
 
   useEffect(() => {
     if (!isExpanded || note || noteLoading || !request.encryptedRequestNote) return;
@@ -99,7 +129,16 @@ const RequestCard: React.FC<RequestCardProps> = ({
 
   const isPending = request.status === 'pending';
   const isFulfilled = request.status === 'fulfilled';
-  const initials = request.targetEmail.slice(0, 2).toUpperCase();
+  const isDenied = request.status === 'denied';
+
+  //Display info
+  const displayDetail = targetProfile
+    ? `${targetProfile.displayName} (${targetProfile.email})`
+    : request.targetEmail;
+  const initials =
+    targetProfile?.firstName && targetProfile?.lastName
+      ? `${targetProfile.firstName[0]}${targetProfile.lastName[0]}`.toUpperCase()
+      : request.targetEmail.slice(0, 2).toUpperCase();
 
   const handleCancel = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -127,7 +166,7 @@ const RequestCard: React.FC<RequestCardProps> = ({
               {initials}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-slate-900 truncate">{request.targetEmail}</p>
+              <p className="text-sm font-medium text-slate-900 truncate">{displayDetail}</p>
               <p className="text-xs text-slate-500 mt-0.5">
                 Requested {formatTimestamp(request.createdAt)}
               </p>
@@ -158,13 +197,6 @@ const RequestCard: React.FC<RequestCardProps> = ({
             <span className="text-xs text-slate-400 flex-shrink-0">
               {request.readAt ? 'Opened · awaiting upload' : 'Sent · not yet opened'}
             </span>
-          </div>
-        )}
-
-        {isFulfilled && request.fulfilledRecordIds && request.fulfilledRecordIds.length > 0 && (
-          <div className="mt-2 flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5 text-green-600" />
-            <span className="text-xs text-green-700">Record received</span>
           </div>
         )}
       </button>
@@ -209,7 +241,7 @@ const RequestCard: React.FC<RequestCardProps> = ({
               <TimelineLine />
               <TimelineDot done={!!request.readAt} />
               <TimelineLine />
-              <TimelineDot done={isFulfilled} />
+              <TimelineDot done={isFulfilled || isDenied} />
             </div>
             <div className="flex-1 space-y-5 pb-1">
               <TimelineStep
@@ -227,13 +259,16 @@ const RequestCard: React.FC<RequestCardProps> = ({
                 done={!!request.readAt}
               />
               <TimelineStep
-                label={isFulfilled ? 'Fulfilled' : 'Awaiting upload'}
+                label={isFulfilled ? 'Fulfilled' : isDenied ? 'Denied' : 'Awaiting upload'}
                 detail={
                   isFulfilled && request.fulfilledAt
                     ? `${formatTimestamp(request.fulfilledAt)} · Record uploaded and in your library`
-                    : 'Waiting for provider to upload records'
+                    : isDenied
+                      ? `${formatTimestamp(request.deniedAt)} · Provider denied the request`
+                      : 'Waiting for provider to upload records'
                 }
                 done={isFulfilled}
+                note={request.deniedReason}
               />
             </div>
           </div>
@@ -324,14 +359,16 @@ const TimelineLine: React.FC = () => (
   <div className="w-px bg-slate-200 my-1" style={{ flex: 1, minHeight: 20 }} />
 );
 
-const TimelineStep: React.FC<{ label: string; detail: string; done: boolean }> = ({
-  label,
-  detail,
-  done,
-}) => (
+const TimelineStep: React.FC<{
+  label: string;
+  detail: string;
+  done: boolean;
+  note?: string;
+}> = ({ label, detail, done, note }) => (
   <div>
     <p className={`text-sm font-medium ${done ? 'text-slate-900' : 'text-slate-400'}`}>{label}</p>
     <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{detail}</p>
+    {note && <p className="text-xs text-red-400 mt-1 italic">"{note}"</p>}
   </div>
 );
 

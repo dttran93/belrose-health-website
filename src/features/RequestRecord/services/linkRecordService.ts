@@ -17,8 +17,9 @@
 
 import { getFirestore, doc, updateDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { PermissionsService, Role } from '@/features/Permissions/services/permissionsService';
-import { DenyReasonValue, RecordRequest } from './fulfillRequestService';
+import { DenyReasonValue } from './fulfillRequestService';
 import { PermissionPreparationService } from '@/features/Permissions/services/permissionPreparationService';
+import { RecordRequest } from '@belrose/shared';
 
 // ── addRecords ────────────────────────────────────────────────────────────────
 

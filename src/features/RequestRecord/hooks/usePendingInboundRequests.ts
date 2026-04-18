@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
 import { useAuthContext } from '@/features/Auth/AuthContext';
-import { RecordRequest } from '../services/fulfillRequestService';
+import { RecordRequest } from '@belrose/shared';
 
 interface UseInboundRequestsReturn {
   requests: RecordRequest[];

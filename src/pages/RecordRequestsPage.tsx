@@ -20,11 +20,11 @@ import RequestListView from '@/features/RequestRecord/components/Request/Request
 import InboundRequestListView from '@/features/RequestRecord/components/Request/InboundRequestListView';
 import { Button } from '@/components/ui/Button';
 import { Plus } from 'lucide-react';
-import { RecordRequest } from '@/features/RequestRecord/services/fulfillRequestService';
 import { useInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
 import { markRequestComplete } from '@/features/RequestRecord/services/linkRecordService';
 import { toast } from 'sonner';
 import LinkRecordModal from '@/features/RequestRecord/components/Respond/LinkRecordModal';
+import { RecordRequest } from '@belrose/shared';
 
 type PageView = 'list' | 'new';
 type Tab = 'sent' | 'received';
@@ -32,6 +32,7 @@ type Tab = 'sent' | 'received';
 const RecordRequestsPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthContext();
+  if (!user) return null;
 
   const outbound = useRecordRequests();
   const inbound = useInboundRequests();
@@ -42,6 +43,9 @@ const RecordRequestsPage: React.FC = () => {
 
   // The request open in the modal (null = modal closed)
   const [linkRequest, setLinkRequest] = useState<RecordRequest | null>(null);
+  const [linkModalPhase, setLinkModalPhase] = useState<'pick-records' | 'confirm-deny'>(
+    'pick-records'
+  );
 
   const toggleExpand = (id: string) => setExpandedId(prev => (prev === id ? null : id));
 
@@ -52,6 +56,7 @@ const RecordRequestsPage: React.FC = () => {
 
   // ── Link existing: open modal ──────────────────────────────────────────────
   const handleLinkExisting = (request: RecordRequest) => {
+    setLinkModalPhase('pick-records');
     setLinkRequest(request);
   };
 
@@ -71,10 +76,8 @@ const RecordRequestsPage: React.FC = () => {
   // deny flow internally via goToDenyConfirm on open.
   // Simplest approach: open modal normally, user clicks "Deny request" inside.
   const handleDeny = (request: RecordRequest) => {
+    setLinkModalPhase('confirm-deny');
     setLinkRequest(request);
-    // The modal opens on pick-records; user reaches deny via the "Deny request" button
-    // If you want to jump straight to the deny phase, wire a separate prop into the
-    // modal — for now opening is enough since "Deny" is prominently surfaced there.
   };
 
   // ── Modal success: refresh list ────────────────────────────────────────────
@@ -190,6 +193,7 @@ const RecordRequestsPage: React.FC = () => {
         request={linkRequest}
         onClose={() => setLinkRequest(null)}
         onSuccess={handleModalSuccess}
+        initialPhase={linkModalPhase}
       />
     </div>
   );

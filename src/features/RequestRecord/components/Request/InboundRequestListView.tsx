@@ -2,8 +2,8 @@
 
 import { AlertCircle, Inbox, Loader2 } from 'lucide-react';
 import { InboundRequestFilter } from '../../hooks/usePendingInboundRequests';
-import { RecordRequest } from '../../services/fulfillRequestService';
 import InboundRequestCard from '../ui/InboundRequestCard';
+import { RecordRequest } from '@belrose/shared';
 
 interface InboundRequestListViewProps {
   filtered: RecordRequest[];
@@ -45,7 +45,7 @@ const InboundRequestListView: React.FC<InboundRequestListViewProps> = ({
 
     {/* Filter tabs */}
     <div className="flex gap-1 bg-white border border-slate-200 rounded-lg p-1 w-fit">
-      {(['pending', 'fulfilled', 'all'] as InboundRequestFilter[]).map(f => (
+      {(['pending', 'fulfilled', 'denied', 'all'] as InboundRequestFilter[]).map(f => (
         <button
           key={f}
           onClick={() => setFilter(f)}

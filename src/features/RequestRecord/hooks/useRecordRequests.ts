@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { RecordRequestService } from '../services/recordRequestService';
-import { RecordRequest } from '../services/fulfillRequestService';
+import { RecordRequest } from '@belrose/shared';
 
-export type RequestFilter = 'active' | 'fulfilled' | 'all';
+export type RequestFilter = 'active' | 'fulfilled' | 'denied' | 'all';
 
 interface UseRecordRequestsReturn {
   requests: RecordRequest[];
@@ -70,6 +70,7 @@ export function useRecordRequests(): UseRecordRequestsReturn {
   const filtered = requests.filter(r => {
     if (filter === 'active') return r.status === 'pending';
     if (filter === 'fulfilled') return r.status === 'fulfilled';
+    if (filter === 'denied') return r.status === 'denied';
     return true; // 'all'
   });
 
@@ -77,6 +78,7 @@ export function useRecordRequests(): UseRecordRequestsReturn {
   const counts = {
     pending: requests.filter(r => r.status === 'pending' && !r.readAt).length,
     opened: requests.filter(r => r.status === 'pending' && !!r.readAt).length,
+    denied: requests.filter(r => r.status === 'denied').length,
     fulfilled: requests.filter(r => r.status === 'fulfilled').length,
   };
 
