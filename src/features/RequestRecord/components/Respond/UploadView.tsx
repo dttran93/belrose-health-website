@@ -2,8 +2,8 @@
 
 import { Button } from '@/components/ui/Button';
 import CombinedUploadFHIR from '@/features/AddRecord/components/CombinedUploadFHIR';
+import { RecordRequest } from '@belrose/shared';
 import { CheckCircle, Lock } from 'lucide-react';
-import { RecordRequest } from '../../services/fulfillRequestService';
 
 interface UploadViewProps {
   recordRequest: RecordRequest;

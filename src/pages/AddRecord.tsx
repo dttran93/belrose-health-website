@@ -66,16 +66,14 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
 
   console.log('🔍 Destructured updateFileStatus:', updateFileStatus);
 
-  const handleReviewFile = (fileRecord: FileObject) => {
+  const handleReviewFile = (fileRecord: FileObject, viewMode: string = 'record') => {
     if (!fileRecord.id) {
       console.error('File not found:', fileRecord.firestoreId);
       return;
     }
 
-    console.log('🚀 Navigating to AllRecords with record:', fileRecord.firestoreId);
-
     // Navigate to AllRecords with the record to open in edit mode
-    navigate(`/app/records/${fileRecord.id}?view=edit`);
+    navigate(`/app/records/${fileRecord.id}?view=${viewMode}`);
   };
 
   // ==================== RENDER JSX ====================

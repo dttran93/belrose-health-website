@@ -25,7 +25,7 @@
  *   variant          — 'default' (blue) | 'danger' (red confirm, for delete flows)
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Check, X, FileText, Calendar, Lock } from 'lucide-react';
 import { FileObject } from '@/types/core';
 
@@ -50,7 +50,7 @@ export interface RecordPickerProps {
 // RecordPickerContent — no overlay, fits inside any container
 // ============================================================================
 
-export function RecordPickerContent({
+export function RecordPicker({
   records,
   selectedRecordIds,
   onSelectionChange,
@@ -287,20 +287,6 @@ export function RecordPickerContent({
             {actionLabel} ({localSelection.size})
           </button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// RecordPicker — RecordPickerContent in a full-screen overlay
-// ============================================================================
-
-export function RecordPicker(props: RecordPickerProps) {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-        <RecordPickerContent {...props} />
       </div>
     </div>
   );

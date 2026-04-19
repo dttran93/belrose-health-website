@@ -13,7 +13,17 @@
  */
 
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
-import { Ban, CheckCircle2, ChevronDown, ChevronUp, Link, Loader2, Upload } from 'lucide-react';
+import {
+  Ban,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+  FileText,
+  Link,
+  Loader2,
+  Upload,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import {
   doc,
@@ -27,6 +37,7 @@ import { RequestNoteService } from '../../services/requestNoteService';
 import { useEffect, useState } from 'react';
 import { RequestNote } from '../Request/NewRequestForm';
 import { RecordRequest } from '@belrose/shared';
+import NoteRow from './NoteRow';
 
 interface InboundRequestCardProps {
   request: RecordRequest;
@@ -36,6 +47,7 @@ interface InboundRequestCardProps {
   onDeny: (request: RecordRequest) => void;
   /** Immediately marks the request complete without opening the modal */
   onMarkComplete: (request: RecordRequest) => void;
+  onViewRecord: (recordIds: string[]) => void;
 }
 
 function getDaysUntil(ts: Timestamp): number {
@@ -70,6 +82,7 @@ const InboundRequestCard: React.FC<InboundRequestCardProps> = ({
   onLinkExisting,
   onDeny,
   onMarkComplete,
+  onViewRecord,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [note, setNote] = useState<RequestNote | null>(null);
@@ -97,10 +110,13 @@ const InboundRequestCard: React.FC<InboundRequestCardProps> = ({
   useEffect(() => {
     if (!isExpanded || note || noteLoading || !request.encryptedRequestNote) return;
 
-    updateDoc(doc(getFirestore(), 'recordRequests', request.inviteCode), {
-      ...(!request.readAt && { readAt: serverTimestamp() }),
-      ...(!isPending && { viewCount: increment(1) }),
-    });
+    if (isPending) {
+      updateDoc(doc(getFirestore(), 'recordRequests', request.inviteCode), {
+        ...(!request.readAt && { readAt: serverTimestamp() }),
+        viewCount: increment(1),
+      });
+    }
+
     setNoteLoading(true);
     setNoteError(null);
     RequestNoteService.decryptAsProvider(request)
@@ -249,6 +265,32 @@ const InboundRequestCard: React.FC<InboundRequestCardProps> = ({
             </div>
           )}
 
+          {/* Fulfilled records — shown when records have been linked */}
+          {linkedCount > 0 && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                Linked Records
+              </p>
+              <div className="space-y-1">
+                {request.fulfilledRecordIds!.map((id, index) => (
+                  <Button
+                    key={id}
+                    variant="secondary"
+                    size="sm"
+                    className="justify-between text-xs bg-slate-50 hover:bg-slate-100 border-slate-200 h-9 w-full"
+                    onClick={() => onViewRecord([id])}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <FileText className="w-3.5 h-3.5 text-blue-600" />
+                      <span className="truncate">Record {index + 1}</span>
+                    </div>
+                    <ExternalLink className="w-3 h-3 text-slate-400" />
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Action buttons in expanded panel */}
           {isPending && (
             <div className="pt-2 border-t border-slate-100 space-y-2">
@@ -302,12 +344,5 @@ const InboundRequestCard: React.FC<InboundRequestCardProps> = ({
     </div>
   );
 };
-
-const NoteRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="flex items-baseline gap-2">
-    <span className="text-xs text-slate-400 w-24 flex-shrink-0">{label}</span>
-    <span className="text-sm text-slate-700">{value}</span>
-  </div>
-);
 
 export default InboundRequestCard;

@@ -30,7 +30,7 @@ export const RecordActionGroup: React.FC<RecordActionGroupProps> = ({ record }) 
         subject: 'subject',
         'subject-rejection': 'subject',
         verify: 'credibility',
-        'link-request': 'follow-ups',
+        'link-request': 'follow-up',
       };
       const view = viewMap[itemId] ?? 'follow-ups';
       navigate(`/app/records/${record.id}?view=${view}`);

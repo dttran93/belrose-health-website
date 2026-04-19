@@ -30,7 +30,7 @@ export const RecordFollowUpsView: React.FC<RecordFollowUpsViewProps> = ({
 
   return (
     <div className="w-full mx-auto p-8 space-y-6">
-      {/* Header — matches SubjectManager / CredibilityView exactly */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-4 pb-2 border-b">
         <h3 className="font-semibold text-lg flex items-center gap-2">
           <ListChecks className="w-5 h-5" />

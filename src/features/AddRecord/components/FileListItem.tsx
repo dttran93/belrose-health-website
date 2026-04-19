@@ -24,6 +24,7 @@ export interface FileListItemProps {
   onForceConvert?: (fileItem: FileObject) => void;
   showFHIRResults?: boolean;
   onReview: (fileItem: FileObject) => void;
+  onAction?: (fileItem: FileObject, itemId: string) => void;
 }
 
 export const FileListItem: React.FC<FileListItemProps> = ({
@@ -34,6 +35,7 @@ export const FileListItem: React.FC<FileListItemProps> = ({
   onRetry,
   showFHIRResults = true,
   onReview,
+  onAction,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [followUpDismissed, setFollowUpDismissed] = useState(false);
@@ -48,7 +50,13 @@ export const FileListItem: React.FC<FileListItemProps> = ({
   // The hook checks the FileObject and returns only items that genuinely need action.
 
   const { followUpItems, isLoading: followUpsLoading } = useRecordFollowUps(fileItem, {
-    onAction: onReview,
+    onAction: (item, itemId) => {
+      if (onAction) {
+        onAction(item, itemId);
+      } else {
+        onReview(item); // existing fallback for callers that haven't updated yet
+      }
+    },
   });
   const showFollowUp = !followUpDismissed && followUpItems.length > 0;
   const isRecordComplete =

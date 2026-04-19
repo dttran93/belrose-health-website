@@ -16,14 +16,14 @@
  */
 
 import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowLeft, Link, Loader2, X, XCircle } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import { ArrowLeft, Link, Loader2, X } from 'lucide-react';
+import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { useLinkRecord } from '../../hooks/useLinkRecord';
 import { DENY_REASONS, DenyReasonValue } from '../../services/fulfillRequestService';
-import RoleSelector from '@/features/Permissions/component/ui/RoleSelector';
-import { RecordPickerContent } from '@/features/Ai/components/ui/RecordPicker';
+import { RecordPicker } from '@/features/Ai/components/ui/RecordPicker';
 import { RecordRequest } from '@belrose/shared';
+import { LinkModalOverlay, ExecutingPhase, ErrorPhase, PickRolePhase } from '../ui/LinkModalShell';
 
 interface LinkRecordModalProps {
   request: RecordRequest | null;
@@ -72,106 +72,66 @@ const LinkRecordModal: React.FC<LinkRecordModalProps> = ({
   } = hook;
 
   useEffect(() => {
-    if (isOpen && initialPhase === 'confirm-deny') {
+    if (request !== null && initialPhase === 'confirm-deny') {
       goToDenyConfirm();
     }
   });
 
   const isOpen = request !== null;
-  const canDismiss = phase !== 'executing';
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={open => !open && canDismiss && handleClose()}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl z-[101] w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden focus:outline-none">
-          {phase === 'executing' && <ExecutingPhase />}
+    <LinkModalOverlay isOpen={isOpen} canDismiss={phase !== 'executing'} onClose={handleClose}>
+      {phase === 'executing' && <ExecutingPhase />}
 
-          {phase === 'error' && (
-            <ErrorPhase error={error} onRetry={goBackToRecordPicker} onClose={handleClose} />
-          )}
+      {phase === 'error' && (
+        <ErrorPhase error={error} onRetry={goBackToRecordPicker} onClose={handleClose} />
+      )}
 
-          {phase === 'pick-records' && (
-            <PickRecordsPhase
-              request={request}
-              records={records}
-              recordsLoading={recordsLoading}
-              selectedIds={selectedIds}
-              linkedThisSession={linkedThisSession}
-              // Bridge RecordPickerContent's onSelectionChange → hook's selectedIds
-              onSelectionChange={newIds => hook.setSelectedIds(newIds)}
-              onNext={goToRolePicker}
-              onDeny={goToDenyConfirm}
-              onMarkComplete={submitMarkComplete}
-              onClose={handleClose}
-            />
-          )}
+      {phase === 'pick-records' && (
+        <PickRecordsPhase
+          request={request}
+          records={records}
+          recordsLoading={recordsLoading}
+          selectedIds={selectedIds}
+          linkedThisSession={linkedThisSession}
+          onSelectionChange={newIds => hook.setSelectedIds(newIds)}
+          onNext={goToRolePicker}
+          onDeny={goToDenyConfirm}
+          onMarkComplete={submitMarkComplete}
+          onClose={handleClose}
+        />
+      )}
 
-          {phase === 'pick-role' && (
-            <PickRolePhase
-              request={request}
-              selectedCount={selectedIds.length}
-              selectedRole={selectedRole}
-              onRoleChange={setSelectedRole}
-              onBack={goBackToRecordPicker}
-              onConfirm={submitAddRecords}
-            />
-          )}
+      {phase === 'pick-role' && (
+        <PickRolePhase
+          itemLabel={`${selectedIds.length} record${selectedIds.length !== 1 ? 's' : ''}`}
+          recipientLabel={request?.requesterName ?? ''}
+          selectedRole={selectedRole}
+          onRoleChange={setSelectedRole}
+          onBack={goBackToRecordPicker}
+          onConfirm={submitAddRecords}
+          confirmLabel="Grant access & add more"
+        />
+      )}
 
-          {phase === 'confirm-deny' && (
-            <ConfirmDenyPhase
-              request={request}
-              denyReason={denyReason}
-              denyNote={denyNote}
-              onReasonChange={setDenyReason}
-              onNoteChange={setDenyNote}
-              onBack={initialPhase === 'confirm-deny' ? handleClose : goBackFromDeny}
-              onConfirm={submitDeny}
-            />
-          )}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+      {phase === 'confirm-deny' && (
+        <ConfirmDenyPhase
+          request={request}
+          denyReason={denyReason}
+          denyNote={denyNote}
+          onReasonChange={setDenyReason}
+          onNoteChange={setDenyNote}
+          onBack={initialPhase === 'confirm-deny' ? handleClose : goBackFromDeny}
+          onConfirm={submitDeny}
+        />
+      )}
+    </LinkModalOverlay>
   );
 };
 
 // ============================================================================
 // PHASE COMPONENTS
 // ============================================================================
-
-// ── Executing ─────────────────────────────────────────────────────────────────
-
-const ExecutingPhase: React.FC = () => (
-  <div className="flex flex-col items-center gap-4 py-16 px-6">
-    <Loader2 className="w-10 h-10 text-slate-400 animate-spin" />
-    <p className="text-base font-semibold text-slate-800">Working…</p>
-    <p className="text-sm text-slate-500 text-center">
-      Writing to the network and updating encryption keys.
-    </p>
-  </div>
-);
-
-// ── Error ─────────────────────────────────────────────────────────────────────
-
-const ErrorPhase: React.FC<{ error: string | null; onRetry: () => void; onClose: () => void }> = ({
-  error,
-  onRetry,
-  onClose,
-}) => (
-  <div className="flex flex-col items-center gap-4 py-12 px-6">
-    <XCircle className="w-10 h-10 text-red-500" />
-    <p className="text-base font-semibold text-slate-800">Something went wrong</p>
-    <p className="text-sm text-slate-500 text-center">{error || 'An unexpected error occurred.'}</p>
-    <div className="flex gap-3 w-full mt-2">
-      <Button variant="outline" className="flex-1" onClick={onClose}>
-        Cancel
-      </Button>
-      <Button className="flex-1" onClick={onRetry}>
-        Go back
-      </Button>
-    </div>
-  </div>
-);
 
 // ── Pick records ──────────────────────────────────────────────────────────────
 
@@ -243,7 +203,7 @@ const PickRecordsPhase: React.FC<PickRecordsPhaseProps> = ({
         </div>
       ) : (
         <div className="flex-1 overflow-hidden h-full">
-          <RecordPickerContent
+          <RecordPicker
             records={records}
             selectedRecordIds={selectedIds}
             onSelectionChange={onSelectionChange}
@@ -280,74 +240,6 @@ const PickRecordsPhase: React.FC<PickRecordsPhaseProps> = ({
     </div>
   );
 };
-
-// ── Pick role ─────────────────────────────────────────────────────────────────
-
-interface PickRolePhaseProps {
-  request: RecordRequest | null;
-  selectedCount: number;
-  selectedRole: import('@/features/Permissions/services/permissionsService').Role;
-  onRoleChange: (r: import('@/features/Permissions/services/permissionsService').Role) => void;
-  onBack: () => void;
-  onConfirm: () => void;
-}
-
-const PickRolePhase: React.FC<PickRolePhaseProps> = ({
-  request,
-  selectedCount,
-  selectedRole,
-  onRoleChange,
-  onBack,
-  onConfirm,
-}) => (
-  <>
-    <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 flex-shrink-0">
-      <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
-        <ArrowLeft className="w-4 h-4 text-slate-500" />
-      </button>
-      <Dialog.Title className="text-base font-semibold text-slate-900">
-        Choose access level
-      </Dialog.Title>
-    </div>
-
-    <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
-      {/* Summary */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <p className="text-xs text-slate-500">
-          Sharing{' '}
-          <span className="font-medium text-slate-700">
-            {selectedCount} record{selectedCount !== 1 ? 's' : ''}
-          </span>
-          {request && (
-            <>
-              {' '}
-              with <span className="font-medium text-slate-700">{request.requesterName}</span>
-            </>
-          )}
-        </p>
-        <p className="text-xs text-slate-400 mt-0.5">
-          The access level you choose applies to all selected records.
-        </p>
-      </div>
-
-      <div>
-        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-          Access level
-        </p>
-        <RoleSelector value={selectedRole} onChange={onRoleChange} />
-      </div>
-    </div>
-
-    <div className="px-5 py-4 border-t border-slate-100 flex-shrink-0 flex gap-3">
-      <Button variant="outline" className="flex-1" onClick={onBack}>
-        Back
-      </Button>
-      <Button className="flex-1" onClick={onConfirm}>
-        Grant access & add more
-      </Button>
-    </div>
-  </>
-);
 
 // ── Confirm deny ──────────────────────────────────────────────────────────────
 

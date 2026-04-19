@@ -185,6 +185,7 @@ const RecordRequestsPage: React.FC = () => {
             onLinkExisting={handleLinkExisting}
             onDeny={handleDeny}
             onMarkComplete={handleMarkComplete}
+            onViewRecord={id => navigate(`/app/records/${id}`)}
           />
         )}
       </div>

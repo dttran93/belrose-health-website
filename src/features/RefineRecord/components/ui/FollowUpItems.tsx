@@ -104,7 +104,7 @@ const FollowUpRow: React.FC<{ item: FollowUpItem }> = ({ item }) => {
 
 // ─── Container ───────────────────────────────────────────────────────────────
 
-export const FollowUpItems: React.FC<FollowUpItemsProps> = ({ items, onDismiss }) => {
+export const FollowUpItems: React.FC<FollowUpItemsProps> = ({ items }) => {
   // Don't render if everything is done and there's nothing to show
   if (items.length === 0) return null;
 

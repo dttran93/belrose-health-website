@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { X, Save, Ellipsis, Info } from 'lucide-react';
-import { FileObject, BelroseFields } from '@/types/core';
+import { FileObject } from '@/types/core';
 import { LayoutSlot } from '@/components/app/LayoutProvider';
 import VersionControlPanel from './Edit/VersionControlPanel';
 import { RecordVersion } from '../services/versionControlService.types';
@@ -32,6 +32,8 @@ import { useNavigate } from 'react-router-dom';
 import { useReviewedByCurrentUser } from '@/features/Credibility/hooks/useVerifiedByCurrentUser';
 import FollowUpBadge from '@/features/RefineRecord/components/ui/FollowUpBadge';
 import RecordFollowUpsView from '@/features/RefineRecord/components/RecordFollowUpsView';
+import { BelroseFields } from '@belrose/shared';
+import LinkRequestModal from '@/features/RequestRecord/components/Respond/LinkRequestModal';
 
 type ViewMode =
   | 'record'
@@ -139,6 +141,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
   const [enterVerificationInModifyMode, setEnterVerificationinModifyMode] = useState(false);
   const [enterDisputeInModifyMode, setEnterDisputeinModifyMode] = useState(false);
   const { hasReviewed, isLoading: isCheckingReview } = useReviewedByCurrentUser(record);
+  const [linkRequestOpen, setLinkRequestOpen] = useState(false);
   const navigate = useNavigate();
 
   // For managing subject banner
@@ -660,15 +663,26 @@ export const RecordFull: React.FC<RecordFullProps> = ({
           record={record}
           onBack={handleBackToRecord}
           onAction={(_, itemId) => {
-            if (itemId === 'subject') setViewMode('subject');
+            if (itemId === 'subject' || itemId === 'subject-rejection') setViewMode('subject');
             else if (itemId === 'verify') setViewMode('credibility');
-            else if (itemId === 'link-request') setViewMode('follow-up');
+            else if (itemId === 'link-request') setLinkRequestOpen(true);
           }}
         />
       )}
 
       {/* Subject Action Dialog for accept/decline flows */}
       <SubjectActionDialog {...subjectFlow.dialogProps} />
+
+      {/* Link Request Modal — opened from follow-up actions */}
+      <LinkRequestModal
+        record={record}
+        isOpen={linkRequestOpen}
+        onClose={() => setLinkRequestOpen(false)}
+        onSuccess={() => {
+          setLinkRequestOpen(false);
+          onRefreshRecord?.();
+        }}
+      />
     </div>
   );
 };

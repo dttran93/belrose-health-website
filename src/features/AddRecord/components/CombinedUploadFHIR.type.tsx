@@ -50,7 +50,7 @@ export interface CombinedUploadFHIRProps {
   // Updated: Hook provides the full FileStats interface
   getStats: () => FileStats;
 
-  onReview: (fileItem: FileObject) => void;
+  onReview: (fileItem: FileObject, viewMode?: string) => void;
   processFile: (fileObj: FileObject) => Promise<FileObject>;
 
   // Direct upload functions
@@ -72,13 +72,4 @@ export interface CombinedUploadFHIRProps {
   className?: string;
 
   convertTextToFHIR?: (text: string, patientName?: string) => Promise<FHIRWithValidation>;
-
-  //RefinementProps
-  refinementStatus?: RefinementStatus;
-  refinementQuestions?: RefinementQuestion[];
-  refinementError?: string | null;
-  onStartRefinement?: () => void;
-  onSubmitRefinementAnswers?: (answers: RefinementAnswer[]) => void;
-  onSkipRefinement?: () => void;
-  onRefinementDone?: () => void;
 }

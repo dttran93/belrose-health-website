@@ -748,8 +748,8 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt', 'viewCount'])
       ) ||
   
-      // Path B: Provider links records — adds IDs to fulfilledRecordIds array.
-      //         Status stays 'pending'. Requires the provider to be the target.
+      // Path B: Provider fulfills request — can update status to 'fulfilled' and add fulfilledRecordIds, but
+      //         fulfilledRecordIds must be non-empty before marking complete.
       (
         request.auth != null &&
         resource.data.status == 'pending' &&
@@ -757,9 +757,20 @@ service cloud.firestore {
           request.auth.uid == resource.data.targetUserId ||
           request.auth.token.email == resource.data.targetEmail
         ) &&
-        request.resource.data.status == 'pending' &&
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['fulfilledRecordIds'])
+          .hasOnly(['status', 'fulfilledRecordIds', 'fulfilledAt']) &&
+        (
+          // Still pending — adding record IDs
+          (
+            request.resource.data.status == 'pending' &&
+            request.resource.data.fulfilledRecordIds.size() > 0
+          ) ||
+          // Marking complete — status flips to fulfilled
+          (
+            request.resource.data.status == 'fulfilled' &&
+            resource.data.fulfilledRecordIds.size() > 0
+          )
+        )
       ) ||
   
       // Path C: Requester cancels

@@ -36,6 +36,7 @@ import { SharingKeyManagementService } from '@/features/Sharing/services/sharing
 import { removeUndefinedValues } from '@/utils/dataFormattingUtils';
 import { FileObject } from '@/types/core';
 import { RecordRequest } from '@belrose/shared';
+import { PermissionsService, Role } from '@/features/Permissions/services/permissionsService';
 
 // ── Firestore document ────────────────────────────────────────────────────────
 
@@ -68,6 +69,36 @@ export class FulfillRequestService {
   // ============================================================================
   // MAIN FULFILL FLOW
   // ============================================================================
+
+  // In FulfillRequestService
+
+  /**
+   * Links an existing record to a pending request by granting the requester
+   * a role and marking the request fulfilled.
+   *
+   * Used by LinkRequestModal when the record owner selects an existing record
+   * to satisfy a request, as opposed to fulfill() which handles fresh uploads.
+   *
+   * @param recordRequest - The pending request to fulfill
+   * @param recordId      - The already-uploaded record to link
+   * @param role          - Access level to grant the requester
+   */
+  static async linkExistingRecord(
+    recordRequest: RecordRequest,
+    recordId: string,
+    role: Role
+  ): Promise<void> {
+    // Step 1: Grant role — this handles the key wrapping internally
+    await PermissionsService.grantRole(recordId, recordRequest.requesterId, role);
+
+    // Step 2: Mark request fulfilled
+    const db = getFirestore();
+    await updateDoc(doc(db, 'recordRequests', recordRequest.inviteCode), {
+      status: 'fulfilled',
+      fulfilledRecordIds: arrayUnion(recordId),
+      fulfilledAt: serverTimestamp(),
+    });
+  }
 
   /**
    * Encrypt a FileObject and write it to Firestore + Storage as a fulfilled
@@ -277,7 +308,7 @@ export class FulfillRequestService {
 
     // Return the fileKey alongside the result so the page can hold it in
     // state for the post-registration wrap (Path B). The key lives in memory
-    // only — it is gone permanently if the page unmounts or the user navigates.
+    // only — it is gone permanently if the page unmounts or the user navigates. as f
     return { success: true, recordId, fileKey: encrypted.fileKey };
   }
 
