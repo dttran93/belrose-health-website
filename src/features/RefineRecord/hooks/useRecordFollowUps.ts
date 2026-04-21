@@ -28,6 +28,7 @@ import SubjectQueryService from '@/features/Subject/services/subjectQueryService
 import { useInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
 import useAuth from '@/features/Auth/hooks/useAuth';
 import { useSubjectAlerts } from '@/features/Subject/hooks/useSubjectAlerts';
+import { doc, getDoc, getFirestore } from 'firebase/firestore';
 
 // ─── Options ─────────────────────────────────────────────────────────────────
 
@@ -62,22 +63,21 @@ export function useRecordFollowUps(
   const recordId = fileItem.firestoreId ?? fileItem.id;
 
   // ── Check 1: Subject ───────────────────────────────────────────────────────
-  // Synchronous — subjects array is already on the FileObject
-  const hasSubject = (fileItem.subjects ?? []).length > 0;
 
   // Also check if a consent request is already pending (request sent, not yet accepted)
+  const [freshSubjects, setFreshSubjects] = useState<string[]>(fileItem.subjects ?? []);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
   const [isLoadingPendingRequest, setIsLoadingPendingRequest] = useState(false);
 
   useEffect(() => {
-    if (!isEligible || hasSubject) return; // no need to check if subject already set
-    setIsLoadingPendingRequest(true);
+    if (!isEligible) return;
+    const db = getFirestore();
+    getDoc(doc(db, 'records', recordId)).then(snap => {
+      if (snap.exists()) setFreshSubjects(snap.data().subjects ?? []);
+    });
+  }, [isEligible, recordId, options?.refreshKey]);
 
-    SubjectQueryService.getPendingConsentRequestsForRecord(recordId)
-      .then(requests => setHasPendingRequest(requests.length > 0))
-      .catch(() => setHasPendingRequest(false))
-      .finally(() => setIsLoadingPendingRequest(false));
-  }, [isEligible, hasSubject, fileItem.firestoreId, fileItem.id, options?.refreshKey]);
+  const hasSubject = freshSubjects.length > 0;
 
   const { hasPendingRejectionResponse, isLoading: isLoadingAlerts } = useSubjectAlerts({
     recordId,
@@ -88,7 +88,7 @@ export function useRecordFollowUps(
   // useReviewedByCurrentUser safely no-ops when record.recordHash is missing
   const { user } = useAuth();
 
-  const isSubject = (fileItem.subjects ?? []).includes(user?.uid || '');
+  const isSubject = freshSubjects.includes(user?.uid || '');
   const isCreator = fileItem.uploadedBy === user?.uid;
 
   const {
