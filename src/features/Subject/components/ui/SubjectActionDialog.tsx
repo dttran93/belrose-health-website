@@ -51,6 +51,7 @@ import UserCard from '@/features/Users/components/ui/UserCard';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { REJECTION_REASON_OPTIONS, RejectionReasons } from '../../services/subjectRejectionService';
 import NetworkPreparingContent from '@/features/BlockchainWallet/components/NetworkPreparingContent';
+import RequesterSuggestions from '@/features/RequestRecord/components/ui/RequesterSuggestions';
 
 // ============================================================================
 // TYPES
@@ -521,6 +522,10 @@ const SearchingContent: React.FC<{
 
       {/* User Search */}
       <div className="mb-4">
+        <RequesterSuggestions
+          onSelectUser={onSelectUser}
+          excludeUserIds={[...currentSubjects, user?.uid || '']}
+        />
         <UserSearch
           onUserSelect={handleUserSelect}
           excludeUserIds={[...currentSubjects, user?.uid || '']}
@@ -552,7 +557,8 @@ const SearchingContent: React.FC<{
         <div>
           <p className="text-sm font-medium text-amber-900">Consent Required</p>
           <p className="text-xs mt-1 text-amber-800">
-            The selected user will receive a notification and must accept before they are added.
+            The selected user will receive record access and a notification. They must accept before
+            they are added as subject.
           </p>
         </div>
       </div>
@@ -762,7 +768,7 @@ const ConfirmRequestConsentContent: React.FC<{
 
       {/* Role Info */}
       <div className={`p-3 border rounded-lg ${roleConfig.bgColor} ${roleConfig.borderColor} mb-4`}>
-        <p className="text-xs text-gray-500 mb-1">Access Level (if accepted)</p>
+        <p className="text-xs text-gray-500 mb-1">Access Level</p>
         <div className="flex items-center gap-2">
           <RoleIcon className={`w-5 h-5 ${roleConfig.color}`} />
           <span className="font-medium">{roleConfig.label}</span>
@@ -772,8 +778,8 @@ const ConfirmRequestConsentContent: React.FC<{
       {/* Info */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
         <p className="text-xs text-gray-600 leading-relaxed">
-          The user will receive a notification and must accept before being added as a subject.
-          Their acceptance will be recorded on the distributed network.
+          The user will receive record access but must accept before being added as a subject. Their
+          acceptance will be recorded on the distributed network.
         </p>
       </div>
 

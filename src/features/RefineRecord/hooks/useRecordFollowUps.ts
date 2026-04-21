@@ -32,6 +32,7 @@ import { useSubjectAlerts } from '@/features/Subject/hooks/useSubjectAlerts';
 // ─── Options ─────────────────────────────────────────────────────────────────
 
 export interface UseRecordFollowUpsOptions {
+  refreshKey?: number;
   onAction: (fileItem: FileObject, itemId: string) => void;
 }
 
@@ -76,7 +77,7 @@ export function useRecordFollowUps(
       .then(requests => setHasPendingRequest(requests.length > 0))
       .catch(() => setHasPendingRequest(false))
       .finally(() => setIsLoadingPendingRequest(false));
-  }, [isEligible, hasSubject, fileItem.firestoreId, fileItem.id]);
+  }, [isEligible, hasSubject, fileItem.firestoreId, fileItem.id, options?.refreshKey]);
 
   const { hasPendingRejectionResponse, isLoading: isLoadingAlerts } = useSubjectAlerts({
     recordId,

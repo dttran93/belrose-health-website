@@ -748,8 +748,8 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt', 'viewCount'])
       ) ||
   
-      // Path B: Provider fulfills request — can update status to 'fulfilled' and add fulfilledRecordIds, but
-      //         fulfilledRecordIds must be non-empty before marking complete.
+      // Path B: Provider adds records to a pending request.
+      // Can add record IDs while staying pending, or add and mark fulfilled in one write.
       (
         request.auth != null &&
         resource.data.status == 'pending' &&
@@ -768,7 +768,7 @@ service cloud.firestore {
           // Marking complete — status flips to fulfilled
           (
             request.resource.data.status == 'fulfilled' &&
-            resource.data.fulfilledRecordIds.size() > 0
+            request.resource.data.fulfilledRecordIds.size() > 0
           )
         )
       ) ||

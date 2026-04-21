@@ -30,8 +30,8 @@ const countryData: CountryEntry[] = [
           almost none of its core objectives.
         </p>
         <p className="text-left mb-4">
-          What has followed is a revolving door of successor agencies and programmes — care.data,
-          HSCIC, NHS Digital, NHSX, and many more — each inheriting the same structural problems and
+          What has followed is a revolving door of successor agencies and programmes: care.data,
+          HSCIC, NHS Digital, NHSX, and many more, each inheriting the same structural problems and
           failing in turn. As of 2025, only 20% of NHS organisations are considered "digitally
           mature" with many still using paper records
           <CitationLink id="nhs-digital-maturity" /> and an independent review in 2024 concluded
@@ -121,9 +121,9 @@ const countryData: CountryEntry[] = [
         <p className="text-left mb-4">
           Sweden is frequently cited as proof that centralization of health records works. The
           country's patient portal, 1177.se, gives citizens access to their medical records through
-          a service called Journalen. By many measures it is genuinely good - it's the #1 medical
-          app in Sweden and has a satisfaction rating that is the envy of health ministries
-          worldwide. The catch is that Sweden doesn't have one system, it has 21 of them.
+          a service called Journalen. By many measures it is genuinely good; it's the #1 medical app
+          in Sweden and has a satisfaction rating that is the envy of health ministries worldwide.
+          The catch is that Sweden doesn't have one system, it has 21 of them.
         </p>
         <p className="text-left mb-4">
           Sweden's 21 autonomous regions each procures and operates its own EHR infrastructure. This

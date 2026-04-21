@@ -68,7 +68,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
             <FollowUpBadge record={record} onClick={() => onFollowUp?.(record)} />
             {/* SubjectBadge: hidden on mobile, shown md+ */}
             <div className="hidden md:flex items-center">
-              <SubjectBadge record={record} onOpenManager={() => onSubject?.(record)} />
+              <SubjectBadge record={record} onClick={() => onSubject?.(record)} />
             </div>
             <CredibilityBadge score={record.credibility?.score} />
             <HealthRecordMenu

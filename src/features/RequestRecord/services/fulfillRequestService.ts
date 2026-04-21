@@ -89,7 +89,12 @@ export class FulfillRequestService {
     role: Role
   ): Promise<void> {
     // Step 1: Grant role — this handles the key wrapping internally
-    await PermissionsService.grantRole(recordId, recordRequest.requesterId, role);
+    try {
+      await PermissionsService.grantRole(recordId, recordRequest.requesterId, role);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      if (!message.startsWith('User is already')) throw err; // re-throw anything unexpected
+    }
 
     // Step 2: Mark request fulfilled
     const db = getFirestore();

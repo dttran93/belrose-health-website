@@ -41,6 +41,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   const lastLinkRequestRecord = useRef<FileObject | null>(null);
   const [subjectRecord, setSubjectRecord] = useState<FileObject | null>(null);
   const lastSubjectRecord = useRef<FileObject | null>(null);
+  const [followUpRefreshKey, setFollowUpRefreshKey] = useState(0);
 
   const stats = getStats();
   const hasProcessingFiles = files.length > 0;
@@ -52,7 +53,10 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
 
   const subjectFlow = useSubjectFlow({
     record: lastSubjectRecord.current ?? ({} as FileObject),
-    onSuccess: () => setSubjectRecord(null),
+    onSuccess: () => {
+      setSubjectRecord(null);
+      setFollowUpRefreshKey(k => k + 1);
+    },
   });
 
   const handleFollowUpAction = (fileItem: FileObject, itemId: string) => {

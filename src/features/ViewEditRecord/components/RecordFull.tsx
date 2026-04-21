@@ -490,7 +490,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
             <div className="flex items-center gap-1 flex-shrink-0">
               <FollowUpBadge record={record} onClick={handleFollowUpsPage} />
               <div className="hidden md:flex items-center">
-                <SubjectBadge record={record} onOpenManager={handleSubjectPage} />
+                <SubjectBadge record={record} onClick={handleSubjectPage} />
               </div>
               <CredibilityBadge score={record.credibility?.score} />
               {!readOnly && (

@@ -1,12 +1,11 @@
 // features/Subject/components/SubjectBadge.tsx
 
 import React, { useState, useEffect } from 'react';
-import { FileUser, AlertTriangle, Loader2 } from 'lucide-react';
+import { FileUser, Loader2, CircleDashed } from 'lucide-react';
 import { FileObject } from '@/types/core';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { useSubjectFlow } from '../hooks/useSubjectFlow';
-import SubjectActionDialog from './ui/SubjectActionDialog';
+import { useSubjectAlerts } from '../hooks/useSubjectAlerts';
 
 interface SubjectBadgeProps {
   record: FileObject;
@@ -14,7 +13,6 @@ interface SubjectBadgeProps {
   showName?: boolean; // Show first subject's name on badge
   onClick?: () => void; // If provided, overrides default click behavior
   onOpenManager?: () => void; // Navigate to SubjectManager when subjects exist
-  onSuccess?: () => void; // Called after successfully setting a subject
 }
 
 export const SubjectBadge: React.FC<SubjectBadgeProps> = ({
@@ -23,20 +21,16 @@ export const SubjectBadge: React.FC<SubjectBadgeProps> = ({
   showName = true,
   onClick,
   onOpenManager,
-  onSuccess,
 }) => {
   const [firstSubjectName, setFirstSubjectName] = useState<string | null>(null);
   const [loadingName, setLoadingName] = useState(false);
 
   const subjects = record.subjects || [];
   const hasSubject = subjects.length > 0;
+  const recordId = record.firestoreId ?? record.id;
 
-  const { dialogProps } = useSubjectFlow({
-    record,
-    onSuccess: () => {
-      onSuccess?.();
-    },
-  });
+  const { pendingConsentRequests } = useSubjectAlerts({ recordId });
+  const hasPendingRequest = pendingConsentRequests.length > 0;
 
   // Fetch the first subject's name for display
   useEffect(() => {
@@ -88,9 +82,7 @@ export const SubjectBadge: React.FC<SubjectBadgeProps> = ({
 
   // Build display text
   const getDisplayText = () => {
-    if (!hasSubject) {
-      return 'Set Subject';
-    }
+    if (!hasSubject && hasPendingRequest) return 'Pending';
 
     if (loadingName) {
       return 'Loading...';
@@ -109,16 +101,47 @@ export const SubjectBadge: React.FC<SubjectBadgeProps> = ({
 
   // Tooltip content
   const getTooltipContent = () => {
-    if (!hasSubject) {
-      return 'The record Subjects represents the Belrose account(s) this record is assigned to. Click to add a record Subject.';
-    }
-
+    if (!hasSubject && hasPendingRequest)
+      return 'A subject request has been sent and is awaiting acceptance.';
     if (subjects.length === 1) {
       return `The record Subjects represent the Belrose account(s) this record is assigned to. Click to manage.`;
     }
-
     return `${subjects.length} subjects assigned. Click to manage.`;
   };
+
+  // Pending state — no subject yet but request is out
+  if (!hasSubject && hasPendingRequest) {
+    return (
+      <Tooltip.Provider>
+        <Tooltip.Root>
+          <Tooltip.Trigger asChild>
+            <button
+              onClick={handleClick}
+              className={`
+                inline-flex items-center rounded-full border font-medium
+                bg-amber-50 text-amber-700 border-amber-300
+                hover:bg-amber-100
+                transition-colors cursor-pointer
+                ${sizeClasses[size]}
+              `}
+            >
+              <CircleDashed className={`${iconSizes[size]}`} />
+              <span>Pending</span>
+            </button>
+          </Tooltip.Trigger>
+          <Tooltip.Portal>
+            <Tooltip.Content
+              className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 max-w-xs z-50"
+              sideOffset={5}
+            >
+              A subject request has been sent and is awaiting acceptance.
+              <Tooltip.Arrow className="fill-gray-900" />
+            </Tooltip.Content>
+          </Tooltip.Portal>
+        </Tooltip.Root>
+      </Tooltip.Provider>
+    );
+  }
 
   if (hasSubject) {
     return (

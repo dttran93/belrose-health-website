@@ -25,6 +25,7 @@ export interface FileListItemProps {
   showFHIRResults?: boolean;
   onReview: (fileItem: FileObject) => void;
   onAction?: (fileItem: FileObject, itemId: string) => void;
+  refreshKey?: number;
 }
 
 export const FileListItem: React.FC<FileListItemProps> = ({
@@ -36,6 +37,7 @@ export const FileListItem: React.FC<FileListItemProps> = ({
   showFHIRResults = true,
   onReview,
   onAction,
+  refreshKey,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [followUpDismissed, setFollowUpDismissed] = useState(false);
@@ -50,6 +52,7 @@ export const FileListItem: React.FC<FileListItemProps> = ({
   // The hook checks the FileObject and returns only items that genuinely need action.
 
   const { followUpItems, isLoading: followUpsLoading } = useRecordFollowUps(fileItem, {
+    refreshKey,
     onAction: (item, itemId) => {
       if (onAction) {
         onAction(item, itemId);
