@@ -67,19 +67,51 @@ export class RequestNoteService {
     encryptedNoteKey: string,
     encryptedNoteIv: string
   ): Promise<RequestNote> {
-    // 1. Get master key from session
     const masterKey = await EncryptionKeyManager.getSessionKey();
-    if (!masterKey)
-      throw new Error('Encryption session not active. Please unlock your encryption.');
+    if (!masterKey) throw new Error('Encryption session not active.');
 
-    // 2. Get current user
     const auth = getAuth();
     const user = auth.currentUser;
     if (!user) throw new Error('Not authenticated.');
 
-    // 3. Fetch encrypted RSA private key from Firestore
+    const rsaPrivateKey = EncryptionKeyManager.hasGuestRsaPrivateKey()
+      ? await RequestNoteService.getGuestRsaPrivateKey()
+      : await RequestNoteService.getRegisteredUserRsaPrivateKey(user.uid, masterKey);
+
+    const aesKey = await SharingKeyManagementService.unwrapKey(encryptedNoteKey, rsaPrivateKey);
+
+    const decryptedBytes = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: base64ToArrayBuffer(encryptedNoteIv) },
+      aesKey,
+      base64ToArrayBuffer(encryptedRequestNote)
+    );
+
+    return JSON.parse(new TextDecoder().decode(decryptedBytes)) as RequestNote;
+  }
+
+  /**
+   * Get RSA private key for guest users — reads the ephemeral key
+   * delivered via the invite URL and stored in memory by FulfillRequestPage.
+   */
+  private static async getGuestRsaPrivateKey(): Promise<CryptoKey> {
+    const guestPrivateKeyBase64 = EncryptionKeyManager.getGuestRsaPrivateKey();
+    if (!guestPrivateKeyBase64) {
+      throw new Error('Guest RSA key not found in memory. Please click the invite link again.');
+    }
+    console.log('ℹ️ Decrypting note as guest — using ephemeral RSA key');
+    return SharingKeyManagementService.importPrivateKey(guestPrivateKeyBase64);
+  }
+
+  /**
+   * Get RSA private key for registered users — fetches the encrypted private
+   * key from Firestore and decrypts it with the user's master key.
+   */
+  private static async getRegisteredUserRsaPrivateKey(
+    userId: string,
+    masterKey: CryptoKey
+  ): Promise<CryptoKey> {
     const db = getFirestore();
-    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    const userDoc = await getDoc(doc(db, 'users', userId));
     if (!userDoc.exists()) throw new Error('User profile not found.');
 
     const userData = userDoc.data();
@@ -87,33 +119,12 @@ export class RequestNoteService {
       throw new Error('Encryption keys not set up. Please complete account setup.');
     }
 
-    console.log(
-      'userData.encryption.publicKey (first 150):',
-      userData.encryption?.publicKey?.slice(0, 150)
-    );
-
-    // 4. Decrypt RSA private key with master key
     const privateKeyBytes = await EncryptionService.decryptFile(
       base64ToArrayBuffer(userData.encryption.encryptedPrivateKey),
       masterKey,
       base64ToArrayBuffer(userData.encryption.encryptedPrivateKeyIV)
     );
 
-    const rsaPrivateKey = await SharingKeyManagementService.importPrivateKey(
-      arrayBufferToBase64(privateKeyBytes)
-    );
-
-    // 5. Unwrap the one-off AES note key using the RSA private key
-    const aesKey = await SharingKeyManagementService.unwrapKey(encryptedNoteKey, rsaPrivateKey);
-
-    // 6. AES-GCM decrypt the note ciphertext
-    const decryptedBytes = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: base64ToArrayBuffer(encryptedNoteIv) },
-      aesKey,
-      base64ToArrayBuffer(encryptedRequestNote)
-    );
-
-    // 7. Decode and parse back into RequestNote object
-    return JSON.parse(new TextDecoder().decode(decryptedBytes)) as RequestNote;
+    return SharingKeyManagementService.importPrivateKey(arrayBufferToBase64(privateKeyBytes));
   }
 }

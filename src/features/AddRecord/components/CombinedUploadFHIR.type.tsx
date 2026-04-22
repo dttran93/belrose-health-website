@@ -72,4 +72,7 @@ export interface CombinedUploadFHIRProps {
   className?: string;
 
   convertTextToFHIR?: (text: string, patientName?: string) => Promise<FHIRWithValidation>;
+
+  externalLinkRequestFile?: FileObject | null;
+  onExternalLinkRequestClose?: () => void;
 }

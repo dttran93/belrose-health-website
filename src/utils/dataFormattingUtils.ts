@@ -397,3 +397,10 @@ export function formatLargeNumber(num: number): string {
   if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
   return num.toString();
 }
+
+/**
+ * Truncate a string to a maximum length, appending an ellipsis if necessary
+ */
+export function truncate(str: string, maxLen: number): string {
+  return str.length > maxLen ? str.slice(0, maxLen - 1) + '…' : str;
+}

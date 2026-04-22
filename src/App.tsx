@@ -2,7 +2,7 @@ import React from 'react';
 import { Toaster as Sonner } from 'sonner';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import NotFound from './pages/NotFound';
 import Auth from './pages/Auth';
 import Layout from './components/app/Layout';
@@ -34,87 +34,97 @@ import RecordRequestsPage from './pages/RecordRequestsPage';
 import ForProviders from './pages/ForProviders';
 import ActivityHub from './pages/ActivityHub';
 
-// Create QueryClient instance with proper typing
 const queryClient = new QueryClient();
 
-const App: React.FC = (): React.JSX.Element => {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Sonner />
-          <CitationProvider>
-            <BrowserRouter>
-              <Routes>
-                {/* ── Public site shell ── */}
-                <Route path="/" element={<Index />} />
-                <Route path="/privacy" element={<PrivacyPolicy />} />
-                <Route path="/for-providers" element={<ForProviders />} />
+// ── Root wrapper — provides all global context, renders matched route via Outlet ──
+// Replaces the provider nesting that previously wrapped <BrowserRouter>.
+// Every route in the tree is a descendant of this component.
+const RootLayout: React.FC = () => (
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>
+      <TooltipProvider>
+        <Sonner />
+        <CitationProvider>
+          <Outlet />
+        </CitationProvider>
+      </TooltipProvider>
+    </AuthProvider>
+  </QueryClientProvider>
+);
 
-                {/* ── Auth & verification ── */}
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/auth/register" element={<Auth />} />
-                <Route path="/auth/recover" element={<Auth />} />
-                <Route path="/waitlist" element={<Auth />} />
-                <Route path="/verification" element={<VerificationHub />} />
-                <Route path="/verify-email" element={<EmailVerifiedPage />} />
+// ── Protected app shell — auth gate + encryption gate + layout providers ──
+// Replaces the inline nesting inside the old /app/* Route element.
+// <Layout /> now renders <Outlet /> instead of {children}.
+const ProtectedLayout: React.FC = () => (
+  <ProtectedRoute>
+    <EncryptionGate>
+      <AIChatProvider>
+        <LayoutProvider>
+          <Layout />
+        </LayoutProvider>
+      </AIChatProvider>
+    </EncryptionGate>
+  </ProtectedRoute>
+);
 
-                {/* ── Auth & verification ── */}
-                <Route path="/invite" element={<GuestInvitePage />} />
-                <Route path="/fulfill-request" element={<FulfillRequestPage />} />
+// ── Router ────────────────────────────────────────────────────────────────────
+const router = createBrowserRouter([
+  {
+    // RootLayout wraps every route — all providers live here
+    element: <RootLayout />,
+    children: [
+      // ── Public site shell ──
+      { path: '/', element: <Index /> },
+      { path: '/privacy', element: <PrivacyPolicy /> },
+      { path: '/for-providers', element: <ForProviders /> },
 
-                {/* ── Protected app ── */}
-                <Route
-                  path="/app/*"
-                  element={
-                    <ProtectedRoute>
-                      <EncryptionGate>
-                        <AIChatProvider>
-                          <LayoutProvider>
-                            <Layout>
-                              <Routes>
-                                <Route index element={<AppPortal />} />
-                                // Admin Routes
-                                <Route path="hash-tester" element={<HashTester />} />
-                                <Route
-                                  path="blockchain-admin"
-                                  element={
-                                    <RequiresPlatformAdmin>
-                                      <BlockchainAdminDashboard />
-                                    </RequiresPlatformAdmin>
-                                  }
-                                />
-                                <Route
-                                  path="health-profile/:subjectId"
-                                  element={<HealthProfile />}
-                                />
-                                <Route path="ai/chat/:chatId" element={<AppPortal />} />
-                                <Route path="ai/history" element={<ChatHistoryPage />} />
-                                <Route path="all-records" element={<AllRecords />} />
-                                <Route path="record-requests" element={<RecordRequestsPage />} />
-                                <Route path="records/:recordId" element={<RecordDetail />} />
-                                <Route path="add-record" element={<AddRecord />} />
-                                <Route path="settings/*" element={<SettingsPage />} />
-                                <Route path="activity" element={<ActivityHub />} />
-                                <Route path="messages" element={<Messaging />} />
-                                <Route path="messages/:recipientId" element={<Messaging />} />
-                              </Routes>
-                            </Layout>
-                          </LayoutProvider>
-                        </AIChatProvider>
-                      </EncryptionGate>
-                    </ProtectedRoute>
-                  }
-                />
+      // ── Auth & verification ──
+      { path: '/auth', element: <Auth /> },
+      { path: '/auth/register', element: <Auth /> },
+      { path: '/auth/recover', element: <Auth /> },
+      { path: '/waitlist', element: <Auth /> },
+      { path: '/verification', element: <VerificationHub /> },
+      { path: '/verify-email', element: <EmailVerifiedPage /> },
 
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </CitationProvider>
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
-  );
-};
+      // ── Guest flows ──
+      { path: '/invite', element: <GuestInvitePage /> },
+      { path: '/fulfill-request', element: <FulfillRequestPage /> },
+
+      // ── Protected app ──
+      {
+        path: '/app',
+        element: <ProtectedLayout />,
+        children: [
+          { index: true, element: <AppPortal /> },
+          { path: 'hash-tester', element: <HashTester /> },
+          {
+            path: 'blockchain-admin',
+            element: (
+              <RequiresPlatformAdmin>
+                <BlockchainAdminDashboard />
+              </RequiresPlatformAdmin>
+            ),
+          },
+          { path: 'health-profile/:subjectId', element: <HealthProfile /> },
+          { path: 'ai/chat/:chatId', element: <AppPortal /> },
+          { path: 'ai/history', element: <ChatHistoryPage /> },
+          { path: 'all-records', element: <AllRecords /> },
+          { path: 'record-requests', element: <RecordRequestsPage /> },
+          { path: 'records/:recordId', element: <RecordDetail /> },
+          { path: 'add-record', element: <AddRecord /> },
+          { path: 'settings/*', element: <SettingsPage /> },
+          { path: 'activity', element: <ActivityHub /> },
+          { path: 'messages', element: <Messaging /> },
+          { path: 'messages/:recipientId', element: <Messaging /> },
+        ],
+      },
+
+      { path: '*', element: <NotFound /> },
+    ],
+  },
+]);
+
+// ── App ───────────────────────────────────────────────────────────────────────
+const App: React.FC = (): React.JSX.Element => <RouterProvider router={router} />;
 
 export default App;

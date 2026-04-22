@@ -35,6 +35,8 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   maxFiles = 5,
   maxSizeBytes = 10 * 1024 * 1024,
   className = '',
+  externalLinkRequestFile,
+  onExternalLinkRequestClose,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('upload');
   const [linkRequestRecord, setLinkRequestRecord] = useState<FileObject | null>(null);
@@ -58,6 +60,15 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
       setFollowUpRefreshKey(k => k + 1);
     },
   });
+
+  const resolvedLinkRequestRecord = externalLinkRequestFile ?? linkRequestRecord;
+  const handleLinkRequestClose = () => {
+    if (externalLinkRequestFile) {
+      onExternalLinkRequestClose?.();
+    } else {
+      setLinkRequestRecord(null);
+    }
+  };
 
   const handleFollowUpAction = (fileItem: FileObject, itemId: string) => {
     if (itemId === 'link-request') {
@@ -149,6 +160,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
                     showFHIRResults={true}
                     onReview={onReview}
                     onAction={handleFollowUpAction}
+                    refreshKey={followUpRefreshKey}
                   />
                 ))}
               </div>
@@ -190,10 +202,10 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
         </div>
       </div>
       <LinkRequestModal
-        record={lastLinkRequestRecord.current!}
-        isOpen={linkRequestRecord !== null}
-        onClose={() => setLinkRequestRecord(null)}
-        onSuccess={() => setLinkRequestRecord(null)}
+        record={resolvedLinkRequestRecord ?? lastLinkRequestRecord.current!}
+        isOpen={resolvedLinkRequestRecord !== null}
+        onClose={handleLinkRequestClose}
+        onSuccess={handleLinkRequestClose}
       />
       <SubjectActionDialog {...subjectFlow.dialogProps} />
     </>

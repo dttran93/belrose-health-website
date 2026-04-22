@@ -35,9 +35,6 @@ import {
   increment,
 } from 'firebase/firestore';
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import useFileManager from '@/features/AddRecord/hooks/useFileManager';
-import { useFHIRConversion } from '@/features/AddRecord/hooks/useFHIRConversion';
-import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
 import { FulfillRequestService } from '../features/RequestRecord/services/fulfillRequestService';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import type { FileObject } from '@/types/core';
@@ -54,7 +51,7 @@ import { RecordRequest } from '@belrose/shared';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type PageStep = 'loading' | 'landing' | 'upload' | 'uploading' | 'success' | 'cancelled' | 'error';
+type PageStep = 'loading' | 'landing' | 'cancelled' | 'error';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -74,44 +71,7 @@ const FulfillRequestPage: React.FC = () => {
   // Used by FulfillRequestService.fulfill() to wrap the file key.
   const providerPrivateKeyRef = useRef<string | null>(null);
 
-  // Held after a successful upload so Path B (register after upload)
-  // can call wrapAndSaveForProvider() while the key is still in memory.
-  const [uploadedRecordId, setUploadedRecordId] = useState<string | null>(null);
-  const [uploadedFileKey, setUploadedFileKey] = useState<CryptoKey | null>(null);
-
   const navigate = useNavigate();
-
-  // ── File manager (same wiring as AddRecord.tsx) ───────────────────────────
-  const {
-    files,
-    processedFiles,
-    savingToFirestore,
-    addFiles,
-    removeFileFromLocal,
-    removeFileComplete,
-    retryFile,
-    getStats,
-    uploadFiles,
-    updateFirestoreRecord,
-    setFHIRConversionCallback,
-    processFile,
-    processVirtualRecord,
-    reset: resetFileUpload,
-  } = useFileManager();
-
-  const { fhirData, handleFHIRConverted } = useFHIRConversion(
-    processedFiles,
-    updateFirestoreRecord,
-    uploadFiles
-  );
-
-  React.useEffect(() => {
-    setFHIRConversionCallback((fileId: string, uploadResult: any) => {
-      const currentFile = files.find(f => f.id === fileId);
-      if (!currentFile?.extractedText) return Promise.resolve();
-      return handleFHIRConverted(fileId, uploadResult);
-    });
-  }, [setFHIRConversionCallback, handleFHIRConverted, files]);
 
   // ── On mount: extract private key from hash + load request ───────────────
   useEffect(() => {
@@ -210,15 +170,14 @@ const FulfillRequestPage: React.FC = () => {
     }
   };
 
-  // ── Sign in as guest via redeemGuestInvite ────────────────────────────────
+  // ── Redeem guest session (for both "create account" and anonymous paths) ───────
+  // Two paths: 1 for providers who create an account and another for those who skip straight to uplaod. Both require guest authentication
+  // Path 1 uses guest authentication to populate the claim account modal with correct information. 2 just uses it to login
   const handleContinueWithAccount = async () => {
-    const guestCode = searchParams.get('guestCode');
-    if (!guestCode) {
-      throw new Error('No Guest Code');
-    }
-
     setSigningIn(true);
     try {
+      const guestCode = searchParams.get('guestCode');
+      if (!guestCode) throw new Error('No Guest Code');
       const redeemFn = httpsCallable<{ inviteCode: string }, { customToken: string }>(
         getFunctions(),
         'redeemGuestInvite'
@@ -226,9 +185,8 @@ const FulfillRequestPage: React.FC = () => {
       const { data } = await redeemFn({ inviteCode: guestCode });
       await signInWithCustomToken(getAuth(), data.customToken);
       await refreshUser();
-      setShowClaimModal(true);
+      setShowClaimModal(true); // modal generates real keys, no throwaway needed
     } catch (err: any) {
-      console.error('❌ Guest sign-in failed:', err);
       setErrorMessage('Failed to create your session. Please try again.');
       setStep('error');
     } finally {
@@ -236,81 +194,34 @@ const FulfillRequestPage: React.FC = () => {
     }
   };
 
-  // Called when GuestClaimAccountModal closes (either completed or dismissed)
-  const handleClaimModalClose = () => {
-    setShowClaimModal(false);
-    // Proceed to upload regardless — if they completed the modal their master
-    // key is in session; if they dismissed it they're still signed in as a
-    // guest and fulfill() will fall back to the anonymous path
-    setStep('upload');
-  };
-
-  // ── Submit handler ────────────────────────────────────────────────────────
-  const handleSubmit = async () => {
-    if (!recordRequest) return;
-
-    // Get the completed files from the file manager
-    const completedFiles = files.filter(f => f.status === 'completed' && !f.firestoreId);
-    if (completedFiles.length === 0) return;
-
-    // For now we take the first completed file.
-    // Multi-file support can be added later — each file would be a separate
-    // fulfill() call writing a separate record.
-    const fileObj = completedFiles[0] as FileObject;
-
-    setStep('uploading');
-
+  // Branch 3: needs throwaway key to pass EncryptionGate
+  const handleContinueWithoutAccount = async () => {
+    setSigningIn(true);
     try {
-      // Determine if the provider is a registered Belrose user
-      // user?.isGuest covers the anonymous sign-in case
-      const isRegisteredUser = user && !user.isGuest && user.encryption?.publicKey;
-      const providerPublicKey = isRegisteredUser ? user.encryption.publicKey : undefined;
-      const providerUserId = isRegisteredUser ? user.uid : undefined;
-
-      const result = await FulfillRequestService.fulfill(
-        recordRequest,
-        fileObj,
-        providerPublicKey,
-        providerUserId
+      const guestCode = searchParams.get('guestCode');
+      if (!guestCode) throw new Error('No Guest Code');
+      const redeemFn = httpsCallable<{ inviteCode: string }, { customToken: string }>(
+        getFunctions(),
+        'redeemGuestInvite'
       );
+      const { data } = await redeemFn({ inviteCode: guestCode });
+      await signInWithCustomToken(getAuth(), data.customToken);
+      await refreshUser();
 
-      // Hold the file key in state for Path B (register after upload)
-      setUploadedRecordId(result.recordId);
-      setUploadedFileKey(result.fileKey);
-      setStep('success');
+      // Satisfy EncryptionGate before navigating into /app/*
+      const throwawayKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, [
+        'encrypt',
+        'decrypt',
+      ]);
+      EncryptionKeyManager.setSessionKey(throwawayKey);
+      navigate('/app/record-requests');
     } catch (err: any) {
-      console.error('❌ Fulfill failed:', err);
-      setErrorMessage(err.message || 'Upload failed. Please try again.');
+      setErrorMessage('Failed to create your session. Please try again.');
       setStep('error');
+    } finally {
+      setSigningIn(false);
     }
   };
-
-  // ── Path B: wrap key if provider registers after upload ───────────────────
-  useEffect(() => {
-    if (
-      step === 'success' &&
-      uploadedRecordId &&
-      uploadedFileKey &&
-      user &&
-      !user.isGuest &&
-      user.encryption?.publicKey
-    ) {
-      FulfillRequestService.wrapAndSaveForProvider(
-        uploadedRecordId,
-        uploadedFileKey,
-        user.uid,
-        user.encryption.publicKey
-      )
-        .then(() => {
-          console.log('✅ Post-registration wrap completed');
-          setUploadedFileKey(null);
-        })
-        .catch(err => console.error('⚠️ Post-registration wrap failed:', err));
-    }
-  }, [user?.uid, step]);
-
-  const completedFiles = files.filter(f => f.status === 'completed' && !f.firestoreId);
-  const canSubmit = completedFiles.length > 0 && step === 'upload';
 
   // ============================================================================
   // RENDER
@@ -333,42 +244,9 @@ const FulfillRequestPage: React.FC = () => {
             }
             targetIsRegistered={targetIsRegistered}
             onContinueWithAccount={handleContinueWithAccount}
-            onContinueWithoutAccount={() => setStep('upload')}
-            onContinueAsExistingUser={() => navigate('/app/add-record')}
+            onContinueWithoutAccount={handleContinueWithoutAccount}
+            onContinueAsExistingUser={() => navigate('/app/record-request')}
             signingIn={signingIn}
-          />
-        )}
-
-        {step === 'upload' && recordRequest && (
-          <UploadView
-            recordRequest={recordRequest}
-            files={files}
-            addFiles={addFiles}
-            removeFile={removeFileComplete}
-            removeFileFromLocal={removeFileFromLocal}
-            retryFile={retryFile}
-            getStats={getStats}
-            addFhirAsVirtualFile={processVirtualRecord}
-            uploadFiles={uploadFiles}
-            fhirData={fhirData}
-            onFHIRConverted={handleFHIRConverted}
-            convertTextToFHIR={convertToFHIR}
-            savingToFirestore={savingToFirestore}
-            processFile={processFile}
-            canSubmit={canSubmit}
-            onSubmit={handleSubmit}
-            onBack={() => setStep('landing')}
-          />
-        )}
-
-        {step === 'uploading' && <UploadingView />}
-
-        {step === 'success' && recordRequest && (
-          <SuccessView
-            recordRequest={recordRequest}
-            isRegisteredUser={!!(user && !user.isGuest)}
-            hasKeyInMemory={!!uploadedFileKey}
-            onRegister={() => setShowClaimModal(true)}
           />
         )}
 
@@ -387,15 +265,9 @@ const FulfillRequestPage: React.FC = () => {
       {user && (
         <GuestClaimAccountModal
           isOpen={showClaimModal}
-          onClose={
-            step === 'landing' || step === 'upload'
-              ? handleClaimModalClose
-              : () => setShowClaimModal(false)
-          }
+          onClose={() => navigate('/app/record-requests')} // branch 3 — skipped
+          onComplete={() => navigate('/app/record-requests')} // branch 2 — claimed
           guestContext="record_request"
-          onComplete={
-            step === 'success' ? () => navigate('/app/add-record') : handleClaimModalClose
-          }
         />
       )}
     </>

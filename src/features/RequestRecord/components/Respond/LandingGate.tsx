@@ -14,7 +14,7 @@
 
 import React from 'react';
 import { ArrowRight, Lock, ExternalLink, UserPlus, Loader2, Upload, LogIn } from 'lucide-react';
-import type { RecordRequest } from '../../services/fulfillRequestService';
+import { RecordRequest } from '@belrose/shared';
 
 interface LandingGateProps {
   recordRequest: RecordRequest;

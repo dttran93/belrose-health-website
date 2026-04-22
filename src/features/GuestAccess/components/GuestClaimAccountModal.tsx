@@ -1,5 +1,25 @@
 // src/features/Auth/components/GuestClaimAccountModal.tsx
 
+/**
+ * GuestClaimAccountModal
+ *
+ * Converts a temporary guest session into a permanent Belrose account.
+ *
+ * Write strategy:
+ *   - Step 1a (sharing file key rewrap) — in batch with profile/invites/backfill
+ *     because these all belong to the same "account is now real" transaction.
+ *   - Step 1b (request note key rewrap) — standalone updateDoc outside batch.
+ *     Fails intermittently in batch context, likely due to auth token state
+ *     after updatePassword. Non-fatal: provider loses note decrypt if it fails,
+ *     but record access and fulfillment are unaffected.
+ *   - Step 1c (uploaded record key rewrap) — standalone updateDoc outside batch.
+ *     Best-effort: throwaway key may be gone if session was interrupted between
+ *     upload and claim. Non-fatal with toast warning to re-upload if needed.
+ *   - Steps 3/4/4b (user profile, guestInvites, targetUserId) — in batch.
+ *     These must succeed or fail atomically: a half-claimed state where isGuest
+ *     is false but encryption keys aren't saved would break decryption.
+ */
+
 import React, { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, Check, Loader2 } from 'lucide-react';
@@ -22,10 +42,12 @@ import {
   collection,
   deleteField,
   doc,
+  getDoc,
   getDocs,
   getFirestore,
   query,
   serverTimestamp,
+  updateDoc,
   where,
   writeBatch,
 } from 'firebase/firestore';
@@ -42,6 +64,7 @@ interface GuestClaimAccountModalProps {
   onClose: () => void;
   onComplete?: () => void;
   guestContext?: 'sharing' | 'record_request';
+  pendingRecordIds?: string[];
 }
 
 export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
@@ -49,6 +72,7 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
   onClose,
   onComplete,
   guestContext,
+  pendingRecordIds,
 }) => {
   const { user, refreshUser } = useAuthContext();
 
@@ -151,8 +175,6 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
 
   const handleClaim = async () => {
     if (!acknowledged || !cryptoData) return;
-    console.log('🔑 Guest RSA key at handleClaim:', EncryptionKeyManager.hasGuestRsaPrivateKey());
-    console.log('🔑 Guest RSA key length:', EncryptionKeyManager.getGuestRsaPrivateKey()?.length);
 
     setStep('processing');
     setError(null);
@@ -173,11 +195,13 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         return;
       }
 
-      // ── Step 1a: Re-wrap guest file keys (Sharing Flow) ───────────────────
       const newRsaPublicKey = await SharingKeyManagementService.importPublicKey(
         cryptoData.publicKey
       );
 
+      // ── Step 1a: Rewrap guest file keys (Sharing Flow) ────────────────────
+      // In batch — these belong to the same atomic "account is now real" write
+      // as the user profile update below.
       if (hasKeys) {
         setProgress({ message: 'Re-encrypting record access keys...' });
         for (const [recordId, fileKey] of guestFileKeys!) {
@@ -193,21 +217,19 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         }
       }
 
-      // ── Step 1b: Rewrap record Note keys (Request Flow) ───────────────────────────
-      // The note key was wrapped with the ephemeral guest RSA key. Now that the
-      // provider has a real RSA key pair, rewrap it so they can decrypt the note
-      // going forward. The guest private key was stored in EncryptionKeyManager
-      // when the provider first opened the fulfill URL.
+      // ── Step 1b: Rewrap request note key (Request Flow) ───────────────────
+      // Standalone updateDoc — fails intermittently when run inside a batch,
+      // likely due to auth token state changes after updatePassword in step 2.
+      // Non-fatal: provider loses note decrypt access if this fails, but record
+      // access and request fulfillment are unaffected.
       const guestPrivateKeyBase64 = EncryptionKeyManager.getGuestRsaPrivateKey();
 
       if (guestPrivateKeyBase64) {
         setProgress({ message: 'Re-encrypting request note access...' });
-
         try {
           const guestRsaPrivateKey =
             await SharingKeyManagementService.importPrivateKey(guestPrivateKeyBase64);
 
-          // Find all record requests where this guest was the provider
           const requestSnap = await getDocs(
             query(collection(db, 'recordRequests'), where('providerGuestUid', '==', guestUid))
           );
@@ -216,32 +238,76 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
             const data = requestDoc.data();
             if (!data.encryptedNoteKeyForProvider || !data.encryptedNoteIv) continue;
 
-            // Unwrap the AES note key with the old guest RSA private key
             const aesNoteKey = await SharingKeyManagementService.unwrapKey(
               data.encryptedNoteKeyForProvider,
               guestRsaPrivateKey
             );
-
-            // Rewrap with the new RSA public key
             const rewrappedNoteKey = await SharingKeyManagementService.wrapKey(
               aesNoteKey,
               newRsaPublicKey
             );
 
-            batch.update(doc(db, 'recordRequests', requestDoc.id), {
+            await updateDoc(doc(db, 'recordRequests', requestDoc.id), {
               encryptedNoteKeyForProvider: rewrappedNoteKey,
             });
           }
-
-          console.log('✅ Note keys rewrapped for', requestSnap.docs.length, 'request(s)');
         } catch (err) {
-          // Non-fatal — log and continue. The provider loses note access for
-          // this request but the fulfill flow and record access are unaffected.
-          console.warn('⚠️ Failed to rewrap note key:', err);
+          console.warn('⚠️ Step 1b: failed to rewrap note key — provider loses note access', err);
         }
       }
 
-      // ── Step 2: Set password on Firebase Auth account ────────────────────────
+      // ── Step 1c: Rewrap uploaded record keys (Upload Blocker Flow) ────────
+      // Standalone updateDoc — best-effort. The throwaway AES master key used
+      // to encrypt these file keys only lives in memory for the current session.
+      // If the session was interrupted between upload and claim (tab close,
+      // re-login, etc.), the key is gone and the rewrap cannot be completed.
+      // The record itself still exists in Firestore — the guest just loses
+      // decrypt access after claiming. A toast warns them to re-upload.
+      let skippedRecordCount = 0;
+
+      if (pendingRecordIds && pendingRecordIds.length > 0) {
+        setProgress({ message: 'Securing your uploaded records...' });
+        const throwawayKey = await EncryptionKeyManager.getSessionKey();
+
+        if (!throwawayKey) {
+          console.warn('⚠️ Throwaway key gone — skipping step 1c entirely');
+          skippedRecordCount = pendingRecordIds.length;
+        } else {
+          for (const recordId of pendingRecordIds) {
+            const docId = `${recordId}_${guestUid}`;
+            try {
+              const wrappedKeySnap = await getDoc(doc(db, 'wrappedKeys', docId));
+              if (!wrappedKeySnap.exists()) {
+                console.warn('⚠️ wrappedKeys doc not found:', docId);
+                skippedRecordCount++;
+                continue;
+              }
+
+              const encryptedKeyData = base64ToArrayBuffer(wrappedKeySnap.data().wrappedKey);
+              const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(
+                encryptedKeyData,
+                throwawayKey
+              );
+              const fileKey = await EncryptionService.importKey(fileKeyData);
+              const rewrapped = await EncryptionService.encryptKeyWithMasterKey(
+                fileKey,
+                cryptoData.masterKey
+              );
+
+              await updateDoc(doc(db, 'wrappedKeys', docId), {
+                wrappedKey: arrayBufferToBase64(rewrapped),
+                claimedAt: serverTimestamp(),
+              });
+              console.log('✅ Step 1c write ok:', docId);
+            } catch (e) {
+              console.warn(`⚠️ Step 1c skipped for ${recordId}`, e);
+              skippedRecordCount++;
+            }
+          }
+        }
+      }
+
+      // ── Step 2: Set password on Firebase Auth account ────────────────────
       setProgress({ message: 'Securing your account...' });
       try {
         await updatePassword(auth.currentUser!, password);
@@ -254,15 +320,11 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         throw err;
       }
 
-      // ── Step 3: Call claimGuestAccount Cloud Function ────────────────────────
-      // Handles profile update, wrappedKeys re-wrap, guestInvites accepted
-      // Does NOT touch wallet — that's handled separately below
+      // ── Step 3: Update user profile (in batch) ────────────────────────────
       setProgress({ message: 'Saving your account details...' });
       const displayName = `${firstName} ${lastName}`;
 
-      // Update user profile
-      const userRef = doc(db, 'users', guestUid);
-      batch.update(userRef, {
+      batch.update(doc(db, 'users', guestUid), {
         displayName,
         displayNameLower: displayName.toLowerCase(),
         firstName,
@@ -286,7 +348,7 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         },
       });
 
-      // ── Step 4: Mark guestInvites as accepted ────────────────────────
+      // ── Step 4: Mark guestInvites as accepted (in batch) ──────────────────
       const inviteSnap = await getDocs(
         query(
           collection(db, 'guestInvites'),
@@ -302,47 +364,52 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         });
       });
 
-      // ── Step 4b: Backfill targetUserId on any recordRequests matched by email ──
-      // useInboundRequests queries by both userId and email, but setting targetUserId
-      // ensures future queries by ID alone (e.g. useRecordFollowUps) still find them.
-      const requestSnap = await getDocs(
+      // ── Step 4b: Backfill targetUserId on recordRequests (in batch) ───────
+      // useInboundRequests queries by both userId and email, but setting
+      // targetUserId ensures future queries by ID alone still find them.
+      const backfillSnap = await getDocs(
         query(
           collection(db, 'recordRequests'),
           where('targetEmail', '==', user.email),
-          where('status', '==', 'pending')
+          where('status', 'in', ['pending', 'fulfilled'])
         )
       );
 
-      requestSnap.docs.forEach(requestDoc => {
-        batch.update(requestDoc.ref, {
-          targetUserId: guestUid,
-        });
+      backfillSnap.docs.forEach(requestDoc => {
+        batch.update(requestDoc.ref, { targetUserId: guestUid });
       });
 
-      console.log('About to commit batch, steps completed so far...');
-      console.log('hasKeys:', hasKeys);
-      console.log('guestPrivateKey present:', !!guestPrivateKeyBase64);
-
+      // ── Commit atomic writes ──────────────────────────────────────────────
+      setProgress({ message: 'Saving changes...' });
       await batch.commit();
 
-      // ── Step 5: Generate real wallet ─────────────────────────────────────────
-      // Overwrites the placeholder guest wallet with a real one.
-      // wallet.ts now allows this for guest accounts (isGuest check).
+      // Warn if any uploaded records couldn't be rewrapped (step 1c failures)
+      if (skippedRecordCount > 0) {
+        toast.warning(
+          `${skippedRecordCount} uploaded record${skippedRecordCount > 1 ? 's' : ''} couldn't be secured`,
+          {
+            description:
+              'Your session expired before we could secure access. These records were uploaded successfully but you may not be able to view them. You can re-upload them from your account.',
+            duration: 8000,
+          }
+        );
+      }
+
+      // ── Step 5: Generate real wallet ──────────────────────────────────────
       setProgress({ message: 'Generating your wallet...' });
       const walletData = await WalletGenerationService.generateWallet({
         userId: guestUid,
         masterKey: cryptoData.masterKey,
       });
-      console.log('✅ Real wallet generated:', walletData.walletAddress);
 
-      // Set real master key in session before smart account initialization, function pulls from the session to compute smart account address
+      // Set real master key in session — required before smart account init
       EncryptionKeyManager.setSessionKey(cryptoData.masterKey);
 
-      // ── Step 6: Register EOA on blockchain ───────────────────────────────────
+      // ── Step 6: Register EOA on blockchain ───────────────────────────────
       setProgress({ message: 'Registering on the secure network...' });
       await MemberRegistryBlockchain.registerMemberWallet(walletData.walletAddress);
 
-      // ── Step 7: Initialize smart account ────────────────────────────────────
+      // ── Step 7: Initialize smart account ─────────────────────────────────
       setProgress({ message: 'Setting up your smart account...' });
       await SmartAccountService.ensureFullyInitialized();
 
@@ -375,21 +442,17 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         }
       }
 
-      // ── Step 10: Generate Signal keys ─────────────────────────────────────────
+      // ── Step 10: Generate Signal keys ─────────────────────────────────────
       setProgress({ message: 'Setting up secure messaging...' });
       const signalKeyBundle = await generateKeyBundle(guestUid);
       await KeyBundleService.uploadKeyBundle(guestUid, signalKeyBundle);
 
-      // ── Step 11: Clear guest key ───────────────
+      // ── Step 11: Clear guest keys from memory ─────────────────────────────
       EncryptionKeyManager.setGuestFileKeys(new Map());
 
       // ── Step 12: Refresh auth context so banner disappears ───────────────────
       setProgress({ message: 'Finalizing...' });
-
-      // Update display name in Firebase Auth profile (optional, since we have it in Firestore, but good for consistency)
-      await updateProfile(auth.currentUser!, {
-        displayName,
-      });
+      await updateProfile(auth.currentUser!, { displayName });
       await refreshUser();
 
       setStep('done');
@@ -402,6 +465,8 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
       setStep('recovery');
     }
   };
+
+  // ── Modal lifecycle ────────────────────────────────────────────────────────
 
   const handleClose = () => {
     if (step === 'processing') return; // Don't allow closing during processing
@@ -546,9 +611,7 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
                   />
                 </div>
 
-                <div>
-                  <PasswordStrengthIndicator password={password} /> {/* ← add here */}
-                </div>
+                <PasswordStrengthIndicator password={password} />
 
                 <div>
                   <label className="text-xs font-medium text-slate-700 block mb-1">
@@ -600,7 +663,6 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
                   isCompleted={acknowledged}
                   isActivated={true}
                 />
-
                 {error && (
                   <p
                     className="text-xs text-red-600 bg-red-50 border border-red-200 
@@ -623,7 +685,7 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
               </div>
             )}
 
-            {/* ── Done ── */}
+            {/* Done */}
             {step === 'done' && (
               <div className="flex flex-col items-center gap-4 py-8 text-center">
                 <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center">

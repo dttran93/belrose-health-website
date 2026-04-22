@@ -1,5 +1,5 @@
-import { useState, useEffect, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import DesktopSidebar from '@/components/app/DesktopSidebar';
 import MobileSidebar from '@/components/app/MobileSidebar';
@@ -16,22 +16,17 @@ import { useUnreadMessageCount } from '@/features/Messaging/hooks/useUnreadMessa
 import { useInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
 import { useActionsCount } from '@/features/RefineRecord/hooks/useActionsCount';
 
-interface AppLayoutProps {
-  children: ReactNode;
-}
+// ── No longer accepts children — nested routes render via <Outlet /> ──────────
 
-// Main Layout Component
-function AppLayout({ children }: AppLayoutProps) {
+function AppLayout() {
   const { user } = useAuthContext();
   const { header, footer } = useLayout();
   const navigate = useNavigate();
   const isGuest = user?.isGuest === true;
 
-  // Pull unread notifications count for notifications quick action item
   const { count: actionsCount } = useActionsCount();
   const { unreadCount } = useNotifications(user?.uid);
 
-  // Pull inbound requests for requestRecords notification
   const { counts } = useInboundRequests();
   const pendingRequests = counts.pending;
 
@@ -42,10 +37,8 @@ function AppLayout({ children }: AppLayoutProps) {
     ),
   }));
 
-  // Pull unread messages for Message Badge
   const unreadMessages = useUnreadMessageCount(user?.uid);
 
-  // Pull chat history + current chat state from context
   const { chats, chatsLoading, currentChatId, handleLoadChat, handleNewChat, deleteChat } =
     useAIChatContext();
 
@@ -55,7 +48,6 @@ function AppLayout({ children }: AppLayoutProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
 
-  // Sidebar chat handlers
   const handleSelectChat = (chatId: string) => {
     handleLoadChat(chatId);
     navigate(`/app/ai/chat/${chatId}`);
@@ -76,36 +68,23 @@ function AppLayout({ children }: AppLayoutProps) {
   const handleLogout = async () => {
     try {
       await authService.signOut();
-      navigate('/'); // Navigate after successful logout
+      navigate('/');
     } catch (error) {
       toast.error('Failed to sign out. Please try again.');
     }
   };
 
-  const handleSettings = () => {
-    navigate('/app/settings');
-  };
+  const handleSettings = () => navigate('/app/settings');
+  const handleNotifications = () => navigate('/app/notifications');
+  const handleHelp = () => window.open('https://help.example.com', '_blank');
 
-  const handleNotifications = () => {
-    navigate('/app/notifications');
-  };
-
-  const handleHelp = () => {
-    window.open('https://help.example.com', '_blank');
-  };
-
-  // Close mobile sidebar when switching to desktop
   useEffect(() => {
-    if (isDesktop) {
-      setIsMobileOpen(false);
-    }
+    if (isDesktop) setIsMobileOpen(false);
   }, [isDesktop]);
 
   if (isDesktop) {
-    // Desktop Layout with AI Panel
     return (
       <div className="h-screen flex overflow-hidden">
-        {/* Sidebar */}
         <div className="flex-shrink-0">
           <DesktopSidebar
             isCollapsed={isDesktopCollapsed}
@@ -128,18 +107,17 @@ function AppLayout({ children }: AppLayoutProps) {
           />
         </div>
 
-        {/* Main Content Area */}
         <div className="flex flex-col flex-1 overflow-hidden">
           {isGuest && <GuestBanner />}
-          {/* Conditional Header */}
           {header && <div>{header}</div>}
 
-          {/* Content and AI Panel */}
           <div className="flex flex-1 overflow-hidden">
-            <main className="flex-1 overflow-auto">{children}</main>
+            {/* Outlet replaces {children} — the matched child route renders here */}
+            <main className="flex-1 overflow-auto">
+              <Outlet />
+            </main>
           </div>
 
-          {/* Conditional Footer */}
           {isGuest && <GuestFooter />}
           {footer && <div>{footer}</div>}
         </div>
@@ -150,7 +128,6 @@ function AppLayout({ children }: AppLayoutProps) {
   // Mobile Layout
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {/*Mobile Header */}
       <MobileHeader
         user={user}
         onMenuToggle={() => setIsMobileOpen(true)}
@@ -159,7 +136,6 @@ function AppLayout({ children }: AppLayoutProps) {
 
       {isGuest && <GuestBanner />}
 
-      {/* Mobile Sidebar */}
       <MobileSidebar
         isOpen={isMobileOpen}
         onClose={() => setIsMobileOpen(false)}
@@ -179,10 +155,12 @@ function AppLayout({ children }: AppLayoutProps) {
       />
 
       <div className="flex flex-1 overflow-hidden">
-        <main className="flex-1 overflow-auto">{children}</main>
+        {/* Outlet replaces {children} — the matched child route renders here */}
+        <main className="flex-1 overflow-auto">
+          <Outlet />
+        </main>
       </div>
 
-      {/* Conditional Footer */}
       {isGuest && <GuestFooter />}
       {footer && <div className="border-t border-gray-200 bg-white shadow-sm">{footer}</div>}
     </div>
