@@ -6,37 +6,27 @@
  * Handles the complete fulfillment flow when a provider uploads a record
  * in response to a patient's record request.
  *
- * Crypto flow (all in-browser, nothing sensitive leaves the device unencrypted):
- *   1. Generate a fresh AES-256 file key
- *   2. Encrypt the file bytes with that key
- *   3. Encrypt the file name with that key
- *   4. Import the requester's RSA public key (from the recordRequests doc)
- *   5. Wrap the AES key with the RSA public key
- *   6. Write encrypted record to Firestore + Storage
- *   7. Write wrappedKey doc so requester can decrypt via normal RSA path
- *   8. Mark the recordRequest as fulfilled
- *
- * The requester decrypts via the existing RecordDecryptionService RSA path
- * (isCreator: false branch).
  */
 
 import {
   getFirestore,
   doc,
-  setDoc,
   updateDoc,
   serverTimestamp,
-  collection,
   arrayUnion,
+  getDoc,
+  setDoc,
 } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { getAuth, signInAnonymously } from 'firebase/auth';
-import { EncryptionService } from '@/features/Encryption/services/encryptionService';
-import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
-import { removeUndefinedValues } from '@/utils/dataFormattingUtils';
-import { FileObject } from '@/types/core';
 import { RecordRequest } from '@belrose/shared';
 import { PermissionsService, Role } from '@/features/Permissions/services/permissionsService';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getUserProfile } from '@/features/Users/services/userProfileService';
+import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
+import { getAuth } from 'firebase/auth';
+import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
+import { base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
+import { EncryptionService } from '@/features/Encryption/services/encryptionService';
+import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 
 // ── Firestore document ────────────────────────────────────────────────────────
 
@@ -56,14 +46,6 @@ export const DENY_REASONS = [
 ] as const;
 
 export type DenyReasonValue = (typeof DENY_REASONS)[number]['value'];
-
-// ── Service result types ──────────────────────────────────────────────────────
-
-export interface FulfillRequestResult {
-  success: boolean;
-  recordId: string;
-  fileKey: CryptoKey; // Return the file key so it can be rewrapped for the provider if needed
-}
 
 export class FulfillRequestService {
   // ============================================================================
@@ -106,264 +88,97 @@ export class FulfillRequestService {
   }
 
   /**
-   * Encrypt a FileObject and write it to Firestore + Storage as a fulfilled
-   * record request.
+   * Fulfill a record request as a guest provider.
    *
-   * @param recordRequest     - The full recordRequest document
-   * @param fileObj           - Populated FileObject with plaintext fields ready
-   * @param providerPublicKey - RSA public key of the provider if they are a
-   *                           registered Belrose user. Pass undefined for
-   *                           anonymous uploads (Path B/C).
-   * @param providerUserId    - UID of the provider if authenticated. Required
-   *                           when providerPublicKey is provided.
+   * Differences from the registered flow:
+   * - No blockchain role grant for the provider (no wallet yet)
+   * - Record is initialized on-chain with the requester as administrator
+   *   via a cloud function call (admin wallet handles this)
+   * - Provider's own access is queued for backfill on claim
+   * - Encryption: requester's public RSA key wraps the file key directly
    */
-  static async fulfill(
-    recordRequest: RecordRequest,
-    fileObj: FileObject,
-    providerPublicKey?: string,
-    providerUserId?: string
-  ): Promise<FulfillRequestResult> {
-    // ── Step 1: Ensure auth session ───────────────────────────────────────────
-    // If the provider is a registered user they should already be signed in.
-    // If anonymous, sign in now — gives us a UID for the audit trail without
-    // requiring any account setup.
-    const auth = getAuth();
-    if (!auth.currentUser) {
-      await signInAnonymously(auth);
-      console.log('✅ Signed in anonymously for fulfill flow');
-    }
-    const uploaderUid = auth.currentUser!.uid;
-
-    // ── Step 2: Encrypt complete record ───────────────────────────────────────
-    // throwawayKey satisfies encryptCompleteRecord's userKey param (used to
-    // produce result.encryptedKey via the creator/AES path). We discard
-    // result.encryptedKey immediately — we use RSA wrapping instead.
-    // result.fileKey is the actual AES key that encrypted all the fields.
-    const throwawayKey = await EncryptionService.generateFileKey();
-
-    const encrypted = await EncryptionService.encryptCompleteRecord(
-      fileObj.fileName,
-      fileObj.file,
-      fileObj.extractedText ?? null,
-      fileObj.originalText ?? null,
-      fileObj.contextText ?? null,
-      fileObj.fhirData ?? null,
-      fileObj.belroseFields ?? null,
-      fileObj.customData ?? null,
-      throwawayKey
-      // externalFileKey omitted — function generates internally and returns
-      // it on result.fileKey so we can RSA-wrap it below
-    );
-
-    console.log('✅ Record encrypted');
-
-    // ── Step 3: RSA-wrap file key for requester ───────────────────────────────
-    const requesterRsaKey = await SharingKeyManagementService.importPublicKey(
-      recordRequest.requesterPublicKey
-    );
-    const wrappedKeyForRequester = await SharingKeyManagementService.wrapKey(
-      encrypted.fileKey,
-      requesterRsaKey
-    );
-    console.log('✅ File key RSA-wrapped for requester');
-
-    // ── Step 4: RSA-wrap file key for provider (Path A only) ─────────────────
-    // If the provider is a registered Belrose user, wrap a second copy so
-    // they get permanent access without needing the post-registration flow.
-    let wrappedKeyForProvider: string | null = null;
-    if (providerPublicKey && providerUserId) {
-      const providerRsaKey = await SharingKeyManagementService.importPublicKey(providerPublicKey);
-      wrappedKeyForProvider = await SharingKeyManagementService.wrapKey(
-        encrypted.fileKey,
-        providerRsaKey
-      );
-      console.log('✅ File key RSA-wrapped for authenticated provider');
-    }
-
-    // ── Step 5: Pre-generate Firestore record ID ──────────────────────────────
-    // Needed before Storage upload so the path follows records/{recordId}/...
+  static async fulfillAsGuest(recordRequest: RecordRequest, recordId: string): Promise<void> {
     const db = getFirestore();
-    const recordRef = doc(collection(db, 'records'));
-    const recordId = recordRef.id;
+    const auth = getAuth();
+    const guestUid = auth.currentUser?.uid;
+    if (!guestUid) throw new Error('Not authenticated');
 
-    // ── Step 6: Upload encrypted file to Storage ──────────────────────────────
-    // Skipped for virtual/text-only records.
-    let downloadURL: string | null = null;
-    let storagePath: string | null = null;
-
-    if (encrypted.file && fileObj.file) {
-      const storage = getStorage();
-      const uniqueId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      storagePath = `records/${recordId}/${uniqueId}.encrypted`;
-      const storageRef = ref(storage, storagePath);
-
-      await uploadBytes(
-        storageRef,
-        new Blob([encrypted.file.encrypted], { type: 'application/octet-stream' }),
-        {
-          contentType: 'application/octet-stream',
-          customMetadata: {
-            uploadedBy: uploaderUid,
-            encrypted: 'true',
-            uploadedAt: new Date().toISOString(),
-            recordId,
-            fulfillRequestId: recordRequest.inviteCode,
-          },
-        }
-      );
-
-      downloadURL = await getDownloadURL(storageRef);
-      console.log('✅ Encrypted file uploaded to Storage');
+    // ── Step 1: Retrieve file key from wrappedKeys using throwaway session key ────────
+    const throwawayKey = await EncryptionKeyManager.getSessionKey();
+    if (!throwawayKey) {
+      throw new Error('Encryption session expired. Please reload the page and try again.');
     }
 
-    // ── Step 7: Write Firestore record document ───────────────────────────────
-    // Shape mirrors createFirestoreRecord in uploadUtils.ts exactly.
-    const documentData = removeUndefinedValues({
-      fileSize: fileObj.fileSize,
-      fileType: fileObj.fileType,
-      downloadURL,
-      storagePath,
+    const wrappedKeySnap = await getDoc(doc(db, 'wrappedKeys', `${recordId}_${guestUid}`));
+    if (!wrappedKeySnap.exists()) {
+      throw new Error('Record key not found.');
+    }
 
-      // Ownership — requester owns it, anonymous provider UID is audit trail only
-      uploadedBy: uploaderUid,
-      owners: [recordRequest.requesterId],
-      // If provider is registered, include them as administrator from the start
-      administrators: providerUserId
-        ? [recordRequest.requesterId, providerUserId]
-        : [recordRequest.requesterId],
-      viewers: [],
-      subjects: [],
+    const encryptedKeyData = base64ToArrayBuffer(wrappedKeySnap.data().wrappedKey);
+    const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(
+      encryptedKeyData,
+      throwawayKey
+    );
+    const fileKey = await EncryptionService.importKey(fileKeyData);
 
-      isEncrypted: true,
-      isVirtual: fileObj.isVirtual ?? false,
-      encryptedFileIV: encrypted.file?.iv ?? undefined,
+    // Step 2: Wrap file key with requester's RSA public key
+    // The requester is a registered user — their public key is in their profile
+    const requesterProfile = await getUserProfile(recordRequest.requesterId);
+    if (!requesterProfile?.encryption?.publicKey) {
+      throw new Error('Requester does not have encryption keys set up');
+    }
 
-      encryptedFileName: encrypted.fileName
-        ? { encrypted: encrypted.fileName.encrypted, iv: encrypted.fileName.iv }
-        : undefined,
-      encryptedExtractedText: encrypted.extractedText
-        ? { encrypted: encrypted.extractedText.encrypted, iv: encrypted.extractedText.iv }
-        : undefined,
-      encryptedOriginalText: encrypted.originalText
-        ? { encrypted: encrypted.originalText.encrypted, iv: encrypted.originalText.iv }
-        : undefined,
-      encryptedContextText: encrypted.contextText
-        ? { encrypted: encrypted.contextText.encrypted, iv: encrypted.contextText.iv }
-        : undefined,
-      encryptedFhirData: encrypted.fhirData
-        ? { encrypted: encrypted.fhirData.encrypted, iv: encrypted.fhirData.iv }
-        : undefined,
-      encryptedBelroseFields: encrypted.belroseFields
-        ? { encrypted: encrypted.belroseFields.encrypted, iv: encrypted.belroseFields.iv }
-        : undefined,
-      encryptedCustomData: encrypted.customData
-        ? { encrypted: encrypted.customData.encrypted, iv: encrypted.customData.iv }
-        : undefined,
+    const requesterPublicKey = await SharingKeyManagementService.importPublicKey(
+      requesterProfile.encryption.publicKey
+    );
+    const wrappedKey = await SharingKeyManagementService.wrapKey(fileKey, requesterPublicKey);
 
-      sourceType: fileObj.sourceType ?? 'File Upload',
-      wordCount: fileObj.wordCount ?? undefined,
-      aiProcessingStatus: fileObj.aiProcessingStatus ?? 'not_needed',
-      recordHash: fileObj.recordHash ?? null,
-      originalFileHash: fileObj.originalFileHash ?? null,
-      versionNumber: 0,
-      fulfilledFromRequest: recordRequest.inviteCode,
+    // Step 3: Initialize record on-chain with requester as administrator
+    // Admin cloud function handles this — guest has no wallet to call the contract
+    try {
+      const initFn = httpsCallable(getFunctions(), 'initializeRoleOnChainForRequester');
+      await initFn({
+        recordId,
+        requesterUserId: recordRequest.requesterId,
+        role: 'administrator',
+      });
+    } catch (err: any) {
+      await BlockchainSyncQueueService.logFailure({
+        contract: 'MemberRoleManager',
+        action: 'initializeRoleOnChainForRequester',
+        userId: guestUid,
+        error: err?.message || 'Unknown error',
+        context: {
+          type: 'permission',
+          targetUserId: recordRequest.requesterId,
+          targetWalletAddress: requesterProfile.wallet.address ?? '',
+          role: 'administrator',
+          recordId,
+        },
+      });
+      throw err;
+    }
 
-      uploadedAt: serverTimestamp(),
-      createdAt: serverTimestamp(),
-      lastModified: serverTimestamp(),
-      status: 'completed',
-    });
-
-    await setDoc(recordRef, documentData);
-    console.log('✅ Firestore record document created:', recordId);
-
-    // ── Step 8: Write wrappedKey for requester ────────────────────────────────
+    // Step 4: Write wrappedKey doc for requester
     await setDoc(doc(db, 'wrappedKeys', `${recordId}_${recordRequest.requesterId}`), {
       recordId,
       userId: recordRequest.requesterId,
-      wrappedKey: wrappedKeyForRequester,
+      wrappedKey,
+      isCreator: false,
       isActive: true,
-      isCreator: false, // → RecordDecryptionService uses RSA unwrap path
-      grantedBy: null,
       createdAt: serverTimestamp(),
     });
-    console.log('✅ wrappedKeys document created for requester');
 
-    // ── Step 9: Write wrappedKey for provider if Path A ──────────────────────
-    if (wrappedKeyForProvider && providerUserId) {
-      await setDoc(doc(db, 'wrappedKeys', `${recordId}_${providerUserId}`), {
-        recordId,
-        userId: providerUserId,
-        wrappedKey: wrappedKeyForProvider,
-        isActive: true,
-        isCreator: false,
-        grantedBy: null,
-        createdAt: serverTimestamp(),
-      });
-      console.log('✅ wrappedKeys document created for provider');
-    }
+    // Step 5: Grant requester role in Firestore record arrays
+    await updateDoc(doc(db, 'records', recordId), {
+      administrators: arrayUnion(recordRequest.requesterId),
+    });
 
-    // ── Step 10: Mark request fulfilled ──────────────────────────────────────
+    // Step 6: Mark request fulfilled
     await updateDoc(doc(db, 'recordRequests', recordRequest.inviteCode), {
       status: 'fulfilled',
       fulfilledRecordIds: arrayUnion(recordId),
       fulfilledAt: serverTimestamp(),
     });
-    console.log('✅ recordRequest marked fulfilled');
-
-    // Return the fileKey alongside the result so the page can hold it in
-    // state for the post-registration wrap (Path B). The key lives in memory
-    // only — it is gone permanently if the page unmounts or the user navigates. as f
-    return { success: true, recordId, fileKey: encrypted.fileKey };
-  }
-
-  // ============================================================================
-  // POST-REGISTRATION WRAP (Path B)
-  // ============================================================================
-
-  /**
-   * Called after a successful upload (Path B) if the provider chooses to
-   * register an account on the success screen.
-   *
-   * The page holds the fileKey returned by fulfill() in component state.
-   * Once registration completes and the provider's public key is saved to
-   * Firestore, the page calls this method to write their wrappedKeys entry.
-   *
-   * This window closes the moment the page unmounts — the key cannot be
-   * recovered after that point.
-   *
-   * @param recordId          - The record created by fulfill()
-   * @param fileKey           - The AES file key from FulfillRequestResult
-   * @param providerUserId    - UID of the newly registered provider
-   * @param providerPublicKey - RSA public key from their fresh user profile
-   */
-  static async wrapAndSaveForProvider(
-    recordId: string,
-    fileKey: CryptoKey,
-    providerUserId: string,
-    providerPublicKey: string
-  ): Promise<void> {
-    const db = getFirestore();
-
-    const rsaKey = await SharingKeyManagementService.importPublicKey(providerPublicKey);
-    const wrappedKey = await SharingKeyManagementService.wrapKey(fileKey, rsaKey);
-
-    await setDoc(doc(db, 'wrappedKeys', `${recordId}_${providerUserId}`), {
-      recordId,
-      userId: providerUserId,
-      wrappedKey,
-      isActive: true,
-      isCreator: false,
-      grantedBy: null,
-      createdAt: serverTimestamp(),
-    });
-
-    // Also add them as administrator on the record so they can actually access it
-    const { updateDoc: update, doc: docRef } = await import('firebase/firestore');
-    await update(docRef(db, 'records', recordId), {
-      administrators: (await import('firebase/firestore')).arrayUnion(providerUserId),
-    });
-
-    console.log('✅ Post-registration wrap complete for provider:', providerUserId);
   }
 }

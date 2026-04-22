@@ -29,12 +29,14 @@ import { useInboundRequests } from '../../hooks/usePendingInboundRequests';
 import { LinkModalOverlay, ExecutingPhase, ErrorPhase, PickRolePhase } from '../ui/LinkModalShell';
 import { RecordRequest } from '@belrose/shared';
 import { FulfillRequestService } from '../../services/fulfillRequestService';
+import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 
 interface LinkRequestModalProps {
   record: FileObject;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (requests: RecordRequest[]) => void;
+  isGuest?: boolean;
 }
 
 // ── Main modal ────────────────────────────────────────────────────────────────
@@ -44,6 +46,7 @@ const LinkRequestModal: React.FC<LinkRequestModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  isGuest,
 }) => {
   const [phase, setPhase] = useState<'pick-requests' | 'pick-role' | 'executing' | 'error'>(
     'pick-requests'
@@ -75,9 +78,20 @@ const LinkRequestModal: React.FC<LinkRequestModalProps> = ({
     if (selected.length === 0) return;
     setPhase('executing');
     try {
-      await Promise.all(
-        selected.map(r => FulfillRequestService.linkExistingRecord(r, record.id, selectedRole))
-      );
+      if (isGuest) {
+        // Verify throwaway session key is still alive before attempting fulfill.
+        // If it's gone the user needs to reload — fulfillAsGuest will also check
+        // internally but this gives a cleaner error before any Firestore reads.
+        const throwawayKey = await EncryptionKeyManager.getSessionKey();
+        if (!throwawayKey) {
+          throw new Error('Your session has expired. Please reload the page and try again.');
+        }
+        await Promise.all(selected.map(r => FulfillRequestService.fulfillAsGuest(r, record.id)));
+      } else {
+        await Promise.all(
+          selected.map(r => FulfillRequestService.linkExistingRecord(r, record.id, selectedRole))
+        );
+      }
       onSuccess(selected);
       handleClose();
     } catch (err: any) {
@@ -113,8 +127,9 @@ const LinkRequestModal: React.FC<LinkRequestModalProps> = ({
           selectedIds={selectedIds}
           onToggle={toggle}
           onClearAll={() => setSelectedIds(new Set())}
-          onNext={() => setPhase('pick-role')}
+          onNext={() => (isGuest ? handleConfirm() : setPhase('pick-role'))}
           onClose={handleClose}
+          isGuest={isGuest}
         />
       )}
 
@@ -146,6 +161,7 @@ interface PickRequestsPhaseProps {
   onClearAll: () => void;
   onNext: () => void;
   onClose: () => void;
+  isGuest?: boolean;
 }
 
 const PickRequestsPhase: React.FC<PickRequestsPhaseProps> = ({
@@ -157,6 +173,7 @@ const PickRequestsPhase: React.FC<PickRequestsPhaseProps> = ({
   onClearAll,
   onNext,
   onClose,
+  isGuest,
 }) => {
   const [search, setSearch] = useState('');
 
@@ -301,7 +318,7 @@ const PickRequestsPhase: React.FC<PickRequestsPhaseProps> = ({
             Cancel
           </Button>
           <Button className="flex-1" disabled={selectedIds.size === 0} onClick={onNext}>
-            Next: set access level
+            {isGuest ? 'Fulfill request' : 'Next: set access level'}
           </Button>
         </div>
       </div>

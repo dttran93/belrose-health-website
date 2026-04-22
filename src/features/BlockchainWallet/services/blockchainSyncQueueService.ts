@@ -85,7 +85,14 @@ export type SyncContext =
   | { type: 'trustee-accept'; trustorId: string; trusteeId: string }
   | { type: 'trustee-revoke'; trustorId: string; trusteeId: string }
   | { type: 'trustee-grant'; trustorId: string; trusteeId: string; recordIds: string[] }
-  | { type: 'trustee-level-update'; trustorId: string; trusteeId: string };
+  | { type: 'trustee-level-update'; trustorId: string; trusteeId: string }
+  | {
+      type: 'guest-provider-role-backfill';
+      recordId: string;
+      guestUserId: string;
+      role: 'administrator';
+      note: 'Record initialized with requester before provider claimed account. Provider has Firestore access but no on-chain role.';
+    };
 
 export interface BlockchainSyncFailure extends BaseSyncFailure {
   context: SyncContext;

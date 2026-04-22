@@ -47,6 +47,7 @@ export {
   deactivateWalletOnChain,
   reactivateWalletOnChain,
   initializeRoleOnChain,
+  initializeRoleOnChainForRequester,
 } from './handlers/memberRegistry';
 
 // ==================== NOTIFICATIONS ====================

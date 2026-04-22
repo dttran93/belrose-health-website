@@ -37,6 +37,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   className = '',
   externalLinkRequestFile,
   onExternalLinkRequestClose,
+  isGuest,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('upload');
   const [linkRequestRecord, setLinkRequestRecord] = useState<FileObject | null>(null);
@@ -206,6 +207,7 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
         isOpen={resolvedLinkRequestRecord !== null}
         onClose={handleLinkRequestClose}
         onSuccess={handleLinkRequestClose}
+        isGuest={isGuest}
       />
       <SubjectActionDialog {...subjectFlow.dialogProps} />
     </>

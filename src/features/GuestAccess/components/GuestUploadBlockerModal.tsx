@@ -7,7 +7,7 @@
 
 import React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowRight, Lock, Loader2, Send, UserPlus, AlertTriangle } from 'lucide-react';
+import { Lock, Loader2, Send, UserPlus, AlertTriangle } from 'lucide-react';
 import { RecordRequest } from '@belrose/shared';
 import { FileObject } from '@/types/core';
 import { truncate } from '@/utils/dataFormattingUtils';

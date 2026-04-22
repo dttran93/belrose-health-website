@@ -4,11 +4,10 @@ import { useFHIRConversion } from '@/features/AddRecord/hooks/useFHIRConversion'
 import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
 import { FileObject } from '@/types/core';
 import CombinedUploadFHIR from '@/features/AddRecord/components/CombinedUploadFHIR';
-import { useBlocker, useLocation, useNavigate } from 'react-router-dom';
+import { useBlocker, useNavigate } from 'react-router-dom';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { useInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
 import { GuestUploadBlockerModal } from '@/features/GuestAccess/components/GuestUploadBlockerModal';
-import { FulfillRequestService } from '@/features/RequestRecord/services/fulfillRequestService';
 import { GuestClaimAccountModal } from '@/features/GuestAccess/components/GuestClaimAccountModal';
 
 interface AddRecordProps {
@@ -23,7 +22,6 @@ interface AddRecordProps {
  */
 const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user } = useAuthContext();
 
   const isGuest = user?.isGuest === true;
@@ -52,7 +50,11 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
   const [fulfilling, setFulfilling] = useState(false);
   const [showClaimModal, setShowClaimModal] = useState(false);
   const hasCompletedFiles = files.some(f => f.status === 'completed');
-  const { filtered: pendingRequests, loading: requestsLoading } = useInboundRequests();
+  const {
+    filtered: pendingRequests,
+    loading: requestsLoading,
+    refresh: refreshRequests,
+  } = useInboundRequests();
   const pendingRequest = isGuest ? (pendingRequests[0] ?? null) : null;
 
   const completedFileIds = files
@@ -84,8 +86,6 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
       return handleFHIRConverted(fileId, uploadResult); // Pass the file object
     });
   }, [setFHIRConversionCallback, handleFHIRConverted, files]);
-
-  console.log('🔍 Destructured updateFileStatus:', updateFileStatus);
 
   // Block navigation if guest has uploaded something
 
@@ -135,7 +135,11 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
           onReview={handleReviewFile}
           processFile={processFile}
           externalLinkRequestFile={linkRequestFile}
-          onExternalLinkRequestClose={() => setLinkRequestFile(null)}
+          onExternalLinkRequestClose={() => {
+            setLinkRequestFile(null);
+            refreshRequests();
+          }}
+          isGuest={isGuest}
         />
       </div>
 

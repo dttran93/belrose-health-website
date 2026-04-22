@@ -414,3 +414,75 @@ export const initializeRoleOnChain = onCall(
     }
   }
 );
+
+/**
+ * Cloud function for guest access fulfillment flow — initializes record on-chain with requester as admin
+ * Rather than the creator themselves. In this flow the guest has no wallet, so the admin wallet calls initializeRecordRole directly with the requester's linked wallet.
+ */
+export const initializeRoleOnChainForRequester = onCall(
+  { secrets: ['ADMIN_WALLET_PRIVATE_KEY', 'RPC_URL'] },
+  async request => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'User must be authenticated');
+
+    const { recordId, requesterUserId, role } = request.data;
+
+    if (!recordId || !requesterUserId) {
+      throw new HttpsError('invalid-argument', 'Missing recordId or requesterUserId');
+    }
+    if (role !== 'administrator' && role !== 'owner') {
+      throw new HttpsError('invalid-argument', 'Role must be administrator or owner');
+    }
+
+    const db = getFirestore();
+
+    // Verify caller uploaded this record
+    const recordDoc = await db.collection('records').doc(recordId).get();
+    const recordData = recordDoc.data();
+    if (!recordData) throw new HttpsError('not-found', 'Record not found');
+    if (recordData.uploadedBy !== request.auth.uid) {
+      throw new HttpsError('permission-denied', 'Only the uploader can initialize roles');
+    }
+
+    // Get requester's wallet
+    const requesterDoc = await db.collection('users').doc(requesterUserId).get();
+    const requesterData = requesterDoc.data();
+    if (!requesterData) throw new HttpsError('not-found', 'Requester not found');
+
+    const linkedWallets = requesterData.onChainIdentity?.linkedWallets || [];
+    const activeWallet = linkedWallets.find((w: any) => w.isWalletActive);
+    if (!activeWallet) {
+      throw new HttpsError('failed-precondition', 'Requester has no active wallet');
+    }
+
+    try {
+      const contract = getAdminContract();
+
+      // Idempotency check
+      const owners = await contract.getRecordOwners(recordId);
+      const admins = await contract.getRecordAdmins(recordId);
+      if (owners.length > 0 || admins.length > 0) {
+        throw new HttpsError('already-exists', 'Record already initialized on chain');
+      }
+
+      const tx = await contract.initializeRecordRole(recordId, activeWallet.address, role);
+      const receipt = await tx.wait();
+
+      await db
+        .collection('records')
+        .doc(recordId)
+        .update({
+          blockchainRoleInitialization: {
+            blockchainInitialized: true,
+            blockchainInitializedAt: Timestamp.now(),
+            blockchainInitTxHash: tx.hash,
+            blockchainInitBlockNumber: receipt.blockNumber,
+          },
+        });
+
+      return { success: true, txHash: tx.hash, blockNumber: receipt?.blockNumber };
+    } catch (error: any) {
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError('internal', `Blockchain error: ${error.message}`);
+    }
+  }
+);
