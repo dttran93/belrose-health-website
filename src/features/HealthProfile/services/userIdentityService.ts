@@ -8,6 +8,12 @@ import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionK
 import { RecordHashService } from '@/features/ViewEditRecord/services/generateRecordHash';
 import { auth } from '@/firebase/config';
 import { updateFirestoreRecord } from '@/firebase/uploadUtils';
+import { ethers } from 'ethers';
+
+export function getIdentityRecordId(userId: string): string {
+  const userIdHash = ethers.id(userId); // keccak256 of userId
+  return `${userIdHash}_u_id`;
+}
 
 /**
  * Converts a UserIdentity form object into a FHIR R4 Patient bundle.
@@ -61,7 +67,7 @@ export async function saveUserIdentityRecord(
   const user = auth.currentUser;
   if (!user) throw new Error('User not authenticated');
 
-  const recordId = `${userId}_u_id`;
+  const recordId = getIdentityRecordId(userId);
   const sourceType = 'Belrose Identity Form';
   const fhirData = buildIdentityFHIRBundle(identity, userId);
   const fileName = 'User Identity';

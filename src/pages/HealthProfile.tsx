@@ -36,6 +36,7 @@ import { IdentityTab } from '../features/HealthProfile/components/IdentityTab/Id
 import { useProfileCompleteness } from '../features/HealthProfile/hooks/useProfileCompleteness';
 import ProfileCompletenessTab from '../features/HealthProfile/components/ProfileCompletenessTab/ProfileCompletenessTab';
 import useBlockchainCompleteness from '../features/HealthProfile/hooks/useBlockchainCompleteness';
+import { getIdentityRecordId } from '@/features/HealthProfile/services/userIdentityService';
 
 // ============================================================================
 // TAB CONFIG
@@ -134,7 +135,7 @@ const HealthProfile: React.FC = () => {
   });
 
   const identityRecord = useMemo(
-    () => allSubjectRecords.find(r => r.id === `${resolvedSubjectId}_u_id`) ?? null,
+    () => allSubjectRecords.find(r => r.id === getIdentityRecordId(resolvedSubjectId)) ?? null,
     [allSubjectRecords, resolvedSubjectId]
   );
 

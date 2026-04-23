@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Save, Loader2 } from 'lucide-react';
 import { UserIdentity } from '../../utils/parseUserIdentity';
-import { saveUserIdentityRecord } from '../../services/userIdentityService';
+import { getIdentityRecordId, saveUserIdentityRecord } from '../../services/userIdentityService';
 import { toast } from 'sonner';
 import { FileObject } from '@/types/core';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
@@ -44,7 +44,7 @@ export const UserIdentityForm: React.FC<UserIdentityFormProps> = ({
       await saveUserIdentityRecord(userId, form);
 
       // Fetch the just-saved record to pass back
-      const recordId = `${userId}_u_id`;
+      const recordId = getIdentityRecordId(userId);
       const db = getFirestore();
       const snap = await getDoc(doc(db, 'records', recordId));
       const record = mapFirestoreToFileObject(snap.id, snap.data()!);

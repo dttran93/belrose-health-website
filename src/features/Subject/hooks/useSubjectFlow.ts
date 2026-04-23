@@ -246,27 +246,28 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
    * Returns true if ready to proceed, false if failed
    */
   const runPreparation = useCallback(
-    async (operationType: SubjectOperationType): Promise<boolean> => {
+    async (operationType: SubjectOperationType, overrideRecordId?: string): Promise<boolean> => {
       setPhase('preparing');
       setError(null);
+      const targetRecordId = overrideRecordId ?? recordId;
 
       try {
         // Choose the right verification method based on operation type
         let prereqs;
         switch (operationType) {
           case 'setSubjectAsSelf':
-            prereqs = await SubjectPreparationService.verifyPrerequisites(recordId);
+            prereqs = await SubjectPreparationService.verifyPrerequisites(targetRecordId);
             break;
           case 'acceptSubjectRequest':
-            prereqs = await SubjectPreparationService.verifyAcceptPrerequisites(recordId);
+            prereqs = await SubjectPreparationService.verifyAcceptPrerequisites(targetRecordId);
             break;
           case 'rejectSubjectStatus':
-            prereqs = await SubjectPreparationService.verifyRemovePrerequisites(recordId);
+            prereqs = await SubjectPreparationService.verifyRemovePrerequisites(targetRecordId);
             break;
           default:
             // For other operations (rejectSubjectRequest, removeSubjectByOwner),
             // just check basic wallet readiness
-            prereqs = await SubjectPreparationService.verifyAcceptPrerequisites(recordId);
+            prereqs = await SubjectPreparationService.verifyAcceptPrerequisites(targetRecordId);
         }
 
         if (prereqs.ready) {
@@ -280,17 +281,17 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
 
         if (walletNotReady || recordNotInitialized) {
           // Either wallet needs setup OR record needs initialization — prepare() handles both
-          await SubjectPreparationService.prepare(recordId, progress => {
+          await SubjectPreparationService.prepare(targetRecordId, progress => {
             setPreparationProgress(progress);
           });
 
           // Verify again after preparation
           const finalCheck =
             operationType === 'setSubjectAsSelf'
-              ? await SubjectPreparationService.verifyPrerequisites(recordId)
+              ? await SubjectPreparationService.verifyPrerequisites(targetRecordId)
               : operationType === 'rejectSubjectStatus'
-                ? await SubjectPreparationService.verifyRemovePrerequisites(recordId)
-                : await SubjectPreparationService.verifyAcceptPrerequisites(recordId);
+                ? await SubjectPreparationService.verifyRemovePrerequisites(targetRecordId)
+                : await SubjectPreparationService.verifyAcceptPrerequisites(targetRecordId);
 
           if (!finalCheck.ready) {
             // Still not ready after wallet setup - must be a different issue
@@ -743,6 +744,38 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
     [pendingOperation, recordId, revokeAccess, reset, refetchAll, onSuccess]
   );
 
+  /**
+   * Fast-path for identity records: skip selection, go straight to preparing.
+   * Always sets the user as owner of their own identity record.
+   */
+  const initiateAddSubjectAsSelf = useCallback(
+    async (overrideRecordId?: string) => {
+      const auth = getAuth();
+      const userId = auth.currentUser?.uid;
+
+      const targetRecordId = overrideRecordId ?? recordId; // ← use override if provided
+
+      // Guard: already a subject
+      if (userId && currentSubjects.includes(userId)) return;
+
+      setSubjectChoice('self');
+      setSelectedRole('owner');
+      setSelectedUser(null);
+      setPendingOperation({
+        type: 'setSubjectAsSelf',
+        recordId: targetRecordId,
+        subjectChoice: 'self',
+        selectedRole: 'owner',
+      });
+
+      const ready = await runPreparation('setSubjectAsSelf', targetRecordId);
+      if (ready) {
+        setPhase('confirming'); // still shows the confirm step before executing
+      }
+    },
+    [recordId, currentSubjects, runPreparation]
+  );
+
   // ==========================================================================
   // COMPUTED VALUES
   // ==========================================================================
@@ -801,6 +834,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
     initiateAddSubject,
     initiateAcceptRequest,
     initiateRejectRequest,
+    initiateAddSubjectAsSelf,
 
     // Remove subject status
     initiateRemoveSubjectStatus,

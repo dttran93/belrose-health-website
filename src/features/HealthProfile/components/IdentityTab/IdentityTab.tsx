@@ -51,9 +51,9 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({
     setEditing(false);
 
     // Only prompt blockchain anchoring on first save (not edits)
-    if (!hasIdentityRecord) {
+    if (!hasIdentityRecord && !subjectFlow.isSubject) {
       setSavedRecord(record);
-      subjectFlow.initiateAddSubject?.(); // opens the dialog at 'selecting' phase
+      subjectFlow.initiateAddSubjectAsSelf?.(record.id);
     } else {
       onSaved?.();
     }
