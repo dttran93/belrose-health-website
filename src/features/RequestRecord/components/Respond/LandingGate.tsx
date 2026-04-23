@@ -22,7 +22,8 @@ interface LandingGateProps {
   isAlreadyLoggedIn: boolean;
   // State 2: target email has a full Belrose account but isn't signed in
   targetIsRegistered: boolean;
-  signingIn?: boolean;
+  signingIn: boolean;
+  signingInGuest: boolean;
   onContinueWithAccount: () => void; // State 3: new provider — guest + modal
   onContinueWithoutAccount: () => void; // Anonymous path
   onContinueAsExistingUser: () => void; // State 1: already signed in → upload
@@ -33,6 +34,7 @@ const LandingGate: React.FC<LandingGateProps> = ({
   isAlreadyLoggedIn,
   targetIsRegistered,
   signingIn = false,
+  signingInGuest = false,
   onContinueWithAccount,
   onContinueWithoutAccount,
   onContinueAsExistingUser,
@@ -147,17 +149,27 @@ const LandingGate: React.FC<LandingGateProps> = ({
 
               <button
                 onClick={onContinueWithoutAccount}
-                disabled={signingIn}
+                disabled={signingIn || signingInGuest}
                 className="w-full bg-slate-50 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors rounded-xl px-5 py-4 text-left flex items-center gap-4 border border-slate-200 group"
               >
                 <div className="w-9 h-9 bg-slate-200 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Upload className="w-4 h-4 text-slate-500" />
+                  {signingInGuest ? (
+                    <Loader2 className="w-4 h-4 text-slate-500 animate-spin" />
+                  ) : (
+                    <Upload className="w-4 h-4 text-slate-500" />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-700">Upload without an account</p>
-                  <p className="text-xs text-slate-400 mt-0.5">No record access after upload</p>
+                  <p className="text-sm font-semibold text-slate-700">
+                    {signingInGuest ? 'Setting up session...' : 'Upload without an account'}
+                  </p>
+                  {!signingInGuest && (
+                    <p className="text-xs text-slate-400 mt-0.5">No record access after upload</p>
+                  )}
                 </div>
-                <ArrowRight className="w-4 h-4 text-slate-300 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                {!signingInGuest && (
+                  <ArrowRight className="w-4 h-4 text-slate-300 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                )}
               </button>
             </>
           )}

@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.refineRecord = exports.checkEmailRegistrationStatus = exports.getKeyBundle = exports.aiChat = exports.getSponsorshipStatus = exports.signSponsorship = exports.onRecordRequestUpdated = exports.onRecordRequestCreated = exports.onRecordDeletionEventUpdated = exports.onRecordDeletionEventCreated = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.initializeRoleOnChainForRequester = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.createRecordRequest = exports.redeemGuestInvite = exports.createGuestInvite = exports.sendPasswordChangeEmail = exports.sendWaitlistConfirmationEmail = exports.sendAlphaApprovalEmail = exports.sendShareInvitationEmail = exports.personaWebhook = exports.checkVerificationStatus = exports.createVerificationSession = exports.getEncryptedWallet = exports.createWallet = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = exports.setPlatformAdmin = void 0;
+exports.refineRecord = exports.checkEmailRegistrationStatus = exports.getKeyBundle = exports.aiChat = exports.getSponsorshipStatus = exports.signSponsorship = exports.onRecordRequestUpdated = exports.onRecordRequestCreated = exports.onRecordDeletionEventUpdated = exports.onRecordDeletionEventCreated = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.initializeRoleOnChainForRequester = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.guestPasswordUpdate = exports.createRecordRequest = exports.redeemGuestInvite = exports.createGuestInvite = exports.sendPasswordChangeEmail = exports.sendWaitlistConfirmationEmail = exports.sendAlphaApprovalEmail = exports.sendShareInvitationEmail = exports.personaWebhook = exports.checkVerificationStatus = exports.createVerificationSession = exports.getEncryptedWallet = exports.createWallet = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = exports.setPlatformAdmin = void 0;
 // functions/src/index.ts
 const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin
@@ -76,6 +76,8 @@ var redeemGuestInvite_1 = require("./handlers/redeemGuestInvite");
 Object.defineProperty(exports, "redeemGuestInvite", { enumerable: true, get: function () { return redeemGuestInvite_1.redeemGuestInvite; } });
 var createRecordRequest_1 = require("./handlers/createRecordRequest");
 Object.defineProperty(exports, "createRecordRequest", { enumerable: true, get: function () { return createRecordRequest_1.createRecordRequest; } });
+var guestPasswordUpdate_1 = require("./handlers/guestPasswordUpdate");
+Object.defineProperty(exports, "guestPasswordUpdate", { enumerable: true, get: function () { return guestPasswordUpdate_1.guestPasswordUpdate; } });
 // ==================== HEALTH CHECK ====================
 var healthCheck_1 = require("./handlers/healthCheck");
 Object.defineProperty(exports, "health", { enumerable: true, get: function () { return healthCheck_1.health; } });

@@ -62,15 +62,6 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
     },
   });
 
-  const resolvedLinkRequestRecord = externalLinkRequestFile ?? linkRequestRecord;
-  const handleLinkRequestClose = () => {
-    if (externalLinkRequestFile) {
-      onExternalLinkRequestClose?.();
-    } else {
-      setLinkRequestRecord(null);
-    }
-  };
-
   const handleFollowUpAction = (fileItem: FileObject, itemId: string) => {
     if (itemId === 'link-request') {
       lastLinkRequestRecord.current = fileItem;
@@ -202,13 +193,26 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
           )}
         </div>
       </div>
-      <LinkRequestModal
-        record={resolvedLinkRequestRecord ?? lastLinkRequestRecord.current!}
-        isOpen={resolvedLinkRequestRecord !== null}
-        onClose={handleLinkRequestClose}
-        onSuccess={handleLinkRequestClose}
-        isGuest={isGuest}
-      />
+      {/*Link Request Modal - called from within FileListItem follow-up action*/}
+      {linkRequestRecord && (
+        <LinkRequestModal
+          record={linkRequestRecord}
+          isOpen={true}
+          onClose={() => setLinkRequestRecord(null)}
+          onSuccess={() => setLinkRequestRecord(null)}
+          isGuest={isGuest}
+        />
+      )}
+      {/* Link Request Modal called from Add Record's blocker (passed down) Yeah it's a little janky but w/e*/}
+      {externalLinkRequestFile && (
+        <LinkRequestModal
+          record={externalLinkRequestFile}
+          isOpen={true}
+          onClose={onExternalLinkRequestClose}
+          onSuccess={onExternalLinkRequestClose}
+          isGuest={isGuest}
+        />
+      )}
       <SubjectActionDialog {...subjectFlow.dialogProps} />
     </>
   );

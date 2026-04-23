@@ -9,9 +9,6 @@
  * Step flow:
  *   'loading'   → Validate code, read private key from hash, stamp readAt
  *   'landing'   → LandingGate — who is requesting, account CTA
- *   'upload'    → CombinedUploadFHIR ingestion
- *   'uploading' → FulfillRequestService.fulfill() in progress
- *   'success'   → Confirmation + GuestClaimAccountModal if still a guest
  *   'cancelled' → Request was cancelled by requester
  *   'error'     → Invalid code, already fulfilled, network failure etc.
  *
@@ -35,14 +32,10 @@ import {
   increment,
 } from 'firebase/firestore';
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { FulfillRequestService } from '../features/RequestRecord/services/fulfillRequestService';
 import { useAuthContext } from '@/features/Auth/AuthContext';
-import type { FileObject } from '@/types/core';
 import StatusCard from '@/features/RequestRecord/components/ui/StatusCard';
 import PageShell from '@/features/RequestRecord/components/ui/PageShell';
 import LandingGate from '@/features/RequestRecord/components/Respond/LandingGate';
-import UploadView from '@/features/RequestRecord/components/Respond/UploadView';
-import SuccessView from '@/features/RequestRecord/components/Respond/SuccessView';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getAuth, signInWithCustomToken, signOut } from 'firebase/auth';
 import { GuestClaimAccountModal } from '@/features/GuestAccess/components/GuestClaimAccountModal';
@@ -63,12 +56,12 @@ const FulfillRequestPage: React.FC = () => {
   const [recordRequest, setRecordRequest] = useState<RecordRequest | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [signingIn, setSigningIn] = useState(false);
+  const [signingInGuest, setSigningInGuest] = useState(false);
   const [showClaimModal, setShowClaimModal] = useState(false);
   const [targetIsRegistered, setTargetIsRegistered] = useState(false);
 
   // Provider's RSA private key — read once from URL hash on mount,
   // held in memory for the lifetime of the page, never persisted.
-  // Used by FulfillRequestService.fulfill() to wrap the file key.
   const providerPrivateKeyRef = useRef<string | null>(null);
 
   const navigate = useNavigate();
@@ -196,7 +189,7 @@ const FulfillRequestPage: React.FC = () => {
 
   // Branch 3: needs throwaway key to pass EncryptionGate
   const handleContinueWithoutAccount = async () => {
-    setSigningIn(true);
+    setSigningInGuest(true);
     try {
       const guestCode = searchParams.get('guestCode');
       if (!guestCode) throw new Error('No Guest Code');
@@ -219,7 +212,7 @@ const FulfillRequestPage: React.FC = () => {
       setErrorMessage('Failed to create your session. Please try again.');
       setStep('error');
     } finally {
-      setSigningIn(false);
+      setSigningInGuest(false);
     }
   };
 
@@ -247,6 +240,7 @@ const FulfillRequestPage: React.FC = () => {
             onContinueWithoutAccount={handleContinueWithoutAccount}
             onContinueAsExistingUser={() => navigate('/app/record-request')}
             signingIn={signingIn}
+            signingInGuest={signingInGuest}
           />
         )}
 
@@ -257,11 +251,7 @@ const FulfillRequestPage: React.FC = () => {
         {step === 'error' && <ErrorView message={errorMessage} />}
       </PageShell>
 
-      {/* GuestClaimAccountModal
-          - Before upload: opened by handleContinueWithAccount after sign-in
-            onClose → proceeds to upload (handleClaimModalClose)
-          - After upload (Path C): opened by SuccessView's onRegister button
-            onClose → just closes, wrapAndSaveForProvider fires via useEffect */}
+      {/* GuestClaimAccountModal */}
       {user && (
         <GuestClaimAccountModal
           isOpen={showClaimModal}

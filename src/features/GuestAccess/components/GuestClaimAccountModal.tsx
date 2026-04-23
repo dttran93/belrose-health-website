@@ -18,13 +18,22 @@
  *   - Steps 3/4/4b (user profile, guestInvites, targetUserId) — in batch.
  *     These must succeed or fail atomically: a half-claimed state where isGuest
  *     is false but encryption keys aren't saved would break decryption.
+ *   - Step 4 (password update) — via Cloud Function (guestPasswordUpdate).
+ *     Uses Admin SDK to bypass Firebase's 5-minute recent-login requirement,
+ *     which guests routinely exceed. Invalidates the auth token, so refreshUser()
+ *     is called immediately after before any further Firebase client calls.
+ *   - Step 5 (mark guestInvites accepted) — separate batch AFTER Cloud Function.
+ *     The CF guards on guestInvites.status == 'pending', so this must commit
+ *     only after the password update succeeds. Intentionally not atomic with
+ *     the profile batch — a failed invite mark is non-fatal since the account
+ *     is already fully claimed at that point.
  */
 
 import React, { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { getAuth, updatePassword, updateProfile } from 'firebase/auth';
+import { getAuth, signInWithCustomToken, updateProfile } from 'firebase/auth';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
@@ -52,6 +61,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import PasswordStrengthIndicator from '@/features/Auth/components/ui/PasswordStrengthIndicator';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 type ClaimStep = 'credentials' | 'recovery' | 'processing' | 'done';
 
@@ -199,6 +209,10 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         cryptoData.publicKey
       );
 
+      // ===========================================================================================
+      // Step 1 - Rewrap guest keys for record access, request notes, and uploaded records
+      // ===========================================================================================
+
       // ── Step 1a: Rewrap guest file keys (Sharing Flow) ────────────────────
       // In batch — these belong to the same atomic "account is now real" write
       // as the user profile update below.
@@ -307,28 +321,23 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         }
       }
 
-      // ── Step 2: Set password on Firebase Auth account ────────────────────
-      setProgress({ message: 'Securing your account...' });
-      try {
-        await updatePassword(auth.currentUser!, password);
-      } catch (err: any) {
-        if (err.code === 'auth/requires-recent-login') {
-          throw new Error(
-            'Your session has expired. Please click the invite link again to refresh your session.'
-          );
-        }
-        throw err;
-      }
-
-      // ── Step 3: Update user profile (in batch) ────────────────────────────
+      // ── Step 2: Update user profile (in batch) ────────────────────────────
       setProgress({ message: 'Saving your account details...' });
       const displayName = `${firstName} ${lastName}`;
+
+      // Deactivate any placeholder guest wallets — they won't be used anymore and it's cleaner to mark them as inactive than to delete them from the on-chain identity array.
+      const currentWallets = user.onChainIdentity?.linkedWallets ?? [];
+      const deactivatedWallets = currentWallets.map((w: any) => ({
+        ...w,
+        isWalletActive: false,
+      }));
 
       batch.update(doc(db, 'users', guestUid), {
         displayName,
         displayNameLower: displayName.toLowerCase(),
         firstName,
         lastName,
+        'onChainIdentity.linkedWallets': deactivatedWallets,
         isGuest: false,
         emailVerified: true,
         emailVerifiedAt: serverTimestamp(),
@@ -348,23 +357,7 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         },
       });
 
-      // ── Step 4: Mark guestInvites as accepted (in batch) ──────────────────
-      const inviteSnap = await getDocs(
-        query(
-          collection(db, 'guestInvites'),
-          where('guestUserId', '==', guestUid),
-          where('status', '==', 'pending')
-        )
-      );
-
-      inviteSnap.docs.forEach(inviteDoc => {
-        batch.update(inviteDoc.ref, {
-          status: 'accepted',
-          claimedAt: serverTimestamp(),
-        });
-      });
-
-      // ── Step 4b: Backfill targetUserId on recordRequests (in batch) ───────
+      // ── Step 2b: Backfill targetUserId on recordRequests (in batch) ───────
       // useInboundRequests queries by both userId and email, but setting
       // targetUserId ensures future queries by ID alone still find them.
       const backfillSnap = await getDocs(
@@ -395,7 +388,7 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         );
       }
 
-      // ── Step 5: Generate real wallet ──────────────────────────────────────
+      // ── Step 3: Generate real wallet ──────────────────────────────────────
       setProgress({ message: 'Generating your wallet...' });
       const walletData = await WalletGenerationService.generateWallet({
         userId: guestUid,
@@ -404,6 +397,42 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
 
       // Set real master key in session — required before smart account init
       EncryptionKeyManager.setSessionKey(cryptoData.masterKey);
+
+      // ── Step 4: Set password on Firebase Auth account ────────────────────
+      // Cloud function to more securely handle passwords for guest accounts which are likely to hit 5 minute limit for firebase
+      setProgress({ message: 'Securing your account...' });
+      try {
+        const updatePasswordFn = httpsCallable(getFunctions(), 'guestPasswordUpdate');
+        const result = await updatePasswordFn({ newPassword: password });
+        const { customToken } = result.data as { customToken: string };
+        await signInWithCustomToken(getAuth(), customToken);
+      } catch (err: any) {
+        if (err.code === 'auth/requires-recent-login') {
+          throw new Error(
+            'Your session has expired. Please click the invite link again to refresh your session.'
+          );
+        }
+        throw err;
+      }
+
+      // ── Step 5: Mark guestInvites as accepted (in batch) ──────────────────
+      // Has to come after password change, because cloud function checks for guestInvite with status pending
+      const inviteSnap = await getDocs(
+        query(
+          collection(db, 'guestInvites'),
+          where('guestUserId', '==', guestUid),
+          where('status', '==', 'pending')
+        )
+      );
+
+      const inviteBatch = writeBatch(db);
+      inviteSnap.docs.forEach(inviteDoc => {
+        inviteBatch.update(inviteDoc.ref, {
+          status: 'accepted',
+          claimedAt: serverTimestamp(),
+        });
+      });
+      await inviteBatch.commit();
 
       // ── Step 6: Register EOA on blockchain ───────────────────────────────
       setProgress({ message: 'Registering on the secure network...' });
@@ -452,8 +481,14 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
 
       // ── Step 12: Refresh auth context so banner disappears ───────────────────
       setProgress({ message: 'Finalizing...' });
-      await updateProfile(auth.currentUser!, { displayName });
-      await refreshUser();
+
+      try {
+        await getAuth().currentUser?.getIdToken(true);
+        await refreshUser();
+        await updateProfile(getAuth().currentUser!, { displayName });
+      } catch (err) {
+        console.warn('⚠️ Post-claim refresh failed — account was created successfully', err);
+      }
 
       setStep('done');
       toast.success('Welcome to Belrose!', {

@@ -1,11 +1,16 @@
-import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/Button';
 import { useState } from 'react';
 import { GuestClaimAccountModal } from '@/features/GuestAccess/components/GuestClaimAccountModal';
+import { useGuestContext } from '@/features/GuestAccess/hooks/useGuestContext';
 
 export const GuestBanner: React.FC = () => {
-  const navigate = useNavigate();
   const [isClaimOpen, setIsClaimOpen] = useState(false);
+  const { guestContext, fetchGuestContext } = useGuestContext();
+
+  const handleOpen = async () => {
+    await fetchGuestContext();
+    setIsClaimOpen(true);
+  };
 
   return (
     <>
@@ -16,18 +21,25 @@ export const GuestBanner: React.FC = () => {
             records.
           </span>
         </div>
-        <Button onClick={() => setIsClaimOpen(true)} className="">
-          Create Account
-        </Button>
+        <Button onClick={handleOpen}>Create Account</Button>
       </div>
-      <GuestClaimAccountModal isOpen={isClaimOpen} onClose={() => setIsClaimOpen(false)} />
+      <GuestClaimAccountModal
+        isOpen={isClaimOpen}
+        onClose={() => setIsClaimOpen(false)}
+        guestContext={guestContext}
+      />
     </>
   );
 };
 
 export const GuestFooter: React.FC = () => {
-  const navigate = useNavigate();
   const [isClaimOpen, setIsClaimOpen] = useState(false);
+  const { guestContext, fetchGuestContext } = useGuestContext();
+
+  const handleOpen = async () => {
+    await fetchGuestContext();
+    setIsClaimOpen(true);
+  };
 
   const features = [
     {
@@ -104,14 +116,18 @@ export const GuestFooter: React.FC = () => {
 
           {/* Right Aligned Button */}
           <div className="flex justify-center md:justify-end">
-            <Button onClick={() => setIsClaimOpen(true)} className="whitespace-nowrap">
+            <Button onClick={handleOpen} className="whitespace-nowrap">
               Get Started Free →
             </Button>
           </div>
         </div>
       </div>
 
-      <GuestClaimAccountModal isOpen={isClaimOpen} onClose={() => setIsClaimOpen(false)} />
+      <GuestClaimAccountModal
+        isOpen={isClaimOpen}
+        onClose={() => setIsClaimOpen(false)}
+        guestContext={guestContext}
+      />
     </>
   );
 };

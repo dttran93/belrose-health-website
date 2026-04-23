@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import useFileManager from '@/features/AddRecord/hooks/useFileManager';
 import { useFHIRConversion } from '@/features/AddRecord/hooks/useFHIRConversion';
 import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
@@ -48,6 +48,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
 
   const [linkRequestFile, setLinkRequestFile] = useState<FileObject | null>(null);
   const [fulfilling, setFulfilling] = useState(false);
+  const isFulfilled = useRef(false);
   const [showClaimModal, setShowClaimModal] = useState(false);
   const hasCompletedFiles = files.some(f => f.status === 'completed');
   const {
@@ -91,7 +92,10 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
 
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      isGuest && hasCompletedFiles && currentLocation.pathname !== nextLocation.pathname
+      isGuest &&
+      hasCompletedFiles &&
+      !isFulfilled.current &&
+      currentLocation.pathname !== nextLocation.pathname
   );
 
   const handleReviewFile = (fileRecord: FileObject, viewMode: string = 'record') => {
@@ -136,6 +140,7 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
           processFile={processFile}
           externalLinkRequestFile={linkRequestFile}
           onExternalLinkRequestClose={() => {
+            isFulfilled.current = true;
             setLinkRequestFile(null);
             refreshRequests();
           }}

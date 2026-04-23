@@ -824,7 +824,6 @@ service cloud.firestore {
       // Path G: Guest claiming account — backfill their userId
       (
         request.auth != null &&
-        resource.data.status == 'pending' &&
         request.auth.token.email == resource.data.targetEmail &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['targetUserId']) &&

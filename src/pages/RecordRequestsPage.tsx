@@ -11,7 +11,7 @@
  *               Step 2: Your request details (name, date range, note, send)
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { useRecordRequests } from '@/features/RequestRecord/hooks/useRecordRequests';
@@ -39,6 +39,8 @@ const RecordRequestsPage: React.FC = () => {
 
   const [pageView, setPageView] = useState<PageView>('list');
   const [tab, setTab] = useState<Tab>('sent');
+  const hasInitializedTab = useRef(false);
+
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // The request open in the modal (null = modal closed)
@@ -48,6 +50,16 @@ const RecordRequestsPage: React.FC = () => {
   );
 
   const toggleExpand = (id: string) => setExpandedId(prev => (prev === id ? null : id));
+
+  // Auto-switch to "Received" tab if there are pending inbound requests and user hasn't explicitly switched tabs yet
+  useEffect(() => {
+    if (!inbound.loading && !hasInitializedTab.current) {
+      hasInitializedTab.current = true;
+      if (inbound.counts.pending > 0) {
+        setTab('received');
+      }
+    }
+  }, [inbound.loading, inbound.counts.pending]);
 
   // ── Upload new: navigate to AddRecord ─────────────────────────────────────
   const handleUploadNew = (request: RecordRequest) => {
