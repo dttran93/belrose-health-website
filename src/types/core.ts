@@ -35,6 +35,7 @@ export interface BelroseUserProfile extends User {
   emailVerified: boolean;
   emailVerifiedAt?: any;
   identityVerified: boolean;
+  identityVerificationStatus?: 'unverified' | 'pending_manual_review' | 'verified';
   identityVerifiedAt?: any;
   credibility?: CredibilityScore;
   isGuest?: boolean; //For guest accounts

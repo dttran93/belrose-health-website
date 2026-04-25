@@ -1,6 +1,6 @@
 export type VerificationStatus = 'idle' | 'loading' | 'verifying' | 'complete' | 'error';
 
-export type VerificationProvider = 'persona'; //Add others in the future
+export type VerificationProvider = 'idswyft'; //Add others in the future
 
 export interface VerifiedData {
   firstName: string;
@@ -23,6 +23,22 @@ export interface VerificationAdapterProps {
   onStatusChange: (status: VerificationStatus) => void;
   onSuccess: (result: VerificationResult) => void;
   onError: (error: Error) => void;
+  onBack?: () => void;
 }
 
 export type VerificationAdapter = React.ComponentType<VerificationAdapterProps>;
+
+// IDSwyft-specific result structure
+export interface IDswyftVerificationResult {
+  verificationId: string;
+  status: 'verified' | 'failed' | 'manual_review' | 'HARD_REJECTED';
+  ocrData: {
+    fullName: string;
+    dateOfBirth: string;
+    idNumber: string;
+    expiryDate: string;
+    rawText: string;
+  };
+  rejectionReason?: string;
+  retryAvailable?: boolean;
+}

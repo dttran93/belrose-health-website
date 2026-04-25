@@ -19,13 +19,6 @@ export { createBelroseFields } from './handlers/belroseFields';
 // ==================== WALLET FUNCTIONS ====================
 export { createWallet, getEncryptedWallet } from './handlers/wallet';
 
-// ==================== IDENTITY VERIFICATION FUNCTIONS ====================
-export {
-  createVerificationSession,
-  checkVerificationStatus,
-  personaWebhook,
-} from './handlers/verification';
-
 // ==================== EMAIL FUNCTIONS ====================
 export { sendShareInvitationEmail } from './handlers/sendShareInvitationEmail';
 export { sendAlphaApprovalEmail } from './handlers/sendAlphaApprovalEmail';

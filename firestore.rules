@@ -967,6 +967,15 @@ service cloud.firestore {
     }
 
     // ============================================
+    // VERIFICATION CERTIFICATES
+    // ============================================
+
+    match /IdVerificationCertificates/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ============================================
     // SYSTEM QUEUES & LOGGING
     // ============================================
 

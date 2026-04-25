@@ -1,31 +1,19 @@
 // /features/Auth/components/VerificationHub.tsx
-// Updated with tiered verification: Email = Required, Identity = Optional but incentivized
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import {
-  Mail,
-  IdCard,
-  CheckCircle2,
-  ArrowRight,
-  Shield,
-  Users,
-  FileText,
-  Sparkles,
-  ArrowLeft,
-  Clock,
-  Lock,
-  RefreshCw,
-} from 'lucide-react';
+import { Mail, CheckCircle2, ArrowRight, Clock, Lock, RefreshCw, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
-import IdentityVerificationForm from '../features/Auth/components/IdentityVerificationForm';
-import { VerificationResult, VerifiedData } from '@/types/identity';
+import { VerificationResult, VerifiedData } from '@/features/IdentityVerification/identity.types';
 import { getAuth, sendEmailVerification } from 'firebase/auth';
 import { getFirestore, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { authService } from '@/features/Auth/services/authServices';
+import IdentityVerificationCard from '@/features/IdentityVerification/components/IdentityVerificationCard';
+import IDswyftAdapter from '@/features/IdentityVerification/adapters/IDswyftAdapter';
+import IdentityVerification from '@/features/IdentityVerification/components/IdentityVerification';
 
 interface VerificationHubProps {
   userId?: string;
@@ -62,8 +50,11 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
   // Verification states
   const [emailVerified, setEmailVerified] = useState(false);
   const [identityVerified, setIdentityVerified] = useState(false);
+  const [identityStatus, setIdentityStatus] = useState<
+    'unverified' | 'pending_manual_review' | 'verified'
+  >('unverified');
   const [verifiedData, setVerifiedData] = useState<VerifiedData | null>(null);
-  const [showIdentityForm, setShowIdentityForm] = useState(false);
+  const [activeFlow, setActiveFlow] = useState<'hub' | 'identity'>('hub');
 
   // Loading/error states
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
@@ -148,27 +139,42 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
   };
 
   const handleIdentityVerificationSuccess = async (result: VerificationResult) => {
-    console.log('Identity verification successful!', result);
-    setVerifiedData(result.data ?? null);
-    setIdentityVerified(true);
-    setShowIdentityForm(false);
+    const isPendingReview = result.reason === 'pending_manual_review';
 
-    // Update Firestore
     if (userId) {
       const userDocRef = doc(db, 'users', userId);
       await updateDoc(userDocRef, {
-        identityVerified: true,
-        verifiedData: result.data,
-        identityVerifiedAt: new Date().toISOString(),
+        identityVerified: result.verified, // true only if fully verified
+        identityVerificationStatus: isPendingReview // new field
+          ? 'pending_manual_review'
+          : result.verified
+            ? 'verified'
+            : 'failed',
+        identityVerifiedAt: result.verified ? new Date().toISOString() : null,
       });
     }
 
-    await writeVerificationToBlockchain(emailVerified, true);
+    if (result.verified) {
+      await writeVerificationToBlockchain(emailVerified, true);
+    }
 
-    toast.success('Identity verified!', {
-      description: emailVerified
-        ? 'Your network trust score has been upgraded to Verified status'
-        : 'Complete email verification to unlock full Verified status',
+    setIdentityStatus(
+      result.verified
+        ? 'verified'
+        : result.reason === 'pending_manual_review'
+          ? 'pending_manual_review'
+          : 'unverified'
+    );
+    setVerifiedData(result.data ?? null);
+    setIdentityVerified(result.verified);
+    setActiveFlow('hub');
+
+    toast.success(result.verified ? 'Identity verified!' : 'Documents submitted for review', {
+      description: result.verified
+        ? emailVerified
+          ? 'Your network status has been upgraded to Verified'
+          : 'Complete email verification to unlock full Verified status'
+        : "We'll notify you by email once your identity has been confirmed.",
     });
   };
 
@@ -178,30 +184,20 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
   };
 
   // Only allow skipping IDENTITY verification, not email
-  const handleSkipIdentityVerification = () => {
-    if (!emailVerified) {
-      toast.error('Email verification required', {
-        description: 'Please verify your email before continuing',
-      });
-      return;
-    }
-
-    toast.info('Identity verification skipped', {
-      description: 'You can complete this later in Account Settings',
-    });
-    navigate('/app', { replace: true });
-  };
-
   const handleContinueToApp = async () => {
     await auth.currentUser?.reload();
     if (!auth.currentUser?.emailVerified) {
       toast.error('Email verification required', {
         description: 'Please verify your email before continuing',
       });
-      // Explicitly update local state so the UI matches reality
       setEmailVerified(false);
       return;
     }
+
+    if (!identityVerified) {
+      toast.info('You can complete identity verification anytime from Account Settings');
+    }
+
     navigate('/app', { replace: true });
   };
 
@@ -258,247 +254,158 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
         </div>
 
         {/* Main Content */}
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
-          {!showIdentityForm ? (
+        <div className="bg-white rounded-2xl shadow-2xl p-6">
+          {/* Identity Verification Adapter and Form */}
+          {activeFlow === 'identity' ? (
             <>
-              {/* Verification Cards */}
-              <div className="space-y-6 mb-8">
-                {/* Email Verification Card - REQUIRED */}
-                <div
-                  className={`border-2 rounded-xl p-6 transition-all ${
-                    emailVerified
-                      ? 'border-complement-3 bg-complement-3/5'
-                      : 'border-destructive bg-destructive/5'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-4 flex-1">
-                      <div
-                        className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
-                          emailVerified ? 'bg-complement-3' : 'bg-destructive'
-                        }`}
-                      >
-                        {emailVerified ? (
-                          <CheckCircle2 className="w-6 h-6 text-white" />
-                        ) : (
-                          <Mail className="w-6 h-6 text-white" />
-                        )}
-                      </div>
-
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="text-xl font-semibold text-primary">Email Verification</h3>
-                          {!emailVerified && (
-                            <span className="px-2 py-0.5 text-xs font-medium bg-destructive text-white rounded">
-                              REQUIRED
-                            </span>
-                          )}
-                          {emailVerified && (
-                            <span className="text-sm text-complement-3 font-medium">
-                              ✓ Verified
-                            </span>
-                          )}
-                        </div>
-
-                        {!emailVerified && (
-                          <>
-                            <p className="text-muted-foreground mb-4">
-                              We've sent a verification link to{' '}
-                              <span className="font-medium text-primary">{email}</span>. Check your
-                              inbox and click the link to verify.
-                            </p>
-
-                            {/* Why it's required */}
-                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-                              <div className="flex items-start space-x-2">
-                                <Lock className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                                <p className="text-sm text-amber-800">
-                                  Email verification is required to share records, recover your
-                                  account, and receive important security notifications.
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Action buttons */}
-                            <div className="flex items-center justify-center">
-                              <div className="flex gap-3">
-                                <Button
-                                  onClick={handleEmailVerificationCheck}
-                                  disabled={isCheckingEmail}
-                                  variant="default"
-                                >
-                                  {isCheckingEmail ? (
-                                    <>
-                                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                      Checking...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <CheckCircle2 className="w-4 h-4 mr-2" />
-                                      I've Verified My Email
-                                    </>
-                                  )}
-                                </Button>
-
-                                <Button
-                                  onClick={handleResendVerificationEmail}
-                                  disabled={isResendingEmail}
-                                  variant="outline"
-                                >
-                                  {isResendingEmail ? (
-                                    <>
-                                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                      Sending...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Mail className="w-4 h-4 mr-2" />
-                                      Resend Email
-                                    </>
-                                  )}
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Help text after multiple attempts */}
-                            {emailCheckAttempts >= 2 && (
-                              <p className="text-sm text-muted-foreground mt-3">
-                                <Clock className="w-3 h-3 inline mr-1" />
-                                Can't find it? Check your spam folder or try resending.
-                              </p>
-                            )}
-                          </>
-                        )}
-
-                        {emailVerified && (
-                          <p className="text-muted-foreground">
-                            Your email has been successfully verified. You can now share records and
-                            recover your account.
-                          </p>
-                        )}
-                      </div>
+              <button
+                onClick={() => setActiveFlow('hub')}
+                className="flex items-center text-sm text-gray-500 hover:text-gray-700 mb-6"
+              >
+                <ArrowLeft className="w-4 h-4 mr-1" />
+                Back to verification
+              </button>
+              <IdentityVerification
+                userId={userId}
+                onSuccess={result => {
+                  handleIdentityVerificationSuccess(result);
+                  setActiveFlow('hub');
+                }}
+                onError={error => {
+                  handleIdentityVerificationError(error);
+                  setActiveFlow('hub');
+                }}
+                onBack={() => setActiveFlow('hub')}
+              />
+            </>
+          ) : (
+            <div className="space-y-6">
+              {/* Email Verification Card - REQUIRED */}
+              <div
+                className={`border-2 rounded-xl p-6 transition-all ${
+                  emailVerified
+                    ? 'border-complement-3 bg-complement-3/5'
+                    : 'border-destructive bg-destructive/5'
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start space-x-4 flex-1">
+                    <div
+                      className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
+                        emailVerified ? 'bg-complement-3' : 'bg-destructive'
+                      }`}
+                    >
+                      {emailVerified ? (
+                        <CheckCircle2 className="w-6 h-6 text-white" />
+                      ) : (
+                        <Mail className="w-6 h-6 text-white" />
+                      )}
                     </div>
-                  </div>
-                </div>
 
-                {/* Identity Verification Card - OPTIONAL */}
-                <div
-                  className={`border-2 rounded-xl p-6 transition-all ${
-                    identityVerified
-                      ? 'border-complement-3 bg-complement-3/5'
-                      : emailVerified
-                        ? 'border-gray-200 hover:border-complement-4'
-                        : 'border-gray-200 opacity-60'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-4 flex-1">
-                      <div
-                        className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
-                          identityVerified
-                            ? 'bg-complement-3'
-                            : emailVerified
-                              ? 'bg-complement-4'
-                              : 'bg-gray-300'
-                        }`}
-                      >
-                        {identityVerified ? (
-                          <CheckCircle2 className="w-6 h-6 text-white" />
-                        ) : (
-                          <IdCard className="w-6 h-6 text-white" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="text-xl font-semibold text-primary">Email Verification</h3>
+                        {!emailVerified && (
+                          <span className="px-2 py-0.5 text-xs font-medium bg-destructive text-white rounded">
+                            REQUIRED
+                          </span>
+                        )}
+                        {emailVerified && (
+                          <span className="text-sm text-complement-3 font-medium">✓ Verified</span>
                         )}
                       </div>
 
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="text-xl font-semibold text-primary">
-                            Identity Verification
-                          </h3>
-                          {!identityVerified && (
-                            <span className="px-2 py-0.5 text-xs font-medium bg-complement-4/20 text-complement-4 rounded">
-                              RECOMMENDED
-                            </span>
-                          )}
-                          {identityVerified && (
-                            <span className="text-sm text-complement-3 font-medium">
-                              ✓ Verified
-                            </span>
-                          )}
-                        </div>
+                      {!emailVerified && (
+                        <>
+                          <p className="text-muted-foreground mb-4">
+                            We've sent a verification link to{' '}
+                            <span className="font-medium text-primary">{email}</span>. Check your
+                            inbox and click the link to verify.
+                          </p>
 
-                        {!identityVerified && (
-                          <>
-                            <p className="text-muted-foreground mb-4">
-                              {emailVerified
-                                ? 'Verify your identity to unlock important features and enhanced trust'
-                                : 'Complete email verification first to enable identity verification'}
-                            </p>
-
-                            {/* Benefits - only show if email is verified */}
-                            {emailVerified && (
-                              <>
-                                <div className="space-y-2 mb-4">
-                                  <div className="flex items-center text-sm text-muted-foreground">
-                                    <FileText className="w-4 h-4 mr-2 text-complement-4" />
-                                    <span>Request medical records on your behalf</span>
-                                  </div>
-                                  <div className="flex items-center text-sm text-muted-foreground">
-                                    <Sparkles className="w-4 h-4 mr-2 text-complement-4" />
-                                    <span>Verified trust status</span>
-                                  </div>
-                                  <div className="flex items-center text-sm text-muted-foreground">
-                                    <Shield className="w-4 h-4 mr-2 text-complement-4" />
-                                    <span>Make attestations and dispute records</span>
-                                  </div>
-                                  <div className="flex items-center text-sm text-muted-foreground">
-                                    <Users className="w-4 h-4 mr-2 text-complement-4" />
-                                    <span>Higher credibility when sharing with providers</span>
-                                  </div>
-                                </div>
-
-                                <Button
-                                  onClick={() => setShowIdentityForm(true)}
-                                  variant="default"
-                                  disabled={!emailVerified}
-                                >
-                                  <IdCard className="w-4 h-4 mr-2" />
-                                  Start Identity Verification
-                                </Button>
-                              </>
-                            )}
-                          </>
-                        )}
-
-                        {identityVerified && verifiedData && (
-                          <div className="space-y-2">
-                            <p className="text-muted-foreground">
-                              Identity verified as{' '}
-                              <span className="font-medium text-primary">
-                                {verifiedData.firstName} {verifiedData.lastName}
-                              </span>
-                            </p>
-                            <div className="flex items-center text-sm text-complement-3">
-                              <Shield className="w-4 h-4 mr-1" />
-                              <span>Network status: Verified Member</span>
+                          {/* Why it's required */}
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                            <div className="flex items-start space-x-2">
+                              <Lock className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                              <p className="text-sm text-amber-800">
+                                Email verification is required to share records, recover your
+                                account, and receive important security notifications.
+                              </p>
                             </div>
                           </div>
-                        )}
-                      </div>
+
+                          {/* Action buttons */}
+                          <div className="flex items-center justify-center">
+                            <div className="flex gap-3">
+                              <Button
+                                onClick={handleEmailVerificationCheck}
+                                disabled={isCheckingEmail}
+                                variant="default"
+                              >
+                                {isCheckingEmail ? (
+                                  <>
+                                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                    Checking...
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                                    I've Verified My Email
+                                  </>
+                                )}
+                              </Button>
+
+                              <Button
+                                onClick={handleResendVerificationEmail}
+                                disabled={isResendingEmail}
+                                variant="outline"
+                              >
+                                {isResendingEmail ? (
+                                  <>
+                                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                    Sending...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Mail className="w-4 h-4 mr-2" />
+                                    Resend Email
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Help text after multiple attempts */}
+                          {emailCheckAttempts >= 2 && (
+                            <p className="text-sm text-muted-foreground mt-3">
+                              <Clock className="w-3 h-3 inline mr-1" />
+                              Can't find it? Check your spam folder or try resending.
+                            </p>
+                          )}
+                        </>
+                      )}
+
+                      {emailVerified && (
+                        <p className="text-muted-foreground">
+                          Your email has been successfully verified. You can now share records and
+                          recover your account.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center justify-between pt-6 border-t">
-                <div>
-                  {emailVerified && !identityVerified && (
-                    <Button variant="ghost" onClick={handleSkipIdentityVerification}>
-                      Skip Identity Verification
-                    </Button>
-                  )}
-                </div>
+              {/* Identity Verification Section */}
+              <IdentityVerificationCard
+                emailVerified={emailVerified}
+                status={identityStatus}
+                verifiedData={verifiedData}
+                onStart={() => setActiveFlow('identity')}
+              />
 
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end pt-6 border-t">
                 <div className="flex items-center space-x-2">
                   {(emailVerified || identityVerified) && (
                     <div className="text-sm text-muted-foreground mr-2">
@@ -520,31 +427,12 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
                   </Button>
                 </div>
               </div>
-            </>
-          ) : (
-            <>
-              {/* Identity Verification Form */}
-              <div className="mb-4">
-                <Button variant="ghost" onClick={() => setShowIdentityForm(false)} className="mb-4">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Verification Hub
-                </Button>
-              </div>
-
-              <IdentityVerificationForm
-                userId={userId}
-                onSuccess={handleIdentityVerificationSuccess}
-                onError={handleIdentityVerificationError}
-                isCompleted={identityVerified}
-                initialVerifiedData={verifiedData ?? undefined}
-                isActivated={true}
-              />
-            </>
+            </div>
           )}
         </div>
 
         {/* Footer Note - Updated messaging */}
-        <div className="text-center mt-6">
+        <div className="text-center mt-3">
           <p className="text-sm text-muted-foreground">
             {!emailVerified ? (
               <>
@@ -557,12 +445,14 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
                   Resend verification email
                 </button>
               </>
-            ) : !identityVerified ? (
+            ) : !identityVerified && activeFlow !== 'identity' ? (
               <>
                 Identity verification is optional but unlocks important features. You can complete
                 it anytime from{' '}
                 <span className="text-primary font-medium">Account Settings → Verification</span>.
               </>
+            ) : activeFlow === 'identity' ? (
+              <></>
             ) : (
               <>Your account is fully verified. You have access to all Belrose features.</>
             )}

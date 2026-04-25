@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@idswyft/sdk": "^4.0.0",
     "@privacyresearch/libsignal-protocol-typescript": "^0.0.16",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -39,6 +40,7 @@
     "pdfjs-dist": "^5.3.31",
     "permissionless": "^0.3.2",
     "prop-types": "^15.8.1",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-firebase-hooks": "^5.1.1",
