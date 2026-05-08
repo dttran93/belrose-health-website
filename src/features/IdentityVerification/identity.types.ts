@@ -1,6 +1,6 @@
 export type VerificationStatus = 'idle' | 'loading' | 'verifying' | 'complete' | 'error';
 
-export type VerificationProvider = 'idswyft'; //Add others in the future
+export type VerificationProvider = 'idswyft' | 'stripe'; //Add others in the future
 
 export interface VerifiedData {
   firstName: string;

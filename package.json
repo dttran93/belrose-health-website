@@ -20,6 +20,7 @@
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-tooltip": "^1.2.7",
+    "@stripe/stripe-js": "^9.4.0",
     "@tanstack/react-query": "^5.79.0",
     "@types/lodash": "^4.17.20",
     "@types/uuid": "^10.0.0",
@@ -78,7 +79,6 @@
     "vite-plugin-node-polyfills": "^0.24.0"
   },
   "workspaces": [
-    "packages/*",
-    "functions"
+    "packages/*"
   ]
 }

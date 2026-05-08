@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.refineRecord = exports.checkEmailRegistrationStatus = exports.getKeyBundle = exports.aiChat = exports.getSponsorshipStatus = exports.signSponsorship = exports.onRecordRequestUpdated = exports.onRecordRequestCreated = exports.onRecordDeletionEventUpdated = exports.onRecordDeletionEventCreated = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.initializeRoleOnChainForRequester = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.guestPasswordUpdate = exports.createRecordRequest = exports.redeemGuestInvite = exports.createGuestInvite = exports.sendPasswordChangeEmail = exports.sendWaitlistConfirmationEmail = exports.sendAlphaApprovalEmail = exports.sendShareInvitationEmail = exports.getEncryptedWallet = exports.createWallet = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = exports.setPlatformAdmin = void 0;
+exports.stripeIdentityWebhook = exports.getStripeSessionStatus = exports.createStripeVerificationSession = exports.refineRecord = exports.checkEmailRegistrationStatus = exports.getKeyBundle = exports.aiChat = exports.getSponsorshipStatus = exports.signSponsorship = exports.onRecordRequestUpdated = exports.onRecordRequestCreated = exports.onRecordDeletionEventUpdated = exports.onRecordDeletionEventCreated = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.initializeRoleOnChainForRequester = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.guestPasswordUpdate = exports.createRecordRequest = exports.redeemGuestInvite = exports.createGuestInvite = exports.sendPasswordChangeEmail = exports.sendWaitlistConfirmationEmail = exports.sendAlphaApprovalEmail = exports.sendShareInvitationEmail = exports.getEncryptedWallet = exports.createWallet = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = exports.setPlatformAdmin = void 0;
 // functions/src/index.ts
 const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin
@@ -111,4 +111,9 @@ Object.defineProperty(exports, "checkEmailRegistrationStatus", { enumerable: tru
 // ==================== RECORD REFINEMENT FUNCTIONS ====================
 var refineRecord_1 = require("./handlers/refineRecord");
 Object.defineProperty(exports, "refineRecord", { enumerable: true, get: function () { return refineRecord_1.refineRecord; } });
+// ==================== IDENTITY VERIFICATION ====================
+var stripeIdentity_1 = require("./handlers/stripeIdentity");
+Object.defineProperty(exports, "createStripeVerificationSession", { enumerable: true, get: function () { return stripeIdentity_1.createStripeVerificationSession; } });
+Object.defineProperty(exports, "getStripeSessionStatus", { enumerable: true, get: function () { return stripeIdentity_1.getStripeSessionStatus; } });
+Object.defineProperty(exports, "stripeIdentityWebhook", { enumerable: true, get: function () { return stripeIdentity_1.stripeIdentityWebhook; } });
 //# sourceMappingURL=index.js.map

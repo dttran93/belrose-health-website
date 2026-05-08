@@ -74,3 +74,10 @@ export { checkEmailRegistrationStatus } from './handlers/checkEmailRegistrationS
 
 // ==================== RECORD REFINEMENT FUNCTIONS ====================
 export { refineRecord } from './handlers/refineRecord';
+
+// ==================== IDENTITY VERIFICATION ====================
+export {
+  createStripeVerificationSession,
+  getStripeSessionStatus,
+  stripeIdentityWebhook,
+} from './handlers/stripeIdentity';

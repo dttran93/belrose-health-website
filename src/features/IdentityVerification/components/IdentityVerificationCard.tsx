@@ -97,10 +97,6 @@ const IdentityVerificationCard: React.FC<IdentityVerificationCardProps> = ({
                   {verifiedData.firstName} {verifiedData.lastName}
                 </span>
               </p>
-              <div className="flex items-center text-sm text-complement-3">
-                <Shield className="w-4 h-4 mr-1" />
-                <span>Network status: Verified Member</span>
-              </div>
             </div>
           )}
         </div>

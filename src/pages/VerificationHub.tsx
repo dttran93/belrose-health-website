@@ -1,6 +1,6 @@
 // /features/Auth/components/VerificationHub.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Mail,
@@ -50,6 +50,8 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
   const email = propEmail || location.state?.email || auth.currentUser?.email;
   const fromRegistration = location.state?.fromRegistration || false;
 
+  console.log('UserID: ', userId);
+
   // If no user is logged in, redirect to auth
   useEffect(() => {
     if (!auth.currentUser) {
@@ -76,6 +78,9 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
   const [isResendingEmail, setIsResendingEmail] = useState(false);
   const [emailCheckAttempts, setEmailCheckAttempts] = useState(0);
   const [lastResendTime, setLastResendTime] = useState<number | null>(null);
+
+  //To prevent polling loop from firing blockchain update multiple times
+  const blockchainUpdateCalledRef = useRef(false);
 
   // Check initial email verification status
   useEffect(() => {
@@ -158,7 +163,6 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
       const userDocRef = doc(db, 'users', userId);
       await updateDoc(userDocRef, {
         identityVerified: result.verified,
-        identityVerificationStatus: result.verified ? 'verified' : 'failed',
         identityVerifiedAt: result.verified ? new Date().toISOString() : null,
       });
     }
@@ -215,18 +219,18 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
     isEmailVerified: boolean,
     isIdentityVerified: boolean
   ) => {
-    if (!isEmailVerified || !isIdentityVerified) return;
+    if (!isEmailVerified || !isIdentityVerified || blockchainUpdateCalledRef.current) return;
+
+    // Set immediately and synchronously before any await
+    blockchainUpdateCalledRef.current = true;
+
     try {
-      const userDoc = await getDoc(doc(db, 'users', userId));
-      const userData = userDoc.data();
-      const walletAddress = userData?.wallet?.address;
-      if (walletAddress) {
-        const functions = getFunctions();
-        const updateStatus = httpsCallable(functions, 'updateMemberStatus');
-        await updateStatus({ walletAddress, status: 2 });
-      }
+      const functions = getFunctions();
+      const updateStatus = httpsCallable(functions, 'updateMemberStatus');
+      await updateStatus({ userId, status: 3 });
     } catch (error) {
       console.error('⚠️ Blockchain update failed:', error);
+      blockchainUpdateCalledRef.current = false;
     }
   };
 

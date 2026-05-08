@@ -16,10 +16,13 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "types": ["node"],
+    "typeRoots": ["./node_modules/@types", "../node_modules/@types"],
     "paths": {
       "@/*": ["./src/*"],
       "@types/*": ["./src/types/*"],
-      "@belrose/shared": ["./src/_shared/index.ts"]
+      "@belrose/shared": ["./src/_shared/index.ts"],
+      "stripe": ["../node_modules/stripe/types/index.d.ts"],
+      "stripe/*": ["../node_modules/stripe/types/*"]
     }
   },
   "references": [{ "path": "../packages/shared" }],
