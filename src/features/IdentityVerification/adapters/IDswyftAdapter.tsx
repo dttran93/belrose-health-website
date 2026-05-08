@@ -1,17 +1,9 @@
 // src/features/IdentityVerification/adapters/IDswyftAdapter.tsx
 
 import React, { useEffect, useRef, useState } from 'react';
-import { EncryptionService } from '@/features/Encryption/services/encryptionService';
-import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { getFirestore, doc, setDoc, Timestamp, getDoc } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, Timestamp } from 'firebase/firestore';
 import type { VerificationAdapterProps } from '../identity.types';
 import type { OCRData } from '@idswyft/sdk';
-import {
-  getIdentityRecordId,
-  saveUserIdentityRecord,
-} from '@/features/HealthProfile/services/userIdentityService';
-import type { UserIdentity } from '@/features/HealthProfile/utils/parseUserIdentity';
 import CameraViewfinder from '../components/DocumentCapture/CameraViewfinder';
 import CapturePreview from '../components/DocumentCapture/CapturePreview';
 import StepIndicator, { StepStatus } from '../components/StepIndicator';
@@ -22,14 +14,7 @@ const IDSWYFT_BASE = import.meta.env.VITE_IDSWYFT_URL || 'http://localhost:3001'
 const IDSWYFT_API_KEY = import.meta.env.VITE_IDSWYFT_API_KEY || '';
 
 type CaptureStep = 'front' | 'back' | 'selfie';
-type AdapterStep =
-  | 'choice'
-  | 'qr'
-  | CaptureStep
-  | 'processing'
-  | 'done'
-  | 'error'
-  | 'manual_review';
+type AdapterStep = 'choice' | 'qr' | CaptureStep | 'processing' | 'done' | 'error';
 
 // Which sub-state each capture step is in
 type CaptureState = 'capturing' | 'preview' | 'uploading';
@@ -49,11 +34,38 @@ const IDswyftAdapter: React.FC<VerificationAdapterProps> = ({
 
   const verificationIdRef = useRef<string | null>(null);
   const sessionTokenRef = useRef<string | null>(null);
-  const capturedFilesRef = useRef<{
-    front?: File;
-    back?: File;
-    selfie?: File;
-  }>({});
+
+  // ── Save certificate to Firestore (no biometrics) ─────────────────
+  const saveCertificate = async (
+    verificationId: string,
+    result: any,
+    ocrData: OCRData,
+    captureMethod: 'qr_handoff' | 'webcam'
+  ) => {
+    const db = getFirestore();
+    await setDoc(
+      doc(db, 'IdVerificationCertificates', userId),
+      {
+        verifiedAt: Timestamp.now(),
+        verifiedName: ocrData.full_name ?? null,
+        verifiedDOB: ocrData.date_of_birth ?? null,
+        verifiedAddress: ocrData.address ?? null,
+        verificationProvider: 'idswyft',
+        verificationId,
+        status: result.status,
+        finalResult: result.final_result,
+        rejectionReason: result.rejection_reason ?? null,
+        rejectionDetail: result.rejection_detail ?? null,
+        manualReview:
+          result.final_result === 'manual_review' || result.rejection_reason === 'HARD_REJECTED',
+        liveness: result.liveness_results ?? null,
+        faceMatch: result.face_match_results ?? null,
+        captureMethod,
+        certifiedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  };
 
   const initSession = async () => {
     try {
@@ -88,10 +100,7 @@ const IDswyftAdapter: React.FC<VerificationAdapterProps> = ({
   };
 
   useEffect(() => {
-    // Only init if starting directly on webcam (mobile)
-    if (isMobileDevice) {
-      initSession();
-    }
+    if (isMobileDevice) initSession();
   }, []);
 
   const handleChooseWebcam = () => {
@@ -99,39 +108,19 @@ const IDswyftAdapter: React.FC<VerificationAdapterProps> = ({
     initSession();
   };
 
+  // ── QR handoff complete ──────────────────────────────────────────────
   const handleQRComplete = async (verificationId: string, finalResult: string) => {
     setStep('processing');
     onStatusChange('verifying');
 
     try {
-      // Fetch full status for OCR data and results
       const statusRes = await fetch(`${IDSWYFT_BASE}/api/v2/verify/${verificationId}/status`, {
         headers: { 'X-API-Key': IDSWYFT_API_KEY },
       });
       const result = await statusRes.json();
       const ocrData: OCRData = result.ocr_data ?? {};
 
-      // Save certificate — no biometrics since phone captured them
-      // but we save the result metadata
-      const db = getFirestore();
-      await setDoc(
-        doc(db, 'IdVerificationCertificates', userId),
-        {
-          verifiedAt: Timestamp.now(),
-          verifiedName: ocrData.full_name ?? null,
-          verifiedDOB: ocrData.date_of_birth ?? null,
-          verificationProvider: 'idswyft',
-          verificationId,
-          status: result.status,
-          rejectionReason: result.rejection_reason ?? null,
-          manualReview: finalResult === 'manual_review',
-          liveness: result.liveness_results ?? null,
-          faceMatch: result.face_match_results ?? null,
-          captureMethod: 'qr_handoff',
-          biometricsCapturedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
+      await saveCertificate(verificationId, result, ocrData, 'qr_handoff');
 
       if (finalResult === 'verified') {
         setStep('done');
@@ -147,21 +136,19 @@ const IDswyftAdapter: React.FC<VerificationAdapterProps> = ({
             verified: true,
           },
         });
+      } else if (finalResult === 'manual_review') {
+        setStep('error');
+        setErrorMessage(
+          'Automatic verification was inconclusive. Please try again or contact support.'
+        );
+        onStatusChange('error');
+        onError(new Error('Automatic verification was inconclusive.'));
       } else {
-        setStep('manual_review');
-        onStatusChange('complete');
-        onSuccess({
-          verified: false,
-          inquiryId: verificationId,
-          reason: 'pending_manual_review',
-          data: {
-            firstName: ocrData.full_name?.split(' ')[0] ?? '',
-            lastName: ocrData.full_name?.split(' ').slice(-1)[0] ?? '',
-            dateOfBirth: '',
-            address: '',
-            verified: false,
-          },
-        });
+        // ❌ Hard rejected / failed — show error with option to retry
+        setStep('error');
+        setErrorMessage(result.rejection_detail || 'Verification could not be completed.');
+        onStatusChange('error');
+        onError(new Error(result.rejection_detail || 'Verification failed'));
       }
     } catch (err: any) {
       setStep('error');
@@ -170,7 +157,7 @@ const IDswyftAdapter: React.FC<VerificationAdapterProps> = ({
     }
   };
 
-  // ── Handle capture from viewfinder ──────────────────────────────────
+  // ── Webcam capture handlers ──────────────────────────────────────────
   const handleCapture = (file: File) => {
     setCapturedFile(file);
     setCaptureState('preview');
@@ -179,7 +166,6 @@ const IDswyftAdapter: React.FC<VerificationAdapterProps> = ({
   // ── Handle capture from livenessCapture ──────────────────────────────────
   const handleLivenessComplete = (result: { selfieFile: File; livenessMetadata: any }) => {
     livenessMetadataRef.current = result.livenessMetadata;
-    capturedFilesRef.current['selfie'] = result.selfieFile;
     setCapturedFile(result.selfieFile);
     setCaptureState('preview');
   };
@@ -190,7 +176,6 @@ const IDswyftAdapter: React.FC<VerificationAdapterProps> = ({
     const currentStep = step as CaptureStep;
 
     setCaptureState('uploading');
-    capturedFilesRef.current[currentStep] = capturedFile;
 
     try {
       // Upload to IDswyft
@@ -202,19 +187,12 @@ const IDswyftAdapter: React.FC<VerificationAdapterProps> = ({
       const formData = new FormData();
       if (currentStep === 'selfie') {
         formData.append('selfie', capturedFile);
-        // ← include liveness metadata
         if (livenessMetadataRef.current) {
-          console.log(
-            '🎯 Liveness metadata being sent:',
-            JSON.stringify(livenessMetadataRef.current, null, 2)
-          );
           formData.append('liveness_metadata', JSON.stringify(livenessMetadataRef.current));
         }
       } else {
         formData.append('document', capturedFile);
       }
-
-      console.log('🔍 livenessMetadataRef.current:', livenessMetadataRef.current);
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -227,14 +205,9 @@ const IDswyftAdapter: React.FC<VerificationAdapterProps> = ({
 
       if (!res.ok) {
         const err = await res.json().catch(() => res.text());
-        console.error('❌ Upload error body:', err);
         throw new Error(`Upload failed: ${JSON.stringify(err)}`);
       }
 
-      const responseData = await res.json();
-      console.log('📊 Live capture response:', JSON.stringify(responseData, null, 2));
-
-      // Advance to next step
       setCapturedFile(null);
       setCaptureState('capturing');
 
@@ -248,13 +221,12 @@ const IDswyftAdapter: React.FC<VerificationAdapterProps> = ({
     }
   };
 
-  // ── Retake ───────────────────────────────────────────────────────────
   const handleRetake = () => {
     setCapturedFile(null);
     setCaptureState('capturing');
   };
 
-  // ── Run verification after selfie ────────────────────────────────────
+  // ── Run verification after webcam selfie ─────────────────────────────
   const runVerification = async () => {
     setStep('processing');
     onStatusChange('verifying');
@@ -267,7 +239,7 @@ const IDswyftAdapter: React.FC<VerificationAdapterProps> = ({
       const result = await statusRes.json();
       const ocrData: OCRData = result.ocr_data ?? {};
 
-      await saveCapturesToBelrose(result, ocrData);
+      await saveCertificate(verificationIdRef.current!, result, ocrData, 'webcam');
 
       if (result.final_result === 'verified') {
         setStep('done');
@@ -287,20 +259,12 @@ const IDswyftAdapter: React.FC<VerificationAdapterProps> = ({
         result.final_result === 'manual_review' ||
         result.rejection_reason === 'HARD_REJECTED'
       ) {
-        setStep('manual_review');
-        onStatusChange('complete');
-        onSuccess({
-          verified: false,
-          inquiryId: verificationIdRef.current!,
-          reason: 'pending_manual_review',
-          data: {
-            firstName: ocrData.full_name?.split(' ')[0] ?? '',
-            lastName: ocrData.full_name?.split(' ').slice(-1)[0] ?? '',
-            dateOfBirth: '',
-            address: '',
-            verified: false,
-          },
-        });
+        setStep('error');
+        setErrorMessage(
+          'Automatic verification was inconclusive. Please try again or contact support.'
+        );
+        onStatusChange('error');
+        onError(new Error('Automatic verification was inconclusive.'));
       } else {
         setStep('error');
         setErrorMessage(result.rejection_detail || 'Verification failed');
@@ -314,81 +278,14 @@ const IDswyftAdapter: React.FC<VerificationAdapterProps> = ({
     }
   };
 
-  // ── Save captures to Belrose ─────────────────────────────────────────
-  const saveCapturesToBelrose = async (result: any, ocrData: OCRData) => {
-    try {
-      const masterKey = await EncryptionKeyManager.getSessionKey();
-      if (!masterKey) return;
-
-      const storage = getStorage();
-      const db = getFirestore();
-      const recordId = getIdentityRecordId(userId);
-      const biometrics: Record<string, any> = {};
-
-      // Ensure identity record exists
-      const existing = await getDoc(doc(db, 'records', recordId));
-      if (!existing.exists()) {
-        const identityFromOCR: UserIdentity = {
-          fullName: ocrData.full_name || undefined,
-          dateOfBirth: ocrData.date_of_birth ? new Date(ocrData.date_of_birth) : undefined,
-        };
-        await saveUserIdentityRecord(userId, identityFromOCR);
-      }
-
-      // Encrypt and upload each captured file
-      for (const [label, file] of Object.entries(capturedFilesRef.current) as [string, File][]) {
-        const arrayBuffer = await file.arrayBuffer();
-        const { encrypted, iv } = await EncryptionService.encryptFile(arrayBuffer, masterKey);
-
-        const path = `records/${recordId}/${label}_${Date.now()}.encrypted`;
-        const storageRef = ref(storage, path);
-
-        await uploadBytes(storageRef, new Blob([encrypted]), {
-          contentType: 'application/octet-stream',
-          customMetadata: { encrypted: 'true', label, recordId, uploadedBy: userId },
-        });
-
-        const downloadURL = await getDownloadURL(storageRef);
-        biometrics[label] = {
-          downloadURL,
-          iv: Array.from(new Uint8Array(iv)),
-          path,
-        };
-      }
-
-      // Write certificate
-      await setDoc(
-        doc(db, 'IdVerificationCertificates', userId),
-        {
-          verifiedAt: Timestamp.now(),
-          verifiedName: ocrData.full_name ?? null,
-          verifiedDOB: ocrData.date_of_birth ?? null,
-          verificationProvider: 'idswyft',
-          verificationId: verificationIdRef.current,
-          status: result.status,
-          rejectionReason: result.rejection_reason ?? null,
-          manualReview:
-            result.final_result === 'manual_review' || result.rejection_reason === 'HARD_REJECTED',
-          liveness: result.liveness_results ?? null,
-          faceMatch: result.face_match_results ?? null,
-          biometrics,
-          biometricsCapturedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
-    } catch (err) {
-      console.error('❌ Failed to save to Belrose:', err);
-    }
-  };
-
-  // ── Step indicator config ────────────────────────────────────────────
+  // ── Step indicator ───────────────────────────────────────────────────
   const steps: { label: string; status: StepStatus }[] = [
     {
       label: 'Front of ID',
       status:
         step === 'front'
           ? 'current'
-          : ['back', 'selfie', 'processing', 'done', 'manual_review'].includes(step)
+          : ['back', 'selfie', 'processing', 'done'].includes(step)
             ? 'complete'
             : 'upcoming',
     },
@@ -397,7 +294,7 @@ const IDswyftAdapter: React.FC<VerificationAdapterProps> = ({
       status:
         step === 'back'
           ? 'current'
-          : ['selfie', 'processing', 'done', 'manual_review'].includes(step)
+          : ['selfie', 'processing', 'done'].includes(step)
             ? 'complete'
             : 'upcoming',
     },
@@ -406,7 +303,7 @@ const IDswyftAdapter: React.FC<VerificationAdapterProps> = ({
       status:
         step === 'selfie'
           ? 'current'
-          : ['processing', 'done', 'manual_review'].includes(step)
+          : ['processing', 'done'].includes(step)
             ? 'complete'
             : 'upcoming',
     },
@@ -553,27 +450,32 @@ const IDswyftAdapter: React.FC<VerificationAdapterProps> = ({
         </div>
       )}
 
-      {/* Manual review */}
-      {step === 'manual_review' && (
-        <div className="flex flex-col items-center py-8 gap-3 text-center px-4">
-          <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
-            <span className="text-3xl">⏳</span>
-          </div>
-          <p className="text-amber-700 font-medium">Documents submitted for review</p>
-          <p className="text-sm text-amber-600">
-            A Belrose team member will review your identity — usually within 24 hours.
-          </p>
-        </div>
-      )}
-
       {/* Error */}
       {step === 'error' && (
-        <div className="flex flex-col items-center py-8 gap-3 text-center px-4">
+        <div className="flex flex-col items-center py-8 gap-4 text-center px-4">
           <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
             <span className="text-3xl">❌</span>
           </div>
-          <p className="text-red-600 font-medium">Verification failed</p>
-          <p className="text-sm text-red-500">{errorMessage || 'Please try again.'}</p>
+          <p className="text-red-600 font-medium text-lg">Verification failed</p>
+          <p className="text-sm text-red-500 max-w-xs">{errorMessage || 'Please try again.'}</p>
+          <div className="flex flex-col gap-2 w-full max-w-xs">
+            <button
+              onClick={() => setStep('qr')}
+              className="w-full py-2 px-4 bg-primary text-white rounded-lg text-sm font-medium"
+            >
+              Try again with QR code
+            </button>
+            <button
+              onClick={handleChooseWebcam}
+              className="w-full py-2 px-4 border border-gray-300 rounded-lg text-sm text-gray-600"
+            >
+              Try with webcam instead
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 max-w-xs">
+            Common issues: poor lighting, ID not fully visible, or camera permissions not granted on
+            your phone.
+          </p>
         </div>
       )}
     </div>

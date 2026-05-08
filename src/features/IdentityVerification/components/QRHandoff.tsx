@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/Button';
 
 const IDSWYFT_BASE = import.meta.env.VITE_IDSWYFT_URL || 'http://localhost:3001';
 const IDSWYFT_API_KEY = import.meta.env.VITE_IDSWYFT_API_KEY || '';
-// IDswyft frontend runs on port 80 (same host, different port)
 const IDSWYFT_FRONTEND = import.meta.env.VITE_IDSWYFT_FRONTEND_URL || 'http://192.168.0.9';
 
 interface QRHandoffProps {
@@ -17,14 +16,13 @@ type QRState = 'loading' | 'ready' | 'scanning' | 'expired' | 'error';
 
 const QRHandoff: React.FC<QRHandoffProps> = ({ userId, onComplete, onError }) => {
   const [qrState, setQrState] = useState<QRState>('loading');
-  const [token, setToken] = useState<string | null>(null);
   const [verificationUrl, setVerificationUrl] = useState<string>('');
-  const [timeLeft, setTimeLeft] = useState<number>(600); // 10 minutes
+  const [timeLeft, setTimeLeft] = useState<number>(600);
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const expiresAtRef = useRef<Date | null>(null);
+  const verificationIdRef = useRef<string | null>(null);
 
   const cleanup = useCallback(() => {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
@@ -32,56 +30,55 @@ const QRHandoff: React.FC<QRHandoffProps> = ({ userId, onComplete, onError }) =>
   }, []);
 
   useEffect(() => {
-    createHandoffSession();
+    createSession();
     return cleanup;
   }, []);
 
-  const createHandoffSession = async () => {
+  const createSession = async () => {
     setQrState('loading');
-    setToken(null);
     try {
-      const res = await fetch(`${IDSWYFT_BASE}/api/verify/handoff/create`, {
+      // Step 1 — create a v2 verification session
+      const res = await fetch(`${IDSWYFT_BASE}/api/v2/verify/initialize`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': IDSWYFT_API_KEY,
+        },
         body: JSON.stringify({
-          api_key: IDSWYFT_API_KEY,
+          document_type: 'drivers_license',
           user_id: crypto.randomUUID(),
         }),
       });
 
-      if (!res.ok) throw new Error(`Handoff create failed: ${res.status}`);
+      if (!res.ok) throw new Error(`Initialize failed: ${res.status}`);
 
-      const { token: newToken, expires_at } = await res.json();
-      expiresAtRef.current = new Date(expires_at);
+      const { verification_id, session_token } = await res.json();
+      verificationIdRef.current = verification_id;
 
-      const url = `${IDSWYFT_FRONTEND}/user-verification?session=${newToken}`;
-      setToken(newToken);
+      // Step 2 — build QR URL using the session_token
+      const url = `${IDSWYFT_FRONTEND}/user-verification?session=${session_token}`;
       setVerificationUrl(url);
       setQrState('ready');
 
       console.log('🔗 QR URL:', url);
-      console.log('🎟️ Token:', newToken);
+      console.log('🆔 Verification ID:', verification_id);
 
       startCountdown();
-      startPolling(newToken);
+      startPolling(verification_id);
     } catch (err: any) {
       setQrState('error');
       setErrorMessage(err.message);
-      onError(err instanceof Error ? err : new Error('Failed to create handoff session'));
+      onError(err instanceof Error ? err : new Error('Failed to create session'));
     }
   };
 
   const startCountdown = () => {
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
 
     countdownIntervalRef.current = setInterval(() => {
-      if (!expiresAtRef.current) return;
-      const secondsLeft = Math.max(
-        0,
-        Math.floor((expiresAtRef.current.getTime() - Date.now()) / 1000)
-      );
+      const secondsLeft = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
       setTimeLeft(secondsLeft);
-
       if (secondsLeft <= 0) {
         clearInterval(countdownIntervalRef.current!);
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
@@ -90,33 +87,38 @@ const QRHandoff: React.FC<QRHandoffProps> = ({ userId, onComplete, onError }) =>
     }, 1000);
   };
 
-  const startPolling = (pollToken: string) => {
+  const startPolling = (verificationId: string) => {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
 
     pollIntervalRef.current = setInterval(async () => {
       try {
-        const res = await fetch(`${IDSWYFT_BASE}/api/verify/handoff/${pollToken}/status`, {
+        const res = await fetch(`${IDSWYFT_BASE}/api/v2/verify/${verificationId}/status`, {
           headers: { 'X-API-Key': IDSWYFT_API_KEY },
         });
 
-        if (!res.ok) return; // retry on next tick
+        if (!res.ok) return;
 
         const data = await res.json();
+        console.log('📊 Poll status:', JSON.stringify(data)); // ← add this line
 
-        if (data.status === 'scanning') {
+        // Map v2 status fields to QR states
+        if (data.status === 'processing') {
           setQrState('scanning');
         }
 
-        if (data.status === 'completed') {
+        if (
+          data.status === 'completed' ||
+          data.status === 'verified' ||
+          data.status === 'failed' ||
+          data.status === 'manual_review' ||
+          data.status === 'HARD_REJECTED' || // ← add this
+          data.final_result === 'verified' || // ← also check final_result directly
+          data.final_result === 'failed' ||
+          data.final_result === 'manual_review'
+        ) {
           cleanup();
-          onComplete(data.verification_id, data.final_result ?? 'manual_review');
-        }
-
-        if (data.status === 'failed') {
-          cleanup();
-          setQrState('error');
-          setErrorMessage(data.message || 'Verification failed on mobile');
-          onError(new Error(data.message || 'Verification failed on mobile'));
+          const finalResult = data.final_result ?? data.status;
+          onComplete(verificationId, finalResult);
         }
       } catch {
         // network hiccup, retry next tick
@@ -130,7 +132,6 @@ const QRHandoff: React.FC<QRHandoffProps> = ({ userId, onComplete, onError }) =>
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  // ── Render ────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col items-center gap-6 py-4">
       {qrState === 'loading' && (
@@ -153,7 +154,6 @@ const QRHandoff: React.FC<QRHandoffProps> = ({ userId, onComplete, onError }) =>
             </p>
           </div>
 
-          {/* QR Code */}
           <div
             className={`p-4 bg-white rounded-xl border-2 transition-colors ${
               qrState === 'scanning' ? 'border-green-400' : 'border-gray-200'
@@ -162,7 +162,6 @@ const QRHandoff: React.FC<QRHandoffProps> = ({ userId, onComplete, onError }) =>
             <QRCodeSVG value={verificationUrl} size={200} level="M" includeMargin={false} />
           </div>
 
-          {/* Expiry countdown */}
           <div
             className={`flex items-center gap-2 text-sm ${
               timeLeft < 60 ? 'text-red-500' : 'text-gray-500'
@@ -188,7 +187,7 @@ const QRHandoff: React.FC<QRHandoffProps> = ({ userId, onComplete, onError }) =>
           </div>
           <p className="font-medium text-gray-900">QR code expired</p>
           <p className="text-sm text-gray-500">Generate a new code to continue</p>
-          <Button onClick={createHandoffSession} variant="default">
+          <Button onClick={createSession} variant="default">
             Generate New Code
           </Button>
         </div>
@@ -201,7 +200,7 @@ const QRHandoff: React.FC<QRHandoffProps> = ({ userId, onComplete, onError }) =>
           </div>
           <p className="font-medium text-red-600">Something went wrong</p>
           <p className="text-sm text-red-500">{errorMessage}</p>
-          <Button onClick={createHandoffSession} variant="default">
+          <Button onClick={createSession} variant="default">
             Try Again
           </Button>
         </div>
