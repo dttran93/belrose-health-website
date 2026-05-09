@@ -55,9 +55,12 @@ export const VerificationDetailModal: React.FC<VerificationDetailModalProps> = (
   const isCurrentVersion = verification.recordHash === record.recordHash;
 
   const handleViewOnBlockchain = () => {
-    if (verification.txHash) {
+    if (verification.blockchainRef?.txHash) {
       // Assuming Sepolia testnet - adjust URL for mainnet
-      window.open(`https://sepolia.etherscan.io/tx/${verification.txHash}`, '_blank');
+      window.open(
+        `https://sepolia.etherscan.io/tx/${verification.blockchainRef?.txHash}`,
+        '_blank'
+      );
     }
   };
 
@@ -182,7 +185,7 @@ export const VerificationDetailModal: React.FC<VerificationDetailModalProps> = (
                 variant="outline"
                 size="sm"
                 onClick={handleViewOnBlockchain}
-                disabled={!verification.txHash}
+                disabled={!verification.blockchainRef?.txHash}
                 className="text-gray-600"
               >
                 <ExternalLink className="w-4 h-4 mr-1" />

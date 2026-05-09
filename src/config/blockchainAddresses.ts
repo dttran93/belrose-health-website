@@ -7,6 +7,8 @@
 // hardcoding addresses locally.
 //
 
+import { BlockchainRef } from '@belrose/shared';
+
 // ============================================================================
 // NETWORK INFRASTRUCTURE
 // ============================================================================
@@ -72,3 +74,27 @@ export const CONTRACT_ADDRESSES = {
   healthRecordCore: HEALTH_RECORD_CORE.proxy,
   entryPoint: AA_INFRASTRUCTURE.entryPoint,
 } as const;
+
+// ============================================================================
+// BLOCKCHAIN REF HELPERS
+// ============================================================================
+
+export function buildBlockchainRef(
+  txHash: string,
+  blockNumber: number,
+  contractAddress: string
+): BlockchainRef {
+  return {
+    txHash,
+    chainId: NETWORK.chainId,
+    blockNumber,
+    contractAddress,
+  };
+}
+
+// Pre-bound helpers for each contract — chainId is always pulled from NETWORK
+export const buildMemberRegistryRef = (txHash: string, blockNumber: number) =>
+  buildBlockchainRef(txHash, blockNumber, MEMBER_ROLE_MANAGER.proxy);
+
+export const buildHealthRecordRef = (txHash: string, blockNumber: number) =>
+  buildBlockchainRef(txHash, blockNumber, HEALTH_RECORD_CORE.proxy);

@@ -4,8 +4,10 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { ethers } from 'ethers';
+import { BlockchainRef } from '@/_shared';
 
 const MEMBER_ROLE_MANAGER_ADDRESS = '0xC31477f563dC8f7529Ba6AE7E410ABdB84C27d7C';
+const CHAIN_ID = 11155111;
 
 const MEMBER_ROLE_MANAGER_ABI = [
   // Admin Functions
@@ -55,6 +57,15 @@ function getAdminContract(): ethers.Contract {
     MEMBER_ROLE_MANAGER_ABI,
     getAdminWallet()
   );
+}
+
+function buildMemberRegistryRef(txHash: string, blockNumber: number): BlockchainRef {
+  return {
+    txHash,
+    chainId: CHAIN_ID,
+    blockNumber,
+    contractAddress: MEMBER_ROLE_MANAGER_ADDRESS,
+  };
 }
 
 // ============================================================================
@@ -107,6 +118,7 @@ export const registerMemberOnChain = onCall(
       // Smart Contract Call
       const tx = await contract.addMember(walletAddress, userIdHash);
       const receipt = await tx.wait();
+      const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
 
       //4. Update Firestore
       await db
@@ -118,14 +130,13 @@ export const registerMemberOnChain = onCall(
           'onChainIdentity.linkedWallets': FieldValue.arrayUnion({
             address: walletAddress,
             type: walletLabel,
-            txHash: tx.hash,
-            blockNumber: receipt?.blockNumber,
+            blockchainRef,
             linkedAt: Timestamp.now(),
             isWalletActive: true,
           }),
         });
 
-      return { success: true, txHash: tx.hash, blockNumber: receipt?.blockNumber };
+      return { success: true, blockchainRef };
     } catch (error: any) {
       console.error('❌ Member registration failed:', error);
 
@@ -161,6 +172,7 @@ export const updateMemberStatus = onCall(
       const contract = getAdminContract();
       const tx = await contract.setUserStatus(userIdHash, status);
       const receipt = await tx.wait();
+      const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
 
       // Sync the status change to Firestore
       const statusMap: Record<number, string> = {
@@ -173,10 +185,10 @@ export const updateMemberStatus = onCall(
       await getFirestore().collection('users').doc(userId).update({
         'onChainIdentity.status': statusMap[status],
         'onChainIdentity.statusUpdatedAt': Timestamp.now(),
-        'onChainIdentity.statusTxHash': tx.hash,
+        'onChainIdentity.statusBlockchainRef': blockchainRef,
       });
 
-      return { success: true, txHash: tx.hash, blockNumber: receipt?.blockNumber };
+      return { success: true, blockchainRef };
     } catch (error: any) {
       console.error('❌ Status update failed:', error);
       throw new HttpsError('internal', error.message);
@@ -230,6 +242,7 @@ export const deactivateWalletOnChain = onCall(
       const contract = getAdminContract();
       const tx = await contract.deactivateWallet(walletAddress);
       const receipt = await tx.wait();
+      const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
 
       // Update Firestore - mark wallet as inactive
       const updatedWallets = linkedWallets.map((w: any) =>
@@ -238,7 +251,7 @@ export const deactivateWalletOnChain = onCall(
               ...w,
               isWalletActive: false,
               deactivatedAt: Timestamp.now(),
-              deactivateTxHash: tx.hash,
+              blockchainRef,
             }
           : w
       );
@@ -248,7 +261,7 @@ export const deactivateWalletOnChain = onCall(
       });
 
       console.log('✅ Wallet deactivated:', tx.hash);
-      return { success: true, txHash: tx.hash, blockNumber: receipt?.blockNumber };
+      return { success: true, blockchainRef };
     } catch (error: any) {
       console.error('❌ Wallet deactivation failed:', error);
 
@@ -299,6 +312,7 @@ export const reactivateWalletOnChain = onCall(
       const contract = getAdminContract();
       const tx = await contract.reactivateWallet(walletAddress);
       const receipt = await tx.wait();
+      const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
 
       // Update Firestore - mark wallet as active
       const updatedWallets = linkedWallets.map((w: any) =>
@@ -307,7 +321,7 @@ export const reactivateWalletOnChain = onCall(
               ...w,
               isWalletActive: true,
               reactivatedAt: Timestamp.now(),
-              reactivateTxHash: tx.hash,
+              blockchainRef,
             }
           : w
       );
@@ -317,7 +331,7 @@ export const reactivateWalletOnChain = onCall(
       });
 
       console.log('✅ Wallet reactivated:', tx.hash);
-      return { success: true, txHash: tx.hash, blockNumber: receipt?.blockNumber };
+      return { success: true, blockchainRef };
     } catch (error: any) {
       console.error('❌ Wallet reactivation failed:', error);
 
@@ -394,6 +408,7 @@ export const initializeRoleOnChain = onCall(
       // 4. Execution
       const tx = await contract.initializeRecordRole(recordId, walletAddress, role);
       const receipt = await tx.wait();
+      const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
 
       await db
         .collection('records')
@@ -402,12 +417,11 @@ export const initializeRoleOnChain = onCall(
           blockchainRoleInitialization: {
             blockchainInitialized: true,
             blockchainInitializedAt: Timestamp.now(),
-            blockchainInitTxHash: tx.hash,
-            blockchainInitBlockNumber: receipt.blockNumber,
+            blockchainRef,
           },
         });
 
-      return { success: true, txHash: tx.hash, blockNumber: receipt?.blockNumber };
+      return { success: true, blockchainRef };
     } catch (error: any) {
       if (error instanceof HttpsError) throw error;
       throw new HttpsError('internal', `Blockchain error: ${error.message}`);
@@ -466,6 +480,7 @@ export const initializeRoleOnChainForRequester = onCall(
 
       const tx = await contract.initializeRecordRole(recordId, activeWallet.address, role);
       const receipt = await tx.wait();
+      const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
 
       await db
         .collection('records')
@@ -474,12 +489,11 @@ export const initializeRoleOnChainForRequester = onCall(
           blockchainRoleInitialization: {
             blockchainInitialized: true,
             blockchainInitializedAt: Timestamp.now(),
-            blockchainInitTxHash: tx.hash,
-            blockchainInitBlockNumber: receipt.blockNumber,
+            blockchainRef,
           },
         });
 
-      return { success: true, txHash: tx.hash, blockNumber: receipt?.blockNumber };
+      return { success: true, blockchainRef };
     } catch (error: any) {
       if (error instanceof HttpsError) throw error;
       throw new HttpsError('internal', `Blockchain error: ${error.message}`);

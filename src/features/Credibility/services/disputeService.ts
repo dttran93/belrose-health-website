@@ -21,6 +21,8 @@ import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormatting
 import { getVerificationId } from './verificationService';
 import { onDisputeCreated, onDisputeModified, onDisputeRevoked } from './credibilityScoreService';
 import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
+import { BlockchainRef } from '@belrose/shared';
+import { buildHealthRecordRef } from '@/config/blockchainAddresses';
 
 // ============================================================
 // TYPES
@@ -74,7 +76,7 @@ export interface DisputeDoc {
   createdAt: Timestamp;
   lastModified?: Timestamp;
   chainStatus: 'pending' | 'confirmed' | 'failed';
-  txHash?: string;
+  blockchainRef?: BlockchainRef;
 }
 
 export interface ReactionDoc {
@@ -88,7 +90,7 @@ export interface ReactionDoc {
   createdAt: Timestamp;
   lastModified?: Timestamp;
   chainStatus: 'pending' | 'confirmed' | 'failed';
-  txHash?: string;
+  blockchainRef?: BlockchainRef;
 }
 
 /** Extended type with decrypted notes for display */
@@ -412,6 +414,7 @@ export async function createDispute(
       culpability,
       notesHash
     );
+    const blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
     console.log('✅ Blockchain: Dispute recorded');
 
     // Step 2: Write to Firestore
@@ -423,7 +426,7 @@ export async function createDispute(
         notesHash,
         isActive: true,
         chainStatus: 'confirmed',
-        txHash: tx.txHash,
+        blockchainRef,
         error: null,
         lastModified: Timestamp.now(),
       });
@@ -441,13 +444,13 @@ export async function createDispute(
         isActive: true,
         createdAt: Timestamp.now(),
         chainStatus: 'confirmed',
-        txHash: tx.txHash,
+        blockchainRef,
       });
       console.log('✅ Firestore: Dispute created');
     }
 
     // Step 3: Update credibility score
-    await onDisputeCreated(recordId, recordHash, severity, culpability, tx.txHash);
+    await onDisputeCreated(recordId, recordHash, severity, culpability, blockchainRef);
 
     console.log('✅ Dispute created successfully');
     return disputeId;
@@ -506,6 +509,7 @@ export async function retractDispute(recordHash: string, disputerId: string): Pr
   try {
     console.log('🔗 Retracting dispute on blockchain...');
     const tx = await blockchainHealthRecordService.retractDispute(recordHash);
+    const blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
     console.log('✅ Blockchain: Dispute retracted');
 
     // Step 2: Update Firestore (only if blockchain succeeded)
@@ -513,12 +517,18 @@ export async function retractDispute(recordHash: string, disputerId: string): Pr
       isActive: false,
       lastModified: Timestamp.now(),
       chainStatus: 'confirmed',
-      txHash: tx.txHash,
+      blockchainRef,
     });
     console.log('✅ Firestore: Dispute marked inactive');
 
     // Step 3: Update credibility score
-    await onDisputeRevoked(data.recordId, recordHash, data.severity, data.culpability, tx.txHash);
+    await onDisputeRevoked(
+      data.recordId,
+      recordHash,
+      data.severity,
+      data.culpability,
+      blockchainRef
+    );
 
     console.log('✅ Dispute retracted successfully');
   } catch (error) {
@@ -599,6 +609,7 @@ export async function modifyDispute(
       newSeverity,
       newCulpability
     );
+    const blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
     console.log('✅ Blockchain: Dispute modified');
 
     // Step 2: Update Firestore
@@ -607,7 +618,7 @@ export async function modifyDispute(
       culpability: newCulpability,
       lastModified: Timestamp.now(),
       chainStatus: 'confirmed',
-      txHash: tx.txHash,
+      blockchainRef,
     });
     console.log('✅ Firestore: Dispute updated');
 
@@ -619,7 +630,7 @@ export async function modifyDispute(
       oldCulpability,
       newSeverity,
       newCulpability,
-      tx.txHash
+      blockchainRef
     );
 
     console.log('✅ Dispute modified successfully');
@@ -712,7 +723,7 @@ export async function reactToDispute(
   const disputerIdHash = ethers.keccak256(ethers.toUtf8Bytes(disputerId));
 
   // Generate deterministic ID
-  const reactionId = `${recordHash}_${disputerId}_${reactorId}`;
+  const reactionId = `${recordHash}_${disputerIdHash}_${reactorId}`;
   const docRef = doc(db, 'disputeReactions', reactionId);
 
   const existing = await getDoc(docRef);
@@ -734,6 +745,7 @@ export async function reactToDispute(
       disputerIdHash,
       supportsDispute
     );
+    const blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
     console.log('✅ Blockchain: Reaction recorded');
 
     // Step 2: Write to Firestore (only if blockchain succeeded)
@@ -742,7 +754,7 @@ export async function reactToDispute(
         supportsDispute,
         isActive: true,
         chainStatus: 'confirmed',
-        txHash: tx.txHash,
+        blockchainRef,
         error: null,
         lastModified: Timestamp.now(),
       });
@@ -758,7 +770,7 @@ export async function reactToDispute(
         isActive: true,
         createdAt: Timestamp.now(),
         chainStatus: 'confirmed',
-        txHash: tx.txHash,
+        blockchainRef,
       });
       console.log('✅ Firestore: Reaction created');
     }
@@ -824,6 +836,7 @@ export async function retractReaction(
   try {
     console.log('🔗 Retracting reaction on blockchain...');
     const tx = await blockchainHealthRecordService.retractReaction(recordHash, disputerIdHash);
+    const blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
     console.log('✅ Blockchain: Reaction retracted');
 
     // Step 2: Update Firestore (only if blockchain succeeded)
@@ -831,7 +844,7 @@ export async function retractReaction(
       isActive: false,
       lastModified: Timestamp.now(),
       chainStatus: 'confirmed',
-      txHash: tx.txHash,
+      blockchainRef,
     });
     console.log('✅ Firestore: Reaction marked inactive');
 
@@ -904,6 +917,7 @@ export async function modifyReaction(
       disputerIdHash,
       newSupport
     );
+    const blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
     console.log('✅ Blockchain: Reaction modified');
 
     // Step 2: Update Firestore
@@ -911,7 +925,7 @@ export async function modifyReaction(
       supportsDispute: newSupport,
       lastModified: Timestamp.now(),
       chainStatus: 'confirmed',
-      txHash: tx.txHash,
+      blockchainRef,
     });
     console.log('✅ Firestore: Reaction updated');
 
@@ -995,7 +1009,7 @@ export async function getDisputeReactions(
       createdAt: data.createdAt,
       lastModified: data.lastModified,
       chainStatus: data.chainStatus,
-      txHash: data.txHash,
+      blockchainRef: data.blockchainRef,
     } as ReactionDoc);
   });
 

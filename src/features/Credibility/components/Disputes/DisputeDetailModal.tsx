@@ -100,8 +100,8 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
   const sevColors = severityColors[severityInfo.color as keyof typeof severityColors];
 
   const handleViewOnBlockchain = () => {
-    if (dispute.txHash) {
-      window.open(`https://sepolia.etherscan.io/tx/${dispute.txHash}`, '_blank');
+    if (dispute.blockchainRef?.txHash) {
+      window.open(`https://sepolia.etherscan.io/tx/${dispute.blockchainRef?.txHash}`, '_blank');
     }
   };
 
@@ -302,7 +302,7 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={handleViewOnBlockchain}
-                  disabled={!dispute.txHash}
+                  disabled={!dispute.blockchainRef?.txHash}
                   className="text-gray-600"
                 >
                   <ExternalLink className="w-4 h-4 mr-1" />

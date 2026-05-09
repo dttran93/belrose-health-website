@@ -3,24 +3,24 @@
 // Calls backend Cloud Functions which use the admin wallet to write to blockchain.
 
 import { MemberStatus } from '@/features/MemberBlockchainViewer/lib/types';
+import { BlockchainRef } from '@belrose/shared';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // ==================== TYPES ====================
 interface RegisterMemberResult {
   success: boolean;
-  txHash?: string;
+  blockchainRef?: BlockchainRef;
   message?: string;
 }
 
 interface UpdateUserStatusResult {
   success: boolean;
-  txHash?: string;
+  blockchainRef?: BlockchainRef;
 }
 
 interface WalletStatusResult {
   success: boolean;
-  txHash: string;
-  blockNumber: number;
+  blockchainRef?: BlockchainRef;
 }
 
 // ==================== SERVICE ====================
@@ -145,7 +145,7 @@ export class MemberRegistryBlockchain {
 
       const result = await deactivateFn({ walletAddress });
 
-      console.log('✅ Wallet deactivated:', result.data.txHash);
+      console.log('✅ Wallet deactivated:', result.data.blockchainRef);
       return result.data;
     } catch (error: any) {
       console.error('❌ Wallet deactivation failed:', error);
@@ -168,7 +168,7 @@ export class MemberRegistryBlockchain {
 
       const result = await reactivateFn({ walletAddress });
 
-      console.log('✅ Wallet reactivated:', result.data.txHash);
+      console.log('✅ Wallet reactivated:', result.data.blockchainRef);
       return result.data;
     } catch (error: any) {
       console.error('❌ Wallet reactivation failed:', error);

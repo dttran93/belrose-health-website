@@ -60,6 +60,8 @@ const stripeWebhookSecret = (0, params_1.defineSecret)('STRIPE_WEBHOOK_SECRET');
 const db = admin.firestore();
 // ── 1. Create Verification Session ──────────────────────────────────
 exports.createStripeVerificationSession = (0, https_1.onCall)({ secrets: [stripeSecretKey], cors: true }, async (request) => {
+    // 1. Log the incoming request to see if it even hits the function
+    console.log('Request received for user:', request.data.userId);
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated to verify identity.');
     }

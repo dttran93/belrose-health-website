@@ -37,6 +37,7 @@ import {
 import { getAuth } from 'firebase/auth';
 import type { VerificationLevel } from './verificationService';
 import type { DisputeSeverity, DisputeCulpability } from './disputeService';
+import { BlockchainRef } from '@belrose/shared';
 
 // ==================== TYPES ====================
 
@@ -74,7 +75,7 @@ export interface ScoreEventMetadata {
   previousDisputeCulpability?: DisputeCulpability;
 
   // Blockchain reference
-  txHash?: string;
+  blockchainRef?: BlockchainRef;
 }
 
 // ==================== CONSTANTS ====================
@@ -264,11 +265,11 @@ export async function onVerificationCreated(
   recordId: string,
   recordHash: string,
   level: VerificationLevel,
-  txHash?: string
+  blockchainRef?: BlockchainRef
 ): Promise<void> {
   await createScoreEvent(recordId, recordHash, 'verification', {
     verificationLevel: level,
-    txHash,
+    blockchainRef,
   });
 }
 
@@ -276,11 +277,11 @@ export async function onVerificationRevoked(
   recordId: string,
   recordHash: string,
   previousLevel: VerificationLevel,
-  txHash?: string
+  blockchainRef?: BlockchainRef
 ): Promise<void> {
   await createScoreEvent(recordId, recordHash, 'verification_revoked', {
     previousVerificationLevel: previousLevel,
-    txHash,
+    blockchainRef,
   });
 }
 
@@ -289,12 +290,12 @@ export async function onVerificationModified(
   recordHash: string,
   previousLevel: VerificationLevel,
   newLevel: VerificationLevel,
-  txHash?: string
+  blockchainRef?: BlockchainRef
 ): Promise<void> {
   await createScoreEvent(recordId, recordHash, 'verification_modified', {
     previousVerificationLevel: previousLevel,
     verificationLevel: newLevel,
-    txHash,
+    blockchainRef,
   });
 }
 
@@ -305,12 +306,12 @@ export async function onDisputeCreated(
   recordHash: string,
   severity: DisputeSeverity,
   culpability: DisputeCulpability,
-  txHash?: string
+  blockchainRef?: BlockchainRef
 ): Promise<void> {
   await createScoreEvent(recordId, recordHash, 'dispute', {
     disputeSeverity: severity,
     disputeCulpability: culpability,
-    txHash,
+    blockchainRef,
   });
 }
 
@@ -319,12 +320,12 @@ export async function onDisputeRevoked(
   recordHash: string,
   previousSeverity: DisputeSeverity,
   previousCulpability: DisputeCulpability,
-  txHash?: string
+  blockchainRef?: BlockchainRef
 ): Promise<void> {
   await createScoreEvent(recordId, recordHash, 'dispute_revoked', {
     previousDisputeSeverity: previousSeverity,
     previousDisputeCulpability: previousCulpability,
-    txHash,
+    blockchainRef,
   });
 }
 
@@ -335,14 +336,14 @@ export async function onDisputeModified(
   previousCulpability: DisputeCulpability,
   newSeverity: DisputeSeverity,
   newCulpability: DisputeCulpability,
-  txHash?: string
+  blockchainRef?: BlockchainRef
 ): Promise<void> {
   await createScoreEvent(recordId, recordHash, 'dispute_modified', {
     previousDisputeSeverity: previousSeverity,
     previousDisputeCulpability: previousCulpability,
     disputeSeverity: newSeverity,
     disputeCulpability: newCulpability,
-    txHash,
+    blockchainRef,
   });
 }
 

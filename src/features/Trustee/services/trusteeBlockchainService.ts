@@ -12,10 +12,12 @@ import {
 } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
+import { BlockchainRef } from '@belrose/shared';
+import { buildMemberRegistryRef } from '@/config/blockchainAddresses';
 
 interface TrusteeResult {
   success: boolean;
-  txHash: string | null;
+  blockchainRef: BlockchainRef | null;
 }
 
 type TrusteeAction =
@@ -65,8 +67,9 @@ export class TrusteeBlockchainService {
       console.log('⛓️ Proposing trustee on blockchain...', { trustorId, trusteeId, level });
       const trusteeIdHash = ethers.id(trusteeId);
       const result = await BlockchainRoleManagerService.proposeTrustee(trusteeIdHash, level);
+      const blockchainRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
       console.log('✅ Trustee proposed on blockchain');
-      return { success: true, txHash: result.txHash };
+      return { success: true, blockchainRef };
     } catch (error) {
       await this.logTrusteeFailure({
         action: 'proposeTrustee',
@@ -76,7 +79,7 @@ export class TrusteeBlockchainService {
         walletAddress,
         error,
       });
-      return { success: false, txHash: null };
+      return { success: false, blockchainRef: null };
     }
   }
 
@@ -91,8 +94,9 @@ export class TrusteeBlockchainService {
       console.log('⛓️ Accepting trustee proposal on blockchain...', { trustorId, trusteeId });
       const trustorIdHash = ethers.id(trustorId);
       const result = await BlockchainRoleManagerService.acceptTrustee(trustorIdHash);
+      const blockchainRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
       console.log('✅ Trustee accepted on blockchain');
-      return { success: true, txHash: result.txHash };
+      return { success: true, blockchainRef };
     } catch (error) {
       await this.logTrusteeFailure({
         action: 'acceptTrustee',
@@ -102,7 +106,7 @@ export class TrusteeBlockchainService {
         walletAddress,
         error,
       });
-      return { success: false, txHash: null };
+      return { success: false, blockchainRef: null };
     }
   }
 
@@ -122,8 +126,9 @@ export class TrusteeBlockchainService {
       const trustorIdHash = ethers.id(trustorId);
       const trusteeIdHash = ethers.id(trusteeId);
       const result = await BlockchainRoleManagerService.revokeTrustee(trustorIdHash, trusteeIdHash);
+      const blockchainRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
       console.log('✅ Trustee revoked on blockchain');
-      return { success: true, txHash: result.txHash };
+      return { success: true, blockchainRef };
     } catch (error) {
       await this.logTrusteeFailure({
         action: 'revokeTrustee',
@@ -133,7 +138,7 @@ export class TrusteeBlockchainService {
         walletAddress,
         error,
       });
-      return { success: false, txHash: null };
+      return { success: false, blockchainRef: null };
     }
   }
 
@@ -164,7 +169,8 @@ export class TrusteeBlockchainService {
         trusteeWallet,
         roles as RoleType[]
       );
-      return { success: true, txHash: result.txHash };
+      const blockchainRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
+      return { success: true, blockchainRef };
     } catch (error) {
       await this.logTrusteeFailure({
         action: 'grantRoleAsTrusteeBatch',
@@ -174,7 +180,7 @@ export class TrusteeBlockchainService {
         walletAddress: trusteeWallet ?? '',
         error,
       });
-      return { success: false, txHash: null };
+      return { success: false, blockchainRef: null };
     }
   }
 
@@ -189,8 +195,9 @@ export class TrusteeBlockchainService {
       console.log('⛓️ Updating trustee level on blockchain...', { trustorId, trusteeId, newLevel });
       const trusteeIdHash = ethers.id(trusteeId);
       const result = await BlockchainRoleManagerService.updateTrusteeLevel(trusteeIdHash, newLevel);
+      const blockchainRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
       console.log('✅ Trustee level updated on blockchain');
-      return { success: true, txHash: result.txHash };
+      return { success: true, blockchainRef };
     } catch (error) {
       await this.logTrusteeFailure({
         action: 'updateTrusteeLevel',
@@ -200,7 +207,7 @@ export class TrusteeBlockchainService {
         walletAddress,
         error,
       });
-      return { success: false, txHash: null };
+      return { success: false, blockchainRef: null };
     }
   }
 

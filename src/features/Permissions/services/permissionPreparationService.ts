@@ -31,6 +31,7 @@ import {
 import { MEMBER_ROLE_MANAGER } from '@/config/blockchainAddresses';
 import { getAuth } from 'firebase/auth';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
+import { BlockchainRef } from '@belrose/shared';
 
 // ==================== SMART CONTRACT CONFIG ====================
 
@@ -95,8 +96,7 @@ export type InitialRole = 'administrator' | 'owner';
 
 export interface InitializeRecordResult {
   success: boolean;
-  txHash: string;
-  blockNumber: number;
+  blockchainRef?: BlockchainRef;
   role: InitialRole;
 }
 
@@ -477,7 +477,7 @@ export class PermissionPreparationService {
 
       const result = await initFn({ recordId, walletAddress, role });
 
-      console.log('✅ Record initialized:', result.data.txHash);
+      console.log('✅ Record initialized:', result.data.blockchainRef);
       return result.data;
     } catch (error: any) {
       // Handle "already exists" gracefully - not really an error
@@ -490,8 +490,7 @@ export class PermissionPreparationService {
         console.log('ℹ️ Record already initialized on network');
         return {
           success: true,
-          txHash: '',
-          blockNumber: 0,
+          blockchainRef: undefined,
           role: role,
         };
       }

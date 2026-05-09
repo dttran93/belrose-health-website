@@ -227,7 +227,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         registrationData.walletAddress
       );
 
-      if (!eoaResult.txHash && eoaResult.message !== 'Already registered') {
+      if (!eoaResult.blockchainRef && eoaResult.message !== 'Already registered') {
         throw new Error('EOA blockchain registration failed - no transaction hash received');
       }
 

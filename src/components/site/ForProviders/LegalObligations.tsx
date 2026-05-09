@@ -60,10 +60,13 @@ const LegalObligations: React.FC<LegalObligationsProps> = ({ onNext }) => (
       <section className="text-left">
         <h3 className="font-bold text-slate-900 mb-2">3. Identity & Verification</h3>
         <p className="text-sm text-slate-700 leading-relaxed mb-1">
-          If you have doubts about the identity of the requester, you may contact the patient
-          directly to verify (they are CC'd on the request email). Belrose Health has also
-          independently verified the identity of the patient via a government-issued photo ID and
-          liveness check. Verification records are retained and available within the platform.
+          Belrose Health has verified the identity of the patient via{' '}
+          <a href="https://stripe.com/gb/identity" className="text-primary font-medium">
+            Stripe Identity
+          </a>
+          , an identiy verification service trusted by thousands of companies worldwide. If you have
+          doubts about the identity of the requester, you may contact the patient directly to verify
+          (they are CC'd on the request email).
         </p>
       </section>
     </div>

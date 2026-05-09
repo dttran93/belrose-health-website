@@ -3,4 +3,5 @@ export * from './timestamp';
 export * from './belroseFields';
 export * from './convertToFHIR';
 export * from './aiImageAnalysis';
+export * from './blockchain';
 //# sourceMappingURL=index.d.ts.map

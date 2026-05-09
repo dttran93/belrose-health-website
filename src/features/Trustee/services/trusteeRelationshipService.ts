@@ -53,6 +53,7 @@ import { getAuth } from 'firebase/auth';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
 import { TrusteeBlockchainService } from './trusteeBlockchainService';
 import { TrusteePermissionService } from './trusteePermissionService';
+import { BlockchainRef } from '@belrose/shared';
 
 // ============================================================================
 // TYPES
@@ -84,9 +85,10 @@ export interface TrusteeRelationship {
   statusUpdateReason: StatusUpdate | null;
 
   // Controller only — blockchain tx hash from the controller appointment
-  inviteTxHash: string | null;
-  acceptTxHash: string | null;
-  revocationTxHash: string | null;
+  inviteBlockchainRef: BlockchainRef | null;
+  acceptBlockchainRef: BlockchainRef | null;
+  revocationBlockchainRef: BlockchainRef | null;
+  editBlockchainRef: BlockchainRef | null;
 }
 
 // ============================================================================
@@ -172,11 +174,12 @@ export class TrusteeRelationshipService {
 
     // Step 1: Blockchain proposal
     console.log('🔗 Proposing trustee on blockchain...');
-    const { success, txHash: inviteTxHash } = await TrusteeBlockchainService.proposeTrustee(
-      trustorId,
-      trusteeId,
-      trustLevelMap[trustLevel]
-    );
+    const { success, blockchainRef: inviteBlockchainRef } =
+      await TrusteeBlockchainService.proposeTrustee(
+        trustorId,
+        trusteeId,
+        trustLevelMap[trustLevel]
+      );
     if (!success) throw new Error('Blockchain proposal failed — see sync queue for details');
     console.log('✅ Blockchain: Trustee proposed');
 
@@ -197,9 +200,10 @@ export class TrusteeRelationshipService {
         revokedAt: null,
         revokedBy: null,
         statusUpdateReason: null,
-        inviteTxHash,
-        acceptTxHash: null,
-        revocationTxHash: null,
+        inviteBlockchainRef,
+        acceptBlockchainRef: null,
+        revocationBlockchainRef: null,
+        editBlockchainRef: null,
       });
     } else {
       // First time — create new document
@@ -215,9 +219,10 @@ export class TrusteeRelationshipService {
         revokedAt: null,
         revokedBy: null,
         statusUpdateReason: null,
-        inviteTxHash,
-        acceptTxHash: null,
-        revocationTxHash: null,
+        inviteBlockchainRef,
+        acceptBlockchainRef: null,
+        revocationBlockchainRef: null,
+        editBlockchainRef: null,
       } satisfies TrusteeRelationship);
     }
 
@@ -251,11 +256,8 @@ export class TrusteeRelationshipService {
 
     // Step 1: Revoke on blockchain
     console.log('🔗 Revoking trustee on blockchain...');
-    const { success, txHash: revocationTxHash } = await TrusteeBlockchainService.revokeTrustee(
-      trustorId,
-      trusteeId,
-      trustorId
-    );
+    const { success, blockchainRef: revocationBlockchainRef } =
+      await TrusteeBlockchainService.revokeTrustee(trustorId, trusteeId, trustorId);
     if (!success) throw new Error('Blockchain revocation failed — see sync queue for details');
     console.log('✅ Blockchain: Trustee revoked');
 
@@ -275,7 +277,7 @@ export class TrusteeRelationshipService {
       revokedAt: Timestamp.now(),
       revokedBy: trustorId,
       statusUpdateReason: 'trustor_revoked',
-      revocationTxHash,
+      revocationBlockchainRef,
     });
 
     console.log(`✅ Trustee revoked: ${trustorId} revoked ${trusteeId}`);
@@ -321,11 +323,12 @@ export class TrusteeRelationshipService {
 
     // Step 1: Update trust level on blockchain
     console.log('🔗 Updating trust level on blockchain...');
-    const { success, txHash } = await TrusteeBlockchainService.updateTrusteeLevel(
-      trustorId,
-      trusteeId,
-      trustLevelMap[newTrustLevel]
-    );
+    const { success, blockchainRef: editBlockchainRef } =
+      await TrusteeBlockchainService.updateTrusteeLevel(
+        trustorId,
+        trusteeId,
+        trustLevelMap[newTrustLevel]
+      );
     if (!success) throw new Error('Blockchain update failed — see sync queue for details');
     console.log('✅ Blockchain: Trust level updated');
 
@@ -336,6 +339,7 @@ export class TrusteeRelationshipService {
     await updateDoc(relationshipRef, {
       trustLevel: newTrustLevel,
       statusUpdateReason: isUpgrade ? 'trust_level_upgrade' : 'trust_level_downgrade',
+      editBlockchainRef,
     });
 
     console.log(`✅ Trust level updated: ${trustorId} → ${trusteeId} (${newTrustLevel})`);
@@ -390,10 +394,8 @@ export class TrusteeRelationshipService {
 
     // Step 1: Accept on blockchain
     console.log('🔗 Accepting trustee on blockchain...');
-    const { success, txHash: acceptTxHash } = await TrusteeBlockchainService.acceptTrustee(
-      trustorId,
-      trusteeId
-    );
+    const { success, blockchainRef: acceptBlockchainRef } =
+      await TrusteeBlockchainService.acceptTrustee(trustorId, trusteeId);
     if (!success) throw new Error('Blockchain acceptance failed — see sync queue for details');
     console.log('✅ Blockchain: Trustee accepted');
 
@@ -407,7 +409,7 @@ export class TrusteeRelationshipService {
       isActive: true,
       status: 'active',
       respondedAt: Timestamp.now(),
-      acceptTxHash,
+      acceptBlockchainRef,
     });
 
     console.log(`✅ Trustee invite accepted: ${trusteeId} accepted invite from ${trustorId}`);
@@ -484,11 +486,8 @@ export class TrusteeRelationshipService {
 
     // Step 1: Revoke on blockchain
     console.log('🔗 Resigning as trustee on blockchain...');
-    const { success, txHash: revocationTxHash } = await TrusteeBlockchainService.revokeTrustee(
-      trustorId,
-      trusteeId,
-      trusteeId
-    );
+    const { success, blockchainRef: revocationBlockchainRef } =
+      await TrusteeBlockchainService.revokeTrustee(trustorId, trusteeId, trusteeId);
     if (!success) throw new Error('Blockchain revocation failed — see sync queue for details');
     console.log('✅ Blockchain: Trustee resigned');
 
@@ -502,7 +501,7 @@ export class TrusteeRelationshipService {
       revokedAt: Timestamp.now(),
       revokedBy: trusteeId,
       statusUpdateReason: 'trustee_resigned',
-      revocationTxHash,
+      revocationBlockchainRef,
     });
 
     console.log(`✅ Trustee resigned: ${trusteeId} resigned from ${trustorId}'s account`);

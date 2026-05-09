@@ -54,6 +54,7 @@ interface TrusteeRecordAccess {
   recordId: string;
   role: Role;
   hadPriorAccess?: boolean; // true if trustee already had independent access before this relationship
+  trustorRole: Role | null;
 }
 
 export class TrusteePermissionService {
@@ -186,9 +187,11 @@ export class TrusteePermissionService {
         // Pass currentTrusteeRole — skips if trustee already has equal/higher role
         role: this.resolveTrusteeRole(trustLevel, trustorRole, currentTrusteeRole),
         hadPriorAccess: currentTrusteeRole !== null,
+        trustorRole,
       }))
       .filter(
-        (r): r is { recordId: string; role: Role; hadPriorAccess: boolean } => r.role !== null
+        (r): r is { recordId: string; role: Role; hadPriorAccess: boolean; trustorRole: Role } =>
+          r.role !== null
       );
 
     if (accessList.length === 0) {
@@ -214,27 +217,30 @@ export class TrusteePermissionService {
     // We do these together so the record stays consistent even if we crash partway through
     const db = getFirestore();
 
-    for (const { recordId, role, hadPriorAccess } of accessList) {
+    for (const { recordId, role, hadPriorAccess, trustorRole } of accessList) {
       try {
-        // Create wrappedKey in inactive state — trustee can't decrypt until they accept
         await SharingService.grantEncryptionAccess(recordId, trusteeId, trustorId, {
           isActive: false,
         });
 
-        // Move trustee into the correct role array.
-        // Only add to trustees[] if they didn't already have independent access —
-        // trustees[] marks access as trustee-derived (cascades on trustor removal).
-        await updateDoc(doc(db, 'records', recordId), {
-          owners: arrayRemove(trusteeId),
-          administrators: arrayRemove(trusteeId),
-          viewers: arrayRemove(trusteeId),
-          [this.roleToArray(role)]: arrayUnion(trusteeId),
+        const roleArray = this.roleToArray(role);
+        const trustorIsAdminOrOwner = trustorRole === 'owner' || trustorRole === 'administrator';
+
+        const update: any = {
+          [roleArray]: arrayUnion(trusteeId),
           ...(!hadPriorAccess && { trustees: arrayUnion(trusteeId) }),
-        });
+        };
+
+        if (trustorIsAdminOrOwner) {
+          if (roleArray !== 'owners') update.owners = arrayRemove(trusteeId);
+          if (roleArray !== 'administrators') update.administrators = arrayRemove(trusteeId);
+          if (roleArray !== 'viewers') update.viewers = arrayRemove(trusteeId);
+        }
+
+        await updateDoc(doc(db, 'records', recordId), update);
 
         console.log(`✅ Pending access granted: ${trusteeId} as ${role} on record ${recordId}`);
       } catch (err) {
-        // Log and continue — partial failures are recoverable
         console.error(`⚠️ Failed to grant pending access on record ${recordId}:`, err);
       }
     }

@@ -10,11 +10,11 @@ import {
 import type {
   MemberRoleManagerContract,
   UserData,
-  UserStatus,
   WalletInfo,
   RoleAssignment,
   DashboardStats,
   TrusteeRelationshipOnChain,
+  MemberStatus,
 } from '../lib/types';
 import { TrusteeStatus, TrusteeLevel } from '../lib/types';
 import { getProfilesByUserIdHashes, transformToUserProfile } from './userProfileService';
@@ -216,7 +216,7 @@ export async function getAllUsers(): Promise<UserData[]> {
 
         return {
           userIdHash,
-          status: Number(status) as UserStatus,
+          status: Number(status) as MemberStatus,
           wallets,
           records,
           profile,

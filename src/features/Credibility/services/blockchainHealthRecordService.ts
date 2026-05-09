@@ -14,7 +14,10 @@
 // Write operations: Routes through PaymasterService
 
 import { ethers, Contract } from 'ethers';
-import { PaymasterService } from '@/features/BlockchainWallet/services/paymasterService';
+import {
+  PaymasterService,
+  TransactionResult,
+} from '@/features/BlockchainWallet/services/paymasterService';
 import { HEALTH_RECORD_CORE, NETWORK } from '@/config/blockchainAddresses';
 
 // ============================================================================
@@ -591,11 +594,6 @@ export interface ReactionStats {
   activeOpposes: number;
 }
 
-export interface TransactionResult {
-  txHash: string;
-  blockNumber: number;
-}
-
 // ============================================================================
 // SERVICE
 // ============================================================================
@@ -624,12 +622,10 @@ export class blockchainHealthRecordService {
   ): Promise<TransactionResult> {
     const data = this.encodeFunctionData(functionName, args);
 
-    const txHash = await PaymasterService.sendTransaction({
+    return await PaymasterService.sendTransaction({
       to: HEALTH_RECORD_CORE_ADDRESS as `0x${string}`,
       data,
     });
-
-    return { txHash, blockNumber: 0 };
   }
 
   // ==========================================================================

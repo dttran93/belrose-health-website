@@ -533,12 +533,10 @@ export class BlockchainRoleManagerService {
   ): Promise<TransactionResult> {
     const data = this.encodeFunctionData(functionName, args);
 
-    const txHash = await PaymasterService.sendTransaction({
+    return await PaymasterService.sendTransaction({
       to: MEMBER_ROLE_MANAGER_ADDRESS as `0x${string}`,
       data,
     });
-
-    return { txHash, blockNumber: 0 };
   }
 
   // ==========================================================================

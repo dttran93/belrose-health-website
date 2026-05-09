@@ -157,7 +157,7 @@ export class SmartAccountService {
     const result = await MemberRegistryBlockchain.registerMemberWallet(address);
 
     if (result.success) {
-      console.log('✅ Smart account registered on-chain:', result.txHash || 'already registered');
+      console.log('✅ Smart account registered on-chain:', result.blockchainRef);
     }
   }
 

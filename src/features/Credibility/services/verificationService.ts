@@ -22,6 +22,8 @@ import {
   onVerificationRevoked,
 } from './credibilityScoreService';
 import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
+import { BlockchainRef } from '@belrose/shared';
+import { buildHealthRecordRef } from '@/config/blockchainAddresses';
 
 // ============================================================
 // TYPES
@@ -50,7 +52,7 @@ export interface VerificationDoc {
   createdAt: Timestamp;
   lastModified?: Timestamp;
   chainStatus: 'pending' | 'confirmed' | 'failed';
-  txHash?: string;
+  blockchainRef?: BlockchainRef;
 }
 
 // ============================================================
@@ -226,6 +228,7 @@ export async function createVerification(
   try {
     console.log('🔗 Writing verification to blockchain...');
     const tx = await blockchainHealthRecordService.verifyRecord(recordId, recordHash, level);
+    const blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
     console.log('✅ Blockchain: Verification recorded');
 
     // Step 2: Write to Firestore
@@ -236,7 +239,7 @@ export async function createVerification(
         level,
         isActive: true,
         chainStatus: 'confirmed',
-        txHash: tx.txHash,
+        blockchainRef,
         error: null,
         lastModified: Timestamp.now(),
       });
@@ -251,13 +254,13 @@ export async function createVerification(
         isActive: true,
         createdAt: Timestamp.now(),
         chainStatus: 'confirmed',
-        txHash: tx.txHash,
+        blockchainRef,
       });
       console.log('✅ Firestore: Verification created');
     }
 
     // Step 3: Update credibility score
-    await onVerificationCreated(recordId, recordHash, level, tx.txHash);
+    await onVerificationCreated(recordId, recordHash, level, blockchainRef);
 
     console.log('✅ Verification created successfully');
     return verificationId;
@@ -318,6 +321,7 @@ export async function retractVerification(recordHash: string, verifierId: string
   try {
     console.log('🔗 Retracting verification on blockchain...');
     const tx = await blockchainHealthRecordService.retractVerification(recordHash);
+    const blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
     console.log('✅ Blockchain: Verification retracted');
 
     // Step 2: Update Firestore (only if blockchain succeeded)
@@ -325,12 +329,12 @@ export async function retractVerification(recordHash: string, verifierId: string
       isActive: false,
       lastModified: Timestamp.now(),
       chainStatus: 'confirmed',
-      txHash: tx.txHash,
+      blockchainRef,
     });
     console.log('✅ Firestore: Verification marked inactive');
 
     // Step 3: Update credibility score
-    await onVerificationRevoked(data.recordId, data.recordHash, data.level, tx.txHash);
+    await onVerificationRevoked(data.recordId, data.recordHash, data.level, blockchainRef);
 
     console.log('✅ Verification retracted successfully');
   } catch (error) {
@@ -399,6 +403,7 @@ export async function modifyVerificationLevel(
   try {
     console.log('🔗 Modifying verification level on blockchain...');
     const tx = await blockchainHealthRecordService.modifyVerificationLevel(recordHash, newLevel);
+    const blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
     console.log('✅ Blockchain: Verification level updated');
 
     // Step 2: Update Firestore
@@ -406,12 +411,12 @@ export async function modifyVerificationLevel(
       level: newLevel,
       lastModified: Timestamp.now(),
       chainStatus: 'confirmed',
-      txHash: tx.txHash,
+      blockchainRef,
     });
     console.log('✅ Firestore: Verification level updated');
 
     // Step 3: Update credibility score
-    await onVerificationModified(data.recordId, recordHash, oldLevel, newLevel, tx.txHash);
+    await onVerificationModified(data.recordId, recordHash, oldLevel, newLevel, blockchainRef);
 
     console.log('✅ Verification level modified successfully');
   } catch (error) {

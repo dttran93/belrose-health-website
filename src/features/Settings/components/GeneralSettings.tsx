@@ -149,9 +149,9 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({
 
               <SettingsRow
                 label="Transaction Hash"
-                value={wallet.txHash}
+                value={wallet.blockchainRef?.txHash}
                 isLink
-                linkHref={`${etherscanBase}/tx/${wallet.txHash}`}
+                linkHref={`${etherscanBase}/tx/${wallet.blockchainRef?.txHash}`}
                 mono
               />
 

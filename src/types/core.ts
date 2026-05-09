@@ -1,4 +1,4 @@
-import { BelroseFields } from '@belrose/shared';
+import { BelroseFields, BlockchainRef } from '@belrose/shared';
 import { Timestamp } from 'firebase/firestore';
 import { ReactNode } from 'react';
 
@@ -44,7 +44,7 @@ export interface BelroseUserProfile extends User {
     userIdHash: string; // The keccak256 hash of the UID. Intentionally not a search path for users. Want to maintain privacy separation between on-chain/off-chain identities.
     status: 'Inactive' | 'Active' | 'Verified';
     statusUpdatedAt?: any;
-    statusTxHash?: string;
+    statusBlockchainRef?: BlockchainRef;
 
     // The collection of all linked wallets to this identity on the contract
     linkedWallets: LinkedWalletRecord[];
@@ -81,8 +81,7 @@ export interface UserWallet {
 export interface LinkedWalletRecord {
   address: string;
   type: 'eoa' | 'smart-account' | 'controller-trustee';
-  txHash: string;
-  blockNumber: number;
+  blockchainRef: BlockchainRef;
   linkedAt: any; // Timestamp
   isWalletActive: boolean; // Reflects contract's isWalletActive status
   trusteeId?: string;
@@ -118,8 +117,7 @@ export interface LocationState {
 export interface RoleInitialization {
   blockchainInitialized: boolean;
   blockchainInitializedAt: Timestamp;
-  blockchainInitTxHash: string;
-  blockchainInitBlockNumber: number;
+  blockchainRef: BlockchainRef;
   syncedFromChain: boolean; //For when an intialization had to be self-healed. Indicates there was an issue with updating firebase previously for future debugging/auditing
 }
 

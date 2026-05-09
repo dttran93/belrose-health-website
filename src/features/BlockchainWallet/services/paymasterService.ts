@@ -57,6 +57,11 @@ export interface TransactionRequest {
   value?: bigint;
 }
 
+export interface TransactionResult {
+  txHash: string;
+  blockNumber: number;
+}
+
 // ==================== SERVICE ====================
 
 export class PaymasterService {
@@ -70,7 +75,7 @@ export class PaymasterService {
    * @param request - The transaction to send (to, data, value)
    * @returns Transaction hash
    */
-  static async sendTransaction(request: TransactionRequest): Promise<string> {
+  static async sendTransaction(request: TransactionRequest): Promise<TransactionResult> {
     const wallet = await WalletService.getCurrentUserWallet();
 
     if (wallet?.origin === 'generated') {
@@ -83,7 +88,9 @@ export class PaymasterService {
   /**
    * Send a direct transaction where user pays gas (MetaMask, etc.)
    */
-  private static async sendDirectTransaction(request: TransactionRequest): Promise<string> {
+  private static async sendDirectTransaction(
+    request: TransactionRequest
+  ): Promise<TransactionResult> {
     console.log('🦊 PaymasterService: Sending direct transaction (user pays gas)...');
 
     const { signer } = await WalletService.getSigner();
@@ -96,7 +103,7 @@ export class PaymasterService {
     const receipt = await tx.wait();
     console.log('✅ PaymasterService: Direct transaction confirmed:', tx.hash);
 
-    return tx.hash;
+    return { txHash: tx.hash, blockNumber: receipt?.blockNumber ?? 0 };
   }
 
   /**
@@ -145,7 +152,7 @@ export class PaymasterService {
    * @returns Transaction hash
    * @throws Error if sponsorship fails or transaction reverts
    */
-  static async sendSponsoredTransaction(request: TransactionRequest): Promise<string> {
+  static async sendSponsoredTransaction(request: TransactionRequest): Promise<TransactionResult> {
     console.log('🚀 PaymasterService: Sending sponsored transaction...');
 
     // Verify eligibility first
@@ -164,8 +171,12 @@ export class PaymasterService {
       value: request.value ?? 0n,
     });
 
-    console.log('✅ PaymasterService: Transaction submitted:', txHash);
-    return txHash;
+    // Bundler only returns a hash — fetch the receipt separately to get blockNumber
+    const publicClient = createPublicClient({ chain: CHAIN, transport: http() });
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+    console.log('✅ PaymasterService: Transaction confirmed:', txHash);
+    return { txHash, blockNumber: Number(receipt.blockNumber) };
   }
 
   /**
