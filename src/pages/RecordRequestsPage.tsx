@@ -25,6 +25,9 @@ import { markRequestComplete } from '@/features/RequestRecord/services/linkRecor
 import { toast } from 'sonner';
 import LinkRecordModal from '@/features/RequestRecord/components/Respond/LinkRecordModal';
 import { RecordRequest } from '@belrose/shared';
+import IdentityVerificationBanner from '@/features/RequestRecord/components/ui/IdentityVerificationBanner';
+import { REQUIRE_IDENTITY_VERIFICATION } from '@/config/featureFlags';
+import IdentityVerificationGateModal from '@/features/RequestRecord/components/ui/IdentityVerificationGateModal';
 
 type PageView = 'list' | 'new';
 type Tab = 'sent' | 'received';
@@ -100,6 +103,11 @@ const RecordRequestsPage: React.FC = () => {
   if (pageView === 'new') {
     return (
       <div className="min-h-screen bg-gray-50">
+        {/* Gate modal sits on top — onClose sends user back to list */}
+        {REQUIRE_IDENTITY_VERIFICATION && !user.identityVerified && (
+          <IdentityVerificationGateModal onClose={() => setPageView('list')} />
+        )}
+
         <NewRequestForm
           user={user}
           onBack={() => setPageView('list')}
@@ -115,8 +123,11 @@ const RecordRequestsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+        {REQUIRE_IDENTITY_VERIFICATION && !user.identityVerified && <IdentityVerificationBanner />}
         {/* Header */}
         <div className="flex items-start text-left justify-between">
+          {/* Identity gate banner */}
+
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Record requests</h1>
             <p className="text-sm text-gray-500 mt-1">

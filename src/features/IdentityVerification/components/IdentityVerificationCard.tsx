@@ -1,7 +1,7 @@
 // src/features/IdentityVerification/components/IdentityVerificationCard.tsx
 
 import React from 'react';
-import { IdCard, CheckCircle2, Clock, Shield, Users, FileText, Sparkles } from 'lucide-react';
+import { IdCard, CheckCircle2, Users, FileText, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { VerifiedData } from '../identity.types';
 

@@ -1,0 +1,1 @@
+export const REQUIRE_IDENTITY_VERIFICATION = true;
