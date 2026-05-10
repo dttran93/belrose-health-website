@@ -6,8 +6,6 @@ import {
   UserPlus,
   Loader2,
   XCircle,
-  ShieldCheck,
-  Crown,
   Key,
   Stethoscope,
   FileText,

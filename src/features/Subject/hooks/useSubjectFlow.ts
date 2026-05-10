@@ -14,9 +14,9 @@
  * - searching: User search for "other" flow
  * - preparing: Wallet setup
  * - confirming: Final confirmation
- * - executing: Operation in progress
- * - success: Operation completed
- * - error: Operation failed
+ * - executing: Brief moment while tx is being submitted
+ * - submitted: Tx handed off to OnChainActivityTray, dialog closing
+ * - error: Pre-submission failure (tx never sent)
  */
 
 import { useState, useCallback, useEffect } from 'react';
@@ -34,6 +34,7 @@ import { doc, getDoc, getFirestore, updateDoc } from 'firebase/firestore';
 import SubjectQueryService, { IncomingSubjectRequest } from '../services/subjectQueryService';
 import { SubjectConsentRequest } from '../services/subjectConsentService';
 import { RejectionReasons } from '../services/subjectRejectionService';
+import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
 
 // ============================================================================
 // TYPES
@@ -48,9 +49,9 @@ export type SubjectDialogPhase =
   | 'searching' // User search for "other" flow
   | 'preparing'
   | 'confirming'
-  | 'executing'
-  | 'success'
-  | 'error';
+  | 'executing' // Brief: tx being submitted, dialog about to close
+  | 'submitted' // Tx handed off to tray, OnChainSubmittedContent showing
+  | 'error'; // Pre-submission failure only — post-submission errors go to tray
 
 export interface UseSubjectFlowOptions {
   /** The record to operate on */
@@ -141,6 +142,10 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
   const [currentSubjects, setCurrentSubjects] = useState<string[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<IncomingSubjectRequest[]>([]);
   const [isLoadingRequests, setIsLoadingRequests] = useState(true);
+
+  // onChain Activity Tray. UI display for blockchain processing in background
+  const { addActivity, updateActivity } = useOnChainActivityTray();
+  const [submittedLabel, setSubmittedLabel] = useState('');
 
   // ==========================================================================
   // FETCH CURRENT STATUS
@@ -417,42 +422,44 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
       return;
     }
 
-    setPhase('executing');
+    // Capture these now before closing the dialog — closures in .then()/.catch()
+    // will still reference them correctly
+    const targetRole = pendingOperation.selectedRole || 'viewer';
+    const currentRole = getUserRoleForRecord(userId, record);
 
-    try {
-      // Step 1: Add as subject (includes blockchain anchoring)
-      const result = await SubjectService.setSubjectAsSelf(recordId);
+    const activityId = addActivity({ label: 'Setting subject status' });
 
-      // Step 2: Grant role if needed
-      const currentRole = getUserRoleForRecord(userId, record);
-      const targetRole = pendingOperation.selectedRole || 'viewer';
+    // Fire tx — don't await
+    const txPromise = SubjectService.setSubjectAsSelf(recordId);
 
-      if (!currentRole || ROLE_HIERARCHY[targetRole] > ROLE_HIERARCHY[currentRole]) {
-        console.log(`🔐 Granting ${targetRole} role...`);
-        await PermissionsService.grantRole(recordId, userId, targetRole);
-      }
+    // Close dialog immediately
+    setSubmittedLabel('Setting subject status');
+    setPhase('submitted');
 
-      if (result.blockchainAnchored) {
-        toast.success('You are now a subject of this record');
-      } else {
-        toast.success('You are now a subject of this record (blockchain sync pending)');
-      }
-
-      reset();
-      await refetchAll();
-      onSuccess?.();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to set subject status';
-      setError(message);
-      setPhase('error');
-      toast.error(message);
-    }
-  }, [pendingOperation, recordId, record, reset, refetchAll, onSuccess]);
+    // Resolve in background
+    txPromise
+      .then(async result => {
+        if (!currentRole || ROLE_HIERARCHY[targetRole] > ROLE_HIERARCHY[currentRole]) {
+          await PermissionsService.grantRole(recordId, userId, targetRole);
+        }
+        updateActivity(activityId, { status: 'confirmed' });
+        await refetchAll();
+        onSuccess?.();
+      })
+      .catch(err => {
+        const message = err instanceof Error ? err.message : 'Failed to set subject status';
+        updateActivity(activityId, { status: 'failed', errorMessage: message });
+      });
+  }, [pendingOperation, recordId, record, addActivity, updateActivity, refetchAll, onSuccess]);
 
   // ==========================================================================
   // CONFIRM REQUEST CONSENT
   // ==========================================================================
 
+  /**
+   * Create a subject request for another user to accept
+   * No write to the blockchain, all firestore. Doesn't pass anything to ActivityTray
+   */
   const confirmRequestConsent = useCallback(async () => {
     if (!pendingOperation || pendingOperation.subjectChoice !== 'other' || !selectedUser) return;
 
@@ -514,9 +521,9 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
       console.log('✅ Step 3 complete');
 
       toast.success('Consent request sent. The user will be notified.');
-      reset();
       await refetchAll();
       onSuccess?.();
+      reset();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to send consent request';
       setError(message);
@@ -557,25 +564,27 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
       return;
     }
 
-    setPhase('executing');
+    const activityId = addActivity({ label: 'Accepting subject request' });
 
-    try {
-      const result = await SubjectService.acceptSubjectRequest(pendingOperation.recordId);
+    // Fire tx — don't await
+    const txPromise = SubjectService.acceptSubjectRequest(pendingOperation.recordId);
 
-      if (result) {
-        toast.success('Subject request accepted');
-      }
+    // Close dialog immediately
+    setSubmittedLabel('Accepting subject status');
+    setPhase('submitted');
 
-      reset();
-      await refetchAll();
-      onSuccess?.();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to accept request';
-      setError(message);
-      setPhase('error');
-      toast.error(message);
-    }
-  }, [pendingOperation, reset, refetchAll, onSuccess]);
+    // Resolve in background
+    txPromise
+      .then(async () => {
+        updateActivity(activityId, { status: 'confirmed' });
+        await refetchAll();
+        onSuccess?.();
+      })
+      .catch(err => {
+        const message = err instanceof Error ? err.message : 'Failed to accept request';
+        updateActivity(activityId, { status: 'failed', errorMessage: message });
+      });
+  }, [pendingOperation, addActivity, updateActivity, refetchAll, onSuccess]);
 
   // ==========================================================================
   // REJECT SUBJECT REQUEST FLOW
@@ -602,6 +611,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
 
   /**
    * Execute the confirmed "reject subject request" operation
+   * No blockchain write, no need to add to OnChainActivityTray
    */
   const confirmRejectRequest = useCallback(
     async (reason?: string) => {
@@ -699,49 +709,58 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
         return;
       }
 
-      setPhase('executing');
+      // Capture before dialog closes
+      const shouldRevokeAccess = pendingOperation.revokeAccess;
 
-      try {
-        const result = await SubjectService.rejectSubjectStatus(recordId, reason);
+      const activityId = addActivity({ label: 'Removing subject status' });
 
-        // Optionally revoke access if user chose to
-        let accessRevoked = false;
-        if (pendingOperation.revokeAccess) {
-          const db = getFirestore();
-          const requestId = `${recordId}_${userId}`;
-          const requestRef = doc(db, 'subjectConsentRequests', requestId);
-          const requestDoc = await getDoc(requestRef);
-          const requestData = requestDoc.data() as SubjectConsentRequest | undefined;
+      // Fire tx — don't await
+      const txPromise = SubjectService.rejectSubjectStatus(recordId, reason);
 
-          if (requestData?.grantedAccessOnSubjectRequest) {
-            const role = requestData.requestedSubjectRole;
-            await PermissionsService.removeRole(recordId, userId, role);
-            accessRevoked = true;
+      // Close dialog immediately
+      setSubmittedLabel('Removing subject status');
+      setPhase('submitted');
+
+      // Resolve in background
+      txPromise
+        .then(async result => {
+          let accessRevoked = false;
+
+          if (shouldRevokeAccess) {
+            const db = getFirestore();
+            const requestId = `${recordId}_${userId}`;
+            const requestRef = doc(db, 'subjectConsentRequests', requestId);
+            const requestDoc = await getDoc(requestRef);
+            const requestData = requestDoc.data() as SubjectConsentRequest | undefined;
+
+            if (requestData?.grantedAccessOnSubjectRequest) {
+              const role = requestData.requestedSubjectRole;
+              await PermissionsService.removeRole(recordId, userId, role);
+              accessRevoked = true;
+            }
           }
-        }
 
-        // Show appropriate success message
-        if (accessRevoked) {
-          toast.success('You have been removed as a subject and your access has been revoked');
-        } else if (result) {
-          toast.success('You have been removed as a subject');
-        }
+          updateActivity(activityId, { status: 'confirmed' });
 
-        if (result.pendingCreatorDecision) {
-          toast.info('The record creator will be notified of your removal');
-        }
+          if (accessRevoked) {
+            toast.success('You have been removed as a subject and your access has been revoked');
+          } else if (result) {
+            toast.success('You have been removed as a subject');
+          }
 
-        reset();
-        await refetchAll();
-        onSuccess?.();
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to remove subject status';
-        setError(message);
-        setPhase('error');
-        toast.error(message);
-      }
+          if (result.pendingCreatorDecision) {
+            toast.info('The record creator will be notified of your removal');
+          }
+
+          await refetchAll();
+          onSuccess?.();
+        })
+        .catch(err => {
+          const message = err instanceof Error ? err.message : 'Failed to remove subject status';
+          updateActivity(activityId, { status: 'failed', errorMessage: message });
+        });
     },
-    [pendingOperation, recordId, revokeAccess, reset, refetchAll, onSuccess]
+    [pendingOperation, recordId, addActivity, updateActivity, refetchAll, onSuccess]
   );
 
   /**
@@ -819,6 +838,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
       onConfirmAcceptRequest: confirmAcceptRequest,
       onConfirmRejectRequest: confirmRejectRequest,
       onConfirmRemoveSubjectStatus: confirmRemoveSubjectStatus,
+      submittedLabel,
     },
 
     // Current status

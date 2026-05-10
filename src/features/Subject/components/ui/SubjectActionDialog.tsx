@@ -52,6 +52,7 @@ import { useAuthContext } from '@/features/Auth/AuthContext';
 import { REJECTION_REASON_OPTIONS, RejectionReasons } from '../../services/subjectRejectionService';
 import NetworkPreparingContent from '@/features/BlockchainWallet/components/NetworkPreparingContent';
 import RequesterSuggestions from '@/features/RequestRecord/components/ui/RequesterSuggestions';
+import { OnChainSubmittedContent } from '@/features/OnChainActivityTray/components/OnChainSubmittedModal';
 
 // ============================================================================
 // TYPES
@@ -87,6 +88,7 @@ interface SubjectActionDialogProps {
   onConfirmAcceptRequest: () => void;
   onConfirmRejectRequest: (reason: RejectionReasons) => void;
   onConfirmRemoveSubjectStatus: (reason: RejectionReasons) => void;
+  submittedLabel: string;
   zIndex?: { overlay: number; content: number };
 }
 
@@ -165,6 +167,7 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
   onConfirmAcceptRequest,
   onConfirmRejectRequest,
   onConfirmRemoveSubjectStatus,
+  submittedLabel,
   zIndex = { overlay: 100, content: 101 },
 }) => {
   const { user } = useAuthContext();
@@ -176,7 +179,7 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
     phase === 'searching' ||
     phase === 'confirming' ||
     phase === 'error' ||
-    phase === 'success';
+    phase === 'submitted';
 
   return (
     <AlertDialog.Root open={isOpen} onOpenChange={open => !open && canClose && onClose()}>
@@ -230,11 +233,6 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
           {/* Error Phase */}
           {phase === 'error' && <ErrorContent error={error} onClose={onClose} />}
 
-          {/* Success Phase */}
-          {phase === 'success' && (
-            <SuccessContent operationType={operationType} onClose={onClose} />
-          )}
-
           {/* Confirming Phase - Set Self as Subject */}
           {phase === 'confirming' && operationType === 'setSubjectAsSelf' && (
             <ConfirmSetSubjectAsSelfContent
@@ -283,6 +281,13 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
               setRevokeAccess={setRevokeAccess}
               onConfirm={(reason: RejectionReasons) => onConfirmRemoveSubjectStatus(reason)}
               onClose={onClose}
+            />
+          )}
+
+          {phase === 'submitted' && (
+            <OnChainSubmittedContent
+              onClose={onClose} // onClose calls reset() in the hook
+              label={submittedLabel}
             />
           )}
         </AlertDialog.Content>
@@ -618,35 +623,6 @@ const ErrorContent: React.FC<{ error?: string | null; onClose: () => void }> = (
     </Button>
   </div>
 );
-
-const SuccessContent: React.FC<{
-  operationType: SubjectOperationType;
-  onClose: () => void;
-}> = ({ operationType, onClose }) => {
-  const messages: Record<SubjectOperationType, string> = {
-    setSubjectAsSelf: 'You are now linked to this record as a subject.',
-    requestSubjectConsent: 'You have sent a subject request to the selected user.',
-    acceptSubjectRequest: 'You have accepted the subject request.',
-    rejectSubjectRequest: 'You have declined the subject request.',
-    rejectSubjectStatus: 'You have been removed as a subject of this record.',
-    removeSubjectByOwner: 'Subject has been removed from the record.',
-  };
-
-  return (
-    <div className="flex flex-col items-center gap-4 py-8">
-      <CheckCircle2 className="w-10 h-10 text-green-500" />
-      <AlertDialog.Title className="text-lg font-bold text-center text-green-600">
-        Success
-      </AlertDialog.Title>
-      <AlertDialog.Description className="text-sm text-gray-600 text-center">
-        {messages[operationType] || 'Operation completed successfully!'}
-      </AlertDialog.Description>
-      <Button onClick={onClose} className="mt-2 bg-green-600 hover:bg-green-700">
-        Done
-      </Button>
-    </div>
-  );
-};
 
 // ============================================================================
 // CONFIRM CONTENT COMPONENTS

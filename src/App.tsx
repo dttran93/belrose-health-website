@@ -33,6 +33,8 @@ import FulfillRequestPage from './pages/FulfillRequestPage';
 import RecordRequestsPage from './pages/RecordRequestsPage';
 import ForProviders from './pages/ForProviders';
 import ActivityHub from './pages/ActivityHub';
+import { OnChainActivityTrayProvider } from './features/OnChainActivityTray/OnChainActivityTrayContext';
+import OnChainActivityTray from './features/OnChainActivityTray/components/OnChainActivityTray';
 
 const queryClient = new QueryClient();
 
@@ -42,12 +44,14 @@ const queryClient = new QueryClient();
 const RootLayout: React.FC = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Sonner />
-        <CitationProvider>
-          <Outlet />
-        </CitationProvider>
-      </TooltipProvider>
+      <OnChainActivityTrayProvider>
+        <TooltipProvider>
+          <Sonner />
+          <CitationProvider>
+            <Outlet />
+          </CitationProvider>
+        </TooltipProvider>
+      </OnChainActivityTrayProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
@@ -61,6 +65,7 @@ const ProtectedLayout: React.FC = () => (
       <AIChatProvider>
         <LayoutProvider>
           <Layout />
+          <OnChainActivityTray />
         </LayoutProvider>
       </AIChatProvider>
     </EncryptionGate>
