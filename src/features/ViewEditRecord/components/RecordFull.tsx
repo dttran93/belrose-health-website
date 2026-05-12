@@ -593,7 +593,11 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       )}
 
       {viewMode === 'permissions' && (
-        <PermissionsManager record={displayRecord} onBack={handleBackToRecord} />
+        <PermissionsManager
+          record={displayRecord}
+          onBack={handleBackToRecord}
+          onPermissionChange={onRefreshRecord}
+        />
       )}
 
       {viewMode === 'subject' && (

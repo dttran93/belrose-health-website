@@ -55,8 +55,8 @@ const AccessUserCard: React.FC<AccessUserCardProps> = ({
         icon: <AlertTriangle className="w-3 h-3" />,
         tooltip: 'User can decrypt but has no permission role. Security risk.',
       },
-      revoked: {
-        text: 'Revoked',
+      inactive: {
+        text: 'Inactive',
         color: 'primary',
         icon: <XCircle className="w-3 h-3" />,
         tooltip: 'Access previously granted but now disabled.',

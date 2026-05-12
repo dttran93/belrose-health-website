@@ -32,7 +32,7 @@ export interface AccessEntry {
   profile: BelroseUserProfile | undefined;
   wrappedKey: WrappedKeyInfo | null;
   role: 'owner' | 'administrator' | 'viewer' | 'none';
-  status: 'synced' | 'missing-key' | 'missing-role' | 'revoked';
+  status: 'synced' | 'missing-key' | 'missing-role' | 'inactive';
 }
 
 interface EncryptionAccessViewProps {
@@ -94,7 +94,7 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
         else if (latestRecord.viewers?.includes(userId)) role = 'viewer';
 
         let status: AccessEntry['status'] = 'synced';
-        if (wrappedKey && !wrappedKey.isActive) status = 'revoked';
+        if (wrappedKey && !wrappedKey.isActive) status = 'inactive';
         else if (wrappedKey && role === 'none') status = 'missing-role';
         else if (!wrappedKey && role !== 'none') status = 'missing-key';
 
@@ -115,7 +115,7 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
   }, [record.id, record.owners, record.administrators, record.viewers]);
 
   const issueCount = accessEntries.filter(
-    e => e.status !== 'synced' && e.status !== 'revoked'
+    e => e.status !== 'synced' && e.status !== 'inactive'
   ).length;
   const activeKeyCount = accessEntries.filter(e => e.wrappedKey?.isActive).length;
 
@@ -166,7 +166,7 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
           <strong>Orphaned Key:</strong> Can decrypt but has no role (security issue)
         </li>
         <li>
-          <strong>Revoked:</strong> Previously had access, now revoked
+          <strong>Inactive:</strong> Access has not been activated or was revoked
         </li>
       </ol>
     </>

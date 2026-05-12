@@ -10,11 +10,16 @@ import { useRecordTrustees } from '@/features/Trustee/hooks/useRecordTrustees';
 interface PermissionsManagerProps {
   record: FileObject;
   onBack: () => void;
+  onPermissionChange?: () => void;
 }
 
 type PermissionViewMode = 'manager' | 'add-subject' | 'add-owner' | 'add-viewer';
 
-export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ record, onBack }) => {
+export const PermissionsManager: React.FC<PermissionsManagerProps> = ({
+  record,
+  onBack,
+  onPermissionChange,
+}) => {
   const [viewMode, setViewMode] = useState<PermissionViewMode>('manager');
 
   // Collect all direct-role userIds so the hook knows who the trustors could be
@@ -49,7 +54,9 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ record, 
         <OwnerManagement
           record={record}
           currentOwners={record.owners}
-          onSuccess={() => {}}
+          onSuccess={() => {
+            onPermissionChange?.();
+          }}
           onBack={handleManagerScreen}
           onAddMode={() => setViewMode('add-subject')}
           isAddMode={viewMode === 'add-subject'}
@@ -63,6 +70,9 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ record, 
         <AdminManagement
           record={record}
           currentAdmins={record.administrators}
+          onSuccess={() => {
+            onPermissionChange?.();
+          }}
           onBack={handleManagerScreen}
           onAddMode={() => setViewMode('add-owner')}
           isAddMode={viewMode === 'add-owner'}
@@ -76,6 +86,9 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ record, 
         <ViewerManagement
           record={record}
           currentViewers={record.viewers}
+          onSuccess={() => {
+            onPermissionChange?.();
+          }}
           onBack={handleManagerScreen}
           onAddMode={() => setViewMode('add-viewer')}
           isAddMode={viewMode === 'add-viewer'}
