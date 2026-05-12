@@ -12,8 +12,9 @@
 // - idle: no dialog open
 // - preparing: checking both wallets on-chain
 // - confirming: user reviews and confirms
-// - executing: blockchain tx + firestore in progress
-// - error: something went wrong
+// - executing: brief moment while tx is being submitted (only for confirmDecline now)
+// - submitted: tx handed off to tray, OnChainSubmittedContent showing
+// - error: pre-submission failure only — post-submission errors go to tray
 
 import { useState, useCallback } from 'react';
 import { getAuth } from 'firebase/auth';
@@ -24,6 +25,7 @@ import {
   TrustLevel,
 } from '@/features/Trustee/services/trusteeRelationshipService';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
+import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
 
 // ============================================================================
 // TYPES
@@ -37,7 +39,13 @@ export type TrusteeOperationType =
   | 'editLevel'
   | 'resign';
 
-export type TrusteeDialogPhase = 'idle' | 'preparing' | 'confirming' | 'executing' | 'error';
+export type TrusteeDialogPhase =
+  | 'idle'
+  | 'preparing'
+  | 'confirming'
+  | 'executing' // only used by confirmDecline (Firestore only)
+  | 'submitted' // tx handed off to tray
+  | 'error'; // pre-submission failure only
 
 export interface UseTrusteeFlowOptions {
   onSuccess?: () => void;
@@ -101,9 +109,11 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
   const [phase, setPhase] = useState<TrusteeDialogPhase>('idle');
   const [error, setError] = useState<string | null>(null);
   const [pendingOperation, setPendingOperation] = useState<PendingOperation | null>(null);
-
-  // Selected trust level (for invite and editLevel confirming phase)
   const [selectedTrustLevel, setSelectedTrustLevel] = useState<TrustLevel>('observer');
+
+  // OnChainActivityTray — UI display for blockchain processing in background
+  const { addActivity, updateActivity } = useOnChainActivityTray();
+  const [submittedLabel, setSubmittedLabel] = useState('');
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -178,24 +188,32 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
   const confirmInvite = useCallback(async () => {
     if (!pendingOperation || pendingOperation.type !== 'invite') return;
 
-    setPhase('executing');
+    // Capture before dialog closes
+    const { targetUserId } = pendingOperation;
+    const levelToInvite = selectedTrustLevel;
+    const targetName = pendingOperation.targetUserProfile?.displayName || 'user';
 
-    try {
-      await TrusteeRelationshipService.inviteTrustee(
-        pendingOperation.targetUserId,
-        selectedTrustLevel
-      );
+    const activityId = addActivity({ label: `Inviting ${targetName} as trustee` });
 
-      toast.success('Trustee invite sent');
-      reset();
-      onSuccess?.();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to send invite';
-      setError(message);
-      setPhase('error');
-      toast.error(message);
-    }
-  }, [pendingOperation, selectedTrustLevel, reset, onSuccess]);
+    // Fire tx — don't await
+    const txPromise = TrusteeRelationshipService.inviteTrustee(targetUserId, levelToInvite);
+
+    // Close dialog immediately
+    setSubmittedLabel(`Inviting ${targetName} as trustee`);
+    setPhase('submitted');
+
+    // Resolve in background
+    txPromise
+      .then(() => {
+        updateActivity(activityId, { status: 'confirmed' });
+        toast.success('Trustee invite sent');
+        onSuccess?.();
+      })
+      .catch(err => {
+        const message = err instanceof Error ? err.message : 'Failed to send invite';
+        updateActivity(activityId, { status: 'failed', errorMessage: message });
+      });
+  }, [pendingOperation, selectedTrustLevel, addActivity, updateActivity, onSuccess]);
 
   // ==========================================================================
   // ACCEPT FLOW
@@ -224,21 +242,31 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
   const confirmAccept = useCallback(async () => {
     if (!pendingOperation || pendingOperation.type !== 'accept') return;
 
-    setPhase('executing');
+    // Capture before dialog closes
+    const { targetUserId } = pendingOperation;
+    const trustorName = pendingOperation.targetUserProfile?.displayName || 'user';
 
-    try {
-      await TrusteeRelationshipService.acceptInvite(pendingOperation.targetUserId);
+    const activityId = addActivity({ label: `Accepting trustee invite from ${trustorName}` });
 
-      toast.success('Trustee invite accepted');
-      reset();
-      onSuccess?.();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to accept invite';
-      setError(message);
-      setPhase('error');
-      toast.error(message);
-    }
-  }, [pendingOperation, reset, onSuccess]);
+    // Fire tx — don't await
+    const txPromise = TrusteeRelationshipService.acceptInvite(targetUserId);
+
+    // Close dialog immediately
+    setSubmittedLabel(`Accepting trustee invite from ${trustorName}`);
+    setPhase('submitted');
+
+    // Resolve in background
+    txPromise
+      .then(() => {
+        updateActivity(activityId, { status: 'confirmed' });
+        toast.success('Trustee invite accepted');
+        onSuccess?.();
+      })
+      .catch(err => {
+        const message = err instanceof Error ? err.message : 'Failed to accept invite';
+        updateActivity(activityId, { status: 'failed', errorMessage: message });
+      });
+  }, [pendingOperation, addActivity, updateActivity, onSuccess]);
 
   // ==========================================================================
   // DECLINE FLOW (no blockchain)
@@ -306,21 +334,31 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
   const confirmRevoke = useCallback(async () => {
     if (!pendingOperation || pendingOperation.type !== 'revoke') return;
 
-    setPhase('executing');
+    // Capture before dialog closes
+    const { targetUserId } = pendingOperation;
+    const trusteeName = pendingOperation.targetUserProfile?.displayName || 'user';
 
-    try {
-      await TrusteeRelationshipService.revokeTrustee(pendingOperation.targetUserId);
+    const activityId = addActivity({ label: `Revoking ${trusteeName} as trustee` });
 
-      toast.success('Trustee revoked');
-      reset();
-      onSuccess?.();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to revoke trustee';
-      setError(message);
-      setPhase('error');
-      toast.error(message);
-    }
-  }, [pendingOperation, reset, onSuccess]);
+    // Fire tx — don't await
+    const txPromise = TrusteeRelationshipService.revokeTrustee(targetUserId);
+
+    // Close dialog immediately
+    setSubmittedLabel(`Revoking ${trusteeName} as trustee`);
+    setPhase('submitted');
+
+    // Resolve in background
+    txPromise
+      .then(() => {
+        updateActivity(activityId, { status: 'confirmed' });
+        toast.success('Trustee revoked');
+        onSuccess?.();
+      })
+      .catch(err => {
+        const message = err instanceof Error ? err.message : 'Failed to revoke trustee';
+        updateActivity(activityId, { status: 'failed', errorMessage: message });
+      });
+  }, [pendingOperation, addActivity, updateActivity, onSuccess]);
 
   // ==========================================================================
   // EDIT LEVEL FLOW
@@ -350,24 +388,32 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
   const confirmEditLevel = useCallback(async () => {
     if (!pendingOperation || pendingOperation.type !== 'editLevel') return;
 
-    setPhase('executing');
+    // Capture before dialog closes — selectedTrustLevel is React state, grab it now
+    const { targetUserId } = pendingOperation;
+    const levelToSet = selectedTrustLevel;
+    const trusteeName = pendingOperation.targetUserProfile?.displayName || 'user';
 
-    try {
-      await TrusteeRelationshipService.editTrusteeRelationship(
-        pendingOperation.targetUserId,
-        selectedTrustLevel
-      );
+    const activityId = addActivity({ label: `Updating trust level for ${trusteeName}` });
 
-      toast.success('Trust level updated');
-      reset();
-      onSuccess?.();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to update trust level';
-      setError(message);
-      setPhase('error');
-      toast.error(message);
-    }
-  }, [pendingOperation, selectedTrustLevel, reset, onSuccess]);
+    // Fire tx — don't await
+    const txPromise = TrusteeRelationshipService.editTrusteeRelationship(targetUserId, levelToSet);
+
+    // Close dialog immediately
+    setSubmittedLabel(`Updating trust level for ${trusteeName}`);
+    setPhase('submitted');
+
+    // Resolve in background
+    txPromise
+      .then(() => {
+        updateActivity(activityId, { status: 'confirmed' });
+        toast.success('Trust level updated');
+        onSuccess?.();
+      })
+      .catch(err => {
+        const message = err instanceof Error ? err.message : 'Failed to update trust level';
+        updateActivity(activityId, { status: 'failed', errorMessage: message });
+      });
+  }, [pendingOperation, selectedTrustLevel, addActivity, updateActivity, onSuccess]);
 
   // ==========================================================================
   // RESIGN FLOW
@@ -396,21 +442,31 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
   const confirmResign = useCallback(async () => {
     if (!pendingOperation || pendingOperation.type !== 'resign') return;
 
-    setPhase('executing');
+    // Capture before dialog closes
+    const { targetUserId } = pendingOperation;
+    const trustorName = pendingOperation.targetUserProfile?.displayName || 'user';
 
-    try {
-      await TrusteeRelationshipService.resignAsTrustee(pendingOperation.targetUserId);
+    const activityId = addActivity({ label: `Resigning as trustee for ${trustorName}` });
 
-      toast.success('You have resigned as trustee');
-      reset();
-      onSuccess?.();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to resign';
-      setError(message);
-      setPhase('error');
-      toast.error(message);
-    }
-  }, [pendingOperation, reset, onSuccess]);
+    // Fire tx — don't await
+    const txPromise = TrusteeRelationshipService.resignAsTrustee(targetUserId);
+
+    // Close dialog immediately
+    setSubmittedLabel(`Resigning as trustee for ${trustorName}`);
+    setPhase('submitted');
+
+    // Resolve in background
+    txPromise
+      .then(() => {
+        updateActivity(activityId, { status: 'confirmed' });
+        toast.success('You have resigned as trustee');
+        onSuccess?.();
+      })
+      .catch(err => {
+        const message = err instanceof Error ? err.message : 'Failed to resign';
+        updateActivity(activityId, { status: 'failed', errorMessage: message });
+      });
+  }, [pendingOperation, addActivity, updateActivity, onSuccess]);
 
   // ==========================================================================
   // RETURN
@@ -434,6 +490,7 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
       onConfirmRevoke: confirmRevoke,
       onConfirmEditLevel: confirmEditLevel,
       onConfirmResign: confirmResign,
+      submittedLabel,
     },
 
     // Initiators — call these from tab components

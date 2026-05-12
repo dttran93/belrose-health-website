@@ -14,7 +14,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowLeft, Loader2, XCircle } from 'lucide-react';
 import React from 'react';
 import { Button } from '@/components/ui/Button';
-import RoleSelector from '@/features/Permissions/component/ui/RoleSelector';
+import RoleSelector from '@/features/Permissions/components/ui/RoleSelector';
 import { Role } from '@/features/Permissions/services/permissionsService';
 
 // ── Overlay wrapper ───────────────────────────────────────────────────────────

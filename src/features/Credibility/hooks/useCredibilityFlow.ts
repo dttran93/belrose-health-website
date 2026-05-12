@@ -30,6 +30,7 @@ import {
 } from '../services/disputeService';
 import { toast } from 'sonner';
 import { DialogPhase } from '../components/ui/CredibilityActionDialog';
+import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
 
 // ============================================================================
 // TYPES
@@ -73,6 +74,10 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
   const [isLoadingVerification, setIsLoadingVerification] = useState(true);
   const [dispute, setDispute] = useState<DisputeDocDecrypted | null>(null);
   const [isLoadingDispute, setIsLoadingDispute] = useState(true);
+
+  // OnChainActivityTray — UI display for blockchain processing in background
+  const { addActivity, updateActivity } = useOnChainActivityTray();
+  const [submittedLabel, setSubmittedLabel] = useState('');
 
   // ==========================================================================
   // FETCH EXISTING DATA
@@ -197,9 +202,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       });
 
       const ready = await runPreparation();
-      if (ready) {
-        setPhase('confirming');
-      }
+      if (ready) setPhase('confirming');
     },
     [recordId, recordHash, runPreparation]
   );
@@ -209,9 +212,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
    */
   const confirmVerification = useCallback(
     async (level: VerificationLevelOptions) => {
-      if (!pendingOperation || pendingOperation.type !== 'verify') {
-        return;
-      }
+      if (!pendingOperation || pendingOperation.type !== 'verify') return;
 
       const auth = getAuth();
       const verifierId = auth.currentUser?.uid;
@@ -222,29 +223,37 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
         return;
       }
 
-      setPhase('executing');
+      // Capture before dialog closes
+      const levelInfo = getVerificationConfig(level);
+      const activityId = addActivity({ label: 'Submitting verification' });
 
-      try {
-        await createVerification(recordId, recordHash, verifierId, level);
+      // Fire tx — don't await
+      const txPromise = createVerification(recordId, recordHash, verifierId, level);
 
-        const levelInfo = getVerificationConfig(level);
-        toast.success(`Record verified at ${levelInfo.name} level`);
-        reset();
-        await refetchAll();
-        onSuccess?.();
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to verify record';
-        setError(message);
-        setPhase('error');
-        toast.error(message);
-      }
+      // Close dialog immediately
+      setSubmittedLabel('Submitting verification');
+      setPhase('submitted');
+
+      // Resolve in background
+      txPromise
+        .then(async () => {
+          updateActivity(activityId, { status: 'confirmed' });
+          toast.success(`Record verified at ${levelInfo.name} level`);
+          await refetchAll();
+          onSuccess?.();
+        })
+        .catch(err => {
+          const message = err instanceof Error ? err.message : 'Failed to verify record';
+          updateActivity(activityId, { status: 'failed', errorMessage: message });
+        });
     },
-    [pendingOperation, recordId, recordHash, reset, refetchAll, onSuccess]
+    [pendingOperation, recordId, recordHash, addActivity, updateActivity, refetchAll, onSuccess]
   );
 
-  /**
-   * Start a retract verification flow
-   */
+  // ==========================================================================
+  // RETRACT VERIFICATION FLOW
+  // ==========================================================================
+
   const initiateRetractVerification = useCallback(
     async (verificationRecordHash?: string) => {
       setPendingOperation({
@@ -254,9 +263,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       });
 
       const ready = await runPreparation();
-      if (ready) {
-        setPhase('confirming');
-      }
+      if (ready) setPhase('confirming');
     },
     [recordId, recordHash, runPreparation]
   );
@@ -284,25 +291,33 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       return;
     }
 
-    setPhase('executing');
+    const activityId = addActivity({ label: 'Retracting verification' });
 
-    try {
-      await retractVerification(verificationRecordHash, verifierId);
-      toast.success('Verification retracted');
-      reset();
-      await refetchAll();
-      onSuccess?.();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to retract verification';
-      setError(message);
-      setPhase('error');
-      toast.error(message);
-    }
-  }, [pendingOperation, reset, refetchAll, onSuccess]);
+    // Fire tx — don't await
+    const txPromise = retractVerification(verificationRecordHash, verifierId);
 
-  /**
-   * Start a modify verification flow (Phase 1: Setup)
-   */
+    // Close dialog immediately
+    setSubmittedLabel('Retracting verification');
+    setPhase('submitted');
+
+    // Resolve in background
+    txPromise
+      .then(async () => {
+        updateActivity(activityId, { status: 'confirmed' });
+        toast.success('Verification retracted');
+        await refetchAll();
+        onSuccess?.();
+      })
+      .catch(err => {
+        const message = err instanceof Error ? err.message : 'Failed to retract verification';
+        updateActivity(activityId, { status: 'failed', errorMessage: message });
+      });
+  }, [pendingOperation, addActivity, updateActivity, refetchAll, onSuccess]);
+
+  // ==========================================================================
+  // MODIFY VERIFICATION FLOW
+  // ==========================================================================
+
   const initiateModifyVerification = useCallback(
     async (verificationRecordHash: string, newLevel: VerificationLevelOptions) => {
       // Stage the data for the confirmation dialog
@@ -322,10 +337,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
 
       // Run network/wallet preparation
       const ready = await runPreparation();
-      if (ready) {
-        // Transition to confirmation phase in the UI
-        setPhase('confirming');
-      }
+      if (ready) setPhase('confirming');
     },
     [recordId, runPreparation]
   );
@@ -336,34 +348,44 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
   const confirmModifyVerification = useCallback(async () => {
     if (!pendingOperation || pendingOperation.type !== 'modifyVerification') return;
 
-    const { recordHash, verificationLevel } = pendingOperation;
+    const { recordHash: verificationRecordHash, verificationLevel } = pendingOperation;
     const auth = getAuth();
     const verifierId = auth.currentUser?.uid;
 
-    if (!verifierId || !recordHash || verificationLevel === undefined) {
+    if (!verifierId || !verificationRecordHash || verificationLevel === undefined) {
       setError('Missing required verification data');
       setPhase('error');
       return;
     }
 
-    setPhase('executing');
+    // Capture before dialog closes
+    const levelInfo = getVerificationConfig(verificationLevel);
+    const activityId = addActivity({ label: 'Updating verification' });
 
-    try {
-      await modifyVerificationLevel(recordHash, verifierId, verificationLevel);
+    // Fire tx — don't await
+    const txPromise = modifyVerificationLevel(
+      verificationRecordHash,
+      verifierId,
+      verificationLevel
+    );
 
-      const levelInfo = getVerificationConfig(verificationLevel);
-      toast.success(`Verification updated to ${levelInfo.name} level`);
+    // Close dialog immediately
+    setSubmittedLabel('Updating verification');
+    setPhase('submitted');
 
-      setPhase('success');
-      await refetchAll();
-      onSuccess?.();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to modify verification';
-      setError(message);
-      setPhase('error');
-      toast.error(message);
-    }
-  }, [pendingOperation, refetchAll, onSuccess]);
+    // Resolve in background
+    txPromise
+      .then(async () => {
+        updateActivity(activityId, { status: 'confirmed' });
+        toast.success(`Verification updated to ${levelInfo.name} level`);
+        await refetchAll();
+        onSuccess?.();
+      })
+      .catch(err => {
+        const message = err instanceof Error ? err.message : 'Failed to modify verification';
+        updateActivity(activityId, { status: 'failed', errorMessage: message });
+      });
+  }, [pendingOperation, addActivity, updateActivity, refetchAll, onSuccess]);
 
   // ==========================================================================
   // DISPUTE FLOW
@@ -387,9 +409,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       });
 
       const ready = await runPreparation();
-      if (ready) {
-        setPhase('confirming');
-      }
+      if (ready) setPhase('confirming');
     },
     [recordId, recordHash, runPreparation]
   );
@@ -416,34 +436,43 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       return;
     }
 
-    setPhase('executing');
+    // Capture before dialog closes
+    const { disputeSeverity, disputeCulpability, disputeNotes } = pendingOperation;
+    const severityInfo = getSeverityConfig(disputeSeverity);
+    const activityId = addActivity({ label: 'Filing dispute' });
 
-    try {
-      await createDispute(
-        recordId,
-        recordHash,
-        disputerId,
-        pendingOperation.disputeSeverity,
-        pendingOperation.disputeCulpability,
-        pendingOperation.disputeNotes
-      );
+    // Fire tx — don't await
+    const txPromise = createDispute(
+      recordId,
+      recordHash,
+      disputerId,
+      disputeSeverity,
+      disputeCulpability,
+      disputeNotes
+    );
 
-      const severityInfo = getSeverityConfig(pendingOperation.disputeSeverity);
-      toast.success(`Dispute filed with ${severityInfo.name} severity`);
-      reset();
-      await refetchAll();
-      onSuccess?.();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to file dispute';
-      setError(message);
-      setPhase('error');
-      toast.error(message);
-    }
-  }, [pendingOperation, recordId, recordHash, reset, refetchAll, onSuccess]);
+    // Close dialog immediately
+    setSubmittedLabel('Filing dispute');
+    setPhase('submitted');
 
-  /**
-   * Start a retract dispute flow
-   */
+    // Resolve in background
+    txPromise
+      .then(async () => {
+        updateActivity(activityId, { status: 'confirmed' });
+        toast.success(`Dispute filed with ${severityInfo.name} severity`);
+        await refetchAll();
+        onSuccess?.();
+      })
+      .catch(err => {
+        const message = err instanceof Error ? err.message : 'Failed to file dispute';
+        updateActivity(activityId, { status: 'failed', errorMessage: message });
+      });
+  }, [pendingOperation, recordId, recordHash, addActivity, updateActivity, refetchAll, onSuccess]);
+
+  // ==========================================================================
+  // RETRACT DISPUTE FLOW
+  // ==========================================================================
+
   const initiateRetractDispute = useCallback(
     async (disputeRecordHash?: string) => {
       setPendingOperation({
@@ -453,9 +482,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       });
 
       const ready = await runPreparation();
-      if (ready) {
-        setPhase('confirming');
-      }
+      if (ready) setPhase('confirming');
     },
     [recordId, recordHash, runPreparation]
   );
@@ -483,25 +510,33 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       return;
     }
 
-    setPhase('executing');
+    const activityId = addActivity({ label: 'Retracting dispute' });
 
-    try {
-      await retractDispute(disputeRecordHash, disputerId);
-      toast.success('Dispute retracted');
-      reset();
-      await refetchAll();
-      onSuccess?.();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to retract dispute';
-      setError(message);
-      setPhase('error');
-      toast.error(message);
-    }
-  }, [pendingOperation, reset, refetchAll, onSuccess]);
+    // Fire tx — don't await
+    const txPromise = retractDispute(disputeRecordHash, disputerId);
 
-  /**
-   * Start a modify dispute flow
-   */
+    // Close dialog immediately
+    setSubmittedLabel('Retracting dispute');
+    setPhase('submitted');
+
+    // Resolve in background
+    txPromise
+      .then(async () => {
+        updateActivity(activityId, { status: 'confirmed' });
+        toast.success('Dispute retracted');
+        await refetchAll();
+        onSuccess?.();
+      })
+      .catch(err => {
+        const message = err instanceof Error ? err.message : 'Failed to retract dispute';
+        updateActivity(activityId, { status: 'failed', errorMessage: message });
+      });
+  }, [pendingOperation, addActivity, updateActivity, refetchAll, onSuccess]);
+
+  // ==========================================================================
+  // MODIFY DISPUTE FLOW
+  // ==========================================================================
+
   const initiateModifyDispute = useCallback(
     async (
       disputeRecordHash: string,
@@ -527,10 +562,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
 
       // 3. Run preparation (e.g., blockchain wallet setup)
       const ready = await runPreparation();
-      if (ready) {
-        // 4. Move to confirmation UI
-        setPhase('confirming');
-      }
+      if (ready) setPhase('confirming');
     },
     [recordId, runPreparation]
   );
@@ -542,42 +574,48 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
     // Guard: Ensure we have the right operation pending
     if (!pendingOperation || pendingOperation.type !== 'modifyDispute') return;
 
-    const { recordHash, disputeSeverity, disputeCulpability } = pendingOperation;
+    const { recordHash: disputeRecordHash, disputeSeverity, disputeCulpability } = pendingOperation;
     const auth = getAuth();
     const disputerId = auth.currentUser?.uid;
 
-    // Validation
-    if (!recordHash || !disputerId || !disputeSeverity || !disputeCulpability) {
+    if (!disputeRecordHash || !disputerId || !disputeSeverity || !disputeCulpability) {
       setError('Missing required dispute information');
       setPhase('error');
       return;
     }
 
-    setPhase('executing');
+    // Capture before dialog closes
+    const severityInfo = getSeverityConfig(disputeSeverity);
+    const culpabilityInfo = getCulpabilityConfig(disputeCulpability);
+    const activityId = addActivity({ label: 'Updating dispute' });
 
-    try {
-      await modifyDispute(recordHash, disputerId, disputeSeverity, disputeCulpability);
+    // Fire tx — don't await
+    const txPromise = modifyDispute(
+      disputeRecordHash,
+      disputerId,
+      disputeSeverity,
+      disputeCulpability
+    );
 
-      const severityInfo = getSeverityConfig(disputeSeverity);
-      // Culpability is optional in some logic, handle accordingly
-      const culpabilityInfo = disputeCulpability
-        ? getCulpabilityConfig(disputeCulpability)
-        : { name: 'unspecified' };
+    // Close dialog immediately
+    setSubmittedLabel('Updating dispute');
+    setPhase('submitted');
 
-      toast.success(
-        `Dispute updated to ${severityInfo.name} severity and ${culpabilityInfo.name} culpability`
-      );
-
-      setPhase('success');
-      await refetchAll();
-      onSuccess?.();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to modify dispute';
-      setError(message);
-      setPhase('error');
-      toast.error(message);
-    }
-  }, [pendingOperation, refetchAll, onSuccess]);
+    // Resolve in background
+    txPromise
+      .then(async () => {
+        updateActivity(activityId, { status: 'confirmed' });
+        toast.success(
+          `Dispute updated to ${severityInfo.name} severity and ${culpabilityInfo.name} culpability`
+        );
+        await refetchAll();
+        onSuccess?.();
+      })
+      .catch(err => {
+        const message = err instanceof Error ? err.message : 'Failed to modify dispute';
+        updateActivity(activityId, { status: 'failed', errorMessage: message });
+      });
+  }, [pendingOperation, addActivity, updateActivity, refetchAll, onSuccess]);
 
   // ==========================================================================
   // REACT TO DISPUTE FLOW
@@ -587,21 +625,19 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
    * Start a reaction flow (support or oppose a dispute)
    */
   const initiateReaction = useCallback(
-    async (recordHash: string, disputerId: string, supports: boolean) => {
+    async (reactionRecordHash: string, disputerId: string, supports: boolean) => {
       setPendingOperation({
         type: 'reactToDispute',
         recordId,
-        recordHash,
+        recordHash: reactionRecordHash,
         disputerId,
         reactionSupport: supports,
       });
 
       const ready = await runPreparation();
-      if (ready) {
-        setPhase('confirming');
-      }
+      if (ready) setPhase('confirming');
     },
-    [recordId, recordHash, runPreparation]
+    [recordId, runPreparation]
   );
 
   /**
@@ -631,21 +667,35 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
         return;
       }
 
-      setPhase('executing');
+      const label = supports ? 'Supporting dispute' : 'Opposing dispute';
+      const activityId = addActivity({ label });
 
-      try {
-        await reactToDispute(recordId, disputeRecordHash, disputerId, reactorId, supports);
-        toast.success(supports ? 'Supported dispute' : 'Opposed dispute');
-        reset();
-        onSuccess?.();
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to submit reaction';
-        setError(message);
-        setPhase('error');
-        toast.error(message);
-      }
+      // Fire tx — don't await
+      const txPromise = reactToDispute(
+        recordId,
+        disputeRecordHash,
+        disputerId,
+        reactorId,
+        supports
+      );
+
+      // Close dialog immediately
+      setSubmittedLabel('Submitting reaction');
+      setPhase('submitted');
+
+      // Resolve in background
+      txPromise
+        .then(() => {
+          updateActivity(activityId, { status: 'confirmed' });
+          toast.success(supports ? 'Supported dispute' : 'Opposed dispute');
+          onSuccess?.();
+        })
+        .catch(err => {
+          const message = err instanceof Error ? err.message : 'Failed to submit reaction';
+          updateActivity(activityId, { status: 'failed', errorMessage: message });
+        });
     },
-    [pendingOperation, recordId, reset, onSuccess]
+    [pendingOperation, recordId, addActivity, updateActivity, onSuccess]
   );
 
   // ==========================================================================
@@ -675,6 +725,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
         pendingOperation?.type === 'retractVerification'
           ? confirmRetractVerification
           : confirmRetractDispute,
+      submittedLabel,
     },
 
     // Existing data
@@ -700,7 +751,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
     refetch: refetchAll,
 
     // State
-    isLoading: phase === 'preparing' || phase === 'executing',
+    isLoading: phase === 'preparing',
     isDialogOpen: phase !== 'idle',
     phase,
     error,

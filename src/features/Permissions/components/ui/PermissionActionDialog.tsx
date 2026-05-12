@@ -19,12 +19,13 @@ import UserCard from '@/features/Users/components/ui/UserCard';
 import { useState } from 'react';
 import NetworkPreparingContent from '@/features/BlockchainWallet/components/NetworkPreparingContent';
 import RoleSelector, { ROLE_CONFIG } from './RoleSelector';
+import { OnChainSubmittedContent } from '@/features/OnChainActivityTray/components/OnChainSubmittedModal';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-export type DialogPhase = 'idle' | 'preparing' | 'confirming' | 'executing' | 'error';
+export type DialogPhase = 'idle' | 'preparing' | 'confirming' | 'executing' | 'submitted' | 'error';
 export type OperationType = 'grant' | 'revoke' | 'guest-invite';
 export type RevokeAction = 'full-revoke' | 'demote-admin' | 'demote-viewer';
 export type GrantVariant = 'confirm' | 'select-role';
@@ -53,6 +54,7 @@ interface PermissionActionDialogProps {
     onOpenRecordPicker: () => void;
     onRemoveRecord: (id: string) => void;
   };
+  submittedLabel: string;
 }
 
 // ============================================================================
@@ -73,11 +75,12 @@ export const PermissionActionDialog: React.FC<PermissionActionDialogProps> = ({
   onConfirmRevoke,
   onConfirmGuestInvite,
   guestInviteProps,
+  submittedLabel,
 }) => {
   // Don't render if closed or no user
   if (!isOpen) return null;
 
-  const canClose = phase === 'confirming' || phase === 'error';
+  const canClose = phase === 'confirming' || phase === 'error' || phase === 'submitted';
 
   return (
     <AlertDialog.Root open={isOpen} onOpenChange={open => !open && canClose && onClose()}>
@@ -125,6 +128,9 @@ export const PermissionActionDialog: React.FC<PermissionActionDialogProps> = ({
               onConfirm={onConfirmGuestInvite}
               onClose={onClose}
             />
+          )}
+          {phase === 'submitted' && (
+            <OnChainSubmittedContent onClose={onClose} label={submittedLabel} />
           )}
         </AlertDialog.Content>
       </AlertDialog.Portal>

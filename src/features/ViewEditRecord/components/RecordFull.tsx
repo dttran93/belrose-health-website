@@ -14,7 +14,7 @@ import { EncryptionAccessView } from '@/features/Sharing/components/EncryptionAc
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
-import PermissionsManager from '@/features/Permissions/component/PermissionManager';
+import PermissionsManager from '@/features/Permissions/components/PermissionManager';
 import SubjectManager from '@/features/Subject/components/SubjectManager';
 import SubjectBadge from '@/features/Subject/components/SubjectBadge';
 import { useSubjectFlow } from '@/features/Subject/hooks/useSubjectFlow';

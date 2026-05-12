@@ -8,7 +8,7 @@ import { FileObject, BelroseUserProfile } from '@/types/core';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { Button } from '@/components/ui/Button';
 import { usePermissionFlow } from '@/features/Permissions/hooks/usePermissionFlow';
-import { PermissionActionDialog } from '@/features/Permissions/component/ui/PermissionActionDialog';
+import { PermissionActionDialog } from '@/features/Permissions/components/ui/PermissionActionDialog';
 import UserSearch from '@/features/Users/components/UserSearch';
 import type { Role } from '@/features/Permissions/services/permissionsService';
 import AccessUserCard from './ui/AccessUserCard';

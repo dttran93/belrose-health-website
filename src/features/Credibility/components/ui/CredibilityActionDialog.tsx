@@ -4,9 +4,7 @@ import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import {
   ShieldCheck,
   ShieldAlert,
-  Loader2,
   XCircle,
-  CheckCircle2,
   AlertTriangle,
   FileX,
   ThumbsUp,
@@ -19,8 +17,6 @@ import type {
   CredibilityPreparationProgress,
 } from '@/features/Credibility/services/credibilityPreparationService';
 import {
-  VerificationLevel,
-  VERIFICATION_OPTIONS,
   getVerificationConfig,
   VerificationLevelOptions,
 } from '../../services/verificationService';
@@ -31,12 +27,13 @@ import {
   getCulpabilityConfig,
 } from '../../services/disputeService';
 import NetworkPreparingContent from '@/features/BlockchainWallet/components/NetworkPreparingContent';
+import { OnChainSubmittedContent } from '@/features/OnChainActivityTray/components/OnChainSubmittedModal';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-export type DialogPhase = 'idle' | 'preparing' | 'confirming' | 'executing' | 'success' | 'error';
+export type DialogPhase = 'idle' | 'preparing' | 'confirming' | 'executing' | 'submitted' | 'error';
 
 interface CredibilityActionDialogProps {
   isOpen: boolean;
@@ -57,6 +54,7 @@ interface CredibilityActionDialogProps {
   onConfirmDispute: () => void;
   onConfirmReaction: (supports: boolean) => void;
   onConfirmModifyDispute: () => void;
+  submittedLabel: string;
 }
 
 // ============================================================================
@@ -81,10 +79,11 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
   onConfirmDispute,
   onConfirmReaction,
   onConfirmModifyDispute,
+  submittedLabel,
 }) => {
   if (!isOpen) return null;
 
-  const canClose = phase === 'confirming' || phase === 'error' || phase === 'success';
+  const canClose = phase === 'confirming' || phase === 'error' || phase === 'submitted';
 
   return (
     <AlertDialog.Root open={isOpen} onOpenChange={open => !open && canClose && onClose()}>
@@ -100,15 +99,12 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
             />
           )}
 
-          {/* Executing Phase */}
-          {phase === 'executing' && <ExecutingContent operationType={operationType} />}
-
           {/* Error Phase */}
           {phase === 'error' && <ErrorContent error={error} onClose={onClose} />}
 
-          {/* Success Phase */}
-          {phase === 'success' && (
-            <SuccessContent operationType={operationType} onClose={onClose} />
+          {/* Submitted Phase */}
+          {phase === 'submitted' && (
+            <OnChainSubmittedContent onClose={onClose} label={submittedLabel} />
           )}
 
           {/* Confirming Phase - Verification - Creation or Modification */}
@@ -185,56 +181,6 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
 // PHASE CONTENT COMPONENTS
 // ============================================================================
 
-const ExecutingContent: React.FC<{ operationType: CredibilityOperationType }> = ({
-  operationType,
-}) => {
-  const messages: Record<CredibilityOperationType, { title: string; description: string }> = {
-    verify: {
-      title: 'Submitting Verification',
-      description: 'Recording your verification on the network...',
-    },
-    dispute: {
-      title: 'Filing Dispute',
-      description: 'Recording your dispute on the network...',
-    },
-    retractVerification: {
-      title: 'Retracting Verification',
-      description: 'Removing your verification from the record...',
-    },
-    retractDispute: {
-      title: 'Retracting Dispute',
-      description: 'Removing your dispute from the record...',
-    },
-    modifyVerification: {
-      title: 'Modifying Verification',
-      description: 'Updating your verification on the network...',
-    },
-    modifyDispute: {
-      title: 'Modifying Dispute',
-      description: 'Updating your dispute on the network...',
-    },
-    reactToDispute: {
-      title: 'Submitting Reaction',
-      description: 'Recording your reaction on the network...',
-    },
-  };
-
-  const { title, description } = messages[operationType] || {
-    title: 'Processing',
-    description: 'Please wait...',
-  };
-
-  return (
-    <div className="flex flex-col items-center gap-4 py-4">
-      <Loader2 className="w-10 h-10 text-complement-3 animate-spin" />
-      <AlertDialog.Title className="text-lg font-bold text-center">{title}</AlertDialog.Title>
-      <AlertDialog.Description className="text-sm text-gray-600 text-center">
-        {description}
-      </AlertDialog.Description>
-    </div>
-  );
-};
-
 const ErrorContent: React.FC<{ error?: string | null; onClose: () => void }> = ({
   error,
   onClose,
@@ -252,36 +198,6 @@ const ErrorContent: React.FC<{ error?: string | null; onClose: () => void }> = (
     </Button>
   </div>
 );
-
-const SuccessContent: React.FC<{
-  operationType: CredibilityOperationType;
-  onClose: () => void;
-}> = ({ operationType, onClose }) => {
-  const messages: Record<CredibilityOperationType, string> = {
-    verify: 'Verification submitted successfully!',
-    dispute: 'Dispute filed successfully!',
-    retractVerification: 'Verification retracted successfully!',
-    retractDispute: 'Dispute retracted successfully!',
-    modifyVerification: 'Verification modified successfully!',
-    modifyDispute: 'Dispute modified successfully!',
-    reactToDispute: 'Reaction submitted successfully!',
-  };
-
-  return (
-    <div className="flex flex-col items-center gap-4 py-4">
-      <CheckCircle2 className="w-10 h-10 text-complement-3" />
-      <AlertDialog.Title className="text-lg font-bold text-center text-complement-3">
-        Success
-      </AlertDialog.Title>
-      <AlertDialog.Description className="text-sm text-gray-600 text-center">
-        {messages[operationType] || 'Operation completed successfully!'}
-      </AlertDialog.Description>
-      <Button onClick={onClose} className="mt-2 bg-complement-3 hover:bg-complement-3/90">
-        Done
-      </Button>
-    </div>
-  );
-};
 
 // ============================================================================
 // CONFIRM VERIFICATION CONTENT
@@ -525,88 +441,6 @@ const ConfirmReactionContent: React.FC<{
           className="flex-1 bg-complement-3 hover:bg-complement-3/90"
         >
           Submit Reaction
-        </Button>
-      </div>
-    </>
-  );
-};
-
-// ============================================================================
-// CONFIRM MODIFY VERIFICATION
-// ============================================================================
-
-const ConfirmModifyVerification: React.FC<{
-  previousLevel?: VerificationLevel;
-  onConfirm: (level: VerificationLevel) => void;
-  onClose: () => void;
-}> = ({ previousLevel, onConfirm, onClose }) => {
-  const [selectedLevel, setSelectedLevel] = useState<VerificationLevel>(previousLevel || 1);
-
-  return (
-    <>
-      <AlertDialog.Title className="text-lg font-bold flex items-center gap-2">
-        <ShieldCheck className="w-5 h-5 text-complement-3" />
-        Modify Verification
-      </AlertDialog.Title>
-
-      <AlertDialog.Description className="mt-3 text-sm text-gray-600">
-        Select the level of verification you are changing to for this record.
-      </AlertDialog.Description>
-
-      <div className="space-y-2 my-4">
-        {VERIFICATION_OPTIONS.map(config => {
-          const isSelected = selectedLevel === config.value;
-          const IconComponent = config.icon;
-
-          return (
-            <label
-              key={config.value}
-              className={`flex items-start gap-3 p-3 border rounded-lg transition-colors cursor-pointer
-                    ${isSelected ? 'border-complement-3 bg-complement-3/10' : 'border-gray-200 hover:border-gray-300'}`}
-            >
-              <input
-                type="radio"
-                name="verificationLevel"
-                value={config.value}
-                checked={isSelected}
-                onChange={() => setSelectedLevel(config.value)}
-                className="mt-1 w-4 h-4 accent-complement-3"
-              />
-              <IconComponent
-                className={`w-5 h-5 mt-0.5 ${isSelected ? 'text-complement-3' : 'text-gray-400'}`}
-              />
-              <div className="flex-1">
-                <p className="font-medium text-gray-900">{config.name}</p>
-                <p className="text-xs text-gray-500">{config.declarative}</p>
-              </div>
-            </label>
-          );
-        })}
-      </div>
-
-      {/* CONSOLIDATED FOOTER */}
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-        <p className="text-xs text-amber-800 leading-relaxed">
-          <strong>Note:</strong> By verifying this record, you are staking your personal and
-          professional reputation on its accuracy.{' '}
-          <span className="block mt-2">
-            Belrose will report proven misconduct to the appropriate legal and professional
-            authorities.
-          </span>
-        </p>
-      </div>
-
-      <div className="flex gap-3">
-        <AlertDialog.Cancel asChild>
-          <Button variant="outline" className="flex-1" onClick={onClose}>
-            Cancel
-          </Button>
-        </AlertDialog.Cancel>
-        <Button
-          onClick={() => onConfirm(selectedLevel)}
-          className="flex-1 bg-complement-3 hover:bg-complement-3/90"
-        >
-          Modify Verification
         </Button>
       </div>
     </>

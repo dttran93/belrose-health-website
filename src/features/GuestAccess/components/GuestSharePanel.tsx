@@ -7,25 +7,17 @@ import { Stethoscope } from 'lucide-react';
 import { ethers } from 'ethers';
 import { getAuth } from 'firebase/auth';
 import { BlockchainRoleManagerService } from '@/features/Permissions/services/blockchainRoleManagerService';
-import {
-  arrayUnion,
-  collection,
-  doc,
-  getDocs,
-  getFirestore,
-  query,
-  updateDoc,
-  where,
-} from 'firebase/firestore';
+import { arrayUnion, doc, getFirestore, updateDoc } from 'firebase/firestore';
 import { SharingService } from '@/features/Sharing/services/sharingService';
 import {
   PermissionActionDialog,
   DialogPhase,
-} from '@/features/Permissions/component/ui/PermissionActionDialog';
+} from '@/features/Permissions/components/ui/PermissionActionDialog';
 import { RecordPicker } from '@/features/Ai/components/ui/RecordPicker';
 import { getShareableRecords } from '../services/guestShareableRecords';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 import { GuestFeatureGate } from './GuestFeatureGate';
+import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
 
 interface GuestSharePanelProps {
   record?: FileObject; // optional — pre-selects this record if provided
@@ -68,6 +60,10 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
   const [availableRecords, setAvailableRecords] = useState<FileObject[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
   const [isRecordPickerOpen, setIsRecordPickerOpen] = useState(false);
+
+  // OnChainActivityTray — UI display for blockchain processing in background
+  const { addActivity, updateActivity } = useOnChainActivityTray();
+  const [submittedLabel, setSubmittedLabel] = useState('');
 
   const fetchShareableRecords = async () => {
     const auth = getAuth();
@@ -128,8 +124,12 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
 
   const handleConfirm = async () => {
     if (!email || selectedRecords.length === 0) return;
-    setPhase('executing');
     setError(null);
+
+    // Capture before closing
+    const recordsToShare = [...selectedRecords];
+    const durationToUse = duration;
+    const emailToUse = email;
 
     try {
       const auth = getAuth();
@@ -139,59 +139,64 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
       // ── Step 1: Cloud Function ─────────────────────────────────────────────
       // Creates guest Firebase Auth account, writes guest Firestore profile
       // with RSA public key, creates guestInvites doc, sends email
+      setPhase('executing');
       const functions = getFunctions();
       const createGuestInvite = httpsCallable(functions, 'createGuestInvite');
       const result = (await createGuestInvite({
-        guestEmail: email,
-        recordIds: selectedRecords.map(r => r.id),
+        guestEmail: emailToUse,
+        recordIds: recordsToShare.map(r => r.id),
         patientName,
-        durationSeconds: duration.seconds,
+        durationSeconds: durationToUse.seconds,
       })) as { data: { guestUid: string } };
 
       const { guestUid } = result.data;
 
-      // ── Step 2: Blockchain guest access ───────────────────────────────────
+      // ── Step 2: Hand off to activity tray ───────────────────────────────────
+      const activityId = addActivity({ label: `Guest invite sent to ${emailToUse}` });
+      setSubmittedLabel(`Guest invite sent to ${emailToUse}`);
+      setPhase('submitted');
+
+      // ── Step 3: Blockchain and guest access ───────────────────────────────────
       // Derives a deterministic placeholder wallet for the guest so they
       // slot into the existing wallets/userIdHash infrastructure on-chain.
       // Fires GuestAccessGranted event with expiry for the audit trail.
       const guestWallet = deriveGuestWallet(guestUid);
       const guestIdHash = ethers.keccak256(ethers.toUtf8Bytes(guestUid));
       const guestEmailHash = hashEmail(email);
+      const db = getFirestore();
 
       console.log('🔗 Granting guest access on blockchain...');
-      await BlockchainRoleManagerService.grantGuestAccess(
-        selectedRecords.map(r => r.id),
+      BlockchainRoleManagerService.grantGuestAccess(
+        recordsToShare.map(r => r.id),
         guestWallet,
         guestIdHash,
         guestEmailHash,
-        duration.seconds
-      );
-      console.log('✅ Blockchain: Guest access granted');
-
-      // ── Step 3: Encryption access for all selected records ────────────────
-      await Promise.all(
-        selectedRecords.map(r =>
-          SharingService.grantEncryptionAccess(r.id, guestUid, currentUser.uid, {
-            isGuest: true,
-            expiresAt: new Date(Date.now() + duration.seconds * 1000),
-          })
-        )
-      );
-      console.log('✅ Encryption access granted for all records');
-
-      // ── Step 4: Firestore viewers array for all selected records ──────────
-      const db = getFirestore();
-      await Promise.all(
-        selectedRecords.map(r =>
-          updateDoc(doc(db, 'records', r.id), { viewers: arrayUnion(guestUid) })
-        )
-      );
-      console.log('✅ Added to viewers array for all records');
-
-      handleClose();
-      onSuccess?.();
+        durationToUse.seconds
+      )
+        .then(async () => {
+          await Promise.all(
+            recordsToShare.map(r =>
+              SharingService.grantEncryptionAccess(r.id, guestUid, currentUser.uid, {
+                isGuest: true,
+                expiresAt: new Date(Date.now() + durationToUse.seconds * 1000),
+              })
+            )
+          );
+          await Promise.all(
+            recordsToShare.map(r =>
+              updateDoc(doc(db, 'records', r.id), { viewers: arrayUnion(guestUid) })
+            )
+          );
+          updateActivity(activityId, { status: 'confirmed' });
+          onSuccess?.();
+        })
+        .catch(err => {
+          const message = err instanceof Error ? err.message : 'Failed to complete guest setup';
+          updateActivity(activityId, { status: 'failed', errorMessage: message });
+        });
     } catch (err: any) {
-      console.error('❌ Guest share failed:', err);
+      // Cloud Function failed — invite never sent, show error in dialog
+      console.error('❌ Guest invite failed:', err);
       setError(err.message || 'Failed to send invite. Please try again.');
       setPhase('error');
     }
@@ -241,6 +246,7 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
             onOpenRecordPicker: () => setIsRecordPickerOpen(true),
             onRemoveRecord: handleRemoveRecord,
           }}
+          submittedLabel={submittedLabel}
         />
 
         {/* Record picker — shown on top of main dialog */}

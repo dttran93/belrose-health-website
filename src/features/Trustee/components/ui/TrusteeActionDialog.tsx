@@ -4,12 +4,12 @@
 // Phase-based rendering — hook (useTrusteeFlow) drives state.
 //
 // Operations:
-//   invite    — trustor invites a user (preparing → confirming → executing)
-//   accept    — trustee accepts invite (preparing → confirming → executing)
+//   invite    — trustor invites a user (preparing → confirming → submitted)
+//   accept    — trustee accepts invite (preparing → confirming → submitted)
 //   decline   — trustee declines invite (confirming → executing, no blockchain)
-//   revoke    — trustor revokes a trustee (preparing → confirming → executing)
-//   editLevel — trustor changes trust level (preparing → confirming → executing)
-//   resign    — trustee resigns (preparing → confirming → executing)
+//   revoke    — trustor revokes a trustee (preparing → confirming → submitted)
+//   editLevel — trustor changes trust level (preparing → confirming → submitted)
+//   resign    — trustee resigns (preparing → confirming → submitted)
 
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import {
@@ -30,6 +30,7 @@ import { BelroseUserProfile } from '@/types/core';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { TrusteeDialogPhase, TrusteeOperationType } from '../../hooks/useTrusteeFlow';
 import { TrustLevel } from '../../services/trusteeRelationshipService';
+import { OnChainSubmittedContent } from '@/features/OnChainActivityTray/components/OnChainSubmittedModal';
 
 // ============================================================================
 // TYPES
@@ -51,6 +52,7 @@ interface TrusteeActionDialogProps {
   onConfirmRevoke: () => void;
   onConfirmEditLevel: () => void;
   onConfirmResign: () => void;
+  submittedLabel: string;
 }
 
 // ============================================================================
@@ -78,7 +80,7 @@ const TRUST_LEVEL_CONFIG: Record<
   },
   custodian: {
     label: 'Custodian',
-    description: 'Can manage your records up to their own role level.',
+    description: 'Can manage your records up to your own role level.',
     icon: ShieldCheck,
     textColor: 'text-purple-600',
     bgColor: 'bg-purple-50',
@@ -132,13 +134,8 @@ const PreparingContent: React.FC = () => (
 );
 
 const ExecutingContent: React.FC<{ operationType: TrusteeOperationType }> = ({ operationType }) => {
-  const messages: Record<TrusteeOperationType, string> = {
-    invite: 'Sending trustee invite...',
-    accept: 'Accepting trustee invite...',
+  const messages: Record<string, string> = {
     decline: 'Declining invite...',
-    revoke: 'Revoking trustee access...',
-    editLevel: 'Updating trust level...',
-    resign: 'Resigning as trustee...',
   };
 
   return (
@@ -235,7 +232,7 @@ const ConfirmInviteContent: React.FC<{
   onConfirm: () => void;
   onClose: () => void;
 }> = ({ targetUser, selectedTrustLevel, setSelectedTrustLevel, onConfirm, onClose }) => (
-  <div className="p-6">
+  <div>
     <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
       <UserPlus className="w-5 h-5 text-primary" />
       Invite Trustee
@@ -343,7 +340,7 @@ const ConfirmDeclineContent: React.FC<{
   onConfirm: () => void;
   onClose: () => void;
 }> = ({ targetUser, trustLevel, onConfirm, onClose }) => (
-  <div className="p-6">
+  <div>
     <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
       <XCircle className="w-5 h-5 text-red-500" />
       Decline Trustee Invite
@@ -394,7 +391,7 @@ const ConfirmRevokeContent: React.FC<{
   onConfirm: () => void;
   onClose: () => void;
 }> = ({ targetUser, trustLevel, onConfirm, onClose }) => (
-  <div className="p-6">
+  <div>
     <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
       <UserMinus className="w-5 h-5 text-red-600" />
       Revoke Trustee
@@ -454,7 +451,7 @@ const ConfirmEditLevelContent: React.FC<{
   onConfirm,
   onClose,
 }) => (
-  <div className="p-6">
+  <div>
     <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
       <Pencil className="w-5 h-5 text-primary" />
       Edit Trust Level
@@ -505,7 +502,7 @@ const ConfirmResignContent: React.FC<{
   onConfirm: () => void;
   onClose: () => void;
 }> = ({ targetUser, trustLevel, onConfirm, onClose }) => (
-  <div className="p-6">
+  <div>
     <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
       <LogOut className="w-5 h-5 text-orange-500" />
       Resign as Trustee
@@ -568,16 +565,17 @@ export const TrusteeActionDialog: React.FC<TrusteeActionDialogProps> = ({
   onConfirmRevoke,
   onConfirmEditLevel,
   onConfirmResign,
+  submittedLabel,
 }) => {
   if (!isOpen) return null;
 
-  const canClose = phase === 'confirming' || phase === 'error';
+  const canClose = phase === 'confirming' || phase === 'error' || phase === 'submitted';
 
   return (
     <AlertDialog.Root open={isOpen} onOpenChange={open => !open && canClose && onClose()}>
       <AlertDialog.Portal>
         <AlertDialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" />
-        <AlertDialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl z-[101] w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <AlertDialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-6 rounded-xl shadow-2xl z-[101] w-full max-w-md max-h-[90vh] overflow-y-auto">
           {phase === 'preparing' && <PreparingContent />}
           {phase === 'executing' && <ExecutingContent operationType={operationType} />}
           {phase === 'error' && <ErrorContent error={error} onClose={onClose} />}
@@ -632,6 +630,9 @@ export const TrusteeActionDialog: React.FC<TrusteeActionDialogProps> = ({
               onConfirm={onConfirmResign}
               onClose={onClose}
             />
+          )}
+          {phase === 'submitted' && (
+            <OnChainSubmittedContent onClose={onClose} label={submittedLabel} />
           )}
         </AlertDialog.Content>
       </AlertDialog.Portal>

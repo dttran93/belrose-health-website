@@ -10,12 +10,13 @@ import { PermissionsService, Role } from '../services/permissionsService';
 import { BelroseUserProfile } from '@/types/core';
 import { toast } from 'sonner';
 import { getAuth } from 'firebase/auth';
-import type {
+import {
   DialogPhase,
+  GrantVariant,
   OperationType,
   RevokeAction,
-  GrantVariant,
-} from '@/features/Permissions/component/ui/PermissionActionDialog';
+} from '../components/ui/PermissionActionDialog';
+import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
 
 // ============================================================================
 // TYPES
@@ -58,6 +59,10 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
   const [pendingOperation, setPendingOperation] = useState<PendingOperation | null>(null);
   const [preparationProgress, setPreparationProgress] =
     useState<PermissionPreparationProgress | null>(null);
+
+  // OnChainActivityTray — UI display for blockchain processing in background
+  const { addActivity, updateActivity } = useOnChainActivityTray();
+  const [submittedLabel, setSubmittedLabel] = useState('');
 
   // ==========================================================================
   // HELPERS
@@ -155,53 +160,59 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
     [recordIds, primaryRecordId, isBatch, getCurrentUserRole]
   );
 
+  /**
+   * Execute a confirmed grant.
+   * Blockchain write — fire-and-forget pattern:
+   * tx fires, dialog closes immediately to submitted, tray tracks the rest.
+   */
   const confirmGrant = useCallback(
     async (roleOverride?: Role) => {
       if (!pendingOperation || pendingOperation.type !== 'grant') return;
 
-      setPhase('executing');
+      // Capture before dialog closes
+      const role = roleOverride || pendingOperation.role;
+      const { targetUserId } = pendingOperation;
 
-      try {
-        const role = roleOverride || pendingOperation.role;
-        const { targetUserId } = pendingOperation;
+      const activityLabel = isBatch
+        ? `Granting ${roleLabels[role]} access across ${recordIds.length} records`
+        : `Granting ${roleLabels[role]} access`;
 
-        if (isBatch) {
-          // Single blockchain tx for all records
-          await PermissionsService.grantRoleBatch(
+      const activityId = addActivity({ label: activityLabel });
+
+      // Fire tx — don't await
+      const txPromise = isBatch
+        ? PermissionsService.grantRoleBatch(
             recordIds,
             targetUserId,
-            recordIds.map(() => role) // same role for all records in this flow
-          );
-        } else {
-          // Single-record path: unchanged
-          switch (role) {
-            case 'viewer':
-              await PermissionsService.grantViewer(primaryRecordId, targetUserId);
-              break;
-            case 'administrator':
-              await PermissionsService.grantAdmin(primaryRecordId, targetUserId);
-              break;
-            case 'owner':
-              await PermissionsService.grantOwner(primaryRecordId, targetUserId);
-              break;
-          }
-        }
+            recordIds.map(() => role)
+          )
+        : role === 'viewer'
+          ? PermissionsService.grantViewer(primaryRecordId, targetUserId)
+          : role === 'administrator'
+            ? PermissionsService.grantAdmin(primaryRecordId, targetUserId)
+            : PermissionsService.grantOwner(primaryRecordId, targetUserId);
 
-        toast.success(
-          isBatch
-            ? `${roleLabels[role]} access granted across ${recordIds.length} records`
-            : `${roleLabels[role]} added successfully`
-        );
-        reset();
-        onSuccess?.();
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to grant access';
-        setError(message);
-        setPhase('error');
-        toast.error(message);
-      }
+      // Close dialog immediately
+      setSubmittedLabel(activityLabel);
+      setPhase('submitted');
+
+      // Resolve in background
+      txPromise
+        .then(async () => {
+          updateActivity(activityId, { status: 'confirmed' });
+          toast.success(
+            isBatch
+              ? `${roleLabels[role]} access granted across ${recordIds.length} records`
+              : `${roleLabels[role]} added successfully`
+          );
+          await onSuccess?.();
+        })
+        .catch(err => {
+          const message = err instanceof Error ? err.message : 'Failed to grant access';
+          updateActivity(activityId, { status: 'failed', errorMessage: message });
+        });
     },
-    [pendingOperation, recordIds, primaryRecordId, isBatch, reset, onSuccess]
+    [pendingOperation, recordIds, primaryRecordId, isBatch, addActivity, updateActivity, onSuccess]
   );
 
   // ==========================================================================
@@ -261,50 +272,60 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
     async (action: RevokeAction) => {
       if (!pendingOperation || pendingOperation.type !== 'revoke') return;
 
-      setPhase('executing');
+      // Capture before dialog closes
+      const { role, targetUserId } = pendingOperation;
 
-      try {
-        const { role, targetUserId } = pendingOperation;
+      const activityLabel =
+        action === 'full-revoke'
+          ? 'Revoking access'
+          : action === 'demote-admin'
+            ? 'Demoting to Administrator'
+            : 'Demoting to Viewer';
 
-        switch (role) {
-          case 'viewer':
-            await PermissionsService.removeViewer(primaryRecordId, targetUserId);
-            break;
-          case 'administrator':
-            await PermissionsService.removeAdmin(primaryRecordId, targetUserId, {
-              demoteToViewer: action === 'demote-viewer',
-            });
-            break;
-          case 'owner':
-            await PermissionsService.removeOwner(primaryRecordId, targetUserId, {
-              demoteTo:
-                action === 'demote-admin'
-                  ? 'administrator'
-                  : action === 'demote-viewer'
-                    ? 'viewer'
-                    : undefined,
-            });
-            break;
-        }
+      const activityId = addActivity({ label: activityLabel });
 
-        const successMessage =
-          action === 'full-revoke'
-            ? 'Access revoked successfully'
-            : action === 'demote-admin'
-              ? 'Demoted to Administrator'
-              : 'Demoted to Viewer';
+      // Fire tx — don't await
+      const txPromise =
+        role === 'viewer'
+          ? PermissionsService.removeViewer(primaryRecordId, targetUserId)
+          : role === 'administrator'
+            ? PermissionsService.removeAdmin(primaryRecordId, targetUserId, {
+                demoteToViewer: action === 'demote-viewer',
+              })
+            : PermissionsService.removeOwner(primaryRecordId, targetUserId, {
+                demoteTo:
+                  action === 'demote-admin'
+                    ? 'administrator'
+                    : action === 'demote-viewer'
+                      ? 'viewer'
+                      : undefined,
+              });
 
-        toast.success(successMessage);
-        reset();
-        onSuccess?.();
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to update access';
-        setError(message);
-        setPhase('error');
-        toast.error(message);
-      }
+      // Close dialog immediately
+      setSubmittedLabel(activityLabel);
+      setPhase('submitted');
+
+      // Resolve in background — action is captured in closure
+      txPromise
+        .then(async () => {
+          updateActivity(activityId, { status: 'confirmed' });
+
+          const successMessage =
+            action === 'full-revoke'
+              ? 'Access revoked successfully'
+              : action === 'demote-admin'
+                ? 'Demoted to Administrator'
+                : 'Demoted to Viewer';
+
+          toast.success(successMessage);
+          await onSuccess?.();
+        })
+        .catch(err => {
+          const message = err instanceof Error ? err.message : 'Failed to update access';
+          updateActivity(activityId, { status: 'failed', errorMessage: message });
+        });
     },
-    [pendingOperation, primaryRecordId, reset, onSuccess]
+    [pendingOperation, primaryRecordId, addActivity, updateActivity, onSuccess]
   );
 
   // ==========================================================================
@@ -312,7 +333,6 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
   // ==========================================================================
 
   return {
-    // Props to spread directly onto PermissionActionDialog
     dialogProps: {
       isOpen: phase !== 'idle',
       phase,
@@ -325,6 +345,7 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
       onClose: reset,
       onConfirmGrant: confirmGrant,
       onConfirmRevoke: confirmRevoke,
+      submittedLabel,
     },
 
     // Actions to initiate flows
@@ -332,7 +353,7 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
     initiateRevoke,
 
     // Convenience state
-    isLoading: phase === 'preparing' || phase === 'executing',
+    isLoading: phase === 'executing',
     phase,
     error,
   };
