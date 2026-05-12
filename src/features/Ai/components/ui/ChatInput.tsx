@@ -1,11 +1,12 @@
 import React, { ClipboardEvent, useEffect, useRef } from 'react';
 import { Send, Plus, CircleStop } from 'lucide-react';
-import { AIModel, ModelSelector } from './ModelSelector';
+import { ModelSelector } from './ModelSelector';
 import AttachmentBadge, {
   ChatAttachment,
   createPastedTextAttachment,
   isPastedText,
 } from './AttachmentBadge';
+import { AIModel } from '@/config/aiModels';
 
 interface ChatInputProps {
   value: string;

@@ -5,7 +5,7 @@ exports.convertToFHIR = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const params_1 = require("firebase-functions/params");
 const anthropicService_1 = require("../services/anthropicService");
-const prompts_1 = require("../utils/prompts");
+const recordAiPrompts_1 = require("../utils/recordAiPrompts");
 /**
  * FHIR Conversion Handler
  * Converts medical document text into FHIR format using AI
@@ -52,7 +52,7 @@ exports.convertToFHIR = (0, https_1.onRequest)({
         // Create Anthropic service
         const anthropicService = new anthropicService_1.AnthropicService(apiKey);
         // Generate prompt and call AI
-        const prompt = (0, prompts_1.getFHIRConversionPrompt)(documentText);
+        const prompt = (0, recordAiPrompts_1.getFHIRConversionPrompt)(documentText);
         const responseText = await anthropicService.sendTextMessage(prompt, {
             model: anthropicService_1.MODELS.SONNET, // Use smart model for complex conversion
             maxTokens: 8000,

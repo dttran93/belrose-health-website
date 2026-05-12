@@ -8,13 +8,13 @@
 
 import { MessageSquare, Sparkles, Shield, X, Loader2 } from 'lucide-react';
 import { AIChat } from '@/features/Ai/components/AIChat';
-import { AIModel } from '@/features/Ai/components/ui/ModelSelector';
 import { FileObject } from '@/types/core';
 import { SubjectInfo } from '@/features/Ai/components/ui/SubjectList';
 import { ContextSelection } from '@/features/Ai/components/ui/ContextBadge';
 import { ContextSelector } from '@/features/Ai/components/ui/ContextSelector';
 import { Message } from '../service/chatService';
 import { ChatAttachment } from './ui/AttachmentBadge';
+import { AIModel } from '@/config/aiModels';
 
 // ============================================================================
 // VIEW COMPONENTS

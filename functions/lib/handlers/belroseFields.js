@@ -5,7 +5,7 @@ exports.createBelroseFields = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const params_1 = require("firebase-functions/params");
 const anthropicService_1 = require("../services/anthropicService");
-const prompts_1 = require("../utils/prompts");
+const recordAiPrompts_1 = require("../utils/recordAiPrompts");
 // Define the secret
 const anthropicKey = (0, params_1.defineSecret)('ANTHROPIC_KEY');
 /**
@@ -78,7 +78,7 @@ exports.createBelroseFields = (0, https_1.onRequest)({
 async function processDataForBelroseFields(fhirData, apiKey, fileName, extractedText, originalText, contextText) {
     const anthropicService = new anthropicService_1.AnthropicService(apiKey);
     // Build the prompt with all context
-    const prompt = (0, prompts_1.getBelroseFieldsPrompt)(fhirData, fileName, extractedText, originalText, contextText);
+    const prompt = (0, recordAiPrompts_1.getBelroseFieldsPrompt)(fhirData, fileName, extractedText, originalText, contextText);
     try {
         // Use Haiku model - it's faster and cheaper for this task
         const responseText = await anthropicService.sendTextMessage(prompt, {

@@ -23,13 +23,13 @@ import {
   getEncryptedChatMessages,
   deleteMessagesAfter,
 } from '@/features/Ai/service/encryptedChatService';
-import { AIModel } from '@/features/Ai/components/ui/ModelSelector';
 import { ContextBuilder } from '@/features/Ai/service/contextBuilder';
 import { ContextFormatter, MediaPart } from '@/features/Ai/service/contextFormatter';
 import { fileToBase64 } from '@/utils/dataFormattingUtils';
 import textExtractionService from '@/features/AddRecord/services/textExtractionService';
 import { ChatAttachment, isPastedText } from '../components/ui/AttachmentBadge';
 import { aiImageService } from '@/features/AddRecord/services/aiImageService';
+import { AIModel } from '@/config/aiModels';
 
 interface UseAIChatProps {
   user: BelroseUserProfile | null;

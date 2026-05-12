@@ -4,7 +4,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { ethers } from 'ethers';
-import { BlockchainRef } from '@/_shared';
+import { BlockchainRef } from '../_shared/';
 
 const MEMBER_ROLE_MANAGER_ADDRESS = '0xC31477f563dC8f7529Ba6AE7E410ABdB84C27d7C';
 const CHAIN_ID = 11155111;

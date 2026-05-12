@@ -7,10 +7,7 @@ import * as crypto from 'crypto';
 /**
  * verifyWebhookSignature
  *
- * Generic HMAC-SHA256 webhook signature verifier. Adapted from Persona's
- * original implementation — kept for reuse with future verification providers
- * (e.g. IDswyft webhooks, Onfido etc).
- *
+ * Generic HMAC-SHA256 webhook signature verifier.
  * Expects signature header in the format: "t=timestamp,v1=hmac_hex"
  * Rejects payloads older than 5 minutes to prevent replay attacks.
  *

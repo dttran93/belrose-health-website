@@ -4,4 +4,5 @@ export * from './belroseFields';
 export * from './convertToFHIR';
 export * from './aiImageAnalysis';
 export * from './blockchain';
+export * from './aiChat';
 //# sourceMappingURL=index.d.ts.map

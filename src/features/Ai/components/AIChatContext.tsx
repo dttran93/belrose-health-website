@@ -4,14 +4,12 @@ import { createContext, useContext, ReactNode } from 'react';
 import { useAIChat } from '@/features/Ai/hooks/useAIChat';
 import { useChatHistory } from '@/features/Ai/hooks/useChatHistory';
 import { useAuthContext } from '@/features/Auth/AuthContext';
-import {
-  AIModel,
-  AnthropicLogo,
-  AVAILABLE_MODELS,
-} from '@/features/Ai/components/ui/ModelSelector';
 import { FileObject } from '@/types/core';
 import { ContextSelection } from '@/features/Ai/components/ui/ContextBadge';
 import { useState } from 'react';
+import { AIModel } from '@/config/aiModels';
+import { AVAILABLE_MODELS } from '@belrose/shared';
+import { AnthropicLogo } from '@/config/modelLogos';
 
 // ---- Shape of everything the context exposes ----
 interface AIChatContextValue {
@@ -50,8 +48,8 @@ export function AIChatProvider({ children }: { children: ReactNode }) {
 
   const [selectedModel, setSelectedModel] = useState<AIModel>(
     AVAILABLE_MODELS[0] ?? {
-      id: 'claude-sonnet-4-5-20250929',
-      name: 'Claude Sonnet 4.5',
+      id: 'claude-sonnet-4-6',
+      name: 'Claude Sonnet 4.6',
       provider: 'anthropic',
       icon: AnthropicLogo,
       description: "Anthropic's best combination of speed and intelligence",

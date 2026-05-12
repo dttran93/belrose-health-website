@@ -6,8 +6,9 @@ import { ChatInput } from './ui/ChatInput';
 import { LayoutSlot } from '@/components/app/LayoutProvider';
 import { Button } from '@/components/ui/Button';
 import { Message } from '../service/chatService';
-import { AIModel, AVAILABLE_MODELS } from './ui/ModelSelector';
 import { ChatAttachment } from './ui/AttachmentBadge';
+import { AVAILABLE_MODELS } from '@belrose/shared';
+import { AIModel } from '@/config/aiModels';
 
 interface AIChatProps {
   healthContext: string | null;

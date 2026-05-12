@@ -13,7 +13,6 @@ import {
   getAccessibleRecords,
   getAvailableSubjects,
 } from '@/features/Ai/service/recordContextService';
-import { AIModel } from '@/features/Ai/components/ui/ModelSelector';
 import {
   AIHealthAssistantView,
   LoadingView,
@@ -21,12 +20,12 @@ import {
   ErrorView,
   NoRecordsView,
 } from '@/features/Ai/components/AIAssistantView';
-import { AVAILABLE_MODELS } from '@/features/Ai/components/ui/ModelSelector';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 import { useAIChatContext } from '@/features/Ai/components/AIChatContext';
 import { useFileDrop } from '@/hooks/useFileDrop';
 import { FileDragOverlay } from '@/components/ui/FileDragOverlay';
 import { ChatAttachment } from '@/features/Ai/components/ui/AttachmentBadge';
+import { AIModel, UI_MODELS } from '@/config/aiModels';
 
 export default function AppPortal() {
   const { user, loading: authLoading } = useAuthContext();
@@ -71,7 +70,7 @@ export default function AppPortal() {
   // ============================================================================
 
   // AI Model selection
-  const availableModels: AIModel[] = AVAILABLE_MODELS;
+  const availableModels: AIModel[] = UI_MODELS;
   const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
 
   // ============================================================================

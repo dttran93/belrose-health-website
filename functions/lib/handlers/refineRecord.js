@@ -14,7 +14,7 @@ exports.refineRecord = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const params_1 = require("firebase-functions/params");
 const anthropicService_1 = require("../services/anthropicService");
-const prompts_1 = require("../utils/prompts");
+const recordAiPrompts_1 = require("../utils/recordAiPrompts");
 const anthropicKey = (0, params_1.defineSecret)('ANTHROPIC_KEY');
 exports.refineRecord = (0, https_1.onRequest)({
     secrets: [anthropicKey],
@@ -37,7 +37,7 @@ exports.refineRecord = (0, https_1.onRequest)({
             return;
         }
         const anthropicService = new anthropicService_1.AnthropicService(apiKey);
-        const prompt = (0, prompts_1.getRefinementEditPrompt)({
+        const prompt = (0, recordAiPrompts_1.getRefinementEditPrompt)({
             fhirData,
             belroseFields,
             userRequest,

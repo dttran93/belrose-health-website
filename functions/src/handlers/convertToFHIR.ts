@@ -4,8 +4,8 @@ import { onRequest } from 'firebase-functions/v2/https';
 import type { Request, Response } from 'express';
 import { defineSecret } from 'firebase-functions/params';
 import { AnthropicService, MODELS } from '../services/anthropicService';
-import { getFHIRConversionPrompt } from '../utils/prompts';
-import { FHIRConversionRequest, FHIRConversionResponse } from '@belrose/shared';
+import { getFHIRConversionPrompt } from '../utils/recordAiPrompts';
+import { FHIRConversionRequest, FHIRConversionResponse } from '../_shared';
 
 /**
  * FHIR Conversion Handler
