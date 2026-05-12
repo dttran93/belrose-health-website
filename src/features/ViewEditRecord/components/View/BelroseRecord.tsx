@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Calendar, User, Stethoscope, Building2, FileText, Clock } from 'lucide-react';
-import { BelroseFields } from '@/types/core';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import ReactMarkdown from 'react-markdown';
+import { BelroseFields } from '@belrose/shared';
 
 interface BelroseRecordProps {
   Data: BelroseFields | undefined;

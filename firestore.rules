@@ -638,7 +638,8 @@ service cloud.firestore {
       allow delete: if request.auth != null &&
         exists(/databases/$(database)/documents/records/$(resource.data.recordId)) && (
           isAdminOrOwnerOfRecord(resource.data.recordId) ||
-          resource.data.userId == request.auth.uid
+          resource.data.userId == request.auth.uid ||
+          resource.data.grantedBy == request.auth.uid
       );
     }
 

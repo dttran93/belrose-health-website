@@ -267,7 +267,7 @@ export class TrusteeRelationshipService {
     if (data.status === 'active') {
       await TrusteePermissionService.revokeTrusteeAccess(trustorId, trusteeId);
     } else if (data.status === 'pending') {
-      await TrusteePermissionService.rollbackPendingTrusteeAccess(trustorId);
+      await TrusteePermissionService.rollbackPendingTrusteeAccess(trustorId, trusteeId);
     }
 
     // Step 3: Update Firestore relationship doc
@@ -445,7 +445,7 @@ export class TrusteeRelationshipService {
     }
 
     // Step 1: Roll back all pending permissions granted at invite time
-    await TrusteePermissionService.rollbackPendingTrusteeAccess(trustorId);
+    await TrusteePermissionService.rollbackPendingTrusteeAccess(trustorId, trusteeId);
 
     // Step 2: Update relationship doc
     await updateDoc(relationshipRef, {

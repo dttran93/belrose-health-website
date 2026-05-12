@@ -131,11 +131,24 @@ export class RecordDecryptionService {
   static async decryptRecords(encryptedRecords: FileObject[]): Promise<FileObject[]> {
     console.log(`🔓 Decrypting ${encryptedRecords.length} records...`);
 
-    const decryptedRecords = await Promise.all(
+    const results = await Promise.allSettled(
       encryptedRecords.map(record => this.decryptRecord(record))
     );
 
-    console.log(`✅ Decrypted ${decryptedRecords.length} records`);
+    const decryptedRecords: FileObject[] = [];
+
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        decryptedRecords.push(result.value);
+      } else {
+        // Log the record ID so you can track down the problem record
+        console.warn(
+          `⚠️ Skipping record ${encryptedRecords[index]?.id}: ${result.reason?.message}`
+        );
+      }
+    });
+
+    console.log(`✅ Decrypted ${decryptedRecords.length}/${encryptedRecords.length} records`);
     return decryptedRecords;
   }
 
@@ -180,6 +193,7 @@ export class RecordDecryptionService {
     const wrappedKeyData = wrappedKeyDoc.data();
 
     if (!wrappedKeyData.isActive) {
+      console.error('🚫 Revoked record ID:', recordId);
       throw new Error('Your access to this record has been revoked');
     }
 

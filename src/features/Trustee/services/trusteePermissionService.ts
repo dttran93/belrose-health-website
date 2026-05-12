@@ -300,12 +300,15 @@ export class TrusteePermissionService {
    * Removes trustee from role arrays + trustees[], deletes inactive wrappedKeys.
    * Blockchain revocation is handled upstream by TrusteeBlockchainService.
    */
-  static async rollbackPendingTrusteeAccess(trustorId: string): Promise<void> {
+  static async rollbackPendingTrusteeAccess(trustorId: string, trusteeId: string): Promise<void> {
     const auth = getAuth();
-    const trusteeId = auth.currentUser?.uid;
-    if (!trusteeId) throw new Error('User not authenticated');
+    const currentUserId = auth.currentUser?.uid;
+    if (!currentUserId) throw new Error('User not authenticated');
 
-    console.log('🔄 Rolling back pending trustee access...', { trustorId, trusteeId });
+    //Can be called either by the trustor when revoking an invite or trustee when rejecting one
+    if (currentUserId !== trustorId && currentUserId !== trusteeId) {
+      throw new Error('Unauthorized: you are not a party to this trustee relationship');
+    }
 
     const db = getFirestore();
 
