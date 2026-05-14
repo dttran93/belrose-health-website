@@ -22,10 +22,15 @@ exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated 
 const firestore_1 = require("firebase-functions/v2/firestore");
 const firestore_2 = require("firebase-admin/firestore");
 const notificationUtils_1 = require("../notificationUtils");
+const params_1 = require("firebase-functions/params");
+const emailUtils_1 = require("../emailUtils");
+const resend_1 = require("resend");
+const subjectEmailTemplates_1 = require("../emails/subjectEmailTemplates");
 // ============================================================================
 // CONSTANTS
 // ============================================================================
-const SOURCE = 'Subject';
+const resendKey = (0, params_1.defineSecret)('RESEND_API_KEY');
+const resend = new resend_1.Resend(resendKey.value());
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -68,7 +73,7 @@ function isNewCreatorResponse(before, after) {
     const beforeStatus = before.rejection?.creatorResponse?.status;
     const afterStatus = after.rejection?.creatorResponse?.status;
     return (beforeStatus === 'pending_creator_decision' &&
-        (afterStatus === 'acknowledged' || afterStatus === 'publicly_listed'));
+        (afterStatus === 'acknowledged' || afterStatus === 'escalated'));
 }
 // ============================================================================
 // TRIGGER 1: NEW CONSENT REQUEST CREATED
@@ -77,7 +82,7 @@ function isNewCreatorResponse(before, after) {
  * Triggered when a new consent request document is created.
  * Notifies the proposed subject that someone wants them to be a subject.
  */
-exports.onSubjectConsentRequestCreated = (0, firestore_1.onDocumentCreated)('subjectConsentRequests/{requestId}', async (event) => {
+exports.onSubjectConsentRequestCreated = (0, firestore_1.onDocumentCreated)({ document: 'subjectConsentRequests/{requestId}', secrets: [resendKey] }, async (event) => {
     const requestId = event.params.requestId;
     const data = event.data?.data();
     if (!data) {
@@ -91,10 +96,10 @@ exports.onSubjectConsentRequestCreated = (0, firestore_1.onDocumentCreated)('sub
         return;
     }
     const requesterName = await (0, notificationUtils_1.getUserDisplayName)(data.requestedBy);
+    const subjectName = await (0, notificationUtils_1.getUserDisplayName)(data.subjectId);
     const recordName = data.recordTitle || (await (0, notificationUtils_1.getRecordDisplayName)(data.recordId));
     await (0, notificationUtils_1.createNotification)(data.subjectId, {
         type: 'SUBJECT_REQUEST_RECEIVED',
-        sourceService: SOURCE,
         message: `${requesterName} has requested to set you as the subject of record: ${recordName}. Please review and respond.`,
         link: `/app/records/${data.recordId}/review-subject-request`,
         payload: {
@@ -105,6 +110,11 @@ exports.onSubjectConsentRequestCreated = (0, firestore_1.onDocumentCreated)('sub
             requestedSubjectRole: data.requestedSubjectRole,
         },
     });
+    await (0, emailUtils_1.sendEmailIfEnabled)(data.subjectId, 'SUBJECT_REQUEST_RECEIVED', {
+        subject: `${requesterName} wants to add you as a subject`,
+        html: (0, subjectEmailTemplates_1.buildSubjectRequestHtml)(requesterName, recordName, data.recordId),
+        text: (0, subjectEmailTemplates_1.buildSubjectRequestText)(requesterName, recordName, data.recordId),
+    }, resend);
     console.log(`✅ Notification sent to subject: ${data.subjectId}`);
 });
 // ============================================================================
@@ -128,15 +138,16 @@ exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)('sub
     }
     console.log(`🔄 Consent request ${requestId} updated`);
     const recordName = afterData.recordTitle || (await (0, notificationUtils_1.getRecordDisplayName)(afterData.recordId));
+    const recordId = afterData.recordId;
+    const requesterName = await (0, notificationUtils_1.getUserDisplayName)(beforeData.requestedBy);
+    const subjectName = await (0, notificationUtils_1.getUserDisplayName)(afterData.subjectId);
     // ========================================================================
     // CASE 1: Status changed from pending → accepted
     // ========================================================================
     if (beforeData.status === 'pending' && afterData.status === 'accepted') {
         console.log(`✅ Request accepted: ${requestId}`);
-        const subjectName = await (0, notificationUtils_1.getUserDisplayName)(afterData.subjectId);
         await (0, notificationUtils_1.createNotification)(afterData.requestedBy, {
             type: 'SUBJECT_ACCEPTED',
-            sourceService: SOURCE,
             message: `${subjectName} has accepted your subject request for the record: ${recordName}.`,
             link: `/app/records/${afterData.recordId}`,
             payload: {
@@ -145,6 +156,11 @@ exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)('sub
                 subjectId: afterData.subjectId,
             },
         });
+        await (0, emailUtils_1.sendEmailIfEnabled)(afterData.requestedBy, 'SUBJECT_ACCEPTED', {
+            subject: `${subjectName} accepted your subject request`,
+            html: (0, subjectEmailTemplates_1.buildSubjectAcceptedHtml)(subjectName, recordName, recordId),
+            text: (0, subjectEmailTemplates_1.buildSubjectAcceptedText)(subjectName, recordName, recordId),
+        }, resend);
         console.log(`✅ Acceptance notification sent to requester: ${afterData.requestedBy}`);
         return;
     }
@@ -153,18 +169,22 @@ exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)('sub
     // ========================================================================
     if (beforeData.status === 'pending' && afterData.status === 'rejected') {
         console.log(`❌ Request rejected: ${requestId}`);
-        const subjectName = await (0, notificationUtils_1.getUserDisplayName)(afterData.subjectId);
         await (0, notificationUtils_1.createNotification)(afterData.requestedBy, {
             type: 'REJECTION_PENDING_CREATOR_DECISION',
-            sourceService: SOURCE,
             message: `${subjectName} has declined to be set as the subject of record: ${recordName}.`,
             link: `/app/records/${afterData.recordId}`,
             payload: {
                 recordId: afterData.recordId,
                 requestId,
                 subjectId: afterData.subjectId,
+                rejectionType: 'request_rejected',
             },
         });
+        await (0, emailUtils_1.sendEmailIfEnabled)(afterData.requestedBy, 'REJECTION_PENDING_CREATOR_DECISION', {
+            subject: `${subjectName} removed themselves from your record`,
+            html: (0, subjectEmailTemplates_1.buildSubjectDeclinedHtml)(subjectName, recordName, recordId),
+            text: (0, subjectEmailTemplates_1.buildSubjectDeclinedText)(subjectName, recordName, recordId),
+        }, resend);
         console.log(`✅ Rejection notification sent to requester: ${afterData.requestedBy}`);
         return;
     }
@@ -186,7 +206,6 @@ exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)('sub
             const subjectName = await (0, notificationUtils_1.getUserDisplayName)(afterData.subjectId);
             await (0, notificationUtils_1.createNotificationForMultiple)(targets, {
                 type: 'REJECTION_PENDING_CREATOR_DECISION',
-                sourceService: SOURCE,
                 message: `Action Required: ${subjectName} has removed their subject status from record: ${recordName}. Please review and decide whether to publicly list this change.`,
                 link: `/app/records/${afterData.recordId}/review-rejection`,
                 payload: {
@@ -196,6 +215,11 @@ exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)('sub
                     rejectionType: rejection.rejectionType,
                 },
             });
+            await (0, emailUtils_1.sendEmailIfEnabled)(afterData.requestedBy, 'REJECTION_PENDING_CREATOR_DECISION', {
+                subject: `${subjectName} rejected your subject request`,
+                html: (0, subjectEmailTemplates_1.buildSubjectRemovedHtml)(subjectName, recordName, recordId),
+                text: (0, subjectEmailTemplates_1.buildSubjectRemovedText)(subjectName, recordName, recordId),
+            }, resend);
             console.log(`✅ Removal notification sent to ${targets.length} record owner(s)`);
         }
         return;
@@ -206,26 +230,28 @@ exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)('sub
     if (isNewCreatorResponse(beforeData, afterData)) {
         console.log(`📋 Creator responded to rejection: ${requestId}`);
         const rejection = afterData.rejection;
-        const creatorResponse = rejection.creatorResponse;
-        const notificationType = creatorResponse.status === 'publicly_listed'
-            ? 'REJECTION_PUBLICLY_LISTED'
-            : 'REJECTION_ACKNOWLEDGED';
-        const message = creatorResponse.status === 'publicly_listed'
-            ? `The record creator has publicly listed your subject status removal for: ${recordName}.`
+        const creatorResponse = rejection?.creatorResponse;
+        const isEscalated = creatorResponse?.status === 'escalated';
+        const notificationType = creatorResponse?.status === 'escalated' ? 'REJECTION_ESCALATED' : 'REJECTION_ACKNOWLEDGED';
+        const message = creatorResponse?.status === 'escalated'
+            ? `The record creator has escalated your subject status removal for: ${recordName} to Belrose.`
             : `The record creator has acknowledged your subject status removal for: ${recordName}.`;
         await (0, notificationUtils_1.createNotification)(afterData.subjectId, {
             type: notificationType,
-            sourceService: SOURCE,
             message,
             link: `/app/records/${afterData.recordId}`,
             payload: {
                 recordId: afterData.recordId,
                 requestId,
                 subjectId: afterData.subjectId,
-                publiclyListed: creatorResponse.publiclyListed,
             },
         });
-        console.log(`✅ Creator response notification sent to subject: ${afterData.subjectId} (${creatorResponse.status})`);
+        await (0, emailUtils_1.sendEmailIfEnabled)(afterData.requestedBy, notificationType, {
+            subject: `${subjectName} rejected your subject request`,
+            html: (0, subjectEmailTemplates_1.buildCreatorResponseHtml)(recordName, recordId, isEscalated),
+            text: (0, subjectEmailTemplates_1.buildCreatorResponseText)(recordName, recordId, isEscalated),
+        }, resend);
+        console.log(`✅ Creator response notification sent to subject: ${afterData.subjectId} (${creatorResponse?.status})`);
         return;
     }
     console.log('📭 No relevant changes detected');

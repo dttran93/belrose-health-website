@@ -15,7 +15,6 @@
  *    - Rejected requests (notifies requester)
  * - Subject removals after acceptance (notifies record owners/creators)
  * - Creator responses to rejections (notifies subject)
-
  */
 
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
@@ -27,15 +26,29 @@ import {
   getUserDisplayName,
   getRecordDisplayName,
   NotificationType,
-  SourceService,
 } from '../notificationUtils';
+import { defineSecret } from 'firebase-functions/params';
+import { sendEmailIfEnabled } from '../emailUtils';
+import { Resend } from 'resend';
+import {
+  buildCreatorResponseHtml,
+  buildCreatorResponseText,
+  buildSubjectAcceptedHtml,
+  buildSubjectAcceptedText,
+  buildSubjectDeclinedHtml,
+  buildSubjectDeclinedText,
+  buildSubjectRemovedHtml,
+  buildSubjectRemovedText,
+  buildSubjectRequestHtml,
+  buildSubjectRequestText,
+} from '../emails/subjectEmailTemplates';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 export type SubjectRejectionType = 'request_rejected' | 'removed_after_acceptance';
-type CreatorResponseStatus = 'pending_creator_decision' | 'acknowledged' | 'publicly_listed';
+type CreatorResponseStatus = 'pending_creator_decision' | 'acknowledged' | 'escalated';
 
 /**
  * Creator's response to a subject rejection
@@ -83,7 +96,8 @@ interface RecordForNotification {
 // CONSTANTS
 // ============================================================================
 
-const SOURCE: SourceService = 'Subject';
+const resendKey = defineSecret('RESEND_API_KEY');
+const resend = new Resend(resendKey.value());
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -141,7 +155,7 @@ function isNewCreatorResponse(
 
   return (
     beforeStatus === 'pending_creator_decision' &&
-    (afterStatus === 'acknowledged' || afterStatus === 'publicly_listed')
+    (afterStatus === 'acknowledged' || afterStatus === 'escalated')
   );
 }
 
@@ -154,7 +168,7 @@ function isNewCreatorResponse(
  * Notifies the proposed subject that someone wants them to be a subject.
  */
 export const onSubjectConsentRequestCreated = onDocumentCreated(
-  'subjectConsentRequests/{requestId}',
+  { document: 'subjectConsentRequests/{requestId}', secrets: [resendKey] },
   async event => {
     const requestId = event.params.requestId;
     const data = event.data?.data() as SubjectConsentRequest | undefined;
@@ -177,7 +191,6 @@ export const onSubjectConsentRequestCreated = onDocumentCreated(
 
     await createNotification(data.subjectId, {
       type: 'SUBJECT_REQUEST_RECEIVED',
-      sourceService: SOURCE,
       message: `${requesterName} has requested to set you as the subject of record: ${recordName}. Please review and respond.`,
       link: `/app/records/${data.recordId}/review-subject-request`,
       payload: {
@@ -188,6 +201,17 @@ export const onSubjectConsentRequestCreated = onDocumentCreated(
         requestedSubjectRole: data.requestedSubjectRole,
       },
     });
+
+    await sendEmailIfEnabled(
+      data.subjectId,
+      'SUBJECT_REQUEST_RECEIVED',
+      {
+        subject: `${requesterName} wants to add you as a subject`,
+        html: buildSubjectRequestHtml(requesterName, recordName, data.recordId),
+        text: buildSubjectRequestText(requesterName, recordName, data.recordId),
+      },
+      resend
+    );
 
     console.log(`✅ Notification sent to subject: ${data.subjectId}`);
   }
@@ -220,18 +244,17 @@ export const onSubjectConsentRequestUpdated = onDocumentUpdated(
     console.log(`🔄 Consent request ${requestId} updated`);
 
     const recordName = afterData.recordTitle || (await getRecordDisplayName(afterData.recordId));
+    const recordId = afterData.recordId;
+    const subjectName = await getUserDisplayName(afterData.subjectId);
 
     // ========================================================================
-    // CASE 1: Status changed from pending → accepted
+    // TRIGGER 2a: Request Accepted: Status changed from pending → accepted
     // ========================================================================
     if (beforeData.status === 'pending' && afterData.status === 'accepted') {
       console.log(`✅ Request accepted: ${requestId}`);
 
-      const subjectName = await getUserDisplayName(afterData.subjectId);
-
       await createNotification(afterData.requestedBy, {
         type: 'SUBJECT_ACCEPTED',
-        sourceService: SOURCE,
         message: `${subjectName} has accepted your subject request for the record: ${recordName}.`,
         link: `/app/records/${afterData.recordId}`,
         payload: {
@@ -241,45 +264,65 @@ export const onSubjectConsentRequestUpdated = onDocumentUpdated(
         },
       });
 
+      await sendEmailIfEnabled(
+        afterData.requestedBy,
+        'SUBJECT_ACCEPTED',
+        {
+          subject: `${subjectName} accepted your subject request`,
+          html: buildSubjectAcceptedHtml(subjectName, recordName, recordId),
+          text: buildSubjectAcceptedText(subjectName, recordName, recordId),
+        },
+        resend
+      );
+
       console.log(`✅ Acceptance notification sent to requester: ${afterData.requestedBy}`);
       return;
     }
 
     // ========================================================================
-    // CASE 2: Status changed from pending → rejected (initial rejection)
+    // TRIGGER 2B: Status changed from pending → rejected (initial rejection)
     // ========================================================================
     if (beforeData.status === 'pending' && afterData.status === 'rejected') {
       console.log(`❌ Request rejected: ${requestId}`);
 
-      const subjectName = await getUserDisplayName(afterData.subjectId);
-
       await createNotification(afterData.requestedBy, {
         type: 'REJECTION_PENDING_CREATOR_DECISION',
-        sourceService: SOURCE,
         message: `${subjectName} has declined to be set as the subject of record: ${recordName}.`,
         link: `/app/records/${afterData.recordId}`,
         payload: {
           recordId: afterData.recordId,
           requestId,
           subjectId: afterData.subjectId,
+          rejectionType: 'request_rejected',
         },
       });
+
+      await sendEmailIfEnabled(
+        afterData.requestedBy,
+        'REJECTION_PENDING_CREATOR_DECISION',
+        {
+          subject: `${subjectName} removed themselves from your record`,
+          html: buildSubjectDeclinedHtml(subjectName, recordName, recordId),
+          text: buildSubjectDeclinedText(subjectName, recordName, recordId),
+        },
+        resend
+      );
 
       console.log(`✅ Rejection notification sent to requester: ${afterData.requestedBy}`);
       return;
     }
 
     // ========================================================================
-    // CASE 3: Rejection data added (subject removed after acceptance)
+    // TRIGGER 2B: Rejection data added (subject removed after acceptance)
     // This happens when someone accepted, then later removed themselves
     // ========================================================================
     if (isNewRejection(beforeData, afterData)) {
       console.log(`🚫 Subject removal detected: ${requestId}`);
 
-      const rejection = afterData.rejection!;
+      const rejection = afterData.rejection;
 
       // Only notify for removals after acceptance (not initial rejections)
-      if (rejection.rejectionType === 'removed_after_acceptance') {
+      if (rejection?.rejectionType === 'removed_after_acceptance') {
         const recordData = await getRecordData(afterData.recordId);
 
         if (!recordData) {
@@ -292,7 +335,6 @@ export const onSubjectConsentRequestUpdated = onDocumentUpdated(
 
         await createNotificationForMultiple(targets, {
           type: 'REJECTION_PENDING_CREATOR_DECISION',
-          sourceService: SOURCE,
           message: `Action Required: ${subjectName} has removed their subject status from record: ${recordName}. Please review and decide whether to publicly list this change.`,
           link: `/app/records/${afterData.recordId}/review-rejection`,
           payload: {
@@ -303,46 +345,64 @@ export const onSubjectConsentRequestUpdated = onDocumentUpdated(
           },
         });
 
+        await sendEmailIfEnabled(
+          afterData.requestedBy,
+          'REJECTION_PENDING_CREATOR_DECISION',
+          {
+            subject: `${subjectName} rejected your subject request`,
+            html: buildSubjectRemovedHtml(subjectName, recordName, recordId),
+            text: buildSubjectRemovedText(subjectName, recordName, recordId),
+          },
+          resend
+        );
         console.log(`✅ Removal notification sent to ${targets.length} record owner(s)`);
       }
-
       return;
     }
 
     // ========================================================================
-    // CASE 4: Creator responded to rejection
+    // TRIGGER 3: Creator responded to rejection
     // ========================================================================
     if (isNewCreatorResponse(beforeData, afterData)) {
       console.log(`📋 Creator responded to rejection: ${requestId}`);
 
-      const rejection = afterData.rejection!;
-      const creatorResponse = rejection.creatorResponse!;
+      const rejection = afterData.rejection;
+      const creatorResponse = rejection?.creatorResponse;
+      const isEscalated = creatorResponse?.status === 'escalated';
 
-      const notificationType: NotificationType =
-        creatorResponse.status === 'publicly_listed'
-          ? 'REJECTION_PUBLICLY_LISTED'
-          : 'REJECTION_ACKNOWLEDGED';
+      const notificationType: NotificationType = isEscalated
+        ? 'REJECTION_ESCALATED'
+        : 'REJECTION_ACKNOWLEDGED';
 
       const message =
-        creatorResponse.status === 'publicly_listed'
-          ? `The record creator has publicly listed your subject status removal for: ${recordName}.`
+        creatorResponse?.status === 'escalated'
+          ? `The record creator has escalated your subject status removal for: ${recordName} to Belrose.`
           : `The record creator has acknowledged your subject status removal for: ${recordName}.`;
 
       await createNotification(afterData.subjectId, {
         type: notificationType,
-        sourceService: SOURCE,
         message,
         link: `/app/records/${afterData.recordId}`,
         payload: {
           recordId: afterData.recordId,
           requestId,
           subjectId: afterData.subjectId,
-          publiclyListed: creatorResponse.publiclyListed,
         },
       });
 
+      await sendEmailIfEnabled(
+        afterData.requestedBy,
+        notificationType,
+        {
+          subject: `${subjectName} rejected your subject request`,
+          html: buildCreatorResponseHtml(recordName, recordId, isEscalated),
+          text: buildCreatorResponseText(recordName, recordId, isEscalated),
+        },
+        resend
+      );
+
       console.log(
-        `✅ Creator response notification sent to subject: ${afterData.subjectId} (${creatorResponse.status})`
+        `✅ Creator response notification sent to subject: ${afterData.subjectId} (${creatorResponse?.status})`
       );
       return;
     }

@@ -4,7 +4,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.onRecordRequestUpdated = exports.onRecordRequestCreated = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const notificationUtils_1 = require("../notificationUtils");
-const SOURCE = 'RequestRecord';
 /**
  * Triggered when a new Record Request is created.
  * Note: The actual EMAIL to the provider is usually sent by the
@@ -18,10 +17,9 @@ exports.onRecordRequestCreated = (0, firestore_1.onDocumentCreated)('recordReque
     const requesterName = await (0, notificationUtils_1.getUserDisplayName)(data.requesterId);
     await (0, notificationUtils_1.createNotification)(data.targetUserId, {
         type: 'RECORD_REQUEST_RECEIVED',
-        sourceService: SOURCE,
         message: `${requesterName} is requesting medical records from you.`,
         link: `/fulfill-request?code=${data.inviteCode}`,
-        payload: { requestId: data.inviteCode },
+        payload: { requestId: data.inviteCode, requestedBy: data.requesterId },
     });
 });
 /**
@@ -38,7 +36,6 @@ exports.onRecordRequestUpdated = (0, firestore_1.onDocumentUpdated)('recordReque
     if (!before.readAt && after.readAt) {
         await (0, notificationUtils_1.createNotification)(after.requesterId, {
             type: 'RECORD_REQUEST_VIEWED',
-            sourceService: SOURCE,
             message: `Your record request to ${after.targetEmail} has been opened.`,
             link: `/app/requests`, // Link to their dashboard
             payload: { requestId },
@@ -49,7 +46,6 @@ exports.onRecordRequestUpdated = (0, firestore_1.onDocumentUpdated)('recordReque
     if (before.status === 'pending' && after.status === 'fulfilled') {
         await (0, notificationUtils_1.createNotification)(after.requesterId, {
             type: 'RECORD_REQUEST_FULFILLED',
-            sourceService: SOURCE,
             message: `Success! ${after.targetEmail} has uploaded your requested records.`,
             link: after.fulfilledRecordIds?.[0]
                 ? `/app/records/${after.fulfilledRecordIds[0]}`
@@ -63,7 +59,6 @@ exports.onRecordRequestUpdated = (0, firestore_1.onDocumentUpdated)('recordReque
         const reasonText = after.deniedReason ? ` Reason: ${after.deniedReason}` : '';
         await (0, notificationUtils_1.createNotification)(after.requesterId, {
             type: 'RECORD_REQUEST_DENIED',
-            sourceService: SOURCE,
             message: `${after.targetEmail} declined your record request.${reasonText}`,
             link: `/app/requests`,
             payload: { requestId, deniedReason: after.deniedReason },

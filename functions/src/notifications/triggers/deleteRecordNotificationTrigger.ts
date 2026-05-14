@@ -17,11 +17,13 @@
 
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { Timestamp } from 'firebase-admin/firestore';
+import { createNotificationForMultiple, getUserDisplayName } from '../notificationUtils';
+import { Resend } from 'resend';
+import { resendKey, sendEmailIfEnabled } from '../emailUtils';
 import {
-  createNotificationForMultiple,
-  getUserDisplayName,
-  SourceService,
-} from '../notificationUtils';
+  buildRecordDeletedHtml,
+  buildRecordDeletedText,
+} from '../emails/recordDeletionEmailTemplates';
 
 // ============================================================================
 // TYPES
@@ -44,12 +46,6 @@ interface RecordDeletionEvent {
   };
   deletionComplete: boolean;
 }
-
-// ============================================================================
-// CONSTANTS
-// ============================================================================
-
-const SOURCE: SourceService = 'Record';
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -102,15 +98,29 @@ export const onRecordDeletionEventCreated = onDocumentCreated(
 
     await createNotificationForMultiple(affectedUserIds, {
       type: 'RECORD_DELETED',
-      sourceService: SOURCE,
       message: `${deleterName} has permanently deleted the record: ${recordName}. You no longer have access to this record.`,
       link: `/app/records`,
       payload: {
         recordId,
-        subjectId: '', // Not subject-specific — required by NotificationPayload shape
         deletedBy: data.deletedBy,
       },
     });
+
+    const resend = new Resend(resendKey.value());
+    await Promise.all(
+      affectedUserIds.map(uid =>
+        sendEmailIfEnabled(
+          uid,
+          'RECORD_DELETED',
+          {
+            subject: `${deleterName} deleted a record you had access to`,
+            html: buildRecordDeletedHtml(deleterName, recordName),
+            text: buildRecordDeletedText(deleterName, recordName),
+          },
+          resend
+        )
+      )
+    );
 
     console.log(
       `✅ Deletion notifications sent to ${affectedUserIds.length} user(s) for record: ${recordId}`

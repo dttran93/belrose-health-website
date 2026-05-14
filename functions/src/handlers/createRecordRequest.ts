@@ -193,7 +193,7 @@ export const createRecordRequest = onCall(
       status: 'pending',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       deadline: admin.firestore.Timestamp.fromDate(deadline),
-      fulfilledRecordId: null,
+      fulfilledRecordIds: null,
     };
 
     const docRef = db.collection('recordRequests').doc(inviteCode);

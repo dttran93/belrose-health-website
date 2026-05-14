@@ -1,16 +1,21 @@
 // functions/src/notifications/triggers/requestRecordNotificationTrigger.ts
 
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
-import { createNotification, getUserDisplayName, SourceService } from '../notificationUtils';
+import { createNotification, getUserDisplayName } from '../notificationUtils';
 import type { RecordRequest } from '@belrose/shared';
-
-const SOURCE: SourceService = 'RequestRecord';
+import { resendKey, sendEmailIfEnabled } from '../emailUtils';
+import {
+  buildRecordRequestDeniedHtml,
+  buildRecordRequestDeniedText,
+  buildRecordRequestFulfilledHtml,
+  buildRecordRequestFulfilledText,
+  buildRecordRequestViewedHtml,
+  buildRecordRequestViewedText,
+} from '../emails/recordRequestEmailTemplate';
+import { Resend } from 'resend';
 
 /**
- * Triggered when a new Record Request is created.
- * Note: The actual EMAIL to the provider is usually sent by the
- * Callable Function that creates the doc, but we can trigger
- * an in-app notification here if the target is an existing user.
+ * Triggered when a new Record Request is created. Sent to the target user in-app and their email.
  */
 export const onRecordRequestCreated = onDocumentCreated(
   'recordRequests/{requestId}',
@@ -22,11 +27,12 @@ export const onRecordRequestCreated = onDocumentCreated(
 
     await createNotification(data.targetUserId, {
       type: 'RECORD_REQUEST_RECEIVED',
-      sourceService: SOURCE,
       message: `${requesterName} is requesting medical records from you.`,
       link: `/fulfill-request?code=${data.inviteCode}`,
-      payload: { requestId: data.inviteCode },
+      payload: { requestId: data.inviteCode, requestedBy: data.requesterId },
     });
+
+    //Email notification sent through createRecordRequests (request landing portal covers both users and guests).
   }
 );
 
@@ -39,6 +45,7 @@ export const onRecordRequestUpdated = onDocumentUpdated(
   async event => {
     const before = event.data?.before.data() as RecordRequest | undefined;
     const after = event.data?.after.data() as RecordRequest | undefined;
+    const resend = new Resend(resendKey.value());
 
     if (!before || !after) return;
 
@@ -48,11 +55,22 @@ export const onRecordRequestUpdated = onDocumentUpdated(
     if (!before.readAt && after.readAt) {
       await createNotification(after.requesterId, {
         type: 'RECORD_REQUEST_VIEWED',
-        sourceService: SOURCE,
         message: `Your record request to ${after.targetEmail} has been opened.`,
         link: `/app/requests`, // Link to their dashboard
         payload: { requestId },
       });
+
+      await sendEmailIfEnabled(
+        after.requesterId,
+        'RECORD_REQUEST_VIEWED',
+        {
+          subject: `Your record request to ${after.targetEmail} has been opened`,
+          html: buildRecordRequestViewedHtml(after.targetEmail),
+          text: buildRecordRequestViewedText(after.targetEmail),
+        },
+        resend
+      );
+
       return;
     }
 
@@ -60,13 +78,28 @@ export const onRecordRequestUpdated = onDocumentUpdated(
     if (before.status === 'pending' && after.status === 'fulfilled') {
       await createNotification(after.requesterId, {
         type: 'RECORD_REQUEST_FULFILLED',
-        sourceService: SOURCE,
         message: `Success! ${after.targetEmail} has uploaded your requested records.`,
         link: after.fulfilledRecordIds?.[0]
           ? `/app/records/${after.fulfilledRecordIds[0]}`
           : `/app/requests`,
         payload: { requestId, recordIds: after.fulfilledRecordIds },
       });
+      await sendEmailIfEnabled(
+        after.requesterId,
+        'RECORD_REQUEST_FULFILLED',
+        {
+          subject: `Your records have been uploaded by ${after.targetEmail}`,
+          html: buildRecordRequestFulfilledHtml(
+            after.targetEmail,
+            after.fulfilledRecordIds?.[0] ?? null
+          ),
+          text: buildRecordRequestFulfilledText(
+            after.targetEmail,
+            after.fulfilledRecordIds?.[0] ?? null
+          ),
+        },
+        resend
+      );
       return;
     }
 
@@ -75,11 +108,20 @@ export const onRecordRequestUpdated = onDocumentUpdated(
       const reasonText = after.deniedReason ? ` Reason: ${after.deniedReason}` : '';
       await createNotification(after.requesterId, {
         type: 'RECORD_REQUEST_DENIED',
-        sourceService: SOURCE,
         message: `${after.targetEmail} declined your record request.${reasonText}`,
         link: `/app/requests`,
         payload: { requestId, deniedReason: after.deniedReason },
       });
+      await sendEmailIfEnabled(
+        after.requesterId,
+        'RECORD_REQUEST_DENIED',
+        {
+          subject: `${after.targetEmail} declined your record request`,
+          html: buildRecordRequestDeniedHtml(after.targetEmail, after.deniedReason),
+          text: buildRecordRequestDeniedText(after.targetEmail, after.deniedReason),
+        },
+        resend
+      );
       return;
     }
   }

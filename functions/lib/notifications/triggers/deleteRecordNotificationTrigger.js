@@ -19,10 +19,6 @@ exports.onRecordDeletionEventUpdated = exports.onRecordDeletionEventCreated = vo
 const firestore_1 = require("firebase-functions/v2/firestore");
 const notificationUtils_1 = require("../notificationUtils");
 // ============================================================================
-// CONSTANTS
-// ============================================================================
-const SOURCE = 'Record';
-// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 /**
@@ -62,12 +58,10 @@ exports.onRecordDeletionEventCreated = (0, firestore_1.onDocumentCreated)('recor
     const recordName = data.recordTitle || `Record ${recordId.slice(0, 8)}...`;
     await (0, notificationUtils_1.createNotificationForMultiple)(affectedUserIds, {
         type: 'RECORD_DELETED',
-        sourceService: SOURCE,
         message: `${deleterName} has permanently deleted the record: ${recordName}. You no longer have access to this record.`,
         link: `/app/records`,
         payload: {
             recordId,
-            subjectId: '', // Not subject-specific — required by NotificationPayload shape
             deletedBy: data.deletedBy,
         },
     });

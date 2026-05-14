@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.NOTIFICATION_MAPPING = void 0;
 exports.getFirestore = getFirestore;
 exports.getUserDisplayName = getUserDisplayName;
 exports.getRecordDisplayName = getRecordDisplayName;
@@ -47,8 +48,27 @@ exports.deleteOldNotifications = deleteOldNotifications;
  *
  * Contains types, helpers, and the core createNotification function
  * used by all notification triggers throughout the app.
+ *
+ * - NotificationDoc is a discriminated union — each type has its own
+ *   payload shape, giving full type safety at every call site.
+ * - SourceService is derived automatically from NotificationType via
+ *   NOTIFICATION_SOURCE — callers never pass it explicitly.
  */
 const admin = __importStar(require("firebase-admin"));
+exports.NOTIFICATION_MAPPING = {
+    RECORD_EDITED: 'recordEditing',
+    SUBJECT_REQUEST_RECEIVED: 'subjectRequests',
+    SUBJECT_ACCEPTED: 'subjectRequests',
+    REJECTION_PENDING_CREATOR_DECISION: 'subjectRequests',
+    REJECTION_ACKNOWLEDGED: 'subjectRequests',
+    REJECTION_ESCALATED: 'subjectRequests',
+    RECORD_DELETED: 'recordDeletion',
+    RECORD_REQUEST_RECEIVED: 'recordRequests',
+    RECORD_REQUEST_VIEWED: 'recordRequests',
+    RECORD_REQUEST_FULFILLED: 'recordRequests',
+    RECORD_REQUEST_DENIED: 'recordRequests',
+    GENERIC_NOTIFICATION: 'system',
+};
 function getFirestore() {
     return admin.firestore();
 }
@@ -120,16 +140,17 @@ function formatRecordIdFallback(recordId) {
  * @returns The created notification document ID
  */
 async function createNotification(targetUserId, notification) {
-    const notificationRef = getFirestore()
-        .collection('users')
-        .doc(targetUserId)
-        .collection('notifications');
-    const docRef = await notificationRef.add({
+    const stored = {
         ...notification,
+        sourceService: exports.NOTIFICATION_MAPPING[notification.type],
         read: false,
         createdAt: admin.firestore.Timestamp.now(),
-    });
-    console.log(`✅ Notification created for user ${targetUserId}: ${notification.type} (${docRef.id})`);
+    };
+    const docRef = await getFirestore()
+        .collection('users')
+        .doc(targetUserId)
+        .collection('notifications')
+        .add(stored);
     return docRef.id;
 }
 /**

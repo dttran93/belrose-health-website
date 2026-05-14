@@ -21,4 +21,5 @@ __exportStar(require("./convertToFHIR"), exports);
 __exportStar(require("./aiImageAnalysis"), exports);
 __exportStar(require("./blockchain"), exports);
 __exportStar(require("./aiChat"), exports);
+__exportStar(require("./notifications"), exports);
 //# sourceMappingURL=index.js.map

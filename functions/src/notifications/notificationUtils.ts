@@ -5,84 +5,156 @@
  *
  * Contains types, helpers, and the core createNotification function
  * used by all notification triggers throughout the app.
+ *
+ * - NotificationDoc is a discriminated union — each type has its own
+ *   payload shape, giving full type safety at every call site.
+ * - SourceService is derived automatically from NotificationType via
+ *   NOTIFICATION_SOURCE — callers never pass it explicitly.
  */
 
 import * as admin from 'firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { SubjectRejectionType } from '../notifications/triggers/subjectNotificationTrigger';
+import { NotificationCategory } from '@/_shared';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 /**
- * All notification types across the app.
- * Add new types here as you build new features.
+ * Flexible payload that can holds context for any notification type.
  */
-export type NotificationType =
-  // Subject-related
-  | 'SUBJECT_REQUEST_RECEIVED'
-  | 'SUBJECT_ACCEPTED'
-  | 'REJECTION_PENDING_CREATOR_DECISION'
-  | 'REJECTION_ACKNOWLEDGED'
-  | 'REJECTION_PUBLICLY_LISTED'
-  // Record Deletion
-  | 'RECORD_DELETED'
-  // Record Request
-  | 'RECORD_REQUEST_RECEIVED'
-  | 'RECORD_REQUEST_VIEWED'
-  | 'RECORD_REQUEST_FULFILLED'
-  | 'RECORD_REQUEST_DENIED'
-  // Generic fallback
-  | 'GENERIC_NOTIFICATION';
+export type NotificationDoc =
+  // ── Record editing ────────────────────────────────────────────────────────
+  | {
+      type: 'RECORD_EDITED';
+      payload: {
+        recordId: string;
+        versionId: string;
+        versionNumber: number;
+        editedBy: string;
+        encryptedRecordTitle?: string;
+        encryptedRecordTitleIv?: string;
+      };
+    }
 
-/**
- * Source services - identifies which feature triggered the notification.
- * Useful for filtering and analytics.
- */
-export type SourceService = 'Subject' | 'Messaging' | 'Record' | 'RequestRecord' | 'System';
+  // ── Subject requests ──────────────────────────────────────────────────────
+  | {
+      type: 'SUBJECT_REQUEST_RECEIVED';
+      payload: {
+        recordId: string;
+        requestId: string;
+        subjectId: string;
+        requestedBy: string;
+        requestedSubjectRole: 'viewer' | 'administrator' | 'owner';
+      };
+    }
+  | {
+      type: 'SUBJECT_ACCEPTED';
+      payload: {
+        recordId: string;
+        requestId: string;
+        subjectId: string;
+      };
+    }
+  | {
+      type: 'REJECTION_PENDING_CREATOR_DECISION';
+      payload: {
+        recordId: string;
+        requestId: string;
+        subjectId: string;
+        rejectionType: SubjectRejectionType;
+      };
+    }
+  | {
+      type: 'REJECTION_ACKNOWLEDGED';
+      payload: {
+        recordId: string;
+        requestId: string;
+        subjectId: string;
+      };
+    }
+  | {
+      type: 'REJECTION_ESCALATED';
+      payload: {
+        recordId: string;
+        requestId: string;
+        subjectId: string;
+      };
+    }
 
-/**
- * The shape of a notification document in Firestore.
- * Stored at: users/{userId}/notifications/{notificationId}
- */
-export interface NotificationDoc {
-  type: NotificationType;
-  sourceService: SourceService;
+  // ── Record deletion ───────────────────────────────────────────────────────
+  | {
+      type: 'RECORD_DELETED';
+      payload: {
+        recordId: string;
+        deletedBy: string;
+      };
+    }
+
+  // ── Record requests ───────────────────────────────────────────────────────
+  | {
+      type: 'RECORD_REQUEST_RECEIVED';
+      payload: {
+        requestId: string;
+        requestedBy: string;
+      };
+    }
+  | {
+      type: 'RECORD_REQUEST_VIEWED';
+      payload: {
+        requestId: string;
+      };
+    }
+  | {
+      type: 'RECORD_REQUEST_FULFILLED';
+      payload: {
+        requestId: string;
+        recordIds: string[];
+      };
+    }
+  | {
+      type: 'RECORD_REQUEST_DENIED';
+      payload: {
+        requestId: string;
+        deniedReason?: string;
+      };
+    }
+
+  // ── Generic fallback ──────────────────────────────────────────────────────
+  | {
+      type: 'GENERIC_NOTIFICATION';
+      payload: Record<string, unknown>;
+    };
+
+export type NotificationType = NotificationDoc['type'];
+
+export const NOTIFICATION_MAPPING: Record<NotificationType, NotificationCategory> = {
+  RECORD_EDITED: 'recordEditing',
+  SUBJECT_REQUEST_RECEIVED: 'subjectRequests',
+  SUBJECT_ACCEPTED: 'subjectRequests',
+  REJECTION_PENDING_CREATOR_DECISION: 'subjectRequests',
+  REJECTION_ACKNOWLEDGED: 'subjectRequests',
+  REJECTION_ESCALATED: 'subjectRequests',
+  RECORD_DELETED: 'recordDeletion',
+  RECORD_REQUEST_RECEIVED: 'recordRequests',
+  RECORD_REQUEST_VIEWED: 'recordRequests',
+  RECORD_REQUEST_FULFILLED: 'recordRequests',
+  RECORD_REQUEST_DENIED: 'recordRequests',
+  GENERIC_NOTIFICATION: 'system',
+};
+
+export type CreateNotificationInput = NotificationDoc & {
   message: string;
+  link: string;
+};
+
+// What actually gets stored — createNotification adds the rest
+export type StoredNotificationDoc = CreateNotificationInput & {
+  sourceService: NotificationCategory;
   read: boolean;
   createdAt: Timestamp;
-  link: string;
-  payload: NotificationPayload;
-}
-
-/**
- * Flexible payload that can hold context for any notification type.
- * Add new optional fields as needed for new features.
- */
-export interface NotificationPayload {
-  // Subject-related
-  recordId?: string;
-  subjectId?: string;
-  requestId?: string;
-  requestedBy?: string;
-  requestedSubjectRole?: string;
-  // Deletion Related
-  deletedBy?: string;
-
-  // Record Request Related
-  recordIds?: string[];
-  deniedReason?: string;
-
-  // Messaging (future)
-  conversationId?: string;
-  senderId?: string;
-  publiclyListed?: boolean;
-  rejectionType?: SubjectRejectionType;
-  // Add more as needed...
-}
-
-export type CreateNotificationInput = Omit<NotificationDoc, 'createdAt' | 'read'>;
+};
 
 export function getFirestore() {
   return admin.firestore();
@@ -167,20 +239,18 @@ export async function createNotification(
   targetUserId: string,
   notification: CreateNotificationInput
 ): Promise<string> {
-  const notificationRef = getFirestore()
-    .collection('users')
-    .doc(targetUserId)
-    .collection('notifications');
-
-  const docRef = await notificationRef.add({
+  const stored: StoredNotificationDoc = {
     ...notification,
+    sourceService: NOTIFICATION_MAPPING[notification.type],
     read: false,
     createdAt: admin.firestore.Timestamp.now(),
-  });
+  };
 
-  console.log(
-    `✅ Notification created for user ${targetUserId}: ${notification.type} (${docRef.id})`
-  );
+  const docRef = await getFirestore()
+    .collection('users')
+    .doc(targetUserId)
+    .collection('notifications')
+    .add(stored);
 
   return docRef.id;
 }
