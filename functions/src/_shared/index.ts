@@ -6,3 +6,4 @@ export * from './aiImageAnalysis';
 export * from './blockchain';
 export * from './aiChat';
 export * from './notifications';
+export * from './permissions';

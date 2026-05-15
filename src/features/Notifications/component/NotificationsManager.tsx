@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Bell, CheckCheck, Filter, Loader2, AlertCircle, Inbox } from 'lucide-react';
+import { CheckCheck, Filter, Loader2, AlertCircle, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { useNotifications } from '../hooks/useNotifications';

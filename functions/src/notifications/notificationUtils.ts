@@ -92,6 +92,30 @@ export type NotificationDoc =
       };
     }
 
+  // ── Permission requests ───────────────────────────────────────────────────
+  | {
+      type: 'PERMISSIONS_GRANTED';
+      payload: {
+        recordId: string;
+        changedBy: string;
+        newRole: 'owner' | 'administrator' | 'viewer';
+        previousRole?: 'owner' | 'administrator' | 'viewer' | null; // present for upgrades
+        encryptedRecordTitle?: string;
+        encryptedRecordTitleIv?: string;
+      };
+    }
+  | {
+      type: 'PERMISSIONS_REVOKED';
+      payload: {
+        recordId: string;
+        changedBy: string;
+        previousRole: 'owner' | 'administrator' | 'viewer';
+        newRole?: 'owner' | 'administrator' | 'viewer' | null; // present for downgrades, null for full revocation
+        encryptedRecordTitle?: string;
+        encryptedRecordTitleIv?: string;
+      };
+    }
+
   // ── Record requests ───────────────────────────────────────────────────────
   | {
       type: 'RECORD_REQUEST_RECEIVED';

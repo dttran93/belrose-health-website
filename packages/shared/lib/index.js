@@ -22,3 +22,4 @@ __exportStar(require("./aiImageAnalysis"), exports);
 __exportStar(require("./blockchain"), exports);
 __exportStar(require("./aiChat"), exports);
 __exportStar(require("./notifications"), exports);
+__exportStar(require("./permissions"), exports);

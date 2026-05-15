@@ -55,20 +55,8 @@ exports.deleteOldNotifications = deleteOldNotifications;
  *   NOTIFICATION_SOURCE — callers never pass it explicitly.
  */
 const admin = __importStar(require("firebase-admin"));
-exports.NOTIFICATION_MAPPING = {
-    RECORD_EDITED: 'recordEditing',
-    SUBJECT_REQUEST_RECEIVED: 'subjectRequests',
-    SUBJECT_ACCEPTED: 'subjectRequests',
-    REJECTION_PENDING_CREATOR_DECISION: 'subjectRequests',
-    REJECTION_ACKNOWLEDGED: 'subjectRequests',
-    REJECTION_ESCALATED: 'subjectRequests',
-    RECORD_DELETED: 'recordDeletion',
-    RECORD_REQUEST_RECEIVED: 'recordRequests',
-    RECORD_REQUEST_VIEWED: 'recordRequests',
-    RECORD_REQUEST_FULFILLED: 'recordRequests',
-    RECORD_REQUEST_DENIED: 'recordRequests',
-    GENERIC_NOTIFICATION: 'system',
-};
+const _shared_1 = require("@/_shared");
+exports.NOTIFICATION_MAPPING = Object.fromEntries(Object.entries(_shared_1.NOTIFICATION_CATEGORIES).flatMap(([category, { notificationTypes }]) => notificationTypes.map(type => [type, category])));
 function getFirestore() {
     return admin.firestore();
 }

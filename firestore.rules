@@ -642,6 +642,25 @@ service cloud.firestore {
           resource.data.grantedBy == request.auth.uid
       );
     }
+    
+    // ============================================
+    // PERMISSION CHANGE EVENT LOG
+    // ============================================
+    match /permissionChangeEvents/{eventId} {
+
+      // Create: must be authenticated and have a role on the record
+      // changedBy must match the authenticated user — can't write events on behalf of others
+      allow create: if request.auth != null
+        && request.resource.data.changedBy == request.auth.uid
+        && hasRoleOnRecord(request.resource.data.recordId);
+
+      // Read: must be authenticated and have a role on the record
+      allow read: if request.auth != null
+        && hasRoleOnRecord(resource.data.recordId);
+
+      // Update/Delete: nobody — audit log is immutable
+      allow update, delete: if false;
+    }
 
     // ============================================
     // TRUSTEE RELATIONSHIPS

@@ -13,6 +13,9 @@ import { BlockchainRoleManagerService } from './blockchainRoleManagerService';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
 import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 import { SubjectRole } from '@/features/Subject/hooks/useSubjectFlow';
+import writePermissionChangeEvent from './writePermissionChangeEvent';
+import { buildMemberRegistryRef } from '@/config/blockchainAddresses';
+import { BlockchainRef } from '@belrose/shared';
 
 export type Role = 'owner' | 'administrator' | 'viewer';
 
@@ -189,9 +192,17 @@ export class PermissionsService {
     console.log('🔄 Granting viewer access:', targetUserId);
 
     // Step 1: Grant viewer role on blockchain
+
+    let blockchainRef: BlockchainRef;
+
     try {
       console.log('🔗 Granting viewer role on blockchain...');
-      await BlockchainRoleManagerService.grantRole(recordId, targetWalletAddress, 'viewer');
+      const tx = await BlockchainRoleManagerService.grantRole(
+        recordId,
+        targetWalletAddress,
+        'viewer'
+      );
+      blockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
       console.log('✅ Blockchain: Viewer role granted');
     } catch (blockchainError) {
       console.error('⚠️ Blockchain update failed:', blockchainError);
@@ -220,11 +231,25 @@ export class PermissionsService {
     // Step 2: Grant encryption access
     await SharingService.grantEncryptionAccess(recordId, targetUserId, currentUser.uid);
 
-    // Step 3: Add to viewers array in Firebase
+    // Step 3: Write event log for audit/notification purposes
+    await writePermissionChangeEvent(
+      recordId,
+      currentUser.uid,
+      [
+        {
+          userId: targetUserId,
+          action: 'granted', //Always granted, you never upgrade to viewer
+          previousRole: existingRole ?? null,
+          newRole: 'viewer',
+        },
+      ],
+      blockchainRef
+    );
+
+    // Step 4: Add to viewers array in Firebase
     await updateDoc(recordRef, {
       viewers: arrayUnion(targetUserId),
     });
-    console.log('✅ Added to viewers array in Firebase');
 
     console.log('✅ Viewer access granted successfully');
   }
@@ -304,6 +329,7 @@ export class PermissionsService {
 
     // Step 1: Blockchain - determine action based on existing role
     // changeRole is in case they're being upgraded from viewer to admin
+    let blockchainRef: BlockchainRef;
     const hasExistingRole = existingRole !== null;
 
     try {
@@ -312,17 +338,19 @@ export class PermissionsService {
       );
 
       if (hasExistingRole) {
-        await BlockchainRoleManagerService.changeRole(
+        const tx = await BlockchainRoleManagerService.changeRole(
           recordId,
           targetWalletAddress,
           'administrator'
         );
+        blockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
       } else {
-        await BlockchainRoleManagerService.grantRole(
+        const tx = await BlockchainRoleManagerService.grantRole(
           recordId,
           targetWalletAddress,
           'administrator'
         );
+        blockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
       }
 
       console.log('✅ Blockchain: Administrator role set');
@@ -353,12 +381,33 @@ export class PermissionsService {
     // Step 2: Grant encryption access
     await SharingService.grantEncryptionAccess(recordId, targetUserId, currentUser.uid);
 
-    // Step 3: Update arrays - add to admins, remove from viewers (highest role only)
+    // Step 3: Write event log
+    await writePermissionChangeEvent(
+      recordId,
+      currentUser.uid,
+      [
+        hasExistingRole
+          ? {
+              userId: targetUserId,
+              action: 'upgraded' as const,
+              previousRole: existingRole as Role, // narrowed — hasExistingRole guarantees non-null
+              newRole: 'administrator' as const,
+            }
+          : {
+              userId: targetUserId,
+              action: 'granted' as const,
+              previousRole: null,
+              newRole: 'administrator' as const,
+            },
+      ],
+      blockchainRef
+    );
+
+    // Step 4: Update arrays - add to admins, remove from viewers (highest role only)
     await updateDoc(recordRef, {
       administrators: arrayUnion(targetUserId),
       viewers: arrayRemove(targetUserId),
     });
-    console.log('✅ Added to administrators array');
 
     console.log('✅ Administrator access granted successfully');
   }
@@ -437,6 +486,7 @@ export class PermissionsService {
     console.log('🔄 Granting owner access:', targetUserId);
 
     // Step 1: Blockchain - determine action based on existing role
+    let blockchainRef: BlockchainRef;
     const hasExistingRole = existingRole !== null;
 
     try {
@@ -445,9 +495,19 @@ export class PermissionsService {
       );
 
       if (hasExistingRole) {
-        await BlockchainRoleManagerService.changeRole(recordId, targetWalletAddress, 'owner');
+        const tx = await BlockchainRoleManagerService.changeRole(
+          recordId,
+          targetWalletAddress,
+          'owner'
+        );
+        blockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
       } else {
-        await BlockchainRoleManagerService.grantRole(recordId, targetWalletAddress, 'owner');
+        const tx = await BlockchainRoleManagerService.grantRole(
+          recordId,
+          targetWalletAddress,
+          'owner'
+        );
+        blockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
       }
 
       console.log('✅ Blockchain: Owner role set');
@@ -476,13 +536,34 @@ export class PermissionsService {
     // Step 2: Grant encryption access
     await SharingService.grantEncryptionAccess(recordId, targetUserId, currentUser.uid);
 
-    // Step 3: Update arrays - add to owners, remove from lower roles (highest role only)
+    // Step 3: Write event log
+    await writePermissionChangeEvent(
+      recordId,
+      currentUser.uid,
+      [
+        hasExistingRole
+          ? {
+              userId: targetUserId,
+              action: 'upgraded' as const,
+              previousRole: existingRole as Role,
+              newRole: 'owner' as const,
+            }
+          : {
+              userId: targetUserId,
+              action: 'granted' as const,
+              previousRole: null,
+              newRole: 'owner' as const,
+            },
+      ],
+      blockchainRef
+    );
+
+    // Step 4: Update arrays - add to owners, remove from lower roles (highest role only)
     await updateDoc(recordRef, {
       owners: arrayUnion(targetUserId),
       administrators: arrayRemove(targetUserId),
       viewers: arrayRemove(targetUserId),
     });
-    console.log('✅ Added to owners array');
 
     console.log('✅ Owner access granted successfully');
   }
@@ -563,9 +644,12 @@ export class PermissionsService {
     console.log('🔄 Removing viewer access:', targetUserId);
 
     // Step 1: Revoke role on blockchain
+    let blockchainRef: BlockchainRef;
+
     try {
       console.log('🔗 Revoking role on blockchain...');
-      await BlockchainRoleManagerService.revokeRole(recordId, targetWalletAddress);
+      const tx = await BlockchainRoleManagerService.revokeRole(recordId, targetWalletAddress);
+      blockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
       console.log('✅ Blockchain: Role revoked');
     } catch (blockchainError) {
       console.error('⚠️ Blockchain update failed:', blockchainError);
@@ -594,11 +678,25 @@ export class PermissionsService {
     // Step 2: Revoke encryption access
     await SharingService.revokeEncryptionAccess(recordId, targetUserId, currentUser.uid);
 
-    // Step 3: Remove from viewers array
+    // Step 3: Write event log
+    await writePermissionChangeEvent(
+      recordId,
+      currentUser.uid,
+      [
+        {
+          userId: targetUserId,
+          action: 'revoked',
+          previousRole: 'viewer',
+          newRole: null,
+        },
+      ],
+      blockchainRef
+    );
+
+    // Step 4: Remove from viewers array
     await updateDoc(recordRef, {
       viewers: arrayRemove(targetUserId),
     });
-    console.log('✅ Removed from viewers array');
 
     console.log('✅ Viewer access removed successfully');
   }
@@ -682,14 +780,22 @@ export class PermissionsService {
     const demoteToViewer = options?.demoteToViewer ?? false;
 
     // Step 1: Update blockchain
+    let blockchainRef: BlockchainRef;
+
     try {
       if (demoteToViewer) {
         console.log('🔗 Demoting to viewer on blockchain...');
-        await BlockchainRoleManagerService.changeRole(recordId, targetWalletAddress, 'viewer');
+        const tx = await BlockchainRoleManagerService.changeRole(
+          recordId,
+          targetWalletAddress,
+          'viewer'
+        );
+        blockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
         console.log('✅ Blockchain: Demoted to viewer');
       } else {
         console.log('🔗 Revoking role on blockchain...');
-        await BlockchainRoleManagerService.revokeRole(recordId, targetWalletAddress);
+        const tx = await BlockchainRoleManagerService.revokeRole(recordId, targetWalletAddress);
+        blockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
         console.log('✅ Blockchain: Role revoked');
       }
     } catch (blockchainError) {
@@ -716,7 +822,29 @@ export class PermissionsService {
       throw blockchainError;
     }
 
-    // Step 2: Update Firestore arrays
+    // Step 2: Write event log
+    await writePermissionChangeEvent(
+      recordId,
+      currentUser.uid,
+      [
+        demoteToViewer
+          ? {
+              userId: targetUserId,
+              action: 'downgraded' as const,
+              previousRole: 'administrator' as const,
+              newRole: 'viewer' as const,
+            }
+          : {
+              userId: targetUserId,
+              action: 'revoked' as const,
+              previousRole: 'administrator' as const,
+              newRole: null,
+            },
+      ],
+      blockchainRef
+    );
+
+    // Step 3: Update Firestore arrays and encryption access if applicable
     if (demoteToViewer) {
       await updateDoc(recordRef, {
         administrators: arrayRemove(targetUserId),
@@ -811,15 +939,22 @@ export class PermissionsService {
 
     // Step 1: Update blockchain - both operations need to succeed together
     // Owners must use voluntarilyRemoveOwnOwnership, if one works but the other doesn't, user is stuck
+    let blockchainRef: BlockchainRef;
+
     try {
-      console.log('🔗 Removing ownership on blockchain...');
-      await BlockchainRoleManagerService.voluntarilyLeaveOwnership(recordId);
+      const leaveTx = await BlockchainRoleManagerService.voluntarilyLeaveOwnership(recordId);
+      blockchainRef = buildMemberRegistryRef(leaveTx.txHash, leaveTx.blockNumber);
       console.log('✅ Blockchain: Ownership removed');
 
       // If demoting, need to grant the new role
       if (demoteTo) {
         console.log(`🔗 Demoting to ${demoteTo} on blockchain...`);
-        await BlockchainRoleManagerService.grantRole(recordId, targetWalletAddress, demoteTo);
+        const demoteTx = await BlockchainRoleManagerService.grantRole(
+          recordId,
+          targetWalletAddress,
+          demoteTo
+        );
+        blockchainRef = buildMemberRegistryRef(demoteTx.txHash, demoteTx.blockNumber);
         console.log(`✅ Blockchain: Demoted to ${demoteTo}`);
       }
     } catch (blockchainError) {
@@ -845,6 +980,28 @@ export class PermissionsService {
 
       throw blockchainError;
     }
+
+    // Step 2: Write event log
+    await writePermissionChangeEvent(
+      recordId,
+      currentUser.uid,
+      [
+        demoteTo
+          ? {
+              userId: targetUserId,
+              action: 'downgraded' as const,
+              previousRole: 'owner' as const,
+              newRole: demoteTo, // Role — non-null, TypeScript is happy
+            }
+          : {
+              userId: targetUserId,
+              action: 'revoked' as const,
+              previousRole: 'owner' as const,
+              newRole: null, // null — matches revoked member
+            },
+      ],
+      blockchainRef
+    );
 
     // Step 3: Update Firestore arrays
     if (demoteTo === 'administrator') {
@@ -907,7 +1064,7 @@ export class PermissionsService {
     // to the blockchain call. The contract also validates but we want to avoid
     // a failed tx that wastes gas on the sponsored paymaster.
 
-    const eligible: { recordId: string; role: Role }[] = [];
+    const eligible: { recordId: string; role: Role; existingRole: Role | null }[] = [];
 
     for (let i = 0; i < recordIds.length; i++) {
       const recordId = recordIds[i];
@@ -954,7 +1111,7 @@ export class PermissionsService {
         continue;
       }
 
-      eligible.push({ recordId, role });
+      eligible.push({ recordId, role, existingRole });
     }
 
     if (eligible.length === 0) {
@@ -963,12 +1120,15 @@ export class PermissionsService {
     }
 
     // ── Step 1: Single blockchain transaction for all eligible records ────────
+    let batchBlockchainRef: BlockchainRef;
+
     try {
-      await BlockchainRoleManagerService.grantRoleBatch(
+      const tx = await BlockchainRoleManagerService.grantRoleBatch(
         eligible.map(e => e.recordId),
         targetWalletAddress,
         eligible.map(e => e.role)
       );
+      batchBlockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
       console.log(`✅ Blockchain: batch grant complete (${eligible.length} records)`);
     } catch (blockchainError) {
       const errorMessage =
@@ -995,10 +1155,32 @@ export class PermissionsService {
     const succeededRecordIds: string[] = [];
 
     await Promise.all(
-      eligible.map(async ({ recordId, role }) => {
+      eligible.map(async ({ recordId, role, existingRole }) => {
         try {
           // Encryption access
           await SharingService.grantEncryptionAccess(recordId, targetUserId, currentUser.uid);
+
+          // Write event log per record
+          await writePermissionChangeEvent(
+            recordId,
+            currentUser.uid,
+            [
+              existingRole
+                ? {
+                    userId: targetUserId,
+                    action: 'upgraded' as const,
+                    previousRole: existingRole, // already Role since existingRole is truthy
+                    newRole: role,
+                  }
+                : {
+                    userId: targetUserId,
+                    action: 'granted' as const,
+                    previousRole: null,
+                    newRole: role,
+                  },
+            ],
+            batchBlockchainRef
+          );
 
           // Firestore role arrays
           const recordRef = doc(db, 'records', recordId);
@@ -1091,8 +1273,11 @@ export class PermissionsService {
       }
 
       // Step 1: Revoke on blockchain
+      let blockchainRef: BlockchainRef;
+
       try {
-        await BlockchainRoleManagerService.revokeRole(recordId, targetWalletAddress);
+        const tx = await BlockchainRoleManagerService.revokeRole(recordId, targetWalletAddress);
+        blockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
       } catch (blockchainError) {
         const errorMessage =
           blockchainError instanceof Error ? blockchainError.message : String(blockchainError);
@@ -1117,7 +1302,22 @@ export class PermissionsService {
       // Step 2: Revoke encryption access
       await SharingService.revokeEncryptionAccess(recordId, targetUserId, currentUser.uid);
 
-      // Step 3: Remove from Firestore arrays
+      // Step 3: Write event log
+      await writePermissionChangeEvent(
+        recordId,
+        currentUser.uid,
+        [
+          {
+            userId: targetUserId,
+            action: 'revoked',
+            previousRole: existingRole,
+            newRole: null,
+          },
+        ],
+        blockchainRef
+      );
+
+      // Step 4: Remove from Firestore arrays
       await updateDoc(recordRef, {
         owners: arrayRemove(targetUserId),
         administrators: arrayRemove(targetUserId),
@@ -1201,8 +1401,15 @@ export class PermissionsService {
       }
 
       // Step 1: Change role on blockchain
+      let blockchainRef: BlockchainRef;
+
       try {
-        await BlockchainRoleManagerService.changeRole(recordId, targetWalletAddress, newRole);
+        const tx = await BlockchainRoleManagerService.changeRole(
+          recordId,
+          targetWalletAddress,
+          newRole
+        );
+        blockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
       } catch (blockchainError) {
         const errorMessage =
           blockchainError instanceof Error ? blockchainError.message : String(blockchainError);
@@ -1231,7 +1438,24 @@ export class PermissionsService {
         await SharingService.grantEncryptionAccess(recordId, targetUserId, currentUser.uid);
       }
 
-      // Step 3: Update Firestore arrays
+      // Step 3: Write event log
+      const roleOrder = { viewer: 0, administrator: 1, owner: 2 };
+
+      await writePermissionChangeEvent(
+        recordId,
+        currentUser.uid,
+        [
+          {
+            userId: targetUserId,
+            action: roleOrder[newRole] > roleOrder[existingRole] ? 'upgraded' : 'downgraded',
+            previousRole: existingRole,
+            newRole: newRole,
+          },
+        ],
+        blockchainRef
+      );
+
+      // Step 4: Update Firestore arrays
       const update: Record<string, unknown> = {};
       if (newRole === 'owner') {
         update.owners = arrayUnion(targetUserId);
