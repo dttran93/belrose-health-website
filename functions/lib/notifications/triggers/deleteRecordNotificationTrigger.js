@@ -18,6 +18,9 @@ exports.onRecordDeletionEventUpdated = exports.onRecordDeletionEventCreated = vo
  */
 const firestore_1 = require("firebase-functions/v2/firestore");
 const notificationUtils_1 = require("../notificationUtils");
+const resend_1 = require("resend");
+const emailUtils_1 = require("../emailUtils");
+const recordDeletionEmailTemplates_1 = require("../emails/recordDeletionEmailTemplates");
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -65,6 +68,12 @@ exports.onRecordDeletionEventCreated = (0, firestore_1.onDocumentCreated)('recor
             deletedBy: data.deletedBy,
         },
     });
+    const resend = new resend_1.Resend(emailUtils_1.resendKey.value());
+    await Promise.all(affectedUserIds.map(uid => (0, emailUtils_1.sendEmailIfEnabled)(uid, 'RECORD_DELETED', {
+        subject: `${deleterName} deleted a record you had access to`,
+        html: (0, recordDeletionEmailTemplates_1.buildRecordDeletedHtml)(deleterName, recordName),
+        text: (0, recordDeletionEmailTemplates_1.buildRecordDeletedText)(deleterName, recordName),
+    }, resend)));
     console.log(`✅ Deletion notifications sent to ${affectedUserIds.length} user(s) for record: ${recordId}`);
 });
 // ============================================================================

@@ -17,7 +17,6 @@ exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated 
  *    - Rejected requests (notifies requester)
  * - Subject removals after acceptance (notifies record owners/creators)
  * - Creator responses to rejections (notifies subject)
-
  */
 const firestore_1 = require("firebase-functions/v2/firestore");
 const firestore_2 = require("firebase-admin/firestore");
@@ -96,7 +95,6 @@ exports.onSubjectConsentRequestCreated = (0, firestore_1.onDocumentCreated)({ do
         return;
     }
     const requesterName = await (0, notificationUtils_1.getUserDisplayName)(data.requestedBy);
-    const subjectName = await (0, notificationUtils_1.getUserDisplayName)(data.subjectId);
     const recordName = data.recordTitle || (await (0, notificationUtils_1.getRecordDisplayName)(data.recordId));
     await (0, notificationUtils_1.createNotification)(data.subjectId, {
         type: 'SUBJECT_REQUEST_RECEIVED',
@@ -139,10 +137,9 @@ exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)('sub
     console.log(`🔄 Consent request ${requestId} updated`);
     const recordName = afterData.recordTitle || (await (0, notificationUtils_1.getRecordDisplayName)(afterData.recordId));
     const recordId = afterData.recordId;
-    const requesterName = await (0, notificationUtils_1.getUserDisplayName)(beforeData.requestedBy);
     const subjectName = await (0, notificationUtils_1.getUserDisplayName)(afterData.subjectId);
     // ========================================================================
-    // CASE 1: Status changed from pending → accepted
+    // TRIGGER 2a: Request Accepted: Status changed from pending → accepted
     // ========================================================================
     if (beforeData.status === 'pending' && afterData.status === 'accepted') {
         console.log(`✅ Request accepted: ${requestId}`);
@@ -165,7 +162,7 @@ exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)('sub
         return;
     }
     // ========================================================================
-    // CASE 2: Status changed from pending → rejected (initial rejection)
+    // TRIGGER 2B: Status changed from pending → rejected (initial rejection)
     // ========================================================================
     if (beforeData.status === 'pending' && afterData.status === 'rejected') {
         console.log(`❌ Request rejected: ${requestId}`);
@@ -189,14 +186,14 @@ exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)('sub
         return;
     }
     // ========================================================================
-    // CASE 3: Rejection data added (subject removed after acceptance)
+    // TRIGGER 2B: Rejection data added (subject removed after acceptance)
     // This happens when someone accepted, then later removed themselves
     // ========================================================================
     if (isNewRejection(beforeData, afterData)) {
         console.log(`🚫 Subject removal detected: ${requestId}`);
         const rejection = afterData.rejection;
         // Only notify for removals after acceptance (not initial rejections)
-        if (rejection.rejectionType === 'removed_after_acceptance') {
+        if (rejection?.rejectionType === 'removed_after_acceptance') {
             const recordData = await getRecordData(afterData.recordId);
             if (!recordData) {
                 console.log('⚠️ Could not fetch record data for notifications');
@@ -225,14 +222,16 @@ exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)('sub
         return;
     }
     // ========================================================================
-    // CASE 4: Creator responded to rejection
+    // TRIGGER 3: Creator responded to rejection
     // ========================================================================
     if (isNewCreatorResponse(beforeData, afterData)) {
         console.log(`📋 Creator responded to rejection: ${requestId}`);
         const rejection = afterData.rejection;
         const creatorResponse = rejection?.creatorResponse;
         const isEscalated = creatorResponse?.status === 'escalated';
-        const notificationType = creatorResponse?.status === 'escalated' ? 'REJECTION_ESCALATED' : 'REJECTION_ACKNOWLEDGED';
+        const notificationType = isEscalated
+            ? 'REJECTION_ESCALATED'
+            : 'REJECTION_ACKNOWLEDGED';
         const message = creatorResponse?.status === 'escalated'
             ? `The record creator has escalated your subject status removal for: ${recordName} to Belrose.`
             : `The record creator has acknowledged your subject status removal for: ${recordName}.`;

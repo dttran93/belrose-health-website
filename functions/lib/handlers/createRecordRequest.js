@@ -159,7 +159,7 @@ exports.createRecordRequest = (0, https_1.onCall)({ secrets: [resendKey] }, asyn
         status: 'pending',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         deadline: admin.firestore.Timestamp.fromDate(deadline),
-        fulfilledRecordId: null,
+        fulfilledRecordIds: null,
     };
     const docRef = db.collection('recordRequests').doc(inviteCode);
     await docRef.set(requestDoc);

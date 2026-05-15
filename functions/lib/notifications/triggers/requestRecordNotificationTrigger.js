@@ -4,11 +4,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.onRecordRequestUpdated = exports.onRecordRequestCreated = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const notificationUtils_1 = require("../notificationUtils");
+const emailUtils_1 = require("../emailUtils");
+const recordRequestEmailTemplate_1 = require("../emails/recordRequestEmailTemplate");
+const resend_1 = require("resend");
 /**
- * Triggered when a new Record Request is created.
- * Note: The actual EMAIL to the provider is usually sent by the
- * Callable Function that creates the doc, but we can trigger
- * an in-app notification here if the target is an existing user.
+ * Triggered when a new Record Request is created. Sent to the target user in-app and their email.
  */
 exports.onRecordRequestCreated = (0, firestore_1.onDocumentCreated)('recordRequests/{requestId}', async (event) => {
     const data = event.data?.data();
@@ -21,6 +21,7 @@ exports.onRecordRequestCreated = (0, firestore_1.onDocumentCreated)('recordReque
         link: `/fulfill-request?code=${data.inviteCode}`,
         payload: { requestId: data.inviteCode, requestedBy: data.requesterId },
     });
+    //Email notification sent through createRecordRequests (request landing portal covers both users and guests).
 });
 /**
  * Triggered when a Record Request is updated.
@@ -29,6 +30,7 @@ exports.onRecordRequestCreated = (0, firestore_1.onDocumentCreated)('recordReque
 exports.onRecordRequestUpdated = (0, firestore_1.onDocumentUpdated)('recordRequests/{requestId}', async (event) => {
     const before = event.data?.before.data();
     const after = event.data?.after.data();
+    const resend = new resend_1.Resend(emailUtils_1.resendKey.value());
     if (!before || !after)
         return;
     const requestId = event.params.requestId;
@@ -40,6 +42,11 @@ exports.onRecordRequestUpdated = (0, firestore_1.onDocumentUpdated)('recordReque
             link: `/app/requests`, // Link to their dashboard
             payload: { requestId },
         });
+        await (0, emailUtils_1.sendEmailIfEnabled)(after.requesterId, 'RECORD_REQUEST_VIEWED', {
+            subject: `Your record request to ${after.targetEmail} has been opened`,
+            html: (0, recordRequestEmailTemplate_1.buildRecordRequestViewedHtml)(after.targetEmail),
+            text: (0, recordRequestEmailTemplate_1.buildRecordRequestViewedText)(after.targetEmail),
+        }, resend);
         return;
     }
     // CASE 2: Fulfilled
@@ -52,6 +59,11 @@ exports.onRecordRequestUpdated = (0, firestore_1.onDocumentUpdated)('recordReque
                 : `/app/requests`,
             payload: { requestId, recordIds: after.fulfilledRecordIds },
         });
+        await (0, emailUtils_1.sendEmailIfEnabled)(after.requesterId, 'RECORD_REQUEST_FULFILLED', {
+            subject: `Your records have been uploaded by ${after.targetEmail}`,
+            html: (0, recordRequestEmailTemplate_1.buildRecordRequestFulfilledHtml)(after.targetEmail, after.fulfilledRecordIds?.[0] ?? null),
+            text: (0, recordRequestEmailTemplate_1.buildRecordRequestFulfilledText)(after.targetEmail, after.fulfilledRecordIds?.[0] ?? null),
+        }, resend);
         return;
     }
     // CASE 3: Denied
@@ -63,6 +75,11 @@ exports.onRecordRequestUpdated = (0, firestore_1.onDocumentUpdated)('recordReque
             link: `/app/requests`,
             payload: { requestId, deniedReason: after.deniedReason },
         });
+        await (0, emailUtils_1.sendEmailIfEnabled)(after.requesterId, 'RECORD_REQUEST_DENIED', {
+            subject: `${after.targetEmail} declined your record request`,
+            html: (0, recordRequestEmailTemplate_1.buildRecordRequestDeniedHtml)(after.targetEmail, after.deniedReason),
+            text: (0, recordRequestEmailTemplate_1.buildRecordRequestDeniedText)(after.targetEmail, after.deniedReason),
+        }, resend);
         return;
     }
 });

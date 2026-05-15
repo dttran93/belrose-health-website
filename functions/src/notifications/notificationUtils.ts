@@ -15,7 +15,7 @@
 import * as admin from 'firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { SubjectRejectionType } from '../notifications/triggers/subjectNotificationTrigger';
-import { NotificationCategory } from '@/_shared';
+import { NOTIFICATION_CATEGORIES, NotificationCategory } from '@/_shared';
 
 // ============================================================================
 // TYPES
@@ -129,20 +129,11 @@ export type NotificationDoc =
 
 export type NotificationType = NotificationDoc['type'];
 
-export const NOTIFICATION_MAPPING: Record<NotificationType, NotificationCategory> = {
-  RECORD_EDITED: 'recordEditing',
-  SUBJECT_REQUEST_RECEIVED: 'subjectRequests',
-  SUBJECT_ACCEPTED: 'subjectRequests',
-  REJECTION_PENDING_CREATOR_DECISION: 'subjectRequests',
-  REJECTION_ACKNOWLEDGED: 'subjectRequests',
-  REJECTION_ESCALATED: 'subjectRequests',
-  RECORD_DELETED: 'recordDeletion',
-  RECORD_REQUEST_RECEIVED: 'recordRequests',
-  RECORD_REQUEST_VIEWED: 'recordRequests',
-  RECORD_REQUEST_FULFILLED: 'recordRequests',
-  RECORD_REQUEST_DENIED: 'recordRequests',
-  GENERIC_NOTIFICATION: 'system',
-};
+export const NOTIFICATION_MAPPING = Object.fromEntries(
+  Object.entries(NOTIFICATION_CATEGORIES).flatMap(([category, { notificationTypes }]) =>
+    notificationTypes.map(type => [type, category])
+  )
+) as Record<NotificationType, NotificationCategory>;
 
 export type CreateNotificationInput = NotificationDoc & {
   message: string;
