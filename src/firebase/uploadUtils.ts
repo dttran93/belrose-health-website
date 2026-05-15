@@ -401,6 +401,14 @@ export const updateFirestoreRecord = async (
     console.log('🔗 Record hash updated. New history length:', previousHashes.length);
 
     // 8. Create version history
+    const recordTitle =
+      updateData.belroseFields?.title ||
+      existingPlaintext.belroseFields.title ||
+      updateData.fileName ||
+      existingPlaintext.fileName;
+
+    console.log('📝 Creating version history with title:', recordTitle);
+
     const encryptedUpdatedFileObject = {
       ...currentData,
       ...filteredData,
@@ -411,7 +419,12 @@ export const updateFirestoreRecord = async (
       const { VersionControlService } =
         await import('@/features/ViewEditRecord/services/versionControlService');
       const versionService = new VersionControlService();
-      await versionService.createVersion(documentId, encryptedUpdatedFileObject, commitMessage);
+      await versionService.createVersion(
+        documentId,
+        encryptedUpdatedFileObject,
+        recordTitle,
+        commitMessage
+      );
       console.log('✅ Version history created');
     } catch (versionError) {
       console.warn('⚠️ Failed to create version history:', versionError);

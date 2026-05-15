@@ -22,15 +22,15 @@ import {
   onVerificationRevoked,
 } from './credibilityScoreService';
 import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
-import { BlockchainRef } from '@belrose/shared';
+import { VerificationDoc, VerificationLevelOptions } from '@belrose/shared';
 import { buildHealthRecordRef } from '@/config/blockchainAddresses';
+import { encryptNotificationTitle } from '@/features/Notifications/services/encryptNotificationTitle';
 
 // ============================================================
 // TYPES
 // ============================================================
 
 export type VerificationLevel = 0 | 1 | 2 | 3;
-export type VerificationLevelOptions = 1 | 2 | 3;
 export type VerificationLevelOptionName = 'Provenance' | 'Content' | 'Full';
 
 export interface VerificationConfig {
@@ -39,20 +39,6 @@ export interface VerificationConfig {
   icon: LucideIcon;
   description: string;
   declarative: string;
-}
-
-export interface VerificationDoc {
-  id: string;
-  recordHash: string;
-  recordId: string;
-  verifierId: string;
-  verifierIdHash: string;
-  level: VerificationLevelOptions;
-  isActive: boolean;
-  createdAt: Timestamp;
-  lastModified?: Timestamp;
-  chainStatus: 'pending' | 'confirmed' | 'failed';
-  blockchainRef?: BlockchainRef;
 }
 
 // ============================================================
@@ -182,7 +168,8 @@ export async function createVerification(
   recordId: string,
   recordHash: string,
   verifierId: string,
-  level: VerificationLevelOptions
+  level: VerificationLevelOptions,
+  recordTitle?: string
 ): Promise<string> {
   const db = getFirestore();
 
@@ -224,6 +211,8 @@ export async function createVerification(
 
   console.log('🔄 Creating verification:', { recordId, recordHash, level });
 
+  const titleData = recordTitle ? await encryptNotificationTitle(recordTitle, recordId) : null;
+
   // Step 1: Write to blockchain
   try {
     console.log('🔗 Writing verification to blockchain...');
@@ -255,6 +244,7 @@ export async function createVerification(
         createdAt: Timestamp.now(),
         chainStatus: 'confirmed',
         blockchainRef,
+        ...(titleData ?? {}),
       });
       console.log('✅ Firestore: Verification created');
     }

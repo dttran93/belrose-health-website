@@ -1,7 +1,7 @@
 "use strict";
 // functions/src/notifications/triggers/deleteRecordNotificationTrigger.ts
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onRecordDeletionEventUpdated = exports.onRecordDeletionEventCreated = void 0;
+exports.onRecordDeletionEventCreated = void 0;
 /**
  * Record Deletion Notification Triggers
  *
@@ -11,10 +11,6 @@ exports.onRecordDeletionEventUpdated = exports.onRecordDeletionEventCreated = vo
  * Two triggers:
  * 1. onRecordDeletionEventCreated - watches recordDeletionEvents collection
  *    - Notifies all affected users (owners, admins, viewers) that the record was deleted
- *
- * 2. onRecordDeletionEventUpdated - watches recordDeletionEvents collection
- *    - Fires when deletionComplete flips to true (Firebase deletion finished)
- *    - Currently a no-op hook — reserved for any post-deletion follow-up if needed
  */
 const firestore_1 = require("firebase-functions/v2/firestore");
 const notificationUtils_1 = require("../notificationUtils");
@@ -58,7 +54,7 @@ exports.onRecordDeletionEventCreated = (0, firestore_1.onDocumentCreated)('recor
         return;
     }
     const deleterName = await (0, notificationUtils_1.getUserDisplayName)(data.deletedBy);
-    const recordName = data.recordTitle || `Record ${recordId.slice(0, 8)}...`;
+    const recordName = `Record ${recordId.slice(0, 8)}...`;
     await (0, notificationUtils_1.createNotificationForMultiple)(affectedUserIds, {
         type: 'RECORD_DELETED',
         message: `${deleterName} has permanently deleted the record: ${recordName}. You no longer have access to this record.`,
@@ -75,36 +71,5 @@ exports.onRecordDeletionEventCreated = (0, firestore_1.onDocumentCreated)('recor
         text: (0, recordDeletionEmailTemplates_1.buildRecordDeletedText)(deleterName, recordName),
     }, resend)));
     console.log(`✅ Deletion notifications sent to ${affectedUserIds.length} user(s) for record: ${recordId}`);
-});
-// ============================================================================
-// TRIGGER 2: DELETION EVENT UPDATED (deletionComplete → true)
-// ============================================================================
-/**
- * Triggered when a recordDeletionEvent document is updated.
- *
- * Currently handles the deletionComplete flag flipping to true, which means
- * the Firebase deletion (storage + Firestore + versions + keys) has finished.
- *
- * No additional notifications are sent at this point — users were already
- * notified on creation. This trigger is reserved for any future post-deletion
- * logic (e.g., analytics, audit logging, cascade cleanup).
- */
-exports.onRecordDeletionEventUpdated = (0, firestore_1.onDocumentUpdated)('recordDeletionEvents/{recordId}', async (event) => {
-    const recordId = event.params.recordId;
-    const beforeData = event.data?.before.data();
-    const afterData = event.data?.after.data();
-    if (!beforeData || !afterData) {
-        console.log('⚠️ No data to compare, skipping');
-        return;
-    }
-    // ========================================================================
-    // CASE 1: Deletion marked complete
-    // ========================================================================
-    if (!beforeData.deletionComplete && afterData.deletionComplete) {
-        console.log(`✅ Record deletion fully complete: ${recordId}`);
-        // Reserved for future post-deletion logic
-        return;
-    }
-    console.log('📭 No relevant changes detected on deletion event');
 });
 //# sourceMappingURL=deleteRecordNotificationTrigger.js.map

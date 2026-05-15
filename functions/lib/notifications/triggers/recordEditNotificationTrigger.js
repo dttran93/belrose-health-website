@@ -75,21 +75,23 @@ exports.onRecordVersionCreated = (0, firestore_1.onDocumentCreated)({ document: 
     // In-app notifications
     await (0, notificationUtils_1.createNotificationForMultiple)(targets, {
         type: 'RECORD_EDITED',
-        message: `${editorName} made changes to ${recordName} (version ${data.versionNumber}).${data.commitMessage ? ` "${data.commitMessage}"` : ''}`,
+        message: `${editorName} made changes to ${recordName} (version ${data.versionNumber}).`,
         link: `/app/records/${data.recordId}`,
         payload: {
             recordId: data.recordId,
             versionId,
             versionNumber: data.versionNumber,
             editedBy: data.editedBy,
+            encryptedRecordTitle: data.encryptedRecordTitle,
+            encryptedRecordTitleIv: data.encryptedRecordTitleIv,
         },
     });
     // Emails
     const resend = new resend_1.Resend(resendKey.value());
     await Promise.all(targets.map(uid => (0, emailUtils_1.sendEmailIfEnabled)(uid, 'RECORD_EDITED', {
         subject: `${editorName} edited a record you're connected to`,
-        html: (0, recordEditEmailTemplate_1.buildRecordEditedHtml)(editorName, recordName, data.recordId, data.versionNumber, data.commitMessage),
-        text: (0, recordEditEmailTemplate_1.buildRecordEditedText)(editorName, recordName, data.recordId, data.versionNumber, data.commitMessage),
+        html: (0, recordEditEmailTemplate_1.buildRecordEditedHtml)(editorName, recordName, data.recordId, data.versionNumber),
+        text: (0, recordEditEmailTemplate_1.buildRecordEditedText)(editorName, recordName, data.recordId, data.versionNumber),
     }, resend)));
     console.log(`✅ Edit notifications sent to ${targets.length} stakeholder(s)`);
 });

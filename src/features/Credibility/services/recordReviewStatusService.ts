@@ -13,12 +13,10 @@
  * document already confirms on-chain status, and Firestore is faster.
  */
 
-import { getVerification, VerificationLevelOptions } from './verificationService';
-import {
-  getDisputesByRecordId,
-  getDisputeReactions,
-  DisputeSeverityOptions,
-} from './disputeService';
+import { getVerification } from './verificationService';
+import { getDisputesByRecordId, getDisputeReactions } from './disputeService';
+import { VerificationLevelOptions } from '../hooks/useCredibilityFlow';
+import { DisputeSeverityOptions } from '@belrose/shared';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

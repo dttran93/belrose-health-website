@@ -23,6 +23,7 @@ import { RecordDecryptionService } from '@/features/Encryption/services/recordDe
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
+import { encryptNotificationTitle } from '@/features/Notifications/services/encryptNotificationTitle';
 
 // ==================== VERSION ID UTILITIES ====================
 
@@ -101,6 +102,7 @@ export class VersionControlService {
   private async initializeVersioning(
     recordId: string,
     updatedRecord: FileObject,
+    recordTitle?: string,
     commitMessage?: string
   ): Promise<string> {
     if (!this.currentUser) throw new Error('User not authenticated');
@@ -125,12 +127,8 @@ export class VersionControlService {
     const version0: any = {
       recordId,
       versionNumber: 0,
-      //Uses original uploader's info, fall back to unknown user if necessary
-      editedBy: originalRecord.uploadedBy || 'Unknown User',
-      editedAt: originalRecord.uploadedAt || Timestamp.now(),
       commitMessage: 'Original Upload (auto-created baseline)',
       recordHash: originalRecord.recordHash || '',
-      // No changes in initial version (no previous version to diff against)
       encryptedChanges: null,
     };
 
@@ -156,7 +154,12 @@ export class VersionControlService {
     console.log('🆕 Continuing to Version 1...');
 
     //Delegate to createVersion for v1 now that v0 has been created
-    const version1Id = await this.createVersion(recordId, updatedRecord, commitMessage);
+    const version1Id = await this.createVersion(
+      recordId,
+      updatedRecord,
+      recordTitle,
+      commitMessage
+    );
     console.log('✅ Versioning initialized (V0 + V1 created)');
     return version1Id;
   }
@@ -167,6 +170,7 @@ export class VersionControlService {
   async createVersion(
     recordId: string,
     updatedRecord: FileObject,
+    recordTitle?: string,
     commitMessage?: string
   ): Promise<string> {
     if (!this.currentUser) throw new Error('User not authenticated');
@@ -221,6 +225,21 @@ export class VersionControlService {
         editedAt: Timestamp.now(),
         recordHash: updatedRecord.recordHash || '',
       };
+
+      // Encrypt the record title for notifications
+      const encryptedTitle = await encryptNotificationTitle(recordTitle || '', recordId);
+
+      console.log(
+        'Record title result:',
+        recordTitle,
+        '🔐 Encrypted title result:',
+        encryptedTitle
+      );
+
+      if (encryptedTitle) {
+        version.encryptedRecordTitle = encryptedTitle.encryptedRecordTitle;
+        version.encryptedRecordTitleIv = encryptedTitle.encryptedRecordTitleIv;
+      }
 
       // Encrypt changes if any exist
       if (changes.length > 0) {

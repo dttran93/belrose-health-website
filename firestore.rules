@@ -301,9 +301,21 @@ service cloud.firestore {
     match /recordVersions/{versionId} {
       allow read: if request.auth != null && hasRoleOnRecord(resource.data.recordId);
 
-      allow create: if request.auth != null && 
-        isAdminOrOwnerOfRecord(request.resource.data.recordId) &&
-        request.resource.data.editedBy == request.auth.uid;
+    allow create: if request.auth != null && 
+      isAdminOrOwnerOfRecord(request.resource.data.recordId) && (
+        // Path A: Strict Baseline Validation (Version 0)
+        (
+          request.resource.data.versionNumber == 0 &&
+          request.resource.data.encryptedChanges == null &&
+          request.resource.data.commitMessage == 'Original Upload (auto-created baseline)'
+        ) || 
+        
+        // Path B: Standard Edit Validation (Version 1+)
+        (
+          request.resource.data.versionNumber > 0 &&
+          request.resource.data.editedBy == request.auth.uid
+        )
+      );
 
       allow update: if false; // Versions are immutable
 

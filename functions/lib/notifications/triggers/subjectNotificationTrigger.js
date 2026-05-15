@@ -29,7 +29,6 @@ const subjectEmailTemplates_1 = require("../emails/subjectEmailTemplates");
 // CONSTANTS
 // ============================================================================
 const resendKey = (0, params_1.defineSecret)('RESEND_API_KEY');
-const resend = new resend_1.Resend(resendKey.value());
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -72,7 +71,7 @@ function isNewCreatorResponse(before, after) {
     const beforeStatus = before.rejection?.creatorResponse?.status;
     const afterStatus = after.rejection?.creatorResponse?.status;
     return (beforeStatus === 'pending_creator_decision' &&
-        (afterStatus === 'acknowledged' || afterStatus === 'escalated'));
+        (afterStatus === 'dropped' || afterStatus === 'escalated'));
 }
 // ============================================================================
 // TRIGGER 1: NEW CONSENT REQUEST CREATED
@@ -84,6 +83,7 @@ function isNewCreatorResponse(before, after) {
 exports.onSubjectConsentRequestCreated = (0, firestore_1.onDocumentCreated)({ document: 'subjectConsentRequests/{requestId}', secrets: [resendKey] }, async (event) => {
     const requestId = event.params.requestId;
     const data = event.data?.data();
+    const resend = new resend_1.Resend(resendKey.value());
     if (!data) {
         console.log('⚠️ No data in created document, skipping');
         return;
@@ -95,17 +95,19 @@ exports.onSubjectConsentRequestCreated = (0, firestore_1.onDocumentCreated)({ do
         return;
     }
     const requesterName = await (0, notificationUtils_1.getUserDisplayName)(data.requestedBy);
-    const recordName = data.recordTitle || (await (0, notificationUtils_1.getRecordDisplayName)(data.recordId));
+    const recordName = await (0, notificationUtils_1.formatRecordIdFallback)(data.recordId);
     await (0, notificationUtils_1.createNotification)(data.subjectId, {
         type: 'SUBJECT_REQUEST_RECEIVED',
         message: `${requesterName} has requested to set you as the subject of record: ${recordName}. Please review and respond.`,
-        link: `/app/records/${data.recordId}/review-subject-request`,
+        link: `/app/records/${data.recordId}?view=subject`,
         payload: {
             recordId: data.recordId,
             requestId,
             subjectId: data.subjectId,
             requestedBy: data.requestedBy,
             requestedSubjectRole: data.requestedSubjectRole,
+            encryptedRecordTitle: data.encryptedRecordTitle,
+            encryptedRecordTitleIv: data.encryptedRecordTitleIv,
         },
     });
     await (0, emailUtils_1.sendEmailIfEnabled)(data.subjectId, 'SUBJECT_REQUEST_RECEIVED', {
@@ -126,18 +128,20 @@ exports.onSubjectConsentRequestCreated = (0, firestore_1.onDocumentCreated)({ do
  * 2. Rejection data added (subject removed themselves after accepting)
  * 3. Creator response to rejection
  */
-exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)('subjectConsentRequests/{requestId}', async (event) => {
+exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)({ document: 'subjectConsentRequests/{requestId}', secrets: [resendKey] }, async (event) => {
     const requestId = event.params.requestId;
     const beforeData = event.data?.before.data();
     const afterData = event.data?.after.data();
+    const resend = new resend_1.Resend(resendKey.value());
     if (!beforeData || !afterData) {
         console.log('⚠️ No data to compare, skipping');
         return;
     }
     console.log(`🔄 Consent request ${requestId} updated`);
-    const recordName = afterData.recordTitle || (await (0, notificationUtils_1.getRecordDisplayName)(afterData.recordId));
+    const recordName = await (0, notificationUtils_1.formatRecordIdFallback)(afterData.recordId);
     const recordId = afterData.recordId;
     const subjectName = await (0, notificationUtils_1.getUserDisplayName)(afterData.subjectId);
+    const requesterName = await (0, notificationUtils_1.getUserDisplayName)(afterData.requestedBy);
     // ========================================================================
     // TRIGGER 2a: Request Accepted: Status changed from pending → accepted
     // ========================================================================
@@ -145,12 +149,14 @@ exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)('sub
         console.log(`✅ Request accepted: ${requestId}`);
         await (0, notificationUtils_1.createNotification)(afterData.requestedBy, {
             type: 'SUBJECT_ACCEPTED',
-            message: `${subjectName} has accepted your subject request for the record: ${recordName}.`,
+            message: `${subjectName} has accepted your subject request for ${recordName}.`,
             link: `/app/records/${afterData.recordId}`,
             payload: {
                 recordId: afterData.recordId,
                 requestId,
                 subjectId: afterData.subjectId,
+                encryptedRecordTitle: afterData.encryptedRecordTitle,
+                encryptedRecordTitleIv: afterData.encryptedRecordTitleIv,
             },
         });
         await (0, emailUtils_1.sendEmailIfEnabled)(afterData.requestedBy, 'SUBJECT_ACCEPTED', {
@@ -168,13 +174,15 @@ exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)('sub
         console.log(`❌ Request rejected: ${requestId}`);
         await (0, notificationUtils_1.createNotification)(afterData.requestedBy, {
             type: 'REJECTION_PENDING_CREATOR_DECISION',
-            message: `${subjectName} has declined to be set as the subject of record: ${recordName}.`,
-            link: `/app/records/${afterData.recordId}`,
+            message: `${subjectName} has declined to be set as the subject of ${recordName}.`,
+            link: `/app/records/${afterData.recordId}/?view=subject`,
             payload: {
                 recordId: afterData.recordId,
                 requestId,
                 subjectId: afterData.subjectId,
                 rejectionType: 'request_rejected',
+                encryptedRecordTitle: afterData.encryptedRecordTitle,
+                encryptedRecordTitleIv: afterData.encryptedRecordTitleIv,
             },
         });
         await (0, emailUtils_1.sendEmailIfEnabled)(afterData.requestedBy, 'REJECTION_PENDING_CREATOR_DECISION', {
@@ -203,13 +211,15 @@ exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)('sub
             const subjectName = await (0, notificationUtils_1.getUserDisplayName)(afterData.subjectId);
             await (0, notificationUtils_1.createNotificationForMultiple)(targets, {
                 type: 'REJECTION_PENDING_CREATOR_DECISION',
-                message: `Action Required: ${subjectName} has removed their subject status from record: ${recordName}. Please review and decide whether to publicly list this change.`,
-                link: `/app/records/${afterData.recordId}/review-rejection`,
+                message: `Action Required: ${subjectName} has removed their subject status from ${recordName}. Please review and decide whether to publicly list this change.`,
+                link: `/app/records/${afterData.recordId}/?view=subject`,
                 payload: {
                     recordId: afterData.recordId,
                     requestId,
                     subjectId: afterData.subjectId,
                     rejectionType: rejection.rejectionType,
+                    encryptedRecordTitle: afterData.encryptedRecordTitle,
+                    encryptedRecordTitleIv: afterData.encryptedRecordTitleIv,
                 },
             });
             await (0, emailUtils_1.sendEmailIfEnabled)(afterData.requestedBy, 'REJECTION_PENDING_CREATOR_DECISION', {
@@ -233,20 +243,22 @@ exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)('sub
             ? 'REJECTION_ESCALATED'
             : 'REJECTION_ACKNOWLEDGED';
         const message = creatorResponse?.status === 'escalated'
-            ? `The record creator has escalated your subject status removal for: ${recordName} to Belrose.`
-            : `The record creator has acknowledged your subject status removal for: ${recordName}.`;
+            ? `${requesterName} has escalated your subject status removal for: ${recordName} to Belrose.`
+            : `${requesterName} has acknowledged your subject status removal for: ${recordName}.`;
         await (0, notificationUtils_1.createNotification)(afterData.subjectId, {
             type: notificationType,
             message,
-            link: `/app/records/${afterData.recordId}`,
+            link: `/app/records/${afterData.recordId}?view=subject`,
             payload: {
                 recordId: afterData.recordId,
                 requestId,
                 subjectId: afterData.subjectId,
+                encryptedRecordTitle: afterData.encryptedRecordTitle,
+                encryptedRecordTitleIv: afterData.encryptedRecordTitleIv,
             },
         });
-        await (0, emailUtils_1.sendEmailIfEnabled)(afterData.requestedBy, notificationType, {
-            subject: `${subjectName} rejected your subject request`,
+        await (0, emailUtils_1.sendEmailIfEnabled)(afterData.subjectId, notificationType, {
+            subject: `${subjectName} has responded to your declining to be a subject`,
             html: (0, subjectEmailTemplates_1.buildCreatorResponseHtml)(recordName, recordId, isEscalated),
             text: (0, subjectEmailTemplates_1.buildCreatorResponseText)(recordName, recordId, isEscalated),
         }, resend);

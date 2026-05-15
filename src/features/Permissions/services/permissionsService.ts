@@ -32,16 +32,21 @@ export class PermissionsService {
    * @param role - The role to grant
    */
 
-  static grantRole = async (recordId: string, userId: string, role: SubjectRole): Promise<void> => {
+  static grantRole = async (
+    recordId: string,
+    userId: string,
+    role: SubjectRole,
+    recordTitle?: string
+  ): Promise<void> => {
     switch (role) {
       case 'owner':
-        await PermissionsService.grantOwner(recordId, userId);
+        await PermissionsService.grantOwner(recordId, userId, recordTitle);
         break;
       case 'administrator':
-        await PermissionsService.grantAdmin(recordId, userId);
+        await PermissionsService.grantAdmin(recordId, userId, recordTitle);
         break;
       case 'viewer':
-        await PermissionsService.grantViewer(recordId, userId);
+        await PermissionsService.grantViewer(recordId, userId, recordTitle);
         break;
     }
   };
@@ -119,7 +124,11 @@ export class PermissionsService {
    * @throws Error if operation fails or user doesn't have permission
    * Mirrors to blockchain as well. Creates retry queue entry if blockchain mirroring fails
    */
-  static async grantViewer(recordId: string, targetUserId: string): Promise<void> {
+  static async grantViewer(
+    recordId: string,
+    targetUserId: string,
+    recordTitle?: string
+  ): Promise<void> {
     const auth = getAuth();
     const currentUser = auth.currentUser;
 
@@ -243,7 +252,8 @@ export class PermissionsService {
           newRole: 'viewer',
         },
       ],
-      blockchainRef
+      blockchainRef,
+      recordTitle
     );
 
     // Step 4: Add to viewers array in Firebase
@@ -260,7 +270,11 @@ export class PermissionsService {
    * @param targetUserId - The user ID to add as administrator
    * @throws Error if operation fails or user doesn't have permission
    */
-  static async grantAdmin(recordId: string, targetUserId: string): Promise<void> {
+  static async grantAdmin(
+    recordId: string,
+    targetUserId: string,
+    recordTitle?: string
+  ): Promise<void> {
     const auth = getAuth();
     const currentUser = auth.currentUser;
 
@@ -400,7 +414,8 @@ export class PermissionsService {
               newRole: 'administrator' as const,
             },
       ],
-      blockchainRef
+      blockchainRef,
+      recordTitle
     );
 
     // Step 4: Update arrays - add to admins, remove from viewers (highest role only)
@@ -419,7 +434,11 @@ export class PermissionsService {
    * @throws Error if operation fails or user doesn't have permission
    * Mirrors to blockchain as well. Creates retry queue entry if blockchain mirroring fails
    */
-  static async grantOwner(recordId: string, targetUserId: string): Promise<void> {
+  static async grantOwner(
+    recordId: string,
+    targetUserId: string,
+    recordTitle?: string
+  ): Promise<void> {
     const auth = getAuth();
     const currentUser = auth.currentUser;
 
@@ -555,7 +574,8 @@ export class PermissionsService {
               newRole: 'owner' as const,
             },
       ],
-      blockchainRef
+      blockchainRef,
+      recordTitle
     );
 
     // Step 4: Update arrays - add to owners, remove from lower roles (highest role only)
@@ -578,7 +598,11 @@ export class PermissionsService {
    * @param targetUserId - The user ID to remove as viewer
    * @throws Error if operation fails or user doesn't have permission
    */
-  static async removeViewer(recordId: string, targetUserId: string): Promise<void> {
+  static async removeViewer(
+    recordId: string,
+    targetUserId: string,
+    recordTitle?: string
+  ): Promise<void> {
     const auth = getAuth();
     const currentUser = auth.currentUser;
 
@@ -690,7 +714,8 @@ export class PermissionsService {
           newRole: null,
         },
       ],
-      blockchainRef
+      blockchainRef,
+      recordTitle
     );
 
     // Step 4: Remove from viewers array
@@ -705,12 +730,14 @@ export class PermissionsService {
    * Remove an admin from a record
    * @param recordId - The record ID
    * @param targetUserId - The user ID to remove as admin
+   * @param recordTitle - The title of the record
    * @param options - Can set demote to viewer as true otherwise access fully revoked
    * @throws Error if operation fails or user doesn't have permission
    */
   static async removeAdmin(
     recordId: string,
     targetUserId: string,
+    recordTitle?: string,
     options?: { demoteToViewer?: boolean }
   ): Promise<void> {
     const auth = getAuth();
@@ -841,7 +868,8 @@ export class PermissionsService {
               newRole: null,
             },
       ],
-      blockchainRef
+      blockchainRef,
+      recordTitle
     );
 
     // Step 3: Update Firestore arrays and encryption access if applicable
@@ -875,6 +903,7 @@ export class PermissionsService {
   static async removeOwner(
     recordId: string,
     targetUserId: string,
+    recordTitle?: string,
     options?: { demoteTo?: 'administrator' | 'viewer' }
   ): Promise<void> {
     const auth = getAuth();
@@ -1000,7 +1029,8 @@ export class PermissionsService {
               newRole: null, // null — matches revoked member
             },
       ],
-      blockchainRef
+      blockchainRef,
+      recordTitle
     );
 
     // Step 3: Update Firestore arrays
@@ -1033,6 +1063,12 @@ export class PermissionsService {
   // ============================================================================
   // BATCH METHODS
   // ============================================================================
+
+  /**
+   * Batch methods generally don't have recordTitle passed. These usually are trustee
+   * or admin operations so the individual notification isn't as important or useful.
+   * User can just click through to see the update also so not a big deal.
+   */
 
   /**
    * Grant a user a role across multiple records in one operation

@@ -9,14 +9,9 @@
  * Two triggers:
  * 1. onRecordDeletionEventCreated - watches recordDeletionEvents collection
  *    - Notifies all affected users (owners, admins, viewers) that the record was deleted
- *
- * 2. onRecordDeletionEventUpdated - watches recordDeletionEvents collection
- *    - Fires when deletionComplete flips to true (Firebase deletion finished)
- *    - Currently a no-op hook — reserved for any post-deletion follow-up if needed
  */
 
-import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
-import { Timestamp } from 'firebase-admin/firestore';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { createNotificationForMultiple, getUserDisplayName } from '../notificationUtils';
 import { Resend } from 'resend';
 import { resendKey, sendEmailIfEnabled } from '../emailUtils';
@@ -24,28 +19,7 @@ import {
   buildRecordDeletedHtml,
   buildRecordDeletedText,
 } from '../emails/recordDeletionEmailTemplates';
-
-// ============================================================================
-// TYPES
-// ============================================================================
-
-/**
- * Mirrors the RecordDeletionEvent interface written by RecordDeletionService
- * on the client side.
- */
-interface RecordDeletionEvent {
-  recordId: string;
-  recordTitle: string;
-  deletedBy: string;
-  deletedAt: Timestamp;
-  affectedUsers: {
-    owners: string[];
-    administrators: string[];
-    viewers: string[];
-    subjects: string[];
-  };
-  deletionComplete: boolean;
-}
+import { RecordDeletionEvent } from '@/_shared';
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -94,7 +68,7 @@ export const onRecordDeletionEventCreated = onDocumentCreated(
     }
 
     const deleterName = await getUserDisplayName(data.deletedBy);
-    const recordName = data.recordTitle || `Record ${recordId.slice(0, 8)}...`;
+    const recordName = `Record ${recordId.slice(0, 8)}...`;
 
     await createNotificationForMultiple(affectedUserIds, {
       type: 'RECORD_DELETED',
@@ -125,44 +99,5 @@ export const onRecordDeletionEventCreated = onDocumentCreated(
     console.log(
       `✅ Deletion notifications sent to ${affectedUserIds.length} user(s) for record: ${recordId}`
     );
-  }
-);
-
-// ============================================================================
-// TRIGGER 2: DELETION EVENT UPDATED (deletionComplete → true)
-// ============================================================================
-
-/**
- * Triggered when a recordDeletionEvent document is updated.
- *
- * Currently handles the deletionComplete flag flipping to true, which means
- * the Firebase deletion (storage + Firestore + versions + keys) has finished.
- *
- * No additional notifications are sent at this point — users were already
- * notified on creation. This trigger is reserved for any future post-deletion
- * logic (e.g., analytics, audit logging, cascade cleanup).
- */
-export const onRecordDeletionEventUpdated = onDocumentUpdated(
-  'recordDeletionEvents/{recordId}',
-  async event => {
-    const recordId = event.params.recordId;
-    const beforeData = event.data?.before.data() as RecordDeletionEvent | undefined;
-    const afterData = event.data?.after.data() as RecordDeletionEvent | undefined;
-
-    if (!beforeData || !afterData) {
-      console.log('⚠️ No data to compare, skipping');
-      return;
-    }
-
-    // ========================================================================
-    // CASE 1: Deletion marked complete
-    // ========================================================================
-    if (!beforeData.deletionComplete && afterData.deletionComplete) {
-      console.log(`✅ Record deletion fully complete: ${recordId}`);
-      // Reserved for future post-deletion logic
-      return;
-    }
-
-    console.log('📭 No relevant changes detected on deletion event');
   }
 );

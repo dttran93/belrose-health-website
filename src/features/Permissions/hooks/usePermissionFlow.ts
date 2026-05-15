@@ -34,6 +34,7 @@ interface PendingOperation {
 interface UsePermissionFlowOptions {
   /** Single record ID (string) or multiple (string[]) for batch operations */
   recordId: string | string[];
+  recordTitle?: string; // Optional title for better notifications
   onSuccess?: () => void;
 }
 
@@ -47,7 +48,7 @@ const roleLabels: Record<Role, string> = {
 // HOOK
 // ============================================================================
 
-export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOptions) {
+export function usePermissionFlow({ recordId, recordTitle, onSuccess }: UsePermissionFlowOptions) {
   // Normalise to array once — everything below works with recordIds
   const recordIds = Array.isArray(recordId) ? recordId : [recordId];
   // For single-record operations (revoke, backwards-compat) keep the first ID handy
@@ -187,10 +188,10 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
             recordIds.map(() => role)
           )
         : role === 'viewer'
-          ? PermissionsService.grantViewer(primaryRecordId, targetUserId)
+          ? PermissionsService.grantViewer(primaryRecordId, targetUserId, recordTitle)
           : role === 'administrator'
-            ? PermissionsService.grantAdmin(primaryRecordId, targetUserId)
-            : PermissionsService.grantOwner(primaryRecordId, targetUserId);
+            ? PermissionsService.grantAdmin(primaryRecordId, targetUserId, recordTitle)
+            : PermissionsService.grantOwner(primaryRecordId, targetUserId, recordTitle);
 
       // Close dialog immediately
       setSubmittedLabel(activityLabel);
@@ -212,7 +213,16 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
           updateActivity(activityId, { status: 'failed', errorMessage: message });
         });
     },
-    [pendingOperation, recordIds, primaryRecordId, isBatch, addActivity, updateActivity, onSuccess]
+    [
+      pendingOperation,
+      recordIds,
+      primaryRecordId,
+      recordTitle,
+      isBatch,
+      addActivity,
+      updateActivity,
+      onSuccess,
+    ]
   );
 
   // ==========================================================================
@@ -287,12 +297,12 @@ export function usePermissionFlow({ recordId, onSuccess }: UsePermissionFlowOpti
       // Fire tx — don't await
       const txPromise =
         role === 'viewer'
-          ? PermissionsService.removeViewer(primaryRecordId, targetUserId)
+          ? PermissionsService.removeViewer(primaryRecordId, targetUserId, recordTitle)
           : role === 'administrator'
-            ? PermissionsService.removeAdmin(primaryRecordId, targetUserId, {
+            ? PermissionsService.removeAdmin(primaryRecordId, targetUserId, recordTitle, {
                 demoteToViewer: action === 'demote-viewer',
               })
-            : PermissionsService.removeOwner(primaryRecordId, targetUserId, {
+            : PermissionsService.removeOwner(primaryRecordId, targetUserId, recordTitle, {
                 demoteTo:
                   action === 'demote-admin'
                     ? 'administrator'

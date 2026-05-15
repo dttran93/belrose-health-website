@@ -31,6 +31,8 @@ import { buildRecordEditedHtml, buildRecordEditedText } from '../emails/recordEd
 // TYPES
 // ============================================================================
 
+//Kept this as it's own separate type from the front end because the front end has the complete record
+// Snapshot, much more data than is necessary
 interface RecordVersion {
   recordId: string;
   versionNumber: number;
@@ -39,6 +41,8 @@ interface RecordVersion {
   editedAt: Timestamp;
   commitMessage?: string;
   recordHash: string;
+  encryptedRecordTitle?: string;
+  encryptedRecordTitleIv?: string;
 }
 
 interface RecordDocument {
@@ -117,15 +121,15 @@ export const onRecordVersionCreated = onDocumentCreated(
     // In-app notifications
     await createNotificationForMultiple(targets, {
       type: 'RECORD_EDITED',
-      message: `${editorName} made changes to ${recordName} (version ${data.versionNumber}).${
-        data.commitMessage ? ` "${data.commitMessage}"` : ''
-      }`,
+      message: `${editorName} made changes to ${recordName} (version ${data.versionNumber}).`,
       link: `/app/records/${data.recordId}`,
       payload: {
         recordId: data.recordId,
         versionId,
         versionNumber: data.versionNumber,
         editedBy: data.editedBy,
+        encryptedRecordTitle: data.encryptedRecordTitle,
+        encryptedRecordTitleIv: data.encryptedRecordTitleIv,
       },
     });
 
@@ -138,20 +142,8 @@ export const onRecordVersionCreated = onDocumentCreated(
           'RECORD_EDITED',
           {
             subject: `${editorName} edited a record you're connected to`,
-            html: buildRecordEditedHtml(
-              editorName,
-              recordName,
-              data.recordId,
-              data.versionNumber,
-              data.commitMessage
-            ),
-            text: buildRecordEditedText(
-              editorName,
-              recordName,
-              data.recordId,
-              data.versionNumber,
-              data.commitMessage
-            ),
+            html: buildRecordEditedHtml(editorName, recordName, data.recordId, data.versionNumber),
+            text: buildRecordEditedText(editorName, recordName, data.recordId, data.versionNumber),
           },
           resend
         )

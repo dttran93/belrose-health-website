@@ -9,6 +9,13 @@
  *  the state of consents.
  */
 
+import { encryptNotificationTitle } from '@/features/Notifications/services/encryptNotificationTitle';
+import {
+  CreatorResponseStatus,
+  SubjectConsentRequest,
+  SubjectRejectionType,
+  SubjectRequestStatus,
+} from '@belrose/shared';
 import {
   deleteDoc,
   doc,
@@ -18,31 +25,6 @@ import {
   Timestamp,
   updateDoc,
 } from 'firebase/firestore';
-import {
-  CreatorResponseStatus,
-  SubjectRejectionData,
-  SubjectRejectionType,
-} from './subjectRejectionService';
-
-export type SubjectRequestStatus = 'pending' | 'accepted' | 'rejected';
-
-/**
- * Document structure for subjectConsentRequests collection
- * Document ID format: {recordId}_{targetUserId}
- */
-export interface SubjectConsentRequest {
-  recordId: string;
-  subjectId: string;
-  requestedBy: string;
-  requestedSubjectRole: 'viewer' | 'administrator' | 'owner';
-  status: SubjectRequestStatus;
-  createdAt: Timestamp;
-  respondedAt?: Timestamp;
-  recordTitle?: string;
-  grantedAccessOnSubjectRequest: boolean;
-  rejection?: SubjectRejectionData;
-}
-
 /**
  * Generate the document ID for a consent request
  * Format: {recordId}_{targetUserId}
@@ -76,6 +58,12 @@ export class SubjectConsentService {
       }
     }
 
+    const titleData = params.recordTitle
+      ? await encryptNotificationTitle(params.recordTitle, params.recordId)
+      : undefined;
+
+    console.log('Title data testing:', { titleData, recordTitle: params.recordTitle });
+
     const consentRequest: SubjectConsentRequest = {
       recordId: params.recordId,
       subjectId: params.subjectId,
@@ -83,8 +71,8 @@ export class SubjectConsentService {
       requestedSubjectRole: params.requestedSubjectRole,
       status: 'pending',
       createdAt: Timestamp.now(),
-      recordTitle: params.recordTitle,
       grantedAccessOnSubjectRequest: false,
+      ...(titleData ?? {}),
     };
 
     await setDoc(requestRef, consentRequest);

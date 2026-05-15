@@ -28,6 +28,7 @@
  *    c. Marks deletion event complete
  */
 
+import { encryptNotificationTitle } from '@/features/Notifications/services/encryptNotificationTitle';
 import { PermissionsService } from '@/features/Permissions/services/permissionsService';
 import SubjectQueryService from '@/features/Subject/services/subjectQueryService';
 import {
@@ -38,6 +39,7 @@ import {
   getFileMetadata,
 } from '@/firebase/uploadUtils';
 import { FileObject } from '@/types/core';
+import { RecordDeletionEvent } from '@belrose/shared';
 import { getFirestore, doc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
 
 export interface DeletionCheckResult {
@@ -53,20 +55,6 @@ export interface DeletionCheckResult {
   otherAdmins?: string[];
   otherViewers?: string[];
   otherSubjects?: string[];
-}
-
-interface RecordDeletionEvent {
-  recordId: string;
-  recordTitle: string;
-  deletedBy: string;
-  deletedAt: Timestamp;
-  affectedUsers: {
-    owners: string[];
-    administrators: string[];
-    viewers: string[];
-    subjects: string[];
-  };
-  deletionComplete: boolean;
 }
 
 class RecordDeletionService {
@@ -282,7 +270,6 @@ class RecordDeletionService {
 
       const deletionEvent: RecordDeletionEvent = {
         recordId: record.id,
-        recordTitle: record.belroseFields?.title || record.fileName,
         deletedBy: userId,
         deletedAt: Timestamp.now(),
         affectedUsers: {

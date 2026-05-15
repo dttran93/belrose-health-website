@@ -23,3 +23,5 @@ __exportStar(require("./blockchain"), exports);
 __exportStar(require("./aiChat"), exports);
 __exportStar(require("./notifications"), exports);
 __exportStar(require("./permissions"), exports);
+__exportStar(require("./credibility"), exports);
+__exportStar(require("./deletion"), exports);

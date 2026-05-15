@@ -41,6 +41,7 @@ export const ViewerManagement: React.FC<ViewerManagementProps> = ({
 
   const { dialogProps, initiateGrant, initiateRevoke, isLoading } = usePermissionFlow({
     recordId: record.id,
+    recordTitle: (record.belroseFields?.title || record.fileName) ?? undefined,
     onSuccess: () => {
       setSelectedUser(null);
       setRefreshTrigger(prev => prev + 1);

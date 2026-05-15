@@ -26,13 +26,12 @@ import {
   where,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { SubjectConsentRequest, SubjectRequestStatus } from './subjectConsentService';
-import { RejectionReasons, SubjectRejectionData } from './subjectRejectionService';
 import {
   SubjectRemovalRequest,
   RemovalRequestStatus,
   getRemovalRequestId,
 } from './subjectRemovalService';
+import { RejectionReasons, SubjectConsentRequest, SubjectRequestStatus } from '@belrose/shared';
 
 // ============================================================================
 // TYPES
@@ -203,7 +202,6 @@ export class SubjectQueryService {
       return {
         id: doc.id,
         recordId: data.recordId,
-        recordTitle: data.recordTitle,
         requestedBy: data.requestedBy,
         requestedSubjectRole: data.requestedSubjectRole,
         requestedAt: data.createdAt,
@@ -371,7 +369,6 @@ export class SubjectQueryService {
         subjectId: data.subjectId,
         rejectedAt: data.rejection!.rejectedAt,
         reason: data.rejection!.reason,
-        recordTitle: data.recordTitle,
       }));
   }
 

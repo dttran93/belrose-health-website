@@ -95,7 +95,7 @@ function body(content) {
 }
 // ─── Case 1: New subject request ─────────────────────────────────────────────
 function buildSubjectRequestHtml(requesterName, recordName, recordId) {
-    const reviewUrl = `${emailUtils_1.APP_URL}/app/records/${recordId}/review-subject-request`;
+    const reviewUrl = `${emailUtils_1.APP_URL}/records/${recordId}/review-subject-request`;
     return wrap(`
     ${header('Subject request', '#3b82f6', "You've been requested as a subject", `${requesterName} wants to associate you with a health record.`)}
     ${body(`
@@ -125,7 +125,7 @@ function buildSubjectRequestHtml(requesterName, recordName, recordId) {
 function buildSubjectRequestText(requesterName, recordName, recordId) {
     return `${requesterName} has requested to set you as the subject of "${recordName}".
 
-Review and respond at: ${emailUtils_1.APP_URL}/app/records/${recordId}/review-subject-request
+Review and respond at: ${emailUtils_1.APP_URL}/records/${recordId}/review-subject-request
 
 You can accept (gaining access to the record) or decline — you're never obligated to accept.
 
@@ -133,7 +133,7 @@ Questions? ${emailUtils_1.SUPPORT_EMAIL}`;
 }
 // ─── Case 2: Request accepted ────────────────────────────────────────────────
 function buildSubjectAcceptedHtml(subjectName, recordName, recordId) {
-    const recordUrl = `${emailUtils_1.APP_URL}/app/records/${recordId}`;
+    const recordUrl = `${emailUtils_1.APP_URL}/records/${recordId}`;
     return wrap(`
     ${header('Request accepted', '#22c55e', `${subjectName} accepted your request`, `They are now the subject of "${recordName}".`)}
     ${body(`
@@ -155,13 +155,13 @@ function buildSubjectAcceptedHtml(subjectName, recordName, recordId) {
 function buildSubjectAcceptedText(subjectName, recordName, recordId) {
     return `${subjectName} has accepted your subject request for "${recordName}".
 
-View the record at: ${emailUtils_1.APP_URL}/app/records/${recordId}
+View the record at: ${emailUtils_1.APP_URL}/records/${recordId}
 
 Questions? ${emailUtils_1.SUPPORT_EMAIL}`;
 }
 // ─── Case 3: Request declined ────────────────────────────────────────────────
 function buildSubjectDeclinedHtml(subjectName, recordName, recordId) {
-    const recordUrl = `${emailUtils_1.APP_URL}/app/records/${recordId}`;
+    const recordUrl = `${emailUtils_1.APP_URL}/records/${recordId}`;
     return wrap(`
     ${header('Request declined', '#f59e0b', `${subjectName} declined your request`, `Your subject request for "${recordName}" was not accepted.`)}
     ${body(`
@@ -183,13 +183,13 @@ function buildSubjectDeclinedHtml(subjectName, recordName, recordId) {
 function buildSubjectDeclinedText(subjectName, recordName, recordId) {
     return `${subjectName} has declined to be set as the subject of "${recordName}".
 
-View the record at: ${emailUtils_1.APP_URL}/app/records/${recordId}
+View the record at: ${emailUtils_1.APP_URL}/records/${recordId}
 
 Questions? ${emailUtils_1.SUPPORT_EMAIL}`;
 }
 // ─── Case 4a: Subject removed after acceptance (notifies record owners) ───────
 function buildSubjectRemovedHtml(subjectName, recordName, recordId) {
-    const reviewUrl = `${emailUtils_1.APP_URL}/app/records/${recordId}/review-rejection`;
+    const reviewUrl = `${emailUtils_1.APP_URL}/records/${recordId}/review-rejection`;
     return wrap(`
     ${header('Action required', '#ef4444', 'A subject has removed themselves', `${subjectName} removed their subject status from "${recordName}".`)}
     ${body(`
@@ -208,9 +208,10 @@ function buildSubjectRemovedHtml(subjectName, recordName, recordId) {
           Your options
         </p>
         <p style="margin:0;font-size:13px;color:#7f1d1d;line-height:1.6;">
-          <strong>Acknowledge</strong> — note the change privately, record stays as-is.<br/>
-          <strong>Publicly list</strong> — disclose the subject removal on the public record 
-          log, as may be required for transparency or compliance.
+          <strong>Drop-It</strong> — Acknowledge the user's right to withdraw. No further action.<br/>
+          <strong>Escalate</strong> — If you feel the record is crucial information to the 
+          user's health record, you may escalate it to Belrose. Upon review we may publicly 
+          log the subject's rejection. (No sensitive information will ever be disclosed)
         </p>
       </div>
       ${ctaButton(reviewUrl, 'Review and decide', '#ef4444')}
@@ -221,7 +222,7 @@ function buildSubjectRemovedHtml(subjectName, recordName, recordId) {
 function buildSubjectRemovedText(subjectName, recordName, recordId) {
     return `Action required: ${subjectName} has removed their subject status from "${recordName}".
 
-Review and decide at: ${emailUtils_1.APP_URL}/app/records/${recordId}/review-rejection
+Review and decide at: ${emailUtils_1.APP_URL}/records/${recordId}/review-rejection
 
 Options:
 - Acknowledge: note the change privately
@@ -231,7 +232,7 @@ Questions? ${emailUtils_1.SUPPORT_EMAIL}`;
 }
 // ─── Case 4b: Creator responded (notifies the subject) ───────────────────────
 function buildCreatorResponseHtml(recordName, recordId, escalated) {
-    const recordUrl = `${emailUtils_1.APP_URL}/app/records/${recordId}`;
+    const recordUrl = `${emailUtils_1.APP_URL}/records/${recordId}`;
     const isEscalated = escalated;
     const badgeText = isEscalated ? 'Escalated' : 'Acknowledged';
     const badgeColor = isEscalated ? '#ef4444' : '#22c55e';
@@ -270,7 +271,7 @@ function buildCreatorResponseText(recordName, recordId, escalated) {
         : 'acknowledged your subject status removal';
     return `The record creator has ${outcome} for "${recordName}".
 
-View the record at: ${emailUtils_1.APP_URL}/app/records/${recordId}
+View the record at: ${emailUtils_1.APP_URL}/records/${recordId}
 
 Questions? ${emailUtils_1.SUPPORT_EMAIL}`;
 }

@@ -8,7 +8,6 @@ import {
   AlertTriangle,
   CheckCircle,
   Globe,
-  MessageSquare,
   Bell,
   Circle,
   Trash2,
@@ -35,7 +34,16 @@ interface NotificationConfig {
 }
 
 // Notification types that reference a record title needing decryption
-const RECORD_TITLE_TYPES = new Set<NotificationType>(['RECORD_EDITED']);
+const RECORD_TITLE_TYPES = new Set<NotificationType>([
+  'RECORD_EDITED',
+  'SUBJECT_REQUEST_RECEIVED',
+  'SUBJECT_ACCEPTED',
+  'REJECTION_PENDING_CREATOR_DECISION',
+  'REJECTION_ACKNOWLEDGED',
+  'REJECTION_ESCALATED',
+  'PERMISSIONS_GRANTED',
+  'PERMISSIONS_REVOKED',
+]);
 
 // ============================================================================
 // NOTIFICATION CONFIG
@@ -128,7 +136,8 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
     resolveNotificationTitle(notification.payload).then(title => {
       if (cancelled) return;
       // Replace the fallback placeholder with the real decrypted title
-      setDisplayMessage(notification.message.replace(/Record [a-f0-9]{8}\.\.\./, title));
+      const shortId = `Record ${notification.payload.recordId?.slice(0, 8)}...`;
+      setDisplayMessage(notification.message.replace(shortId, title));
     });
 
     return () => {

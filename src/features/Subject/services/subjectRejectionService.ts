@@ -9,18 +9,14 @@
 import { doc, getDoc, getFirestore, Timestamp, updateDoc } from 'firebase/firestore';
 import { RespondToRejectionResult } from './subjectService';
 import { getAuth } from 'firebase/auth';
-import { SubjectConsentRequest } from './subjectConsentService';
-
-export type SubjectRejectionType = 'request_rejected' | 'removed_after_acceptance';
-
-export type CreatorResponseStatus = 'pending_creator_decision' | 'dropped' | 'escalated';
-
-export type RejectionReasons =
-  | 'identity_mismatch'
-  | 'content_dispute'
-  | 'privacy'
-  | 'duplicate'
-  | 'other';
+import {
+  CreatorResponse,
+  CreatorResponseStatus,
+  RejectionReasons,
+  SubjectConsentRequest,
+  SubjectRejectionData,
+  SubjectRejectionType,
+} from '@belrose/shared';
 
 export const REJECTION_REASON_OPTIONS: { value: RejectionReasons; label: string }[] = [
   { value: 'identity_mismatch', label: 'I am not the person listed as the subject' },
@@ -32,26 +28,6 @@ export const REJECTION_REASON_OPTIONS: { value: RejectionReasons; label: string 
   { value: 'duplicate', label: 'This is a duplicate request' },
   { value: 'other', label: 'Other reason' },
 ];
-
-/**
- * Creator's response to a subject rejection
- * Nested within SubjectConsentRequest.rejection
- */
-export interface CreatorResponse {
-  status: CreatorResponseStatus;
-  lastModified?: Timestamp;
-}
-
-/**
- * Rejection data - nested within SubjectConsentRequest
- * Only populated when a subject removes themselves AFTER accepting
- */
-export interface SubjectRejectionData {
-  rejectionType: SubjectRejectionType;
-  rejectedAt: Timestamp;
-  reason: RejectionReasons;
-  creatorResponse?: CreatorResponse;
-}
 
 export class SubjectRejectionService {
   // ============================================================================

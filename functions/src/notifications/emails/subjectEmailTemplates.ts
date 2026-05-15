@@ -97,7 +97,7 @@ export function buildSubjectRequestHtml(
   recordName: string,
   recordId: string
 ): string {
-  const reviewUrl = `${APP_URL}/app/records/${recordId}/review-subject-request`;
+  const reviewUrl = `${APP_URL}/records/${recordId}/review-subject-request`;
 
   return wrap(`
     ${header(
@@ -138,7 +138,7 @@ export function buildSubjectRequestText(
 ): string {
   return `${requesterName} has requested to set you as the subject of "${recordName}".
 
-Review and respond at: ${APP_URL}/app/records/${recordId}/review-subject-request
+Review and respond at: ${APP_URL}/records/${recordId}/review-subject-request
 
 You can accept (gaining access to the record) or decline — you're never obligated to accept.
 
@@ -152,7 +152,7 @@ export function buildSubjectAcceptedHtml(
   recordName: string,
   recordId: string
 ): string {
-  const recordUrl = `${APP_URL}/app/records/${recordId}`;
+  const recordUrl = `${APP_URL}/records/${recordId}`;
 
   return wrap(`
     ${header(
@@ -185,7 +185,7 @@ export function buildSubjectAcceptedText(
 ): string {
   return `${subjectName} has accepted your subject request for "${recordName}".
 
-View the record at: ${APP_URL}/app/records/${recordId}
+View the record at: ${APP_URL}/records/${recordId}
 
 Questions? ${SUPPORT_EMAIL}`;
 }
@@ -197,7 +197,7 @@ export function buildSubjectDeclinedHtml(
   recordName: string,
   recordId: string
 ): string {
-  const recordUrl = `${APP_URL}/app/records/${recordId}`;
+  const recordUrl = `${APP_URL}/records/${recordId}`;
 
   return wrap(`
     ${header(
@@ -230,7 +230,7 @@ export function buildSubjectDeclinedText(
 ): string {
   return `${subjectName} has declined to be set as the subject of "${recordName}".
 
-View the record at: ${APP_URL}/app/records/${recordId}
+View the record at: ${APP_URL}/records/${recordId}
 
 Questions? ${SUPPORT_EMAIL}`;
 }
@@ -242,7 +242,7 @@ export function buildSubjectRemovedHtml(
   recordName: string,
   recordId: string
 ): string {
-  const reviewUrl = `${APP_URL}/app/records/${recordId}/review-rejection`;
+  const reviewUrl = `${APP_URL}/records/${recordId}/review-rejection`;
 
   return wrap(`
     ${header(
@@ -267,9 +267,10 @@ export function buildSubjectRemovedHtml(
           Your options
         </p>
         <p style="margin:0;font-size:13px;color:#7f1d1d;line-height:1.6;">
-          <strong>Acknowledge</strong> — note the change privately, record stays as-is.<br/>
-          <strong>Publicly list</strong> — disclose the subject removal on the public record 
-          log, as may be required for transparency or compliance.
+          <strong>Drop-It</strong> — Acknowledge the user's right to withdraw. No further action.<br/>
+          <strong>Escalate</strong> — If you feel the record is crucial information to the 
+          user's health record, you may escalate it to Belrose. Upon review we may publicly 
+          log the subject's rejection. (No sensitive information will ever be disclosed)
         </p>
       </div>
       ${ctaButton(reviewUrl, 'Review and decide', '#ef4444')}
@@ -285,7 +286,7 @@ export function buildSubjectRemovedText(
 ): string {
   return `Action required: ${subjectName} has removed their subject status from "${recordName}".
 
-Review and decide at: ${APP_URL}/app/records/${recordId}/review-rejection
+Review and decide at: ${APP_URL}/records/${recordId}/review-rejection
 
 Options:
 - Acknowledge: note the change privately
@@ -301,7 +302,7 @@ export function buildCreatorResponseHtml(
   recordId: string,
   escalated: boolean
 ): string {
-  const recordUrl = `${APP_URL}/app/records/${recordId}`;
+  const recordUrl = `${APP_URL}/records/${recordId}`;
   const isEscalated = escalated;
 
   const badgeText = isEscalated ? 'Escalated' : 'Acknowledged';
@@ -347,7 +348,7 @@ export function buildCreatorResponseText(
     : 'acknowledged your subject status removal';
   return `The record creator has ${outcome} for "${recordName}".
 
-View the record at: ${APP_URL}/app/records/${recordId}
+View the record at: ${APP_URL}/records/${recordId}
 
 Questions? ${SUPPORT_EMAIL}`;
 }

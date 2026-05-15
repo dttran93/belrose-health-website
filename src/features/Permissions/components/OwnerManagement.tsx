@@ -42,6 +42,7 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
   // 3. Initialize the flow hook
   const { dialogProps, initiateGrant, initiateRevoke, isLoading } = usePermissionFlow({
     recordId: record.id,
+    recordTitle: (record.belroseFields?.title || record.fileName) ?? undefined,
     onSuccess: () => {
       setSelectedUser(null);
       setRefreshTrigger(prev => prev + 1);

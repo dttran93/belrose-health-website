@@ -58,6 +58,8 @@ export interface RecordVersion {
   id?: string; // Firestore document ID
   recordId: string; // Link to parent record
   versionNumber: number; // Sequential version number
+  encryptedRecordTitle?: string; // Optional encrypted title for display in notifications
+  encryptedRecordTitleIv?: string;
 
   // Who and when
   editedBy: string; // User ID

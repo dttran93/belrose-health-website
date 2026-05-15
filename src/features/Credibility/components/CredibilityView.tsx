@@ -17,11 +17,12 @@ import { Button } from '@/components/ui/Button';
 import { RecordReviewPanel } from './RecordReviewPanel';
 import { useAuth } from '@/features/Auth/hooks/useAuth';
 import VerificationManagement from './Verifications/VerificationManagement';
-import { getVerificationsByRecordId, VerificationDoc } from '../services/verificationService';
+import { getVerificationsByRecordId } from '../services/verificationService';
 import { getDisputesByRecordId } from '../services/disputeService';
 import DisputeManagement from './Disputes/DisputeManagement';
 import { useCredibilityFlow } from '../hooks/useCredibilityFlow';
 import CredibilityActionDialog from './ui/CredibilityActionDialog';
+import { VerificationDoc } from '@belrose/shared';
 
 type ViewMode = 'loading' | 'empty' | 'list' | 'add';
 type ReviewTab = 'verify' | 'dispute';
@@ -52,6 +53,7 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({
   // Generate and retrieve the record hash
   const recordHash = (record.recordHash || RecordHashService.generateRecordHash(record)) as string;
   const recordId = record.firestoreId || record.id;
+  const recordTitle = record.belroseFields?.title || record.fileName || '';
 
   const handleOperationSuccess = async () => {
     try {
@@ -97,6 +99,7 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({
   } = useCredibilityFlow({
     recordId,
     recordHash,
+    recordTitle,
     onSuccess: handleOperationSuccess,
   });
 

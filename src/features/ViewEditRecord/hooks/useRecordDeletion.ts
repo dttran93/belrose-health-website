@@ -117,11 +117,9 @@ export const useRecordDeletion = (
     setPhase('deleting');
 
     try {
-      const service = new RecordDeletionService();
-
       // If user is a subject and wants to remove subject status, they need to handle that separately
       // via SubjectActionDialog - this just removes permissions
-      await service.removeUserFromRecord(record, user.uid);
+      await RecordDeletionService.removeUserFromRecord(record, user.uid);
 
       setPhase('success');
 

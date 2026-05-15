@@ -21,18 +21,23 @@ import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormatting
 import { getVerificationId } from './verificationService';
 import { onDisputeCreated, onDisputeModified, onDisputeRevoked } from './credibilityScoreService';
 import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
-import { BlockchainRef } from '@belrose/shared';
+import {
+  BlockchainRef,
+  DisputeCulpability,
+  DisputeDoc,
+  DisputeSeverityOptions,
+  EncryptedField,
+  ReactionDoc,
+} from '@belrose/shared';
 import { buildHealthRecordRef } from '@/config/blockchainAddresses';
+import { encryptNotificationTitle } from '@/features/Notifications/services/encryptNotificationTitle';
 
 // ============================================================
 // TYPES
 // ============================================================
 
 export type DisputeSeverity = 0 | 1 | 2 | 3; // 0 used in blockchain for returning errors
-export type DisputeSeverityOptions = 1 | 2 | 3; //0 is not an option in actual selection
 export type DisputeSeverityOptionNames = 'Negligible' | 'Moderate' | 'Major';
-
-export type DisputeCulpability = 0 | 1 | 2 | 3 | 4 | 5;
 
 export type DisputeCulpabilityName =
   | 'Unknown'
@@ -55,42 +60,6 @@ export interface CulpabilityConfig {
   name: DisputeCulpabilityName;
   description: string;
   declarative: string;
-}
-
-export interface EncryptedField {
-  encrypted: string;
-  iv: string;
-}
-
-export interface DisputeDoc {
-  id: string;
-  recordHash: string;
-  recordId: string;
-  disputerId: string;
-  disputerIdHash: string;
-  severity: DisputeSeverityOptions;
-  culpability: DisputeCulpability;
-  encryptedNotes?: EncryptedField;
-  notesHash: string;
-  isActive: boolean;
-  createdAt: Timestamp;
-  lastModified?: Timestamp;
-  chainStatus: 'pending' | 'confirmed' | 'failed';
-  blockchainRef?: BlockchainRef;
-}
-
-export interface ReactionDoc {
-  id: string;
-  recordId: string;
-  recordHash: string;
-  reactorId: string;
-  reactorIdHash: string;
-  supportsDispute: boolean;
-  isActive: boolean;
-  createdAt: Timestamp;
-  lastModified?: Timestamp;
-  chainStatus: 'pending' | 'confirmed' | 'failed';
-  blockchainRef?: BlockchainRef;
 }
 
 /** Extended type with decrypted notes for display */
@@ -347,7 +316,8 @@ export async function createDispute(
   disputerId: string,
   severity: DisputeSeverityOptions,
   culpability: DisputeCulpability,
-  notes?: string
+  notes?: string,
+  recordTitle?: string
 ): Promise<string> {
   const db = getFirestore();
 
@@ -404,6 +374,9 @@ export async function createDispute(
 
   console.log('🔄 Creating dispute:', { recordId, recordHash, severity, culpability });
 
+  // Encrypt title for notifications
+  const titleData = recordTitle ? await encryptNotificationTitle(recordTitle, recordId) : null;
+
   // Step 1: Write to blockchain FIRST
   try {
     console.log('🔗 Writing dispute to blockchain...');
@@ -445,6 +418,7 @@ export async function createDispute(
         createdAt: Timestamp.now(),
         chainStatus: 'confirmed',
         blockchainRef,
+        ...(titleData ?? {}),
       });
       console.log('✅ Firestore: Dispute created');
     }
@@ -763,9 +737,10 @@ export async function reactToDispute(
       await setDoc(docRef, {
         recordId,
         recordHash,
-        disputerId,
         reactorId,
         reactorIdHash,
+        disputerId,
+        disputerIdHash,
         supportsDispute,
         isActive: true,
         createdAt: Timestamp.now(),

@@ -32,9 +32,8 @@ import { PermissionsService } from '@/features/Permissions/services/permissionsS
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import { doc, getDoc, getFirestore, updateDoc } from 'firebase/firestore';
 import SubjectQueryService, { IncomingSubjectRequest } from '../services/subjectQueryService';
-import { SubjectConsentRequest } from '../services/subjectConsentService';
-import { RejectionReasons } from '../services/subjectRejectionService';
 import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
+import { RejectionReasons, SubjectConsentRequest } from '@belrose/shared';
 
 // ============================================================================
 // TYPES

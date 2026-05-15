@@ -19,9 +19,11 @@ export async function resolveNotificationTitle(payload: {
   encryptedRecordTitle?: string;
   encryptedRecordTitleIv?: string;
 }): Promise<string> {
+  console.log('Resolving notification title with payload:', payload);
   const fallback = payload.recordId ? `Record ${payload.recordId.slice(0, 8)}...` : 'A record';
 
   if (!payload.encryptedRecordTitle || !payload.encryptedRecordTitleIv || !payload.recordId) {
+    console.log('No encrypted title data in payload, using fallback:', payload);
     return fallback;
   }
 
@@ -38,6 +40,8 @@ export async function resolveNotificationTitle(payload: {
       dek,
       base64ToArrayBuffer(payload.encryptedRecordTitleIv)
     );
+
+    console.log('Decrypted notification title:', decrypted);
 
     return decrypted || fallback;
   } catch (error) {

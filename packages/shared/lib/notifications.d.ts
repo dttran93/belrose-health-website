@@ -22,12 +22,12 @@ export declare const NOTIFICATION_CATEGORIES: {
     readonly credibility: {
         readonly label: "Credibility Updates";
         readonly description: "Get notifications when your verifications or disputes are made on your records.";
-        readonly notificationTypes: readonly ["CREDIBILITY_UPDATED"];
+        readonly notificationTypes: readonly ["VERIFICATION_ADDED", "VERIFICATION_MODIFIED", "VERIFICATION_RETRACTED", "DISPUTE_ADDED", "DISPUTE_MODIFIED", "DISPUTE_RETRACTED", "DISPUTE_REACTION_ADDED", "DISPUTE_REACTION_MODIFIED", "DISPUTE_REACTION_RETRACTED"];
     };
     readonly trustee: {
         readonly label: "Trustee Relationships";
         readonly description: "Get notifications regarding trustee relationship changes.";
-        readonly notificationTypes: readonly ["TRUSTEE_RELATIONSHIP_CHANGED"];
+        readonly notificationTypes: readonly ["TRUSTEE_INVITE_RECEIVED", "TRUSTEE_INVITE_ACCEPTED", "TRUSTEE_INVITE_DECLINED", "TRUSTEE_REVOKED", "TRUSTEE_RESIGNED", "TRUSTEE_LEVEL_CHANGED"];
     };
     readonly recordRequests: {
         readonly label: "Record Requests";

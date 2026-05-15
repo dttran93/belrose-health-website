@@ -4,8 +4,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildRecordEditedHtml = buildRecordEditedHtml;
 exports.buildRecordEditedText = buildRecordEditedText;
 const emailUtils_1 = require("../emailUtils");
-function buildRecordEditedHtml(editorName, recordName, recordId, versionNumber, commitMessage) {
-    const recordUrl = `${emailUtils_1.APP_URL}/app/records/${recordId}`;
+function buildRecordEditedHtml(editorName, recordName, recordId, versionNumber) {
+    const recordUrl = `${emailUtils_1.APP_URL}/records/${recordId}`;
     const year = new Date().getFullYear();
     return `<!DOCTYPE html>
 <html lang="en">
@@ -50,7 +50,7 @@ function buildRecordEditedHtml(editorName, recordName, recordId, versionNumber, 
           <td style="padding:10px 0;border-bottom:1px solid #f1f5f9;
             font-size:13px;color:#64748b;width:40%;">Record</td>
           <td style="padding:10px 0;border-bottom:1px solid #f1f5f9;
-            font-size:13px;color:#1e293b;font-weight:500;">${recordName}</td>
+            font-size:13px;color:#1e293b;font-weight:500;">${recordId}</td>
         </tr>
         <tr>
           <td style="padding:10px 0;border-bottom:1px solid #f1f5f9;
@@ -64,14 +64,6 @@ function buildRecordEditedHtml(editorName, recordName, recordId, versionNumber, 
           <td style="padding:10px 0;border-bottom:1px solid #f1f5f9;
             font-size:13px;color:#1e293b;font-weight:500;">${versionNumber}</td>
         </tr>
-        ${commitMessage
-        ? `
-        <tr>
-          <td style="padding:10px 0;font-size:13px;color:#64748b;">Summary</td>
-          <td style="padding:10px 0;font-size:13px;color:#1e293b;
-            font-weight:500;">${commitMessage}</td>
-        </tr>`
-        : ''}
       </table>
 
       <!-- CTA -->
@@ -103,10 +95,10 @@ function buildRecordEditedHtml(editorName, recordName, recordId, versionNumber, 
 </body>
 </html>`;
 }
-function buildRecordEditedText(editorName, recordName, recordId, versionNumber, commitMessage) {
-    return `${editorName} has saved a new version of ${recordName} (version ${versionNumber}).${commitMessage ? `\n\nSummary: ${commitMessage}` : ''}
+function buildRecordEditedText(editorName, recordName, recordId, versionNumber) {
+    return `${editorName} has saved a new version of ${recordName} (version ${versionNumber}).
 
-View the record at: ${emailUtils_1.APP_URL}/app/records/${recordId}
+View the record at: ${emailUtils_1.APP_URL}/records/${recordId}
 
 Questions? ${emailUtils_1.SUPPORT_EMAIL}`;
 }

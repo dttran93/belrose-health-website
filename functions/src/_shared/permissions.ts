@@ -20,4 +20,6 @@ export interface PermissionChangeEvent {
   changedAt: TimestampLike;
   changes: PermissionChange[];
   blockchainRef: BlockchainRef;
+  context?: 'trustee_grant' | 'trustee_revoke' | 'direct';
+  batchId?: string;
 }

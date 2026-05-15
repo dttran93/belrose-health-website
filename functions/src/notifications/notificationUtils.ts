@@ -14,8 +14,14 @@
 
 import * as admin from 'firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
-import { SubjectRejectionType } from '../notifications/triggers/subjectNotificationTrigger';
-import { NOTIFICATION_CATEGORIES, NotificationCategory } from '@/_shared';
+import {
+  DisputeCulpability,
+  DisputeSeverityOptions,
+  NOTIFICATION_CATEGORIES,
+  NotificationCategory,
+  VerificationLevelOptions,
+} from '../_shared';
+import { SubjectRejectionType } from '@/_shared/subject';
 
 // ============================================================================
 // TYPES
@@ -47,6 +53,8 @@ export type NotificationDoc =
         subjectId: string;
         requestedBy: string;
         requestedSubjectRole: 'viewer' | 'administrator' | 'owner';
+        encryptedRecordTitle?: string;
+        encryptedRecordTitleIv?: string;
       };
     }
   | {
@@ -55,6 +63,8 @@ export type NotificationDoc =
         recordId: string;
         requestId: string;
         subjectId: string;
+        encryptedRecordTitle?: string;
+        encryptedRecordTitleIv?: string;
       };
     }
   | {
@@ -64,6 +74,8 @@ export type NotificationDoc =
         requestId: string;
         subjectId: string;
         rejectionType: SubjectRejectionType;
+        encryptedRecordTitle?: string;
+        encryptedRecordTitleIv?: string;
       };
     }
   | {
@@ -72,6 +84,8 @@ export type NotificationDoc =
         recordId: string;
         requestId: string;
         subjectId: string;
+        encryptedRecordTitle?: string;
+        encryptedRecordTitleIv?: string;
       };
     }
   | {
@@ -80,6 +94,8 @@ export type NotificationDoc =
         recordId: string;
         requestId: string;
         subjectId: string;
+        encryptedRecordTitle?: string;
+        encryptedRecordTitleIv?: string;
       };
     }
 
@@ -89,6 +105,7 @@ export type NotificationDoc =
       payload: {
         recordId: string;
         deletedBy: string;
+        // Payload can't have a record title because the related wrapped keys will have already been deleted by the time the notification is sent
       };
     }
 
@@ -113,6 +130,144 @@ export type NotificationDoc =
         newRole?: 'owner' | 'administrator' | 'viewer' | null; // present for downgrades, null for full revocation
         encryptedRecordTitle?: string;
         encryptedRecordTitleIv?: string;
+      };
+    }
+
+  // ── Credibility updates ───────────────────────────────────────────────────
+  | {
+      type: 'VERIFICATION_ADDED';
+      payload: {
+        recordId: string;
+        recordHash: string;
+        verifierId: string;
+        level: VerificationLevelOptions;
+        encryptedRecordTitle?: string;
+        encryptedRecordTitleIv?: string;
+      };
+    }
+  | {
+      type: 'VERIFICATION_RETRACTED';
+      payload: {
+        recordId: string;
+        recordHash: string;
+        verifierId: string;
+        encryptedRecordTitle?: string;
+        encryptedRecordTitleIv?: string;
+      };
+    }
+  | {
+      type: 'VERIFICATION_MODIFIED';
+      payload: {
+        recordId: string;
+        recordHash: string;
+        verifierId: string;
+        newLevel: VerificationLevelOptions;
+        oldLevel: VerificationLevelOptions;
+        encryptedRecordTitle?: string;
+        encryptedRecordTitleIv?: string;
+      };
+    }
+  | {
+      type: 'DISPUTE_ADDED';
+      payload: {
+        recordId: string;
+        recordHash: string;
+        disputerId: string;
+        severity: DisputeSeverityOptions;
+        culpability: DisputeCulpability;
+        encryptedRecordTitle?: string;
+        encryptedRecordTitleIv?: string;
+      };
+    }
+  | {
+      type: 'DISPUTE_RETRACTED';
+      payload: {
+        recordId: string;
+        recordHash: string;
+        disputerId: string;
+        encryptedRecordTitle?: string;
+        encryptedRecordTitleIv?: string;
+      };
+    }
+  | {
+      type: 'DISPUTE_MODIFIED';
+      payload: {
+        recordId: string;
+        recordHash: string;
+        disputerId: string;
+        newSeverity: DisputeSeverityOptions;
+        newCulpability: DisputeCulpability;
+        oldSeverity: DisputeSeverityOptions;
+        oldCulpability: DisputeCulpability;
+        encryptedRecordTitle?: string;
+        encryptedRecordTitleIv?: string;
+      };
+    }
+  | {
+      type: 'DISPUTE_REACTION_ADDED';
+      payload: {
+        recordId: string;
+        recordHash: string;
+        reactorId: string;
+        disputerId: string;
+        supportsDispute: boolean;
+        encryptedRecordTitle?: string;
+        encryptedRecordTitleIv?: string;
+      };
+    }
+  | {
+      type: 'DISPUTE_REACTION_RETRACTED';
+      payload: {
+        recordId: string;
+        recordHash: string;
+        reactorId: string;
+        disputerId: string;
+        supportsDispute: boolean;
+        encryptedRecordTitle?: string;
+        encryptedRecordTitleIv?: string;
+      };
+    }
+  | {
+      type: 'DISPUTE_REACTION_MODIFIED';
+      payload: {
+        recordId: string;
+        recordHash: string;
+        reactorId: string;
+        disputerId: string;
+        supportsDispute: boolean;
+        encryptedRecordTitle?: string;
+        encryptedRecordTitleIv?: string;
+      };
+    }
+
+  // ── Trustee relationships ───────────────────────────────────────────────────────
+  | {
+      type: 'TRUSTEE_INVITE_RECEIVED';
+      payload: { trustorId: string; trusteeId: string; trustLevel: string };
+    }
+  | {
+      type: 'TRUSTEE_INVITE_ACCEPTED';
+      payload: { trustorId: string; trusteeId: string; trustLevel: string };
+    }
+  | {
+      type: 'TRUSTEE_INVITE_DECLINED';
+      payload: { trustorId: string; trusteeId: string; trustLevel: string };
+    }
+  | {
+      type: 'TRUSTEE_REVOKED';
+      payload: { trustorId: string; trusteeId: string; trustLevel: string };
+    }
+  | {
+      type: 'TRUSTEE_RESIGNED';
+      payload: { trustorId: string; trusteeId: string; trustLevel: string };
+    }
+  | {
+      type: 'TRUSTEE_LEVEL_CHANGED';
+      payload: {
+        trustorId: string;
+        trusteeId: string;
+        trustLevel: string;
+        previousTrustLevel: string;
       };
     }
 
@@ -209,30 +364,9 @@ function formatUserIdFallback(userId: string): string {
 }
 
 /**
- * Fetch a record's display name (fileName) for notification messages.
- *
- * @param recordId - The Firestore document ID
- * @returns File name or truncated ID as fallback
- */
-export async function getRecordDisplayName(recordId: string): Promise<string> {
-  try {
-    const recordDoc = await getFirestore().collection('records').doc(recordId).get();
-
-    if (recordDoc.exists) {
-      const data = recordDoc.data();
-      return data?.fileName || formatRecordIdFallback(recordId);
-    }
-  } catch (error) {
-    console.warn(`⚠️ Could not fetch record name for ${recordId}:`, error);
-  }
-
-  return formatRecordIdFallback(recordId);
-}
-
-/**
  * Format a record ID as a fallback display name
  */
-function formatRecordIdFallback(recordId: string): string {
+export function formatRecordIdFallback(recordId: string): string {
   return `Record ${recordId.slice(0, 8)}...`;
 }
 

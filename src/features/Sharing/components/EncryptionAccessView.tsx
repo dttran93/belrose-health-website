@@ -56,6 +56,7 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
     isLoading: isActionLoading,
   } = usePermissionFlow({
     recordId: record.id,
+    recordTitle: (record.belroseFields?.title || record.fileName) ?? undefined,
     onSuccess: () => fetchEncryptionAccess(),
   });
 

@@ -9,7 +9,7 @@ import * as admin from 'firebase-admin';
 import { Resend } from 'resend';
 import { defineSecret } from 'firebase-functions/params';
 import { NOTIFICATION_MAPPING, NotificationType } from './notificationUtils';
-import { DEFAULT_NOTIFICATION_PREFS, NotificationPrefs } from '@/_shared/notifications';
+import { DEFAULT_NOTIFICATION_PREFS, NotificationPrefs } from '../_shared/notifications';
 
 export const resendKey = defineSecret('RESEND_API_KEY');
 

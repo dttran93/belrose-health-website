@@ -37,7 +37,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.NOTIFICATION_MAPPING = void 0;
 exports.getFirestore = getFirestore;
 exports.getUserDisplayName = getUserDisplayName;
-exports.getRecordDisplayName = getRecordDisplayName;
+exports.formatRecordIdFallback = formatRecordIdFallback;
 exports.createNotification = createNotification;
 exports.createNotificationForMultiple = createNotificationForMultiple;
 exports.markNotificationAsRead = markNotificationAsRead;
@@ -55,7 +55,7 @@ exports.deleteOldNotifications = deleteOldNotifications;
  *   NOTIFICATION_SOURCE — callers never pass it explicitly.
  */
 const admin = __importStar(require("firebase-admin"));
-const _shared_1 = require("@/_shared");
+const _shared_1 = require("../_shared");
 exports.NOTIFICATION_MAPPING = Object.fromEntries(Object.entries(_shared_1.NOTIFICATION_CATEGORIES).flatMap(([category, { notificationTypes }]) => notificationTypes.map(type => [type, category])));
 function getFirestore() {
     return admin.firestore();
@@ -88,25 +88,6 @@ async function getUserDisplayName(userId) {
  */
 function formatUserIdFallback(userId) {
     return `User ${userId.slice(0, 8)}...`;
-}
-/**
- * Fetch a record's display name (fileName) for notification messages.
- *
- * @param recordId - The Firestore document ID
- * @returns File name or truncated ID as fallback
- */
-async function getRecordDisplayName(recordId) {
-    try {
-        const recordDoc = await getFirestore().collection('records').doc(recordId).get();
-        if (recordDoc.exists) {
-            const data = recordDoc.data();
-            return data?.fileName || formatRecordIdFallback(recordId);
-        }
-    }
-    catch (error) {
-        console.warn(`⚠️ Could not fetch record name for ${recordId}:`, error);
-    }
-    return formatRecordIdFallback(recordId);
 }
 /**
  * Format a record ID as a fallback display name

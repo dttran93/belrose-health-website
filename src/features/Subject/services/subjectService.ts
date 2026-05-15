@@ -20,21 +20,14 @@
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import SubjectBlockchainService from './subjectBlockchainService';
-import {
-  CreatorResponseStatus,
-  RejectionReasons,
-  SubjectRejectionService,
-} from './subjectRejectionService';
-import {
-  getConsentRequestId,
-  SubjectConsentRequest,
-  SubjectConsentService,
-} from './subjectConsentService';
+import { SubjectRejectionService } from './subjectRejectionService';
+import { getConsentRequestId, SubjectConsentService } from './subjectConsentService';
 import SubjectMembershipService from './subjectMembershipService';
 import SubjectPermissionService from './subjectPermissionService';
 import { FileObject } from '@/types/core';
 import SubjectRemovalService from './subjectRemovalService';
 import { TrusteePermissionService } from '@/features/Trustee/services/trusteePermissionService';
+import { CreatorResponseStatus, RejectionReasons, SubjectConsentRequest } from '@belrose/shared';
 
 // ============================================================================
 // TYPES

@@ -12,9 +12,7 @@ import {
   retractVerification,
   modifyVerificationLevel,
   getVerification,
-  type VerificationDoc,
   getVerificationConfig,
-  VerificationLevelOptions,
 } from '../services/verificationService';
 import {
   createDispute,
@@ -22,7 +20,6 @@ import {
   modifyDispute,
   getDispute,
   type DisputeSeverity,
-  type DisputeCulpability,
   type DisputeDocDecrypted,
   getSeverityConfig,
   getCulpabilityConfig,
@@ -31,6 +28,7 @@ import {
 import { toast } from 'sonner';
 import { DialogPhase } from '../components/ui/CredibilityActionDialog';
 import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
+import { DisputeCulpability, VerificationDoc, VerificationLevelOptions } from '@belrose/shared';
 
 // ============================================================================
 // TYPES
@@ -41,6 +39,7 @@ export type { CredibilityOperationType, VerificationLevelOptions };
 export interface UseCredibilityFlowOptions {
   recordId: string;
   recordHash: string;
+  recordTitle?: string;
   onSuccess?: () => void;
 }
 
@@ -62,7 +61,12 @@ interface PendingOperation {
 // HOOK
 // ============================================================================
 
-export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredibilityFlowOptions) {
+export function useCredibilityFlow({
+  recordId,
+  recordHash,
+  recordTitle,
+  onSuccess,
+}: UseCredibilityFlowOptions) {
   const [phase, setPhase] = useState<DialogPhase>('idle');
   const [error, setError] = useState<string | null>(null);
   const [pendingOperation, setPendingOperation] = useState<PendingOperation | null>(null);
@@ -228,7 +232,7 @@ export function useCredibilityFlow({ recordId, recordHash, onSuccess }: UseCredi
       const activityId = addActivity({ label: 'Submitting verification' });
 
       // Fire tx — don't await
-      const txPromise = createVerification(recordId, recordHash, verifierId, level);
+      const txPromise = createVerification(recordId, recordHash, verifierId, level, recordTitle);
 
       // Close dialog immediately
       setSubmittedLabel('Submitting verification');

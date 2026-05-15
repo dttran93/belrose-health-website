@@ -45,15 +45,30 @@ export {
 } from './handlers/memberRegistry';
 
 // ==================== NOTIFICATIONS ====================
+export { onRecordVersionCreated } from './notifications/triggers/recordEditNotificationTrigger';
+
+export { onRecordDeletionEventCreated } from './notifications/triggers/deleteRecordNotificationTrigger';
+
 export {
   onSubjectConsentRequestCreated,
   onSubjectConsentRequestUpdated,
 } from './notifications/triggers/subjectNotificationTrigger';
 
+export { onPermissionChangeEventCreated } from './notifications/triggers/permissionNotificationTrigger';
+
 export {
-  onRecordDeletionEventCreated,
-  onRecordDeletionEventUpdated,
-} from './notifications/triggers/deleteRecordNotificationTrigger';
+  onVerificationWritten,
+  onVerificationUpdated,
+  onDisputeWritten,
+  onDisputeUpdated,
+  onDisputeReactionWritten,
+  onDisputeReactionUpdated,
+} from './notifications/triggers/credibilityNotificationTrigger';
+
+export {
+  onTrusteeRelationshipCreated,
+  onTrusteeRelationshipUpdated,
+} from './notifications/triggers/trusteeNotificationTriggers';
 
 export {
   onRecordRequestCreated,

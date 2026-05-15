@@ -6,10 +6,9 @@ export function buildRecordEditedHtml(
   editorName: string,
   recordName: string,
   recordId: string,
-  versionNumber: number,
-  commitMessage?: string | null
+  versionNumber: number
 ): string {
-  const recordUrl = `${APP_URL}/app/records/${recordId}`;
+  const recordUrl = `${APP_URL}/records/${recordId}`;
   const year = new Date().getFullYear();
 
   return `<!DOCTYPE html>
@@ -55,7 +54,7 @@ export function buildRecordEditedHtml(
           <td style="padding:10px 0;border-bottom:1px solid #f1f5f9;
             font-size:13px;color:#64748b;width:40%;">Record</td>
           <td style="padding:10px 0;border-bottom:1px solid #f1f5f9;
-            font-size:13px;color:#1e293b;font-weight:500;">${recordName}</td>
+            font-size:13px;color:#1e293b;font-weight:500;">${recordId}</td>
         </tr>
         <tr>
           <td style="padding:10px 0;border-bottom:1px solid #f1f5f9;
@@ -69,16 +68,6 @@ export function buildRecordEditedHtml(
           <td style="padding:10px 0;border-bottom:1px solid #f1f5f9;
             font-size:13px;color:#1e293b;font-weight:500;">${versionNumber}</td>
         </tr>
-        ${
-          commitMessage
-            ? `
-        <tr>
-          <td style="padding:10px 0;font-size:13px;color:#64748b;">Summary</td>
-          <td style="padding:10px 0;font-size:13px;color:#1e293b;
-            font-weight:500;">${commitMessage}</td>
-        </tr>`
-            : ''
-        }
       </table>
 
       <!-- CTA -->
@@ -115,14 +104,11 @@ export function buildRecordEditedText(
   editorName: string,
   recordName: string,
   recordId: string,
-  versionNumber: number,
-  commitMessage?: string | null
+  versionNumber: number
 ): string {
-  return `${editorName} has saved a new version of ${recordName} (version ${versionNumber}).${
-    commitMessage ? `\n\nSummary: ${commitMessage}` : ''
-  }
+  return `${editorName} has saved a new version of ${recordName} (version ${versionNumber}).
 
-View the record at: ${APP_URL}/app/records/${recordId}
+View the record at: ${APP_URL}/records/${recordId}
 
 Questions? ${SUPPORT_EMAIL}`;
 }

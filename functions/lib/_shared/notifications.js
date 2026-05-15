@@ -31,12 +31,29 @@ exports.NOTIFICATION_CATEGORIES = {
     credibility: {
         label: 'Credibility Updates',
         description: 'Get notifications when your verifications or disputes are made on your records.',
-        notificationTypes: ['CREDIBILITY_UPDATED'],
+        notificationTypes: [
+            'VERIFICATION_ADDED',
+            'VERIFICATION_MODIFIED',
+            'VERIFICATION_RETRACTED',
+            'DISPUTE_ADDED',
+            'DISPUTE_MODIFIED',
+            'DISPUTE_RETRACTED',
+            'DISPUTE_REACTION_ADDED',
+            'DISPUTE_REACTION_MODIFIED',
+            'DISPUTE_REACTION_RETRACTED',
+        ],
     },
     trustee: {
         label: 'Trustee Relationships',
         description: 'Get notifications regarding trustee relationship changes.',
-        notificationTypes: ['TRUSTEE_RELATIONSHIP_CHANGED'],
+        notificationTypes: [
+            'TRUSTEE_INVITE_RECEIVED',
+            'TRUSTEE_INVITE_ACCEPTED',
+            'TRUSTEE_INVITE_DECLINED',
+            'TRUSTEE_REVOKED',
+            'TRUSTEE_RESIGNED',
+            'TRUSTEE_LEVEL_CHANGED',
+        ],
     },
     recordRequests: {
         label: 'Record Requests',
