@@ -29,7 +29,7 @@ import {
 import { db } from '@/firebase/config';
 
 export type ContextType = 'my-records' | 'subject' | 'all-accessible' | 'specific-records';
-export type ChatType = 'ai-chat' | 'record-refinement';
+export type ChatType = 'ai_chat' | 'record_refinement';
 
 export interface Chat {
   id: string;

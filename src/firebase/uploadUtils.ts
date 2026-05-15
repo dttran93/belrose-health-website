@@ -27,6 +27,7 @@ import {
   base64ToArrayBuffer,
 } from '@/utils/dataFormattingUtils';
 import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
+import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 
 // ==================== TYPE DEFINITIONS ====================
 
@@ -337,7 +338,7 @@ export const updateFirestoreRecord = async (
     // This is for the hashing process, otherwise, the hasher will only see what fields have changed
     console.log('🔓 Decrypting existing record for hashing context...');
 
-    const existingPlaintext = await EncryptionService.decryptRecordWithKey(fileKey, {
+    const existingPlaintext = await RecordDecryptionService.decryptRecordWithKey(fileKey, {
       fileName: currentData.encryptedFileName,
       fhirData: currentData.encryptedFhirData || null,
       belroseFields: currentData.encryptedBelroseFields || null,

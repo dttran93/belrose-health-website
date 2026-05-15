@@ -16,7 +16,7 @@ interface InboundRequestListViewProps {
   onLinkExisting: (request: RecordRequest) => void;
   onDeny: (request: RecordRequest) => void;
   onMarkComplete: (request: RecordRequest) => void;
-  onViewRecord: (recordId: string) => void;
+  onViewRecord: (recordIds: string[]) => void;
 }
 
 const InboundRequestListView: React.FC<InboundRequestListViewProps> = ({

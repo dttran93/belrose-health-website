@@ -380,6 +380,7 @@ export class MessageService {
     // Batch the updates — avoids multiple sequential writes
     await Promise.all(snapshot.docs.map(d => updateDoc(d.ref, { readAt: serverTimestamp() })));
 
+    // Update conversation collection's lastReadAt
     await updateDoc(doc(db, 'conversations', conversationId), {
       [`lastReadAt.${currentUserId}`]: serverTimestamp(),
     });

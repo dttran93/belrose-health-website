@@ -22,7 +22,13 @@
     "incremental": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src/**/*", "vite.config.ts", "contracts/scripts/**/*", "test/**/*"],
+  "include": [
+    "src/**/*",
+    "vite.config.ts",
+    "contracts/scripts/**/*",
+    "test/**/*",
+    "packages/shared/src/blockchain.ts"
+  ],
   "exclude": ["node_modules", "dist", "functions/**/*"],
   "references": [{ "path": "./packages/shared" }]
 }

@@ -53,67 +53,26 @@ export class RecordDecryptionService {
       // 2. Decrypt all the fields
       const decryptedData: Partial<FileObject> & { id: string } = {
         ...encryptedRecord, // Start with all fields
+        fileName: await this.safeDecrypt(encryptedRecord.encryptedFileName, fileKey, 'text'),
+        extractedText: await this.safeDecrypt(
+          encryptedRecord.encryptedExtractedText,
+          fileKey,
+          'text'
+        ),
+        originalText: await this.safeDecrypt(
+          encryptedRecord.encryptedOriginalText,
+          fileKey,
+          'text'
+        ),
+        contextText: await this.safeDecrypt(encryptedRecord.encryptedContextText, fileKey, 'text'),
+        fhirData: await this.safeDecrypt(encryptedRecord.encryptedFhirData, fileKey, 'json'),
+        belroseFields: await this.safeDecrypt(
+          encryptedRecord.encryptedBelroseFields,
+          fileKey,
+          'json'
+        ),
+        customData: await this.safeDecrypt(encryptedRecord.encryptedCustomData, fileKey, 'json'),
       };
-
-      // Decrypt file name
-      if (encryptedRecord.encryptedFileName) {
-        decryptedData.fileName = await EncryptionService.decryptText(
-          base64ToArrayBuffer(encryptedRecord.encryptedFileName.encrypted),
-          fileKey,
-          base64ToArrayBuffer(encryptedRecord.encryptedFileName.iv)
-        );
-        console.log('✓ File name decrypted');
-      }
-
-      // Decrypt extracted text
-      if (encryptedRecord.encryptedExtractedText) {
-        decryptedData.extractedText = await EncryptionService.decryptText(
-          base64ToArrayBuffer(encryptedRecord.encryptedExtractedText.encrypted),
-          fileKey,
-          base64ToArrayBuffer(encryptedRecord.encryptedExtractedText.iv)
-        );
-        console.log('✓ Extracted text decrypted');
-      }
-
-      // Decrypt original text
-      if (encryptedRecord.encryptedOriginalText) {
-        decryptedData.originalText = await EncryptionService.decryptText(
-          base64ToArrayBuffer(encryptedRecord.encryptedOriginalText.encrypted),
-          fileKey,
-          base64ToArrayBuffer(encryptedRecord.encryptedOriginalText.iv)
-        );
-        console.log('✓ Original text decrypted');
-      }
-
-      // Decrypt context text
-      if (encryptedRecord.encryptedContextText) {
-        decryptedData.contextText = await EncryptionService.decryptText(
-          base64ToArrayBuffer(encryptedRecord.encryptedContextText.encrypted),
-          fileKey,
-          base64ToArrayBuffer(encryptedRecord.encryptedContextText.iv)
-        );
-        console.log('✓ Context text decrypted');
-      }
-
-      // Decrypt FHIR data
-      if (encryptedRecord.encryptedFhirData) {
-        decryptedData.fhirData = await EncryptionService.decryptJSON(
-          base64ToArrayBuffer(encryptedRecord.encryptedFhirData.encrypted),
-          fileKey,
-          base64ToArrayBuffer(encryptedRecord.encryptedFhirData.iv)
-        );
-        console.log('✓ FHIR data decrypted');
-      }
-
-      // Decrypt Belrose fields
-      if (encryptedRecord.encryptedBelroseFields) {
-        decryptedData.belroseFields = await EncryptionService.decryptJSON(
-          base64ToArrayBuffer(encryptedRecord.encryptedBelroseFields.encrypted),
-          fileKey,
-          base64ToArrayBuffer(encryptedRecord.encryptedBelroseFields.iv)
-        );
-        console.log('✓ Belrose fields decrypted');
-      }
 
       console.log('✅ Record decryption complete');
       return decryptedData as FileObject;
@@ -123,6 +82,33 @@ export class RecordDecryptionService {
         `Decryption failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
+  }
+
+  /**
+   * Decrypt ALL record data using an already-unwrapped file key
+   * Use this when the file key has been already been unwrapped.
+   * This avoids redundant firestore reads. Used in Versioning for example.
+   * - Shared users (RSA-unwrapped keys)
+   * - When you already have the wrapped key in memory
+   * - update operations where key is wrapped once and reused
+   * - Expects fileName/extractedText/originalText, unlike decryptRecord where it uses encryptedFields
+   */
+  static async decryptRecordWithKey(fileKey: CryptoKey, encryptedData: any): Promise<any> {
+    console.log('🔓 Starting complete record decryption with unwrapped key...');
+
+    const result: any = {};
+
+    // Decrypt all fields
+    result.fileName = await this.safeDecrypt(encryptedData.fileName, fileKey, 'text');
+    result.extractedText = await this.safeDecrypt(encryptedData.extractedText, fileKey, 'text');
+    result.originalText = await this.safeDecrypt(encryptedData.originalText, fileKey, 'text');
+    result.contextText = await this.safeDecrypt(encryptedData.contextText, fileKey, 'text');
+    result.fhirData = await this.safeDecrypt(encryptedData.fhirData, fileKey, 'json');
+    result.belroseFields = await this.safeDecrypt(encryptedData.belroseFields, fileKey, 'json');
+    result.customData = await this.safeDecrypt(encryptedData.customData, fileKey, 'json');
+
+    console.log('✅ Complete record decryption finished');
+    return result;
   }
 
   /**
@@ -248,5 +234,18 @@ export class RecordDecryptionService {
     );
 
     return await SharingKeyManagementService.importPrivateKey(arrayBufferToBase64(privateKeyBytes));
+  }
+
+  private static async safeDecrypt(
+    field: { encrypted: string; iv: string } | null | undefined,
+    key: CryptoKey,
+    type: 'text' | 'json'
+  ): Promise<any> {
+    if (!field?.encrypted || !field?.iv) return null;
+    const iv = base64ToArrayBuffer(field.iv);
+    const encrypted = base64ToArrayBuffer(field.encrypted);
+    return type === 'text'
+      ? await EncryptionService.decryptText(encrypted, key, iv)
+      : await EncryptionService.decryptJSON(encrypted, key, iv);
   }
 }

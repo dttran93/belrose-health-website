@@ -157,7 +157,7 @@ wrappedKey (base64) → RSA-OAEP unwrap with RSA private key → DEK as CryptoKe
 
 To get the RSA private key for the shared path: fetch `encryptedPrivateKey` from Firestore, AES-GCM decrypt it with the master key, import as RSA CryptoKey.
 
-Once the DEK is in hand, `EncryptionService.decryptCompleteRecord` decrypts each field using the field-specific IV stored alongside the ciphertext.
+Once the DEK is in hand, `RecordDecryptionService` decrypts each field using the field-specific IV stored alongside the ciphertext.
 
 ---
 

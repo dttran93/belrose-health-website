@@ -10,7 +10,7 @@ import type {
 } from './fhirConversionService.type';
 
 import type { FHIRResource } from '@/types/fhir';
-import { FHIRConversionRequest } from '@/types/sharedApi';
+import { FHIRConversionRequest } from '@belrose/shared';
 
 /**
  * Convert document text to FHIR format using AI

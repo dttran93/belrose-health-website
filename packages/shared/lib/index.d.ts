@@ -5,4 +5,5 @@ export * from './convertToFHIR';
 export * from './aiImageAnalysis';
 export * from './blockchain';
 export * from './aiChat';
+export * from './notifications';
 //# sourceMappingURL=index.d.ts.map

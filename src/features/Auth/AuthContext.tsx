@@ -1,6 +1,10 @@
-import React, { createContext, useContext } from 'react';
+import React, { createContext, ReactNode, useContext } from 'react';
 import { useAuth } from './hooks/useAuth';
-import { AuthContextData, AuthProviderProps } from '@/types/core';
+import { AuthContextData } from '@/types/core';
+
+export interface AuthProviderProps {
+  children: ReactNode;
+}
 
 const AuthContext = createContext<AuthContextData | null>(null);
 

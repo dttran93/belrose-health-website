@@ -14,11 +14,23 @@ import React, { useState, useMemo } from 'react';
 import { Bell, CheckCheck, Filter, Loader2, AlertCircle, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuthContext } from '@/features/Auth/AuthContext';
-import { useNotifications, SourceService } from '../hooks/useNotifications';
+import { useNotifications } from '../hooks/useNotifications';
 import NotificationItem from './ui/NotificationItem';
 import { toast } from 'sonner';
+import { NOTIFICATION_CATEGORIES, NotificationCategory } from '@belrose/shared';
 
-type FilterOption = 'all' | 'unread' | SourceService;
+const FILTERED_CATEGORIES: NotificationCategory[] = [
+  'subjectRequests',
+  'recordEditing',
+  'recordDeletion',
+  'recordRequests',
+  'permissions',
+  'credibility',
+  'trustee',
+  'system',
+];
+
+type FilterOption = 'all' | 'unread' | NotificationCategory;
 
 interface FilterButtonProps {
   label: string;
@@ -62,18 +74,10 @@ const FilterButton: React.FC<FilterButtonProps> = ({
 
 const EmptyState: React.FC<{ filter: FilterOption }> = ({ filter }) => {
   const getMessage = () => {
-    switch (filter) {
-      case 'unread':
-        return "You're all caught up! No unread notifications.";
-      case 'Subject':
-        return 'No subject-related notifications yet.';
-      case 'Messaging':
-        return 'No message notifications yet.';
-      case 'System':
-        return 'No system notifications yet.';
-      default:
-        return "You don't have any notifications yet.";
-    }
+    if (filter === 'unread') return "You're all caught up! No unread notifications.";
+    if (filter === 'all') return "You don't have any notifications yet.";
+    // For category filters, use the label from NOTIFICATION_CATEGORIES
+    return `No ${NOTIFICATION_CATEGORIES[filter as NotificationCategory].label.toLowerCase()} notifications yet.`;
   };
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4">
@@ -130,28 +134,21 @@ export const NotificationsTab: React.FC = () => {
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
 
   const filteredNotifications = useMemo(() => {
-    switch (activeFilter) {
-      case 'unread':
-        return notifications.filter(n => !n.read);
-      case 'Subject':
-      case 'Messaging':
-      case 'System':
-        return notifications.filter(n => n.sourceService === activeFilter);
-      default:
-        return notifications;
-    }
+    if (activeFilter === 'all') return notifications;
+    if (activeFilter === 'unread') return notifications.filter(n => !n.read);
+    return notifications.filter(n => n.sourceService === activeFilter);
   }, [notifications, activeFilter]);
 
-  const filterCounts = useMemo(
-    () => ({
+  const filterCounts = useMemo(() => {
+    const counts: Record<string, number> = {
       all: notifications.length,
       unread: unreadCount,
-      Subject: notifications.filter(n => n.sourceService === 'Subject').length,
-      Messaging: notifications.filter(n => n.sourceService === 'Messaging').length,
-      System: notifications.filter(n => n.sourceService === 'System').length,
-    }),
-    [notifications, unreadCount]
-  );
+    };
+    FILTERED_CATEGORIES.forEach(category => {
+      counts[category] = notifications.filter(n => n.sourceService === category).length;
+    });
+    return counts;
+  }, [notifications, unreadCount]);
 
   const handleMarkAllAsRead = async () => {
     if (unreadCount === 0) return;
@@ -172,37 +169,16 @@ export const NotificationsTab: React.FC = () => {
       <div className="px-4 py-4 flex items-center justify-between gap-4 border-b border-border">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
           <Filter className="w-4 h-4 text-muted-foreground flex-shrink-0 mr-1" />
-          <FilterButton
-            label="All"
-            value="all"
-            activeFilter={activeFilter}
-            onClick={setActiveFilter}
-          />
-          <FilterButton
-            label="Unread"
-            value="unread"
-            activeFilter={activeFilter}
-            onClick={setActiveFilter}
-            count={filterCounts.unread}
-          />
-          <FilterButton
-            label="Subject"
-            value="Subject"
-            activeFilter={activeFilter}
-            onClick={setActiveFilter}
-          />
-          <FilterButton
-            label="Messages"
-            value="Messaging"
-            activeFilter={activeFilter}
-            onClick={setActiveFilter}
-          />
-          <FilterButton
-            label="System"
-            value="System"
-            activeFilter={activeFilter}
-            onClick={setActiveFilter}
-          />
+          {FILTERED_CATEGORIES.map(category => (
+            <FilterButton
+              key={category}
+              label={NOTIFICATION_CATEGORIES[category].label}
+              value={category}
+              activeFilter={activeFilter}
+              onClick={setActiveFilter}
+              count={filterCounts[category]}
+            />
+          ))}
         </div>
 
         {unreadCount > 0 && (

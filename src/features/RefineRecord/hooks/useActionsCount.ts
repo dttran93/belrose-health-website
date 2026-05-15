@@ -18,8 +18,6 @@
  * per-record Firestore reads. It's not perfectly accurate but good enough for
  * a badge count.
  *
- * TODO: replace the credibility proxy with a denormalized `hasVerification`
- * boolean on FileObject once that field exists on the record document.
  */
 
 import { useEffect, useState, useCallback } from 'react';

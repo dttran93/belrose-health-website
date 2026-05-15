@@ -307,82 +307,26 @@ export class EncryptionService {
   }
 
   /**
-   * Decrypt ALL record data using a wrappedKey
-   * Unwraps the key using the user's master key (AES encryption)
-   * Used by record creators whose keys are encrypted with their master key
-   */
-  static async decryptCompleteRecord(
-    encryptedKey: string,
-    encryptedData: any, // Use any here to handle missing properties safely
-    userKey: CryptoKey
-  ): Promise<any> {
-    console.log('🔓 Starting complete record decryption...');
-
-    // 1. Decrypt the file key
-    const keyData = base64ToArrayBuffer(encryptedKey);
-    const fileKeyData = await this.decryptKeyWithMasterKey(keyData, userKey);
-    const fileKey = await this.importKey(fileKeyData);
-
-    const result: any = {};
-
-    // 2. Helper to handle the "Exists + Decrypt" logic
-    const safeDecrypt = async (field: any, type: 'text' | 'json') => {
-      // Check if the field and its inner encrypted data actually exist
-      if (!field || !field.encrypted || !field.iv) return null;
-
-      const iv = base64ToArrayBuffer(field.iv);
-      const encrypted = base64ToArrayBuffer(field.encrypted);
-
-      return type === 'text'
-        ? await this.decryptText(encrypted, fileKey, iv)
-        : await this.decryptJSON(encrypted, fileKey, iv);
-    };
-
-    // 3. Decrypt fields safely
-    result.fileName = await safeDecrypt(encryptedData.fileName, 'text');
-    result.extractedText = await safeDecrypt(encryptedData.extractedText, 'text');
-    result.originalText = await safeDecrypt(encryptedData.originalText, 'text');
-    result.contextText = await safeDecrypt(encryptedData.contextText, 'text');
-    result.fhirData = await safeDecrypt(encryptedData.fhirData, 'json');
-    result.belroseFields = await safeDecrypt(encryptedData.belroseFields, 'json');
-    result.customData = await safeDecrypt(encryptedData.customData, 'json');
-
-    console.log('✅ Complete record decryption finished');
-    return result;
-  }
-
-  /**
    * Decrypt ALL record data using an already-unwrapped file key
    * Use this when the file key has been unwrapped separately:
    * - Shared users (RSA-unwrapped keys)
    * - When you already have the wrapped key in memory
    * - update operations where key is wrapped once and reused
+   * - Point is to avoid redundant firestore reads. Used in Versioning
    */
   static async decryptRecordWithKey(fileKey: CryptoKey, encryptedData: any): Promise<any> {
     console.log('🔓 Starting complete record decryption with unwrapped key...');
 
     const result: any = {};
 
-    // Helper to safely decrypt fields
-    const safeDecrypt = async (field: any, type: 'text' | 'json') => {
-      if (!field || !field.encrypted || !field.iv) return null;
-
-      const iv = base64ToArrayBuffer(field.iv);
-      const encrypted = base64ToArrayBuffer(field.encrypted);
-
-      return type === 'text'
-        ? await this.decryptText(encrypted, fileKey, iv)
-        : await this.decryptJSON(encrypted, fileKey, iv);
-    };
-
     // Decrypt all fields
-    result.fileName = await safeDecrypt(encryptedData.fileName, 'text');
-    result.extractedText = await safeDecrypt(encryptedData.extractedText, 'text');
-    result.originalText = await safeDecrypt(encryptedData.originalText, 'text');
-    result.contextText = await safeDecrypt(encryptedData.contextText, 'text');
-    result.fhirData = await safeDecrypt(encryptedData.fhirData, 'json');
-    result.belroseFields = await safeDecrypt(encryptedData.belroseFields, 'json');
-    result.customData = await safeDecrypt(encryptedData.customData, 'json');
+    result.fileName = await this.safeDecrypt(encryptedData.fileName, fileKey, 'text');
+    result.extractedText = await this.safeDecrypt(encryptedData.extractedText, fileKey, 'text');
+    result.originalText = await this.safeDecrypt(encryptedData.originalText, fileKey, 'text');
+    result.contextText = await this.safeDecrypt(encryptedData.contextText, fileKey, 'text');
+    result.fhirData = await this.safeDecrypt(encryptedData.fhirData, fileKey, 'json');
+    result.belroseFields = await this.safeDecrypt(encryptedData.belroseFields, fileKey, 'json');
+    result.customData = await this.safeDecrypt(encryptedData.customData, fileKey, 'json');
 
     console.log('✅ Complete record decryption finished');
     return result;
@@ -446,6 +390,19 @@ export class EncryptionService {
       masterKey,
       encrypted
     );
+  }
+
+  private static async safeDecrypt(
+    field: { encrypted: string; iv: string } | null | undefined,
+    key: CryptoKey,
+    type: 'text' | 'json'
+  ): Promise<any> {
+    if (!field?.encrypted || !field?.iv) return null;
+    const iv = base64ToArrayBuffer(field.iv);
+    const encrypted = base64ToArrayBuffer(field.encrypted);
+    return type === 'text'
+      ? await this.decryptText(encrypted, key, iv)
+      : await this.decryptJSON(encrypted, key, iv);
   }
 
   // ========== ENCRYPTION KEY DERIVATION AND RECOVERY ============

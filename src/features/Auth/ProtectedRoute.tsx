@@ -1,7 +1,16 @@
-import React from 'react';
+import React, { ReactNode } from 'react';
 import { Navigate, useLocation, Location } from 'react-router-dom';
 import { useAuthContext } from './AuthContext';
-import { ProtectedRouteProps, LocationState } from '@/types/core'; // Import from core types
+
+export interface ProtectedRouteProps {
+  children: ReactNode;
+}
+
+export interface LocationState {
+  from: {
+    pathname: string;
+  };
+}
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, loading } = useAuthContext();

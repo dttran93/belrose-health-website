@@ -1,4 +1,4 @@
-import { BelroseFields, BlockchainRef } from '@belrose/shared';
+import { BelroseFields, BlockchainRef, NotificationPrefs } from '@belrose/shared';
 import { Timestamp } from 'firebase/firestore';
 import { ReactNode } from 'react';
 
@@ -11,6 +11,7 @@ export interface User {
   firstName: string | null;
   lastName: string | null;
   photoURL?: string | null;
+  notificationPrefs?: NotificationPrefs;
 
   encryption: {
     enabled: boolean;
@@ -94,22 +95,6 @@ export interface AuthContextData {
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
   refreshUser: () => {};
-}
-
-// Props for components that need auth context
-export interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export interface ProtectedRouteProps {
-  children: ReactNode;
-}
-
-// Location state for navigation
-export interface LocationState {
-  from: {
-    pathname: string;
-  };
 }
 
 // ==================== HEALTH RECORDS FILE ====================

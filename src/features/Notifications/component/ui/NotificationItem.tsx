@@ -1,6 +1,6 @@
 // src/features/Notifications/components/ui/NotificationItem.tsx
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   UserPlus,
@@ -11,9 +11,13 @@ import {
   MessageSquare,
   Bell,
   Circle,
+  Trash2,
+  FileEdit,
 } from 'lucide-react';
-import { Notification, NotificationType } from '@/features/Notifications/hooks/useNotifications';
+import { Notification } from '@/features/Notifications/hooks/useNotifications';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
+import { resolveNotificationTitle } from '../../services/resolveNotificationTitle';
+import { NotificationType } from '@belrose/shared';
 
 // ============================================================================
 // TYPES
@@ -29,6 +33,9 @@ interface NotificationConfig {
   iconBgColor: string;
   iconColor: string;
 }
+
+// Notification types that reference a record title needing decryption
+const RECORD_TITLE_TYPES = new Set<NotificationType>(['RECORD_EDITED']);
 
 // ============================================================================
 // NOTIFICATION CONFIG
@@ -64,17 +71,23 @@ const getNotificationConfig = (type: NotificationType): NotificationConfig => {
         iconBgColor: 'bg-supplement-4/10',
         iconColor: 'text-supplement-4',
       };
-    case 'REJECTION_PUBLICLY_LISTED':
+    case 'REJECTION_ESCALATED':
       return {
         icon: <Globe className="w-5 h-5" />,
         iconBgColor: 'bg-complement-2/10',
         iconColor: 'text-complement-2',
       };
-    case 'NEW_MESSAGE':
+    case 'RECORD_EDITED':
       return {
-        icon: <MessageSquare className="w-5 h-5" />,
-        iconBgColor: 'bg-complement-5/10',
-        iconColor: 'text-complement-5',
+        icon: <FileEdit className="w-5 h-5" />,
+        iconBgColor: 'bg-complement-1/10',
+        iconColor: 'text-complement-1',
+      };
+    case 'RECORD_DELETED':
+      return {
+        icon: <Trash2 className="w-5 h-5" />,
+        iconBgColor: 'bg-complement-4/10',
+        iconColor: 'text-complement-4',
       };
     default:
       return {
@@ -101,6 +114,27 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
 }) => {
   const navigate = useNavigate();
   const config = getNotificationConfig(notification.type);
+
+  // Resolved display message — starts with the raw message, then substitutes
+  // the decrypted record title once async resolution completes
+  const [displayMessage, setDisplayMessage] = useState(notification.message);
+
+  useEffect(() => {
+    if (!RECORD_TITLE_TYPES.has(notification.type)) return;
+    if (!('payload' in notification)) return;
+
+    let cancelled = false;
+
+    resolveNotificationTitle(notification.payload).then(title => {
+      if (cancelled) return;
+      // Replace the fallback placeholder with the real decrypted title
+      setDisplayMessage(notification.message.replace(/Record [a-f0-9]{8}\.\.\./, title));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [notification]);
 
   const handleClick = () => {
     // Mark as read if unread
@@ -150,7 +184,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
             ${notification.read ? 'text-foreground/80' : 'text-foreground font-medium'}
           `}
         >
-          {notification.message}
+          {displayMessage}
         </p>
 
         {/* Timestamp and source */}

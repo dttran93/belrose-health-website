@@ -3,26 +3,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { onSnapshot, QuerySnapshot, DocumentData, Timestamp } from 'firebase/firestore';
 import { NotificationReader } from '@/features/Notifications/services/notificationReader';
+import { NotificationCategory, NotificationType } from '@belrose/shared';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-export type NotificationType =
-  | 'SUBJECT_REQUEST_RECEIVED'
-  | 'SUBJECT_ACCEPTED'
-  | 'REJECTION_PENDING_CREATOR_DECISION'
-  | 'REJECTION_ACKNOWLEDGED'
-  | 'REJECTION_PUBLICLY_LISTED'
-  | 'NEW_MESSAGE'
-  | 'GENERIC_NOTIFICATION';
-
-export type SourceService = 'Subject' | 'Messaging' | 'System';
-
 export interface Notification {
   id: string;
   type: NotificationType;
-  sourceService: SourceService;
+  sourceService: NotificationCategory;
   message: string;
   read: boolean;
   createdAt: Timestamp;
@@ -99,7 +89,7 @@ export const useNotifications = (userId: string | undefined): UseNotificationsRe
           return {
             id: doc.id,
             type: data.type as NotificationType,
-            sourceService: data.sourceService as SourceService,
+            sourceService: data.sourceService as NotificationCategory,
             message: data.message,
             read: data.read ?? false,
             createdAt: data.createdAt,
