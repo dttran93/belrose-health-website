@@ -42,7 +42,6 @@ exports.sendEmailIfEnabled = sendEmailIfEnabled;
  */
 const admin = __importStar(require("firebase-admin"));
 const params_1 = require("firebase-functions/params");
-const notificationUtils_1 = require("./notificationUtils");
 const notifications_1 = require("../_shared/notifications");
 exports.resendKey = (0, params_1.defineSecret)('RESEND_API_KEY');
 exports.FROM_EMAIL = 'noreply@belrosehealth.com';
@@ -60,7 +59,7 @@ async function getUserEmailAndPrefs(userId) {
     const data = userDoc.data();
     return {
         email: data.email,
-        prefs: data.notificationPrefs ?? notifications_1.DEFAULT_NOTIFICATION_PREFS,
+        prefs: (data.notificationPrefs ?? {}),
     };
 }
 /**
@@ -74,10 +73,12 @@ async function sendEmailIfEnabled(userId, type, payload, resend) {
         return;
     }
     if (type !== null) {
-        const category = notificationUtils_1.NOTIFICATION_MAPPING[type];
         const prefs = result.prefs;
-        if (!prefs[category]?.email) {
-            console.log(`📭 User ${userId} has disabled email for '${category}', skipping`);
+        // Notification look up by Type - falls back to default (true) if not set
+        const effective = prefs[type] ??
+            notifications_1.DEFAULT_NOTIFICATION_PREFS[type] ?? { inApp: true, email: true };
+        if (!effective.email) {
+            console.log(`📭 User ${userId} has disabled email for '${type}', skipping`);
             return;
         }
     }

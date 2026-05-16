@@ -68,9 +68,10 @@ const TRUST_LEVEL_LABELS: Record<TrustLevel, string> = {
 };
 
 const TRUST_LEVEL_DESCRIPTIONS: Record<TrustLevel, string> = {
-  observer: 'Read-only access to your records',
-  custodian: 'Same access level as you on all your records',
-  controller: 'Full account-level access including accepting records on your behalf',
+  observer: "You have read-only access to the trustor's records",
+  custodian: "You have management access to the trustor's records",
+  controller:
+    'You have full account-level permissions including accepting, deleting records on their behalf',
 };
 
 // ============================================================================

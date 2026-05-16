@@ -1,4 +1,5 @@
 import { APP_URL, MARKETING_URL, SUPPORT_EMAIL } from '../emailUtils';
+import { formatRecordIdFallback } from '../notificationUtils';
 
 type Role = 'owner' | 'administrator' | 'viewer';
 
@@ -120,6 +121,7 @@ export function buildPermissionGrantedHtml(
         }
       </p>
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+        ${infoRow('Record', recordId)}
         ${isUpgrade ? infoRow('Previous role', ROLE_LABELS[previousRole!]) : ''}
         ${infoRow('Your role', ROLE_LABELS[newRole])}
       </table>
@@ -176,6 +178,7 @@ export function buildPermissionDowngradedHtml(
         <strong>${changedByName}</strong> has updated your access level on a record.
       </p>
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+        ${infoRow('Record', recordId)}
         ${infoRow('Previous role', ROLE_LABELS[previousRole])}
         ${infoRow('New role', ROLE_LABELS[newRole])}
       </table>
@@ -226,6 +229,7 @@ export function buildPermissionRevokedHtml(
         on Belrose. You no longer have access to this record or its contents.
       </p>
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+        ${infoRow('Record', recordId)}
         ${infoRow('Removed role', ROLE_LABELS[previousRole])}
       </table>
       <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;

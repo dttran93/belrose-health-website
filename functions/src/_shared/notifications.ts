@@ -70,14 +70,15 @@ export const NOTIFICATION_CATEGORIES = {
   },
 } as const;
 
+// Derived from categories, pulls each key from the key/value pairs in the NOTIFICATION_CATEGORIES object to create a union type of all notification types
 export type NotificationCategory = keyof typeof NOTIFICATION_CATEGORIES;
 
-// Derived from the categories — single source of truth
+// Derived from the categories, pulls each notification type from the nested notificationTypes arrays to create a union type of all notification types
 export type NotificationType =
   (typeof NOTIFICATION_CATEGORIES)[NotificationCategory]['notificationTypes'][number];
 
 // ======================================================================
-// NOTIFICATION PREFERENCS
+// NOTIFICATION PREFERENCES
 // ======================================================================
 
 export interface ChannelPrefs {
@@ -85,15 +86,12 @@ export interface ChannelPrefs {
   email: boolean;
 }
 
-export type NotificationPrefs = Record<NotificationCategory, ChannelPrefs>;
+// Preferences are built at the notificationType level, the lowest level of granularity. UI allows for categories to be toggled as well.
+export type NotificationPrefs = Partial<Record<NotificationType, ChannelPrefs>>;
 
-export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
-  recordEditing: { inApp: true, email: true },
-  recordDeletion: { inApp: true, email: true },
-  subjectRequests: { inApp: true, email: true },
-  permissions: { inApp: true, email: true },
-  credibility: { inApp: true, email: true },
-  trustee: { inApp: true, email: true },
-  recordRequests: { inApp: true, email: true },
-  system: { inApp: true, email: true },
-};
+// All notifications are active by default. Object is only updated when the user changes the preference
+export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = Object.fromEntries(
+  (Object.values(NOTIFICATION_CATEGORIES) as { notificationTypes: readonly string[] }[])
+    .flatMap(cat => cat.notificationTypes)
+    .map(type => [type, { inApp: true, email: true }])
+) as NotificationPrefs;

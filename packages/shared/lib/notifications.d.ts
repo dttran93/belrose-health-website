@@ -46,6 +46,6 @@ export interface ChannelPrefs {
     inApp: boolean;
     email: boolean;
 }
-export type NotificationPrefs = Record<NotificationCategory, ChannelPrefs>;
+export type NotificationPrefs = Partial<Record<NotificationType, ChannelPrefs>>;
 export declare const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs;
 //# sourceMappingURL=notifications.d.ts.map

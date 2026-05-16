@@ -71,14 +71,8 @@ exports.NOTIFICATION_CATEGORIES = {
         notificationTypes: ['GENERIC_NOTIFICATION'],
     },
 };
-exports.DEFAULT_NOTIFICATION_PREFS = {
-    recordEditing: { inApp: true, email: true },
-    recordDeletion: { inApp: true, email: true },
-    subjectRequests: { inApp: true, email: true },
-    permissions: { inApp: true, email: true },
-    credibility: { inApp: true, email: true },
-    trustee: { inApp: true, email: true },
-    recordRequests: { inApp: true, email: true },
-    system: { inApp: true, email: true },
-};
+// All notifications are active by default. Object is only updated when the user changes the preference
+exports.DEFAULT_NOTIFICATION_PREFS = Object.fromEntries(Object.values(exports.NOTIFICATION_CATEGORIES)
+    .flatMap(cat => cat.notificationTypes)
+    .map(type => [type, { inApp: true, email: true }]));
 //# sourceMappingURL=notifications.js.map

@@ -13,6 +13,7 @@ import SearchDiscoverabilityToggle from '@/features/Settings/components/SearchDi
 import SettingsNav from '@/features/Settings/components/SettingsNav';
 import AccountSettings from '@/features/Settings/components/AccountSettings';
 import ChangePasswordModal from '@/features/Settings/components/ChangePasswordModal';
+import NotificationSettings from '@/features/Settings/components/NotificationSettings';
 
 const SettingsPage = () => {
   const auth = getAuth();
@@ -133,6 +134,9 @@ const SettingsPage = () => {
 
       case 'trustee':
         return <TrusteePage />;
+
+      case 'notifications':
+        return <NotificationSettings />;
 
       case 'privacy':
         return (

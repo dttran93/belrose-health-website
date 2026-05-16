@@ -8,8 +8,11 @@
 import * as admin from 'firebase-admin';
 import { Resend } from 'resend';
 import { defineSecret } from 'firebase-functions/params';
-import { NOTIFICATION_MAPPING, NotificationType } from './notificationUtils';
-import { DEFAULT_NOTIFICATION_PREFS, NotificationPrefs } from '../_shared/notifications';
+import {
+  DEFAULT_NOTIFICATION_PREFS,
+  NotificationPrefs,
+  NotificationType,
+} from '../_shared/notifications';
 
 export const resendKey = defineSecret('RESEND_API_KEY');
 
@@ -35,7 +38,7 @@ async function getUserEmailAndPrefs(userId: string) {
   const data = userDoc.data()!;
   return {
     email: data.email as string | undefined,
-    prefs: data.notificationPrefs ?? DEFAULT_NOTIFICATION_PREFS,
+    prefs: (data.notificationPrefs ?? {}) as NotificationPrefs,
   };
 }
 
@@ -57,14 +60,18 @@ export async function sendEmailIfEnabled(
   }
 
   if (type !== null) {
-    const category = NOTIFICATION_MAPPING[type];
     const prefs = result.prefs as NotificationPrefs;
 
-    if (!prefs[category]?.email) {
-      console.log(`📭 User ${userId} has disabled email for '${category}', skipping`);
+    // Notification look up by Type - falls back to default (true) if not set
+    const effective = prefs[type] ??
+      DEFAULT_NOTIFICATION_PREFS[type] ?? { inApp: true, email: true };
+
+    if (!effective.email) {
+      console.log(`📭 User ${userId} has disabled email for '${type}', skipping`);
       return;
     }
   }
+
   await resend.emails.send({
     to: result.email,
     from: `${FROM_NAME} <${FROM_EMAIL}>`,

@@ -109,6 +109,15 @@ function formatRecordIdFallback(recordId) {
  * @returns The created notification document ID
  */
 async function createNotification(targetUserId, notification) {
+    // Check in-app preference before writing
+    const userDoc = await getFirestore().collection('users').doc(targetUserId).get();
+    const prefs = (userDoc.data()?.notificationPrefs ?? {});
+    const effective = prefs[notification.type] ??
+        _shared_1.DEFAULT_NOTIFICATION_PREFS[notification.type] ?? { inApp: true, email: true };
+    if (!effective.inApp) {
+        console.log(`📭 User ${targetUserId} has disabled in-app for '${notification.type}', skipping`);
+        return '';
+    }
     const stored = {
         ...notification,
         sourceService: exports.NOTIFICATION_MAPPING[notification.type],

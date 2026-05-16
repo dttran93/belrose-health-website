@@ -102,6 +102,7 @@ function buildPermissionGrantedHtml(changedByName, recordId, newRole, isUpgrade,
         : `<strong>${changedByName}</strong> has granted you access to a record on Belrose.`}
       </p>
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+        ${infoRow('Record', recordId)}
         ${isUpgrade ? infoRow('Previous role', ROLE_LABELS[previousRole]) : ''}
         ${infoRow('Your role', ROLE_LABELS[newRole])}
       </table>
@@ -138,6 +139,7 @@ function buildPermissionDowngradedHtml(changedByName, recordId, previousRole, ne
         <strong>${changedByName}</strong> has updated your access level on a record.
       </p>
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+        ${infoRow('Record', recordId)}
         ${infoRow('Previous role', ROLE_LABELS[previousRole])}
         ${infoRow('New role', ROLE_LABELS[newRole])}
       </table>
@@ -171,6 +173,7 @@ function buildPermissionRevokedHtml(changedByName, recordId, previousRole) {
         on Belrose. You no longer have access to this record or its contents.
       </p>
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+        ${infoRow('Record', recordId)}
         ${infoRow('Removed role', ROLE_LABELS[previousRole])}
       </table>
       <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;

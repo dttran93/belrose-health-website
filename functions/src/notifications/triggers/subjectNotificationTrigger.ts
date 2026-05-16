@@ -25,7 +25,6 @@ import {
   createNotificationForMultiple,
   formatRecordIdFallback,
   getUserDisplayName,
-  NotificationType,
 } from '../notificationUtils';
 import { defineSecret } from 'firebase-functions/params';
 import { sendEmailIfEnabled } from '../emailUtils';
@@ -43,6 +42,7 @@ import {
   buildSubjectRequestText,
 } from '../emails/subjectEmailTemplates';
 import { SubjectConsentRequest } from '@/_shared/subject';
+import { NotificationType } from '@/_shared/notifications';
 
 // ============================================================================
 // TYPES

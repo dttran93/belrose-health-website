@@ -15,10 +15,13 @@
 import * as admin from 'firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import {
+  DEFAULT_NOTIFICATION_PREFS,
   DisputeCulpability,
   DisputeSeverityOptions,
   NOTIFICATION_CATEGORIES,
   NotificationCategory,
+  NotificationPrefs,
+  NotificationType,
   VerificationLevelOptions,
 } from '../_shared';
 import { SubjectRejectionType } from '@/_shared/subject';
@@ -306,8 +309,6 @@ export type NotificationDoc =
       payload: Record<string, unknown>;
     };
 
-export type NotificationType = NotificationDoc['type'];
-
 export const NOTIFICATION_MAPPING = Object.fromEntries(
   Object.entries(NOTIFICATION_CATEGORIES).flatMap(([category, { notificationTypes }]) =>
     notificationTypes.map(type => [type, category])
@@ -388,6 +389,17 @@ export async function createNotification(
   targetUserId: string,
   notification: CreateNotificationInput
 ): Promise<string> {
+  // Check in-app preference before writing
+  const userDoc = await getFirestore().collection('users').doc(targetUserId).get();
+  const prefs = (userDoc.data()?.notificationPrefs ?? {}) as NotificationPrefs;
+  const effective = prefs[notification.type] ??
+    DEFAULT_NOTIFICATION_PREFS[notification.type] ?? { inApp: true, email: true };
+
+  if (!effective.inApp) {
+    console.log(`📭 User ${targetUserId} has disabled in-app for '${notification.type}', skipping`);
+    return '';
+  }
+
   const stored: StoredNotificationDoc = {
     ...notification,
     sourceService: NOTIFICATION_MAPPING[notification.type],
