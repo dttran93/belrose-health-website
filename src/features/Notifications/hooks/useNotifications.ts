@@ -71,7 +71,6 @@ export const useNotifications = (userId: string | undefined): UseNotificationsRe
       return;
     }
 
-    console.log('🔔 Setting up notifications listener for user:', userId);
     setLoading(true);
     setError(null);
 
@@ -82,8 +81,6 @@ export const useNotifications = (userId: string | undefined): UseNotificationsRe
     const unsubscribe = onSnapshot(
       notificationsQuery,
       (snapshot: QuerySnapshot<DocumentData>) => {
-        console.log(`📬 Received ${snapshot.docs.length} notifications`);
-
         const notificationsList: Notification[] = snapshot.docs.map(doc => {
           const data = doc.data();
           return {
@@ -110,7 +107,6 @@ export const useNotifications = (userId: string | undefined): UseNotificationsRe
 
     // Cleanup listener on unmount
     return () => {
-      console.log('🔕 Cleaning up notifications listener');
       unsubscribe();
     };
   }, [userId, refreshTrigger]);
@@ -122,7 +118,6 @@ export const useNotifications = (userId: string | undefined): UseNotificationsRe
 
       try {
         await NotificationReader.markAsRead(userId, notificationId);
-        console.log(`✅ Marked notification ${notificationId} as read`);
       } catch (err) {
         console.error('❌ Failed to mark notification as read:', err);
         throw err;
@@ -141,8 +136,6 @@ export const useNotifications = (userId: string | undefined): UseNotificationsRe
 
       // Mark each as read (in parallel)
       await Promise.all(unreadIds.map(id => NotificationReader.markAsRead(userId, id)));
-
-      console.log(`✅ Marked ${unreadIds.length} notifications as read`);
     } catch (err) {
       console.error('❌ Failed to mark all notifications as read:', err);
       throw err;

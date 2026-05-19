@@ -3,7 +3,7 @@ import React from 'react';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { UserBadge } from '@/features/Users/components/ui/UserBadge';
 import { BelroseUserProfile, FileObject } from '@/types/core';
-import { SubjectConsentRequest } from '../../services/subjectConsentService';
+import { SubjectConsentRequest } from '@belrose/shared';
 
 interface SubjectCardProps {
   userId: string;

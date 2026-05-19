@@ -27,9 +27,9 @@ import { UserCard } from '@/features/Users/components/ui/UserCard';
 import { UserBadge } from '@/features/Users/components/ui/UserBadge';
 import { BelroseUserProfile, FileObject } from '@/types/core';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
-import { SubjectConsentRequest } from '../../services/subjectConsentService';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import { RejectionResponseDialog } from './RejectionResponseDialog';
+import { SubjectConsentRequest } from '@belrose/shared';
 
 // Role configuration for display
 const ROLE_CONFIG: Record<
@@ -253,7 +253,7 @@ export const PendingRequestDetails: React.FC<PendingRequestDetailsProps> = ({
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-500">Record</span>
           <span className="text-sm font-medium truncate max-w-[200px]">
-            {request.recordTitle || record.belroseFields?.title || record.fileName || 'Untitled'}
+            {record.belroseFields?.title || record.fileName || request.recordId || 'Untitled'}
           </span>
         </div>
 

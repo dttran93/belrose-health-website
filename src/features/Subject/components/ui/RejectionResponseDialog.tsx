@@ -24,11 +24,8 @@ import {
 import { Button } from '@/components/ui/Button';
 import { UserCard } from '@/features/Users/components/ui/UserCard';
 import { BelroseUserProfile, FileObject } from '@/types/core';
-import { SubjectConsentRequest } from '../../services/subjectConsentService';
-import {
-  SubjectRejectionService,
-  CreatorResponseStatus,
-} from '../../services/subjectRejectionService';
+import { SubjectRejectionService } from '../../services/subjectRejectionService';
+import { CreatorResponseStatus, SubjectConsentRequest } from '@belrose/shared';
 
 interface RejectionResponseDialogProps {
   isOpen: boolean;
@@ -76,7 +73,7 @@ export const RejectionResponseDialog: React.FC<RejectionResponseDialogProps> = (
   };
 
   const recordTitle =
-    request.recordTitle || record.belroseFields?.title || record.fileName || 'Untitled Record';
+    record.belroseFields?.title || record.fileName || request.recordId || 'Untitled Record';
   const rejectionReason = request.rejection?.reason;
 
   return (

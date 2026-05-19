@@ -55,8 +55,9 @@ export type SubjectDialogPhase =
 export interface UseSubjectFlowOptions {
   /** The record to operate on */
   record: FileObject;
-  /** Callback when an operation succeeds */
+  /** Callbacks when an operation succeeds, Reject needs a separate one because it has to navigate away from the record */
   onSuccess?: () => void;
+  onRejectSuccess?: () => void;
 }
 
 interface PendingOperation {
@@ -118,8 +119,9 @@ export const getMinimumAllowedRole = (userId: string, record: FileObject): Subje
 // HOOK
 // ============================================================================
 
-export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
+export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjectFlowOptions) {
   const recordId = record.id;
+  const recordLink = `/app/records/${recordId}`;
 
   // Dialog state
   const [phase, setPhase] = useState<SubjectDialogPhase>('idle');
@@ -426,7 +428,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
     const targetRole = pendingOperation.selectedRole || 'viewer';
     const currentRole = getUserRoleForRecord(userId, record);
 
-    const activityId = addActivity({ label: 'Setting subject status' });
+    const activityId = addActivity({ label: 'Setting subject status', link: recordLink });
 
     // Fire tx — don't await
     const txPromise = SubjectService.setSubjectAsSelf(recordId);
@@ -457,7 +459,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
 
   /**
    * Create a subject request for another user to accept
-   * No write to the blockchain, all firestore. Doesn't pass anything to ActivityTray
+   * No subject write to the blockchain, all firestore. But may pass grant role to Activity Tray
    */
   const confirmRequestConsent = useCallback(async () => {
     if (!pendingOperation || pendingOperation.subjectChoice !== 'other' || !selectedUser) return;
@@ -494,42 +496,57 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
       console.log('🔄 Step 3: Checking/granting role...');
       const targetRole = pendingOperation.selectedRole || 'viewer';
       const currentRole = getUserRoleForRecord(selectedUser.uid, record);
-      const targetRoleLevel = ROLE_HIERARCHY[targetRole];
-      const currentRoleLevel = ROLE_HIERARCHY[currentRole || 'none'];
-      console.log('📊 Role check:', {
-        targetRole,
-        currentRole,
-        targetRoleLevel,
-        currentRoleLevel,
-        selectedUserUid: selectedUser.uid,
-      });
+      const needsRoleGrant =
+        !currentRole || ROLE_HIERARCHY[targetRole] > ROLE_HIERARCHY[currentRole || 'none'];
 
-      if (!currentRole || targetRoleLevel > currentRoleLevel) {
-        console.log(`🔐 Granting ${targetRole} for selected user...`);
-        await PermissionsService.grantRole(recordId, selectedUser.uid, targetRole);
-
-        //Track that we granted access with this request
-        const requestId = `${recordId}_${selectedUser.uid}`;
-        const requestRef = doc(getFirestore(), 'subjectConsentRequests', requestId);
-        await updateDoc(requestRef, {
-          grantedAccessOnSubjectRequest: true,
+      if (needsRoleGrant) {
+        const activityId = addActivity({
+          label: `Granting ${targetRole} access to subject`,
+          link: recordLink,
         });
-      } else {
-        console.log(`ℹ️ User already has ${currentRole} (target: ${targetRole}), skipping grant`);
-      }
-      console.log('✅ Step 3 complete');
 
-      toast.success('Consent request sent. The user will be notified.');
-      await refetchAll();
-      onSuccess?.();
-      reset();
+        // Close dialog — blockchain work continues in background
+        setSubmittedLabel('Sending subject request');
+        setPhase('submitted');
+
+        PermissionsService.grantRole(recordId, selectedUser.uid, targetRole)
+          .then(async () => {
+            const requestId = `${recordId}_${selectedUser.uid}`;
+            const requestRef = doc(getFirestore(), 'subjectConsentRequests', requestId);
+            await updateDoc(requestRef, { grantedAccessOnSubjectRequest: true });
+            updateActivity(activityId, { status: 'confirmed' });
+            toast.success('Consent request sent. The user will be notified.');
+            await refetchAll();
+            onSuccess?.();
+          })
+          .catch(err => {
+            const message = err instanceof Error ? err.message : 'Failed to grant access';
+            updateActivity(activityId, { status: 'failed', errorMessage: message });
+          });
+      } else {
+        // No blockchain write needed — wrap up synchronously
+        toast.success('Consent request sent. The user will be notified.');
+        reset();
+        await refetchAll();
+        onSuccess?.();
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to send consent request';
       setError(message);
       setPhase('error');
       toast.error(message);
     }
-  }, [pendingOperation, selectedUser, recordId, record, reset, refetchAll, onSuccess]);
+  }, [
+    pendingOperation,
+    selectedUser,
+    recordId,
+    record,
+    addActivity,
+    updateActivity,
+    reset,
+    refetchAll,
+    onSuccess,
+  ]);
 
   // ==========================================================================
   // ACCEPT SUBJECT REQUEST FLOW
@@ -563,7 +580,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
       return;
     }
 
-    const activityId = addActivity({ label: 'Accepting subject request' });
+    const activityId = addActivity({ label: 'Accepting subject request', link: recordLink });
 
     // Fire tx — don't await
     const txPromise = SubjectService.acceptSubjectRequest(pendingOperation.recordId);
@@ -610,7 +627,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
 
   /**
    * Execute the confirmed "reject subject request" operation
-   * No blockchain write, no need to add to OnChainActivityTray
+   * No blockchain write for subject, but may need to revoke access if it was granted with the request
    */
   const confirmRejectRequest = useCallback(
     async (reason?: string) => {
@@ -618,7 +635,6 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
 
       const auth = getAuth();
       const userId = auth.currentUser?.uid;
-
       if (!userId) {
         setError('You must be signed in');
         setPhase('error');
@@ -628,31 +644,44 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
       setPhase('executing');
 
       try {
-        // Get the request data to check if access was granted
+        // Fast Firestore reads/writes — await before closing dialog
         const db = getFirestore();
         const requestId = `${pendingOperation.recordId}_${userId}`;
         const requestRef = doc(db, 'subjectConsentRequests', requestId);
         const requestDoc = await getDoc(requestRef);
         const requestData = requestDoc.data() as SubjectConsentRequest | undefined;
 
-        // Reject the request
         await SubjectService.rejectSubjectRequest(
           pendingOperation.recordId,
           reason || pendingOperation.reason
         );
 
-        // Revoke access if it was granted with the request
+        // Blockchain write — hand off to tray if needed
         if (requestData?.grantedAccessOnSubjectRequest) {
           const role = requestData.requestedSubjectRole;
-          await PermissionsService.removeRole(pendingOperation.recordId, userId, role);
-          toast.success('Subject request declined and access revoked');
-        } else {
-          toast.success('Subject request declined');
-        }
+          const activityId = addActivity({ label: 'Revoking record access' }); //Doesn't take link because it wouldn't go back to the record
 
-        reset();
-        await refetchAll();
-        onSuccess?.();
+          setSubmittedLabel('Declining subject request');
+          setPhase('submitted');
+
+          PermissionsService.removeRole(pendingOperation.recordId, userId, role)
+            .then(async () => {
+              updateActivity(activityId, { status: 'confirmed' });
+              toast.success('Subject request declined and access revoked');
+              await refetchAll();
+              (onRejectSuccess ?? onSuccess)?.();
+            })
+            .catch(err => {
+              const message = err instanceof Error ? err.message : 'Failed to revoke access';
+              updateActivity(activityId, { status: 'failed', errorMessage: message });
+            });
+        } else {
+          // No blockchain write — close normally
+          toast.success('Subject request declined');
+          reset();
+          await refetchAll();
+          (onRejectSuccess ?? onSuccess)?.();
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to reject request';
         setError(message);
@@ -660,7 +689,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
         toast.error(message);
       }
     },
-    [pendingOperation, reset, refetchAll, onSuccess]
+    [pendingOperation, addActivity, updateActivity, reset, refetchAll, onSuccess, onRejectSuccess]
   );
 
   // ==========================================================================
@@ -711,7 +740,7 @@ export function useSubjectFlow({ record, onSuccess }: UseSubjectFlowOptions) {
       // Capture before dialog closes
       const shouldRevokeAccess = pendingOperation.revokeAccess;
 
-      const activityId = addActivity({ label: 'Removing subject status' });
+      const activityId = addActivity({ label: 'Removing subject status' }); //No link because user is being removed from the record
 
       // Fire tx — don't await
       const txPromise = SubjectService.rejectSubjectStatus(recordId, reason);

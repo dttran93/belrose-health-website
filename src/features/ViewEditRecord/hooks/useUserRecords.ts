@@ -54,11 +54,6 @@ export const useUserRecords = (
 
     const { filterType, subjectId } = filters;
 
-    console.log(
-      `🔍 Fetching ${filterType} records for user:`,
-      userId,
-      subjectId ? `(subject: ${subjectId})` : ''
-    );
     setLoading(true);
     setError(null);
 
@@ -127,8 +122,6 @@ export const useUserRecords = (
     const unsubscribe = onSnapshot(
       q,
       async (snapshot: QuerySnapshot<DocumentData>) => {
-        console.log(`📦 Received ${snapshot.docs.length} records`);
-
         try {
           const accessibleRecords: FileObject[] = snapshot.docs.map(doc => {
             const data = doc.data();
@@ -158,13 +151,10 @@ export const useUserRecords = (
             return true;
           });
 
-          console.log(`✅ Processed ${filteredRecords.length} accessible records`);
-
           // Decrypt encrypted records (your existing logic)
           const hasEncryptedRecords = filteredRecords.some((record: any) => record.isEncrypted);
 
           if (hasEncryptedRecords) {
-            console.log('🔓 Decrypting encrypted records...');
             const masterKey = await EncryptionKeyManager.getSessionKey();
 
             if (!masterKey) {
@@ -181,7 +171,6 @@ export const useUserRecords = (
               const decryptedRecords = await RecordDecryptionService.decryptRecords(
                 filteredRecords as any
               );
-              console.log(`✅ Successfully decrypted ${decryptedRecords.length} records`);
               setRecords(decryptedRecords as FileObject[]);
             } catch (decryptError) {
               console.error('❌ Failed to decrypt records:', decryptError);
@@ -191,7 +180,6 @@ export const useUserRecords = (
               setRecords(filteredRecords);
             }
           } else {
-            console.log('📄 No encrypted records found, using records as-is');
             setRecords(filteredRecords);
           }
 
@@ -210,7 +198,6 @@ export const useUserRecords = (
     );
 
     return () => {
-      console.log('🧹 Cleaning up records listener');
       unsubscribe();
     };
   }, [userId, filters.filterType, filters.subjectId, refreshTrigger]);

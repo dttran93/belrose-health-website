@@ -115,6 +115,8 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
   const { addActivity, updateActivity } = useOnChainActivityTray();
   const [submittedLabel, setSubmittedLabel] = useState('');
 
+  const trusteeLink = `/app/settings/trustee`;
+
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   const reset = useCallback(() => {
@@ -193,7 +195,10 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
     const levelToInvite = selectedTrustLevel;
     const targetName = pendingOperation.targetUserProfile?.displayName || 'user';
 
-    const activityId = addActivity({ label: `Inviting ${targetName} as trustee` });
+    const activityId = addActivity({
+      label: `Inviting ${targetName} as trustee`,
+      link: trusteeLink,
+    });
 
     // Fire tx — don't await
     const txPromise = TrusteeRelationshipService.inviteTrustee(targetUserId, levelToInvite);
@@ -246,7 +251,10 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
     const { targetUserId } = pendingOperation;
     const trustorName = pendingOperation.targetUserProfile?.displayName || 'user';
 
-    const activityId = addActivity({ label: `Accepting trustee invite from ${trustorName}` });
+    const activityId = addActivity({
+      label: `Accepting trustee invite from ${trustorName}`,
+      link: trusteeLink,
+    });
 
     // Fire tx — don't await
     const txPromise = TrusteeRelationshipService.acceptInvite(targetUserId);
@@ -338,7 +346,10 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
     const { targetUserId } = pendingOperation;
     const trusteeName = pendingOperation.targetUserProfile?.displayName || 'user';
 
-    const activityId = addActivity({ label: `Revoking ${trusteeName} as trustee` });
+    const activityId = addActivity({
+      label: `Revoking ${trusteeName} as trustee`,
+      link: trusteeLink,
+    });
 
     // Fire tx — don't await
     const txPromise = TrusteeRelationshipService.revokeTrustee(targetUserId);
@@ -393,7 +404,10 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
     const levelToSet = selectedTrustLevel;
     const trusteeName = pendingOperation.targetUserProfile?.displayName || 'user';
 
-    const activityId = addActivity({ label: `Updating trust level for ${trusteeName}` });
+    const activityId = addActivity({
+      label: `Updating trust level for ${trusteeName}`,
+      link: trusteeLink,
+    });
 
     // Fire tx — don't await
     const txPromise = TrusteeRelationshipService.editTrusteeRelationship(targetUserId, levelToSet);
@@ -446,7 +460,10 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
     const { targetUserId } = pendingOperation;
     const trustorName = pendingOperation.targetUserProfile?.displayName || 'user';
 
-    const activityId = addActivity({ label: `Resigning as trustee for ${trustorName}` });
+    const activityId = addActivity({
+      label: `Resigning as trustee for ${trustorName}`,
+      link: trusteeLink,
+    });
 
     // Fire tx — don't await
     const txPromise = TrusteeRelationshipService.resignAsTrustee(targetUserId);

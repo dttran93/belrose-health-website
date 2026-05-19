@@ -22,12 +22,12 @@ import { useSubjectFlow } from '../hooks/useSubjectFlow';
 import { SubjectActionDialog } from './ui/SubjectActionDialog';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { SubjectCard } from './ui/SubjectCard';
-import { SubjectConsentRequest } from '../services/subjectConsentService';
 import SubjectQueryService from '../services/subjectQueryService';
 import { PendingRequestDetails } from './ui/PendingRequestDetails';
 import SubjectRemovalService, { SubjectRemovalRequest } from '../services/subjectRemovalService';
 import { toast } from 'sonner';
 import RecordSectionPanel from '@/components/ui/RecordSectionPanel';
+import { SubjectConsentRequest } from '@belrose/shared';
 
 // View modes for SubjectManager
 type SubjectViewMode = 'list' | 'pending-details' | 'rejected-details';

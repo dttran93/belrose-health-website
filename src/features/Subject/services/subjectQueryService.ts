@@ -432,28 +432,24 @@ export class SubjectQueryService {
 
     try {
       consentRequest = await this.getConsentRequest(recordId, user.uid);
-      console.log('✓ getConsentRequest succeeded:', consentRequest);
     } catch (e) {
       console.error('✗ getConsentRequest failed:', e);
     }
 
     try {
       pendingConsentRequests = await this.getPendingConsentRequestsForRecord(recordId);
-      console.log('✓ getPendingConsentRequestsForRecord succeeded:', pendingConsentRequests);
     } catch (e) {
       console.error('✗ getPendingConsentRequestsForRecord failed:', e);
     }
 
     try {
       pendingRemovalRequests = await this.getPendingRemovalRequestsForRecord(recordId, user.uid);
-      console.log('✓ getPendingRemovalRequestsForRecord succeeded:', pendingRemovalRequests);
     } catch (e) {
       console.error('✗ getPendingRemovalRequestsForRecord failed:', e);
     }
 
     try {
       pendingRejectionResponses = await this.getPendingRejectionResponses(recordId);
-      console.log('✓ getPendingRejectionResponses succeeded:', pendingRejectionResponses);
     } catch (e) {
       console.error('✗ getPendingRejectionResponses failed:', e);
     }

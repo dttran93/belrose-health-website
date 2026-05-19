@@ -83,6 +83,8 @@ export function useCredibilityFlow({
   const { addActivity, updateActivity } = useOnChainActivityTray();
   const [submittedLabel, setSubmittedLabel] = useState('');
 
+  const recordLink = `/app/records/${recordId}?view=credibility`;
+
   // ==========================================================================
   // FETCH EXISTING DATA
   // ==========================================================================
@@ -229,7 +231,7 @@ export function useCredibilityFlow({
 
       // Capture before dialog closes
       const levelInfo = getVerificationConfig(level);
-      const activityId = addActivity({ label: 'Submitting verification' });
+      const activityId = addActivity({ label: 'Submitting verification', link: recordLink });
 
       // Fire tx — don't await
       const txPromise = createVerification(recordId, recordHash, verifierId, level, recordTitle);
@@ -295,7 +297,7 @@ export function useCredibilityFlow({
       return;
     }
 
-    const activityId = addActivity({ label: 'Retracting verification' });
+    const activityId = addActivity({ label: 'Retracting verification', link: recordLink });
 
     // Fire tx — don't await
     const txPromise = retractVerification(verificationRecordHash, verifierId);
@@ -364,7 +366,7 @@ export function useCredibilityFlow({
 
     // Capture before dialog closes
     const levelInfo = getVerificationConfig(verificationLevel);
-    const activityId = addActivity({ label: 'Updating verification' });
+    const activityId = addActivity({ label: 'Updating verification', link: recordLink });
 
     // Fire tx — don't await
     const txPromise = modifyVerificationLevel(
@@ -443,7 +445,7 @@ export function useCredibilityFlow({
     // Capture before dialog closes
     const { disputeSeverity, disputeCulpability, disputeNotes } = pendingOperation;
     const severityInfo = getSeverityConfig(disputeSeverity);
-    const activityId = addActivity({ label: 'Filing dispute' });
+    const activityId = addActivity({ label: 'Filing dispute', link: recordLink });
 
     // Fire tx — don't await
     const txPromise = createDispute(
@@ -514,7 +516,7 @@ export function useCredibilityFlow({
       return;
     }
 
-    const activityId = addActivity({ label: 'Retracting dispute' });
+    const activityId = addActivity({ label: 'Retracting dispute', link: recordLink });
 
     // Fire tx — don't await
     const txPromise = retractDispute(disputeRecordHash, disputerId);
@@ -591,7 +593,7 @@ export function useCredibilityFlow({
     // Capture before dialog closes
     const severityInfo = getSeverityConfig(disputeSeverity);
     const culpabilityInfo = getCulpabilityConfig(disputeCulpability);
-    const activityId = addActivity({ label: 'Updating dispute' });
+    const activityId = addActivity({ label: 'Updating dispute', link: recordLink });
 
     // Fire tx — don't await
     const txPromise = modifyDispute(
@@ -672,7 +674,7 @@ export function useCredibilityFlow({
       }
 
       const label = supports ? 'Supporting dispute' : 'Opposing dispute';
-      const activityId = addActivity({ label });
+      const activityId = addActivity({ label, link: recordLink });
 
       // Fire tx — don't await
       const txPromise = reactToDispute(

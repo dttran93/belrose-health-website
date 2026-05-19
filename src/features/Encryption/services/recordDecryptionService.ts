@@ -18,8 +18,6 @@ export class RecordDecryptionService {
     encryptedRecordKey?: string, //For the cases where the key IS provided within the component, optimized so there aren't multiple firebase reads, see VersionControlService
     isCreator?: boolean
   ): Promise<FileObject> {
-    console.log('🔓 Decrypting record:', encryptedRecord.id);
-
     // Get the master key from session
     const masterKey = await EncryptionKeyManager.getSessionKey();
     if (!masterKey) {
@@ -32,22 +30,17 @@ export class RecordDecryptionService {
       if (encryptedRecordKey && isCreator !== undefined) {
         // PATH 1: Key is provided (e.g., from VersionControlService for efficiency)
         if (isCreator) {
-          console.log('ℹ️ Unwrapping as creator (master key)...');
           const keyData = base64ToArrayBuffer(encryptedRecordKey);
           const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(keyData, masterKey);
           fileKey = await EncryptionService.importKey(fileKeyData);
-          console.log('✓ File key unwrapped successfully');
         } else {
           // PATH 2: Shared user: RSA-wrapped key to be fetched
-          console.log('ℹ️ Fetching and decrypting record key with shared user RSA...');
           const rsaPrivateKey = await this.getUserPrivateKey(getAuth().currentUser!.uid, masterKey);
           fileKey = await SharingKeyManagementService.unwrapKey(encryptedRecordKey, rsaPrivateKey);
-          console.log('✓ File key fetched and decrypted');
         }
       } else {
         // PATH 3: No key provided, fetch via getRecordKey
         fileKey = await this.getRecordKey(encryptedRecord.id, masterKey);
-        console.log('✓ File key fetched and decrypted');
       }
 
       // 2. Decrypt all the fields
@@ -74,7 +67,6 @@ export class RecordDecryptionService {
         customData: await this.safeDecrypt(encryptedRecord.encryptedCustomData, fileKey, 'json'),
       };
 
-      console.log('✅ Record decryption complete');
       return decryptedData as FileObject;
     } catch (error) {
       console.error('❌ Failed to decrypt record:', error);
@@ -94,8 +86,6 @@ export class RecordDecryptionService {
    * - Expects fileName/extractedText/originalText, unlike decryptRecord where it uses encryptedFields
    */
   static async decryptRecordWithKey(fileKey: CryptoKey, encryptedData: any): Promise<any> {
-    console.log('🔓 Starting complete record decryption with unwrapped key...');
-
     const result: any = {};
 
     // Decrypt all fields
@@ -107,7 +97,6 @@ export class RecordDecryptionService {
     result.belroseFields = await this.safeDecrypt(encryptedData.belroseFields, fileKey, 'json');
     result.customData = await this.safeDecrypt(encryptedData.customData, fileKey, 'json');
 
-    console.log('✅ Complete record decryption finished');
     return result;
   }
 
@@ -115,8 +104,6 @@ export class RecordDecryptionService {
    * Decrypt multiple records
    */
   static async decryptRecords(encryptedRecords: FileObject[]): Promise<FileObject[]> {
-    console.log(`🔓 Decrypting ${encryptedRecords.length} records...`);
-
     const results = await Promise.allSettled(
       encryptedRecords.map(record => this.decryptRecord(record))
     );
@@ -165,8 +152,6 @@ export class RecordDecryptionService {
       throw new Error('User not authenticated');
     }
 
-    console.log('🔍 Getting decryption key for record:', recordId);
-
     // Get key from wrappedKeys collection
     const wrappedKeyId = `${recordId}_${user.uid}`;
     const wrappedKeyRef = doc(db, 'wrappedKeys', wrappedKeyId);
@@ -185,23 +170,19 @@ export class RecordDecryptionService {
 
     if (wrappedKeyData.isCreator) {
       // Creator: key is encrypted with their master key (AES)
-      console.log('ℹ️  Decrypting as creator (master key)');
       const encryptedKeyData = base64ToArrayBuffer(wrappedKeyData.wrappedKey);
       const fileKeyData = await EncryptionService.decryptKeyWithMasterKey(
         encryptedKeyData,
         masterKey
       );
-      console.log('✅ Record key decrypted');
       return await EncryptionService.importKey(fileKeyData);
     } else {
       // Shared user: key is wrapped with their RSA public key
-      console.log('ℹ️  Unwrapping as shared user (RSA)');
       const rsaPrivateKey = await this.getUserPrivateKey(user.uid, masterKey);
       const recordKey = await SharingKeyManagementService.unwrapKey(
         wrappedKeyData.wrappedKey,
         rsaPrivateKey
       );
-      console.log('✅ Record key unwrapped');
       return recordKey;
     }
   }

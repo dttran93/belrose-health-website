@@ -25,7 +25,6 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  Link,
   GlobeLock,
 } from 'lucide-react';
 import {
@@ -33,6 +32,7 @@ import {
   OnChainActivity,
   OnChainActivityStatus,
 } from '../OnChainActivityTrayContext';
+import { useNavigate } from 'react-router-dom';
 
 // ============================================================================
 // HELPERS
@@ -73,19 +73,27 @@ interface ActivityCardProps {
 }
 
 const ActivityCard: React.FC<ActivityCardProps> = ({ activity, onDismiss }) => {
+  const navigate = useNavigate();
   const elapsed = useElapsed(activity.startedAt, activity.status);
 
   const isPending = activity.status === 'pending';
   const isConfirmed = activity.status === 'confirmed';
   const isFailed = activity.status === 'failed';
+  const isClickable = isConfirmed && !!activity.link;
+
+  const handleCardClick = () => {
+    if (isClickable) navigate(activity.link!);
+  };
 
   return (
     <div
+      onClick={handleCardClick}
       className={`
         flex items-start gap-3 p-3 rounded-lg border text-sm transition-all duration-300
         ${isPending ? 'bg-white border-gray-200' : ''}
         ${isConfirmed ? 'bg-green-50 border-green-200' : ''}
         ${isFailed ? 'bg-red-50 border-red-200' : ''}
+        ${isClickable ? 'cursor-pointer hover:bg-green-100 hover:border-green-300' : ''}
       `}
     >
       {/* Status icon */}
@@ -129,7 +137,10 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, onDismiss }) => {
       {/* Dismiss button — only for resolved items */}
       {!isPending && (
         <button
-          onClick={() => onDismiss(activity.id)}
+          onClick={e => {
+            e.stopPropagation();
+            onDismiss(activity.id);
+          }}
           className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
           aria-label="Dismiss"
         >

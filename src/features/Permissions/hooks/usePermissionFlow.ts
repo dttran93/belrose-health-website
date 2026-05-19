@@ -51,6 +51,8 @@ const roleLabels: Record<Role, string> = {
 export function usePermissionFlow({ recordId, recordTitle, onSuccess }: UsePermissionFlowOptions) {
   // Normalise to array once — everything below works with recordIds
   const recordIds = Array.isArray(recordId) ? recordId : [recordId];
+  const recordLink = `/app/records/${recordIds[0]}?view=permissions`;
+
   // For single-record operations (revoke, backwards-compat) keep the first ID handy
   const primaryRecordId = recordIds[0] ?? '';
   const isBatch = recordIds.length > 1;
@@ -178,7 +180,7 @@ export function usePermissionFlow({ recordId, recordTitle, onSuccess }: UsePermi
         ? `Granting ${roleLabels[role]} access across ${recordIds.length} records`
         : `Granting ${roleLabels[role]} access`;
 
-      const activityId = addActivity({ label: activityLabel });
+      const activityId = addActivity({ label: activityLabel, link: recordLink });
 
       // Fire tx — don't await
       const txPromise = isBatch
@@ -292,7 +294,7 @@ export function usePermissionFlow({ recordId, recordTitle, onSuccess }: UsePermi
             ? 'Demoting to Administrator'
             : 'Demoting to Viewer';
 
-      const activityId = addActivity({ label: activityLabel });
+      const activityId = addActivity({ label: activityLabel, link: recordLink });
 
       // Fire tx — don't await
       const txPromise =

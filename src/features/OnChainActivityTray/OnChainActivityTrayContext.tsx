@@ -36,10 +36,12 @@ export interface OnChainActivity {
   errorMessage?: string; // Optional: populated on failure
   startedAt: Date;
   resolvedAt?: Date;
+  link?: string;
 }
 
 interface AddActivityInput {
   label: string;
+  link?: string;
 }
 
 interface UpdateActivityInput {
@@ -80,6 +82,7 @@ export const OnChainActivityTrayProvider: React.FC<{ children: ReactNode }> = ({
       label: input.label,
       status: 'pending',
       startedAt: new Date(),
+      link: input.link,
     };
     setActivities(prev => [...prev, newActivity]);
     return id;

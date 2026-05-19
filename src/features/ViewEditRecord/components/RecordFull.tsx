@@ -102,6 +102,9 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       subjectAlerts.refetch();
       onRefreshRecord?.();
     },
+    onRejectSuccess: () => {
+      navigate('/app/all-records'); // After rejecting a subject request, navigate away from the record
+    },
   });
 
   // =========================================================================

@@ -1,13 +1,7 @@
 // src/features/Subject/components/SubjectAlertBanners.tsx
 
 import { AlertBanner } from '@/components/ui/AlertBanner';
-import { Button } from '@/components/ui/Button';
 import { UserCheck, UserX, UserMinus } from 'lucide-react';
-
-interface SubjectAlertConfig {
-  type: 'pending_request' | 'rejection_response' | 'removal_request';
-  isLoading?: boolean;
-}
 
 // Pending subject request - someone wants you to be a subject
 export interface PendingRequestAlertProps {

@@ -49,10 +49,11 @@ import { FileObject, BelroseUserProfile } from '@/types/core';
 import UserSearch from '@/features/Users/components/UserSearch';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { useAuthContext } from '@/features/Auth/AuthContext';
-import { REJECTION_REASON_OPTIONS, RejectionReasons } from '../../services/subjectRejectionService';
+import { REJECTION_REASON_OPTIONS } from '../../services/subjectRejectionService';
 import NetworkPreparingContent from '@/features/BlockchainWallet/components/NetworkPreparingContent';
 import RequesterSuggestions from '@/features/RequestRecord/components/ui/RequesterSuggestions';
 import { OnChainSubmittedContent } from '@/features/OnChainActivityTray/components/OnChainSubmittedModal';
+import { RejectionReasons } from '@belrose/shared';
 
 // ============================================================================
 // TYPES

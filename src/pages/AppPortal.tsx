@@ -130,7 +130,6 @@ export default function AppPortal() {
         const records = await getAccessibleRecords(user.uid);
 
         // Decrypt Records
-        console.log('🔓 Decrypting records...');
         const decryptedRecords = await RecordDecryptionService.decryptRecords(records);
         console.log('✅ Records decrypted:', decryptedRecords.length);
 
