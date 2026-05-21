@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
-import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 /**
  * @title MemberRoleManagerInterface
@@ -13,15 +13,15 @@ interface MemberRoleManagerInterface {
 
   function isVerifiedMember(address wallet) external view returns (bool);
 
-  function hasActiveRole(string memory recordId, address wallet) external view returns (bool);
+  function hasActiveRole(bytes32 recordIdHash, address wallet) external view returns (bool);
 
   function hasRole(
-    string memory recordId,
+    bytes32 recordIdHash,
     address wallet,
     string memory role
   ) external view returns (bool);
 
-  function isOwnerOrAdmin(string memory recordId, address wallet) external view returns (bool);
+  function isOwnerOrAdmin(bytes32 recordIdHash, address wallet) external view returns (bool);
 
   function getUserForWallet(address wallet) external view returns (bytes32);
 
@@ -48,32 +48,32 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
 
   //As in only the Admin wallet can do this function. Don't confuse with Admin role for users below
   modifier onlyAdmin() {
-    require(msg.sender == admin, 'Only admin');
+    require(msg.sender == admin, "Only admin");
     _;
   }
 
   modifier onlyActiveMember() {
-    require(memberRoleManager.isActiveMember(msg.sender), 'Not an active member');
+    require(memberRoleManager.isActiveMember(msg.sender), "Not an active member");
     _;
   }
 
   modifier onlyVerifiedMember() {
-    require(memberRoleManager.isVerifiedMember(msg.sender), 'Not a verified member');
+    require(memberRoleManager.isVerifiedMember(msg.sender), "Not a verified member");
     _;
   }
 
-  modifier onlyRecordParticipant(string memory recordId) {
-    require(memberRoleManager.hasActiveRole(recordId, msg.sender), 'No access to this record');
+  modifier onlyRecordParticipant(bytes32 recordIdHash) {
+    require(memberRoleManager.hasActiveRole(recordIdHash, msg.sender), "No access to this record");
     _;
   }
 
-  modifier onlyOwnerOrAdmin(string memory recordId) {
-    require(memberRoleManager.isOwnerOrAdmin(recordId, msg.sender), 'Only owner or admin');
+  modifier onlyOwnerOrAdmin(bytes32 recordIdHash) {
+    require(memberRoleManager.isOwnerOrAdmin(recordIdHash, msg.sender), "Only owner or admin");
     _;
   }
 
-  modifier onlyOwner(string memory recordId) {
-    require(memberRoleManager.hasRole(recordId, msg.sender, 'owner'), 'Only owner');
+  modifier onlyOwner(bytes32 recordIdHash) {
+    require(memberRoleManager.hasRole(recordIdHash, msg.sender, "owner"), "Only owner");
     _;
   }
 
@@ -88,7 +88,7 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    * @param _memberRoleManager Address of the MemberRoleManager proxy
    */
   function initialize(address _memberRoleManager) public initializer {
-    require(_memberRoleManager != address(0), 'Invalid MemberRoleManager address');
+    require(_memberRoleManager != address(0), "Invalid MemberRoleManager address");
     memberRoleManager = MemberRoleManagerInterface(_memberRoleManager);
     admin = msg.sender;
   }
@@ -100,7 +100,7 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
   function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {}
 
   function transferAdmin(address newAdmin) external onlyAdmin {
-    require(newAdmin != address(0), 'Invalid address');
+    require(newAdmin != address(0), "Invalid address");
     emit AdminTransferred(admin, newAdmin, block.timestamp);
     admin = newAdmin;
   }
@@ -109,7 +109,7 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    * @notice Update the MemberRoleManager reference (in case of upgrade)
    */
   function setMemberRoleManager(address _memberRoleManager) external onlyAdmin {
-    require(_memberRoleManager != address(0), 'Invalid address');
+    require(_memberRoleManager != address(0), "Invalid address");
     memberRoleManager = MemberRoleManagerInterface(_memberRoleManager);
   }
 
@@ -124,7 +124,7 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    */
   function _resolveSubject(bytes32 subjectIdHash) internal view returns (bytes32) {
     bytes32 callerIdHash = memberRoleManager.getUserForWallet(msg.sender);
-    require(callerIdHash != bytes32(0), 'Wallet not registered');
+    require(callerIdHash != bytes32(0), "Wallet not registered");
 
     if (subjectIdHash == bytes32(0) || subjectIdHash == callerIdHash) {
       return callerIdHash;
@@ -132,7 +132,7 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
 
     require(
       memberRoleManager.isControllerOf(subjectIdHash, callerIdHash),
-      'Not a controller for this identity'
+      "Not a controller for this identity"
     );
 
     return subjectIdHash;
@@ -145,47 +145,59 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
   // =================== RECORD ANCHORING - EVENTS ===================
 
   event RecordAnchored(
-    string indexed recordId,
-    string indexed recordHash,
+    bytes32 indexed recordIdHash,
+    bytes32 indexed recordHash,
     bytes32 indexed subjectIdHash,
     uint256 timestamp
   );
 
-  event RecordUnanchored(string indexed recordId, bytes32 indexed subjectIdHash, uint256 timestamp);
+  event RecordUnanchored(
+    bytes32 indexed recordIdHash,
+    bytes32 indexed subjectIdHash,
+    uint256 timestamp
+  );
 
-  event RecordReanchored(string indexed recordId, bytes32 indexed subjectIdHash, uint256 timestamp);
+  event RecordReanchored(
+    bytes32 indexed recordIdHash,
+    bytes32 indexed subjectIdHash,
+    uint256 timestamp
+  );
 
   event RecordHashAdded(
-    string indexed recordId,
-    string indexed newHash,
+    bytes32 indexed recordIdHash,
+    bytes32 indexed newHash,
     bytes32 addedBy,
     uint256 timestamp
   );
 
-  event RecordHashRetracted(string indexed recordId, string indexed recordHash, uint256 timestamp);
+  event RecordHashRetracted(
+    bytes32 indexed recordIdHash,
+    bytes32 indexed recordHash,
+    uint256 timestamp
+  );
 
   // =================== RECORD ANCHORING - STORAGE ===================
 
-  //recordId => list of subject userIdHashes (who is this record about)
-  mapping(string => bytes32[]) public recordSubjects;
+  //recordIdHash => list of subject userIdHashes (who is this record about)
+  mapping(bytes32 => bytes32[]) public recordSubjects;
 
-  // recordId => subjectIdHash => bool (quick lookup: is this user a subject?)
-  mapping(string => mapping(bytes32 => bool)) public isSubjectOfRecord;
+  // recordIdHash => subjectIdHash => bool (quick lookup: is this user a subject?)
+  mapping(bytes32 => mapping(bytes32 => bool)) public isSubjectOfRecord;
 
-  // userIdHash => list of recordIds (user's complete medical history)
-  mapping(bytes32 => string[]) public subjectMedicalHistory;
+  // userIdHash => list of recordIdHashes (user's complete medical history)
+  mapping(bytes32 => bytes32[]) public subjectMedicalHistory;
 
-  // recordId => subjectIdHash => bool (is this subject link active?)
-  mapping(string => mapping(bytes32 => bool)) public isSubjectActive;
+  // recordIdHash => subjectIdHash => bool (is this subject link active?)
+  mapping(bytes32 => mapping(bytes32 => bool)) public isSubjectActive;
 
-  //recordHash => recordId (each hash belongs to exactly one record)
-  mapping(string => string) public recordIdForHash;
+  //recordHash => recordIdHash (each hash belongs to exactly one record)
+  mapping(bytes32 => bytes32) public recordIdForHash;
 
-  //recordId => list of hashes (versionhistory)
-  mapping(string => string[]) public recordVersionHistory;
+  //recordIdHash => list of record hashes (versionhistory)
+  mapping(bytes32 => bytes32[]) public recordVersionHistory;
 
-  // recordHash => bool (is this hash actively attached to a record)
-  mapping(string => bool) public isHashActive; //soft-delete toggle
+  // recordIdHash => bool (is this hash actively attached to a record)
+  mapping(bytes32 => bool) public isHashActive; //soft-delete toggle
 
   uint256 public totalAnchoredRecords;
 
@@ -194,90 +206,87 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
   /**
    * @notice Subject anchors themselves to a record with a hash
    * @dev First subject establishes initial hash; subsequent subjects confirm it
-   * @param recordId The record ID
+   * @param recordIdHash The record ID
    * @param recordHash The content hash (must match current if not first subject)
    */
   function anchorRecord(
-    string memory recordId,
-    string memory recordHash,
+    bytes32 recordIdHash,
+    bytes32 recordHash,
     bytes32 subjectIdHash
-  ) external onlyActiveMember onlyRecordParticipant(recordId) {
-    require(bytes(recordId).length > 0, 'Record ID cannot be empty');
-    require(bytes(recordHash).length > 0, 'Record hash cannot be empty');
+  ) external onlyActiveMember onlyRecordParticipant(recordIdHash) {
+    require(recordIdHash != bytes32(0), "Record ID cannot be empty");
+    require(recordHash != bytes32(0), "Record hash cannot be empty");
 
     //Resolve subject as either the subject themselves or an assigned Controller Trustee
     bytes32 resolvedSubject = _resolveSubject(subjectIdHash);
 
     // Check not already anchored
     require(
-      !isSubjectOfRecord[recordId][resolvedSubject],
-      'Record already anchored to this subject'
+      !isSubjectOfRecord[recordIdHash][resolvedSubject],
+      "Record already anchored to this subject"
     );
 
     //Check if this is the first subject
-    bool isFirstSubject = recordSubjects[recordId].length == 0;
+    bool isFirstSubject = recordSubjects[recordIdHash].length == 0;
 
     if (isFirstSubject) {
       // Check if Hash is already in use
-      string memory existingRecordId = recordIdForHash[recordHash];
+      bytes32 existingRecordIdHash = recordIdForHash[recordHash];
 
-      if (bytes(existingRecordId).length > 0) {
-        require(
-          keccak256(bytes(existingRecordId)) == keccak256(bytes(recordId)),
-          'Hash belongs to different record'
-        );
+      if (existingRecordIdHash != bytes32(0)) {
+        require(existingRecordIdHash == recordIdHash, "Hash belongs to different record");
       } else {
-        require(!isHashActive[recordHash], 'Hash already used');
-        recordIdForHash[recordHash] = recordId;
-        recordVersionHistory[recordId].push(recordHash);
+        require(!isHashActive[recordHash], "Hash already used");
+        recordIdForHash[recordHash] = recordIdHash;
+        recordVersionHistory[recordIdHash].push(recordHash);
         isHashActive[recordHash] = true;
       }
     }
 
-    recordSubjects[recordId].push(resolvedSubject);
-    isSubjectOfRecord[recordId][resolvedSubject] = true;
-    isSubjectActive[recordId][resolvedSubject] = true;
-    subjectMedicalHistory[resolvedSubject].push(recordId);
+    recordSubjects[recordIdHash].push(resolvedSubject);
+    isSubjectOfRecord[recordIdHash][resolvedSubject] = true;
+    isSubjectActive[recordIdHash][resolvedSubject] = true;
+    subjectMedicalHistory[resolvedSubject].push(recordIdHash);
     totalAnchoredRecords++;
 
-    emit RecordAnchored(recordId, recordHash, resolvedSubject, block.timestamp);
+    emit RecordAnchored(recordIdHash, recordHash, resolvedSubject, block.timestamp);
   }
 
   /**
    * @notice Deactivate a subject link (soft delete)
-   * @param recordId The record ID
+   * @param recordIdHash The record ID
    */
   function unanchorRecord(
-    string memory recordId,
+    bytes32 recordIdHash,
     bytes32 subjectIdHash
-  ) external onlyActiveMember onlyRecordParticipant(recordId) {
+  ) external onlyActiveMember onlyRecordParticipant(recordIdHash) {
     bytes32 resolvedSubject = _resolveSubject(subjectIdHash);
 
-    require(isSubjectOfRecord[recordId][resolvedSubject], 'Not a subject of this record');
-    require(isSubjectActive[recordId][resolvedSubject], 'Already unanchored');
+    require(isSubjectOfRecord[recordIdHash][resolvedSubject], "Not a subject of this record");
+    require(isSubjectActive[recordIdHash][resolvedSubject], "Already unanchored");
 
-    isSubjectActive[recordId][resolvedSubject] = false;
+    isSubjectActive[recordIdHash][resolvedSubject] = false;
     //Don't remove from subjectMedicalHistory to preserve audit trail
 
-    emit RecordUnanchored(recordId, resolvedSubject, block.timestamp);
+    emit RecordUnanchored(recordIdHash, resolvedSubject, block.timestamp);
   }
 
   /**
    * @notice Reactivate a previously unanchored subject link
-   * @param recordId The record ID
+   * @param recordIdHash The record ID
    */
   function reanchorRecord(
-    string memory recordId,
+    bytes32 recordIdHash,
     bytes32 subjectIdHash
-  ) external onlyActiveMember onlyRecordParticipant(recordId) {
+  ) external onlyActiveMember onlyRecordParticipant(recordIdHash) {
     bytes32 resolvedSubject = _resolveSubject(subjectIdHash);
 
-    require(isSubjectOfRecord[recordId][resolvedSubject], 'Was never a subject');
-    require(!isSubjectActive[recordId][resolvedSubject], 'Already active');
+    require(isSubjectOfRecord[recordIdHash][resolvedSubject], "Was never a subject");
+    require(!isSubjectActive[recordIdHash][resolvedSubject], "Already active");
 
-    isSubjectActive[recordId][resolvedSubject] = true;
+    isSubjectActive[recordIdHash][resolvedSubject] = true;
 
-    emit RecordReanchored(recordId, resolvedSubject, block.timestamp);
+    emit RecordReanchored(recordIdHash, resolvedSubject, block.timestamp);
   }
 
   /**
@@ -289,23 +298,23 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    * existing record.
    *
    * @dev Only owner/admin can add new versions
-   * @param recordId The record ID
+   * @param recordIdHash The record ID
    * @param newHash The new content hash
    */
   function addRecordHash(
-    string memory recordId,
-    string memory newHash
-  ) external onlyActiveMember onlyRecordParticipant(recordId) {
-    require(bytes(recordIdForHash[newHash]).length == 0, 'Hash already bound to a record');
-    require(bytes(newHash).length > 0, 'Hash cannot be empty');
+    bytes32 recordIdHash,
+    bytes32 newHash
+  ) external onlyActiveMember onlyRecordParticipant(recordIdHash) {
+    require(recordIdForHash[newHash] == bytes32(0), "Hash already bound to a record");
+    require(newHash != bytes32(0), "Hash cannot be empty");
 
     bytes32 userIdHash = memberRoleManager.getUserForWallet(msg.sender);
 
-    recordIdForHash[newHash] = recordId;
-    recordVersionHistory[recordId].push(newHash);
+    recordIdForHash[newHash] = recordIdHash;
+    recordVersionHistory[recordIdHash].push(newHash);
     isHashActive[newHash] = true;
 
-    emit RecordHashAdded(recordId, newHash, userIdHash, block.timestamp);
+    emit RecordHashAdded(recordIdHash, newHash, userIdHash, block.timestamp);
   }
 
   /**
@@ -313,19 +322,16 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    * @dev Prevents retraction if it is the only active hash remaining
    */
   function retractRecordHash(
-    string memory recordId,
-    string memory recordHash
-  ) external onlyActiveMember onlyOwnerOrAdmin(recordId) {
-    // Ensure this hash actually belongs to this recordId
-    require(
-      keccak256(bytes(recordIdForHash[recordHash])) == keccak256(bytes(recordId)),
-      'Hash-Record mismatch'
-    );
-    require(isHashActive[recordHash], 'Already retracted');
+    bytes32 recordIdHash,
+    bytes32 recordHash
+  ) external onlyActiveMember onlyOwnerOrAdmin(recordIdHash) {
+    // Ensure this hash actually belongs to this recordIdHash
+    require(recordIdForHash[recordHash] == recordIdHash, "Hash-Record mismatch");
+    require(isHashActive[recordHash], "Already retracted");
 
-    // Ensure there is at least one hash remaining to be associated with the recordId
+    // Ensure there is at least one hash remaining to be associated with the recordIdHash
     uint256 activeCount = 0;
-    string[] memory history = recordVersionHistory[recordId];
+    bytes32[] memory history = recordVersionHistory[recordIdHash];
 
     for (uint256 i = 0; i < history.length; i++) {
       if (isHashActive[history[i]]) {
@@ -333,13 +339,13 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
       }
     }
 
-    require(activeCount > 1, 'Cannot retract the last active version of a record');
+    require(activeCount > 1, "Cannot retract the last active version of a record");
 
     isHashActive[recordHash] = false;
     delete recordIdForHash[recordHash];
     //Don't remove from recordVersionHistory to preserve audit trail
 
-    emit RecordHashRetracted(recordId, recordHash, block.timestamp);
+    emit RecordHashRetracted(recordIdHash, recordHash, block.timestamp);
   }
 
   // =================== RECORD ANCHORING - VIEW FUNCTIONS ===================
@@ -347,46 +353,41 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
   /**
    * @notice Get the subject (patient) of a record
    */
-  function getRecordSubjects(string memory recordId) external view returns (bytes32[] memory) {
-    return recordSubjects[recordId];
+  function getRecordSubjects(bytes32 recordIdHash) external view returns (bytes32[] memory) {
+    return recordSubjects[recordIdHash];
   }
 
   /**
-   * @notice Get all records where a user is the subject (includes records that may be unanchored)
+   * @notice Get all recordIdHashes where a user is the subject (includes records that may be unanchored)
    */
-  function getSubjectMedicalHistory(bytes32 userIdHash) external view returns (string[] memory) {
+  function getSubjectMedicalHistory(bytes32 userIdHash) external view returns (bytes32[] memory) {
     return subjectMedicalHistory[userIdHash];
   }
 
   /**
    * @notice Check if an address is the subject of a record
    */
-  function isSubject(string memory recordId, bytes32 userIdHash) external view returns (bool) {
-    return isSubjectOfRecord[recordId][userIdHash];
+  function isSubject(bytes32 recordIdHash, bytes32 userIdHash) external view returns (bool) {
+    return isSubjectOfRecord[recordIdHash][userIdHash];
   }
 
   /**
    * @notice Check if user is an ACTIVE subject of a record
    */
-  function isActiveSubject(
-    string memory recordId,
-    bytes32 userIdHash
-  ) external view returns (bool) {
-    return isSubjectOfRecord[recordId][userIdHash] && isSubjectActive[recordId][userIdHash];
+  function isActiveSubject(bytes32 recordIdHash, bytes32 userIdHash) external view returns (bool) {
+    return isSubjectOfRecord[recordIdHash][userIdHash] && isSubjectActive[recordIdHash][userIdHash];
   }
 
   /**
    * @notice Get only active subjects for a record
    */
-  function getActiveRecordSubjects(
-    string memory recordId
-  ) external view returns (bytes32[] memory) {
-    bytes32[] memory allSubjects = recordSubjects[recordId];
+  function getActiveRecordSubjects(bytes32 recordIdHash) external view returns (bytes32[] memory) {
+    bytes32[] memory allSubjects = recordSubjects[recordIdHash];
 
     // Count active first
     uint256 activeCount = 0;
     for (uint256 i = 0; i < allSubjects.length; i++) {
-      if (isSubjectActive[recordId][allSubjects[i]]) {
+      if (isSubjectActive[recordIdHash][allSubjects[i]]) {
         activeCount++;
       }
     }
@@ -395,7 +396,7 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
     bytes32[] memory result = new bytes32[](activeCount);
     uint256 idx = 0;
     for (uint256 i = 0; i < allSubjects.length; i++) {
-      if (isSubjectActive[recordId][allSubjects[i]]) {
+      if (isSubjectActive[recordIdHash][allSubjects[i]]) {
         result[idx++] = allSubjects[i];
       }
     }
@@ -407,13 +408,13 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    * @notice Get subject stats for a record
    */
   function getSubjectStats(
-    string memory recordId
+    bytes32 recordIdHash
   ) external view returns (uint256 total, uint256 active) {
-    bytes32[] memory allSubjects = recordSubjects[recordId];
+    bytes32[] memory allSubjects = recordSubjects[recordIdHash];
     total = allSubjects.length;
 
     for (uint256 i = 0; i < allSubjects.length; i++) {
-      if (isSubjectActive[recordId][allSubjects[i]]) {
+      if (isSubjectActive[recordIdHash][allSubjects[i]]) {
         active++;
       }
     }
@@ -424,30 +425,30 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
   /**
    * @notice Get all hashes (Version history) for a record
    */
-  function getRecordVersionHistory(string memory recordId) external view returns (string[] memory) {
-    return recordVersionHistory[recordId];
+  function getRecordVersionHistory(bytes32 recordIdHash) external view returns (bytes32[] memory) {
+    return recordVersionHistory[recordIdHash];
   }
 
   /**
-   * @notice Get the recordId that a hash belongs to
+   * @notice Get the recordIdHash that a hash belongs to
    */
-  function getRecordIdForHash(string memory recordHash) external view returns (string memory) {
-    require(isHashActive[recordHash], 'Hash does not exist');
+  function getRecordIdForHash(bytes32 recordHash) external view returns (bytes32) {
+    require(isHashActive[recordHash], "Hash does not exist");
     return recordIdForHash[recordHash];
   }
 
   /**
    * @notice Check if a hash exists
    */
-  function doesHashExist(string memory recordHash) external view returns (bool) {
+  function doesHashExist(bytes32 recordHash) external view returns (bool) {
     return isHashActive[recordHash];
   }
 
   /**
    * @notice Get the number of versions for a record
    */
-  function getVersionCount(string memory recordId) external view returns (uint256) {
-    return recordVersionHistory[recordId].length;
+  function getVersionCount(bytes32 recordIdHash) external view returns (uint256) {
+    return recordVersionHistory[recordIdHash].length;
   }
 
   /**
@@ -464,21 +465,21 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
   // =================== RECORD REVIEWS - EVENTS ===================
 
   event RecordVerified(
-    string indexed recordHash,
-    string indexed recordId,
+    bytes32 indexed recordHash,
+    bytes32 indexed recordIdHash,
     bytes32 indexed verifierIdHash,
     VerificationLevel level,
     uint256 timestamp
   );
 
   event VerificationRetracted(
-    string indexed recordHash,
+    bytes32 indexed recordHash,
     bytes32 indexed verifierIdHash,
     uint256 timestamp
   );
 
   event VerificationLevelModified(
-    string indexed recordHash,
+    bytes32 indexed recordHash,
     bytes32 indexed verifierIdHash,
     VerificationLevel oldLevel,
     VerificationLevel newLevel,
@@ -486,8 +487,8 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
   );
 
   event RecordDisputed(
-    string indexed recordHash,
-    string indexed recordId,
+    bytes32 indexed recordHash,
+    bytes32 indexed recordIdHash,
     bytes32 indexed disputerIdHash,
     DisputeSeverity severity,
     DisputeCulpability culpability,
@@ -495,13 +496,13 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
   );
 
   event DisputeRetracted(
-    string indexed recordHash,
+    bytes32 indexed recordHash,
     bytes32 indexed disputerIdHash,
     uint256 timestamp
   );
 
   event DisputeModification(
-    string indexed recordHash,
+    bytes32 indexed recordHash,
     bytes32 indexed disputerIdHash,
     DisputeSeverity oldSeverity,
     DisputeSeverity newSeverity,
@@ -510,42 +511,18 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
     uint256 timestamp
   );
 
-  event DisputeReaction(
-    string indexed recordHash,
-    bytes32 indexed reactorIdHash,
-    bytes32 indexed disputerIdHash,
-    bool supportsDispute,
-    uint256 timestamp
-  );
-
-  event ReactionRetracted(
-    string indexed recordHash,
-    bytes32 indexed reactorIdHash,
-    bytes32 indexed disputerIdHash,
-    uint256 timestamp
-  );
-
-  event ReactionModified(
-    string indexed recordHash,
-    bytes32 indexed reactorIdHash,
-    bytes32 indexed disputerIdHash,
-    bool oldSupport,
-    bool newSupport,
-    uint256 timestamp
-  );
-
   event UnacceptedUpdateFlagged(
     bytes32 indexed subjectIdHash,
-    string indexed recordId,
-    string indexed noteHash,
-    uint256 flagIndex,
+    bytes32 indexed recordIdHash,
+    bytes32 indexed reporterIdHash,
+    bytes32 recordHash,
     uint256 timestamp
   );
 
-  event UnacceptedUpdateResolved(
+  event UnacceptedUpdateFlagRevoked(
     bytes32 indexed subjectIdHash,
-    uint256 indexed flagIndex,
-    ResolutionType resolution,
+    bytes32 indexed recordIdHash,
+    bytes32 indexed reporterIdHash,
     uint256 timestamp
   );
 
@@ -574,19 +551,11 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
     Intentional
   }
 
-  enum ResolutionType {
-    None, // 0 - Unresolved
-    PatientAccepted, // 1 - Patient eventually accepted the update
-    DoctorWithdrew, // 2 - Doctor withdrew the proposed update
-    Arbitrated, // 3 - Belrose made a decision
-    Expired // 4 - No resolution after time limit
-  }
-
   // =================== RECORD REVIEWS - STRUCTURES ===================
 
   struct Verification {
     bytes32 verifierIdHash;
-    string recordId;
+    bytes32 recordIdHash;
     VerificationLevel level;
     uint256 createdAt;
     bool isActive;
@@ -594,7 +563,7 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
 
   struct Dispute {
     bytes32 disputerIdHash;
-    string recordId;
+    bytes32 recordIdHash;
     DisputeSeverity severity;
     DisputeCulpability culpability;
     string notes;
@@ -602,46 +571,34 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
     bool isActive;
   }
 
-  struct Reaction {
-    bytes32 reactorIdHash;
-    bool supportsDispute;
-    uint256 timestamp;
-    bool isActive;
-  }
-
-  struct UnacceptedUpdateFlag {
-    string recordId;
-    string noteHash;
+  struct UnacceptedFlag {
+    bytes32 recordIdHash;
+    bytes32 reporterIdHash;
+    bytes32 recordHash;
     uint256 createdAt;
-    ResolutionType resolution;
-    uint256 resolvedAt;
     bool isActive;
   }
 
   // =================== RECORD REVIEWS - STORAGE ===================
 
-  // Verifications
-  mapping(string => Verification[]) public verifications;
-  mapping(string => mapping(bytes32 => bool)) public currentlyVerified;
-  mapping(string => mapping(bytes32 => uint256)) public verificationIndex;
+  // Verifications: RecordHash --> Verification
+  mapping(bytes32 => Verification[]) public verifications;
+  mapping(bytes32 => mapping(bytes32 => bool)) public currentlyVerified;
+  mapping(bytes32 => mapping(bytes32 => uint256)) public verificationIndex;
 
-  // Disputes
-  mapping(string => Dispute[]) public disputes;
-  mapping(string => mapping(bytes32 => bool)) public currentlyDisputed;
-  mapping(string => mapping(bytes32 => uint256)) public disputeIndex;
+  // Disputes: RecordHash --> Dispute
+  mapping(bytes32 => Dispute[]) public disputes;
+  mapping(bytes32 => mapping(bytes32 => bool)) public currentlyDisputed;
+  mapping(bytes32 => mapping(bytes32 => uint256)) public disputeIndex;
 
-  // Reactions to disputes
-  mapping(string => mapping(bytes32 => Reaction[])) public disputeReactions;
-  mapping(string => mapping(bytes32 => mapping(bytes32 => bool))) public currentlyReacted;
-  mapping(string => mapping(bytes32 => mapping(bytes32 => uint256))) public reactionIndex;
-
-  //Unaccepted Update Flags
-  mapping(bytes32 => UnacceptedUpdateFlag[]) public unacceptedUpdateFlags;
+  //Unaccepted Update Flags: UserIdHash --> Flag
+  mapping(bytes32 => UnacceptedFlag[]) public unacceptedFlagsBySubject;
+  mapping(bytes32 => mapping(bytes32 => uint256)) public unacceptedFlagIndex;
   mapping(bytes32 => uint256) public activeUnacceptedFlagCount;
 
-  // User history
-  mapping(bytes32 => string[]) public verificationsByUser;
-  mapping(bytes32 => string[]) public disputesByUser;
+  // User history: UserIdHash --> recordHash from Verification/Dispute
+  mapping(bytes32 => bytes32[]) public verificationsByUser;
+  mapping(bytes32 => bytes32[]) public disputesByUser;
 
   uint256 public totalVerifications;
   uint256 public totalDisputes;
@@ -653,28 +610,28 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
 
   /**
    * @notice Verify a record hash (vouch for its accuracy)
-   * @param recordId The recordId this hash is claimed to be for
+   * @param recordIdHash The recordIdHash this hash is claimed to be for
    * @param recordHash The hash being verified
    */
   function verifyRecord(
-    string memory recordId,
-    string memory recordHash,
+    bytes32 recordIdHash,
+    bytes32 recordHash,
     uint8 level
-  ) external onlyActiveMember onlyRecordParticipant(recordId) {
-    require(bytes(recordId).length > 0, 'Record ID cannot be empty');
-    require(bytes(recordHash).length > 0, 'Record hash cannot be empty');
-    require(level >= 1 && level <= 3, 'Level must be 1-3');
+  ) external onlyActiveMember onlyRecordParticipant(recordIdHash) {
+    require(recordIdHash != bytes32(0), "Record ID cannot be empty");
+    require(recordHash != bytes32(0), "Record hash cannot be empty");
+    require(level >= 1 && level <= 3, "Level must be 1-3");
 
     bytes32 verifierIdHash = memberRoleManager.getUserForWallet(msg.sender);
-    require(verifierIdHash != bytes32(0), 'Wallet not registered');
-    require(!currentlyVerified[recordHash][verifierIdHash], 'Already verified this hash');
+    require(verifierIdHash != bytes32(0), "Wallet not registered");
+    require(!currentlyVerified[recordHash][verifierIdHash], "Already verified this hash");
 
     uint256 newIndex = verifications[recordHash].length;
 
     verifications[recordHash].push(
       Verification({
         verifierIdHash: verifierIdHash,
-        recordId: recordId,
+        recordIdHash: recordIdHash,
         level: VerificationLevel(level),
         createdAt: block.timestamp,
         isActive: true
@@ -688,7 +645,7 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
 
     emit RecordVerified(
       recordHash,
-      recordId,
+      recordIdHash,
       verifierIdHash,
       VerificationLevel(level),
       block.timestamp
@@ -699,13 +656,13 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    * @notice Retract your verification
    * @param recordHash The hash you verified
    */
-  function retractVerification(string memory recordHash) external {
+  function retractVerification(bytes32 recordHash) external {
     bytes32 verifierIdHash = memberRoleManager.getUserForWallet(msg.sender);
-    require(verifierIdHash != bytes32(0), 'Wallet not registered');
-    require(currentlyVerified[recordHash][verifierIdHash], 'No verification to retract');
+    require(verifierIdHash != bytes32(0), "Wallet not registered");
+    require(currentlyVerified[recordHash][verifierIdHash], "No verification to retract");
 
     uint256 idx = verificationIndex[recordHash][verifierIdHash];
-    require(verifications[recordHash][idx].isActive, 'Already retracted');
+    require(verifications[recordHash][idx].isActive, "Already retracted");
 
     // 1. Kill the active flag in the historical array
     verifications[recordHash][idx].isActive = false;
@@ -720,19 +677,19 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    * @param recordHash The hash you verified
    * @param newLevel New level (1-3)
    */
-  function modifyVerificationLevel(string memory recordHash, uint8 newLevel) external {
-    require(newLevel >= 1 && newLevel <= 3, 'Level must be 1-3');
+  function modifyVerificationLevel(bytes32 recordHash, uint8 newLevel) external {
+    require(newLevel >= 1 && newLevel <= 3, "Level must be 1-3");
 
     bytes32 verifierIdHash = memberRoleManager.getUserForWallet(msg.sender);
-    require(verifierIdHash != bytes32(0), 'Wallet not registered');
-    require(currentlyVerified[recordHash][verifierIdHash], 'No verification to modify');
+    require(verifierIdHash != bytes32(0), "Wallet not registered");
+    require(currentlyVerified[recordHash][verifierIdHash], "No verification to modify");
 
     uint256 idx = verificationIndex[recordHash][verifierIdHash];
     Verification storage verification = verifications[recordHash][idx];
-    require(verification.isActive, 'Verification has been retracted');
+    require(verification.isActive, "Verification has been retracted");
 
     VerificationLevel oldLevel = verification.level;
-    require(oldLevel != VerificationLevel(newLevel), 'Already this level');
+    require(oldLevel != VerificationLevel(newLevel), "Already this level");
 
     verification.level = VerificationLevel(newLevel);
 
@@ -749,34 +706,34 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
 
   /**
    * @notice Dispute a record hash (flag it as inaccurate)
-   * @param recordId The record this hash is claimed to be for
+   * @param recordIdHash The record this hash is claimed to be for
    * @param recordHash The hash being disputed
    * @param severity 1=Negligible, 2=Moderate, 3=Major
    * @param culpability 1=NoFault, 2=Systemic, 3=Preventable, 4=Reckless, 5=Intentional
    * @param notes Off-chain reference for detailed reasoning (IPFS hash, etc.)
    */
   function disputeRecord(
-    string memory recordId,
-    string memory recordHash,
+    bytes32 recordIdHash,
+    bytes32 recordHash,
     uint8 severity,
     uint8 culpability,
     string memory notes
-  ) external onlyActiveMember onlyRecordParticipant(recordId) {
-    require(bytes(recordId).length > 0, 'Record ID cannot be empty');
-    require(bytes(recordHash).length > 0, 'Record hash cannot be empty');
-    require(severity >= 1 && severity <= 3, 'Severity must be 1-3');
-    require(culpability >= 1 && culpability <= 5, 'Culpability must be 1-5');
+  ) external onlyActiveMember onlyRecordParticipant(recordIdHash) {
+    require(recordIdHash != bytes32(0), "Record ID cannot be empty");
+    require(recordHash != bytes32(0), "Record hash cannot be empty");
+    require(severity >= 1 && severity <= 3, "Severity must be 1-3");
+    require(culpability >= 1 && culpability <= 5, "Culpability must be 1-5");
 
     bytes32 disputerIdHash = memberRoleManager.getUserForWallet(msg.sender);
-    require(disputerIdHash != bytes32(0), 'Wallet not registered');
-    require(!currentlyDisputed[recordHash][disputerIdHash], 'Already disputed this hash');
+    require(disputerIdHash != bytes32(0), "Wallet not registered");
+    require(!currentlyDisputed[recordHash][disputerIdHash], "Already disputed this hash");
 
     uint256 newIndex = disputes[recordHash].length;
 
     disputes[recordHash].push(
       Dispute({
         disputerIdHash: disputerIdHash,
-        recordId: recordId,
+        recordIdHash: recordIdHash,
         severity: DisputeSeverity(severity),
         culpability: DisputeCulpability(culpability),
         notes: notes,
@@ -792,7 +749,7 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
 
     emit RecordDisputed(
       recordHash,
-      recordId,
+      recordIdHash,
       disputerIdHash,
       DisputeSeverity(severity),
       DisputeCulpability(culpability),
@@ -804,13 +761,13 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    * @notice Retract your dispute
    * @param recordHash The hash you disputed
    */
-  function retractDispute(string memory recordHash) external {
+  function retractDispute(bytes32 recordHash) external {
     bytes32 disputerIdHash = memberRoleManager.getUserForWallet(msg.sender);
-    require(disputerIdHash != bytes32(0), 'Wallet not registered');
-    require(currentlyDisputed[recordHash][disputerIdHash], 'No dispute to retract');
+    require(disputerIdHash != bytes32(0), "Wallet not registered");
+    require(currentlyDisputed[recordHash][disputerIdHash], "No dispute to retract");
 
     uint256 idx = disputeIndex[recordHash][disputerIdHash];
-    require(disputes[recordHash][idx].isActive, 'Already retracted');
+    require(disputes[recordHash][idx].isActive, "Already retracted");
 
     disputes[recordHash][idx].isActive = false;
     currentlyDisputed[recordHash][disputerIdHash] = false;
@@ -824,21 +781,17 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    * @param newSeverity New severity (1-3)
    * @param newCulpability New culpability (1-5)
    */
-  function modifyDispute(
-    string memory recordHash,
-    uint8 newSeverity,
-    uint8 newCulpability
-  ) external {
-    require(newSeverity >= 1 && newSeverity <= 3, 'Severity must be 1-3');
-    require(newCulpability >= 1 && newCulpability <= 5, 'Culpability must be 1-5');
+  function modifyDispute(bytes32 recordHash, uint8 newSeverity, uint8 newCulpability) external {
+    require(newSeverity >= 1 && newSeverity <= 3, "Severity must be 1-3");
+    require(newCulpability >= 1 && newCulpability <= 5, "Culpability must be 1-5");
 
     bytes32 disputerIdHash = memberRoleManager.getUserForWallet(msg.sender);
-    require(disputerIdHash != bytes32(0), 'Wallet not registered');
-    require(currentlyDisputed[recordHash][disputerIdHash], 'No dispute to modify');
+    require(disputerIdHash != bytes32(0), "Wallet not registered");
+    require(currentlyDisputed[recordHash][disputerIdHash], "No dispute to modify");
 
     uint256 idx = disputeIndex[recordHash][disputerIdHash];
     Dispute storage dispute = disputes[recordHash][idx];
-    require(dispute.isActive, 'Dispute has been retracted');
+    require(dispute.isActive, "Dispute has been retracted");
 
     DisputeSeverity oldSeverity = dispute.severity;
     DisputeCulpability oldCulpability = dispute.culpability;
@@ -857,134 +810,36 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
     );
   }
 
-  // ------------------- REACTIONS -------------------
-
-  /**
-   * @notice React to a dispute (support or oppose)
-   * @param recordHash The hash with the dispute
-   * @param disputerIdHash The user whose dispute you're reacting to
-   * @param supportsDispute True = agree, False = disagree
-   */
-  function reactToDispute(
-    string memory recordHash,
-    bytes32 disputerIdHash,
-    bool supportsDispute
-  ) external onlyActiveMember {
-    require(currentlyDisputed[recordHash][disputerIdHash], 'No dispute from this user');
-
-    uint256 idx = disputeIndex[recordHash][disputerIdHash];
-    string memory recordId = disputes[recordHash][idx].recordId;
-    require(memberRoleManager.hasActiveRole(recordId, msg.sender), 'No access to this record');
-
-    bytes32 reactorIdHash = memberRoleManager.getUserForWallet(msg.sender);
-    require(reactorIdHash != bytes32(0), 'Wallet not registered');
-    require(reactorIdHash != disputerIdHash, 'Cannot react to your own dispute');
-    require(!currentlyReacted[recordHash][disputerIdHash][reactorIdHash], 'Already reacted');
-    require(disputes[recordHash][idx].isActive, 'Dispute has been retracted');
-
-    uint256 newReactionIndex = disputeReactions[recordHash][disputerIdHash].length;
-
-    disputeReactions[recordHash][disputerIdHash].push(
-      Reaction({
-        reactorIdHash: reactorIdHash,
-        supportsDispute: supportsDispute,
-        timestamp: block.timestamp,
-        isActive: true
-      })
-    );
-
-    currentlyReacted[recordHash][disputerIdHash][reactorIdHash] = true;
-    reactionIndex[recordHash][disputerIdHash][reactorIdHash] = newReactionIndex;
-
-    emit DisputeReaction(
-      recordHash,
-      reactorIdHash,
-      disputerIdHash,
-      supportsDispute,
-      block.timestamp
-    );
-  }
-
-  /**
-   * @notice Retract your reaction to a dispute
-   * @param recordHash The hash with the dispute
-   * @param disputerIdHash The user whose dispute you reacted to
-   */
-  function retractReaction(string memory recordHash, bytes32 disputerIdHash) external {
-    bytes32 reactorIdHash = memberRoleManager.getUserForWallet(msg.sender);
-    require(reactorIdHash != bytes32(0), 'Wallet not registered');
-    require(currentlyReacted[recordHash][disputerIdHash][reactorIdHash], 'No reaction to retract');
-
-    uint256 idx = reactionIndex[recordHash][disputerIdHash][reactorIdHash];
-    require(disputeReactions[recordHash][disputerIdHash][idx].isActive, 'Already retracted');
-
-    disputeReactions[recordHash][disputerIdHash][idx].isActive = false;
-    currentlyReacted[recordHash][disputerIdHash][reactorIdHash] = false;
-
-    emit ReactionRetracted(recordHash, reactorIdHash, disputerIdHash, block.timestamp);
-  }
-
-  /**
-   * @notice Modify your reaction to a dispute
-   * @param recordHash The hash with the dispute
-   * @param disputerIdHash The user whose dispute you reacted to
-   * @param newSupport New support value (true = support, false = oppose)
-   */
-  function modifyReaction(
-    string memory recordHash,
-    bytes32 disputerIdHash,
-    bool newSupport
-  ) external {
-    bytes32 reactorIdHash = memberRoleManager.getUserForWallet(msg.sender);
-    require(reactorIdHash != bytes32(0), 'Wallet not registered');
-    require(currentlyReacted[recordHash][disputerIdHash][reactorIdHash], 'No reaction to modify');
-
-    uint256 idx = reactionIndex[recordHash][disputerIdHash][reactorIdHash];
-    Reaction storage reaction = disputeReactions[recordHash][disputerIdHash][idx];
-    require(reaction.isActive, 'Reaction has been retracted');
-
-    bool oldSupport = reaction.supportsDispute;
-    require(oldSupport != newSupport, 'Already this value');
-
-    reaction.supportsDispute = newSupport;
-    reaction.timestamp = block.timestamp; // Update timestamp on modification
-
-    emit ReactionModified(
-      recordHash,
-      reactorIdHash,
-      disputerIdHash,
-      oldSupport,
-      newSupport,
-      block.timestamp
-    );
-  }
-
   // ------------------- UNACCEPTED UPDATE FLAGS -------------------
 
   /**
    * @notice Flag that an unaccepted update exists for a record or user
    * @dev Only admin can call this to protect privacy
    * @param subjectIdHash The subject this flag is about
-   * @param recordId The record ID, optional if there's no recordID associated to patient yet
-   * @param noteHash Hash of encrypted details stored off-chain
+   * @param recordIdHash The record ID, optional if there's no recordIdHash associated to patient yet
+   * @param reporterIdHash The userId of the reporter
+   * @param recordHash The recordContent
    */
   function flagUnacceptedUpdate(
     bytes32 subjectIdHash,
-    string memory recordId,
-    string memory noteHash
+    bytes32 recordIdHash,
+    bytes32 reporterIdHash,
+    bytes32 recordHash
   ) external onlyAdmin {
-    require(subjectIdHash != bytes32(0), 'Subject ID hash cannot be empty');
-    require(bytes(noteHash).length > 0, 'Note hash cannot be empty');
+    require(subjectIdHash != bytes32(0), "Invalid subject");
+    require(recordIdHash != bytes32(0), "Invalid record");
+    require(reporterIdHash != bytes32(0), "Invalid provider");
+    require(unacceptedFlagIndex[subjectIdHash][recordIdHash] == 0, "Already flagged");
 
-    uint256 flagIndex = unacceptedUpdateFlags[subjectIdHash].length;
+    uint256 newIndex = unacceptedFlagsBySubject[subjectIdHash].length;
+    unacceptedFlagIndex[subjectIdHash][recordIdHash] = newIndex + 1;
 
-    unacceptedUpdateFlags[subjectIdHash].push(
-      UnacceptedUpdateFlag({
-        recordId: recordId,
-        noteHash: noteHash,
+    unacceptedFlagsBySubject[subjectIdHash].push(
+      UnacceptedFlag({
+        recordIdHash: recordIdHash,
+        reporterIdHash: reporterIdHash,
+        recordHash: recordHash,
         createdAt: block.timestamp,
-        resolution: ResolutionType.None,
-        resolvedAt: 0,
         isActive: true
       })
     );
@@ -992,34 +847,34 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
     activeUnacceptedFlagCount[subjectIdHash]++;
     totalUnacceptedFlags++;
 
-    emit UnacceptedUpdateFlagged(subjectIdHash, recordId, noteHash, flagIndex, block.timestamp);
+    emit UnacceptedUpdateFlagged(
+      subjectIdHash,
+      recordIdHash,
+      reporterIdHash,
+      recordHash,
+      block.timestamp
+    );
   }
 
   /**
    * @notice Resolve an unaccepted update flag
    * @dev Only admin can call this
    * @param subjectIdHash the subject this flag is about
-   * @param flagIndex The index of the flag to resolve
-   * @param resolution The resolution type
+   * @param recordIdHash The index of the flag to resolve
    */
-  function resolveUnacceptedUpdate(
-    bytes32 subjectIdHash,
-    uint256 flagIndex,
-    ResolutionType resolution
-  ) external onlyAdmin {
-    require(flagIndex < unacceptedUpdateFlags[subjectIdHash].length, 'Flag does not exist');
-    require(resolution != ResolutionType.None, 'Must provide resolution type');
+  function revokeUnacceptedFlag(bytes32 subjectIdHash, bytes32 recordIdHash) external onlyAdmin {
+    uint256 storedIndex = unacceptedFlagIndex[subjectIdHash][recordIdHash];
+    require(storedIndex != 0, "No flag exists");
 
-    UnacceptedUpdateFlag storage flag = unacceptedUpdateFlags[subjectIdHash][flagIndex];
-    require(flag.isActive, 'Flag already resolved');
+    uint256 idx = storedIndex - 1;
+    UnacceptedFlag storage flag = unacceptedFlagsBySubject[subjectIdHash][idx];
+    require(flag.isActive, "Flag already revoked");
 
-    flag.resolution = resolution;
-    flag.resolvedAt = block.timestamp;
+    bytes32 reporterIdHash = flag.reporterIdHash;
     flag.isActive = false;
-
     activeUnacceptedFlagCount[subjectIdHash]--;
 
-    emit UnacceptedUpdateResolved(subjectIdHash, flagIndex, resolution, block.timestamp);
+    emit UnacceptedUpdateFlagRevoked(subjectIdHash, recordIdHash, reporterIdHash, block.timestamp);
   }
 
   // =================== RECORD REVIEWS - VIEW FUNCTIONS ===================
@@ -1029,19 +884,14 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
   /**
    * @notice Get all verifications for a record hash
    */
-  function getVerifications(
-    string memory recordHash
-  ) external view returns (Verification[] memory) {
+  function getVerifications(bytes32 recordHash) external view returns (Verification[] memory) {
     return verifications[recordHash];
   }
 
   /**
    * @notice Check if a user has verified a record hash
    */
-  function hasUserVerified(
-    string memory recordHash,
-    bytes32 userIdHash
-  ) external view returns (bool) {
+  function hasUserVerified(bytes32 recordHash, bytes32 userIdHash) external view returns (bool) {
     return currentlyVerified[recordHash][userIdHash];
   }
 
@@ -1049,34 +899,34 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    * @notice Get a specific user's verification for a hash
    */
   function getUserVerification(
-    string memory recordHash,
+    bytes32 recordHash,
     bytes32 userIdHash
   )
     external
     view
     returns (
       bool exists,
-      string memory recordId,
+      bytes32 recordIdHash,
       VerificationLevel level,
       uint256 createdAt,
       bool isActive
     )
   {
     if (!currentlyVerified[recordHash][userIdHash]) {
-      return (false, '', VerificationLevel.None, 0, false);
+      return (false, bytes32(0), VerificationLevel.None, 0, false);
     }
 
     uint256 idx = verificationIndex[recordHash][userIdHash];
     Verification memory v = verifications[recordHash][idx];
 
-    return (true, v.recordId, v.level, v.createdAt, v.isActive);
+    return (true, v.recordIdHash, v.level, v.createdAt, v.isActive);
   }
 
   /**
    * @notice Get verification stats for a record hash
    */
   function getVerificationStats(
-    string memory recordHash
+    bytes32 recordHash
   ) external view returns (uint256 total, uint256 active) {
     Verification[] memory vers = verifications[recordHash];
     total = vers.length;
@@ -1093,7 +943,7 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
   /**
    * @notice Get all hashes a user has verified
    */
-  function getUserVerifications(bytes32 userIdHash) external view returns (string[] memory) {
+  function getUserVerifications(bytes32 userIdHash) external view returns (bytes32[] memory) {
     return verificationsByUser[userIdHash];
   }
 
@@ -1102,17 +952,14 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
   /**
    * @notice Get all disputes for a record hash
    */
-  function getDisputes(string memory recordHash) external view returns (Dispute[] memory) {
+  function getDisputes(bytes32 recordHash) external view returns (Dispute[] memory) {
     return disputes[recordHash];
   }
 
   /**
    * @notice Check if a user has disputed a record hash
    */
-  function hasUserDisputed(
-    string memory recordHash,
-    bytes32 userIdHash
-  ) external view returns (bool) {
+  function hasUserDisputed(bytes32 recordHash, bytes32 userIdHash) external view returns (bool) {
     return currentlyDisputed[recordHash][userIdHash];
   }
 
@@ -1120,14 +967,14 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    * @notice Get a specific user's dispute for a hash
    */
   function getUserDispute(
-    string memory recordHash,
+    bytes32 recordHash,
     bytes32 userIdHash
   )
     external
     view
     returns (
       bool exists,
-      string memory recordId,
+      bytes32 recordIdHash,
       DisputeSeverity severity,
       DisputeCulpability culpability,
       string memory notes,
@@ -1136,20 +983,20 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
     )
   {
     if (!currentlyDisputed[recordHash][userIdHash]) {
-      return (false, '', DisputeSeverity.None, DisputeCulpability.None, '', 0, false);
+      return (false, bytes32(0), DisputeSeverity.None, DisputeCulpability.None, "", 0, false);
     }
 
     uint256 idx = disputeIndex[recordHash][userIdHash];
     Dispute memory d = disputes[recordHash][idx];
 
-    return (true, d.recordId, d.severity, d.culpability, d.notes, d.createdAt, d.isActive);
+    return (true, d.recordIdHash, d.severity, d.culpability, d.notes, d.createdAt, d.isActive);
   }
 
   /**
    * @notice Get dispute stats for a record hash
    */
   function getDisputeStats(
-    string memory recordHash
+    bytes32 recordHash
   ) external view returns (uint256 total, uint256 active) {
     Dispute[] memory disps = disputes[recordHash];
     total = disps.length;
@@ -1166,121 +1013,52 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
   /**
    * @notice Get all hashes a user has disputed
    */
-  function getUserDisputes(bytes32 userIdHash) external view returns (string[] memory) {
+  function getUserDisputes(bytes32 userIdHash) external view returns (bytes32[] memory) {
     return disputesByUser[userIdHash];
   }
 
-  // ------------------- REACTION VIEWS -------------------
+  // ------------------- UNACCEPTED UPDATE FLAG VIEWS -------------------
 
   /**
-   * @notice Get all reactions to a specific dispute
+   * @notice Get all flags for a subject (includes revoked, for audit trail)
    */
-  function getDisputeReactions(
-    string memory recordHash,
-    bytes32 disputerIdHash
-  ) external view returns (Reaction[] memory) {
-    return disputeReactions[recordHash][disputerIdHash];
-  }
-
-  /**
-   * @notice Check if a user has reacted to a specific dispute
-   */
-  function hasUserReacted(
-    string memory recordHash,
-    bytes32 disputerIdHash,
-    bytes32 reactorIdHash
-  ) external view returns (bool) {
-    return currentlyReacted[recordHash][disputerIdHash][reactorIdHash];
-  }
-
-  /**
-   * @notice Get a specific user's reaction to a dispute
-   */
-  function getUserReaction(
-    string memory recordHash,
-    bytes32 disputerIdHash,
-    bytes32 reactorIdHash
-  ) external view returns (bool exists, bool supportsDispute, uint256 timestamp, bool isActive) {
-    if (!currentlyReacted[recordHash][disputerIdHash][reactorIdHash]) {
-      return (false, false, 0, false);
-    }
-
-    uint256 idx = reactionIndex[recordHash][disputerIdHash][reactorIdHash];
-    Reaction memory r = disputeReactions[recordHash][disputerIdHash][idx];
-
-    return (true, r.supportsDispute, r.timestamp, r.isActive);
-  }
-
-  /**
-   * @notice Get reaction stats for a dispute (supports vs opposes)
-   */
-  function getReactionStats(
-    string memory recordHash,
-    bytes32 disputerIdHash
-  ) external view returns (uint256 totalReactions, uint256 activeSupports, uint256 activeOpposes) {
-    Reaction[] memory reactions = disputeReactions[recordHash][disputerIdHash];
-    totalReactions = reactions.length;
-
-    for (uint256 i = 0; i < reactions.length; i++) {
-      if (reactions[i].isActive) {
-        if (reactions[i].supportsDispute) {
-          activeSupports++;
-        } else {
-          activeOpposes++;
-        }
-      }
-    }
-
-    return (totalReactions, activeSupports, activeOpposes);
-  }
-
-  // ------------------- UNACCEPTED UPDATE FLAGS VIEW -------------------
-
-  /**
-   * @notice Get all flags for a subject
-   */
-  function getUnacceptedUpdateFlags(
+  function getUnacceptedFlags(
     bytes32 subjectIdHash
-  ) external view returns (UnacceptedUpdateFlag[] memory) {
-    return unacceptedUpdateFlags[subjectIdHash];
+  ) external view returns (UnacceptedFlag[] memory) {
+    return unacceptedFlagsBySubject[subjectIdHash];
   }
 
   /**
-   * @notice Get count of active (unresolved) flags for a subject
+   * @notice Get the flag for a specific (subject, record) pair
    */
-  function getActiveUnacceptedFlagCount(bytes32 subjectIdHash) external view returns (uint256) {
-    return activeUnacceptedFlagCount[subjectIdHash];
-  }
-
-  /**
-   * @notice Get a specific flag
-   */
-  function getUnacceptedUpdateFlag(
+  function getUnacceptedFlag(
     bytes32 subjectIdHash,
-    uint256 flagIndex
+    bytes32 recordIdHash
   )
     external
     view
     returns (
-      string memory recordId,
-      string memory noteHash,
-      uint256 createdAt,
-      ResolutionType resolution,
-      uint256 resolvedAt,
-      bool isActive
+      bool exists,
+      bool isActive,
+      bytes32 reporterIdHash,
+      bytes32 recordHash,
+      uint256 createdAt
     )
   {
-    require(flagIndex < unacceptedUpdateFlags[subjectIdHash].length, 'Flag does not exist');
+    uint256 storedIndex = unacceptedFlagIndex[subjectIdHash][recordIdHash];
+    if (storedIndex == 0) {
+      return (false, false, bytes32(0), bytes32(0), 0);
+    }
 
-    UnacceptedUpdateFlag memory flag = unacceptedUpdateFlags[subjectIdHash][flagIndex];
-    return (
-      flag.recordId,
-      flag.noteHash,
-      flag.createdAt,
-      flag.resolution,
-      flag.resolvedAt,
-      flag.isActive
-    );
+    UnacceptedFlag memory flag = unacceptedFlagsBySubject[subjectIdHash][storedIndex - 1];
+    return (true, flag.isActive, flag.reporterIdHash, flag.recordHash, flag.createdAt);
+  }
+
+  /**
+   * @notice Get count of currently active flags for a subject
+   */
+  function getActiveUnacceptedFlagCount(bytes32 subjectIdHash) external view returns (uint256) {
+    return activeUnacceptedFlagCount[subjectIdHash];
   }
 
   /**
@@ -1289,4 +1067,12 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
   function hasActiveUnacceptedFlags(bytes32 subjectIdHash) external view returns (bool) {
     return activeUnacceptedFlagCount[subjectIdHash] > 0;
   }
+
+  // ===============================================================
+  // STORAGE GAP
+  // Safe upgrade buffer — future versions can consume these slots
+  // without shifting the storage layout of existing variables.
+  // ===============================================================
+
+  uint256[50] private __gap;
 }

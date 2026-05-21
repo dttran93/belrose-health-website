@@ -6,9 +6,9 @@
     {
       "inputs": [
         {
-          "internalType": "string",
-          "name": "recordId",
-          "type": "string"
+          "internalType": "bytes32",
+          "name": "recordIdHash",
+          "type": "bytes32"
         },
         {
           "internalType": "bytes32",
