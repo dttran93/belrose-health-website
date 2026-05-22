@@ -4,11 +4,9 @@
  * Three triggers:
  * 1. onVerificationWritten   — verifications created/updated
  * 2. onDisputeWritten        — disputes created/updated
- * 3. onDisputeReactionWritten — dispute reactions created/updated
  *
  * Who gets notified:
  * - Verifications/Disputes: record owners + subjects (not the actor themselves)
- * - Dispute reactions: the original disputer + record owners/subjects
  */
 
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
@@ -30,15 +28,10 @@ import {
   buildDisputeModifiedText,
   buildDisputeRetractedHtml,
   buildDisputeRetractedText,
-  buildDisputeReactionHtml,
-  buildDisputeReactionText,
-  buildDisputeReactionRetractedText,
-  buildDisputeReactionRetractedHtml,
 } from '../emails/credibilityEmailTemplates';
 import {
   DisputeDoc,
   DisputeSeverityOptions,
-  ReactionDoc,
   VerificationDoc,
   VerificationLevelOptions,
 } from '../../_shared';
@@ -403,192 +396,6 @@ export const onDisputeUpdated = onDocumentUpdated(
                 recordFallback,
                 after.recordId,
                 newSeverityName
-              ),
-            },
-            resend
-          )
-        )
-      );
-    }
-  }
-);
-
-// ============================================================================
-// TRIGGER 5: REACTION TO DISPUTE CREATED
-// ============================================================================
-
-export const onDisputeReactionWritten = onDocumentCreated(
-  { document: 'disputeReactions/{reactionId}', secrets: [resendKey] },
-  async event => {
-    const data = event.data?.data() as ReactionDoc | undefined;
-    if (!data || !data.isActive) return;
-
-    // Notify: original disputer + record stakeholders, excluding the reactor
-    const stakeholders = await getRecordStakeholders(data.recordId, data.reactorId);
-
-    // Also notify the disputer if they're not already in stakeholders and not the reactor
-    const targets =
-      data.disputerId !== data.reactorId && !stakeholders.includes(data.disputerId)
-        ? [...stakeholders, data.disputerId]
-        : stakeholders;
-
-    if (targets.length === 0) return;
-
-    const reactorName = await getUserDisplayName(data.reactorId);
-    const stance = data.supportsDispute ? 'supported' : 'opposed';
-    const recordFallback = `Record ${data.recordId.slice(0, 8)}...`;
-
-    await createNotificationForMultiple(targets, {
-      type: 'DISPUTE_REACTION_ADDED',
-      message: `${reactorName} ${stance} a dispute on ${recordFallback}.`,
-      link: `/app/records/${data.recordId}`,
-      payload: {
-        recordId: data.recordId,
-        recordHash: data.recordHash,
-        reactorId: data.reactorId,
-        disputerId: data.disputerId,
-        supportsDispute: data.supportsDispute,
-        encryptedRecordTitle: data.encryptedRecordTitle,
-        encryptedRecordTitleIv: data.encryptedRecordTitleIv,
-      },
-    });
-
-    const resend = new Resend(resendKey.value());
-    await Promise.all(
-      targets.map(uid =>
-        sendEmailIfEnabled(
-          uid,
-          'DISPUTE_REACTION_ADDED',
-          {
-            subject: `${reactorName} ${stance} a dispute on a record`,
-            html: buildDisputeReactionHtml(
-              reactorName,
-              recordFallback,
-              data.recordId,
-              data.supportsDispute
-            ),
-            text: buildDisputeReactionText(
-              reactorName,
-              recordFallback,
-              data.recordId,
-              data.supportsDispute
-            ),
-          },
-          resend
-        )
-      )
-    );
-
-    console.log(`✅ Reaction notifications sent to ${targets.length} stakeholder(s)`);
-  }
-);
-
-// ============================================================================
-// TRIGGER 6: REACTION TO DISPUTE UPDATED - MODIFY OR RETRACTED
-// ============================================================================
-
-export const onDisputeReactionUpdated = onDocumentUpdated(
-  { document: 'disputeReactions/{reactionId}', secrets: [resendKey] },
-  async event => {
-    const before = event.data?.before.data() as ReactionDoc | undefined;
-    const after = event.data?.after.data() as ReactionDoc | undefined;
-    if (!before || !after) return;
-
-    const stakeholders = await getRecordStakeholders(after.recordId, after.reactorId);
-    const targets =
-      after.disputerId !== after.reactorId && !stakeholders.includes(after.disputerId)
-        ? [...stakeholders, after.disputerId]
-        : stakeholders;
-
-    if (targets.length === 0) return;
-
-    const reactorName = await getUserDisplayName(after.reactorId);
-    const recordFallback = `Record ${after.recordId.slice(0, 8)}...`;
-    const resend = new Resend(resendKey.value());
-
-    // CASE 1: Retracted — isActive flipped to false
-    if (before.isActive && !after.isActive) {
-      const previousStance = after.supportsDispute ? 'support' : 'opposition';
-
-      await createNotificationForMultiple(targets, {
-        type: 'DISPUTE_REACTION_RETRACTED',
-        message: `${reactorName} retracted their ${previousStance} of a dispute on ${recordFallback}.`,
-        link: `/app/records/${after.recordId}`,
-        payload: stripUndefined({
-          recordId: after.recordId,
-          recordHash: after.recordHash,
-          reactorId: after.reactorId,
-          disputerId: after.disputerId,
-          supportsDispute: after.supportsDispute,
-          encryptedRecordTitle: after.encryptedRecordTitle,
-          encryptedRecordTitleIv: after.encryptedRecordTitleIv,
-        }),
-      });
-
-      await Promise.all(
-        targets.map(uid =>
-          sendEmailIfEnabled(
-            uid,
-            'DISPUTE_REACTION_RETRACTED',
-            {
-              subject: `${reactorName} retracted their reaction to a dispute`,
-              html: buildDisputeReactionRetractedHtml(
-                reactorName,
-                recordFallback,
-                after.recordId,
-                after.supportsDispute
-              ),
-              text: buildDisputeReactionRetractedText(
-                reactorName,
-                recordFallback,
-                after.recordId,
-                after.supportsDispute
-              ),
-            },
-            resend
-          )
-        )
-      );
-      return;
-    }
-
-    // CASE 2: Stance changed (support ↔ oppose) while still active
-    if (before.isActive && after.isActive && before.supportsDispute !== after.supportsDispute) {
-      const newStance = after.supportsDispute ? 'now supports' : 'now opposes';
-
-      await createNotificationForMultiple(targets, {
-        type: 'DISPUTE_REACTION_MODIFIED',
-        message: `${reactorName} changed their reaction and ${newStance} a dispute on ${recordFallback}.`,
-        link: `/app/records/${after.recordId}`,
-        payload: stripUndefined({
-          recordId: after.recordId,
-          recordHash: after.recordHash,
-          reactorId: after.reactorId,
-          disputerId: after.disputerId,
-          supportsDispute: after.supportsDispute,
-          encryptedRecordTitle: after.encryptedRecordTitle,
-          encryptedRecordTitleIv: after.encryptedRecordTitleIv,
-        }),
-      });
-
-      await Promise.all(
-        targets.map(uid =>
-          sendEmailIfEnabled(
-            uid,
-            'DISPUTE_REACTION_MODIFIED',
-            {
-              subject: `${reactorName} changed their reaction to a dispute`,
-              html: buildDisputeReactionHtml(
-                reactorName,
-                recordFallback,
-                after.recordId,
-                after.supportsDispute
-              ),
-              text: buildDisputeReactionText(
-                reactorName,
-                recordFallback,
-                after.recordId,
-                after.supportsDispute
               ),
             },
             resend

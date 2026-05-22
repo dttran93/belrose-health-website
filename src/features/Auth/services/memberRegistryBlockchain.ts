@@ -23,6 +23,16 @@ interface WalletStatusResult {
   blockchainRef?: BlockchainRef;
 }
 
+interface RegisterMemberCompleteResult {
+  success: boolean;
+  walletAddress: string;
+  smartAccountAddress: string;
+  encryptedPrivateKey: string;
+  encryptedPrivateKeyIV: string;
+  authTag: string;
+  blockchainRef: BlockchainRef;
+}
+
 // ==================== SERVICE ====================
 
 /**
@@ -38,10 +48,46 @@ export class MemberRegistryBlockchain {
   // ==================== MEMBER REGISTRATION ====================
 
   /**
-   * Register a wallet on the blockchain
+   * Full registration flow — generates EOA + smart account, registers both
+   * on-chain in a single transaction, saves to Firestore.
+   * Called once during initial registration.
+   * @param masterKeyHex - Master encryption key in hex format (used server-side to encrypt wallet)
+   */
+  static async registerMemberOnChainComplete(
+    masterKeyHex: string
+  ): Promise<RegisterMemberCompleteResult> {
+    console.log('🔗 Registering member with wallet generation...');
+
+    try {
+      const functions = getFunctions();
+      const registerFn = httpsCallable<{ masterKeyHex: string }, RegisterMemberCompleteResult>(
+        functions,
+        'registerMemberOnChainComplete'
+      );
+
+      const result = await registerFn({ masterKeyHex });
+
+      console.log('✅ Member registered with wallets:', result.data.walletAddress);
+      return result.data;
+    } catch (error: any) {
+      console.error('❌ Full registration failed:', error);
+
+      if (error.code === 'already-exists' || error.code === 'functions/already-exists') {
+        console.log('ℹ️ Member already registered');
+        throw new Error('Member already registered');
+      }
+
+      throw new Error(error.message || 'Failed to complete registration on blockchain');
+    }
+  }
+
+  /**
+   * Register an individual wallet on the blockchain
    * - If first wallet for user: creates identity + links wallet
    * - If user exists: links additional wallet to existing identity
-   *
+   * - Probably won't be used much? For special situations since registerMemberOnChainComplete
+   * covers registration.
+   * - Use case would be adding another EOA wallet or something instead
    * @param walletAddress - Wallet address (EOA or Smart Account)
    */
   static async registerMemberWallet(walletAddress: string): Promise<RegisterMemberResult> {

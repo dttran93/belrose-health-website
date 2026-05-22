@@ -1,7 +1,7 @@
 // src/features/Credibility/services/recordReviewStatusService.ts
 
 /**
- * Aggregates a user's review activity (verifications, disputes, reactions)
+ * Aggregates a user's review activity (verifications, disputes)
  * for a single record, including whether each review is current or stale
  * relative to the record's current content hash.
  *
@@ -14,7 +14,7 @@
  */
 
 import { getVerification } from './verificationService';
-import { getDisputesByRecordId, getDisputeReactions } from './disputeService';
+import { getDisputesByRecordId } from './disputeService';
 import { VerificationLevelOptions } from '../hooks/useCredibilityFlow';
 import { DisputeSeverityOptions } from '@belrose/shared';
 
@@ -30,13 +30,6 @@ export interface RecordReviewStatus {
   hasDispute: boolean;
   disputeIsCurrentHash: boolean; // false if disputed against an older hash
   disputeSeverity?: DisputeSeverityOptions;
-
-  // ── Reaction ─────────────────────────────────────────────────────────────────
-  // A reaction is tied to a specific dispute, so staleness is inherited:
-  // if the dispute it was made against is stale, the reaction is stale too.
-  hasReaction: boolean;
-  reactionIsCurrentHash: boolean;
-  reactionSupportsDispute?: boolean; // true = supported, false = opposed
 
   // ── Derived convenience flags ────────────────────────────────────────────────
   hasAnyActiveReview: boolean; // any of the three is active
@@ -71,8 +64,6 @@ export async function getRecordReviewStatus(
       verificationIsCurrentHash: false,
       hasDispute: false,
       disputeIsCurrentHash: false,
-      hasReaction: false,
-      reactionIsCurrentHash: false,
       hasAnyActiveReview: false,
       hasStaleReview: false,
       currentHashReviewed: false,
@@ -80,8 +71,6 @@ export async function getRecordReviewStatus(
   }
 
   // ── Fetch verification and all disputes on the record in parallel ─────────────
-  // We need all disputes (not just the user's) to check reactions,
-  // since reactions are tied to a disputerId + recordHash combination.
   const [verification, allDisputes] = await Promise.all([
     getVerification(currentRecordHash, userId).catch(() => null),
     getDisputesByRecordId(recordId).catch(() => []),
@@ -115,58 +104,13 @@ export async function getRecordReviewStatus(
   const disputeIsCurrentHash = !!userDisputeCurrentHash;
   const disputeSeverity = (userDisputeCurrentHash || userDisputeStaleHash)?.severity;
 
-  // ── Reactions ─────────────────────────────────────────────────────────────────
-  // Check if the user has reacted to any active dispute on this record.
-  // A reaction is stale if the dispute it was made against is for an old hash.
-  // We check all disputes (any user's) and look for the current user as reactor.
-  let hasReaction = false;
-  let reactionIsCurrentHash = false;
-  let reactionSupportsDispute: boolean | undefined;
-
-  if (allDisputes.length > 0) {
-    // Only check disputes where the user is NOT the disputer
-    // (you can't react to your own dispute)
-    const otherUsersDisputes = allDisputes.filter(d => d.disputerId !== userId && d.isActive);
-
-    // Fetch reactions for each dispute in parallel, looking for the current user
-    const reactionChecks = await Promise.all(
-      otherUsersDisputes.map(async dispute => {
-        const reactions = await getDisputeReactions(
-          recordId,
-          dispute.recordHash,
-          dispute.disputerId,
-          true // activeOnly
-        ).catch(() => []);
-
-        const userReaction = reactions.find(r => r.reactorId === userId);
-        return userReaction
-          ? {
-              found: true,
-              isCurrent: dispute.recordHash === currentRecordHash,
-              supportsDispute: userReaction.supportsDispute,
-            }
-          : null;
-      })
-    );
-
-    const foundReaction = reactionChecks.find(r => r !== null);
-    if (foundReaction) {
-      hasReaction = true;
-      reactionIsCurrentHash = foundReaction.isCurrent;
-      reactionSupportsDispute = foundReaction.supportsDispute;
-    }
-  }
-
   // ── Derived flags ─────────────────────────────────────────────────────────────
-  const hasAnyActiveReview = hasVerification || hasDispute || hasReaction;
+  const hasAnyActiveReview = hasVerification || hasDispute;
 
   const hasStaleReview =
-    (hasVerification && !verificationIsCurrentHash) ||
-    (hasDispute && !disputeIsCurrentHash) ||
-    (hasReaction && !reactionIsCurrentHash);
+    (hasVerification && !verificationIsCurrentHash) || (hasDispute && !disputeIsCurrentHash);
 
-  const currentHashReviewed =
-    verificationIsCurrentHash || disputeIsCurrentHash || reactionIsCurrentHash;
+  const currentHashReviewed = verificationIsCurrentHash || disputeIsCurrentHash;
 
   return {
     hasVerification,
@@ -175,9 +119,6 @@ export async function getRecordReviewStatus(
     hasDispute,
     disputeIsCurrentHash,
     disputeSeverity,
-    hasReaction,
-    reactionIsCurrentHash,
-    reactionSupportsDispute,
     hasAnyActiveReview,
     hasStaleReview,
     currentHashReviewed,

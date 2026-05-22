@@ -17,9 +17,8 @@
  */
 
 import { createPublicClient, http, type Address } from 'viem';
-import { sepolia } from 'viem/chains';
 import { SmartAccountService } from './smartAccountService';
-import { MEMBER_ROLE_MANAGER } from '@/config/blockchainAddresses';
+import { MEMBER_ROLE_MANAGER, NETWORK } from '@/config/blockchainAddresses';
 
 // ==================== SMART CONTRACT CONFIG ====================
 
@@ -88,7 +87,7 @@ export type ProgressCallback = (progress: PreparationProgress) => void;
 
 export class BlockchainPreparationService {
   private static publicClient = createPublicClient({
-    chain: sepolia,
+    chain: NETWORK.chainViem,
     transport: http(),
   });
 

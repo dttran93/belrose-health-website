@@ -11,15 +11,16 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { HelpCircle, Plus, Shield } from 'lucide-react';
+import { Shield } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import { useAuth } from '@/features/Auth/hooks/useAuth';
-import { getVerificationsByRecordId, VerificationDoc } from '../../services/verificationService';
+import { getVerificationsByRecordId } from '../../services/verificationService';
 import VerificationDetailModal from './VerificationDetailModal';
 import VerificationUserCard from './VerificationUserCard';
 import RecordSectionPanel from '@/components/ui/RecordSectionPanel';
+import { VerificationDoc } from '@belrose/shared';
 
 interface VerificationManagementProps {
   record: FileObject;
@@ -28,6 +29,7 @@ interface VerificationManagementProps {
   isAddMode?: boolean;
   onModify?: () => void;
   onRetract?: (verification: VerificationDoc) => void;
+  refreshKey?: number;
 }
 
 export const VerificationManagement: React.FC<VerificationManagementProps> = ({
@@ -37,12 +39,12 @@ export const VerificationManagement: React.FC<VerificationManagementProps> = ({
   isAddMode,
   onModify,
   onRetract,
+  refreshKey,
 }) => {
   const { user } = useAuth();
   const [loadingVerifications, setLoadingVerifications] = useState(true);
   const [verifications, setVerifications] = useState<VerificationDoc[]>([]);
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Modal state
   const [selectedVerification, setSelectedVerification] = useState<VerificationDoc | null>(null);
@@ -87,7 +89,7 @@ export const VerificationManagement: React.FC<VerificationManagementProps> = ({
     };
 
     fetchVerifications();
-  }, [record.firestoreId, record.id, record.recordHash, record.previousRecordHash, refreshTrigger]);
+  }, [record.firestoreId, record.id, record.recordHash, record.previousRecordHash, refreshKey]);
 
   // Handlers
   const handleCardClick = (verification: VerificationDoc) => {

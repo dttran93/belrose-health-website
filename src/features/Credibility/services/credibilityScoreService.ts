@@ -36,8 +36,8 @@ import {
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import type { VerificationLevel } from './verificationService';
-import type { DisputeSeverity, DisputeCulpability } from './disputeService';
-import { BlockchainRef } from '@belrose/shared';
+import type { DisputeSeverity } from './disputeService';
+import { BlockchainRef, DisputeCulpability } from '@belrose/shared';
 
 // ==================== TYPES ====================
 

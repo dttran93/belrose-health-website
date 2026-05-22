@@ -2,7 +2,7 @@
 import hre from 'hardhat';
 
 async function main() {
-  const PAYMASTER_ADDRESS = '0x967e757609E1118E7164e51A204772a14804E253';
+  const PAYMASTER_ADDRESS = '0x02422f03EcD403E1a902101D60a0Dad5bB9E71a7';
   const NEW_SIGNER = '0x875622a16aC9Daa000Cbb34fE396EDc37EB72217';
 
   console.log('Starting signer update...');

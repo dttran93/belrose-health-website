@@ -56,8 +56,9 @@ export class RecordHashService {
     // Convert to hex string
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+    const bytes32HashHex = this.toBytes32(hashHex);
 
-    return hashHex;
+    return bytes32HashHex;
   }
 
   /**
@@ -80,5 +81,12 @@ export class RecordHashService {
     }
 
     return sortedObj;
+  }
+
+  /**
+   * Helper for formatting recordHashes
+   */
+  static toBytes32(hashHex: string): string {
+    return `0x${hashHex}`;
   }
 }

@@ -5,9 +5,13 @@ import { auth } from '@/firebase/config';
 /**
  * WalletGenerationService
  *
- * Handles blockchain wallet generation during user registration.
  * Calls the backend cloud function to securely generate and encrypt
- * the wallet using the user's master encryption key.
+ * the wallet using the user's master encryption key. After updating
+ * memberRegistry cloud function to createWallet, smartAccount, and
+ * register on chain. This isn't really used any more. Keeping for
+ * for special situations where a user didn't have a wallet and we had
+ * to remake one for them (perhaps in a lost original account key scenario
+ * or something like that)
  */
 
 export interface GenerateWalletParams {
@@ -64,7 +68,7 @@ export class WalletGenerationService {
   /**
    * Convert CryptoKey to hex string for backend encryption
    */
-  private static async convertMasterKeyToHex(masterKey: CryptoKey): Promise<string> {
+  static async convertMasterKeyToHex(masterKey: CryptoKey): Promise<string> {
     const masterKeyBytes = await window.crypto.subtle.exportKey('raw', masterKey);
     const masterKeyArray = new Uint8Array(masterKeyBytes);
     const masterKeyHex = Array.from(masterKeyArray)

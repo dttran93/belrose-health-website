@@ -1,6 +1,6 @@
 // src/features/Trustee/services/trusteeBlockchainService.ts
 
-import { ethers } from 'ethers';
+import { ethers, id } from 'ethers';
 import {
   BlockchainRoleManagerService,
   RoleType,
@@ -65,15 +65,15 @@ export class TrusteeBlockchainService {
 
     try {
       console.log('⛓️ Proposing trustee on blockchain...', { trustorId, trusteeId, level });
-      const trusteeIdHash = ethers.id(trusteeId);
-      const result = await BlockchainRoleManagerService.proposeTrustee(trusteeIdHash, level);
+
+      const result = await BlockchainRoleManagerService.proposeTrustee(trusteeId, level);
       const blockchainRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
       console.log('✅ Trustee proposed on blockchain');
       return { success: true, blockchainRef };
     } catch (error) {
       await this.logTrusteeFailure({
         action: 'proposeTrustee',
-        trustorId,
+        trustorId, //blockchain ID hashes calculated in function. Fewer arguments needed
         trusteeId,
         callerId: trustorId,
         walletAddress,
@@ -92,8 +92,7 @@ export class TrusteeBlockchainService {
 
     try {
       console.log('⛓️ Accepting trustee proposal on blockchain...', { trustorId, trusteeId });
-      const trustorIdHash = ethers.id(trustorId);
-      const result = await BlockchainRoleManagerService.acceptTrustee(trustorIdHash);
+      const result = await BlockchainRoleManagerService.acceptTrustee(trustorId);
       const blockchainRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
       console.log('✅ Trustee accepted on blockchain');
       return { success: true, blockchainRef };
@@ -123,9 +122,7 @@ export class TrusteeBlockchainService {
 
     try {
       console.log('⛓️ Revoking trustee on blockchain...', { trustorId, trusteeId });
-      const trustorIdHash = ethers.id(trustorId);
-      const trusteeIdHash = ethers.id(trusteeId);
-      const result = await BlockchainRoleManagerService.revokeTrustee(trustorIdHash, trusteeIdHash);
+      const result = await BlockchainRoleManagerService.revokeTrustee(trustorId, trusteeId);
       const blockchainRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
       console.log('✅ Trustee revoked on blockchain');
       return { success: true, blockchainRef };
@@ -179,6 +176,7 @@ export class TrusteeBlockchainService {
         callerId: trusteeId,
         walletAddress: trusteeWallet ?? '',
         error,
+        recordIds,
       });
       return { success: false, blockchainRef: null };
     }
@@ -193,8 +191,7 @@ export class TrusteeBlockchainService {
 
     try {
       console.log('⛓️ Updating trustee level on blockchain...', { trustorId, trusteeId, newLevel });
-      const trusteeIdHash = ethers.id(trusteeId);
-      const result = await BlockchainRoleManagerService.updateTrusteeLevel(trusteeIdHash, newLevel);
+      const result = await BlockchainRoleManagerService.updateTrusteeLevel(trusteeId, newLevel);
       const blockchainRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
       console.log('✅ Trustee level updated on blockchain');
       return { success: true, blockchainRef };
@@ -239,8 +236,21 @@ export class TrusteeBlockchainService {
 
     const context: SyncContext =
       action === 'grantRoleAsTrusteeBatch'
-        ? { type: 'trustee-grant', trustorId, trusteeId, recordIds: recordIds ?? [] }
-        : { type: contextTypeMap[action], trustorId, trusteeId };
+        ? {
+            type: 'trustee-grant',
+            trustorId,
+            trustorIdHash: id(trustorId),
+            trusteeId,
+            trusteeIdHash: id(trusteeId),
+            recordIds: recordIds ?? [],
+          }
+        : {
+            type: contextTypeMap[action],
+            trustorId,
+            trustorIdHash: id(trustorId),
+            trusteeId,
+            trusteeIdHash: id(trusteeId),
+          };
 
     await BlockchainSyncQueueService.logFailure({
       contract: 'MemberRoleManager',

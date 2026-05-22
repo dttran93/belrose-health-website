@@ -9,7 +9,7 @@
  * Three layers of information per record:
  *   1. Hash history  — which on-chain hashes exist and which matches the current/previous Firestore hash
  *   2. Verifications — third-party attestations (read-only, no add/retract actions)
- *   3. Disputes      — flagged inaccuracies with severity, culpability, and reactions
+ *   3. Disputes      — flagged inaccuracies with severity, culpability
  *
  * Data sources:
  *   - Chain data (anchored IDs + version history): useBlockchainCompleteness

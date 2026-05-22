@@ -1,11 +1,9 @@
 // src/features/Credibility/components/Disputes/DisputeUserCard.tsx
 
 import React from 'react';
-import ReactionButtons, { ReactionType } from '@/components/ui/ReactionButtons';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { UserBadge } from '@/features/Users/components/ui/UserBadge';
 import {
-  DisputeDoc,
   DisputeDocDecrypted,
   getCulpabilityConfig,
   getSeverityConfig,
@@ -20,14 +18,6 @@ interface DisputeCardProps {
   currentRecordHash: string | null | undefined;
   onViewUser: () => void;
   onViewDetails: () => void;
-  reactionStats: {
-    supports: number;
-    opposes: number;
-    userReaction: ReactionType;
-  };
-  onReact: (support: boolean) => void;
-  isLoadingReaction?: boolean;
-  isOwnDispute?: boolean;
 }
 
 const DisputeUserCard: React.FC<DisputeCardProps> = ({
@@ -37,10 +27,6 @@ const DisputeUserCard: React.FC<DisputeCardProps> = ({
   currentRecordHash,
   onViewUser,
   onViewDetails,
-  reactionStats,
-  onReact,
-  isLoadingReaction = false,
-  isOwnDispute = false,
 }) => {
   const severityInfo = getSeverityConfig(dispute.severity);
   const culpabilityInfo = getCulpabilityConfig(dispute.culpability);
@@ -89,21 +75,6 @@ const DisputeUserCard: React.FC<DisputeCardProps> = ({
           {dispute.chainStatus === 'failed' && (
             <UserBadge text="Failed" color="red" tooltip="Network transaction failed" />
           )}
-        </div>
-
-        {/* Reaction Actions */}
-        <div className="border-l pl-3">
-          <ReactionButtons
-            supportCount={reactionStats.supports}
-            opposeCount={reactionStats.opposes}
-            userReaction={reactionStats.userReaction}
-            onSupport={() => onReact(true)}
-            onOppose={() => onReact(false)}
-            disabled={isInactive || isOwnDispute}
-            isLoading={isLoadingReaction}
-            supportTooltip={isOwnDispute ? "You can't react to your own" : 'Support this'}
-            opposeTooltip={isOwnDispute ? "You can't react to your own" : 'Oppose this'}
-          />
         </div>
       </div>
     );

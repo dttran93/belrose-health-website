@@ -8,8 +8,8 @@
 import {
   DisputeCulpability,
   DisputeSeverityOptions,
-} from '@/features/Credibility/services/disputeService';
-import { VerificationLevelOptions } from '@/features/Credibility/services/verificationService';
+  VerificationLevelOptions,
+} from '@belrose/shared';
 import { collection, addDoc, serverTimestamp, getFirestore } from 'firebase/firestore';
 
 // The contract being written to
@@ -32,6 +32,7 @@ export type SyncContext =
       targetWalletAddress: string;
       role: string | string[];
       recordId: string | string[];
+      recordIdHash: string | string[];
     }
   | { type: 'memberRegistry'; newStatus?: string }
   | { type: 'anchorRecord'; recordId: string; recordHash: string; subjectId: string }
@@ -64,28 +65,44 @@ export type SyncContext =
       newSeverity: DisputeSeverityOptions;
       newCulpability: DisputeCulpability;
     }
-  | {
-      type: 'reaction';
-      recordId: string;
-      recordHash: string;
-      disputeId: string;
-      supportsDispute: boolean;
-    }
-  | { type: 'reaction-retraction'; recordHash: string; reactionId: string }
-  | {
-      type: 'reaction-modification';
-      recordHash: string;
-      reactionId: string;
-      oldSupport: boolean;
-      newSupport: boolean;
-    }
   | { type: 'flagUnacceptedUpdate'; recordId: string; recordHash: string; disputeId: string }
   | { type: 'resolveUnacceptedUpdate'; recordId: string; recordHash: string; disputeId: string }
-  | { type: 'trustee-propose'; trustorId: string; trusteeId: string }
-  | { type: 'trustee-accept'; trustorId: string; trusteeId: string }
-  | { type: 'trustee-revoke'; trustorId: string; trusteeId: string }
-  | { type: 'trustee-grant'; trustorId: string; trusteeId: string; recordIds: string[] }
-  | { type: 'trustee-level-update'; trustorId: string; trusteeId: string }
+  | {
+      type: 'trustee-propose';
+      trustorId: string;
+      trustorIdHash: string;
+      trusteeId: string;
+      trusteeIdHash: string;
+    }
+  | {
+      type: 'trustee-accept';
+      trustorId: string;
+      trustorIdHash: string;
+      trusteeId: string;
+      trusteeIdHash: string;
+    }
+  | {
+      type: 'trustee-revoke';
+      trustorId: string;
+      trustorIdHash: string;
+      trusteeId: string;
+      trusteeIdHash: string;
+    }
+  | {
+      type: 'trustee-grant';
+      trustorId: string;
+      trustorIdHash: string;
+      trusteeId: string;
+      trusteeIdHash: string;
+      recordIds: string[];
+    }
+  | {
+      type: 'trustee-level-update';
+      trustorId: string;
+      trustorIdHash: string;
+      trusteeId: string;
+      trusteeIdHash: string;
+    }
   | {
       type: 'guest-provider-role-backfill';
       recordId: string;

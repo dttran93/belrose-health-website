@@ -14,13 +14,11 @@ import { CheckCircle, AlertTriangle, ChevronRight, HelpCircle, Loader2 } from 'l
 import VerificationForm from './Verifications/VerificationForm';
 import DisputeForm from './Disputes/DisputeForm';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { DisputeCulpability, DisputeDoc, DisputeSeverity } from '../services/disputeService';
-import {
-  VerificationDoc,
-  VerificationLevel,
-  VerificationLevelOptions,
-} from '../services/verificationService';
+import { DisputeSeverity } from '../services/disputeService';
+
 import { GuestFeatureGate } from '@/features/GuestAccess/components/GuestFeatureGate';
+import { VerificationLevelOptions } from '../hooks/useCredibilityFlow';
+import { DisputeCulpability, DisputeDoc, VerificationDoc } from '@belrose/shared';
 
 // ============================================================
 // TYPES

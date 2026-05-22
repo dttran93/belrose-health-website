@@ -7,8 +7,8 @@ import { HEALTH_RECORD_CORE, NETWORK } from '@/config/blockchainAddresses';
  */
 
 export const HEALTH_RECORD_CORE_ADDRESS = HEALTH_RECORD_CORE.proxy;
-export const SEPOLIA_RPC_URL = NETWORK.rpcUrl;
-export const ETHERSCAN_BASE_URL = NETWORK.etherscanBaseUrl;
+export const RPC_URL = NETWORK.rpcUrl;
+export const RPC_URL_FALLBACK = NETWORK.rpcUrlFallback;
 export const DEPLOYMENT_BLOCK = HEALTH_RECORD_CORE.deploymentBlock;
 
 /**
@@ -26,8 +26,8 @@ export const HEALTH_RECORD_CORE_ABI = [
   {
     anonymous: false,
     inputs: [
-      { indexed: true, internalType: 'string', name: 'recordId', type: 'string' },
-      { indexed: true, internalType: 'string', name: 'recordHash', type: 'string' },
+      { indexed: true, internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
+      { indexed: true, internalType: 'bytes32', name: 'recordHash', type: 'bytes32' },
       { indexed: true, internalType: 'bytes32', name: 'subjectIdHash', type: 'bytes32' },
       { indexed: false, internalType: 'uint256', name: 'timestamp', type: 'uint256' },
     ],
@@ -37,7 +37,7 @@ export const HEALTH_RECORD_CORE_ABI = [
   {
     anonymous: false,
     inputs: [
-      { indexed: true, internalType: 'string', name: 'recordId', type: 'string' },
+      { indexed: true, internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { indexed: true, internalType: 'bytes32', name: 'subjectIdHash', type: 'bytes32' },
       { indexed: false, internalType: 'uint256', name: 'timestamp', type: 'uint256' },
     ],
@@ -47,7 +47,7 @@ export const HEALTH_RECORD_CORE_ABI = [
   {
     anonymous: false,
     inputs: [
-      { indexed: true, internalType: 'string', name: 'recordId', type: 'string' },
+      { indexed: true, internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { indexed: true, internalType: 'bytes32', name: 'subjectIdHash', type: 'bytes32' },
       { indexed: false, internalType: 'uint256', name: 'timestamp', type: 'uint256' },
     ],
@@ -57,8 +57,8 @@ export const HEALTH_RECORD_CORE_ABI = [
   {
     anonymous: false,
     inputs: [
-      { indexed: true, internalType: 'string', name: 'recordId', type: 'string' },
-      { indexed: true, internalType: 'string', name: 'newHash', type: 'string' },
+      { indexed: true, internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
+      { indexed: true, internalType: 'bytes32', name: 'newHash', type: 'bytes32' },
       { indexed: false, internalType: 'bytes32', name: 'addedBy', type: 'bytes32' },
       { indexed: false, internalType: 'uint256', name: 'timestamp', type: 'uint256' },
     ],
@@ -68,8 +68,8 @@ export const HEALTH_RECORD_CORE_ABI = [
   {
     anonymous: false,
     inputs: [
-      { indexed: true, internalType: 'string', name: 'recordId', type: 'string' },
-      { indexed: true, internalType: 'string', name: 'recordHash', type: 'string' },
+      { indexed: true, internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
+      { indexed: true, internalType: 'bytes32', name: 'recordHash', type: 'bytes32' },
       { indexed: false, internalType: 'uint256', name: 'timestamp', type: 'uint256' },
     ],
     name: 'RecordHashRetracted',
@@ -80,8 +80,8 @@ export const HEALTH_RECORD_CORE_ABI = [
   {
     anonymous: false,
     inputs: [
-      { indexed: true, internalType: 'string', name: 'recordHash', type: 'string' },
-      { indexed: true, internalType: 'string', name: 'recordId', type: 'string' },
+      { indexed: true, internalType: 'bytes32', name: 'recordHash', type: 'bytes32' },
+      { indexed: true, internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { indexed: true, internalType: 'bytes32', name: 'verifierIdHash', type: 'bytes32' },
       {
         indexed: false,
@@ -97,7 +97,7 @@ export const HEALTH_RECORD_CORE_ABI = [
   {
     anonymous: false,
     inputs: [
-      { indexed: true, internalType: 'string', name: 'recordHash', type: 'string' },
+      { indexed: true, internalType: 'bytes32', name: 'recordHash', type: 'bytes32' },
       { indexed: true, internalType: 'bytes32', name: 'verifierIdHash', type: 'bytes32' },
       { indexed: false, internalType: 'uint256', name: 'timestamp', type: 'uint256' },
     ],
@@ -109,8 +109,8 @@ export const HEALTH_RECORD_CORE_ABI = [
   {
     anonymous: false,
     inputs: [
-      { indexed: true, internalType: 'string', name: 'recordHash', type: 'string' },
-      { indexed: true, internalType: 'string', name: 'recordId', type: 'string' },
+      { indexed: true, internalType: 'bytes32', name: 'recordHash', type: 'bytes32' },
+      { indexed: true, internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { indexed: true, internalType: 'bytes32', name: 'disputerIdHash', type: 'bytes32' },
       {
         indexed: false,
@@ -132,7 +132,7 @@ export const HEALTH_RECORD_CORE_ABI = [
   {
     anonymous: false,
     inputs: [
-      { indexed: true, internalType: 'string', name: 'recordHash', type: 'string' },
+      { indexed: true, internalType: 'bytes32', name: 'recordHash', type: 'bytes32' },
       { indexed: true, internalType: 'bytes32', name: 'disputerIdHash', type: 'bytes32' },
       { indexed: false, internalType: 'uint256', name: 'timestamp', type: 'uint256' },
     ],
@@ -145,9 +145,9 @@ export const HEALTH_RECORD_CORE_ABI = [
     anonymous: false,
     inputs: [
       { indexed: true, internalType: 'bytes32', name: 'subjectIdHash', type: 'bytes32' },
-      { indexed: true, internalType: 'string', name: 'recordId', type: 'string' },
-      { indexed: true, internalType: 'string', name: 'noteHash', type: 'string' },
-      { indexed: false, internalType: 'uint256', name: 'flagIndex', type: 'uint256' },
+      { indexed: true, internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
+      { indexed: true, internalType: 'bytes32', name: 'reporterIdHash', type: 'bytes32' },
+      { indexed: false, internalType: 'bytes32', name: 'recordHash', type: 'bytes32' },
       { indexed: false, internalType: 'uint256', name: 'timestamp', type: 'uint256' },
     ],
     name: 'UnacceptedUpdateFlagged',
@@ -157,16 +157,11 @@ export const HEALTH_RECORD_CORE_ABI = [
     anonymous: false,
     inputs: [
       { indexed: true, internalType: 'bytes32', name: 'subjectIdHash', type: 'bytes32' },
-      { indexed: true, internalType: 'uint256', name: 'flagIndex', type: 'uint256' },
-      {
-        indexed: false,
-        internalType: 'enum HealthRecordCore.ResolutionType',
-        name: 'resolution',
-        type: 'uint8',
-      },
+      { indexed: true, internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
+      { indexed: true, internalType: 'bytes32', name: 'reporterIdHash', type: 'bytes32' },
       { indexed: false, internalType: 'uint256', name: 'timestamp', type: 'uint256' },
     ],
-    name: 'UnacceptedUpdateResolved',
+    name: 'UnacceptedUpdateFlagRevoked',
     type: 'event',
   },
 
@@ -208,7 +203,7 @@ export const HEALTH_RECORD_CORE_ABI = [
   // ===============================================================
 
   {
-    inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' }],
     name: 'getRecordSubjects',
     outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
@@ -217,13 +212,13 @@ export const HEALTH_RECORD_CORE_ABI = [
   {
     inputs: [{ internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' }],
     name: 'getSubjectMedicalHistory',
-    outputs: [{ internalType: 'string[]', name: '', type: 'string[]' }],
+    outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
     inputs: [
-      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' },
     ],
     name: 'isSubject',
@@ -233,7 +228,7 @@ export const HEALTH_RECORD_CORE_ABI = [
   },
   {
     inputs: [
-      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' },
     ],
     name: 'isActiveSubject',
@@ -242,14 +237,14 @@ export const HEALTH_RECORD_CORE_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' }],
     name: 'getActiveRecordSubjects',
     outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' }],
     name: 'getSubjectStats',
     outputs: [
       { internalType: 'uint256', name: 'total', type: 'uint256' },
@@ -259,28 +254,28 @@ export const HEALTH_RECORD_CORE_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' }],
     name: 'getRecordVersionHistory',
-    outputs: [{ internalType: 'string[]', name: '', type: 'string[]' }],
+    outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'string', name: 'recordHash', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordHash', type: 'bytes32' }],
     name: 'getRecordIdForHash',
-    outputs: [{ internalType: 'string', name: '', type: 'string' }],
+    outputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'string', name: 'recordHash', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordHash', type: 'bytes32' }],
     name: 'doesHashExist',
     outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' }],
     name: 'getVersionCount',
     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
     stateMutability: 'view',
@@ -292,13 +287,13 @@ export const HEALTH_RECORD_CORE_ABI = [
   // ===============================================================
 
   {
-    inputs: [{ internalType: 'string', name: 'recordHash', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordHash', type: 'bytes32' }],
     name: 'getVerifications',
     outputs: [
       {
         components: [
           { internalType: 'bytes32', name: 'verifierIdHash', type: 'bytes32' },
-          { internalType: 'string', name: 'recordId', type: 'string' },
+          { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
           { internalType: 'enum HealthRecordCore.VerificationLevel', name: 'level', type: 'uint8' },
           { internalType: 'uint256', name: 'createdAt', type: 'uint256' },
           { internalType: 'bool', name: 'isActive', type: 'bool' },
@@ -313,7 +308,7 @@ export const HEALTH_RECORD_CORE_ABI = [
   },
   {
     inputs: [
-      { internalType: 'string', name: 'recordHash', type: 'string' },
+      { internalType: 'bytes32', name: 'recordHash', type: 'bytes32' },
       { internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' },
     ],
     name: 'hasUserVerified',
@@ -323,13 +318,13 @@ export const HEALTH_RECORD_CORE_ABI = [
   },
   {
     inputs: [
-      { internalType: 'string', name: 'recordHash', type: 'string' },
+      { internalType: 'bytes32', name: 'recordHash', type: 'bytes32' },
       { internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' },
     ],
     name: 'getUserVerification',
     outputs: [
       { internalType: 'bool', name: 'exists', type: 'bool' },
-      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { internalType: 'enum HealthRecordCore.VerificationLevel', name: 'level', type: 'uint8' },
       { internalType: 'uint256', name: 'createdAt', type: 'uint256' },
       { internalType: 'bool', name: 'isActive', type: 'bool' },
@@ -338,7 +333,7 @@ export const HEALTH_RECORD_CORE_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'string', name: 'recordHash', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordHash', type: 'bytes32' }],
     name: 'getVerificationStats',
     outputs: [
       { internalType: 'uint256', name: 'total', type: 'uint256' },
@@ -350,7 +345,7 @@ export const HEALTH_RECORD_CORE_ABI = [
   {
     inputs: [{ internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' }],
     name: 'getUserVerifications',
-    outputs: [{ internalType: 'string[]', name: '', type: 'string[]' }],
+    outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
@@ -360,13 +355,13 @@ export const HEALTH_RECORD_CORE_ABI = [
   // ===============================================================
 
   {
-    inputs: [{ internalType: 'string', name: 'recordHash', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordHash', type: 'bytes32' }],
     name: 'getDisputes',
     outputs: [
       {
         components: [
           { internalType: 'bytes32', name: 'disputerIdHash', type: 'bytes32' },
-          { internalType: 'string', name: 'recordId', type: 'string' },
+          { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
           {
             internalType: 'enum HealthRecordCore.DisputeSeverity',
             name: 'severity',
@@ -391,7 +386,7 @@ export const HEALTH_RECORD_CORE_ABI = [
   },
   {
     inputs: [
-      { internalType: 'string', name: 'recordHash', type: 'string' },
+      { internalType: 'bytes32', name: 'recordHash', type: 'bytes32' },
       { internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' },
     ],
     name: 'hasUserDisputed',
@@ -401,13 +396,13 @@ export const HEALTH_RECORD_CORE_ABI = [
   },
   {
     inputs: [
-      { internalType: 'string', name: 'recordHash', type: 'string' },
+      { internalType: 'bytes32', name: 'recordHash', type: 'bytes32' },
       { internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' },
     ],
     name: 'getUserDispute',
     outputs: [
       { internalType: 'bool', name: 'exists', type: 'bool' },
-      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { internalType: 'enum HealthRecordCore.DisputeSeverity', name: 'severity', type: 'uint8' },
       {
         internalType: 'enum HealthRecordCore.DisputeCulpability',
@@ -422,7 +417,7 @@ export const HEALTH_RECORD_CORE_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'string', name: 'recordHash', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordHash', type: 'bytes32' }],
     name: 'getDisputeStats',
     outputs: [
       { internalType: 'uint256', name: 'total', type: 'uint256' },
@@ -434,48 +429,7 @@ export const HEALTH_RECORD_CORE_ABI = [
   {
     inputs: [{ internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' }],
     name: 'getUserDisputes',
-    outputs: [{ internalType: 'string[]', name: '', type: 'string[]' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-
-  // ===============================================================
-  // VIEW FUNCTIONS - REACTIONS
-  // ===============================================================
-
-  {
-    inputs: [
-      { internalType: 'string', name: 'recordHash', type: 'string' },
-      { internalType: 'bytes32', name: 'disputerIdHash', type: 'bytes32' },
-    ],
-    name: 'getDisputeReactions',
-    outputs: [
-      {
-        components: [
-          { internalType: 'bytes32', name: 'reactorIdHash', type: 'bytes32' },
-          { internalType: 'bool', name: 'supportsDispute', type: 'bool' },
-          { internalType: 'uint256', name: 'timestamp', type: 'uint256' },
-          { internalType: 'bool', name: 'isActive', type: 'bool' },
-        ],
-        internalType: 'struct HealthRecordCore.Reaction[]',
-        name: '',
-        type: 'tuple[]',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { internalType: 'string', name: 'recordHash', type: 'string' },
-      { internalType: 'bytes32', name: 'disputerIdHash', type: 'bytes32' },
-    ],
-    name: 'getReactionStats',
-    outputs: [
-      { internalType: 'uint256', name: 'totalReactions', type: 'uint256' },
-      { internalType: 'uint256', name: 'activeSupports', type: 'uint256' },
-      { internalType: 'uint256', name: 'activeOpposes', type: 'uint256' },
-    ],
+    outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
@@ -486,22 +440,17 @@ export const HEALTH_RECORD_CORE_ABI = [
 
   {
     inputs: [{ internalType: 'bytes32', name: 'subjectIdHash', type: 'bytes32' }],
-    name: 'getUnacceptedUpdateFlags',
+    name: 'getUnacceptedFlags',
     outputs: [
       {
         components: [
-          { internalType: 'string', name: 'recordId', type: 'string' },
-          { internalType: 'string', name: 'noteHash', type: 'string' },
+          { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
+          { internalType: 'bytes32', name: 'reporterIdHash', type: 'bytes32' },
+          { internalType: 'bytes32', name: 'recordHash', type: 'bytes32' },
           { internalType: 'uint256', name: 'createdAt', type: 'uint256' },
-          {
-            internalType: 'enum HealthRecordCore.ResolutionType',
-            name: 'resolution',
-            type: 'uint8',
-          },
-          { internalType: 'uint256', name: 'resolvedAt', type: 'uint256' },
           { internalType: 'bool', name: 'isActive', type: 'bool' },
         ],
-        internalType: 'struct HealthRecordCore.UnacceptedUpdateFlag[]',
+        internalType: 'struct HealthRecordCore.UnacceptedFlag[]',
         name: '',
         type: 'tuple[]',
       },
@@ -510,26 +459,25 @@ export const HEALTH_RECORD_CORE_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'bytes32', name: 'subjectIdHash', type: 'bytes32' }],
-    name: 'getActiveUnacceptedFlagCount',
-    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    inputs: [
+      { internalType: 'bytes32', name: 'subjectIdHash', type: 'bytes32' },
+      { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
+    ],
+    name: 'getUnacceptedFlag',
+    outputs: [
+      { internalType: 'bool', name: 'exists', type: 'bool' },
+      { internalType: 'bool', name: 'isActive', type: 'bool' },
+      { internalType: 'bytes32', name: 'reporterIdHash', type: 'bytes32' },
+      { internalType: 'bytes32', name: 'recordHash', type: 'bytes32' },
+      { internalType: 'uint256', name: 'createdAt', type: 'uint256' },
+    ],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [
-      { internalType: 'bytes32', name: 'subjectIdHash', type: 'bytes32' },
-      { internalType: 'uint256', name: 'flagIndex', type: 'uint256' },
-    ],
-    name: 'getUnacceptedUpdateFlag',
-    outputs: [
-      { internalType: 'string', name: 'recordId', type: 'string' },
-      { internalType: 'string', name: 'noteHash', type: 'string' },
-      { internalType: 'uint256', name: 'createdAt', type: 'uint256' },
-      { internalType: 'enum HealthRecordCore.ResolutionType', name: 'resolution', type: 'uint8' },
-      { internalType: 'uint256', name: 'resolvedAt', type: 'uint256' },
-      { internalType: 'bool', name: 'isActive', type: 'bool' },
-    ],
+    inputs: [{ internalType: 'bytes32', name: 'subjectIdHash', type: 'bytes32' }],
+    name: 'getActiveUnacceptedFlagCount',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
     stateMutability: 'view',
     type: 'function',
   },

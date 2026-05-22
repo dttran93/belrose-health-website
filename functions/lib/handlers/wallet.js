@@ -34,17 +34,22 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getEncryptedWallet = exports.createWallet = void 0;
+exports.getEncryptedWallet = exports.createEOAWallet = void 0;
+exports.computeSmartAccountAddress = computeSmartAccountAddress;
 const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-admin/firestore");
 const backendWalletService_1 = require("../services/backendWalletService");
-// ==================== CREATE WALLET HANDLER ====================
+const account_abstraction_1 = require("viem/account-abstraction");
+const accounts_1 = require("viem/accounts");
+const viem_1 = require("viem");
+const chains_1 = require("viem/chains");
+// ==================== CREATE WALLET ====================
 /**
  * Create Wallet Function
  * Creates a new blockchain wallet for a user
  */
-exports.createWallet = (0, https_1.onRequest)({ cors: true }, async (req, res) => {
+exports.createEOAWallet = (0, https_1.onRequest)({ cors: true }, async (req, res) => {
     // Validate HTTP method
     if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method Not Allowed' });
@@ -142,6 +147,30 @@ exports.createWallet = (0, https_1.onRequest)({ cors: true }, async (req, res) =
         handleWalletError(res, error, 'create');
     }
 });
+/**
+ * For generating an account abstraction smart account
+ * @param privateKey uses the same private key as a user's wallet. Most likely the generated EOA wallet above
+ * @returns Smart account address
+ */
+async function computeSmartAccountAddress(privateKey) {
+    // 1. Import the resurrected toSimpleSmartAccount factory
+    const { toSimpleSmartAccount } = await import('permissionless/accounts');
+    // 2. Format the private key safely for viem
+    const formattedKey = (privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`);
+    // 3. Create the owner EOA account instance using viem
+    const viemAccount = (0, accounts_1.privateKeyToAccount)(formattedKey);
+    const publicClient = (0, viem_1.createPublicClient)({ chain: chains_1.baseSepolia, transport: (0, viem_1.http)() });
+    // 4. Instantiate the simple smart account using the new structure
+    const simpleAccount = await toSimpleSmartAccount({
+        client: publicClient,
+        owner: viemAccount,
+        entryPoint: {
+            address: account_abstraction_1.entryPoint07Address,
+            version: '0.7',
+        },
+    });
+    return simpleAccount.address;
+}
 // ==================== GET WALLET HANDLER ====================
 /**
  * Get Encrypted Wallet Function

@@ -17,7 +17,7 @@ export { convertToFHIR } from './handlers/convertToFHIR';
 export { createBelroseFields } from './handlers/belroseFields';
 
 // ==================== WALLET FUNCTIONS ====================
-export { createWallet, getEncryptedWallet } from './handlers/wallet';
+export { createEOAWallet, getEncryptedWallet } from './handlers/wallet';
 
 // ==================== EMAIL FUNCTIONS ====================
 export { sendShareInvitationEmail } from './handlers/sendShareInvitationEmail';
@@ -37,6 +37,7 @@ export { health, healthDetailed } from './handlers/healthCheck';
 // ==================== MEMBER REGISTRY ====================
 export {
   registerMemberOnChain,
+  registerMemberOnChainComplete,
   updateMemberStatus,
   deactivateWalletOnChain,
   reactivateWalletOnChain,
@@ -61,8 +62,6 @@ export {
   onVerificationUpdated,
   onDisputeWritten,
   onDisputeUpdated,
-  onDisputeReactionWritten,
-  onDisputeReactionUpdated,
 } from './notifications/triggers/credibilityNotificationTrigger';
 
 export {

@@ -23,7 +23,6 @@ import {
   type DisputeDocDecrypted,
   getSeverityConfig,
   getCulpabilityConfig,
-  reactToDispute,
 } from '../services/disputeService';
 import { toast } from 'sonner';
 import { DialogPhase } from '../components/ui/CredibilityActionDialog';
@@ -54,7 +53,6 @@ interface PendingOperation {
   disputeSeverity?: DisputeSeverity;
   disputeCulpability?: DisputeCulpability;
   disputeNotes?: string;
-  reactionSupport?: boolean;
 }
 
 // ============================================================================
@@ -624,87 +622,6 @@ export function useCredibilityFlow({
   }, [pendingOperation, addActivity, updateActivity, refetchAll, onSuccess]);
 
   // ==========================================================================
-  // REACT TO DISPUTE FLOW
-  // ==========================================================================
-
-  /**
-   * Start a reaction flow (support or oppose a dispute)
-   */
-  const initiateReaction = useCallback(
-    async (reactionRecordHash: string, disputerId: string, supports: boolean) => {
-      setPendingOperation({
-        type: 'reactToDispute',
-        recordId,
-        recordHash: reactionRecordHash,
-        disputerId,
-        reactionSupport: supports,
-      });
-
-      const ready = await runPreparation();
-      if (ready) setPhase('confirming');
-    },
-    [recordId, runPreparation]
-  );
-
-  /**
-   * Execute a confirmed reaction
-   */
-  const confirmReaction = useCallback(
-    async (supports: boolean) => {
-      const disputerId = pendingOperation?.disputerId;
-      const disputeRecordHash = pendingOperation?.recordHash;
-
-      if (
-        !pendingOperation ||
-        pendingOperation.type !== 'reactToDispute' ||
-        !disputerId ||
-        !disputeRecordHash
-      ) {
-        setError('Dispute information missing.');
-        return;
-      }
-
-      const auth = getAuth();
-      const reactorId = auth.currentUser?.uid;
-
-      if (!reactorId) {
-        setError('You must be signed in to react to disputes');
-        setPhase('error');
-        return;
-      }
-
-      const label = supports ? 'Supporting dispute' : 'Opposing dispute';
-      const activityId = addActivity({ label, link: recordLink });
-
-      // Fire tx — don't await
-      const txPromise = reactToDispute(
-        recordId,
-        disputeRecordHash,
-        disputerId,
-        reactorId,
-        supports
-      );
-
-      // Close dialog immediately
-      setSubmittedLabel('Submitting reaction');
-      setPhase('submitted');
-
-      // Resolve in background
-      txPromise
-        .then(() => {
-          updateActivity(activityId, { status: 'confirmed' });
-          toast.success(supports ? 'Supported dispute' : 'Opposed dispute');
-          onSuccess?.();
-        })
-        .catch(err => {
-          const message = err instanceof Error ? err.message : 'Failed to submit reaction';
-          updateActivity(activityId, { status: 'failed', errorMessage: message });
-        });
-    },
-    [pendingOperation, recordId, addActivity, updateActivity, onSuccess]
-  );
-
-  // ==========================================================================
   // RETURN
   // ==========================================================================
 
@@ -720,13 +637,11 @@ export function useCredibilityFlow({
       pendingSeverity: pendingOperation?.disputeSeverity,
       pendingCulpability: pendingOperation?.disputeCulpability,
       pendingNotes: pendingOperation?.disputeNotes,
-      pendingReaction: pendingOperation?.reactionSupport,
       onClose: reset,
       onConfirmVerification: confirmVerification,
       onConfirmModifyVerification: confirmModifyVerification,
       onConfirmDispute: confirmDispute,
       onConfirmModifyDispute: confirmModifyDispute,
-      onConfirmReaction: confirmReaction,
       onConfirmRetract:
         pendingOperation?.type === 'retractVerification'
           ? confirmRetractVerification
@@ -749,9 +664,6 @@ export function useCredibilityFlow({
     initiateDispute,
     initiateRetractDispute,
     initiateModifyDispute,
-
-    // Reaction actions
-    initiateReaction,
 
     // Refetch
     refetch: refetchAll,

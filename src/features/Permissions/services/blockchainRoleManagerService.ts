@@ -16,7 +16,7 @@
 // Note: Admin-only functions (addMember, setUserStatus, initializeRecordRole,
 // deactivateWallet, reactivateWallet) are handled by Cloud Functions, not this frontend service.
 
-import { ethers, Contract } from 'ethers';
+import { ethers, Contract, id } from 'ethers';
 import { PaymasterService } from '@/features/BlockchainWallet/services/paymasterService';
 import { MEMBER_ROLE_MANAGER, NETWORK } from '@/config/blockchainAddresses';
 
@@ -31,8 +31,6 @@ const MEMBER_ROLE_MANAGER_ABI = [
   // ============================================================================
   // MEMBER REGISTRY - VIEW FUNCTIONS
   // ============================================================================
-
-  // wallets(address) -> (userIdHash, isWalletActive)
   {
     inputs: [{ internalType: 'address', name: '', type: 'address' }],
     name: 'wallets',
@@ -43,7 +41,6 @@ const MEMBER_ROLE_MANAGER_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
-  // userStatus(bytes32) -> MemberStatus
   {
     inputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
     name: 'userStatus',
@@ -108,7 +105,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   // ============================================================================
   {
     inputs: [
-      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { internalType: 'address', name: 'wallet', type: 'address' },
     ],
     name: 'hasActiveRole',
@@ -118,7 +115,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   },
   {
     inputs: [
-      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { internalType: 'address', name: 'wallet', type: 'address' },
       { internalType: 'string', name: 'role', type: 'string' },
     ],
@@ -129,7 +126,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   },
   {
     inputs: [
-      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { internalType: 'address', name: 'wallet', type: 'address' },
     ],
     name: 'isOwnerOrAdmin',
@@ -139,7 +136,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   },
   {
     inputs: [
-      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { internalType: 'address', name: 'wallet', type: 'address' },
     ],
     name: 'getRoleDetails',
@@ -152,7 +149,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   },
   {
     inputs: [
-      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' },
     ],
     name: 'getRoleDetailsByUser',
@@ -164,21 +161,21 @@ const MEMBER_ROLE_MANAGER_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' }],
     name: 'getRecordOwners',
     outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' }],
     name: 'getRecordAdmins',
     outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' }],
     name: 'getRecordViewers',
     outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
@@ -187,12 +184,12 @@ const MEMBER_ROLE_MANAGER_ABI = [
   {
     inputs: [{ internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' }],
     name: 'getRecordsByUser',
-    outputs: [{ internalType: 'string[]', name: '', type: 'string[]' }],
+    outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' }],
     name: 'getRecordRoleStats',
     outputs: [
       { internalType: 'uint256', name: 'ownerCount', type: 'uint256' },
@@ -211,11 +208,11 @@ const MEMBER_ROLE_MANAGER_ABI = [
   },
 
   // ============================================================================
-  // ROLE MANAGEMENT - WRITE FUNCTIONS (require user signature)
+  // ROLE MANAGEMENT - WRITE FUNCTIONS
   // ============================================================================
   {
     inputs: [
-      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { internalType: 'address', name: 'targetWallet', type: 'address' },
       { internalType: 'string', name: 'role', type: 'string' },
     ],
@@ -226,7 +223,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   },
   {
     inputs: [
-      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { internalType: 'address', name: 'targetWallet', type: 'address' },
       { internalType: 'string', name: 'newRole', type: 'string' },
     ],
@@ -237,7 +234,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   },
   {
     inputs: [
-      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { internalType: 'address', name: 'targetWallet', type: 'address' },
     ],
     name: 'revokeRole',
@@ -246,7 +243,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' }],
     name: 'voluntarilyLeaveOwnership',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -258,7 +255,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   // ============================================================================
   {
     inputs: [
-      { internalType: 'string[]', name: 'recordIds', type: 'string[]' },
+      { internalType: 'bytes32[]', name: 'recordIdHashes', type: 'bytes32[]' },
       { internalType: 'address', name: 'targetWallet', type: 'address' },
       { internalType: 'string[]', name: 'roles', type: 'string[]' },
     ],
@@ -269,7 +266,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   },
   {
     inputs: [
-      { internalType: 'string[]', name: 'recordIds', type: 'string[]' },
+      { internalType: 'bytes32[]', name: 'recordIdHashes', type: 'bytes32[]' },
       { internalType: 'address', name: 'targetWallet', type: 'address' },
       { internalType: 'string[]', name: 'newRoles', type: 'string[]' },
     ],
@@ -280,7 +277,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   },
   {
     inputs: [
-      { internalType: 'string[]', name: 'recordIds', type: 'string[]' },
+      { internalType: 'bytes32[]', name: 'recordIdHashes', type: 'bytes32[]' },
       { internalType: 'address', name: 'targetWallet', type: 'address' },
     ],
     name: 'revokeRoleBatch',
@@ -290,7 +287,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   },
   {
     inputs: [
-      { internalType: 'string[]', name: 'recordIds', type: 'string[]' },
+      { internalType: 'bytes32[]', name: 'recordIdHashes', type: 'bytes32[]' },
       { internalType: 'bytes32', name: 'trustorIdHash', type: 'bytes32' },
     ],
     name: 'grantRoleAsTrusteeBatch',
@@ -372,7 +369,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   // ============================================================================
   {
     inputs: [
-      { internalType: 'string[]', name: 'recordIds', type: 'string[]' },
+      { internalType: 'bytes32[]', name: 'recordIdHashes', type: 'bytes32[]' },
       { internalType: 'address', name: 'guestWallet', type: 'address' },
       { internalType: 'bytes32', name: 'guestIdHash', type: 'bytes32' },
       { internalType: 'bytes32', name: 'guestEmailHash', type: 'bytes32' },
@@ -385,7 +382,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   },
   {
     inputs: [
-      { internalType: 'string[]', name: 'recordIds', type: 'string[]' },
+      { internalType: 'bytes32[]', name: 'recordIdHashes', type: 'bytes32[]' },
       { internalType: 'bytes32', name: 'guestIdHash', type: 'bytes32' },
     ],
     name: 'revokeGuestAccess',
@@ -399,7 +396,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   // ============================================================================
   {
     inputs: [
-      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { internalType: 'bytes32', name: 'guestIdHash', type: 'bytes32' },
     ],
     name: 'hasActiveGuestAccess',
@@ -409,7 +406,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
   },
   {
     inputs: [
-      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { internalType: 'bytes32', name: 'guestIdHash', type: 'bytes32' },
     ],
     name: 'getGuestAccess',
@@ -512,7 +509,16 @@ export class BlockchainRoleManagerService {
    * Get a read-only contract instance (no wallet needed)
    */
   private static getReadOnlyContract(): Contract {
-    const provider = new ethers.JsonRpcProvider(RPC_URL);
+    const provider = new ethers.JsonRpcProvider(
+      RPC_URL,
+      {
+        name: NETWORK.name,
+        chainId: NETWORK.chainId,
+      },
+      {
+        staticNetwork: true,
+      }
+    );
     return new ethers.Contract(MEMBER_ROLE_MANAGER_ADDRESS, MEMBER_ROLE_MANAGER_ABI, provider);
   }
 
@@ -620,8 +626,9 @@ export class BlockchainRoleManagerService {
   /**
    * Get all wallet addresses linked to an identity
    */
-  static async getWalletsForUser(userIdHash: string): Promise<string[]> {
+  static async getWalletsForUser(userId: string): Promise<string[]> {
     try {
+      const userIdHash = id(userId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('getWalletsForUser');
       return await fn(userIdHash);
@@ -706,9 +713,10 @@ export class BlockchainRoleManagerService {
    */
   static async hasActiveRole(recordId: string, walletAddress: string): Promise<boolean> {
     try {
+      const recordIdHash = id(recordId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('hasActiveRole');
-      return await fn(recordId, walletAddress);
+      return await fn(recordIdHash, walletAddress);
     } catch (error) {
       console.error('Error checking active role:', error);
       return false;
@@ -720,9 +728,10 @@ export class BlockchainRoleManagerService {
    */
   static async hasRole(recordId: string, walletAddress: string, role: RoleType): Promise<boolean> {
     try {
+      const recordIdHash = id(recordId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('hasRole');
-      return await fn(recordId, walletAddress, role);
+      return await fn(recordIdHash, walletAddress, role);
     } catch (error) {
       console.error('Error checking role:', error);
       return false;
@@ -734,9 +743,10 @@ export class BlockchainRoleManagerService {
    */
   static async isOwnerOrAdmin(recordId: string, walletAddress: string): Promise<boolean> {
     try {
+      const recordIdHash = id(recordId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('isOwnerOrAdmin');
-      return await fn(recordId, walletAddress);
+      return await fn(recordIdHash, walletAddress);
     } catch (error) {
       console.error('Error checking owner/admin status:', error);
       return false;
@@ -748,9 +758,10 @@ export class BlockchainRoleManagerService {
    */
   static async getRoleDetails(recordId: string, walletAddress: string): Promise<RoleDetails> {
     try {
+      const recordIdHash = id(recordId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('getRoleDetails');
-      const result = await fn(recordId, walletAddress);
+      const result = await fn(recordIdHash, walletAddress);
 
       return {
         role: (result[0] as RoleType) || '',
@@ -767,9 +778,10 @@ export class BlockchainRoleManagerService {
    */
   static async getRoleDetailsByUser(recordId: string, userIdHash: string): Promise<RoleDetails> {
     try {
+      const recordIdHash = id(recordId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('getRoleDetailsByUser');
-      const result = await fn(recordId, userIdHash);
+      const result = await fn(recordIdHash, userIdHash);
 
       return {
         role: (result[0] as RoleType) || '',
@@ -787,9 +799,10 @@ export class BlockchainRoleManagerService {
    */
   static async getRecordOwners(recordId: string): Promise<string[]> {
     try {
+      const recordIdHash = id(recordId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('getRecordOwners');
-      return await fn(recordId);
+      return await fn(recordIdHash);
     } catch (error) {
       console.error('Error getting record owners:', error);
       return [];
@@ -802,9 +815,10 @@ export class BlockchainRoleManagerService {
    */
   static async getRecordAdmins(recordId: string): Promise<string[]> {
     try {
+      const recordIdHash = id(recordId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('getRecordAdmins');
-      return await fn(recordId);
+      return await fn(recordIdHash);
     } catch (error) {
       console.error('Error getting record admins:', error);
       return [];
@@ -817,9 +831,10 @@ export class BlockchainRoleManagerService {
    */
   static async getRecordViewers(recordId: string): Promise<string[]> {
     try {
+      const recordIdHash = id(recordId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('getRecordViewers');
-      return await fn(recordId);
+      return await fn(recordIdHash);
     } catch (error) {
       console.error('Error getting record viewers:', error);
       return [];
@@ -828,7 +843,7 @@ export class BlockchainRoleManagerService {
 
   /**
    * Get all records where an identity has any role
-   * Note: Takes userIdHash, not wallet address
+   * Note: Takes userIdHash, not wallet address also returns string of recordIdHashes
    */
   static async getRecordsByUser(userIdHash: string): Promise<string[]> {
     try {
@@ -846,9 +861,11 @@ export class BlockchainRoleManagerService {
    */
   static async getRecordRoleStats(recordId: string): Promise<RecordRoleStats> {
     try {
+      const recordIdHash = id(recordId);
+
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('getRecordRoleStats');
-      const result = await fn(recordId);
+      const result = await fn(recordIdHash);
 
       return {
         ownerCount: Number(result[0]),
@@ -896,7 +913,8 @@ export class BlockchainRoleManagerService {
     role: RoleType
   ): Promise<TransactionResult> {
     console.log('🔗 Granting role on blockchain...', { recordId, targetWalletAddress, role });
-    const result = await this.executeWrite('grantRole', [recordId, targetWalletAddress, role]);
+    const recordIdHash = id(recordId);
+    const result = await this.executeWrite('grantRole', [recordIdHash, targetWalletAddress, role]);
     console.log('✅ Role granted:', result.txHash);
     return result;
   }
@@ -917,8 +935,17 @@ export class BlockchainRoleManagerService {
     targetWalletAddress: string,
     newRole: RoleType
   ): Promise<TransactionResult> {
-    console.log('🔗 Changing role on blockchain...', { recordId, targetWalletAddress, newRole });
-    const result = await this.executeWrite('changeRole', [recordId, targetWalletAddress, newRole]);
+    console.log('🔗 Changing role on blockchain...', {
+      recordId,
+      targetWalletAddress,
+      newRole,
+    });
+    const recordIdHash = id(recordId);
+    const result = await this.executeWrite('changeRole', [
+      recordIdHash,
+      targetWalletAddress,
+      newRole,
+    ]);
     console.log('✅ Role changed:', result.txHash);
     return result;
   }
@@ -939,7 +966,8 @@ export class BlockchainRoleManagerService {
     targetWalletAddress: string
   ): Promise<TransactionResult> {
     console.log('🔗 Revoking role on blockchain...', { recordId, targetWalletAddress });
-    const result = await this.executeWrite('revokeRole', [recordId, targetWalletAddress]);
+    const recordIdHash = id(recordId);
+    const result = await this.executeWrite('revokeRole', [recordIdHash, targetWalletAddress]);
     console.log('✅ Role revoked:', result.txHash);
     return result;
   }
@@ -953,7 +981,8 @@ export class BlockchainRoleManagerService {
    */
   static async voluntarilyLeaveOwnership(recordId: string): Promise<TransactionResult> {
     console.log('🔗 Leaving ownership on blockchain...', { recordId });
-    const result = await this.executeWrite('voluntarilyLeaveOwnership', [recordId]);
+    const recordIdHash = id(recordId);
+    const result = await this.executeWrite('voluntarilyLeaveOwnership', [recordIdHash]);
     console.log('✅ Ownership left:', result.txHash);
     return result;
   }
@@ -967,13 +996,16 @@ export class BlockchainRoleManagerService {
     targetWalletAddress: string,
     roles: RoleType[]
   ): Promise<TransactionResult> {
+    const recordIdHashes = recordIds.map(recordId => id(recordId));
+
     console.log('🔗 Batch granting roles on blockchain...', {
       recordIds,
+      recordIdHashes,
       targetWalletAddress,
       roles,
     });
     const result = await this.executeWrite('grantRoleBatch', [
-      recordIds,
+      recordIdHashes,
       targetWalletAddress,
       roles,
     ]);
@@ -986,13 +1018,16 @@ export class BlockchainRoleManagerService {
     targetWalletAddress: string,
     newRoles: RoleType[]
   ): Promise<TransactionResult> {
+    const recordIdHashes = recordIds.map(recordId => id(recordId));
+
     console.log('🔗 Batch changing roles on blockchain...', {
       recordIds,
+      recordIdHashes,
       targetWalletAddress,
       newRoles,
     });
     const result = await this.executeWrite('changeRoleBatch', [
-      recordIds,
+      recordIdHashes,
       targetWalletAddress,
       newRoles,
     ]);
@@ -1004,8 +1039,16 @@ export class BlockchainRoleManagerService {
     recordIds: string[],
     targetWalletAddress: string
   ): Promise<TransactionResult> {
-    console.log('🔗 Batch revoking roles on blockchain...', { recordIds, targetWalletAddress });
-    const result = await this.executeWrite('revokeRoleBatch', [recordIds, targetWalletAddress]);
+    const recordIdHashes = recordIds.map(recordId => id(recordId));
+    console.log('🔗 Batch revoking roles on blockchain...', {
+      recordIds,
+      recordIdHashes,
+      targetWalletAddress,
+    });
+    const result = await this.executeWrite('revokeRoleBatch', [
+      recordIdHashes,
+      targetWalletAddress,
+    ]);
     console.log('✅ Batch roles revoked:', result.txHash);
     return result;
   }
@@ -1014,8 +1057,15 @@ export class BlockchainRoleManagerService {
     recordIds: string[],
     trustorIdHash: string
   ): Promise<TransactionResult> {
-    console.log('🔗 Granting trustee batch roles on blockchain...', { recordIds, trustorIdHash });
-    const result = await this.executeWrite('grantRoleAsTrusteeBatch', [recordIds, trustorIdHash]);
+    const recordIdHashes = recordIds.map(recordId => id(recordId));
+    console.log('🔗 Granting trustee batch roles on blockchain...', {
+      recordIdHashes,
+      trustorIdHash,
+    });
+    const result = await this.executeWrite('grantRoleAsTrusteeBatch', [
+      recordIdHashes,
+      trustorIdHash,
+    ]);
     console.log('✅ Trustee batch roles granted:', result.txHash);
     return result;
   }
@@ -1030,11 +1080,9 @@ export class BlockchainRoleManagerService {
    * @param trusteeIdHash Identity hash of the proposed trustee
    * @param level 0=Observer, 1=Custodian, 2=Controller
    */
-  static async proposeTrustee(
-    trusteeIdHash: string,
-    level: TrusteeLevel
-  ): Promise<TransactionResult> {
-    console.log('🔗 Proposing trustee on blockchain...', { trusteeIdHash, level });
+  static async proposeTrustee(trusteeId: string, level: TrusteeLevel): Promise<TransactionResult> {
+    console.log('🔗 Proposing trustee on blockchain...', { trusteeId, level });
+    const trusteeIdHash = ethers.id(trusteeId);
     const result = await this.executeWrite('proposeTrustee', [trusteeIdHash, level]);
     console.log('✅ Trustee proposed:', result.txHash);
     return result;
@@ -1044,8 +1092,9 @@ export class BlockchainRoleManagerService {
    * Trustee accepts a pending proposal (Step 2)
    * Called by the TRUSTEE — msg.sender must be an active member
    */
-  static async acceptTrustee(trustorIdHash: string): Promise<TransactionResult> {
-    console.log('🔗 Accepting trustee proposal on blockchain...', { trustorIdHash });
+  static async acceptTrustee(trustorId: string): Promise<TransactionResult> {
+    console.log('🔗 Accepting trustee proposal on blockchain...', { trustorId });
+    const trustorIdHash = ethers.id(trustorId);
     const result = await this.executeWrite('acceptTrustee', [trustorIdHash]);
     console.log('✅ Trustee accepted:', result.txHash);
     return result;
@@ -1054,11 +1103,10 @@ export class BlockchainRoleManagerService {
   /**
    * Revoke a trustee relationship — callable by either party
    */
-  static async revokeTrustee(
-    trustorIdHash: string,
-    trusteeIdHash: string
-  ): Promise<TransactionResult> {
-    console.log('🔗 Revoking trustee on blockchain...', { trustorIdHash, trusteeIdHash });
+  static async revokeTrustee(trustorId: string, trusteeId: string): Promise<TransactionResult> {
+    console.log('🔗 Revoking trustee on blockchain...', { trustorId, trusteeId });
+    const trustorIdHash = ethers.id(trustorId);
+    const trusteeIdHash = ethers.id(trusteeId);
     const result = await this.executeWrite('revokeTrustee', [trustorIdHash, trusteeIdHash]);
     console.log('✅ Trustee revoked:', result.txHash);
     return result;
@@ -1068,10 +1116,11 @@ export class BlockchainRoleManagerService {
    * Upgrade a trustee relationship, only callable by Trustor
    */
   static async updateTrusteeLevel(
-    trusteeIdHash: string,
+    trusteeId: string,
     newLevel: TrusteeLevel
   ): Promise<TransactionResult> {
-    console.log('🔗 Updating trustee level on blockchain...', { trusteeIdHash, newLevel });
+    console.log('🔗 Updating trustee level on blockchain...', { trusteeId, newLevel });
+    const trusteeIdHash = ethers.id(trusteeId);
     const result = await this.executeWrite('updateTrusteeLevel', [trusteeIdHash, newLevel]);
     console.log('✅ Trustee level updated:', result.txHash);
     return result;
@@ -1127,22 +1176,22 @@ export class BlockchainRoleManagerService {
 
   /**
    * Grant a guest temporary viewer access to one or more records.
-   * @param recordIds One or more record IDs
+   * @param recordIdHashes One or more record IDs
    * @param guestWallet Deterministic placeholder address derived from guest UID
    * @param guestIdHash keccak256 of guest Firebase UID
    * @param guestEmailHash keccak256 of guest email (lowercased)
    * @param durationSeconds How long access lasts (default 7 days = 604800)
    */
   static async grantGuestAccess(
-    recordIds: string[],
+    recordIdHashes: string[],
     guestWallet: string,
     guestIdHash: string,
     guestEmailHash: string,
     durationSeconds: number = 604800
   ): Promise<TransactionResult> {
-    console.log('🔗 Granting guest access on blockchain...', { recordIds, guestWallet });
+    console.log('🔗 Granting guest access on blockchain...', { recordIdHashes, guestWallet });
     const result = await this.executeWrite('grantGuestAccess', [
-      recordIds,
+      recordIdHashes,
       guestWallet,
       guestIdHash,
       guestEmailHash,
@@ -1157,11 +1206,11 @@ export class BlockchainRoleManagerService {
    * Can be called by the granter or any owner/admin of the record.
    */
   static async revokeGuestAccess(
-    recordIds: string[],
+    recordIdHashes: string[],
     guestIdHash: string
   ): Promise<TransactionResult> {
-    console.log('🔗 Revoking guest access on blockchain...', { recordIds, guestIdHash });
-    const result = await this.executeWrite('revokeGuestAccess', [recordIds, guestIdHash]);
+    console.log('🔗 Revoking guest access on blockchain...', { recordIdHashes, guestIdHash });
+    const result = await this.executeWrite('revokeGuestAccess', [recordIdHashes, guestIdHash]);
     console.log('✅ Guest access revoked:', result.txHash);
     return result;
   }
@@ -1173,11 +1222,13 @@ export class BlockchainRoleManagerService {
   /**
    * Check if a guest has active non-expired access to a record
    */
-  static async hasActiveGuestAccess(recordId: string, guestIdHash: string): Promise<boolean> {
+  static async hasActiveGuestAccess(recordId: string, guestId: string): Promise<boolean> {
     try {
+      const recordIdHash = id(recordId);
+      const guestIdHash = id(guestId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('hasActiveGuestAccess');
-      return await fn(recordId, guestIdHash);
+      return await fn(recordIdHash, guestIdHash);
     } catch (error) {
       console.error('Error checking guest access:', error);
       return false;
@@ -1187,14 +1238,13 @@ export class BlockchainRoleManagerService {
   /**
    * Get full guest access details for a record
    */
-  static async getGuestAccess(
-    recordId: string,
-    guestIdHash: string
-  ): Promise<GuestAccessInfo | null> {
+  static async getGuestAccess(recordId: string, guestId: string): Promise<GuestAccessInfo | null> {
     try {
+      const recordIdHash = id(recordId);
+      const guestIdHash = id(guestId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('getGuestAccess');
-      const result = await fn(recordId, guestIdHash);
+      const result = await fn(recordIdHash, guestIdHash);
 
       const grantedAt = new Date(Number(result[0]) * 1000);
       const expiresAt = new Date(Number(result[1]) * 1000);

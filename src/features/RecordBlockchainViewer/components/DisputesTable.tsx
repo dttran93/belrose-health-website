@@ -2,14 +2,14 @@
 
 import React, { useState } from 'react';
 import { User, ChevronDown, ChevronRight, ThumbsUp, ThumbsDown, FileText } from 'lucide-react';
-import { Dispute, DisputeSeverity, DisputeCulpability } from '../lib/types';
+import { Dispute, DisputeCulpability } from '../lib/types';
 import { TableWrapper, StatusBadge, HashDisplay } from './SharedComponents';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import {
-  DisputeSeverityOptions,
   getCulpabilityConfig,
   getSeverityConfig,
 } from '@/features/Credibility/services/disputeService';
+import { DisputeSeverityOptions } from '@belrose/shared';
 
 interface DisputesTableProps {
   disputes: Dispute[];
@@ -17,7 +17,7 @@ interface DisputesTableProps {
 
 /**
  * Table displaying record disputes
- * Each row shows dispute details with expandable reaction stats
+ * Each row shows dispute details
  */
 export const DisputesTable: React.FC<DisputesTableProps> = ({ disputes }) => {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -56,9 +56,6 @@ export const DisputesTable: React.FC<DisputesTableProps> = ({ disputes }) => {
             </th>
             <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Culpability
-            </th>
-            <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Reactions
             </th>
             <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Status
@@ -140,24 +137,6 @@ export const DisputesTable: React.FC<DisputesTableProps> = ({ disputes }) => {
                     >
                       {culpabilityInfo.name}
                     </span>
-                  </td>
-
-                  {/* Reactions Summary */}
-                  <td className="px-4 py-3 text-center">
-                    {dispute.reactionStats ? (
-                      <div className="flex items-center justify-center gap-3 text-sm">
-                        <span className="flex items-center gap-1 text-green-600">
-                          <ThumbsUp className="w-3.5 h-3.5" />
-                          {dispute.reactionStats.supports}
-                        </span>
-                        <span className="flex items-center gap-1 text-red-600">
-                          <ThumbsDown className="w-3.5 h-3.5" />
-                          {dispute.reactionStats.opposes}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400 text-sm">—</span>
-                    )}
                   </td>
 
                   {/* Status */}

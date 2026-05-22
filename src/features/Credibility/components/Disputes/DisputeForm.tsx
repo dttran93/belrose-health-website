@@ -4,12 +4,10 @@ import { Button } from '@/components/ui/Button';
 import { AlertTriangle, Loader2, Undo2, Edit2, CheckCircle } from 'lucide-react';
 import {
   CULPABILITY_OPTIONS,
-  DisputeCulpability,
-  DisputeDoc,
   DisputeSeverity,
   SEVERITY_OPTIONS,
 } from '../../services/disputeService';
-import { VerificationDoc } from '../../services/verificationService';
+import { DisputeCulpability, DisputeDoc, VerificationDoc } from '@belrose/shared';
 
 // ============================================================
 // TYPES

@@ -49,9 +49,6 @@ const RECORD_TITLE_TYPES = new Set<NotificationType>([
   'DISPUTE_ADDED',
   'DISPUTE_MODIFIED',
   'DISPUTE_RETRACTED',
-  'DISPUTE_REACTION_ADDED',
-  'DISPUTE_REACTION_MODIFIED',
-  'DISPUTE_REACTION_RETRACTED',
 ]);
 
 // ============================================================================

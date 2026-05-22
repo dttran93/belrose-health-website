@@ -8,18 +8,20 @@
 //
 
 import { BlockchainRef } from '@belrose/shared';
+import { baseSepolia } from 'viem/chains';
+const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
 
 // ============================================================================
 // NETWORK INFRASTRUCTURE
 // ============================================================================
 
 export const NETWORK = {
-  chainId: 11155111,
-  name: 'sepolia',
-  rpcUrl: 'https://ethereum-sepolia.publicnode.com',
-  rpcUrlFallback: 'https://1rpc.io/sepolia',
-  rpcUrlFallback2: 'https://rpc.sepolia.org',
-  etherscanBaseUrl: 'https://sepolia.etherscan.io',
+  chainId: 84532,
+  name: 'base-sepolia',
+  rpcUrl: `https://base-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+  rpcUrlFallback: 'https://sepolia.base.org',
+  publicRpcUrl: 'https://sepolia.basescan.org/',
+  chainViem: baseSepolia,
 } as const;
 
 // ============================================================================
@@ -37,7 +39,7 @@ export const AA_INFRASTRUCTURE = {
 // ============================================================================
 
 export const PAYMASTER = {
-  address: '0x967e757609E1118E7164e51A204772a14804E253',
+  address: '0x02422f03EcD403E1a902101D60a0Dad5bB9E71a7',
 } as const;
 
 // ============================================================================
@@ -47,9 +49,9 @@ export const PAYMASTER = {
 // ============================================================================
 
 export const MEMBER_ROLE_MANAGER = {
-  proxy: '0xC31477f563dC8f7529Ba6AE7E410ABdB84C27d7C',
-  implementation: '0x936cf99beacc5ded69c6630a9d83142ec78332cf',
-  deploymentBlock: 10190794,
+  proxy: '0xdF9583C25E234A34a1E47d9830722123CA228a1a',
+  implementation: '0x4383C4e5EaCDE9F8cEc6c692f5d939BaaF6ff038',
+  deploymentBlock: 41800192,
 } as const;
 
 // ============================================================================
@@ -58,9 +60,9 @@ export const MEMBER_ROLE_MANAGER = {
 // ============================================================================
 
 export const HEALTH_RECORD_CORE = {
-  proxy: '0x97F9eD2af3f9a30Eac958D0994a0F131Eda11A57',
-  implementation: '0x6D3bb289FdAC00d758311619EC034C7405666f63',
-  deploymentBlock: 10190796,
+  proxy: '0x66A8b985C61205e63D7d7DEA72Dfa5849a3e66De',
+  implementation: '0x89839E0c266045c9EA06FdA11152B48129e76Ef2',
+  deploymentBlock: 41800191,
 } as const;
 
 // ============================================================================

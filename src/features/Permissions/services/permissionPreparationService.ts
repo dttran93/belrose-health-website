@@ -22,34 +22,13 @@
  */
 
 import { createPublicClient, http } from 'viem';
-import { sepolia } from 'viem/chains';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import {
-  BlockchainPreparationService,
-  type ProgressCallback,
-} from '@/features/BlockchainWallet/services/blockchainPreparationService';
-import { MEMBER_ROLE_MANAGER } from '@/config/blockchainAddresses';
+import { BlockchainPreparationService } from '@/features/BlockchainWallet/services/blockchainPreparationService';
 import { getAuth } from 'firebase/auth';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { BlockchainRef } from '@belrose/shared';
-
-// ==================== SMART CONTRACT CONFIG ====================
-
-const ROLE_MANAGER_ADDRESS = MEMBER_ROLE_MANAGER.proxy;
-
-const ROLE_MANAGER_ABI = [
-  {
-    name: 'getRecordRoleStats',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'recordId', type: 'string' }],
-    outputs: [
-      { name: 'ownerCount', type: 'uint256' },
-      { name: 'adminCount', type: 'uint256' },
-      { name: 'viewerCount', type: 'uint256' },
-    ],
-  },
-] as const;
+import { BlockchainRoleManagerService } from './blockchainRoleManagerService';
+import { NETWORK } from '@/config/blockchainAddresses';
 
 // ==================== TYPES ====================
 
@@ -111,7 +90,7 @@ export type PermissionProgressCallback = (progress: PermissionPreparationProgres
 
 export class PermissionPreparationService {
   private static publicClient = createPublicClient({
-    chain: sepolia,
+    chain: NETWORK.chainViem,
     transport: http(),
   });
 
@@ -153,10 +132,10 @@ export class PermissionPreparationService {
         };
       }
 
-      // Step 2: Check target wallet and record in parallel
+      // Step 2: Check target wallet and record
       const [isTargetActive, roleStats] = await Promise.all([
         BlockchainPreparationService.isActiveMember(targetWallet),
-        this.getRecordRoleStats(recordId),
+        BlockchainRoleManagerService.getRecordRoleStats(recordId),
       ]);
 
       // Step 3: Validate target
@@ -231,7 +210,7 @@ export class PermissionPreparationService {
       }
 
       // Check record initialization
-      const roleStats = await this.getRecordRoleStats(recordId);
+      const roleStats = await BlockchainRoleManagerService.getRecordRoleStats(recordId);
       const isRecordInitialized = roleStats.ownerCount > 0 || roleStats.adminCount > 0;
 
       if (!isRecordInitialized) {
@@ -303,7 +282,7 @@ export class PermissionPreparationService {
     const justInitialized = new Set<string>();
 
     for (const recordId of recordIds) {
-      const roleStats = await this.getRecordRoleStats(recordId);
+      const roleStats = await BlockchainRoleManagerService.getRecordRoleStats(recordId);
       const isInitialized = roleStats.ownerCount > 0 || roleStats.adminCount > 0;
 
       if (isInitialized) {
@@ -377,7 +356,7 @@ export class PermissionPreparationService {
     const blockchainStatus = await BlockchainPreparationService.getStatus();
 
     // Get record-specific status
-    const roleStats = await this.getRecordRoleStats(recordId);
+    const roleStats = await BlockchainRoleManagerService.getRecordRoleStats(recordId);
     const isRecordInitialized = roleStats.ownerCount > 0 || roleStats.adminCount > 0;
 
     return {
@@ -420,7 +399,7 @@ export class PermissionPreparationService {
     console.log('✅ PermissionPreparationService: Smart account ready:', smartAccountAddress);
 
     // Step 2: Check if record needs initialization
-    const roleStats = await this.getRecordRoleStats(recordId);
+    const roleStats = await BlockchainRoleManagerService.getRecordRoleStats(recordId);
     const isRecordInitialized = roleStats.ownerCount > 0 || roleStats.adminCount > 0;
 
     if (!isRecordInitialized) {
@@ -497,37 +476,6 @@ export class PermissionPreparationService {
 
       console.error('❌ Record initialization failed:', error);
       throw new Error(error.message || 'Failed to initialize record on network');
-    }
-  }
-
-  // ============================================================================
-  // PRIVATE HELPERS
-  // ============================================================================
-
-  /**
-   * Get role statistics for a record from the blockchain.
-   */
-  private static async getRecordRoleStats(recordId: string): Promise<{
-    ownerCount: bigint;
-    adminCount: bigint;
-    viewerCount: bigint;
-  }> {
-    try {
-      const result = await this.publicClient.readContract({
-        address: ROLE_MANAGER_ADDRESS,
-        abi: ROLE_MANAGER_ABI,
-        functionName: 'getRecordRoleStats',
-        args: [recordId],
-      });
-
-      return {
-        ownerCount: result[0],
-        adminCount: result[1],
-        viewerCount: result[2],
-      };
-    } catch (error) {
-      console.error('❌ PermissionPreparationService: Error getting record role stats:', error);
-      return { ownerCount: 0n, adminCount: 0n, viewerCount: 0n };
     }
   }
 }

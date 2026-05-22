@@ -1,7 +1,6 @@
 // src/features/HealthRecordViewer/lib/types.ts
-
-import { DisputeSeverityOptions } from '@/features/Credibility/services/disputeService';
-import { VerificationLevelOptions } from '@/features/Credibility/services/verificationService';
+import { VerificationLevelOptions } from '@/features/Credibility/hooks/useCredibilityFlow';
+import { DisputeSeverityOptions } from '@belrose/shared';
 import { ethers } from 'ethers';
 
 /**
@@ -51,10 +50,6 @@ export interface HealthRecordCoreContract {
   ): Promise<[boolean, string, number, number, string, bigint, boolean]>;
   getDisputeStats(recordHash: string): Promise<[bigint, bigint]>;
   getUserDisputes(userIdHash: string): Promise<string[]>;
-
-  // Reactions
-  getDisputeReactions(recordHash: string, disputerIdHash: string): Promise<ReactionStruct[]>;
-  getReactionStats(recordHash: string, disputerIdHash: string): Promise<[bigint, bigint, bigint]>;
 
   // Unaccepted Flags
   getUnacceptedUpdateFlags(subjectIdHash: string): Promise<UnacceptedUpdateFlagStruct[]>;
@@ -109,13 +104,6 @@ interface DisputeStruct {
   culpability: number;
   notes: string;
   createdAt: bigint;
-  isActive: boolean;
-}
-
-interface ReactionStruct {
-  reactorIdHash: string;
-  supportsDispute: boolean;
-  timestamp: bigint;
   isActive: boolean;
 }
 
@@ -222,23 +210,6 @@ export interface Dispute {
   isActive: boolean;
   // Enriched from Firebase
   disputerProfile?: {
-    displayName: string;
-    email: string;
-  };
-  // Aggregated reaction stats
-  reactionStats?: {
-    supports: number;
-    opposes: number;
-  };
-}
-
-export interface Reaction {
-  reactorIdHash: string;
-  supportsDispute: boolean;
-  timestamp: number;
-  isActive: boolean;
-  // Enriched from Firebase
-  reactorProfile?: {
     displayName: string;
     email: string;
   };

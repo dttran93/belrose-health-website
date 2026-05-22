@@ -76,7 +76,7 @@ function AppLayout() {
 
   const handleSettings = () => navigate('/app/settings');
   const handleNotifications = () => navigate('/app/notifications');
-  const handleHelp = () => window.open('https://help.example.com', '_blank');
+  const handleHelp = () => navigate('/'); //Goes back to homepage
 
   useEffect(() => {
     if (isDesktop) setIsMobileOpen(false);

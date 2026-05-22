@@ -20,27 +20,23 @@ import { useAuth } from '@/features/Auth/hooks/useAuth';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 
 // Verification imports
-import {
-  getVerificationsByRecordId,
-  VerificationDoc,
-} from '@/features/Credibility/services/verificationService';
+import { getVerificationsByRecordId } from '@/features/Credibility/services/verificationService';
 import VerificationDetailModal from '@/features/Credibility/components/Verifications/VerificationDetailModal';
 import VerificationUserCard from '@/features/Credibility/components/Verifications/VerificationUserCard';
 
 // Dispute imports
 import {
   getDisputesByRecordId,
-  getDisputeReactionStats,
   DisputeDocDecrypted,
 } from '@/features/Credibility/services/disputeService';
 import DisputeDetailModal from '@/features/Credibility/components/Disputes/DisputeDetailModal';
 import DisputeUserCard from '@/features/Credibility/components/Disputes/DisputeUserCard';
-import { ReactionType } from '@/components/ui/ReactionButtons';
 
 // Credibility flow hook for actions
 import { useCredibilityFlow } from '@/features/Credibility/hooks/useCredibilityFlow';
 import CredibilityActionDialog from '@/features/Credibility/components/ui/CredibilityActionDialog';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
+import { VerificationDoc } from '@belrose/shared';
 
 // ============================================================
 // TYPES
@@ -53,12 +49,6 @@ interface VersionDetailPageProps {
   onBack: () => void;
   onModifyVerification?: () => void;
   onModifyDispute?: () => void;
-}
-
-interface ReactionStatsWithUser {
-  supports: number;
-  opposes: number;
-  userReaction: ReactionType;
 }
 
 // ============================================================
@@ -88,8 +78,6 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
   const [loadingDisputes, setLoadingDisputes] = useState(true);
   const [selectedDispute, setSelectedDispute] = useState<DisputeDocDecrypted | null>(null);
   const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
-  const [reactionStats, setReactionStats] = useState<Record<string, ReactionStatsWithUser>>({});
-  const [reactingDisputes, setReactingDisputes] = useState<Set<string>>(new Set());
 
   // User profiles
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
@@ -105,7 +93,6 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
     initiateDispute,
     initiateRetractDispute,
     initiateModifyDispute,
-    initiateReaction,
     isLoading,
     refetch,
   } = useCredibilityFlow({
@@ -123,12 +110,6 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
     await fetchVerifications();
     await fetchDisputes();
   }
-
-  const getReactionType = (value: boolean | null | undefined): ReactionType => {
-    if (value === true) return 'support';
-    if (value === false) return 'oppose';
-    return null;
-  };
 
   const fetchVerifications = async () => {
     if (!recordId) return;
@@ -189,25 +170,6 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
 
       setDisputes(filtered);
 
-      // Fetch reaction stats for each dispute
-      const statsMap: Record<string, ReactionStatsWithUser> = {};
-      await Promise.all(
-        filtered.map(async d => {
-          const stats = await getDisputeReactionStats(
-            recordId,
-            d.recordHash,
-            d.disputerId,
-            user?.uid
-          );
-          statsMap[`${d.recordHash}_${d.disputerId}`] = {
-            supports: stats.supports ?? 0,
-            opposes: stats.opposes ?? 0,
-            userReaction: getReactionType(stats.userReaction),
-          };
-        })
-      );
-      setReactionStats(statsMap);
-
       // Collect user IDs for profile fetching
       const userIds = filtered.map(d => d.disputerId);
       return userIds;
@@ -259,57 +221,6 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
   const handleCloseDisputeModal = () => {
     setIsDisputeModalOpen(false);
     setSelectedDispute(null);
-  };
-
-  const handleReaction = async (dispute: DisputeDocDecrypted, support: boolean) => {
-    const statsKey = `${dispute.recordHash}_${dispute.disputerId}`;
-    const currentStats = reactionStats[statsKey] || { supports: 0, opposes: 0, userReaction: null };
-
-    // Optimistic update
-    const newStats = { ...currentStats };
-    if (currentStats.userReaction === (support ? 'support' : 'oppose')) {
-      // Toggle off
-      if (support) {
-        newStats.supports = Math.max(0, newStats.supports - 1);
-      } else {
-        newStats.opposes = Math.max(0, newStats.opposes - 1);
-      }
-      newStats.userReaction = null;
-    } else if (currentStats.userReaction !== null) {
-      // Switch reaction
-      if (support) {
-        newStats.supports += 1;
-        newStats.opposes = Math.max(0, newStats.opposes - 1);
-      } else {
-        newStats.opposes += 1;
-        newStats.supports = Math.max(0, newStats.supports - 1);
-      }
-      newStats.userReaction = support ? 'support' : 'oppose';
-    } else {
-      // New reaction
-      if (support) {
-        newStats.supports += 1;
-      } else {
-        newStats.opposes += 1;
-      }
-      newStats.userReaction = support ? 'support' : 'oppose';
-    }
-
-    setReactionStats(prev => ({ ...prev, [statsKey]: newStats }));
-    setReactingDisputes(prev => new Set(prev).add(statsKey));
-
-    try {
-      await initiateReaction(dispute.recordHash, dispute.disputerId, support);
-    } catch (error) {
-      // Rollback on error
-      setReactionStats(prev => ({ ...prev, [statsKey]: currentStats }));
-    } finally {
-      setReactingDisputes(prev => {
-        const next = new Set(prev);
-        next.delete(statsKey);
-        return next;
-      });
-    }
   };
 
   // ============================================================
@@ -428,13 +339,6 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
                 const disputerProfile = userProfiles.get(dispute.disputerId);
                 const isInactive = !dispute.isActive;
                 const statsKey = `${dispute.recordHash}_${dispute.disputerId}`;
-                const stats = reactionStats[statsKey] || {
-                  supports: 0,
-                  opposes: 0,
-                  userReaction: null,
-                };
-                const isReacting = reactingDisputes.has(statsKey);
-                const isOwnDispute = user?.uid === dispute.disputerId;
 
                 return (
                   <DisputeUserCard
@@ -445,10 +349,6 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
                     currentRecordHash={record.recordHash}
                     onViewUser={() => {}}
                     onViewDetails={() => handleDisputeClick(dispute)}
-                    reactionStats={stats}
-                    onReact={support => handleReaction(dispute, support)}
-                    isLoadingReaction={isReacting}
-                    isOwnDispute={isOwnDispute}
                   />
                 );
               })}
@@ -496,17 +396,6 @@ export const VersionDetailPage: React.FC<VersionDetailPageProps> = ({
             handleCloseDisputeModal();
             initiateRetractDispute(selectedDispute.recordHash);
           }}
-          onReact={(disputerId, support) => {
-            handleCloseDisputeModal();
-            initiateReaction(selectedDispute.recordHash, disputerId, support);
-          }}
-          reactionStats={
-            reactionStats[`${selectedDispute.recordHash}_${selectedDispute.disputerId}`] || {
-              supports: 0,
-              opposes: 0,
-              userReaction: null,
-            }
-          }
         />
       )}
 

@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { ExternalLink } from 'lucide-react';
-import { ETHERSCAN_BASE_URL } from '../lib/constants';
 import { truncateHash } from '../lib/utils';
+import { NETWORK } from '@/config/blockchainAddresses';
 
 interface EtherscanLinkProps {
   txHash?: string;
@@ -13,7 +13,7 @@ interface EtherscanLinkProps {
 }
 
 /**
- * Link to Etherscan (Sepolia) for a transaction, address, or block
+ * Link to a block scanner for a transaction, address, or block
  */
 export const EtherscanLink: React.FC<EtherscanLinkProps> = ({
   txHash,
@@ -25,7 +25,7 @@ export const EtherscanLink: React.FC<EtherscanLinkProps> = ({
     return <span className="text-gray-400 text-sm">—</span>;
   }
 
-  const url = `${ETHERSCAN_BASE_URL}/${type}/${txHash}`;
+  const url = `${NETWORK.publicRpcUrl}/${type}/${txHash}`;
 
   return (
     <a
@@ -33,7 +33,7 @@ export const EtherscanLink: React.FC<EtherscanLinkProps> = ({
       target="_blank"
       rel="noopener noreferrer"
       className={`inline-flex items-center gap-1 font-mono text-sm text-blue-600 hover:text-blue-800 hover:underline ${className}`}
-      title={`View on Etherscan: ${txHash}`}
+      title={`View on Distributed Network: ${txHash}`}
     >
       {truncateHash(txHash, 6, 4)}
       {showIcon && <ExternalLink className="w-3 h-3" />}

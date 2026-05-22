@@ -28,6 +28,7 @@ import {
 } from '@/utils/dataFormattingUtils';
 import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
+import { ethers } from 'ethers';
 
 // ==================== TYPE DEFINITIONS ====================
 
@@ -238,6 +239,10 @@ export async function createFirestoreRecord({
   // Save to global records collection
   console.log('📄 Saving documentData:', documentData);
   const docRef = await addDoc(collection(db, 'records'), removeUndefinedValues(documentData));
+
+  // Add recordIdHash, need to await addDoc so that the recordId is set
+  const recordIdHash = ethers.keccak256(ethers.toUtf8Bytes(docRef.id));
+  await updateDoc(docRef, { recordIdHash });
 
   // Create wrappedKey entry for the creator
   const wrappedKeyId = `${docRef.id}_${user.uid}`;

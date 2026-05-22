@@ -1,4 +1,4 @@
-// src/features/MemberManagement/constants.ts
+// src/features/MemberBlockchainViewer/constants.ts
 
 import { MEMBER_ROLE_MANAGER, NETWORK } from '@/config/blockchainAddresses';
 
@@ -8,8 +8,8 @@ import { MEMBER_ROLE_MANAGER, NETWORK } from '@/config/blockchainAddresses';
 
 export const MEMBER_ROLE_MANAGER_ADDRESS = MEMBER_ROLE_MANAGER.proxy;
 
-export const SEPOLIA_RPC_URL = NETWORK.rpcUrl;
-export const ETHERSCAN_BASE_URL = NETWORK.rpcUrlFallback;
+export const RPC_URL = NETWORK.rpcUrl;
+export const RPC_URL_FALLBACK = NETWORK.rpcUrlFallback;
 export const DEPLOYMENT_BLOCK = MEMBER_ROLE_MANAGER.deploymentBlock;
 
 /**
@@ -68,11 +68,12 @@ export const MEMBER_ROLE_MANAGER_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
+
   // Role Functions
   {
     anonymous: false,
     inputs: [
-      { indexed: true, internalType: 'string', name: 'recordId', type: 'string' },
+      { indexed: true, internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { indexed: true, internalType: 'bytes32', name: 'targetIdHash', type: 'bytes32' },
       { indexed: false, internalType: 'string', name: 'role', type: 'string' },
       { indexed: true, internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' },
@@ -91,13 +92,13 @@ export const MEMBER_ROLE_MANAGER_ABI = [
   {
     inputs: [{ internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' }],
     name: 'getRecordsByUser',
-    outputs: [{ internalType: 'string[]', name: '', type: 'string[]' }],
+    outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
     inputs: [
-      { internalType: 'string', name: 'recordId', type: 'string' },
+      { internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' },
       { internalType: 'bytes32', name: 'userIdHash', type: 'bytes32' },
     ],
     name: 'getRoleDetailsByUser',
@@ -109,28 +110,28 @@ export const MEMBER_ROLE_MANAGER_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' }],
     name: 'getRecordOwners',
     outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' }],
     name: 'getRecordAdmins',
     outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' }],
     name: 'getRecordViewers',
     outputs: [{ internalType: 'bytes32[]', name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'string', name: 'recordId', type: 'string' }],
+    inputs: [{ internalType: 'bytes32', name: 'recordIdHash', type: 'bytes32' }],
     name: 'getRecordRoleStats',
     outputs: [
       { internalType: 'uint256', name: 'ownerCount', type: 'uint256' },
@@ -153,7 +154,6 @@ export const MEMBER_ROLE_MANAGER_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
-  // Events for querying trustee proposals/acceptances
   {
     anonymous: false,
     inputs: [

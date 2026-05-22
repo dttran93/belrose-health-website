@@ -22,8 +22,10 @@
     "ethers": "^6.15.0",
     "firebase-admin": "^12.6.0",
     "firebase-functions": "^7.0.0",
+    "permissionless": "^0.2.57",
     "resend": "^6.9.4",
-    "stripe": "^22.1.1"
+    "stripe": "^22.1.1",
+    "viem": "^2.50.4"
   },
   "devDependencies": {
     "@types/cors": "^2.8.13",

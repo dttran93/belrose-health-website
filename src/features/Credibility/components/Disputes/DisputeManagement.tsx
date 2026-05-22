@@ -6,30 +6,15 @@ import { Button } from '@/components/ui/Button';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { FileObject, BelroseUserProfile } from '@/types/core';
 import { useAuth } from '@/features/Auth/hooks/useAuth';
-import {
-  DisputeDoc,
-  DisputeDocDecrypted,
-  getDisputeReactionStats,
-  getDisputesByRecordId,
-} from '../../services/disputeService';
+import { DisputeDocDecrypted, getDisputesByRecordId } from '../../services/disputeService';
 import DisputeDetailModal from './DisputeDetailModal';
-import { ReactionType } from '@/components/ui/ReactionButtons';
 import DisputeUserCard from './DisputeUserCard';
 import RecordSectionPanel from '@/components/ui/RecordSectionPanel';
+import { DisputeDoc } from '@belrose/shared';
 
 // ============================================================
 // TYPES
 // ============================================================
-
-/**
- * Extended ReactionStats that includes the current user's reaction.
- * This is what we store in state for each dispute.
- */
-export interface ReactionStatsWithUser {
-  supports: number;
-  opposes: number;
-  userReaction: ReactionType; // 'support' | 'oppose' | null
-}
 
 interface DisputeManagementProps {
   record: FileObject;
@@ -39,13 +24,8 @@ interface DisputeManagementProps {
   onModify?: (dispute: DisputeDoc) => void;
   onRetract?: (dispute: DisputeDoc) => void;
   onReact?: (recordHash: string, disputerId: string, support: boolean) => void;
+  refreshKey?: number;
 }
-
-export const getReactionType = (value: boolean | null | undefined): ReactionType => {
-  if (value === true) return 'support';
-  if (value === false) return 'oppose';
-  return null;
-};
 
 export const DisputeManagement: React.FC<DisputeManagementProps> = ({
   record,
@@ -55,14 +35,12 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
   onModify,
   onRetract,
   onReact,
+  refreshKey,
 }) => {
   const { user } = useAuth();
   const [loadingDisputes, setLoadingDisputes] = useState(true);
   const [disputes, setDisputes] = useState<DisputeDocDecrypted[]>([]);
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [reactionStats, setReactionStats] = useState<Record<string, ReactionStatsWithUser>>({});
-  const [reactingDisputes, setReactingDisputes] = useState<Set<string>>(new Set());
   const [selectedDispute, setSelectedDispute] = useState<DisputeDocDecrypted | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -94,32 +72,11 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
         // 3. Get unique disputer IDs and fetch their profiles
         const disputerIds = [...new Set(allDisputes.map(d => d.disputerId))];
 
-        // 4. Fetch Reaction stats for all disputes
-        const statsMap = new Map<string, ReactionStatsWithUser>();
-
-        const statsPromises = allDisputes.map(async d => {
-          const stats = await getDisputeReactionStats(
-            d.recordId,
-            d.recordHash,
-            d.disputerId,
-            user?.uid
-          );
-
-          statsMap.set(`${d.recordHash}_${d.disputerId}`, {
-            supports: stats.supports ?? 0,
-            opposes: stats.opposes ?? 0,
-            userReaction: getReactionType(stats.userReaction) ?? null,
-          });
-        });
-
         await Promise.all([
           disputerIds.length > 0
             ? getUserProfiles(disputerIds).then(setUserProfiles)
             : Promise.resolve(),
-          ...statsPromises,
         ]);
-
-        setReactionStats(Object.fromEntries(statsMap));
       } catch (error) {
         console.error('Error fetching disputes:', error);
       } finally {
@@ -128,7 +85,7 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
     };
 
     fetchDisputes();
-  }, [record.firestoreId, record.id, record.recordHash, refreshTrigger, user?.uid]);
+  }, [record.firestoreId, record.id, record.recordHash, user?.uid, refreshKey]);
 
   // ============================================================
   // HANDLERS
@@ -162,77 +119,6 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
     if (selectedDispute && onReact) {
       handleCloseModal();
       onReact(selectedDispute.recordHash, disputerId, support);
-    }
-  };
-
-  /**
-   * Handle reaction from DisputeCard.
-   * This does optimistic UI update then calls the parent handler.
-   */
-  const handleReaction = async (dispute: DisputeDoc, support: boolean) => {
-    if (!onReact) return;
-
-    const statsKey = `${dispute.recordHash}_${dispute.disputerId}`;
-    const currentStats = reactionStats[statsKey] || { supports: 0, opposes: 0, userReaction: null };
-
-    // Optimistic update
-    const newStats = { ...currentStats };
-
-    if (currentStats.userReaction === (support ? 'support' : 'oppose')) {
-      // User is clicking the same button - toggle off (retract)
-      if (support) {
-        newStats.supports = Math.max(0, newStats.supports - 1);
-      } else {
-        newStats.opposes = Math.max(0, newStats.opposes - 1);
-      }
-      newStats.userReaction = null;
-    } else if (currentStats.userReaction !== null) {
-      // User is switching their reaction
-      if (support) {
-        newStats.supports += 1;
-        newStats.opposes = Math.max(0, newStats.opposes - 1);
-      } else {
-        newStats.opposes += 1;
-        newStats.supports = Math.max(0, newStats.supports - 1);
-      }
-      newStats.userReaction = support ? 'support' : 'oppose';
-    } else {
-      // User is reacting for the first time
-      if (support) {
-        newStats.supports += 1;
-      } else {
-        newStats.opposes += 1;
-      }
-      newStats.userReaction = support ? 'support' : 'oppose';
-    }
-
-    // Update UI immediately
-    setReactionStats(prev => ({
-      ...prev,
-      [statsKey]: newStats,
-    }));
-
-    // Mark as loading
-    setReactingDisputes(prev => new Set(prev).add(statsKey));
-
-    try {
-      // Call the actual API through parent
-      await onReact(dispute.recordHash, dispute.disputerId, support);
-      // Optionally refresh stats after success
-      setRefreshTrigger(prev => prev + 1);
-    } catch (error) {
-      // Revert on error
-      setReactionStats(prev => ({
-        ...prev,
-        [statsKey]: currentStats,
-      }));
-      console.error('Failed to submit reaction:', error);
-    } finally {
-      setReactingDisputes(prev => {
-        const next = new Set(prev);
-        next.delete(statsKey);
-        return next;
-      });
     }
   };
 
@@ -285,7 +171,6 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
         }
       >
         {disputes.map(dispute => {
-          const statsKey = `${dispute.recordHash}_${dispute.disputerId}`;
           return (
             <DisputeUserCard
               key={dispute.id}
@@ -295,12 +180,6 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
               currentRecordHash={record.recordHash}
               onViewUser={() => {}}
               onViewDetails={() => handleCardClick(dispute)}
-              reactionStats={
-                reactionStats[statsKey] || { supports: 0, opposes: 0, userReaction: null }
-              }
-              onReact={support => handleReaction(dispute, support)}
-              isLoadingReaction={reactingDisputes.has(statsKey)}
-              isOwnDispute={user?.uid === dispute.disputerId}
             />
           );
         })}
@@ -317,14 +196,6 @@ export const DisputeManagement: React.FC<DisputeManagementProps> = ({
           isOwnDispute={user?.uid === selectedDispute.disputerId}
           onModify={handleModify}
           onRetract={handleRetract}
-          onReact={handleModalReact}
-          reactionStats={
-            reactionStats[`${selectedDispute.recordHash}_${selectedDispute.disputerId}`] || {
-              supports: 0,
-              opposes: 0,
-              userReaction: null,
-            }
-          }
         />
       )}
     </div>

@@ -1,9 +1,8 @@
 // src/features/MemberBlockchainViewer/hooks/usePaymasterDeposit.ts
 
-import { PAYMASTER } from '@/config/blockchainAddresses';
+import { NETWORK, PAYMASTER } from '@/config/blockchainAddresses';
 import { useState, useEffect, useCallback } from 'react';
 import { createPublicClient, http, formatEther } from 'viem';
-import { sepolia } from 'viem/chains';
 
 // Your deployed paymaster address
 const PAYMASTER_ADDRESS = PAYMASTER.address;
@@ -36,7 +35,7 @@ export function usePaymasterDeposit(lowThresholdEth = 0.01) {
 
     try {
       const publicClient = createPublicClient({
-        chain: sepolia,
+        chain: NETWORK.chainViem,
         transport: http(),
       });
 

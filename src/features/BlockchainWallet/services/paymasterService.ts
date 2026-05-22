@@ -16,7 +16,6 @@
  */
 
 import { createPublicClient, http, type Hex, concat, pad, toHex } from 'viem';
-import { sepolia } from 'viem/chains';
 import { createSmartAccountClient } from 'permissionless';
 import { toSimpleSmartAccount } from 'permissionless/accounts';
 import { createPimlicoClient } from 'permissionless/clients/pimlico';
@@ -24,7 +23,7 @@ import { entryPoint07Address, getUserOperationHash } from 'viem/account-abstract
 import { privateKeyToAccount } from 'viem/accounts';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { WalletService } from './walletService';
-import { PAYMASTER } from '@/config/blockchainAddresses';
+import { NETWORK, PAYMASTER } from '@/config/blockchainAddresses';
 
 // ==================== CONFIG ====================
 
@@ -35,7 +34,7 @@ const PAYMASTER_ADDRESS = PAYMASTER.address;
 const BUNDLER_URL = import.meta.env.VITE_PIMLICO_BUNDLER_URL;
 
 // Chain configuration
-const CHAIN = sepolia;
+const CHAIN = NETWORK.chainViem;
 
 // ==================== TYPES ====================
 

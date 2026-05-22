@@ -47,6 +47,7 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({
   const [verifications, setVerifications] = useState<VerificationDoc[]>([]);
   const [disputes, setDisputes] = useState<any[]>([]);
   const { user } = useAuth();
+  const [credibilityRefreshKey, setCredibilityRefreshKey] = useState(0);
 
   console.log('Current View', viewMode);
 
@@ -74,6 +75,9 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({
       if (viewMode === 'add') {
         setViewMode('list');
       }
+
+      // 4. refreshKey after successful Operation
+      setCredibilityRefreshKey(k => k + 1);
 
       console.log('Credibility data synchronized.');
     } catch (error) {

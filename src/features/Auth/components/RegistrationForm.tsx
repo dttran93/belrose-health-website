@@ -14,7 +14,6 @@ import { EncryptionService } from '@/features/Encryption/services/encryptionServ
 import { MemberRegistryBlockchain } from '../services/memberRegistryBlockchain';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 import { WalletGenerationService } from '../services/walletGenerationService';
-import { SmartAccountService } from '@/features/BlockchainWallet/services/smartAccountService';
 import RegistrationProgressDialog, {
   RegistrationPhase,
   RegistrationProgress,
@@ -104,7 +103,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
   };
 
   const handleStepComplete = async (stepNumber: number, data: any) => {
-    // If completing step 1, generate and encrypt the master key and wallet
+    // If completing step 1, generate and encrypt the master key. Generate Wallet/SmartAccount and register on chain
     if (stepNumber === 1 && data.password) {
       setIsStep1Loading(true);
       try {
@@ -114,7 +113,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         const masterKey = await EncryptionKeyManager.generateMasterKey();
         console.log('✓ Master key generated');
 
-        // 2. Wrap it with password
+        // 2. Wrap with password
         const { encryptedKey, iv, salt } = await EncryptionKeyManager.wrapMasterKeyWithPassword(
           masterKey,
           data.password
@@ -123,8 +122,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
 
         // 3. Generate recovery key (24 words) and hash
         const recoveryKey = await EncryptionKeyManager.generateRecoveryKeyFromMasterKey(masterKey);
-        console.log('✓ Recovery key generated');
         const recoveryKeyHash = await EncryptionKeyManager.hashRecoveryKey(recoveryKey);
+        console.log('✓ Recovery key generated');
 
         // 4. Generate RSA key pair for record sharing
         const { publicKey, privateKey } = await SharingKeyManagementService.generateUserKeyPair();
@@ -136,18 +135,17 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
           await EncryptionService.encryptFile(privateKeyBytes, masterKey);
         const encryptedPrivateKey = arrayBufferToBase64(encryptedPrivateKeyBuffer);
         const encryptedPrivateKeyIV = arrayBufferToBase64(privateKeyIV);
-        console.log('✓ Private key encrypted');
+        console.log('✓ RSA private key encrypted');
 
-        // 6. Store master key in session for registration process
+        // 6. Store master key in session
         EncryptionKeyManager.setSessionKey(masterKey);
 
-        // 7. Generate blockchain wallet
-        console.log('💼 Generating blockchain wallet...');
-        const walletData = await WalletGenerationService.generateWallet({
-          userId: data.userId,
-          masterKey,
-        });
-        console.log('✓ Wallet created:', walletData.walletAddress);
+        // 7. Generate wallet + register both wallets on-chain in one transaction
+        console.log('💼 Generating wallet and registering on-chain...');
+        const masterKeyHex = await WalletGenerationService.convertMasterKeyToHex(masterKey);
+        const registrationResult =
+          await MemberRegistryBlockchain.registerMemberOnChainComplete(masterKeyHex);
+        console.log('✓ Wallet generated and registered:', registrationResult.walletAddress);
 
         // 8. Generate Signal Protocol key bundle
         //    - Generates identity keypair, signed prekey, and 100 one-time prekeys
@@ -157,19 +155,20 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         const signalKeyBundle = await generateKeyBundle(data.userId);
         console.log('✓ Signal keys generated');
 
-        // 9. Update registration data with all setup info
+        // 9. Single state update with everything
         setRegistrationData(prev => ({
           ...prev,
           ...data,
           encryptedMasterKey: encryptedKey,
           masterKeyIV: iv,
           masterKeySalt: salt,
-          recoveryKey: recoveryKey,
-          recoveryKeyHash: recoveryKeyHash,
-          publicKey: publicKey,
-          encryptedPrivateKey: encryptedPrivateKey,
-          encryptedPrivateKeyIV: encryptedPrivateKeyIV,
-          walletAddress: walletData.walletAddress,
+          recoveryKey,
+          recoveryKeyHash,
+          publicKey,
+          encryptedPrivateKey,
+          encryptedPrivateKeyIV,
+          walletAddress: registrationResult.walletAddress,
+          smartAccountAddress: registrationResult.smartAccountAddress,
           walletType: 'generated',
           walletGenerationComplete: true,
           signalKeyBundle,
@@ -186,18 +185,12 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         setIsStep1Loading(false);
       }
     } else {
-      // For other steps, just update data normally
-      setRegistrationData(prev => ({
-        ...prev,
-        ...data,
-      }));
+      setRegistrationData(prev => ({ ...prev, ...data }));
     }
 
     // If last step, trigger complete registration. Else go to next step.
     if (stepNumber === steps.length) {
-      setTimeout(() => {
-        handleCompleteRegistration();
-      }, 0);
+      setTimeout(() => handleCompleteRegistration(), 0);
     } else {
       setCurrentStep(stepNumber + 1);
     }
@@ -218,31 +211,15 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     try {
       console.log('🔄 Completing registration...');
 
-      // 1. Register EOA wallet on blockchain (creates userId identity)
-      setRegistrationProgress({
-        step: 'eoa_registration',
-        message: 'Registering your account on the secure network',
-      });
-      const eoaResult = await MemberRegistryBlockchain.registerMemberWallet(
-        registrationData.walletAddress
-      );
+      // Wallet + blockchain registration already done in step 1
+      // Just need to save account data and Signal keys
 
-      if (!eoaResult.blockchainRef && eoaResult.message !== 'Already registered') {
-        throw new Error('EOA blockchain registration failed - no transaction hash received');
-      }
-
-      // 2. Compute and register smart account (adds to existing userId)
-      setRegistrationProgress({
-        step: 'smart_account_registration',
-        message: 'Computing your smart account for network automation...',
-      });
-      await SmartAccountService.ensureFullyInitialized();
-
-      // 3. Save core account data to Firestore
+      // 1. Save core account data to Firestore
       setRegistrationProgress({
         step: 'firestore_update',
         message: 'Finalizing your account...',
       });
+
       const db = getFirestore();
       const userDocRef = doc(db, 'users', registrationData.userId);
 
@@ -250,7 +227,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         email: registrationData.email,
         firstName: registrationData.firstName,
         lastName: registrationData.lastName,
-
         encryption: {
           enabled: true,
           encryptedMasterKey: registrationData.encryptedMasterKey,
@@ -270,7 +246,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         updatedAt: new Date(),
       });
 
-      // 4. Upload Signal public key bundle to Firestore
+      // 2. Upload Signal public key bundle to Firestore
       //    Private keys are already in IndexedDB from step 1.
       //    This is a separate write so a Firestore failure here doesn't
       //    roll back the main account creation above.
@@ -290,6 +266,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         console.warn('⚠️ Signal key bundle missing — messaging setup incomplete');
       }
 
+      // 3. Update invite doc if applicable
       try {
         const inviteRef = doc(db, 'invites', registrationData.email.toLowerCase());
         await updateDoc(inviteRef, {
@@ -300,18 +277,11 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         console.warn('Could not update invite doc — may not exist or no permission:', e);
       }
 
-      setRegistrationProgress({
-        step: 'complete',
-        message: 'Registration complete!',
-      });
-
+      setRegistrationProgress({ step: 'complete', message: 'Registration complete!' });
       setDialogPhase('success');
     } catch (error) {
       console.error('❌ Registration failed:', error);
-
-      // Provide specific error message
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      setDialogError(errorMessage);
+      setDialogError(error instanceof Error ? error.message : 'Unknown error occurred');
       setDialogPhase('error');
     } finally {
       setIsSubmitting(false);

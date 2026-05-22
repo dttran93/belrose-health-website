@@ -28,6 +28,7 @@ import { BlockchainPreparationService } from '@/features/BlockchainWallet/servic
 import { blockchainHealthRecordService } from './blockchainHealthRecordService';
 import { PermissionPreparationService } from '@/features/Permissions/services/permissionPreparationService';
 import { BlockchainRoleManagerService } from '@/features/Permissions/services/blockchainRoleManagerService';
+import { ethers, id } from 'ethers';
 
 // ==================== TYPES ====================
 
@@ -227,6 +228,7 @@ export class CredibilityPreparationService {
     console.log('✅ CredibilityPreparationService: Ready with address:', address);
 
     // Step 2: Check if record role needs initialization
+
     const roleStats = await BlockchainRoleManagerService.getRecordRoleStats(recordId);
     const isRecordInitialized = roleStats.ownerCount > 0 || roleStats.adminCount > 0;
 

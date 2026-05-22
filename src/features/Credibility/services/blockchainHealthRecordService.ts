@@ -13,7 +13,7 @@
 // Read operations: No wallet needed (uses public RPC)
 // Write operations: Routes through PaymasterService
 
-import { ethers, Contract } from 'ethers';
+import { ethers, Contract, id } from 'ethers';
 import {
   PaymasterService,
   TransactionResult,
@@ -35,8 +35,8 @@ const HEALTH_RECORD_CORE_ABI = [
   // ==================== RECORD ANCHORING - WRITE ====================
   {
     inputs: [
-      { name: 'recordId', type: 'string' },
-      { name: 'recordHash', type: 'string' },
+      { name: 'recordIdHash', type: 'bytes32' },
+      { name: 'recordHash', type: 'bytes32' },
       { name: 'subjectIdHash', type: 'bytes32' },
     ],
     name: 'anchorRecord',
@@ -46,7 +46,7 @@ const HEALTH_RECORD_CORE_ABI = [
   },
   {
     inputs: [
-      { name: 'recordId', type: 'string' },
+      { name: 'recordIdHash', type: 'bytes32' },
       { name: 'subjectIdHash', type: 'bytes32' },
     ],
     name: 'unanchorRecord',
@@ -56,7 +56,7 @@ const HEALTH_RECORD_CORE_ABI = [
   },
   {
     inputs: [
-      { name: 'recordId', type: 'string' },
+      { name: 'recordIdHash', type: 'bytes32' },
       { name: 'subjectIdHash', type: 'bytes32' },
     ],
     name: 'reanchorRecord',
@@ -66,8 +66,8 @@ const HEALTH_RECORD_CORE_ABI = [
   },
   {
     inputs: [
-      { name: 'recordId', type: 'string' },
-      { name: 'newHash', type: 'string' },
+      { name: 'recordIdHash', type: 'bytes32' },
+      { name: 'newHash', type: 'bytes32' },
     ],
     name: 'addRecordHash',
     outputs: [],
@@ -77,7 +77,7 @@ const HEALTH_RECORD_CORE_ABI = [
 
   // ==================== RECORD ANCHORING - VIEW ====================
   {
-    inputs: [{ name: 'recordId', type: 'string' }],
+    inputs: [{ name: 'recordIdHash', type: 'bytes32' }],
     name: 'getRecordSubjects',
     outputs: [{ name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
@@ -86,20 +86,13 @@ const HEALTH_RECORD_CORE_ABI = [
   {
     inputs: [{ name: 'userIdHash', type: 'bytes32' }],
     name: 'getSubjectMedicalHistory',
-    outputs: [{ name: '', type: 'string[]' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'userIdHash', type: 'bytes32' }],
-    name: 'getActiveSubjectMedicalHistory',
-    outputs: [{ name: '', type: 'string[]' }],
+    outputs: [{ name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
     inputs: [
-      { name: 'recordId', type: 'string' },
+      { name: 'recordIdHash', type: 'bytes32' },
       { name: 'userIdHash', type: 'bytes32' },
     ],
     name: 'isSubject',
@@ -109,7 +102,7 @@ const HEALTH_RECORD_CORE_ABI = [
   },
   {
     inputs: [
-      { name: 'recordId', type: 'string' },
+      { name: 'recordIdHash', type: 'bytes32' },
       { name: 'userIdHash', type: 'bytes32' },
     ],
     name: 'isActiveSubject',
@@ -118,14 +111,14 @@ const HEALTH_RECORD_CORE_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ name: 'recordId', type: 'string' }],
+    inputs: [{ name: 'recordIdHash', type: 'bytes32' }],
     name: 'getActiveRecordSubjects',
     outputs: [{ name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ name: 'recordId', type: 'string' }],
+    inputs: [{ name: 'recordIdHash', type: 'bytes32' }],
     name: 'getSubjectStats',
     outputs: [
       { name: 'total', type: 'uint256' },
@@ -135,28 +128,28 @@ const HEALTH_RECORD_CORE_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ name: 'recordId', type: 'string' }],
+    inputs: [{ name: 'recordIdHash', type: 'bytes32' }],
     name: 'getRecordVersionHistory',
-    outputs: [{ name: '', type: 'string[]' }],
+    outputs: [{ name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ name: 'recordHash', type: 'string' }],
+    inputs: [{ name: 'recordHash', type: 'bytes32' }],
     name: 'getRecordIdForHash',
-    outputs: [{ name: '', type: 'string' }],
+    outputs: [{ name: '', type: 'bytes32' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ name: 'recordHash', type: 'string' }],
+    inputs: [{ name: 'recordHash', type: 'bytes32' }],
     name: 'doesHashExist',
     outputs: [{ name: '', type: 'bool' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ name: 'recordId', type: 'string' }],
+    inputs: [{ name: 'recordIdHash', type: 'bytes32' }],
     name: 'getVersionCount',
     outputs: [{ name: '', type: 'uint256' }],
     stateMutability: 'view',
@@ -173,8 +166,8 @@ const HEALTH_RECORD_CORE_ABI = [
   // ==================== VERIFICATIONS - WRITE ====================
   {
     inputs: [
-      { name: 'recordId', type: 'string' },
-      { name: 'recordHash', type: 'string' },
+      { name: 'recordIdHash', type: 'bytes32' },
+      { name: 'recordHash', type: 'bytes32' },
       { name: 'level', type: 'uint8' },
     ],
     name: 'verifyRecord',
@@ -183,7 +176,7 @@ const HEALTH_RECORD_CORE_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ name: 'recordHash', type: 'string' }],
+    inputs: [{ name: 'recordHash', type: 'bytes32' }],
     name: 'retractVerification',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -191,7 +184,7 @@ const HEALTH_RECORD_CORE_ABI = [
   },
   {
     inputs: [
-      { name: 'recordHash', type: 'string' },
+      { name: 'recordHash', type: 'bytes32' },
       { name: 'newLevel', type: 'uint8' },
     ],
     name: 'modifyVerificationLevel',
@@ -202,13 +195,13 @@ const HEALTH_RECORD_CORE_ABI = [
 
   // ==================== VERIFICATIONS - VIEW ====================
   {
-    inputs: [{ name: 'recordHash', type: 'string' }],
+    inputs: [{ name: 'recordHash', type: 'bytes32' }],
     name: 'getVerifications',
     outputs: [
       {
         components: [
           { name: 'verifierIdHash', type: 'bytes32' },
-          { name: 'recordId', type: 'string' },
+          { name: 'recordIdHash', type: 'bytes32' },
           { name: 'level', type: 'uint8' },
           { name: 'createdAt', type: 'uint256' },
           { name: 'isActive', type: 'bool' },
@@ -222,7 +215,7 @@ const HEALTH_RECORD_CORE_ABI = [
   },
   {
     inputs: [
-      { name: 'recordHash', type: 'string' },
+      { name: 'recordHash', type: 'bytes32' },
       { name: 'userIdHash', type: 'bytes32' },
     ],
     name: 'hasUserVerified',
@@ -232,13 +225,13 @@ const HEALTH_RECORD_CORE_ABI = [
   },
   {
     inputs: [
-      { name: 'recordHash', type: 'string' },
+      { name: 'recordHash', type: 'bytes32' },
       { name: 'userIdHash', type: 'bytes32' },
     ],
     name: 'getUserVerification',
     outputs: [
       { name: 'exists', type: 'bool' },
-      { name: 'recordId', type: 'string' },
+      { name: 'recordIdHash', type: 'bytes32' },
       { name: 'level', type: 'uint8' },
       { name: 'createdAt', type: 'uint256' },
       { name: 'isActive', type: 'bool' },
@@ -247,7 +240,7 @@ const HEALTH_RECORD_CORE_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ name: 'recordHash', type: 'string' }],
+    inputs: [{ name: 'recordHash', type: 'bytes32' }],
     name: 'getVerificationStats',
     outputs: [
       { name: 'total', type: 'uint256' },
@@ -259,7 +252,7 @@ const HEALTH_RECORD_CORE_ABI = [
   {
     inputs: [{ name: 'userIdHash', type: 'bytes32' }],
     name: 'getUserVerifications',
-    outputs: [{ name: '', type: 'string[]' }],
+    outputs: [{ name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
@@ -267,8 +260,8 @@ const HEALTH_RECORD_CORE_ABI = [
   // ==================== DISPUTES - WRITE ====================
   {
     inputs: [
-      { name: 'recordId', type: 'string' },
-      { name: 'recordHash', type: 'string' },
+      { name: 'recordIdHash', type: 'bytes32' },
+      { name: 'recordHash', type: 'bytes32' },
       { name: 'severity', type: 'uint8' },
       { name: 'culpability', type: 'uint8' },
       { name: 'notes', type: 'string' },
@@ -279,7 +272,7 @@ const HEALTH_RECORD_CORE_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ name: 'recordHash', type: 'string' }],
+    inputs: [{ name: 'recordHash', type: 'bytes32' }],
     name: 'retractDispute',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -287,7 +280,7 @@ const HEALTH_RECORD_CORE_ABI = [
   },
   {
     inputs: [
-      { name: 'recordHash', type: 'string' },
+      { name: 'recordHash', type: 'bytes32' },
       { name: 'newSeverity', type: 'uint8' },
       { name: 'newCulpability', type: 'uint8' },
     ],
@@ -299,13 +292,13 @@ const HEALTH_RECORD_CORE_ABI = [
 
   // ==================== DISPUTES - VIEW ====================
   {
-    inputs: [{ name: 'recordHash', type: 'string' }],
+    inputs: [{ name: 'recordHash', type: 'bytes32' }],
     name: 'getDisputes',
     outputs: [
       {
         components: [
           { name: 'disputerIdHash', type: 'bytes32' },
-          { name: 'recordId', type: 'string' },
+          { name: 'recordIdHash', type: 'bytes32' },
           { name: 'severity', type: 'uint8' },
           { name: 'culpability', type: 'uint8' },
           { name: 'notes', type: 'string' },
@@ -321,7 +314,7 @@ const HEALTH_RECORD_CORE_ABI = [
   },
   {
     inputs: [
-      { name: 'recordHash', type: 'string' },
+      { name: 'recordHash', type: 'bytes32' },
       { name: 'userIdHash', type: 'bytes32' },
     ],
     name: 'hasUserDisputed',
@@ -331,13 +324,13 @@ const HEALTH_RECORD_CORE_ABI = [
   },
   {
     inputs: [
-      { name: 'recordHash', type: 'string' },
+      { name: 'recordHash', type: 'bytes32' },
       { name: 'userIdHash', type: 'bytes32' },
     ],
     name: 'getUserDispute',
     outputs: [
       { name: 'exists', type: 'bool' },
-      { name: 'recordId', type: 'string' },
+      { name: 'recordIdHash', type: 'bytes32' },
       { name: 'severity', type: 'uint8' },
       { name: 'culpability', type: 'uint8' },
       { name: 'notes', type: 'string' },
@@ -348,7 +341,7 @@ const HEALTH_RECORD_CORE_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ name: 'recordHash', type: 'string' }],
+    inputs: [{ name: 'recordHash', type: 'bytes32' }],
     name: 'getDisputeStats',
     outputs: [
       { name: 'total', type: 'uint256' },
@@ -360,105 +353,7 @@ const HEALTH_RECORD_CORE_ABI = [
   {
     inputs: [{ name: 'userIdHash', type: 'bytes32' }],
     name: 'getUserDisputes',
-    outputs: [{ name: '', type: 'string[]' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-
-  // ==================== REACTIONS - WRITE ====================
-  {
-    inputs: [
-      { name: 'recordHash', type: 'string' },
-      { name: 'disputerIdHash', type: 'bytes32' },
-      { name: 'supportsDispute', type: 'bool' },
-    ],
-    name: 'reactToDispute',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'recordHash', type: 'string' },
-      { name: 'disputerIdHash', type: 'bytes32' },
-    ],
-    name: 'retractReaction',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'recordHash', type: 'string' },
-      { name: 'disputerIdHash', type: 'bytes32' },
-      { name: 'newSupport', type: 'bool' },
-    ],
-    name: 'modifyReaction',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-
-  // ==================== REACTIONS - VIEW ====================
-  {
-    inputs: [
-      { name: 'recordHash', type: 'string' },
-      { name: 'disputerIdHash', type: 'bytes32' },
-    ],
-    name: 'getDisputeReactions',
-    outputs: [
-      {
-        components: [
-          { name: 'reactorIdHash', type: 'bytes32' },
-          { name: 'supportsDispute', type: 'bool' },
-          { name: 'timestamp', type: 'uint256' },
-          { name: 'isActive', type: 'bool' },
-        ],
-        name: '',
-        type: 'tuple[]',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'recordHash', type: 'string' },
-      { name: 'disputerIdHash', type: 'bytes32' },
-      { name: 'reactorIdHash', type: 'bytes32' },
-    ],
-    name: 'hasUserReacted',
-    outputs: [{ name: '', type: 'bool' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'recordHash', type: 'string' },
-      { name: 'disputerIdHash', type: 'bytes32' },
-      { name: 'reactorIdHash', type: 'bytes32' },
-    ],
-    name: 'getUserReaction',
-    outputs: [
-      { name: 'exists', type: 'bool' },
-      { name: 'supportsDispute', type: 'bool' },
-      { name: 'timestamp', type: 'uint256' },
-      { name: 'isActive', type: 'bool' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'recordHash', type: 'string' },
-      { name: 'disputerIdHash', type: 'bytes32' },
-    ],
-    name: 'getReactionStats',
-    outputs: [
-      { name: 'totalReactions', type: 'uint256' },
-      { name: 'activeSupports', type: 'uint256' },
-      { name: 'activeOpposes', type: 'uint256' },
-    ],
+    outputs: [{ name: '', type: 'bytes32[]' }],
     stateMutability: 'view',
     type: 'function',
   },
@@ -466,20 +361,35 @@ const HEALTH_RECORD_CORE_ABI = [
   // ==================== UNACCEPTED UPDATE FLAGS - VIEW ====================
   {
     inputs: [{ name: 'subjectIdHash', type: 'bytes32' }],
-    name: 'getUnacceptedUpdateFlags',
+    name: 'getUnacceptedFlags',
     outputs: [
       {
         components: [
-          { name: 'recordId', type: 'string' },
-          { name: 'noteHash', type: 'string' },
+          { name: 'recordIdHash', type: 'bytes32' },
+          { name: 'reporterIdHash', type: 'bytes32' },
+          { name: 'recordHash', type: 'bytes32' },
           { name: 'createdAt', type: 'uint256' },
-          { name: 'resolution', type: 'uint8' },
-          { name: 'resolvedAt', type: 'uint256' },
           { name: 'isActive', type: 'bool' },
         ],
         name: '',
         type: 'tuple[]',
       },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { name: 'subjectIdHash', type: 'bytes32' },
+      { name: 'recordIdHash', type: 'bytes32' },
+    ],
+    name: 'getUnacceptedFlag',
+    outputs: [
+      { name: 'exists', type: 'bool' },
+      { name: 'isActive', type: 'bool' },
+      { name: 'reporterIdHash', type: 'bytes32' },
+      { name: 'recordContentHash', type: 'bytes32' },
+      { name: 'createdAt', type: 'uint256' },
     ],
     stateMutability: 'view',
     type: 'function',
@@ -530,18 +440,9 @@ export enum DisputeCulpability {
   Intentional = 5, // Deliberate falsification
 }
 
-/** Resolution type for unaccepted update flags */
-export enum ResolutionType {
-  None = 0,
-  PatientAccepted = 1,
-  DoctorWithdrew = 2,
-  Arbitrated = 3,
-  Expired = 4,
-}
-
 export interface Verification {
   verifierIdHash: string;
-  recordId: string;
+  recordIdHash: string;
   level: VerificationLevel;
   createdAt: number;
   isActive: boolean;
@@ -549,7 +450,7 @@ export interface Verification {
 
 export interface Dispute {
   disputerIdHash: string;
-  recordId: string;
+  recordIdHash: string;
   severity: DisputeSeverity;
   culpability: DisputeCulpability;
   notes: string;
@@ -565,11 +466,10 @@ export interface Reaction {
 }
 
 export interface UnacceptedUpdateFlag {
-  recordId: string;
-  noteHash: string;
+  recordIdHash: string;
+  reporterIdHash: string;
   createdAt: number;
-  resolution: ResolutionType;
-  resolvedAt: number;
+  recordHash: string;
   isActive: boolean;
 }
 
@@ -605,7 +505,16 @@ export class blockchainHealthRecordService {
 
   /** Get a read-only contract instance (no wallet needed) */
   private static getReadOnlyContract(): Contract {
-    const provider = new ethers.JsonRpcProvider(RPC_URL);
+    const provider = new ethers.JsonRpcProvider(
+      RPC_URL,
+      {
+        name: NETWORK.name,
+        chainId: NETWORK.chainId,
+      },
+      {
+        staticNetwork: true,
+      }
+    );
     return new ethers.Contract(HEALTH_RECORD_CORE_ADDRESS, HEALTH_RECORD_CORE_ABI, provider);
   }
 
@@ -641,7 +550,12 @@ export class blockchainHealthRecordService {
       recordId,
       recordHash: recordHash.slice(0, 12) + '...',
     });
-    const result = await this.executeWrite('anchorRecord', [recordId, recordHash, ethers.ZeroHash]);
+    const recordIdHash = id(recordId);
+    const result = await this.executeWrite('anchorRecord', [
+      recordIdHash,
+      recordHash,
+      ethers.ZeroHash,
+    ]);
     console.log('✅ Record anchored:', result.txHash);
     return result;
   }
@@ -649,7 +563,8 @@ export class blockchainHealthRecordService {
   /** Deactivate your subject link (soft delete) */
   static async unanchorRecord(recordId: string): Promise<TransactionResult> {
     console.log('⛓️ Unanchoring record...', { recordId });
-    const result = await this.executeWrite('unanchorRecord', [recordId, ethers.ZeroHash]);
+    const recordIdHash = id(recordId);
+    const result = await this.executeWrite('unanchorRecord', [recordIdHash, ethers.ZeroHash]);
     console.log('✅ Record unanchored:', result.txHash);
     return result;
   }
@@ -657,15 +572,20 @@ export class blockchainHealthRecordService {
   /** Reactivate a previously unanchored subject link */
   static async reanchorRecord(recordId: string): Promise<TransactionResult> {
     console.log('⛓️ Reanchoring record...', { recordId });
-    const result = await this.executeWrite('reanchorRecord', [recordId, ethers.ZeroHash]);
+    const recordIdHash = id(recordId);
+    const result = await this.executeWrite('reanchorRecord', [recordIdHash, ethers.ZeroHash]);
     console.log('✅ Record reanchored:', result.txHash);
     return result;
   }
 
   /** Add a new hash version to an existing record (owner/admin only) */
   static async addRecordHash(recordId: string, newHash: string): Promise<TransactionResult> {
-    console.log('⛓️ Adding record hash...', { recordId, newHash: newHash.slice(0, 12) + '...' });
-    const result = await this.executeWrite('addRecordHash', [recordId, newHash]);
+    const recordIdHash = id(recordId);
+    console.log('⛓️ Adding record hash...', {
+      recordIdHash,
+      newHash: recordId.slice(0, 12) + '...',
+    });
+    const result = await this.executeWrite('addRecordHash', [recordIdHash, newHash]);
     console.log('✅ Hash added:', result.txHash);
     return result;
   }
@@ -677,9 +597,10 @@ export class blockchainHealthRecordService {
   /** Get all subjects (patients) of a record */
   static async getRecordSubjects(recordId: string): Promise<string[]> {
     try {
+      const recordIdHash = id(recordId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('getRecordSubjects');
-      return await fn(recordId);
+      return await fn(recordIdHash);
     } catch (error) {
       console.error('Error getting record subjects:', error);
       return [];
@@ -699,23 +620,24 @@ export class blockchainHealthRecordService {
   }
 
   /** Get only ACTIVE records where a user is the subject (excludes unanchored) */
-  static async getActiveSubjectMedicalHistory(userIdHash: string): Promise<string[]> {
+  static async getActiveSubjectMedicalHistory(userId: string): Promise<string[]> {
     try {
       const contract = this.getReadOnlyContract();
+      const userIdHash = id(userId);
 
       // getActiveSubjectMedicalHistory doesn't exist on-chain —
       // fetch all and filter active status ourselves
       const fn = contract.getFunction('getSubjectMedicalHistory');
-      const allRecordIds: string[] = await fn(userIdHash);
+      const allRecordIdHashes: string[] = await fn(userIdHash);
 
-      if (allRecordIds.length === 0) return [];
+      if (allRecordIdHashes.length === 0) return [];
 
       // Check active status for each record in parallel
       const activeChecks = await Promise.all(
-        allRecordIds.map(recordId => this.isActiveSubject(recordId, userIdHash))
+        allRecordIdHashes.map(recordIdHash => this.isActiveSubject(recordIdHash, userIdHash))
       );
 
-      return allRecordIds.filter((_, index) => activeChecks[index]);
+      return allRecordIdHashes.filter((_, index) => activeChecks[index]);
     } catch (error) {
       console.error('Error getting active subject medical history:', error);
       return [];
@@ -725,9 +647,10 @@ export class blockchainHealthRecordService {
   /** Check if a user is a subject of a record */
   static async isSubject(recordId: string, userIdHash: string): Promise<boolean> {
     try {
+      const recordIdHash = id(recordId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('isSubject');
-      return await fn(recordId, userIdHash);
+      return await fn(recordIdHash, userIdHash);
     } catch (error) {
       console.error('Error checking if subject:', error);
       return false;
@@ -737,9 +660,10 @@ export class blockchainHealthRecordService {
   /** Check if a user is an ACTIVE subject of a record */
   static async isActiveSubject(recordId: string, userIdHash: string): Promise<boolean> {
     try {
+      const recordIdHash = id(recordId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('isActiveSubject');
-      return await fn(recordId, userIdHash);
+      return await fn(recordIdHash, userIdHash);
     } catch (error) {
       console.error('Error checking if active subject:', error);
       return false;
@@ -749,9 +673,10 @@ export class blockchainHealthRecordService {
   /** Get only active subjects for a record */
   static async getActiveRecordSubjects(recordId: string): Promise<string[]> {
     try {
+      const recordIdHash = id(recordId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('getActiveRecordSubjects');
-      return await fn(recordId);
+      return await fn(recordIdHash);
     } catch (error) {
       console.error('Error getting active record subjects:', error);
       return [];
@@ -761,9 +686,10 @@ export class blockchainHealthRecordService {
   /** Get subject stats (total and active) for a record */
   static async getSubjectStats(recordId: string): Promise<SubjectStats> {
     try {
+      const recordIdHash = id(recordId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('getSubjectStats');
-      const result = await fn(recordId);
+      const result = await fn(recordIdHash);
       return {
         total: Number(result[0]),
         active: Number(result[1]),
@@ -777,16 +703,17 @@ export class blockchainHealthRecordService {
   /** Get all hash versions for a record */
   static async getRecordVersionHistory(recordId: string): Promise<string[]> {
     try {
+      const recordIdHash = id(recordId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('getRecordVersionHistory');
-      return await fn(recordId);
+      return await fn(recordIdHash);
     } catch (error) {
       console.error('Error getting record version history:', error);
       return [];
     }
   }
 
-  /** Get the recordId that a hash belongs to */
+  /** Get the recordIdHash that a content hash belongs to */
   static async getRecordIdForHash(recordHash: string): Promise<string> {
     try {
       const contract = this.getReadOnlyContract();
@@ -813,9 +740,10 @@ export class blockchainHealthRecordService {
   /** Get the number of versions for a record */
   static async getVersionCount(recordId: string): Promise<number> {
     try {
+      const recordIdHash = id(recordId);
       const contract = this.getReadOnlyContract();
       const fn = contract.getFunction('getVersionCount');
-      const count = await fn(recordId);
+      const count = await fn(recordIdHash);
       return Number(count);
     } catch (error) {
       console.error('Error getting version count:', error);
@@ -850,7 +778,11 @@ export class blockchainHealthRecordService {
     level: VerificationLevel
   ): Promise<TransactionResult> {
     console.log('✅ Verifying record...', { recordId, level });
-    const result = await this.executeWrite('verifyRecord', [recordId, recordHash, level]);
+    // Ensure the recordId is hashed and has the 0x prefix before passing it to encodeFunctionData
+    // We could also just pass recordIdHash directly from the document on the front end.
+    // But want to keep this split: recordId on frontend recordIdHash for blockchain
+    const recordIdHash = id(recordId);
+    const result = await this.executeWrite('verifyRecord', [recordIdHash, recordHash, level]);
     console.log('✅ Record verified:', result.txHash);
     return result;
   }
@@ -887,7 +819,7 @@ export class blockchainHealthRecordService {
 
       return raw.map((v: any) => ({
         verifierIdHash: v.verifierIdHash,
-        recordId: v.recordId,
+        recordIdHash: v.recordIdHash,
         level: Number(v.level) as VerificationLevel,
         createdAt: Number(v.createdAt),
         isActive: v.isActive,
@@ -916,7 +848,7 @@ export class blockchainHealthRecordService {
     userIdHash: string
   ): Promise<{
     exists: boolean;
-    recordId: string;
+    recordIdHash: string;
     level: VerificationLevel;
     createdAt: number;
     isActive: boolean;
@@ -928,7 +860,7 @@ export class blockchainHealthRecordService {
 
       return {
         exists: result[0],
-        recordId: result[1],
+        recordIdHash: result[1],
         level: Number(result[2]) as VerificationLevel,
         createdAt: Number(result[3]),
         isActive: result[4],
@@ -937,7 +869,7 @@ export class blockchainHealthRecordService {
       console.error('Error getting user verification:', error);
       return {
         exists: false,
-        recordId: '',
+        recordIdHash: '',
         level: VerificationLevel.None,
         createdAt: 0,
         isActive: false,
@@ -983,15 +915,16 @@ export class blockchainHealthRecordService {
     recordHash: string,
     severity: DisputeSeverity,
     culpability: DisputeCulpability,
-    notes: string
+    notesHash: string
   ): Promise<TransactionResult> {
     console.log('⚠️ Disputing record...', { recordId, severity, culpability });
+    const recordIdHash = id(recordId);
     const result = await this.executeWrite('disputeRecord', [
-      recordId,
+      recordIdHash,
       recordHash,
       severity,
       culpability,
-      notes,
+      notesHash,
     ]);
     console.log('✅ Record disputed:', result.txHash);
     return result;
@@ -1034,7 +967,7 @@ export class blockchainHealthRecordService {
 
       return raw.map((d: any) => ({
         disputerIdHash: d.disputerIdHash,
-        recordId: d.recordId,
+        recordIdHash: d.recordIdHash,
         severity: Number(d.severity) as DisputeSeverity,
         culpability: Number(d.culpability) as DisputeCulpability,
         notes: d.notes,
@@ -1065,7 +998,7 @@ export class blockchainHealthRecordService {
     userIdHash: string
   ): Promise<{
     exists: boolean;
-    recordId: string;
+    recordIdHash: string;
     severity: DisputeSeverity;
     culpability: DisputeCulpability;
     notes: string;
@@ -1079,7 +1012,7 @@ export class blockchainHealthRecordService {
 
       return {
         exists: result[0],
-        recordId: result[1],
+        recordIdHash: result[1],
         severity: Number(result[2]) as DisputeSeverity,
         culpability: Number(result[3]) as DisputeCulpability,
         notes: result[4],
@@ -1090,7 +1023,7 @@ export class blockchainHealthRecordService {
       console.error('Error getting user dispute:', error);
       return {
         exists: false,
-        recordId: '',
+        recordIdHash: '',
         severity: DisputeSeverity.None,
         culpability: DisputeCulpability.None,
         notes: '',
@@ -1276,15 +1209,14 @@ export class blockchainHealthRecordService {
   static async getUnacceptedUpdateFlags(subjectIdHash: string): Promise<UnacceptedUpdateFlag[]> {
     try {
       const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getUnacceptedUpdateFlags');
+      const fn = contract.getFunction('getUnacceptedFlags');
       const raw = await fn(subjectIdHash);
 
       return raw.map((f: any) => ({
-        recordId: f.recordId,
-        noteHash: f.noteHash,
+        recordIdHash: f.recordIdHash,
+        reporterIdHash: f.reporterIdHash,
+        recordHash: f.recordHash,
         createdAt: Number(f.createdAt),
-        resolution: Number(f.resolution) as ResolutionType,
-        resolvedAt: Number(f.resolvedAt),
         isActive: f.isActive,
       }));
     } catch (error) {

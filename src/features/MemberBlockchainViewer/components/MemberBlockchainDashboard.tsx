@@ -272,7 +272,7 @@ const MemberDashboard: React.FC = () => {
         {error && (
           <ErrorAlert
             message={error}
-            details="Make sure the contract address is correct and you're connected to Sepolia."
+            details="Make sure the contract address is correct and you're connected to the distributed network."
           />
         )}
 

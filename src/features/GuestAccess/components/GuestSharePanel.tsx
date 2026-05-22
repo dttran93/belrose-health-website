@@ -167,7 +167,9 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
 
       console.log('🔗 Granting guest access on blockchain...');
       BlockchainRoleManagerService.grantGuestAccess(
-        recordsToShare.map(r => r.id),
+        recordsToShare.map(
+          r => r.recordIdHash ?? ethers.keccak256(ethers.toUtf8Bytes(r.firestoreId ?? r.id))
+        ),
         guestWallet,
         guestIdHash,
         guestEmailHash,

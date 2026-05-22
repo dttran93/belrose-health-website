@@ -12,8 +12,8 @@ const paymasterSignerKey = (0, params_1.defineSecret)('PAYMASTER_SIGNER_PRIVATE_
 // ==================== CONFIG ====================
 // Your deployed paymaster contract address (update after deployment)
 const PAYMASTER_CONTRACT_ADDRESS = process.env.PAYMASTER_CONTRACT_ADDRESS;
-// Sepolia chain ID
-const CHAIN_ID = 11155111;
+// Base chain ID
+const CHAIN_ID = 84532;
 // Rate limiting config
 const DAILY_SPONSORED_LIMIT = 100; // Max sponsored txs per user per day. Set high so we can test in dev. Change in future
 // ==================== HELPER FUNCTIONS ====================

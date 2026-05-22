@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.stripeIdentityWebhook = exports.getStripeSessionStatus = exports.createStripeVerificationSession = exports.refineRecord = exports.checkEmailRegistrationStatus = exports.getKeyBundle = exports.aiChat = exports.getSponsorshipStatus = exports.signSponsorship = exports.onRecordRequestUpdated = exports.onRecordRequestCreated = exports.onTrusteeRelationshipUpdated = exports.onTrusteeRelationshipCreated = exports.onDisputeReactionUpdated = exports.onDisputeReactionWritten = exports.onDisputeUpdated = exports.onDisputeWritten = exports.onVerificationUpdated = exports.onVerificationWritten = exports.onPermissionChangeEventCreated = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.onRecordDeletionEventCreated = exports.onRecordVersionCreated = exports.initializeRoleOnChainForRequester = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.guestPasswordUpdate = exports.createRecordRequest = exports.redeemGuestInvite = exports.createGuestInvite = exports.sendPasswordChangeEmail = exports.sendWaitlistConfirmationEmail = exports.sendAlphaApprovalEmail = exports.sendShareInvitationEmail = exports.getEncryptedWallet = exports.createWallet = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = exports.setPlatformAdmin = void 0;
+exports.stripeIdentityWebhook = exports.getStripeSessionStatus = exports.createStripeVerificationSession = exports.refineRecord = exports.checkEmailRegistrationStatus = exports.getKeyBundle = exports.aiChat = exports.getSponsorshipStatus = exports.signSponsorship = exports.onRecordRequestUpdated = exports.onRecordRequestCreated = exports.onTrusteeRelationshipUpdated = exports.onTrusteeRelationshipCreated = exports.onDisputeUpdated = exports.onDisputeWritten = exports.onVerificationUpdated = exports.onVerificationWritten = exports.onPermissionChangeEventCreated = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.onRecordDeletionEventCreated = exports.onRecordVersionCreated = exports.initializeRoleOnChainForRequester = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChainComplete = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.guestPasswordUpdate = exports.createRecordRequest = exports.redeemGuestInvite = exports.createGuestInvite = exports.sendPasswordChangeEmail = exports.sendWaitlistConfirmationEmail = exports.sendAlphaApprovalEmail = exports.sendShareInvitationEmail = exports.getEncryptedWallet = exports.createEOAWallet = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = exports.setPlatformAdmin = void 0;
 // functions/src/index.ts
 const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin
@@ -53,7 +53,7 @@ var belroseFields_1 = require("./handlers/belroseFields");
 Object.defineProperty(exports, "createBelroseFields", { enumerable: true, get: function () { return belroseFields_1.createBelroseFields; } });
 // ==================== WALLET FUNCTIONS ====================
 var wallet_1 = require("./handlers/wallet");
-Object.defineProperty(exports, "createWallet", { enumerable: true, get: function () { return wallet_1.createWallet; } });
+Object.defineProperty(exports, "createEOAWallet", { enumerable: true, get: function () { return wallet_1.createEOAWallet; } });
 Object.defineProperty(exports, "getEncryptedWallet", { enumerable: true, get: function () { return wallet_1.getEncryptedWallet; } });
 // ==================== EMAIL FUNCTIONS ====================
 var sendShareInvitationEmail_1 = require("./handlers/sendShareInvitationEmail");
@@ -80,6 +80,7 @@ Object.defineProperty(exports, "healthDetailed", { enumerable: true, get: functi
 // ==================== MEMBER REGISTRY ====================
 var memberRegistry_1 = require("./handlers/memberRegistry");
 Object.defineProperty(exports, "registerMemberOnChain", { enumerable: true, get: function () { return memberRegistry_1.registerMemberOnChain; } });
+Object.defineProperty(exports, "registerMemberOnChainComplete", { enumerable: true, get: function () { return memberRegistry_1.registerMemberOnChainComplete; } });
 Object.defineProperty(exports, "updateMemberStatus", { enumerable: true, get: function () { return memberRegistry_1.updateMemberStatus; } });
 Object.defineProperty(exports, "deactivateWalletOnChain", { enumerable: true, get: function () { return memberRegistry_1.deactivateWalletOnChain; } });
 Object.defineProperty(exports, "reactivateWalletOnChain", { enumerable: true, get: function () { return memberRegistry_1.reactivateWalletOnChain; } });
@@ -100,8 +101,6 @@ Object.defineProperty(exports, "onVerificationWritten", { enumerable: true, get:
 Object.defineProperty(exports, "onVerificationUpdated", { enumerable: true, get: function () { return credibilityNotificationTrigger_1.onVerificationUpdated; } });
 Object.defineProperty(exports, "onDisputeWritten", { enumerable: true, get: function () { return credibilityNotificationTrigger_1.onDisputeWritten; } });
 Object.defineProperty(exports, "onDisputeUpdated", { enumerable: true, get: function () { return credibilityNotificationTrigger_1.onDisputeUpdated; } });
-Object.defineProperty(exports, "onDisputeReactionWritten", { enumerable: true, get: function () { return credibilityNotificationTrigger_1.onDisputeReactionWritten; } });
-Object.defineProperty(exports, "onDisputeReactionUpdated", { enumerable: true, get: function () { return credibilityNotificationTrigger_1.onDisputeReactionUpdated; } });
 var trusteeNotificationTriggers_1 = require("./notifications/triggers/trusteeNotificationTriggers");
 Object.defineProperty(exports, "onTrusteeRelationshipCreated", { enumerable: true, get: function () { return trusteeNotificationTriggers_1.onTrusteeRelationshipCreated; } });
 Object.defineProperty(exports, "onTrusteeRelationshipUpdated", { enumerable: true, get: function () { return trusteeNotificationTriggers_1.onTrusteeRelationshipUpdated; } });

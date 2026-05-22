@@ -7,6 +7,7 @@ import { FileObject } from '@/types/core';
 const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject => {
   return {
     id: docId,
+    recordIdHash: data.recordIdHash,
     fileName: data.fileName || (data.encryptedFileName ? '[ENCRYPTED]' : 'Unknown File'),
     fileSize: data.fileSize || 0,
     fileType: data.fileType || 'application/octet-stream',

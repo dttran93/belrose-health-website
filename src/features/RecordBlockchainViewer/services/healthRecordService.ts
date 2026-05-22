@@ -23,15 +23,15 @@ import {
 import {
   HEALTH_RECORD_CORE_ADDRESS,
   HEALTH_RECORD_CORE_ABI,
-  SEPOLIA_RPC_URL,
+  RPC_URL,
   DEPLOYMENT_BLOCK,
 } from '../lib/constants';
 import {
   getProfilesByUserIdHashes,
   transformToUserProfile,
 } from '@/features/MemberBlockchainViewer/services/userProfileService';
-import { DisputeSeverityOptions } from '@/features/Credibility/services/disputeService';
-import { VerificationLevelOptions } from '@/features/Credibility/services/verificationService';
+import { VerificationLevelOptions } from '@/features/Credibility/hooks/useCredibilityFlow';
+import { DisputeSeverityOptions } from '@belrose/shared';
 
 // ===============================================================
 // SINGLETON INSTANCES
@@ -45,7 +45,7 @@ let contract: (HealthRecordCoreContract & ethers.Contract) | null = null;
  */
 function getProvider(): ethers.JsonRpcProvider {
   if (!provider) {
-    provider = new ethers.JsonRpcProvider(SEPOLIA_RPC_URL);
+    provider = new ethers.JsonRpcProvider(RPC_URL);
   }
   return provider;
 }
@@ -501,12 +501,6 @@ export async function getAllDisputes(): Promise<Dispute[]> {
               continue;
             }
 
-            // Get reaction stats
-            const [, activeSupports, activeOpposes] = await contract.getReactionStats(
-              recordHash,
-              disputerIdHash
-            );
-
             disputes.push({
               disputerIdHash,
               recordId,
@@ -516,10 +510,6 @@ export async function getAllDisputes(): Promise<Dispute[]> {
               notes,
               createdAt: Number(createdAt),
               isActive,
-              reactionStats: {
-                supports: Number(activeSupports),
-                opposes: Number(activeOpposes),
-              },
             });
           }
         }
@@ -573,21 +563,11 @@ export async function getDisputesForHash(recordHash: string): Promise<Dispute[]>
       })
       .filter((d): d is Dispute => d !== null);
 
-    // Get reaction stats and profiles
+    // Get stats and profiles
     const disputerHashes = disputes.map(d => d.disputerIdHash);
     const profileMap = await getProfilesByUserIdHashes(disputerHashes);
 
     for (const dispute of disputes) {
-      // Reaction stats
-      const [, activeSupports, activeOpposes] = await contract.getReactionStats(
-        recordHash,
-        dispute.disputerIdHash
-      );
-      dispute.reactionStats = {
-        supports: Number(activeSupports),
-        opposes: Number(activeOpposes),
-      };
-
       // Profile
       const fbProfile = profileMap.get(dispute.disputerIdHash);
       if (fbProfile) {
@@ -599,31 +579,6 @@ export async function getDisputesForHash(recordHash: string): Promise<Dispute[]>
   } catch (error) {
     console.error(`❌ Failed to fetch disputes for hash ${recordHash}:`, error);
     return [];
-  }
-}
-
-/**
- * Get reaction stats for a dispute
- */
-export async function getDisputeReactionStats(
-  recordHash: string,
-  disputerIdHash: string
-): Promise<{ supports: number; opposes: number }> {
-  const contract = getContract();
-
-  try {
-    const [, activeSupports, activeOpposes] = await contract.getReactionStats(
-      recordHash,
-      disputerIdHash
-    );
-
-    return {
-      supports: Number(activeSupports),
-      opposes: Number(activeOpposes),
-    };
-  } catch (error) {
-    console.error('❌ Failed to fetch reaction stats:', error);
-    return { supports: 0, opposes: 0 };
   }
 }
 

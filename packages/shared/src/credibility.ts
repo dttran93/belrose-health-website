@@ -44,21 +44,3 @@ export interface DisputeDoc {
   encryptedRecordTitle?: string;
   encryptedRecordTitleIv?: string;
 }
-
-export interface ReactionDoc {
-  id: string;
-  recordId: string;
-  recordHash: string;
-  reactorId: string;
-  reactorIdHash: string;
-  disputerId: string; //The uid of the disputer to which the reactor is reacting
-  disputerIdHash: string;
-  supportsDispute: boolean;
-  isActive: boolean;
-  createdAt: TimestampLike;
-  lastModified?: TimestampLike;
-  chainStatus: 'pending' | 'confirmed' | 'failed';
-  blockchainRef?: BlockchainRef;
-  encryptedRecordTitle?: string;
-  encryptedRecordTitleIv?: string;
-}

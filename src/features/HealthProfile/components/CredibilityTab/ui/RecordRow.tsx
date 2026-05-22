@@ -2,14 +2,9 @@
 
 import {
   DisputeDocDecrypted,
-  getDisputeReactionStats,
   getDisputesByRecordId,
-  ReactionStats,
 } from '@/features/Credibility/services/disputeService';
-import {
-  getVerificationsByRecordId,
-  VerificationDoc,
-} from '@/features/Credibility/services/verificationService';
+import { getVerificationsByRecordId } from '@/features/Credibility/services/verificationService';
 import { RecordCompletenessResult } from '@/features/HealthProfile/hooks/useBlockchainCompleteness';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { AlertTriangle, ChevronDown, Shield } from 'lucide-react';
@@ -22,14 +17,13 @@ import useAuth from '@/features/Auth/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import DisputeUserCard from '@/features/Credibility/components/Disputes/DisputeUserCard';
 import DisputeDetailModal from '@/features/Credibility/components/Disputes/DisputeDetailModal';
-import { getReactionType } from '@/features/Credibility/components/Disputes/DisputeManagement';
 import CredibilityBadge from '@/features/Credibility/components/ui/CredibilityBadge';
+import { VerificationDoc } from '@belrose/shared';
 
 type SectionTab = 'hashes' | 'verifications' | 'disputes';
 interface RecordCredibilityData {
   verifications: VerificationDoc[];
   disputes: DisputeDocDecrypted[];
-  reactionStatsMap: Map<string, ReactionStats>;
   userProfiles: Map<string, BelroseUserProfile>;
   isLoading: boolean;
   error: string | null;
@@ -52,7 +46,6 @@ function RecordRow({
   const [credData, setCredData] = useState<RecordCredibilityData>({
     verifications: [],
     disputes: [],
-    reactionStatsMap: new Map(),
     userProfiles: new Map(),
     isLoading: false,
     error: null,
@@ -70,16 +63,6 @@ function RecordRow({
         getDisputesByRecordId(recordId),
       ]);
 
-      // Fetch reaction stats for every dispute in parallel.
-      // getDisputeReactionStats needs recordId, recordHash, and disputerId.
-      const statsEntries = await Promise.all(
-        disputes.map(async d => {
-          const stats = await getDisputeReactionStats(d.recordId, d.recordHash, d.disputerId);
-          return [d.id, stats] as [string, ReactionStats];
-        })
-      );
-      const reactionStatsMap = new Map(statsEntries);
-
       // Collect all user IDs to batch-fetch profiles
       const userIds = [
         ...verifications.map(v => v.verifierId),
@@ -91,7 +74,6 @@ function RecordRow({
       setCredData({
         verifications,
         disputes,
-        reactionStatsMap,
         userProfiles: profiles,
         isLoading: false,
         error: null,
@@ -305,12 +287,6 @@ function RecordRow({
                     </div>
                   )}
                   {credData.disputes.map(d => {
-                    const stats = credData.reactionStatsMap.get(d.id);
-                    const reactionStats = {
-                      supports: stats?.supports ?? 0,
-                      opposes: stats?.opposes ?? 0,
-                      userReaction: getReactionType(stats?.userReaction),
-                    };
                     return (
                       <DisputeUserCard
                         key={d.id}
@@ -320,10 +296,6 @@ function RecordRow({
                         currentRecordHash={result.record.recordHash}
                         onViewUser={() => {}}
                         onViewDetails={() => setSelectedDispute(d)}
-                        reactionStats={reactionStats}
-                        onReact={() => navigate(`/records/${recordId}`)}
-                        isLoadingReaction={false}
-                        isOwnDispute={user?.uid === d.disputerId}
                       />
                     );
                   })}
@@ -361,14 +333,6 @@ function RecordRow({
           isOwnDispute={user?.uid === selectedDispute.disputerId}
           onModify={handleCredibilityRoute}
           onRetract={handleCredibilityRoute}
-          onReact={handleCredibilityRoute}
-          reactionStats={
-            credData.reactionStatsMap.get(selectedDispute.id) ?? {
-              supports: 0,
-              opposes: 0,
-              userReaction: null,
-            }
-          }
         />
       )}
     </>

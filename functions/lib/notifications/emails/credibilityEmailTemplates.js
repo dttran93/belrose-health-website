@@ -13,10 +13,6 @@ exports.buildDisputeModifiedHtml = buildDisputeModifiedHtml;
 exports.buildDisputeModifiedText = buildDisputeModifiedText;
 exports.buildDisputeRetractedHtml = buildDisputeRetractedHtml;
 exports.buildDisputeRetractedText = buildDisputeRetractedText;
-exports.buildDisputeReactionHtml = buildDisputeReactionHtml;
-exports.buildDisputeReactionText = buildDisputeReactionText;
-exports.buildDisputeReactionRetractedHtml = buildDisputeReactionRetractedHtml;
-exports.buildDisputeReactionRetractedText = buildDisputeReactionRetractedText;
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 const emailUtils_1 = require("../emailUtils");
 function header(badgeText, badgeColor, title, subtitle) {
@@ -180,7 +176,7 @@ function buildDisputeAddedHtml(disputerName, recordName, recordId, severityName)
       <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;
         padding:16px 20px;margin-bottom:8px;">
         <p style="margin:0;font-size:13px;color:#7f1d1d;line-height:1.6;">
-          You can view the full dispute details and any reactions on the record page.
+          You can view the full dispute details on the record page.
         </p>
       </div>
       ${ctaButton(`${emailUtils_1.APP_URL}/records/${recordId}`, 'View dispute', '#ef4444')}
@@ -244,72 +240,6 @@ function buildDisputeRetractedText(disputerName, recordName, recordId) {
     return `${disputerName} retracted their dispute on ${recordName}.
 
 The record's credibility score has been updated accordingly.
-
-View the record at: ${emailUtils_1.APP_URL}/records/${recordId}
-
-Questions? ${emailUtils_1.SUPPORT_EMAIL}`;
-}
-// ─── Dispute reaction ─────────────────────────────────────────────────────────
-function buildDisputeReactionHtml(reactorName, recordName, recordId, supportsDispute) {
-    const stance = supportsDispute ? 'supported' : 'opposed';
-    const badgeColor = supportsDispute ? '#ef4444' : '#22c55e';
-    const badgeText = supportsDispute ? 'Dispute supported' : 'Dispute opposed';
-    return wrap(`
-    ${header(badgeText, badgeColor, `A dispute was ${stance}`, `${reactorName} ${stance} a dispute on ${recordName}`)}
-    <div style="padding:32px 40px;">
-      <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#3f3f46;">
-        <strong>${reactorName}</strong> has ${stance} a dispute on a record 
-        you're connected to. 
-        ${supportsDispute
-        ? 'This adds weight to the dispute and further affects the credibility score.'
-        : 'This counters the dispute and reduces its impact on the credibility score.'}
-      </p>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
-        ${infoRow('Record', recordName)}
-        ${infoRow('Reaction by', reactorName)}
-        ${infoRow('Stance', supportsDispute ? 'Supports the dispute' : 'Opposes the dispute')}
-      </table>
-      ${ctaButton(`${emailUtils_1.APP_URL}/records/${recordId}`, 'View dispute', badgeColor)}
-    </div>
-    ${footer()}
-  `);
-}
-function buildDisputeReactionText(reactorName, recordName, recordId, supportsDispute) {
-    const stance = supportsDispute ? 'supported' : 'opposed';
-    return `${reactorName} ${stance} a dispute on ${recordName}.
-
-${supportsDispute
-        ? 'This adds weight to the dispute and further affects the credibility score.'
-        : 'This counters the dispute and reduces its impact on the credibility score.'}
-
-View the record at: ${emailUtils_1.APP_URL}/records/${recordId}
-
-Questions? ${emailUtils_1.SUPPORT_EMAIL}`;
-}
-function buildDisputeReactionRetractedHtml(reactorName, recordName, recordId, hadSupported) {
-    const previousStance = hadSupported ? 'support' : 'opposition';
-    return wrap(`
-    ${header('Reaction retracted', '#94a3b8', 'A dispute reaction was retracted', `${reactorName} withdrew their ${previousStance}`)}
-    <div style="padding:32px 40px;">
-      <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#3f3f46;">
-        <strong>${reactorName}</strong> has retracted their ${previousStance} of 
-        a dispute on ${recordName}. The credibility score has been updated accordingly.
-      </p>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
-        ${infoRow('Record', recordName)}
-        ${infoRow('Retracted by', reactorName)}
-        ${infoRow('Previous stance', hadSupported ? 'Supported the dispute' : 'Opposed the dispute')}
-      </table>
-      ${ctaButton(`${emailUtils_1.APP_URL}/records/${recordId}`, 'View record')}
-    </div>
-    ${footer()}
-  `);
-}
-function buildDisputeReactionRetractedText(reactorName, recordName, recordId, hadSupported) {
-    const previousStance = hadSupported ? 'support' : 'opposition';
-    return `${reactorName} retracted their ${previousStance} of a dispute on ${recordName}.
-
-The credibility score has been updated accordingly.
 
 View the record at: ${emailUtils_1.APP_URL}/records/${recordId}
 

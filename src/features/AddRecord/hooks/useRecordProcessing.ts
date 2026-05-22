@@ -19,11 +19,12 @@ import { createBelroseFields } from '../services/belroseFieldsService';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { measurePerformance, logEncryption } from '@/features/Encryption/encryptionConfig';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
-import { FileObject, VirtualFileInput, BelroseFields, ProcessingStages } from '@/types/core';
+import { FileObject, VirtualFileInput, ProcessingStages } from '@/types/core';
 import {
   RecordHashService,
   HashableFileContent,
 } from '@/features/ViewEditRecord/services/generateRecordHash';
+import { BelroseFields } from '@belrose/shared';
 
 export interface ProcessedRecord {
   extractedText?: string | null;

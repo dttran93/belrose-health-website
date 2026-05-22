@@ -4,7 +4,7 @@ import { ethers } from 'ethers';
 import {
   MEMBER_ROLE_MANAGER_ADDRESS,
   MEMBER_ROLE_MANAGER_ABI,
-  SEPOLIA_RPC_URL,
+  RPC_URL,
   DEPLOYMENT_BLOCK,
 } from '../lib/constants';
 import type {
@@ -35,7 +35,7 @@ let contract: ethers.Contract | null = null;
  */
 function getProvider(): ethers.JsonRpcProvider {
   if (!provider) {
-    provider = new ethers.JsonRpcProvider(SEPOLIA_RPC_URL);
+    provider = new ethers.JsonRpcProvider(RPC_URL);
   }
   return provider;
 }

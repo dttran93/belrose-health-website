@@ -161,6 +161,7 @@ export interface FileObject {
   // === CORE IDENTIFICATION, (EXCLUDES FILE NAME, IN ENCRYPTED HEALTH DATA SECTION BELOW) ===
   id: string; //fileId. Generated in useFileManager via createFileObject() or addVirtualFile(). file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}
   firestoreId?: string; //Id for firestore set after upload
+  recordIdHash?: string | null; // keccak256 of firestoreId used for on-chain lookup
 
   // === FILE PROPERTIES (EXCLUDES FILE, IN ENCRYPTED HEALTH DATA SECTION BELOW)===
   fileSize: number; //file size. Set in createFileObject in useFileManager.ts. file.size for real files

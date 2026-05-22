@@ -206,42 +206,6 @@ export type NotificationDoc =
         encryptedRecordTitleIv?: string;
       };
     }
-  | {
-      type: 'DISPUTE_REACTION_ADDED';
-      payload: {
-        recordId: string;
-        recordHash: string;
-        reactorId: string;
-        disputerId: string;
-        supportsDispute: boolean;
-        encryptedRecordTitle?: string;
-        encryptedRecordTitleIv?: string;
-      };
-    }
-  | {
-      type: 'DISPUTE_REACTION_RETRACTED';
-      payload: {
-        recordId: string;
-        recordHash: string;
-        reactorId: string;
-        disputerId: string;
-        supportsDispute: boolean;
-        encryptedRecordTitle?: string;
-        encryptedRecordTitleIv?: string;
-      };
-    }
-  | {
-      type: 'DISPUTE_REACTION_MODIFIED';
-      payload: {
-        recordId: string;
-        recordHash: string;
-        reactorId: string;
-        disputerId: string;
-        supportsDispute: boolean;
-        encryptedRecordTitle?: string;
-        encryptedRecordTitleIv?: string;
-      };
-    }
 
   // ── Trustee relationships ───────────────────────────────────────────────────────
   | {

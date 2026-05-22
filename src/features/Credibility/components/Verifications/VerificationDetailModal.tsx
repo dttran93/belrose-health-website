@@ -6,7 +6,9 @@ import { X, CheckCircle, ExternalLink, Edit, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { BelroseUserProfile, FileObject } from '@/types/core';
 import UserCard from '@/features/Users/components/ui/UserCard';
-import { getVerificationConfig, VerificationDoc } from '../../services/verificationService';
+import { getVerificationConfig } from '../../services/verificationService';
+import { VerificationDoc } from '@belrose/shared';
+import { NETWORK } from '@/config/blockchainAddresses';
 
 // ============================================================
 // TYPES
@@ -56,11 +58,7 @@ export const VerificationDetailModal: React.FC<VerificationDetailModalProps> = (
 
   const handleViewOnBlockchain = () => {
     if (verification.blockchainRef?.txHash) {
-      // Assuming Sepolia testnet - adjust URL for mainnet
-      window.open(
-        `https://sepolia.etherscan.io/tx/${verification.blockchainRef?.txHash}`,
-        '_blank'
-      );
+      window.open(`${NETWORK.publicRpcUrl}/tx/${verification.blockchainRef?.txHash}`, '_blank');
     }
   };
 

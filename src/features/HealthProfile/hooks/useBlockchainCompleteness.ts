@@ -276,14 +276,13 @@ export function useBlockchainCompleteness(
       setDisputeStatsMap(new Map());
 
       try {
-        const userIdHash = ethers.id(subjectFirebaseUid);
         console.log(`⛓️ Fetching on-chain data for ${subjectFirebaseUid.slice(0, 8)}...`);
 
-        const wallets = await BlockchainRoleManagerService.getWalletsForUser(userIdHash);
+        const wallets = await BlockchainRoleManagerService.getWalletsForUser(subjectFirebaseUid);
         console.log('🔑 Registered wallets for user:', wallets);
 
         const onChainRecordIds: string[] =
-          await blockchainHealthRecordService.getActiveSubjectMedicalHistory(userIdHash);
+          await blockchainHealthRecordService.getActiveSubjectMedicalHistory(subjectFirebaseUid);
 
         console.log(`📋 ${onChainRecordIds.length} anchored records on-chain`);
         setAnchoredRecordIds(new Set(onChainRecordIds));
@@ -321,13 +320,6 @@ export function useBlockchainCompleteness(
         setDisputeStatsMap(new Map(disputeEntries));
 
         console.log(`✅ Fetched credibility stats for ${allHashes.length} hashes`);
-
-        console.log('🔑 Querying chain with:', userIdHash);
-        console.log('📋 On-chain record IDs returned:', onChainRecordIds);
-        console.log(
-          '📁 Firestore record IDs:',
-          records.map(r => r.id)
-        );
 
         // Private records = on-chain but not in viewer's accessible records
         const privateIds = onChainRecordIds.filter(id => !firestoreIds.has(id));

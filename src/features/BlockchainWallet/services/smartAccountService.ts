@@ -5,7 +5,7 @@
  */
 
 import { createPublicClient, http, type Hex, type Address } from 'viem';
-import { sepolia } from 'viem/chains';
+import { baseSepolia } from 'viem/chains';
 import { toSimpleSmartAccount } from 'permissionless/accounts';
 import { entryPoint07Address } from 'viem/account-abstraction';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -13,9 +13,9 @@ import { WalletService } from './walletService';
 import { getFirestore, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { MemberRegistryBlockchain } from '@/features/Auth/services/memberRegistryBlockchain';
-import { MEMBER_ROLE_MANAGER } from '@/config/blockchainAddresses';
+import { MEMBER_ROLE_MANAGER, NETWORK } from '@/config/blockchainAddresses';
 
-const CHAIN = sepolia;
+const CHAIN = NETWORK.chainViem;
 
 // ABI for checking if wallet is already registered
 const MEMBER_ROLE_MANAGER_ADDRESS = MEMBER_ROLE_MANAGER.proxy;

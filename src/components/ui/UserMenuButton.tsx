@@ -116,13 +116,6 @@ const UserMenuButton: React.FC<UserMenuButtonProps> = ({
           className={`${getDropdownClasses()} bg-gray-800 border border-gray-700 rounded-lg shadow-lg py-2 z-50`}
         >
           <button
-            onClick={() => handleMenuItemClick('notifications')}
-            className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-3 text-gray-300 hover:text-white transition-colors"
-          >
-            <Bell className="w-4 h-4" />
-            <span className="text-sm">Notifications</span>
-          </button>
-          <button
             onClick={() => handleMenuItemClick('settings')}
             className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-3 text-gray-300 hover:text-white transition-colors"
           >

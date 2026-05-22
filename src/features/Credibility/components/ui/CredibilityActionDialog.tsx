@@ -16,18 +16,16 @@ import type {
   CredibilityOperationType,
   CredibilityPreparationProgress,
 } from '@/features/Credibility/services/credibilityPreparationService';
+import { getVerificationConfig } from '../../services/verificationService';
 import {
-  getVerificationConfig,
-  VerificationLevelOptions,
-} from '../../services/verificationService';
-import {
-  DisputeCulpability,
   DisputeSeverity,
   getSeverityConfig,
   getCulpabilityConfig,
 } from '../../services/disputeService';
 import NetworkPreparingContent from '@/features/BlockchainWallet/components/NetworkPreparingContent';
 import { OnChainSubmittedContent } from '@/features/OnChainActivityTray/components/OnChainSubmittedModal';
+import { VerificationLevelOptions } from '../../hooks/useCredibilityFlow';
+import { DisputeCulpability } from '@belrose/shared';
 
 // ============================================================================
 // TYPES
@@ -46,13 +44,11 @@ interface CredibilityActionDialogProps {
   pendingSeverity?: DisputeSeverity;
   pendingCulpability?: DisputeCulpability;
   pendingNotes?: string;
-  pendingReaction?: boolean;
   onClose: () => void;
   onConfirmVerification: (level: VerificationLevelOptions) => void;
   onConfirmModifyVerification: (level: VerificationLevelOptions) => void;
   onConfirmRetract: () => void;
   onConfirmDispute: () => void;
-  onConfirmReaction: (supports: boolean) => void;
   onConfirmModifyDispute: () => void;
   submittedLabel: string;
 }
@@ -71,13 +67,11 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
   pendingSeverity,
   pendingCulpability,
   pendingNotes,
-  pendingReaction,
   onClose,
   onConfirmVerification,
   onConfirmModifyVerification,
   onConfirmRetract,
   onConfirmDispute,
-  onConfirmReaction,
   onConfirmModifyDispute,
   submittedLabel,
 }) => {
@@ -157,17 +151,6 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
                 onConfirm={
                   operationType === 'modifyDispute' ? onConfirmModifyDispute : onConfirmDispute
                 }
-                onClose={onClose}
-              />
-            )}
-
-          {/* Confirming Phase - React */}
-          {phase === 'confirming' &&
-            operationType === 'reactToDispute' &&
-            pendingReaction !== undefined && (
-              <ConfirmReactionContent
-                onConfirm={onConfirmReaction}
-                pendingReaction={pendingReaction}
                 onClose={onClose}
               />
             )}
@@ -365,82 +348,6 @@ const ConfirmDisputeContent: React.FC<{
         </AlertDialog.Cancel>
         <Button onClick={onConfirm} variant="destructive" className="flex-1">
           {isModify ? 'Modify Dispute' : 'File Dispute'}
-        </Button>
-      </div>
-    </>
-  );
-};
-
-// ============================================================================
-// CONFIRM REACTION CONTENT
-// ============================================================================
-
-const ConfirmReactionContent: React.FC<{
-  pendingReaction: boolean;
-  onConfirm: (supportsDispute: boolean) => void;
-  onClose: () => void;
-}> = ({ pendingReaction, onConfirm, onClose }) => {
-  const [supports, setSupports] = useState<boolean | null>(pendingReaction);
-
-  return (
-    <>
-      <AlertDialog.Title className="text-lg font-bold flex items-center gap-2">
-        <AlertTriangle className="w-5 h-5 text-amber-600" />
-        React to Dispute
-      </AlertDialog.Title>
-
-      <AlertDialog.Description className="mt-3 text-sm text-gray-600">
-        Do you support or oppose this dispute?
-      </AlertDialog.Description>
-
-      <div className="flex gap-3 my-4">
-        <button
-          onClick={() => setSupports(true)}
-          className={`
-            flex-1 flex flex-col items-center gap-2 p-4 border rounded-lg transition-colors
-            ${supports === true ? 'border-complement-3 bg-complement-3/10' : 'border-gray-200 hover:border-gray-300'}
-          `}
-        >
-          <ThumbsUp
-            className={`w-8 h-8 ${supports === true ? 'text-complement-3' : 'text-gray-400'}`}
-          />
-          <span
-            className={`font-medium ${supports === true ? 'text-complement-3' : 'text-gray-600'}`}
-          >
-            Support
-          </span>
-          <span className="text-xs text-gray-500">I agree with this dispute</span>
-        </button>
-
-        <button
-          onClick={() => setSupports(false)}
-          className={`
-            flex-1 flex flex-col items-center gap-2 p-4 border rounded-lg transition-colors
-            ${supports === false ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'}
-          `}
-        >
-          <ThumbsDown
-            className={`w-8 h-8 ${supports === false ? 'text-red-600' : 'text-gray-400'}`}
-          />
-          <span className={`font-medium ${supports === false ? 'text-red-700' : 'text-gray-600'}`}>
-            Oppose
-          </span>
-          <span className="text-xs text-gray-500">I disagree with this dispute</span>
-        </button>
-      </div>
-
-      <div className="flex gap-3">
-        <AlertDialog.Cancel asChild>
-          <Button variant="outline" className="flex-1" onClick={onClose}>
-            Cancel
-          </Button>
-        </AlertDialog.Cancel>
-        <Button
-          onClick={() => supports !== null && onConfirm(supports)}
-          disabled={supports === null}
-          className="flex-1 bg-complement-3 hover:bg-complement-3/90"
-        >
-          Submit Reaction
         </Button>
       </div>
     </>
