@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { SectionHeader, SettingsRow } from './ui/SettingsRow';
 import { BelroseUserProfile } from '@/types/core';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
-import { NETWORK } from '@/config/blockchainAddresses';
+import { NETWORK } from '@belrose/shared';
 import { copyToClipboard } from '@/utils/browserUtils';
 
 interface GeneralSettingsProps {
@@ -112,7 +112,7 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({
         user.onChainIdentity.linkedWallets.map((wallet, index) => {
           const isEOA = wallet.type === 'eoa';
           const label = isEOA ? 'EOA Account' : 'Smart Account';
-          const etherscanBase = NETWORK.etherscanBaseUrl;
+          const etherscanBase = NETWORK.explorerUrl;
 
           return (
             <div key={wallet.address} className={index > 0 ? 'mt-6' : ''}>

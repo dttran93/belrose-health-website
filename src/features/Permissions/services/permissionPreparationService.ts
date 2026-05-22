@@ -28,7 +28,7 @@ import { getAuth } from 'firebase/auth';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { BlockchainRef } from '@belrose/shared';
 import { BlockchainRoleManagerService } from './blockchainRoleManagerService';
-import { NETWORK } from '@/config/blockchainAddresses';
+import { NETWORK } from '@belrose/shared';
 
 // ==================== TYPES ====================
 

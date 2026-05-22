@@ -23,7 +23,7 @@ import {
 } from './credibilityScoreService';
 import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 import { VerificationDoc, VerificationLevelOptions } from '@belrose/shared';
-import { buildHealthRecordRef } from '@/config/blockchainAddresses';
+import { buildHealthRecordRef } from '@belrose/shared';
 import { encryptNotificationTitle } from '@/features/Notifications/services/encryptNotificationTitle';
 
 // ============================================================

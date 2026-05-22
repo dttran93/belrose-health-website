@@ -43,7 +43,7 @@ const backendWalletService_1 = require("../services/backendWalletService");
 const account_abstraction_1 = require("viem/account-abstraction");
 const accounts_1 = require("viem/accounts");
 const viem_1 = require("viem");
-const chains_1 = require("viem/chains");
+const _shared_1 = require("../_shared");
 // ==================== CREATE WALLET ====================
 /**
  * Create Wallet Function
@@ -159,7 +159,7 @@ async function computeSmartAccountAddress(privateKey) {
     const formattedKey = (privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`);
     // 3. Create the owner EOA account instance using viem
     const viemAccount = (0, accounts_1.privateKeyToAccount)(formattedKey);
-    const publicClient = (0, viem_1.createPublicClient)({ chain: chains_1.baseSepolia, transport: (0, viem_1.http)() });
+    const publicClient = (0, viem_1.createPublicClient)({ chain: _shared_1.NETWORK.chainViem, transport: (0, viem_1.http)() });
     // 4. Instantiate the simple smart account using the new structure
     const simpleAccount = await toSimpleSmartAccount({
         client: publicClient,

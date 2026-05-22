@@ -3,7 +3,7 @@
 import React from 'react';
 import { ExternalLink } from 'lucide-react';
 import { truncateHash } from '../lib/utils';
-import { NETWORK } from '@/config/blockchainAddresses';
+import { NETWORK } from '@belrose/shared';
 
 interface EtherscanLinkProps {
   txHash?: string;
@@ -25,7 +25,7 @@ export const EtherscanLink: React.FC<EtherscanLinkProps> = ({
     return <span className="text-gray-400 text-sm">—</span>;
   }
 
-  const url = `${NETWORK.publicRpcUrl}/${type}/${txHash}`;
+  const url = `${NETWORK.explorerUrl}/${type}/${txHash}`;
 
   return (
     <a

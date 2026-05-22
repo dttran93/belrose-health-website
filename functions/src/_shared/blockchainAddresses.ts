@@ -7,9 +7,7 @@
 // hardcoding addresses locally.
 //
 
-import { BlockchainRef } from '@belrose/shared';
 import { baseSepolia } from 'viem/chains';
-const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
 
 // ============================================================================
 // NETWORK INFRASTRUCTURE
@@ -18,11 +16,15 @@ const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
 export const NETWORK = {
   chainId: 84532,
   name: 'base-sepolia',
-  rpcUrl: `https://base-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
   rpcUrlFallback: 'https://sepolia.base.org',
-  publicRpcUrl: 'https://sepolia.basescan.org/',
+  explorerUrl: 'https://sepolia.basescan.org/',
   chainViem: baseSepolia,
 } as const;
+
+//Has to be built in front/backend because it requires different apiKeys
+export function buildRpcUrl(apiKey: string) {
+  return `https://base-sepolia.g.alchemy.com/v2/${apiKey}`;
+}
 
 // ============================================================================
 // ERC-4337 ACCOUNT ABSTRACTION INFRASTRUCTURE
@@ -40,12 +42,12 @@ export const AA_INFRASTRUCTURE = {
 
 export const PAYMASTER = {
   address: '0x02422f03EcD403E1a902101D60a0Dad5bB9E71a7',
+  dailySponsorLimit: 100, // Max sponsored txs per user per day. Set high so we can test in dev. Change in future
 } as const;
 
 // ============================================================================
 // MEMBER ROLE MANAGER (MemberRoleManager.sol)
 // UUPS upgradeable proxy — always interact via proxy address
-// ******MUST MANUALLY UPDATE IN functions/src/handlers/memberRegistry.ts IF EVER UPDATED******
 // ============================================================================
 
 export const MEMBER_ROLE_MANAGER = {
@@ -80,6 +82,13 @@ export const CONTRACT_ADDRESSES = {
 // ============================================================================
 // BLOCKCHAIN REF HELPERS
 // ============================================================================
+
+export interface BlockchainRef {
+  txHash: string;
+  chainId: number;
+  blockNumber: number;
+  contractAddress: string;
+}
 
 export function buildBlockchainRef(
   txHash: string,

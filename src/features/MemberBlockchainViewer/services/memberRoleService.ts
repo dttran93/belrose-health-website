@@ -1,12 +1,7 @@
 // src/features/MemberManagement/services/memberRoleService.ts
 
 import { ethers } from 'ethers';
-import {
-  MEMBER_ROLE_MANAGER_ADDRESS,
-  MEMBER_ROLE_MANAGER_ABI,
-  RPC_URL,
-  DEPLOYMENT_BLOCK,
-} from '../lib/constants';
+import { MEMBER_ROLE_MANAGER_ABI } from '../lib/constants';
 import type {
   MemberRoleManagerContract,
   UserData,
@@ -18,6 +13,8 @@ import type {
 } from '../lib/types';
 import { TrusteeStatus, TrusteeLevel } from '../lib/types';
 import { getProfilesByUserIdHashes, transformToUserProfile } from './userProfileService';
+import { buildRpcUrl, MEMBER_ROLE_MANAGER } from '@belrose/shared';
+import { requireEnv } from '@/utils/utils';
 
 /**
  * Service for interacting with the MemberRoleManager smart contract
@@ -25,6 +22,11 @@ import { getProfilesByUserIdHashes, transformToUserProfile } from './userProfile
  * This is a read-only service using a public RPC provider.
  * No wallet connection required.
  */
+
+// Contract Config
+const RPC_URL = buildRpcUrl(requireEnv('VITE_ALCHEMY_API_KEY'));
+const MEMBER_ROLE_MANAGER_ADDRESS = MEMBER_ROLE_MANAGER.proxy;
+const DEPLOYMENT_BLOCK = MEMBER_ROLE_MANAGER.deploymentBlock;
 
 // Singleton provider and contract instances
 let provider: ethers.JsonRpcProvider | null = null;

@@ -1,4 +1,4 @@
-import { BlockchainRef } from './blockchain';
+import { BlockchainRef } from './blockchainAddresses';
 import { TimestampLike } from './timestamp';
 
 export type VerificationLevelOptions = 1 | 2 | 3;

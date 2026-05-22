@@ -1,6 +1,6 @@
 // src/features/HealthRecordViewer/lib/constants.ts
 
-import { HEALTH_RECORD_CORE, NETWORK } from '@/config/blockchainAddresses';
+import { HEALTH_RECORD_CORE, NETWORK } from '@belrose/shared';
 
 /**
  * HealthRecordCore Contract Configuration

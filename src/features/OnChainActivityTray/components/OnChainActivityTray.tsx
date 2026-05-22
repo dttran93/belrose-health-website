@@ -33,7 +33,7 @@ import {
   OnChainActivityStatus,
 } from '../OnChainActivityTrayContext';
 import { useNavigate } from 'react-router-dom';
-import { NETWORK } from '@/config/blockchainAddresses';
+import { NETWORK } from '@belrose/shared';
 
 // ============================================================================
 // HELPERS
@@ -124,7 +124,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, onDismiss }) => {
         {/* Etherscan link — only when we have a txHash */}
         {activity.txHash && (
           <a
-            href={`${NETWORK.publicRpcUrl}/tx/${activity.txHash}`}
+            href={`${NETWORK.explorerUrl}/tx/${activity.txHash}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1"

@@ -4,6 +4,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore } from 'firebase-admin/firestore';
 import { ethers } from 'ethers';
 import { defineSecret } from 'firebase-functions/params';
+import { NETWORK, PAYMASTER } from '../_shared';
 
 // ==================== SECRETS ====================
 
@@ -13,13 +14,13 @@ const paymasterSignerKey = defineSecret('PAYMASTER_SIGNER_PRIVATE_KEY');
 // ==================== CONFIG ====================
 
 // Your deployed paymaster contract address (update after deployment)
-const PAYMASTER_CONTRACT_ADDRESS = process.env.PAYMASTER_CONTRACT_ADDRESS;
+const PAYMASTER_CONTRACT_ADDRESS = PAYMASTER.address;
 
 // Base chain ID
-const CHAIN_ID = 84532;
+const CHAIN_ID = NETWORK.chainId;
 
 // Rate limiting config
-const DAILY_SPONSORED_LIMIT = 100; // Max sponsored txs per user per day. Set high so we can test in dev. Change in future
+const DAILY_SPONSORED_LIMIT = PAYMASTER.dailySponsorLimit;
 
 // ==================== TYPES ====================
 

@@ -27,7 +27,7 @@ import {
   DisputeSeverityOptions,
   EncryptedField,
 } from '@belrose/shared';
-import { buildHealthRecordRef } from '@/config/blockchainAddresses';
+import { buildHealthRecordRef } from '@belrose/shared';
 import { encryptNotificationTitle } from '@/features/Notifications/services/encryptNotificationTitle';
 
 // ============================================================

@@ -4,12 +4,12 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { ethers } from 'ethers';
-import { BlockchainRef } from '../_shared/';
+import { BlockchainRef, MEMBER_ROLE_MANAGER, NETWORK } from '../_shared/';
 import { encryptPrivateKey, generateWallet } from '../services/backendWalletService';
 import { computeSmartAccountAddress } from './wallet';
 
-const MEMBER_ROLE_MANAGER_ADDRESS = '0xdF9583C25E234A34a1E47d9830722123CA228a1a';
-const CHAIN_ID = 84532;
+const MEMBER_ROLE_MANAGER_ADDRESS = MEMBER_ROLE_MANAGER.proxy;
+const CHAIN_ID = NETWORK.chainId;
 
 const MEMBER_ROLE_MANAGER_ABI = [
   // Admin Functions
@@ -48,7 +48,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
  */
 function getAdminWallet(): ethers.Wallet {
   const privateKey = process.env.ADMIN_WALLET_PRIVATE_KEY;
-  const rpcUrl = process.env.RPC_URL || 'https://sepolia.base.org';
+  const rpcUrl = process.env.RPC_URL || NETWORK.rpcUrlFallback;
   if (!privateKey) throw new Error('Admin wallet private key not found');
   const provider = new ethers.JsonRpcProvider(rpcUrl);
   return new ethers.Wallet(privateKey, provider);

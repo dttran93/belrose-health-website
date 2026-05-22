@@ -6,16 +6,17 @@ const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const ethers_1 = require("ethers");
 const params_1 = require("firebase-functions/params");
+const _shared_1 = require("../_shared");
 // ==================== SECRETS ====================
 // Define secrets (set these with: firebase functions:secrets:set PAYMASTER_SIGNER_PRIVATE_KEY)
 const paymasterSignerKey = (0, params_1.defineSecret)('PAYMASTER_SIGNER_PRIVATE_KEY');
 // ==================== CONFIG ====================
 // Your deployed paymaster contract address (update after deployment)
-const PAYMASTER_CONTRACT_ADDRESS = process.env.PAYMASTER_CONTRACT_ADDRESS;
+const PAYMASTER_CONTRACT_ADDRESS = _shared_1.PAYMASTER.address;
 // Base chain ID
-const CHAIN_ID = 84532;
+const CHAIN_ID = _shared_1.NETWORK.chainId;
 // Rate limiting config
-const DAILY_SPONSORED_LIMIT = 100; // Max sponsored txs per user per day. Set high so we can test in dev. Change in future
+const DAILY_SPONSORED_LIMIT = _shared_1.PAYMASTER.dailySponsorLimit;
 // ==================== HELPER FUNCTIONS ====================
 /**
  * Check and update rate limit for a user

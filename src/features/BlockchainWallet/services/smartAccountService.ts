@@ -5,7 +5,6 @@
  */
 
 import { createPublicClient, http, type Hex, type Address } from 'viem';
-import { baseSepolia } from 'viem/chains';
 import { toSimpleSmartAccount } from 'permissionless/accounts';
 import { entryPoint07Address } from 'viem/account-abstraction';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -13,7 +12,7 @@ import { WalletService } from './walletService';
 import { getFirestore, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { MemberRegistryBlockchain } from '@/features/Auth/services/memberRegistryBlockchain';
-import { MEMBER_ROLE_MANAGER, NETWORK } from '@/config/blockchainAddresses';
+import { MEMBER_ROLE_MANAGER, NETWORK } from '@belrose/shared';
 
 const CHAIN = NETWORK.chainViem;
 

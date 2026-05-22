@@ -27,7 +27,7 @@
     "vite.config.ts",
     "contracts/scripts/**/*",
     "test/**/*",
-    "packages/shared/src/blockchain.ts"
+    "packages/shared/src/blockchainAddresses.ts"
   ],
   "exclude": ["node_modules", "dist", "functions/**/*"],
   "references": [{ "path": "./packages/shared" }]

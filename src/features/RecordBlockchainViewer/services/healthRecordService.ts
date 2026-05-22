@@ -20,22 +20,24 @@ import {
   RecordVersion,
   HealthRecordCoreContract,
 } from '../lib/types';
-import {
-  HEALTH_RECORD_CORE_ADDRESS,
-  HEALTH_RECORD_CORE_ABI,
-  RPC_URL,
-  DEPLOYMENT_BLOCK,
-} from '../lib/constants';
+import { HEALTH_RECORD_CORE_ABI } from '../lib/constants';
 import {
   getProfilesByUserIdHashes,
   transformToUserProfile,
 } from '@/features/MemberBlockchainViewer/services/userProfileService';
 import { VerificationLevelOptions } from '@/features/Credibility/hooks/useCredibilityFlow';
-import { DisputeSeverityOptions } from '@belrose/shared';
+import { buildRpcUrl, DisputeSeverityOptions, HEALTH_RECORD_CORE } from '@belrose/shared';
+import { NETWORK } from '@belrose/shared';
+import { requireEnv } from '@/utils/utils';
 
 // ===============================================================
 // SINGLETON INSTANCES
 // ===============================================================
+
+// HealthRecordCore Config
+const RPC_URL = buildRpcUrl(requireEnv('VITE_ALCHEMY_API_KEY'));
+const HEALTH_RECORD_CORE_ADDRESS = HEALTH_RECORD_CORE.proxy;
+const DEPLOYMENT_BLOCK = HEALTH_RECORD_CORE.deploymentBlock;
 
 let provider: ethers.JsonRpcProvider | null = null;
 let contract: (HealthRecordCoreContract & ethers.Contract) | null = null;
@@ -45,7 +47,7 @@ let contract: (HealthRecordCoreContract & ethers.Contract) | null = null;
  */
 function getProvider(): ethers.JsonRpcProvider {
   if (!provider) {
-    provider = new ethers.JsonRpcProvider(RPC_URL);
+    provider = new ethers.JsonRpcProvider(NETWORK.rpcUrlFallback);
   }
   return provider;
 }
@@ -73,7 +75,8 @@ async function queryFilterInChunks(
   filter: ethers.DeferredTopicFilter,
   fromBlock: number,
   toBlock: number | string,
-  chunkSize: number = 10000
+  chunkSize: number = 2000,
+  delayMs: number = 500
 ): Promise<(ethers.EventLog | ethers.Log)[]> {
   const currentBlock =
     typeof toBlock === 'number'
@@ -85,12 +88,16 @@ async function queryFilterInChunks(
 
   while (start <= currentBlock) {
     const end = Math.min(start + chunkSize - 1, currentBlock);
-    console.log(`🔍 Querying blocks ${start} to ${end}...`);
 
     const events = await contract.queryFilter(filter, start, end);
     allEvents = allEvents.concat(events);
 
     start += chunkSize;
+
+    // Wait between chunks to avoid rate limiting
+    if (start <= currentBlock) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
   }
 
   return allEvents;

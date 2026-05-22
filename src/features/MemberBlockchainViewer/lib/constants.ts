@@ -1,6 +1,6 @@
 // src/features/MemberBlockchainViewer/constants.ts
 
-import { MEMBER_ROLE_MANAGER, NETWORK } from '@/config/blockchainAddresses';
+import { MEMBER_ROLE_MANAGER, NETWORK } from '@belrose/shared';
 
 /**
  * MemberRoleManager Contract Configuration

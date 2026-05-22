@@ -12,8 +12,7 @@ import {
 } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
-import { BlockchainRef } from '@belrose/shared';
-import { buildMemberRegistryRef } from '@/config/blockchainAddresses';
+import { BlockchainRef, buildMemberRegistryRef } from '@belrose/shared';
 
 interface TrusteeResult {
   success: boolean;

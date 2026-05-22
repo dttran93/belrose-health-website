@@ -1,6 +1,6 @@
 // src/features/Credibility/components/ui/DisputeDetailModal.tsx
 
-import React, { useState } from 'react';
+import React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   X,
@@ -21,13 +21,11 @@ import {
   getCulpabilityConfig,
   DisputeDocDecrypted,
 } from '../../services/disputeService';
-import { NETWORK } from '@/config/blockchainAddresses';
+import { NETWORK } from '@belrose/shared';
 
 // ============================================================
 // TYPES
 // ============================================================
-
-type ViewMode = 'details';
 
 interface DisputeDetailModalProps {
   record: FileObject;
@@ -92,7 +90,7 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
 
   const handleViewOnBlockchain = () => {
     if (dispute.blockchainRef?.txHash) {
-      window.open(`${NETWORK.publicRpcUrl}/tx/${dispute.blockchainRef?.txHash}`, '_blank');
+      window.open(`${NETWORK.explorerUrl}/tx/${dispute.blockchainRef?.txHash}`, '_blank');
     }
   };
 

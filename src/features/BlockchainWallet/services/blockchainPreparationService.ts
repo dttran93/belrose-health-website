@@ -18,7 +18,7 @@
 
 import { createPublicClient, http, type Address } from 'viem';
 import { SmartAccountService } from './smartAccountService';
-import { MEMBER_ROLE_MANAGER, NETWORK } from '@/config/blockchainAddresses';
+import { MEMBER_ROLE_MANAGER, NETWORK } from '@belrose/shared';
 
 // ==================== SMART CONTRACT CONFIG ====================
 

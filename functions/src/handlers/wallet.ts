@@ -8,7 +8,7 @@ import { generateWallet, encryptPrivateKey } from '../services/backendWalletServ
 import { entryPoint07Address } from 'viem/account-abstraction';
 import { privateKeyToAccount } from 'viem/accounts';
 import { createPublicClient, http } from 'viem';
-import { baseSepolia } from 'viem/chains';
+import { NETWORK } from '../_shared';
 
 /**
  * Wallet Handler
@@ -192,7 +192,7 @@ export async function computeSmartAccountAddress(privateKey: string): Promise<st
 
   // 3. Create the owner EOA account instance using viem
   const viemAccount = privateKeyToAccount(formattedKey);
-  const publicClient = createPublicClient({ chain: baseSepolia, transport: http() });
+  const publicClient = createPublicClient({ chain: NETWORK.chainViem, transport: http() });
 
   // 4. Instantiate the simple smart account using the new structure
   const simpleAccount = await toSimpleSmartAccount({

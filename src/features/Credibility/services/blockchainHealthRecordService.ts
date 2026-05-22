@@ -7,7 +7,6 @@
 // - Record anchoring (patients link themselves to health records)
 // - Record verification (providers vouch for record accuracy)
 // - Record disputes (flag inaccurate records)
-// - Dispute reactions (support/oppose disputes)
 // - Unaccepted update flags (admin-only, tracks refused record updates)
 //
 // Read operations: No wallet needed (uses public RPC)
@@ -18,7 +17,7 @@ import {
   PaymasterService,
   TransactionResult,
 } from '@/features/BlockchainWallet/services/paymasterService';
-import { HEALTH_RECORD_CORE, NETWORK } from '@/config/blockchainAddresses';
+import { HEALTH_RECORD_CORE, NETWORK } from '@belrose/shared';
 
 // ============================================================================
 // CONFIG
@@ -458,13 +457,6 @@ export interface Dispute {
   isActive: boolean;
 }
 
-export interface Reaction {
-  reactorIdHash: string;
-  supportsDispute: boolean;
-  timestamp: number;
-  isActive: boolean;
-}
-
 export interface UnacceptedUpdateFlag {
   recordIdHash: string;
   reporterIdHash: string;
@@ -486,12 +478,6 @@ export interface VerificationStats {
 export interface DisputeStats {
   total: number;
   active: number;
-}
-
-export interface ReactionStats {
-  totalReactions: number;
-  activeSupports: number;
-  activeOpposes: number;
 }
 
 // ============================================================================
@@ -1058,144 +1044,6 @@ export class blockchainHealthRecordService {
     } catch (error) {
       console.error('Error getting user disputes:', error);
       return [];
-    }
-  }
-
-  // ==========================================================================
-  // REACTIONS - WRITE FUNCTIONS
-  // ==========================================================================
-
-  /** React to a dispute (support or oppose) */
-  static async reactToDispute(
-    recordHash: string,
-    disputerIdHash: string,
-    supportsDispute: boolean
-  ): Promise<TransactionResult> {
-    console.log('👍 Reacting to dispute...', { supportsDispute });
-    const result = await this.executeWrite('reactToDispute', [
-      recordHash,
-      disputerIdHash,
-      supportsDispute,
-    ]);
-    console.log('✅ Reaction submitted:', result.txHash);
-    return result;
-  }
-
-  /** Retract your reaction to a dispute */
-  static async retractReaction(
-    recordHash: string,
-    disputerIdHash: string
-  ): Promise<TransactionResult> {
-    console.log('↩️ Retracting reaction...');
-    const result = await this.executeWrite('retractReaction', [recordHash, disputerIdHash]);
-    console.log('✅ Reaction retracted:', result.txHash);
-    return result;
-  }
-
-  /** Modify your reaction to a dispute */
-  static async modifyReaction(
-    recordHash: string,
-    disputerIdHash: string,
-    newSupport: boolean
-  ): Promise<TransactionResult> {
-    console.log('✏️ Modifying reaction...', { newSupport });
-    const result = await this.executeWrite('modifyReaction', [
-      recordHash,
-      disputerIdHash,
-      newSupport,
-    ]);
-    console.log('✅ Reaction modified:', result.txHash);
-    return result;
-  }
-
-  // ==========================================================================
-  // REACTIONS - VIEW FUNCTIONS
-  // ==========================================================================
-
-  /** Get all reactions to a specific dispute */
-  static async getDisputeReactions(
-    recordHash: string,
-    disputerIdHash: string
-  ): Promise<Reaction[]> {
-    try {
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getDisputeReactions');
-      const raw = await fn(recordHash, disputerIdHash);
-
-      return raw.map((r: any) => ({
-        reactorIdHash: r.reactorIdHash,
-        supportsDispute: r.supportsDispute,
-        timestamp: Number(r.timestamp),
-        isActive: r.isActive,
-      }));
-    } catch (error) {
-      console.error('Error getting dispute reactions:', error);
-      return [];
-    }
-  }
-
-  /** Check if a user has reacted to a specific dispute */
-  static async hasUserReacted(
-    recordHash: string,
-    disputerIdHash: string,
-    reactorIdHash: string
-  ): Promise<boolean> {
-    try {
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('hasUserReacted');
-      return await fn(recordHash, disputerIdHash, reactorIdHash);
-    } catch (error) {
-      console.error('Error checking if user reacted:', error);
-      return false;
-    }
-  }
-
-  /** Get a specific user's reaction to a dispute */
-  static async getUserReaction(
-    recordHash: string,
-    disputerIdHash: string,
-    reactorIdHash: string
-  ): Promise<{
-    exists: boolean;
-    supportsDispute: boolean;
-    timestamp: number;
-    isActive: boolean;
-  }> {
-    try {
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getUserReaction');
-      const result = await fn(recordHash, disputerIdHash, reactorIdHash);
-
-      return {
-        exists: result[0],
-        supportsDispute: result[1],
-        timestamp: Number(result[2]),
-        isActive: result[3],
-      };
-    } catch (error) {
-      console.error('Error getting user reaction:', error);
-      return { exists: false, supportsDispute: false, timestamp: 0, isActive: false };
-    }
-  }
-
-  /** Get reaction stats for a dispute */
-  static async getReactionStats(
-    recordHash: string,
-    disputerIdHash: string
-  ): Promise<ReactionStats> {
-    try {
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getReactionStats');
-      const result = await fn(recordHash, disputerIdHash);
-
-      return {
-        totalReactions: Number(result[0]),
-        activeSupports: Number(result[1]),
-        activeOpposes: Number(result[2]),
-      };
-    } catch (error) {
-      console.error('Error getting reaction stats:', error);
-      return { totalReactions: 0, activeSupports: 0, activeOpposes: 0 };
     }
   }
 

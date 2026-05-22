@@ -18,13 +18,14 @@
 
 import { ethers, Contract, id } from 'ethers';
 import { PaymasterService } from '@/features/BlockchainWallet/services/paymasterService';
-import { MEMBER_ROLE_MANAGER, NETWORK } from '@/config/blockchainAddresses';
+import { buildRpcUrl, MEMBER_ROLE_MANAGER, NETWORK } from '@belrose/shared';
+import { requireEnv } from '@/utils/utils';
 
 // Contract address
 const MEMBER_ROLE_MANAGER_ADDRESS = MEMBER_ROLE_MANAGER.proxy;
 
 // RPC for read-only operations
-const RPC_URL = NETWORK.rpcUrl;
+const RPC_URL = buildRpcUrl(requireEnv('VITE_ALCHEMY_API_KEY'));
 
 // ABI - all functions we need (view + write)
 const MEMBER_ROLE_MANAGER_ABI = [

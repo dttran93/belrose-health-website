@@ -1,6 +1,6 @@
 // src/features/MemberBlockchainViewer/hooks/usePaymasterDeposit.ts
 
-import { NETWORK, PAYMASTER } from '@/config/blockchainAddresses';
+import { NETWORK, PAYMASTER } from '@belrose/shared';
 import { useState, useEffect, useCallback } from 'react';
 import { createPublicClient, http, formatEther } from 'viem';
 

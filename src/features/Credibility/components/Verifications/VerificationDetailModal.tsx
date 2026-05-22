@@ -8,7 +8,7 @@ import { BelroseUserProfile, FileObject } from '@/types/core';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { getVerificationConfig } from '../../services/verificationService';
 import { VerificationDoc } from '@belrose/shared';
-import { NETWORK } from '@/config/blockchainAddresses';
+import { NETWORK } from '@belrose/shared';
 
 // ============================================================
 // TYPES
@@ -58,7 +58,7 @@ export const VerificationDetailModal: React.FC<VerificationDetailModalProps> = (
 
   const handleViewOnBlockchain = () => {
     if (verification.blockchainRef?.txHash) {
-      window.open(`${NETWORK.publicRpcUrl}/tx/${verification.blockchainRef?.txHash}`, '_blank');
+      window.open(`${NETWORK.explorerUrl}/tx/${verification.blockchainRef?.txHash}`, '_blank');
     }
   };
 

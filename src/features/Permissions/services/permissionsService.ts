@@ -14,7 +14,7 @@ import { getUserProfile } from '@/features/Users/services/userProfileService';
 import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 import { SubjectRole } from '@/features/Subject/hooks/useSubjectFlow';
 import writePermissionChangeEvent from './writePermissionChangeEvent';
-import { buildMemberRegistryRef } from '@/config/blockchainAddresses';
+import { buildMemberRegistryRef } from '@belrose/shared';
 import { BlockchainRef } from '@belrose/shared';
 import { ethers, id } from 'ethers';
 

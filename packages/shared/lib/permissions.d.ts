@@ -1,4 +1,4 @@
-import { BlockchainRef } from './blockchain';
+import { BlockchainRef } from './blockchainAddresses';
 import { TimestampLike } from './timestamp';
 export type PermissionAction = 'granted' | 'revoked' | 'upgraded' | 'downgraded';
 export type RecordRole = 'owner' | 'administrator' | 'viewer';

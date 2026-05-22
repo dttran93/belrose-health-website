@@ -6,10 +6,11 @@ exports.initializeRoleOnChainForRequester = exports.initializeRoleOnChain = expo
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const ethers_1 = require("ethers");
+const _shared_1 = require("../_shared/");
 const backendWalletService_1 = require("../services/backendWalletService");
 const wallet_1 = require("./wallet");
-const MEMBER_ROLE_MANAGER_ADDRESS = '0xdF9583C25E234A34a1E47d9830722123CA228a1a';
-const CHAIN_ID = 84532;
+const MEMBER_ROLE_MANAGER_ADDRESS = _shared_1.MEMBER_ROLE_MANAGER.proxy;
+const CHAIN_ID = _shared_1.NETWORK.chainId;
 const MEMBER_ROLE_MANAGER_ABI = [
     // Admin Functions
     'function addMember(address wallet, bytes32 userIdHash) external',
@@ -43,7 +44,7 @@ const MEMBER_ROLE_MANAGER_ABI = [
  */
 function getAdminWallet() {
     const privateKey = process.env.ADMIN_WALLET_PRIVATE_KEY;
-    const rpcUrl = process.env.RPC_URL || 'https://sepolia.base.org';
+    const rpcUrl = process.env.RPC_URL || _shared_1.NETWORK.rpcUrlFallback;
     if (!privateKey)
         throw new Error('Admin wallet private key not found');
     const provider = new ethers_1.ethers.JsonRpcProvider(rpcUrl);
