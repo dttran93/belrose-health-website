@@ -154,11 +154,6 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({
                 linkHref={`${etherscanBase}/tx/${wallet.blockchainRef?.txHash}`}
                 mono
               />
-
-              <SettingsRow
-                label="Linked At"
-                value={formatTimestamp(wallet.linkedAt.toDate?.() || wallet.linkedAt)}
-              />
             </div>
           );
         })

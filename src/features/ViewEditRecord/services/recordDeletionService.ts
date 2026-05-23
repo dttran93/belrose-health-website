@@ -6,7 +6,7 @@
  * DELETION PERMISSION RULES:
  * - If the record has owners, only an owner can delete it
  * - If there are multiple owners, all other owners must remove themselves first
- * - If there are no owners, any administrator may delete the record
+ * - If there are no owners, any administrator may delete the record if they're the only admin
  * - If there are other subjects (besides the deleting user), they must all unanchor
  *   themselves from the blockchain before deletion is permitted
  *
@@ -26,9 +26,15 @@
  *    a. Creates a recordDeletionEvent → triggers Cloud Function notifications to affected users
  *    b. Deletes file from storage, Firestore record, version history, and wrapped encryption keys
  *    c. Marks deletion event complete
+ *
+ * NOTE ON BLOCKCHAIN:
+ * The most important thing is that the record is unanchored which is required below. But the
+ * blockchain will still have role assignments and verifications/disputes related to the record
+ * floating around. This is more a nuisance than anything since no one will be able to resolve
+ * a verification/dispute/permission against a deleted record in-app. Goal is to eventually,
+ * build a recordDeletion event on-chain.
  */
 
-import { encryptNotificationTitle } from '@/features/Notifications/services/encryptNotificationTitle';
 import { PermissionsService } from '@/features/Permissions/services/permissionsService';
 import SubjectQueryService from '@/features/Subject/services/subjectQueryService';
 import {
@@ -65,7 +71,8 @@ class RecordDeletionService {
    * and if so, what confirmation warnings to display. Checks in order:
    * 1. User must be an owner (if owners exist) or an administrator (if no owners)
    * 2. No other owners may exist — they must remove themselves first
-   * 3. No other subjects may exist — they must unanchor themselves first
+   * 3. No other admins may exist - they must remove themselves first
+   * 4. No other subjects may exist — they must unanchor themselves first
    *
    * If the calling user is the only remaining subject, canDelete will be true
    * and the dialog will prompt them to unanchor before proceeding.
@@ -149,7 +156,22 @@ class RecordDeletionService {
       };
     }
 
-    // Check 4: Cannot delete if there are other subjects — they must unanchor themselves first.
+    // Check 4: Cannot delete if there are other admins — they must remove themselves first
+    if (otherAdmins.length > 0) {
+      return {
+        canDelete: false,
+        reason:
+          'There are other administrators on this record. They must remove themselves before deletion',
+        requiresConfirmation: false,
+        hasSubjects,
+        subjectCount,
+        affectsOtherUsers: true,
+        otherUserCount: totalOtherUsers,
+        otherAdmins,
+      };
+    }
+
+    // Check 5: Cannot delete if there are other subjects — they must unanchor themselves first.
     // If the calling user is the only subject, this check passes and the dialog will
     // prompt them to unanchor before proceeding to deletion.
     if (otherSubjects.length > 0) {
@@ -169,13 +191,14 @@ class RecordDeletionService {
     }
 
     // At this point the user is permitted to delete:
-    // - They are the sole/only owner, OR
-    // - They are an administrator and no owners exist
+    // - They are the sole/only owner or admin if no owner exists
     // - No other subjects remain on the record
     // Build confirmation warnings for affected users.
     const warnings: string[] = [];
 
-    // Warn about other admins/viewers being affected
+    // Warn about other viewers being affected. May 23 changed to make it so admins can only
+    // delete if there are no other admins, so will only ever mention viewers. Leaving the code
+    // since it's harmless and might change in the future
     if (otherAdmins.length > 0 || otherViewers.length > 0) {
       const userBreakdown: string[] = [];
 
@@ -279,6 +302,7 @@ class RecordDeletionService {
           subjects: [],
         },
         deletionComplete: false,
+        chainCleanupStatus: 'pending',
       };
 
       const eventRef = doc(db, 'recordDeletionEvents', record.id);

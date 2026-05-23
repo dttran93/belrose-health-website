@@ -101,7 +101,7 @@ export function buildTrusteeInvitedHtml(
           ${levelDescription}
         </p>
       </div>
-      ${ctaButton(`${APP_URL}/trustees`, 'Review invite', '#8b5cf6')}
+      ${ctaButton(`${APP_URL}/settings/trustees`, 'Review invite', '#8b5cf6')}
     </div>
     ${footer()}
   `);
@@ -116,7 +116,7 @@ export function buildTrusteeInvitedText(
 
 What this means: ${levelDescription}
 
-Review the invite at: ${APP_URL}/trustees
+Review the invite at: ${APP_URL}/settings/trustees
 
 Questions? ${SUPPORT_EMAIL}`;
 }
@@ -141,7 +141,7 @@ export function buildTrusteeAcceptedHtml(trusteeName: string, levelLabel: string
         ${infoRow('Trust level', levelLabel)}
         ${infoRow('Status', 'Active')}
       </table>
-      ${ctaButton(`${APP_URL}/trustees`, 'Manage trustees', '#22c55e')}
+      ${ctaButton(`${APP_URL}/settings/trustees`, 'Manage trustees', '#22c55e')}
     </div>
     ${footer()}
   `);
@@ -150,7 +150,7 @@ export function buildTrusteeAcceptedHtml(trusteeName: string, levelLabel: string
 export function buildTrusteeAcceptedText(trusteeName: string, levelLabel: string): string {
   return `${trusteeName} accepted your ${levelLabel} trustee invite and is now active on your account.
 
-Manage your trustees at: ${APP_URL}/trustees
+Manage your trustees at: ${APP_URL}/settings/trustees
 
 Questions? ${SUPPORT_EMAIL}`;
 }
@@ -175,7 +175,7 @@ export function buildTrusteeDeclinedHtml(trusteeName: string, levelLabel: string
         ${infoRow('Trust level', levelLabel)}
         ${infoRow('Status', 'Declined')}
       </table>
-      ${ctaButton(`${APP_URL}/trustees`, 'Manage trustees', '#f59e0b')}
+      ${ctaButton(`${APP_URL}/settings/trustees`, 'Manage trustees', '#f59e0b')}
     </div>
     ${footer()}
   `);
@@ -184,7 +184,7 @@ export function buildTrusteeDeclinedHtml(trusteeName: string, levelLabel: string
 export function buildTrusteeDeclinedText(trusteeName: string, levelLabel: string): string {
   return `${trusteeName} declined your ${levelLabel} trustee invite.
 
-You can invite someone else from your trustees page: ${APP_URL}/trustees
+You can invite someone else from your trustees page: ${APP_URL}/settings/trustees
 
 Questions? ${SUPPORT_EMAIL}`;
 }
@@ -215,7 +215,7 @@ export function buildTrusteeRevokedHtml(trustorName: string, levelLabel: string)
           If you believe this was a mistake, please contact ${trustorName} directly.
         </p>
       </div>
-      ${ctaButton(`${APP_URL}/trustees`, 'View your trustees', '#ef4444')}
+      ${ctaButton(`${APP_URL}/settings/trustees`, 'View your trustees', '#ef4444')}
     </div>
     ${footer()}
   `);
@@ -226,7 +226,7 @@ export function buildTrusteeRevokedText(trustorName: string, levelLabel: string)
 
 You no longer have access to their records or account. If you believe this was a mistake, please contact ${trustorName} directly.
 
-View your trustees at: ${APP_URL}/trustees
+View your trustees at: ${APP_URL}/settings/trustees
 
 Questions? ${SUPPORT_EMAIL}`;
 }
@@ -251,7 +251,7 @@ export function buildTrusteeResignedHtml(trusteeName: string, levelLabel: string
         ${infoRow('Previous level', levelLabel)}
         ${infoRow('Status', 'Resigned')}
       </table>
-      ${ctaButton(`${APP_URL}/trustees`, 'Manage trustees', '#f59e0b')}
+      ${ctaButton(`${APP_URL}/settings/trustees`, 'Manage trustees', '#f59e0b')}
     </div>
     ${footer()}
   `);
@@ -262,7 +262,7 @@ export function buildTrusteeResignedText(trusteeName: string, levelLabel: string
 
 They no longer have access to your records or account. You can appoint a new trustee from your trustees page.
 
-Manage your trustees at: ${APP_URL}/trustees
+Manage your trustees at: ${APP_URL}/settings/trustees
 
 Questions? ${SUPPORT_EMAIL}`;
 }
@@ -302,7 +302,7 @@ export function buildTrusteeLevelChangedHtml(
           ${newDescription}
         </p>
       </div>
-      ${ctaButton(`${APP_URL}/trustees`, 'View trustee relationships', badgeColor)}
+      ${ctaButton(`${APP_URL}/settings/trustees`, 'View trustee relationships', badgeColor)}
     </div>
     ${footer()}
   `);
@@ -317,7 +317,7 @@ export function buildTrusteeLevelChangedText(
   const action = isUpgrade ? 'upgraded' : 'changed';
   return `${trustorName} has ${action} your trustee level from ${prevLabel} to ${newLabel}.
 
-View your trustee relationships at: ${APP_URL}/trustees
+View your trustee relationships at: ${APP_URL}/settings/trustees
 
 Questions? ${SUPPORT_EMAIL}`;
 }

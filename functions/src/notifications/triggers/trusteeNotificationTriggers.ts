@@ -95,7 +95,7 @@ export const onTrusteeRelationshipCreated = onDocumentCreated(
     await createNotification(data.trusteeId, {
       type: 'TRUSTEE_INVITE_RECEIVED',
       message: `${trustorName} has invited you to be their ${levelLabel} trustee.`,
-      link: '/app/trustees',
+      link: '/app/settings/trustees',
       payload: {
         trustorId: data.trustorId,
         trusteeId: data.trusteeId,
@@ -140,7 +140,7 @@ export const onTrusteeRelationshipUpdated = onDocumentUpdated(
       await createNotification(after.trustorId, {
         type: 'TRUSTEE_INVITE_ACCEPTED',
         message: `${trusteeName} accepted your trustee invite as ${levelLabel}.`,
-        link: '/app/trustees',
+        link: '/app/settings/trustees',
         payload: {
           trustorId: after.trustorId,
           trusteeId: after.trusteeId,
@@ -171,7 +171,7 @@ export const onTrusteeRelationshipUpdated = onDocumentUpdated(
       await createNotification(after.trustorId, {
         type: 'TRUSTEE_INVITE_DECLINED',
         message: `${trusteeName} declined your trustee invite.`,
-        link: '/app/trustees',
+        link: '/app/settings/trustees',
         payload: {
           trustorId: after.trustorId,
           trusteeId: after.trusteeId,
@@ -206,7 +206,7 @@ export const onTrusteeRelationshipUpdated = onDocumentUpdated(
         await createNotification(after.trustorId, {
           type: 'TRUSTEE_RESIGNED',
           message: `${trusteeName} has resigned as your ${levelLabel} trustee.`,
-          link: '/app/trustees',
+          link: '/app/settings/trustees',
           payload: {
             trustorId: after.trustorId,
             trusteeId: after.trusteeId,
@@ -233,7 +233,7 @@ export const onTrusteeRelationshipUpdated = onDocumentUpdated(
         await createNotification(after.trusteeId, {
           type: 'TRUSTEE_REVOKED',
           message: `${trustorName} has revoked your ${levelLabel} trustee access.`,
-          link: '/app/trustees',
+          link: '/app/settings/trustees',
           payload: {
             trustorId: after.trustorId,
             trusteeId: after.trusteeId,
@@ -272,7 +272,7 @@ export const onTrusteeRelationshipUpdated = onDocumentUpdated(
       await createNotification(after.trusteeId, {
         type: 'TRUSTEE_LEVEL_CHANGED',
         message: `${trustorName} ${isUpgrade ? 'upgraded' : 'changed'} your trustee level from ${prevLabel} to ${newLabel}.`,
-        link: '/app/trustees',
+        link: '/app/settings/trustees',
         payload: {
           trustorId: after.trustorId,
           trusteeId: after.trusteeId,

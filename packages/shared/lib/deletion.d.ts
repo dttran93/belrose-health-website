@@ -10,5 +10,6 @@ export interface RecordDeletionEvent {
         subjects: string[];
     };
     deletionComplete: boolean;
+    chainCleanupStatus: string;
 }
 //# sourceMappingURL=deletion.d.ts.map

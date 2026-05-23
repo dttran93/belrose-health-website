@@ -693,7 +693,7 @@ service cloud.firestore {
           resource.data.status == 'pending' &&
           request.resource.data.status in ['active', 'declined'] &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'isActive', 'respondedAt', 'acceptTxHash']) &&
+            .hasOnly(['status', 'isActive', 'respondedAt', 'acceptBlockchainRef', 'revocationBlockchainRef']) &&
           request.resource.data.trustorId == resource.data.trustorId &&
           request.resource.data.trusteeId == resource.data.trusteeId
         )

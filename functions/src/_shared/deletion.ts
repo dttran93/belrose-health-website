@@ -11,4 +11,5 @@ export interface RecordDeletionEvent {
     subjects: string[];
   };
   deletionComplete: boolean;
+  chainCleanupStatus: string;
 }

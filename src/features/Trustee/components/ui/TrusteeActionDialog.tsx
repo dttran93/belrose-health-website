@@ -284,7 +284,7 @@ const ConfirmAcceptContent: React.FC<{
   const Icon = config?.icon ?? Shield;
 
   return (
-    <div className="p-6">
+    <div>
       <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
         <Check className="w-5 h-5 text-green-600" />
         Accept Trustee Invite

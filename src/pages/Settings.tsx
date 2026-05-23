@@ -22,7 +22,7 @@ const SettingsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const location = useLocation();
 
-  //Active Section for deriving URL - e.g. /app/settings/trustee --> trustee page
+  //Active Section for deriving URL - e.g. /app/settings/trustees --> trustees page
   const activeSection = location.pathname.split('/').pop() || 'general';
 
   //Modal states
@@ -132,7 +132,7 @@ const SettingsPage = () => {
           />
         );
 
-      case 'trustee':
+      case 'trustees':
         return <TrusteePage />;
 
       case 'notifications':

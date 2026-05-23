@@ -13,7 +13,7 @@ import {
 const settingsSections = [
   { id: 'general', name: 'General', icon: CircleUserRound },
   { id: 'account', name: 'Account', icon: Key },
-  { id: 'trustee', name: 'Trustees', icon: HeartHandshake },
+  { id: 'trustees', name: 'Trustees', icon: HeartHandshake },
   { id: 'notifications', name: 'Notifications', icon: Bell },
   { id: 'privacy', name: 'Privacy & Security', icon: GlobeLock },
   { id: 'billing', name: 'Billing & Plans', icon: CreditCard },
