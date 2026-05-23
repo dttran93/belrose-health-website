@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { CheckCheck, Filter, Loader2, AlertCircle, Inbox } from 'lucide-react';
+import { CheckCheck, Filter, Loader2, AlertCircle, Inbox, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { useNotifications } from '../hooks/useNotifications';
@@ -31,46 +31,6 @@ const FILTERED_CATEGORIES: NotificationCategory[] = [
 ];
 
 type FilterOption = 'all' | 'unread' | NotificationCategory;
-
-interface FilterButtonProps {
-  label: string;
-  value: FilterOption;
-  activeFilter: FilterOption;
-  onClick: (value: FilterOption) => void;
-  count?: number;
-}
-
-const FilterButton: React.FC<FilterButtonProps> = ({
-  label,
-  value,
-  activeFilter,
-  onClick,
-  count,
-}) => {
-  const isActive = activeFilter === value;
-  return (
-    <button
-      onClick={() => onClick(value)}
-      className={`
-        px-4 py-2 rounded-full text-sm font-medium transition-all duration-200
-        ${
-          isActive
-            ? 'bg-primary text-primary-foreground shadow-sm'
-            : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
-        }
-      `}
-    >
-      {label}
-      {count !== undefined && count > 0 && (
-        <span
-          className={`ml-2 px-1.5 py-0.5 text-xs rounded-full ${isActive ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-complement-1/10 text-complement-1'}`}
-        >
-          {count}
-        </span>
-      )}
-    </button>
-  );
-};
 
 const EmptyState: React.FC<{ filter: FilterOption }> = ({ filter }) => {
   const getMessage = () => {
@@ -165,20 +125,28 @@ export const NotificationsTab: React.FC = () => {
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Sub-header: filter bar + mark all read */}
+      {/* Sub-header: filter dropdown + mark all read */}
       <div className="px-4 py-4 flex items-center justify-between gap-4 border-b border-border">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          <Filter className="w-4 h-4 text-muted-foreground flex-shrink-0 mr-1" />
-          {FILTERED_CATEGORIES.map(category => (
-            <FilterButton
-              key={category}
-              label={NOTIFICATION_CATEGORIES[category].label}
-              value={category}
-              activeFilter={activeFilter}
-              onClick={setActiveFilter}
-              count={filterCounts[category]}
-            />
-          ))}
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          <div className="relative">
+            <select
+              value={activeFilter}
+              onChange={e => setActiveFilter(e.target.value as FilterOption)}
+              className="appearance-none pl-3 pr-8 py-1.5 text-sm font-medium bg-muted/50 border border-border rounded-full text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30 hover:bg-muted transition-colors"
+            >
+              <option value="all">All ({filterCounts.all})</option>
+              <option value="unread">Unread ({filterCounts.unread})</option>
+              <optgroup label="────────────">
+                {FILTERED_CATEGORIES.map(category => (
+                  <option key={category} value={category}>
+                    {NOTIFICATION_CATEGORIES[category].label} ({filterCounts[category]})
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+          </div>
         </div>
 
         {unreadCount > 0 && (

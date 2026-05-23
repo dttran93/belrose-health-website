@@ -17,14 +17,16 @@ import {
   PaymasterService,
   TransactionResult,
 } from '@/features/BlockchainWallet/services/paymasterService';
-import { HEALTH_RECORD_CORE, NETWORK } from '@belrose/shared';
+import { buildRpcUrl, HEALTH_RECORD_CORE, NETWORK } from '@belrose/shared';
+import { requireEnv } from '@/utils/utils';
 
 // ============================================================================
 // CONFIG
 // ============================================================================
 
 const HEALTH_RECORD_CORE_ADDRESS = HEALTH_RECORD_CORE.proxy;
-const RPC_URL = NETWORK.rpcUrl;
+const RPC_URL = buildRpcUrl(requireEnv('VITE_ALCHEMY_API_KEY'));
+const RPC_URL_FALLBACK = NETWORK.rpcUrlFallback;
 
 // ============================================================================
 // ABI (only the functions we need)
@@ -491,16 +493,18 @@ export class blockchainHealthRecordService {
 
   /** Get a read-only contract instance (no wallet needed) */
   private static getReadOnlyContract(): Contract {
-    const provider = new ethers.JsonRpcProvider(
-      RPC_URL,
-      {
-        name: NETWORK.name,
-        chainId: NETWORK.chainId,
-      },
-      {
-        staticNetwork: true,
-      }
-    );
+    const provider = new ethers.FallbackProvider([
+      new ethers.JsonRpcProvider(
+        RPC_URL,
+        { name: NETWORK.name, chainId: NETWORK.chainId },
+        { staticNetwork: true }
+      ),
+      new ethers.JsonRpcProvider(
+        RPC_URL_FALLBACK,
+        { name: NETWORK.name, chainId: NETWORK.chainId },
+        { staticNetwork: true }
+      ),
+    ]);
     return new ethers.Contract(HEALTH_RECORD_CORE_ADDRESS, HEALTH_RECORD_CORE_ABI, provider);
   }
 
@@ -713,14 +717,9 @@ export class blockchainHealthRecordService {
 
   /** Check if a hash exists in the system */
   static async doesHashExist(recordHash: string): Promise<boolean> {
-    try {
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('doesHashExist');
-      return await fn(recordHash);
-    } catch (error) {
-      console.error('Error checking if hash exists:', error);
-      return false;
-    }
+    const contract = this.getReadOnlyContract();
+    const fn = contract.getFunction('doesHashExist');
+    return await fn(recordHash); // let it throw on failure
   }
 
   /** Get the number of versions for a record */

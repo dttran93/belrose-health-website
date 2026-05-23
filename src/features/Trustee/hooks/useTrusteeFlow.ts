@@ -115,7 +115,7 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
   const { addActivity, updateActivity } = useOnChainActivityTray();
   const [submittedLabel, setSubmittedLabel] = useState('');
 
-  const trusteeLink = `/app/settings/trustee`;
+  const trusteeLink = `/app/settings/trustees`;
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 

@@ -97,7 +97,6 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({
     initiateDispute,
     initiateRetractDispute,
     initiateModifyDispute,
-    initiateReaction,
     isLoading,
     refetch,
   } = useCredibilityFlow({
@@ -245,17 +244,16 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({
             isAddMode={false}
             onModify={handleModifyVerification}
             onRetract={verification => initiateRetractVerification(verification.recordHash)}
+            refreshKey={credibilityRefreshKey}
           />
           <DisputeManagement
             record={record}
             onBack={onBack}
             onAddMode={handleAddDispute}
             isAddMode={false}
-            onReact={(disputeRecordHash, disputerId, support) => {
-              initiateReaction(disputeRecordHash, disputerId, support);
-            }}
             onRetract={dispute => initiateRetractDispute(dispute.recordHash)}
             onModify={handleModifyDispute}
+            refreshKey={credibilityRefreshKey}
           />
         </>
       )}

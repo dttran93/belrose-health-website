@@ -496,8 +496,9 @@ export class TrusteeRelationshipService {
 
     // Step 3: Update Firestore
     await updateDoc(relationshipRef, {
-      isActive: false,
       status: 'declined',
+      isActive: false,
+
       revokedAt: Timestamp.now(),
       revokedBy: trusteeId,
       statusUpdateReason: 'trustee_resigned',
