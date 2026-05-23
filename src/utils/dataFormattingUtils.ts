@@ -260,12 +260,14 @@ UNDEFINED DATA FORMATTING
  * Also used in Blockchain Service
  */
 export const removeUndefinedValues = <T>(data: T): T => {
-  // Handle arrays
   if (Array.isArray(data)) {
     return data.map(item => removeUndefinedValues(item)) as T;
   }
 
-  // Handle objects
+  if (data !== null && typeof data === 'object' && '_methodName' in (data as any)) {
+    return data;
+  }
+
   if (data !== null && typeof data === 'object') {
     const cleaned: any = {};
     for (const key in data) {
@@ -277,7 +279,6 @@ export const removeUndefinedValues = <T>(data: T): T => {
     return cleaned as T;
   }
 
-  // Handle primitives (convert undefined to null)
   return (data === undefined ? null : data) as T;
 };
 

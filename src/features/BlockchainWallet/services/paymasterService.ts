@@ -23,7 +23,7 @@ import { entryPoint07Address, getUserOperationHash } from 'viem/account-abstract
 import { privateKeyToAccount } from 'viem/accounts';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { WalletService } from './walletService';
-import { NETWORK, PAYMASTER } from '@/config/blockchainAddresses';
+import { NETWORK, PAYMASTER } from '@belrose/shared';
 
 // ==================== CONFIG ====================
 

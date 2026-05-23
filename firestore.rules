@@ -280,10 +280,17 @@ service cloud.firestore {
           request.auth.uid in resource.data.subjects) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['credibility'])
         ) ||
-        // BRANCH 5: Subject editing viewers
+        // BRANCH 5: Subject editing viewers. Allows Subjets to add Viewers 
         (
           isSubjectWithRole(recordId) &&
           isSubjectEditingViewers()
+        ) ||
+        // BRANCH 6: Viewer removing themselves
+        (
+          request.auth.uid in resource.data.viewers &&
+          !(request.auth.uid in resource.data.subjects) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewers', 'lastModified']) &&
+          !(request.auth.uid in request.resource.data.viewers)
         )
       );
 
@@ -527,37 +534,6 @@ service cloud.firestore {
     }
 
     // ============================================
-    // DISPUTE REACTIONS
-    // ============================================
-  
-    match /disputeReactions/{reactionId} {
-      // READ: Allow if user is reactor OR has role on the record
-      allow read: if request.auth != null && (
-        !exists(/databases/$(database)/documents/disputeReactions/$(reactionId)) ||
-          resource.data.reactorId == request.auth.uid ||
-          hasRoleOnRecord(resource.data.recordId)
-      );
-
-      // CREATE: User must be the reactor
-      allow create: if request.auth != null &&
-        request.resource.data.reactorId == request.auth.uid &&
-        request.resource.data.isActive == true &&
-        request.resource.data.createdAt is timestamp;
-
-      // Only the original reactor can modify their reaction
-      allow update: if request.auth != null &&
-        resource.data.reactorId == request.auth.uid &&
-        // Immutable fields
-        request.resource.data.reactorId == resource.data.reactorId &&
-        request.resource.data.recordHash == resource.data.recordHash &&
-        request.resource.data.disputerId == resource.data.disputerId &&
-        request.resource.data.createdAt == resource.data.createdAt;
-
-      // DELETE: Not allowed - use isActive flag instead
-      allow delete: if false;
-    }
-
-    // ============================================
     // SCORE EVENTS (Credibility Audit Trail)
     // ============================================
     
@@ -644,7 +620,9 @@ service cloud.firestore {
 
       allow update: if request.auth != null && (
         isAdminOrOwnerOfRecord(resource.data.recordId) ||
-        resource.data.userId == request.auth.uid
+        resource.data.userId == request.auth.uid ||
+        (isSubjectWithRole(resource.data.recordId) && 
+        resource.data.grantedBy == request.auth.uid)
       );
 
       allow delete: if request.auth != null &&

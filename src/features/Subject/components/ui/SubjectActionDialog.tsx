@@ -993,7 +993,7 @@ const ConfirmRemoveSubjectStatusContent: React.FC<{
         </AlertDialog.Cancel>
         <Button
           onClick={() => reason && onConfirm(reason)}
-          className="flex-1 bg-orange-600 hover:bg-orange-700"
+          className="flex-1 bg-red-600 hover:bg-orange-700"
         >
           Remove Status
         </Button>

@@ -604,7 +604,11 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       )}
 
       {viewMode === 'subject' && (
-        <SubjectManager record={displayRecord} onBack={handleBackToRecord} />
+        <SubjectManager
+          record={displayRecord}
+          onSuccess={onRefreshRecord}
+          onBack={handleBackToRecord}
+        />
       )}
 
       {/* ===== FOOTER SECTIONS ===== */}
