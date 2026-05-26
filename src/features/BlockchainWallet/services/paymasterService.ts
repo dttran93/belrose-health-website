@@ -23,15 +23,16 @@ import { entryPoint07Address, getUserOperationHash } from 'viem/account-abstract
 import { privateKeyToAccount } from 'viem/accounts';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { WalletService } from './walletService';
-import { NETWORK, PAYMASTER } from '@belrose/shared';
+import { buildBundlerURL, NETWORK, PAYMASTER } from '@belrose/shared';
 
 // ==================== CONFIG ====================
 
 // Deployed paymaster contract address
 const PAYMASTER_ADDRESS = PAYMASTER.address;
 
-// Pimlico bundler URL (from dashboard.pimlico.io)
-const BUNDLER_URL = import.meta.env.VITE_PIMLICO_BUNDLER_URL;
+// Pimlico bundler URL build from blockchainAddresses, pulls API Key from .env
+const pimlicoApiKey = import.meta.env.VITE_PIMLICO_API_KEY;
+const BUNDLER_URL = buildBundlerURL(pimlicoApiKey);
 
 // Chain configuration
 const CHAIN = NETWORK.chainViem;

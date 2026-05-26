@@ -70,28 +70,24 @@ export const useAuth = (): AuthContextData => {
   }, []);
 
   useEffect(() => {
-    if (authService.onAuthStateChanged) {
-      // The listener handles real-time auth changes
-      const unsubscribe = authService.onAuthStateChanged(async (user: FirebaseAuthUser | null) => {
-        setAuthState(prev => ({ ...prev, loading: true }));
-        let mergedUser: BelroseUserProfile | null = null;
+    // The listener handles real-time auth changes
+    const unsubscribe = authService.onAuthStateChanged(async (user: FirebaseAuthUser | null) => {
+      setAuthState(prev => ({ ...prev, loading: true }));
+      let mergedUser: BelroseUserProfile | null = null;
 
-        if (user) {
-          mergedUser = await fetchAndMergeProfile(user); // Use the helper function
-        }
+      if (user) {
+        mergedUser = await fetchAndMergeProfile(user); // Use the helper function
+      }
 
-        // Single batched state update with the MERGED user object
-        setAuthState({
-          user: mergedUser,
-          loading: false,
-        });
+      // Single batched state update with the MERGED user object
+      setAuthState({
+        user: mergedUser,
+        loading: false,
       });
+    });
 
-      return () => {
-        unsubscribe();
-      };
-    }
-  }, [fetchAndMergeProfile]); // Depend on fetchAndMergeProfile
+    return () => unsubscribe();
+  }, []);
 
   // Additional helper methods
   const signOut = useCallback(async () => {
