@@ -598,14 +598,18 @@ function resolveRecordDate(record: FileObject): string | undefined {
   const raw = record.belroseFields?.completedDate || record.createdAt || record.uploadedAt;
   if (!raw) return undefined;
 
-  // Firestore Timestamps have a toDate() method
   if (typeof (raw as any).toDate === 'function') {
     return (raw as any).toDate().toISOString();
   }
 
-  // Plain string or number
   if (typeof raw === 'string' || typeof raw === 'number') {
-    return new Date(raw).toISOString();
+    const date = new Date(raw);
+    if (isNaN(date.getTime())) {
+      console.warn('⚠️ resolveRecordDate: invalid date value on record', record.id, raw);
+      return undefined;
+    }
+
+    return date.toISOString();
   }
 
   return undefined;

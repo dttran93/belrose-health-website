@@ -114,7 +114,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onForgotPassw
 
       const from = location.state?.from?.pathname;
       const safeTo = !from || from.startsWith('/auth') || from === '/' ? '/app' : from;
-
       navigate(safeTo, { replace: true });
     } catch (error) {
       console.error('❌ Login error:', error);
