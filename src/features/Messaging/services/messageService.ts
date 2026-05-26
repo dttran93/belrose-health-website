@@ -240,6 +240,7 @@ export class MessageService {
 
     await updateDoc(doc(db, 'conversations', conversationId), {
       lastMessageAt: serverTimestamp(),
+      [`lastReadAt.${currentUser.uid}`]: serverTimestamp(),
     });
 
     console.log('✅ Message sent:', messageDoc.id);
