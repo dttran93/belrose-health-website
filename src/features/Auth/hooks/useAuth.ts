@@ -70,52 +70,24 @@ export const useAuth = (): AuthContextData => {
   }, []);
 
   useEffect(() => {
-    const checkAuthState = async () => {
-      try {
-        const currentUser = authService.getCurrentUser();
-        let user: BelroseUserProfile | null = null;
+    // The listener handles real-time auth changes
+    const unsubscribe = authService.onAuthStateChanged(async (user: FirebaseAuthUser | null) => {
+      setAuthState(prev => ({ ...prev, loading: true }));
+      let mergedUser: BelroseUserProfile | null = null;
 
-        if (currentUser) {
-          // Check initial state, still need to merge profile
-          user = await fetchAndMergeProfile(currentUser);
-        }
-
-        setAuthState({
-          user,
-          loading: false,
-        });
-      } catch (error) {
-        console.error('Error checking auth state:', error);
-        setAuthState({
-          user: null,
-          loading: false,
-        });
+      if (user) {
+        mergedUser = await fetchAndMergeProfile(user); // Use the helper function
       }
-    };
 
-    if (authService.onAuthStateChanged) {
-      // The listener handles real-time auth changes
-      const unsubscribe = authService.onAuthStateChanged(async (user: FirebaseAuthUser | null) => {
-        let mergedUser: BelroseUserProfile | null = null;
-
-        if (user) {
-          mergedUser = await fetchAndMergeProfile(user); // Use the helper function
-        }
-
-        // Single batched state update with the MERGED user object
-        setAuthState({
-          user: mergedUser,
-          loading: false,
-        });
+      // Single batched state update with the MERGED user object
+      setAuthState({
+        user: mergedUser,
+        loading: false,
       });
+    });
 
-      return () => {
-        unsubscribe();
-      };
-    } else {
-      checkAuthState();
-    }
-  }, [fetchAndMergeProfile]); // Depend on fetchAndMergeProfile
+    return () => unsubscribe();
+  }, []);
 
   // Additional helper methods
   const signOut = useCallback(async () => {
@@ -123,11 +95,6 @@ export const useAuth = (): AuthContextData => {
       setAuthState(prev => ({ ...prev, loading: true }));
 
       await authService.signOut();
-
-      setAuthState({
-        user: null,
-        loading: false,
-      });
     } catch (error) {
       console.error('Sign out error:', error);
       setAuthState(prev => ({ ...prev, loading: false }));
