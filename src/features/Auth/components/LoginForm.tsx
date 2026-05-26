@@ -112,8 +112,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister, onForgotPassw
         duration: 3000,
       });
 
-      const from = location.state?.from?.pathname || '/app';
-      navigate(from, { replace: true });
+      const from = location.state?.from?.pathname;
+      const safeTo = !from || from.startsWith('/auth') || from === '/' ? '/app' : from;
+      navigate(safeTo, { replace: true });
     } catch (error) {
       console.error('❌ Login error:', error);
       const firebaseError = error as FirebaseError;
