@@ -45,6 +45,10 @@ export const PAYMASTER = {
   dailySponsorLimit: 100, // Max sponsored txs per user per day. Set high so we can test in dev. Change in future
 } as const;
 
+export function buildBundlerURL(pimlicoApiKey: string) {
+  return `https://api.pimlico.io/v2/${NETWORK.chainId}/rpc?apikey=${pimlicoApiKey}`;
+}
+
 // ============================================================================
 // MEMBER ROLE MANAGER (MemberRoleManager.sol)
 // UUPS upgradeable proxy — always interact via proxy address

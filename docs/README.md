@@ -1,6 +1,6 @@
 # Belrose Health - Personal Sovereignty Protocol
 
-A technology and incentivization infrastructure to encourage people to own and manage their own health records
+A technology and incentivization infrastructure that gives people sovereignty over their health data
 
 ## The Problem
 

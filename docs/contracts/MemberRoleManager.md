@@ -50,6 +50,21 @@ Firebase UIDs are effectively permanent identifiers tied directly to a real pers
 
 By hashing the UID before putting it on chain, the public blockchain contains only opaque 32-byte values. The app is built so that you only have access to search for people if they have opted in, you know their exact uid or email, or you have shared records.
 
+### recordIdHash vs recordHash
+
+Two different hashes related to records appear throughout the contract and it is important not to confuse them:
+
+|                         | `recordIdHash`                                            | `recordHash`                                                           |
+| ----------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **What it is**          | Keccak256 hash of the Firebase record ID string           | SHA-256 hash of the record's file content                              |
+| **Purpose**             | On-chain identifier for a record's permissions and roles  | Tamper-evident fingerprint of a specific version of the record content |
+| **How to compute**      | `ethers.keccak256(ethers.toUtf8Bytes(firestoreRecordId))` | SHA-256 of the serialised record content fields                        |
+| **Type**                | `bytes32`                                                 | `bytes32`                                                              |
+| **Example use**         | `hasActiveRole(recordIdHash, wallet)`                     | `verifyRecord(recordIdHash, recordHash, level)`                        |
+| **Stored in Firestore** | Yes, as `recordIdHash` on the record document             | Yes, as `recordHash` or `previousRecordHashes`                         |
+
+`MemberRoleManager` only ever deals with `recordIdHash` — it manages who has access to a record, not the record's content. `HealthRecordCore` deals with both: it uses `recordIdHash` to identify the record and `recordHash` to anchor and verify specific versions of the content. It also serves to protect the information of the user, similar to userIdHash above.
+
 ### Member Registry Status Levels
 
 | Status               | Value | Description         | Can Do                |
@@ -59,6 +74,7 @@ By hashing the UID before putting it on chain, the public blockchain contains on
 | **Active**           | 2     | Standard user       | Basic operations      |
 | **Verified**         | 3     | Identity verified   | Advanced features     |
 | **VerifiedProvider** | 4     | Healthcare provider | Professional features |
+| **Guest**            | 5     | Temporary access    | View shared records   |
 
 ### Role Types
 
@@ -72,15 +88,13 @@ Three types of roles for record access:
 
 ### Trustee Relationships
 
-Trustee relationships are account-level trust grants between two identities. Unlike roles
-(which are scoped to a specific record), a trustee relationship gives one person
-standing access across all of the records in which the trustor is the subject.
+Trustee relationships are account-level trust grants between two identities. Unlike roles (which are scoped to a specific record), a trustee relationship gives one person standing access across all of the records in which the trustor is the subject.
 
 **How it works:**
 
 1. Trustor proposes a trustee relationship (Step 1)
 2. Trustee accepts the proposal (Step 2)
-3. The trustee is granted access to the trustors records and will be added to any future records in which the trustor is the subject
+3. The trustee is granted access to the trustor's records and will be added to any future records in which the trustor is the subject
 
 **Trust Levels:**
 
@@ -117,26 +131,35 @@ const tx = await contract.addMember(walletAddress, userIdHash);
 await tx.wait();
 ```
 
-**Contract function:**
+**Or register multiple wallets in one transaction (e.g. EOA + smart account on signup):**
+
+```typescript
+const tx = await contract.addMemberBatch([eoaAddress, smartAccountAddress], userIdHash);
+await tx.wait();
+```
+
+**Contract functions:**
 
 ```solidity
 function addMember(address wallet, bytes32 userIdHash) external onlyAdmin
+function addMemberBatch(address[] calldata walletAddresses, bytes32 userIdHash) external onlyAdmin
 ```
 
 **Requirements:**
 
-- Only admin can call this
+- Only admin can call these
 - Wallet can't already be registered
 - If first wallet for this user: creates new identity with "Active" status
 - If user exists: adds wallet to their identity
-- Wallets can also be deactivated or reactivated with the deactivateWallet/reactivateWallet functions
+- Wallets can also be deactivated or reactivated with `deactivateWallet`/`reactivateWallet`
 
 ### 2. Check if Someone Can Access a Record
 
 **Frontend code example:**
 
 ```typescript
-const hasAccess = await memberRoleManager.hasActiveRole(recordId, userWallet);
+// recordIdHash = ethers.keccak256(ethers.toUtf8Bytes(firestoreRecordId))
+const hasAccess = await memberRoleManager.hasActiveRole(recordIdHash, userWallet);
 
 if (hasAccess) {
   // Show record
@@ -155,11 +178,11 @@ if (hasAccess) {
 
 **What it does:** Give someone access to a record
 
-**Backend code example:**
+**Frontend code example:**
 
 ```typescript
 const tx = await contract.grantRole(
-  recordId,
+  recordIdHash, // bytes32 — keccak256 of the Firestore record ID
   targetWalletAddress,
   'viewer' // or 'administrator' or 'owner'
 );
@@ -177,7 +200,7 @@ await tx.wait();
 **Example:** Promote a viewer to administrator
 
 ```typescript
-const tx = await contract.changeRole(recordId, userWallet, 'administrator');
+const tx = await contract.changeRole(recordIdHash, userWallet, 'administrator');
 await tx.wait();
 ```
 
@@ -186,7 +209,7 @@ await tx.wait();
 ### 5. Remove Someone's Access
 
 ```typescript
-const tx = await contract.revokeRole(recordId, userWallet);
+const tx = await contract.revokeRole(recordIdHash, userWallet);
 await tx.wait();
 ```
 
@@ -209,6 +232,20 @@ const tx = await contract.acceptTrustee(trustorIdHash);
 await tx.wait();
 ```
 
+**To revoke (either party can call):**
+
+```typescript
+const tx = await contract.revokeTrustee(trustorIdHash, trusteeIdHash);
+await tx.wait();
+```
+
+**To update the trust level (trustor only, no re-acceptance needed):**
+
+```typescript
+const tx = await contract.updateTrusteeLevel(trusteeIdHash, 1); // Downgrade to Custodian
+await tx.wait();
+```
+
 ## Business Rules (Enforced by Contract)
 
 ### Role Granting Rules
@@ -221,7 +258,6 @@ await tx.wait();
 **To grant "administrator" or "viewer" role:**
 
 - Only owners and administrators can grant admin or viewer role
-- New users also default to administrator role
 
 ### Role Change Rules
 
@@ -239,20 +275,23 @@ await tx.wait();
 
 ```typescript
 // Does this wallet have ANY role on this record?
-const hasRole = await contract.hasActiveRole(recordId, walletAddress);
+const hasRole = await contract.hasActiveRole(recordIdHash, walletAddress);
 
 // Does this wallet have a specific role?
-const isOwner = await contract.hasRole(recordId, walletAddress, 'owner');
+const isOwner = await contract.hasRole(recordIdHash, walletAddress, 'owner');
 
 // Is this wallet an owner OR admin?
-const canManage = await contract.isOwnerOrAdmin(recordId, walletAddress);
+const canManage = await contract.isOwnerOrAdmin(recordIdHash, walletAddress);
 ```
 
 ### Get Role Details
 
 ```typescript
-// Get someone's full role info
-const [role, isActive] = await contract.getRoleDetails(recordId, walletAddress);
+// Get someone's full role info by wallet
+const [role, isActive] = await contract.getRoleDetails(recordIdHash, walletAddress);
+
+// Get by identity hash instead
+const [role, isActive] = await contract.getRoleDetailsByUser(recordIdHash, userIdHash);
 
 console.log(`Role: ${role}, Active: ${isActive}`);
 // Example output: "Role: administrator, Active: true"
@@ -261,14 +300,14 @@ console.log(`Role: ${role}, Active: ${isActive}`);
 ### List All People with Access
 
 ```typescript
-// Get all owner identities for a record
-const ownerHashes = await contract.getRecordOwners(recordId);
+// Get all owner identity hashes for a record
+const ownerHashes = await contract.getRecordOwners(recordIdHash);
 
-// Get all admin identities
-const adminHashes = await contract.getRecordAdmins(recordId);
+// Get all admin identity hashes
+const adminHashes = await contract.getRecordAdmins(recordIdHash);
 
-// Get all viewer identities
-const viewerHashes = await contract.getRecordViewers(recordId);
+// Get all viewer identity hashes
+const viewerHashes = await contract.getRecordViewers(recordIdHash);
 ```
 
 **Note:** These return userIdHashes. You'll need to look up user info in Firebase.
@@ -277,15 +316,16 @@ const viewerHashes = await contract.getRecordViewers(recordId);
 
 ```typescript
 // Get all records where a user has any role
+// Returns bytes32[] of recordIdHashes
 const userIdHash = ethers.id(userId);
-const recordIds = await contract.getRecordsByUser(userIdHash);
+const recordIdHashes = await contract.getRecordsByUser(userIdHash);
 ```
 
 ### Statistics
 
 ```typescript
 // How many people have each role type?
-const [ownerCount, adminCount, viewerCount] = await contract.getRecordRoleStats(recordId);
+const [ownerCount, adminCount, viewerCount] = await contract.getRecordRoleStats(recordIdHash);
 
 // Total unique users in the system
 const totalUsers = await contract.getTotalUsers();
@@ -314,6 +354,9 @@ const isController = await contract.isControllerOf(trustorIdHash, controllerIdHa
 ```typescript
 // Firebase UID → Blockchain userIdHash
 const userIdHash = ethers.id(firebaseUserId);
+
+// Firestore record ID → recordIdHash (for all contract calls)
+const recordIdHash = ethers.keccak256(ethers.toUtf8Bytes(firestoreRecordId));
 
 // Wallet Address → userIdHash
 const userIdHash = await contract.getUserForWallet(walletAddress);
