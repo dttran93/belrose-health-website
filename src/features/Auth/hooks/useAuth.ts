@@ -70,32 +70,10 @@ export const useAuth = (): AuthContextData => {
   }, []);
 
   useEffect(() => {
-    const checkAuthState = async () => {
-      try {
-        const currentUser = authService.getCurrentUser();
-        let user: BelroseUserProfile | null = null;
-
-        if (currentUser) {
-          // Check initial state, still need to merge profile
-          user = await fetchAndMergeProfile(currentUser);
-        }
-
-        setAuthState({
-          user,
-          loading: false,
-        });
-      } catch (error) {
-        console.error('Error checking auth state:', error);
-        setAuthState({
-          user: null,
-          loading: false,
-        });
-      }
-    };
-
     if (authService.onAuthStateChanged) {
       // The listener handles real-time auth changes
       const unsubscribe = authService.onAuthStateChanged(async (user: FirebaseAuthUser | null) => {
+        setAuthState(prev => ({ ...prev, loading: true }));
         let mergedUser: BelroseUserProfile | null = null;
 
         if (user) {
@@ -112,8 +90,6 @@ export const useAuth = (): AuthContextData => {
       return () => {
         unsubscribe();
       };
-    } else {
-      checkAuthState();
     }
   }, [fetchAndMergeProfile]); // Depend on fetchAndMergeProfile
 
@@ -123,11 +99,6 @@ export const useAuth = (): AuthContextData => {
       setAuthState(prev => ({ ...prev, loading: true }));
 
       await authService.signOut();
-
-      setAuthState({
-        user: null,
-        loading: false,
-      });
     } catch (error) {
       console.error('Sign out error:', error);
       setAuthState(prev => ({ ...prev, loading: false }));
