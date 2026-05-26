@@ -18,8 +18,6 @@ import RegistrationProgressDialog, {
   RegistrationPhase,
   RegistrationProgress,
 } from './ui/RegistrationProgressDialog';
-import { KeyBundleService } from '@/features/Messaging/services/keyBundleService';
-import { generateKeyBundle, PublicKeyBundle } from '@/features/Messaging';
 
 interface StepConfig {
   number: number;
@@ -63,7 +61,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
     publicKey: '',
     encryptedPrivateKey: '',
     encryptedPrivateKeyIV: '',
-    signalKeyBundle: null as PublicKeyBundle | null,
   });
 
   const steps: StepConfig[] = [
@@ -147,15 +144,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
           await MemberRegistryBlockchain.registerMemberOnChainComplete(masterKeyHex);
         console.log('✓ Wallet generated and registered:', registrationResult.walletAddress);
 
-        // 8. Generate Signal Protocol key bundle
-        //    - Generates identity keypair, signed prekey, and 100 one-time prekeys
-        //    - Private keys are saved to IndexedDB by generateKeyBundle() internally
-        //    - Public keys are returned here for upload during handleCompleteRegistration
-        console.log('💬 Generating Signal Protocol keys...');
-        const signalKeyBundle = await generateKeyBundle(data.userId);
-        console.log('✓ Signal keys generated');
-
-        // 9. Single state update with everything
+        // 8. Single state update with everything
         setRegistrationData(prev => ({
           ...prev,
           ...data,
@@ -171,7 +160,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
           smartAccountAddress: registrationResult.smartAccountAddress,
           walletType: 'generated',
           walletGenerationComplete: true,
-          signalKeyBundle,
         }));
 
         toast.success('Account and encryption setup complete!', {
@@ -212,7 +200,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
       console.log('🔄 Completing registration...');
 
       // Wallet + blockchain registration already done in step 1
-      // Just need to save account data and Signal keys
 
       // 1. Save core account data to Firestore
       setRegistrationProgress({
@@ -246,27 +233,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
         updatedAt: new Date(),
       });
 
-      // 2. Upload Signal public key bundle to Firestore
-      //    Private keys are already in IndexedDB from step 1.
-      //    This is a separate write so a Firestore failure here doesn't
-      //    roll back the main account creation above.
-      if (registrationData.signalKeyBundle) {
-        setRegistrationProgress({
-          step: 'firestore_update',
-          message: 'Setting up secure messaging...',
-        });
-        await KeyBundleService.uploadKeyBundle(
-          registrationData.userId,
-          registrationData.signalKeyBundle
-        );
-        console.log('✓ Signal key bundle uploaded');
-      } else {
-        // Non-fatal — messaging won't work until keys are uploaded,
-        // but account creation should still succeed.
-        console.warn('⚠️ Signal key bundle missing — messaging setup incomplete');
-      }
-
-      // 3. Update invite doc if applicable
+      // 2. Update invite doc if applicable
       try {
         const inviteRef = doc(db, 'invites', registrationData.email.toLowerCase());
         await updateDoc(inviteRef, {

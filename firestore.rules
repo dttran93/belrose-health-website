@@ -890,7 +890,7 @@ service cloud.firestore {
         request.resource.data.createdAt == resource.data.createdAt &&
         // Only these fields can change
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['lastMessageAt', 'lastReadAt']);
+        .hasOnly(['lastMessageAt', 'lastReadAt', 'encryptedKeys']);
     
       // DELETE: Not allowed — conversations are permanent records
       // (soft delete via a field could be added later if needed)
@@ -904,20 +904,14 @@ service cloud.firestore {
           request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
     
         // CREATE: Only participants can send messages
-        // We validate the shape but NOT the ciphertext content —
-        // the server is zero-knowledge about message content by design.
         allow create: if request.auth != null &&
           request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants &&
-          // Sender must be the authenticated user
           request.resource.data.senderId == request.auth.uid &&
-          // Signal Protocol message types: 1 = WhisperMessage, 3 = PreKeyWhisperMessage
-          request.resource.data.type in [1, 3] &&
-          // Ciphertext body must be a non-empty string
           request.resource.data.body is string &&
           request.resource.data.body.size() > 0 &&
-          request.resource.data.registrationId is int &&
+          request.resource.data.iv is string &&        // ← replaces type + registrationId
+          request.resource.data.iv.size() > 0 &&
           request.resource.data.sentAt is timestamp &&
-          // Delivery/read receipts start null
           request.resource.data.deliveredAt == null &&
           request.resource.data.readAt == null;
     
@@ -925,15 +919,11 @@ service cloud.firestore {
         // Senders cannot mark their own messages as read (avoids spoofing)
         allow update: if request.auth != null &&
           request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants &&
-          // Cannot be the original sender (recipients update receipts only)
           request.auth.uid != resource.data.senderId &&
-          // Message content fields are all immutable
           request.resource.data.senderId == resource.data.senderId &&
-          request.resource.data.type == resource.data.type &&
           request.resource.data.body == resource.data.body &&
-          request.resource.data.registrationId == resource.data.registrationId &&
+          request.resource.data.iv == resource.data.iv &&        // ← replaces type + registrationId
           request.resource.data.sentAt == resource.data.sentAt &&
-          // Only receipt fields can be updated
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['deliveredAt', 'readAt']);
     

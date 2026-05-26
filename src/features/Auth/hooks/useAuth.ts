@@ -4,36 +4,11 @@ import { UserService } from '../services/userService';
 import { UserSettingsService } from '@/features/Settings/services/userSettingsService';
 import { AuthContextData, BelroseUserProfile } from '@/types/core';
 import { User as FirebaseAuthUser } from 'firebase/auth';
-import { KeyBundleService } from '@/features/Messaging/services/keyBundleService';
-import { BelroseSignalStore } from '@/features/Messaging/lib/BelroseSignalStore';
-import { generateKeyBundle } from '@/features/Messaging/lib/keyGeneration';
 
 // Define the shape of the internal hook state
 interface AuthState {
   user: BelroseUserProfile | null;
   loading: boolean;
-}
-
-// Helper function to ensure the user's Signal key bundle is set up in the background
-async function ensureSignalKeyBundle(userId: string): Promise<void> {
-  try {
-    const [hasBundle, hasLocalKeys] = await Promise.all([
-      KeyBundleService.hasKeyBundle(userId),
-      (async () => {
-        const store = new BelroseSignalStore(userId);
-        return !!(await store.getIdentityKeyPair());
-      })(),
-    ]);
-
-    if (hasBundle && hasLocalKeys) return; // Already good
-
-    const keyBundle = await generateKeyBundle(userId);
-    await KeyBundleService.uploadKeyBundle(userId, keyBundle);
-    console.log('✅ Signal key bundle ready');
-  } catch (err) {
-    // Non-fatal — messaging setup will retry when user opens messages
-    console.warn('⚠️ Background Signal setup failed:', err);
-  }
 }
 
 export const useAuth = (): AuthContextData => {
@@ -125,10 +100,6 @@ export const useAuth = (): AuthContextData => {
 
         if (user) {
           mergedUser = await fetchAndMergeProfile(user); // Use the helper function
-
-          // Kick off Signal setup in the background — non-blocking
-          // By the time user navigates to messages, keys will be ready
-          ensureSignalKeyBundle(user.uid).catch(() => {});
         }
 
         // Single batched state update with the MERGED user object

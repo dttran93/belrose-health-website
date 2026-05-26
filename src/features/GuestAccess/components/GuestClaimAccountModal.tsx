@@ -42,8 +42,6 @@ import { MemberRegistryBlockchain } from '@/features/Auth/services/memberRegistr
 import { SmartAccountService } from '@/features/BlockchainWallet/services/smartAccountService';
 import { RecoveryKeyDisplay } from '@/features/Auth/components/RecoveryKeyDisplay';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
-import { generateKeyBundle } from '@/features/Messaging';
-import { KeyBundleService } from '@/features/Messaging/services/keyBundleService';
 import { toast } from 'sonner';
 import InputField from '@/components/ui/InputField';
 import { WalletGenerationService } from '@/features/Auth/services/walletGenerationService';
@@ -471,15 +469,10 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         }
       }
 
-      // ── Step 10: Generate Signal keys ─────────────────────────────────────
-      setProgress({ message: 'Setting up secure messaging...' });
-      const signalKeyBundle = await generateKeyBundle(guestUid);
-      await KeyBundleService.uploadKeyBundle(guestUid, signalKeyBundle);
-
-      // ── Step 11: Clear guest keys from memory ─────────────────────────────
+      // ── Step 10: Clear guest keys from memory ─────────────────────────────
       EncryptionKeyManager.setGuestFileKeys(new Map());
 
-      // ── Step 12: Refresh auth context so banner disappears ───────────────────
+      // ── Step 11: Refresh auth context so banner disappears ───────────────────
       setProgress({ message: 'Finalizing...' });
 
       try {

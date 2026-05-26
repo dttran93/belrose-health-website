@@ -4,12 +4,12 @@
  * The main React interface for the Belrose messaging feature.
  *
  * Wires together:
- *   SessionManager  (encrypt/decrypt via Signal Protocol)
- *   MessageService  (read/write encrypted blobs to Firestore)
- *   KeyBundleService (OPK replenishment after sends)
+ *   MessageEncryptionService  (encrypt/decrypt via AES-256-GCM)
+ *   ConversationKeyService    (AES key retrieval/generation via RSA key exchange)
+ *   MessageService            (read/write encrypted blobs to Firestore)
  *
  * Components never touch crypto or Firestore directly — they just call
- * sendMessage() and read from messages[]. Everything else is invisible.
+ * sendMessage() and read from messages[].
  *
  * Usage:
  *   const { messages, sendMessage, isLoading, isSending, error } =
@@ -20,11 +20,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { getAuth } from 'firebase/auth';
 import { toast } from 'sonner';
 import { useAuthContext } from '@/features/Auth/AuthContext';
-import { SessionManager } from '../lib/sessionManager';
+import { MessageEncryptionService } from '../services/messageEncryptionService';
 import { MessageService } from '../services/messageService';
-import { KeyBundleService } from '../services/keyBundleService';
-import { MessageBackupService } from '../services/messageBackupService';
-import { generateAdditionalOneTimePreKeys } from '../lib/keyGeneration';
 import type { StoredMessage } from '../services/messageService';
 
 // ---------------------------------------------------------------------------
@@ -33,12 +30,12 @@ import type { StoredMessage } from '../services/messageService';
 
 /**
  * A fully decrypted message ready for rendering.
- * This is what components see — no ciphertext, no Signal internals.
+ * This is what components see — no ciphertext, no crypto internals.
  */
 export interface DecryptedMessage {
   id: string;
   senderId: string;
-  /** Decrypted plaintext content */
+  /** Decrypted plaintext */
   text: string;
   sentAt: StoredMessage['sentAt'];
   deliveredAt: StoredMessage['deliveredAt'];
@@ -73,18 +70,19 @@ export interface UseMessagingReturn {
  *
  * On mount:
  *   1. Gets or creates the conversation document in Firestore
- *   2. Subscribes to messages via onSnapshot
- *   3. Decrypts each incoming message via SessionManager
- *   4. Marks messages as delivered automatically
+ *   2. Restores message backup so UI shows history immediately
+ *   3. Subscribes to messages via onSnapshot
+ *   4. Decrypts each incoming message via MessageEncryptionService
+ *   5. Marks messages as delivered automatically
  *
  * On sendMessage:
- *   1. Encrypts plaintext via SessionManager (X3DH if first message)
- *   2. Writes ciphertext to Firestore via MessageService
- *   3. Checks OPK supply and replenishes if low
+ *   1. Encrypts via MessageEncryptionService (generates conversation key if first message)
+ *   2. Writes { body, iv } ciphertext to Firestore via MessageService
+ *   3. Optimistically updates local state so sender sees message immediately
  *
  * @param recipientUserId - Firebase Auth UID of the conversation partner
  */
-export function useMessaging(recipientUserId: string, signalReady: boolean): UseMessagingReturn {
+export function useMessaging(recipientUserId: string): UseMessagingReturn {
   const { user } = useAuthContext();
   const [messages, setMessages] = useState<DecryptedMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -95,25 +93,22 @@ export function useMessaging(recipientUserId: string, signalReady: boolean): Use
   // Ref to hold the Firestore unsubscribe function — cleaned up on unmount
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
-  // Ref to track highest OPK keyId used — needed for replenishment
-  const lastPreKeyIdRef = useRef<number>(0);
-
-  // Cache of already-decrypted messages — prevents double-decryption when
-  // Firestore onSnapshot fires twice for the same message (cache then server).
-  // The Double Ratchet advances on every decrypt, so decrypting twice = Bad MAC.
+  // Cache of already-decrypted message text by messageId.
+  // AES-GCM decryption is idempotent  calling it twice on the same message
+  // produces the same result. So this cache is a performance optimisation
+  // (avoids redundant decryption work when Firestore fires snapshots for unchanged messages).
   const decryptedCacheRef = useRef<Map<string, string>>(new Map());
+
+  // Stable reference to participantIds for use inside callbacks.
+  // The tuple order doesn't matter — ConversationKeyService sorts UIDs.
+  const participantIdsRef = useRef<[string, string] | null>(null);
 
   // ---------------------------------------------------------------------------
   // Initialise conversation and subscribe to messages
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    // Guard strictly — empty string, whitespace, or obviously invalid IDs
-    // should never reach Firestore
     if (!user || !recipientUserId || recipientUserId.trim() === '') return;
-    if (!signalReady) return;
-
-    // Extra safety: don't message yourself
     if (recipientUserId === user.uid) return;
 
     let isMounted = true;
@@ -123,32 +118,13 @@ export function useMessaging(recipientUserId: string, signalReady: boolean): Use
       setError(null);
 
       try {
-        // Get or create the Firestore conversation document
         const convId = await MessageService.getOrCreateConversation(recipientUserId);
         if (!isMounted) return;
+
         setConversationId(convId);
+        participantIdsRef.current = [user.uid, recipientUserId];
 
-        // Restore backup immediately so the UI shows history before
-        // the Firestore snapshot arrives and decryption completes
-        const backup = await MessageBackupService.loadBackup(convId);
-        if (backup && backup.length > 0 && isMounted) {
-          const restored = backup.map(m => ({
-            id: m.id,
-            senderId: m.senderId,
-            text: m.text,
-            sentAt: m.sentAt as any,
-            deliveredAt: null,
-            readAt: null,
-            isOwn: m.senderId === user.uid,
-          }));
-          setMessages(restored);
-          // Pre-populate cache so the snapshot doesn't re-decrypt backed-up messages
-          backup.forEach(m => decryptedCacheRef.current.set(m.id, m.text));
-          console.log('Cache size after backup restore:', decryptedCacheRef.current.size);
-          console.log(`📂 Restored ${restored.length} messages from backup`);
-        }
-
-        // Subscribe to real-time message updates
+        // Subscribe to real-time updates
         const unsubscribe = MessageService.subscribeToMessages(
           convId,
           async storedMessages => {
@@ -175,13 +151,25 @@ export function useMessaging(recipientUserId: string, signalReady: boolean): Use
 
     init();
 
-    // Cleanup: unsubscribe from Firestore listener on unmount or recipient change
     return () => {
       isMounted = false;
       unsubscribeRef.current?.();
       unsubscribeRef.current = null;
     };
-  }, [user?.uid, recipientUserId, signalReady]);
+  }, [user?.uid, recipientUserId]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && conversationId && user) {
+        MessageService.markAllRead(conversationId, user.uid).catch(err =>
+          console.warn('⚠️ Failed to mark messages as read on focus:', err)
+        );
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [conversationId, user?.uid]);
 
   // ---------------------------------------------------------------------------
   // Decrypt incoming messages
@@ -198,31 +186,16 @@ export function useMessaging(recipientUserId: string, signalReady: boolean): Use
    */
   const handleIncomingMessages = useCallback(
     async (storedMessages: StoredMessage[], convId: string) => {
-      const auth = getAuth();
-      const currentUserId = auth.currentUser?.uid;
-      if (!currentUserId) return;
+      const currentUserId = getAuth().currentUser?.uid;
+      if (!currentUserId || !participantIdsRef.current) return;
+
+      const participantIds = participantIdsRef.current;
 
       const decrypted = await Promise.all(
         storedMessages.map(async (msg): Promise<DecryptedMessage> => {
           const isOwn = msg.senderId === currentUserId;
 
-          if (isOwn) {
-            // Use cached plaintext if we sent this optimistically
-            const cached = decryptedCacheRef.current.get(msg.id);
-            return {
-              id: msg.id,
-              senderId: msg.senderId,
-              text: cached ?? '[Sent message]',
-              sentAt: msg.sentAt,
-              deliveredAt: msg.deliveredAt,
-              readAt: msg.readAt,
-              isOwn: true,
-            };
-          }
-
-          // Return cached plaintext if already decrypted — prevents Bad MAC
-          // from double-decryption when Firestore fires snapshot twice
-          // (once from local cache, once from server on first load)
+          // Return cached result to avoid redundant decryption work
           const cached = decryptedCacheRef.current.get(msg.id);
           if (cached !== undefined) {
             return {
@@ -232,22 +205,21 @@ export function useMessaging(recipientUserId: string, signalReady: boolean): Use
               sentAt: msg.sentAt,
               deliveredAt: msg.deliveredAt,
               readAt: msg.readAt,
-              isOwn: false,
+              isOwn,
             };
           }
 
           // First time seeing this message — decrypt it
           try {
-            const plaintext = await SessionManager.decryptMessage(msg.senderId, {
-              type: msg.type,
-              body: msg.body,
-              registrationId: msg.registrationId,
-            });
+            const plaintext = await MessageEncryptionService.decryptMessage(
+              { body: msg.body, iv: msg.iv },
+              convId,
+              participantIds
+            );
 
-            // Cache so subsequent snapshots don't re-decrypt
             decryptedCacheRef.current.set(msg.id, plaintext);
 
-            if (!msg.deliveredAt) {
+            if (!msg.deliveredAt && !isOwn) {
               MessageService.markDelivered(convId, msg.id).catch(err =>
                 console.warn('⚠️ Failed to mark delivered:', err)
               );
@@ -260,7 +232,7 @@ export function useMessaging(recipientUserId: string, signalReady: boolean): Use
               sentAt: msg.sentAt,
               deliveredAt: msg.deliveredAt,
               readAt: msg.readAt,
-              isOwn: false,
+              isOwn,
             };
           } catch (err) {
             console.error('❌ Failed to decrypt message:', msg.id, err);
@@ -279,19 +251,20 @@ export function useMessaging(recipientUserId: string, signalReady: boolean): Use
 
       setMessages(decrypted);
 
-      // Last message preview, stored in local storage
-      const lastMessage = decrypted[decrypted.length - 1];
-      if (lastMessage) {
-        const currentUserId = getAuth().currentUser?.uid;
-        localStorage.setItem(`${currentUserId}_${convId}_preview`, lastMessage.text.slice(0, 60));
+      // Mark any unread incoming messages as read
+      // Only fires if there are actually unread messages from the other person
+      const hasUnreadIncoming = decrypted.some(m => !m.isOwn && !m.readAt);
+      if (hasUnreadIncoming && convId && document.visibilityState === 'visible') {
+        MessageService.markAllRead(convId, currentUserId).catch(err =>
+          console.warn('⚠️ Failed to mark messages as read:', err)
+        );
       }
 
-      // Save encrypted backup — non-blocking, failures don't affect the UI
-      // This ensures message history survives IndexedDB clears, device switches,
-      // CCleaner runs, and incognito sessions
-      MessageBackupService.saveBackup(convId, decrypted).catch(err =>
-        console.warn('⚠️ Backup save failed (non-fatal):', err)
-      );
+      // Write last-message preview to localStorage for ConversationList
+      const lastMessage = decrypted[decrypted.length - 1];
+      if (lastMessage) {
+        localStorage.setItem(`${currentUserId}_${convId}_preview`, lastMessage.text.slice(0, 60));
+      }
     },
     []
   );
@@ -300,46 +273,38 @@ export function useMessaging(recipientUserId: string, signalReady: boolean): Use
   // Send
   // ---------------------------------------------------------------------------
 
-  /**
-   * Encrypts and sends a plaintext message to the recipient.
-   *
-   * Flow:
-   *   1. Encrypt via SessionManager (handles X3DH if first message)
-   *   2. Write ciphertext to Firestore via MessageService
-   *   3. Optimistically add plaintext to local state so sender sees it immediately
-   *   4. Check OPK supply and replenish if running low
-   */
   const sendMessage = useCallback(
     async (plaintext: string) => {
       if (!plaintext.trim()) return;
-      if (!conversationId) {
+      if (!conversationId || !participantIdsRef.current) {
         toast.error('Conversation not ready — please try again');
         return;
       }
 
-      const auth = getAuth();
-      const currentUserId = auth.currentUser?.uid;
+      const currentUserId = getAuth().currentUser?.uid;
       if (!currentUserId) return;
 
       setIsSending(true);
       setError(null);
 
       try {
-        // 1. Encrypt
-        const encryptedMessage = await SessionManager.encryptMessage(recipientUserId, plaintext);
+        // 1. Encrypt — generates conversation key if this is the first message
+        const encryptedMessage = await MessageEncryptionService.encryptMessage(
+          plaintext,
+          conversationId,
+          participantIdsRef.current
+        );
 
         // 2. Write to Firestore
         const messageId = await MessageService.sendMessage(conversationId, encryptedMessage);
 
-        // Cache our own plaintext so handleIncomingMessages retrieves it
-        // correctly when Firestore's onSnapshot fires for this message
+        // Cache plaintext so handleIncomingMessages shows it correctly
+        // when Firestore's onSnapshot fires for this message
         decryptedCacheRef.current.set(messageId, plaintext);
 
-        // Write preview to localStorage immediately so ConversationList shows preview
         localStorage.setItem(`${currentUserId}_${conversationId}_preview`, plaintext.slice(0, 60));
 
-        // 3. Optimistic update — add our plaintext immediately so the sender
-        //    doesn't see "[Sent message]" while waiting for the Firestore round-trip
+        // 3. Optimistic update — sender sees message immediately
         const optimisticMessage: DecryptedMessage = {
           id: messageId,
           senderId: currentUserId,
@@ -356,19 +321,8 @@ export function useMessaging(recipientUserId: string, signalReady: boolean): Use
             ? prev.map(m => (m.id === messageId ? optimisticMessage : m))
             : [...prev, optimisticMessage];
 
-          // Save backup with the new message included — non-blocking
-          MessageBackupService.saveBackup(conversationId, updated).catch(err =>
-            console.warn('⚠️ Backup save failed (non-fatal):', err)
-          );
-
           return updated;
         });
-
-        // 4. Check OPK supply — replenish if running low
-        // Non-blocking: don't await, failure here shouldn't affect the send
-        checkAndReplenishPreKeys(currentUserId).catch(err =>
-          console.warn('⚠️ OPK replenishment check failed:', err)
-        );
       } catch (err: any) {
         console.error('❌ Failed to send message:', err);
         const error = err instanceof Error ? err : new Error(err.message);
@@ -378,7 +332,7 @@ export function useMessaging(recipientUserId: string, signalReady: boolean): Use
         setIsSending(false);
       }
     },
-    [conversationId, recipientUserId]
+    [conversationId]
   );
 
   // ---------------------------------------------------------------------------
@@ -387,35 +341,12 @@ export function useMessaging(recipientUserId: string, signalReady: boolean): Use
 
   const markAllRead = useCallback(async () => {
     if (!conversationId || !user) return;
-
     try {
       await MessageService.markAllRead(conversationId, user.uid);
     } catch (err) {
       console.warn('⚠️ Failed to mark messages as read:', err);
     }
   }, [conversationId, user?.uid]);
-
-  // ---------------------------------------------------------------------------
-  // OPK replenishment
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Checks OPK supply and generates + uploads a fresh batch if running low.
-   * Called after every message send — cheap Firestore read, non-blocking.
-   */
-  const checkAndReplenishPreKeys = async (userId: string) => {
-    // Generate new batch starting from after the last known keyId
-    // lastPreKeyIdRef tracks this across sends in this session
-    const newPreKeys = await generateAdditionalOneTimePreKeys(lastPreKeyIdRef.current + 1, userId);
-
-    // Update our ref so next replenishment starts from the right keyId
-    const lastKey = newPreKeys.at(-1);
-    if (lastKey) {
-      lastPreKeyIdRef.current = lastKey.keyId;
-    }
-
-    await KeyBundleService.checkAndReplenishPreKeys(userId, newPreKeys);
-  };
 
   // ---------------------------------------------------------------------------
 

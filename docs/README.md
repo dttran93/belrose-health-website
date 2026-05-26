@@ -25,12 +25,11 @@ This all enables the ultimate goal:
 
 - React + Vite (frontend)
 - End-to-End encryption (E2EE)
-  - AES for encrypting records
+  - AES for encrypting records, messages, and AI Chats
   - RSA for passing encrypted keys
 - Blockchain (Solidity) for data verification
 - Pimlico - Account Abstraction for gasless blockchain transactions
 - Firebase (backend database, authentication, and file storage)
-- Signal Protocol - For E2EE Messaging
 
 ## Project Status
 

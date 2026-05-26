@@ -26,8 +26,6 @@ import { useMessaging } from '../hooks/useMessaging';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
 import Avatar from '@/features/Users/components/Avatar';
 import type { BelroseUserProfile } from '@/types/core';
-import { SignalSetupStatus, useSignalSetup } from '../hooks/useSignalSetup';
-import SignalDevPanel from './SignalDevPanel';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 
 // ---------------------------------------------------------------------------
@@ -36,7 +34,6 @@ import { useAuthContext } from '@/features/Auth/AuthContext';
 
 export const MessagingView: React.FC = () => {
   const { user } = useAuthContext();
-  const { isReady: signalReady, status: signalStatus } = useSignalSetup();
   const { recipientId: urlRecipientId } = useParams<{ recipientId?: string }>();
   const navigate = useNavigate();
 
@@ -165,21 +162,11 @@ export const MessagingView: React.FC = () => {
               setSelectedConversationId(null);
               setRecipientUserId('');
             }}
-            signalReady={signalReady}
-            signalStatus={signalStatus}
           />
         ) : (
           <EmptyThreadState />
         )}
       </div>
-
-      {import.meta.env.DEV && (
-        <SignalDevPanel
-          currentUserId={user?.uid ?? null}
-          recipientUserId={recipientUserId || null}
-          signalStatus={signalStatus}
-        />
-      )}
     </div>
   );
 };
@@ -194,8 +181,6 @@ interface ActiveThreadProps {
   recipientName: string;
   onConversationReady: (conversationId: string) => void;
   onBack: () => void;
-  signalReady: boolean;
-  signalStatus: SignalSetupStatus;
 }
 
 const ActiveThread: React.FC<ActiveThreadProps> = ({
@@ -204,19 +189,12 @@ const ActiveThread: React.FC<ActiveThreadProps> = ({
   recipientName,
   onConversationReady,
   onBack,
-  signalReady,
-  signalStatus,
 }) => {
-  const { messages, isLoading, isSending, sendMessage, markAllRead, conversationId } = useMessaging(
-    recipientUserId,
-    signalReady
-  );
-
-  const isSettingUp = signalStatus === 'checking' || signalStatus === 'registering';
+  const { messages, isLoading, isSending, sendMessage, markAllRead, conversationId } =
+    useMessaging(recipientUserId);
 
   // Sync the resolved conversationId back up to MessagingView so
-  // ConversationList can highlight the correct item — works for both
-  // DMs and future group conversations since it's always ID-based
+  // ConversationList can highlight the correct item
   useEffect(() => {
     if (conversationId) onConversationReady(conversationId);
   }, [conversationId]);
@@ -243,32 +221,23 @@ const ActiveThread: React.FC<ActiveThreadProps> = ({
           <p className="text-sm font-semibold text-foreground truncate">
             {recipientName || 'Loading...'}
           </p>
-          {isSettingUp && (
-            <p className="text-xs text-complement-4 truncate">Setting up secure messaging…</p>
+          {recipientProfile?.affiliations && recipientProfile.affiliations.length > 0 && (
+            <p className="text-xs text-muted-foreground truncate">
+              {recipientProfile.affiliations[0]}
+            </p>
           )}
-          {recipientProfile?.affiliations &&
-            recipientProfile.affiliations.length > 0 &&
-            !isSettingUp && (
-              <p className="text-xs text-muted-foreground truncate">
-                {recipientProfile.affiliations[0]}
-              </p>
-            )}
         </div>
       </div>
 
       {/* Message thread */}
-      <MessageThread
-        messages={messages}
-        isLoading={isLoading || isSettingUp}
-        recipientName={recipientName}
-      />
+      <MessageThread messages={messages} isLoading={isLoading} recipientName={recipientName} />
 
-      {/* Input — disabled while setting up so user can't send before keys exist */}
+      {/* Message input */}
       <MessageInput
         onSend={sendMessage}
         isSending={isSending}
-        disabled={isLoading || isSettingUp}
-        placeholder={isSettingUp ? 'Setting up secure messaging…' : 'Message...'}
+        disabled={isLoading}
+        placeholder="Message..."
       />
     </>
   );

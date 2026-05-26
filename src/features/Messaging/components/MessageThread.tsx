@@ -94,9 +94,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       {/* E2EE badge at the bottom — reinforces trust */}
       <div className="flex items-center justify-center gap-1.5 mt-4 mb-1">
         <ShieldCheck className="w-3.5 h-3.5 text-complement-3" />
-        <span className="text-xs text-muted-foreground">
-          End-to-end encrypted with Signal Protocol
-        </span>
+        <span className="text-xs text-muted-foreground">End-to-end encrypted</span>
       </div>
 
       {/* Scroll anchor */}

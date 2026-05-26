@@ -10,7 +10,7 @@ Belrose takes a different approach: **encryption keys are derived from the user'
 
 This is not novel technology. WhatsApp, ProtonMail, and Signal all operate on the same principle. Belrose applies it to health data.
 
-The practical consequence: if a user loses their password and their recovery key, their data is unrecoverable. This is the honest tradeoff of genuine data sovereignty. We're upfront about it during registration.
+The practical consequence: if a user loses their password and their recovery key, their data is unrecoverable. This is the honest tradeoff of genuine data sovereignty, we make this clear during registration.
 
 ---
 
@@ -21,11 +21,11 @@ Belrose uses a layered key hierarchy.
 ```
 Password (user knows this)
     ↓ PBKDF2 derivation (100,000 iterations, SHA-256)
-Key Encryption Key (KEK) — never stored, derived on demand
+Key Encryption Key (KEK) - never stored, derived on demand
     ↓ AES-GCM decrypt
-Master Key (AES-256) — stored encrypted in Firestore, lives in memory during session
+Master Key (AES-256) - stored encrypted in Firestore, lives in memory during session
     ↓ AES-GCM encrypt/decrypt
-Record DEK (Data Encryption Key) — one per record, stored in wrappedKeys collection
+Record DEK (Data Encryption Key) - one per record, stored in wrappedKeys collection
     ↓ AES-GCM encrypt/decrypt
 Record Content (FHIR data, extracted text, file content, etc.)
 ```
@@ -35,27 +35,28 @@ Additionally, each user has an RSA-2048 key pair used exclusively for passing AE
 ```
 Master Key
     ↓ AES-GCM encrypt
-RSA Private Key — stored encrypted in Firestore
-RSA Public Key — stored plaintext in Firestore (intentionally public)
+RSA Private Key - stored encrypted in Firestore
+RSA Public Key - stored plaintext in Firestore (intentionally public)
     ↓ RSA-OAEP wrap
-Record DEK copy for a shared user — stored in wrappedKeys collection
+Record DEK copy for a shared user - stored in wrappedKeys collection
 ```
 
-Signal Protocol keys are completely separate from the record encryption hierarchy and aren't part of the master key chain:
+Messages with other users are also stored with similar encryption
 
 ```
-Registration
-    ↓ generateKeyBundle()
-Identity Keypair       — long-term identity, private key in IndexedDB only
-Signed Prekey          — medium-term, private key in IndexedDB only
-100 One-Time Prekeys   — ephemeral, private keys in IndexedDB only
-    ↓ public halves uploaded to Firestore as PublicKeyBundle
-X3DH Key Agreement (on first message to another user)
-    ↓ produces shared secret, never seen by server
-Double Ratchet         — fresh derived key per message, forward secrecy
-```
+Password (user knows this)
+    ↓ PBKDF2 derivation
+Key Encryption Key (KEK) - never stored, derived on demand
+    ↓ AES-GCM decrypt
+Master Key (AES-256) - stored encrypted in Firestore, lives in memory during session
+    ↓ AES-GCM decrypt
+RSA Private Key - stored encrypted in Firestore, lives in memory during session
+    ↓ RSA-OAEP unwrap
+Conversation Key (AES-256) - stored RSA-OAEP wrapped in the conversation document (one copy per participant)
+    ↓ AES-GCM decrypt with message IV
+Decrypted Message
 
-Refer to BelroseSignalProtocol for further discussion.
+```
 
 ---
 
@@ -83,9 +84,6 @@ A 2048-bit RSA-OAEP key pair is generated for record sharing. The public key is 
 
 **5. Store master key in session**
 The unencrypted master key is placed in memory via `EncryptionKeyManager.setSessionKey` for use during the rest of the registration flow and the current session.
-
-**6. Generate Signal Protocol Keys**
-Signal protocol key bundle is also generated during the registration step. Refer to BelroseSignalProtocol documentation for further information.
 
 ---
 
@@ -227,11 +225,7 @@ Until ZDR agreements and self-hosted models are in place, users should be inform
 
 ## Storage Encryption
 
-Files uploaded to Firebase Storage (record attachments, images) are encrypted
-client-side before upload. The encrypted bytes are stored in Storage; the IV is
-either prepended to the file (first 12 bytes) or stored separately depending on
-the context. The file is decrypted after download using the same record DEK used
-for the text fields of that record.
+Files uploaded to Firebase Storage (record attachments, images) are encrypted client-side before upload. The encrypted bytes are stored in Storage; the IV is either prepended to the file (first 12 bytes) or stored separately depending on the context. The file is decrypted after download using the same record DEK used for the text fields of that record.
 
 This means Firebase Storage holds only ciphertext. Even with direct Storage access, the files are unreadable without the record DEK, which requires the user's master key to unwrap.
 
@@ -245,7 +239,8 @@ This means Firebase Storage holds only ciphertext. Even with direct Storage acce
 | Record DEKs (wrappedKeys)                 | AES or RSA ciphertext                   | No                |
 | Master key                                | AES-GCM ciphertext (KEK-wrapped)        | No                |
 | RSA private key                           | AES-GCM ciphertext (master-key-wrapped) | No                |
-| Signal private keys                       | IndexedDB only, never uploaded          | No                |
+| Message                                   | AES-GCM ciphertext                      | No                |
+| Message Conversation key                  | RSA-OAEP ciphertext (per participant)   | No                |
 | AI chat messages                          | AES-GCM ciphertext                      | No                |
 | Recovery key hash                         | SHA-256 hash                            | Hash only         |
 | RSA public key                            | Plaintext                               | Yes               |
@@ -269,12 +264,14 @@ The boundary we are drawing is that: anything required to operate the account is
 
 ## Encryption Primitives Reference
 
-| Purpose                     | Algorithm                               | Key Size                   |
-| --------------------------- | --------------------------------------- | -------------------------- |
-| Record/file encryption      | AES-GCM                                 | 256-bit                    |
-| Master key wrapping         | AES-GCM                                 | 256-bit                    |
-| Password-to-KEK derivation  | PBKDF2 + SHA-256                        | 100,000 iterations         |
-| Record sharing key wrapping | RSA-OAEP + SHA-256                      | 2048-bit                   |
-| Recovery key encoding       | BIP-39 mnemonic                         | 24 words (256-bit entropy) |
-| Recovery key verification   | SHA-256 hash                            | —                          |
-| Messaging                   | Signal Protocol (X3DH + Double Ratchet) | —                          |
+| Purpose                     | Algorithm          | Key Size                   |
+| --------------------------- | ------------------ | -------------------------- |
+| Record/file encryption      | AES-GCM            | 256-bit                    |
+| Master key wrapping         | AES-GCM            | 256-bit                    |
+| Password-to-KEK derivation  | PBKDF2 + SHA-256   | 100,000 iterations         |
+| Record sharing key wrapping | RSA-OAEP + SHA-256 | 2048-bit                   |
+| Recovery key encoding       | BIP-39 mnemonic    | 24 words (256-bit entropy) |
+| Recovery key verification   | SHA-256 hash       | —                          |
+| Message encryption          | AES-GCM            | 256-bit                    |
+| Conversation key wrapping   | RSA-OAEP + SHA-256 | 2048-bit                   |
+| Per-message IV              | Random nonce       | 96-bit                     |

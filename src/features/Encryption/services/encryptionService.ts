@@ -6,7 +6,7 @@
  */
 import { ENCRYPTION_CONFIG } from '../encryptionConfig';
 import * as bip39 from 'bip39';
-import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
+import { arrayBufferToBase64 } from '@/utils/dataFormattingUtils';
 
 export class EncryptionService {
   /**
@@ -306,32 +306,6 @@ export class EncryptionService {
     return result;
   }
 
-  /**
-   * Decrypt ALL record data using an already-unwrapped file key
-   * Use this when the file key has been unwrapped separately:
-   * - Shared users (RSA-unwrapped keys)
-   * - When you already have the wrapped key in memory
-   * - update operations where key is wrapped once and reused
-   * - Point is to avoid redundant firestore reads. Used in Versioning
-   */
-  static async decryptRecordWithKey(fileKey: CryptoKey, encryptedData: any): Promise<any> {
-    console.log('🔓 Starting complete record decryption with unwrapped key...');
-
-    const result: any = {};
-
-    // Decrypt all fields
-    result.fileName = await this.safeDecrypt(encryptedData.fileName, fileKey, 'text');
-    result.extractedText = await this.safeDecrypt(encryptedData.extractedText, fileKey, 'text');
-    result.originalText = await this.safeDecrypt(encryptedData.originalText, fileKey, 'text');
-    result.contextText = await this.safeDecrypt(encryptedData.contextText, fileKey, 'text');
-    result.fhirData = await this.safeDecrypt(encryptedData.fhirData, fileKey, 'json');
-    result.belroseFields = await this.safeDecrypt(encryptedData.belroseFields, fileKey, 'json');
-    result.customData = await this.safeDecrypt(encryptedData.customData, fileKey, 'json');
-
-    console.log('✅ Complete record decryption finished');
-    return result;
-  }
-
   // =================== HELPER METHODS =========================
 
   /**
@@ -390,19 +364,6 @@ export class EncryptionService {
       masterKey,
       encrypted
     );
-  }
-
-  private static async safeDecrypt(
-    field: { encrypted: string; iv: string } | null | undefined,
-    key: CryptoKey,
-    type: 'text' | 'json'
-  ): Promise<any> {
-    if (!field?.encrypted || !field?.iv) return null;
-    const iv = base64ToArrayBuffer(field.iv);
-    const encrypted = base64ToArrayBuffer(field.encrypted);
-    return type === 'text'
-      ? await this.decryptText(encrypted, key, iv)
-      : await this.decryptJSON(encrypted, key, iv);
   }
 
   // ========== ENCRYPTION KEY DERIVATION AND RECOVERY ============

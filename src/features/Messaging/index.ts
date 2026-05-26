@@ -9,14 +9,6 @@
 export { useMessaging } from './hooks/useMessaging';
 export type { UseMessagingReturn, DecryptedMessage } from './hooks/useMessaging';
 
-// Key generation — called during registration flow
-export {
-  generateKeyBundle,
-  generateAdditionalOneTimePreKeys,
-  rotateSignedPreKey,
-} from './lib/keyGeneration';
-export type { PublicKeyBundle } from './lib/keyGeneration';
-
 // Service types — needed by components that display conversation lists
 export type { Conversation, StoredMessage } from './services/messageService';
 
