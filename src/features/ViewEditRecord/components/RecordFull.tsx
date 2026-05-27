@@ -501,7 +501,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
                   record={record}
                   triggerIcon={Ellipsis}
                   triggerClassName="p-2 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition-colors"
-                  showView={false} //Don't need view because we're already on view full record
+                  onView={viewMode !== 'record' ? handleBackToRecord : undefined}
                   onEdit={viewMode !== 'edit' ? handleEnterEditMode : undefined}
                   onVersion={viewMode !== 'versions' ? handleViewVersionHistory : undefined}
                   onSubject={viewMode !== 'subject' ? handleSubjectPage : undefined}
