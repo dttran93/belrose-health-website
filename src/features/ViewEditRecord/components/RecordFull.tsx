@@ -657,7 +657,11 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       )}
 
       {viewMode === 'access' && (
-        <EncryptionAccessView record={record} onBack={handleBackToRecord} />
+        <EncryptionAccessView
+          record={record}
+          onBack={handleBackToRecord}
+          onSuccess={onRefreshRecord}
+        />
       )}
 
       {viewMode === 'credibility' && (

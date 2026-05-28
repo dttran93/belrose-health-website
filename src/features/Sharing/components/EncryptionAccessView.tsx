@@ -38,9 +38,14 @@ export interface AccessEntry {
 interface EncryptionAccessViewProps {
   record: FileObject;
   onBack?: () => void;
+  onSuccess?: () => void;
 }
 
-export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ record, onBack }) => {
+export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({
+  record,
+  onBack,
+  onSuccess,
+}) => {
   const { user } = useAuth();
   const [accessEntries, setAccessEntries] = useState<AccessEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,7 +62,10 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
   } = usePermissionFlow({
     recordId: record.id,
     recordTitle: (record.belroseFields?.title || record.fileName) ?? undefined,
-    onSuccess: () => fetchEncryptionAccess(),
+    onSuccess: () => {
+      fetchEncryptionAccess();
+      onSuccess?.();
+    },
   });
 
   const fetchEncryptionAccess = async () => {
@@ -253,7 +261,7 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({ reco
           </div>
           <UserSearch
             onUserSelect={user => setSelectedUserForGrant(user)}
-            excludeUserIds={accessEntries.map(e => e.userId)}
+            excludeUserIds={accessEntries.filter(e => e.wrappedKey?.isActive).map(e => e.userId)}
             placeholder="Search by name, email, or user ID..."
           />
           {selectedUserForGrant && (
