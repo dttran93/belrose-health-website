@@ -34,10 +34,8 @@ import {
   UserCircle,
   Watch,
   Rocket,
-  User,
 } from 'lucide-react';
 import { ProfileCompletenessResult } from '@/features/HealthProfile/hooks/useProfileCompleteness';
-import useAuth from '@/features/Auth/hooks/useAuth';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -109,14 +107,6 @@ export const GettingStartedWidget: React.FC<GettingStartedWidgetProps> = ({
       href: '/app/add-record',
     },
     {
-      id: 'profile',
-      label: 'Complete your health profile',
-      description: 'Update identity, clinical, and reliability information in your profile',
-      icon: <UserCircle className="w-4 h-4" />,
-      done: completeness.pct >= 100,
-      href: '/app/health-profile/me',
-    },
-    {
       id: 'wearable',
       label: 'Connect wearables or other apps',
       description: 'Apple Health, Whoop, and more',
@@ -127,10 +117,10 @@ export const GettingStartedWidget: React.FC<GettingStartedWidgetProps> = ({
   ];
 
   const completedCount = steps.filter(s => s.done).length;
-  const totalCount = steps.length;
+  const totalCount = steps.length + 1;
 
   // "All done" means all non-coming-soon steps are complete
-  const allDone = steps.filter(s => !s.comingSoon).every(s => s.done);
+  const allDone = steps.filter(s => !s.comingSoon).every(s => s.done) && completeness.pct >= 100;
 
   // Hide entirely once dismissed
   if (isDismissed) return null;
@@ -208,18 +198,6 @@ export const GettingStartedWidget: React.FC<GettingStartedWidgetProps> = ({
         </div>
       </div>
 
-      {/* Progress bar — driven by real completeness % not just step count */}
-      <div className="w-full h-1.5 bg-muted rounded-full mb-1">
-        <div
-          className="h-1.5 bg-complement-3 rounded-full transition-all duration-500"
-          style={{ width: `${completeness.pct}%` }}
-        />
-      </div>
-      <p className="text-xs text-muted-foreground mb-4">
-        {completeness.tier} · {completeness.pct}% — complete these steps to get the most from
-        Belrose
-      </p>
-
       {/* Step list */}
       <div className="flex flex-col divide-y divide-border">
         {steps.map(step => (
@@ -265,15 +243,54 @@ export const GettingStartedWidget: React.FC<GettingStartedWidgetProps> = ({
           </div>
         ))}
       </div>
+      {/* Health profile completeness — inline below step list */}
+      <div className="mt-2 pt-2 border-t border-border">
+        <div className="flex items-center">
+          <div
+            className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center
+      ${
+        completeness.pct >= 100
+          ? 'bg-complement-3/15 text-complement-3'
+          : 'bg-muted text-muted-foreground'
+      }`}
+          >
+            {completeness.pct >= 100 ? (
+              <CheckCircle2 className="w-4 h-4" />
+            ) : (
+              <UserCircle className="w-4 h-4" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0 text-left px-3 pb-2">
+            <p
+              className={`text-sm font-medium ${completeness.pct >= 100 ? 'text-muted-foreground line-through' : 'text-foreground'}`}
+            >
+              Complete your health profile
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {completeness.tier} · {completeness.pct}%
+            </p>
+          </div>
+          {completeness.pct < 100 && (
+            <button
+              onClick={() => navigate('/app/health-profile/me?tab=completeness')}
+              className="text-xs text-complement-1 font-medium hover:underline flex-shrink-0"
+            >
+              Go →
+            </button>
+          )}
+        </div>
 
-      {/* Link to full completeness tab */}
-      <div className="mt-3 pt-3 border-t border-border">
-        <button
-          onClick={() => navigate('/app/health-profile/me?tab=completeness')}
-          className="text-xs text-complement-1 hover:underline"
-        >
-          View full profile completeness →
-        </button>
+        {/* Progress bar — only shown when incomplete */}
+        {completeness.pct < 100 && (
+          <div className="pl-10">
+            <div className="w-full h-1.5 bg-muted rounded-full">
+              <div
+                className="h-1.5 bg-complement-3 rounded-full transition-all duration-500"
+                style={{ width: `${completeness.pct}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
