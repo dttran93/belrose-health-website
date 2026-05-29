@@ -6,33 +6,33 @@
  * The main landing page after login. Replaces AppPortal as the /app route.
  * AppPortal moves to /app/ai (renamed AIPortal.tsx).
  *
- * Layout:
- *  - Greeting header
- *  - GettingStartedWidget (full-width, collapses once complete)
- *  - Stat pills (record count, open requests, unread messages) — returning users
- *  - 2-column grid:
- *      Left:  AIQuickAskWidget (always)
- *      Right: RequestsWidget (always, empty state if none)
- *  - 2-column grid (conditional):
- *      Left:  NotificationsWidget (only if unreadCount > 0)
- *      Right: MessagesWidget     (only if unreadMessages > 0)
+ * Data strategy:
+ *   - useHealthProfile(user.uid) loads + groups all the user's records.
+ *   - useProfileCompleteness() consumes that data to drive GettingStartedWidget.
+ *     Identical call to HealthProfile.tsx so the % always stays in sync.
+ *   - useNotifications, useUnreadMessageCount, useRecordRequests provide
+ *     the live activity widgets.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Bell, FileSearch, MessageSquare } from 'lucide-react';
-
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import useNotifications from '@/features/Notifications/hooks/useNotifications';
 import { useUnreadMessageCount } from '@/features/Messaging/hooks/useUnreadMessageCount';
 import { useRecordRequests } from '@/features/RequestRecord/hooks/useRecordRequests';
-import { getAccessibleRecords } from '@/features/Ai/service/recordContextService';
-
 import { GettingStartedWidget } from '@/features/HomeDashboard/components/GettingStartedWidget';
 import { MessagesWidget } from '@/features/HomeDashboard/components/MessagesWidget';
 import { DashboardWidget } from '@/features/HomeDashboard/components/ui/DashboardWidget';
 import AIAssistantWidget from '@/features/HomeDashboard/components/AIAssistantWidget';
 import RequestsWidget from '@/features/HomeDashboard/components/RequestsWidget';
 import NotificationsWidget from '@/features/HomeDashboard/components/NotificationsWidgets';
+import { useProfileCompleteness } from '@/features/HealthProfile/hooks/useProfileCompleteness';
+import { parseIdentityFromRecord } from '@/features/HealthProfile/utils/parseUserIdentity';
+import { getIdentityRecordId } from '@/features/HealthProfile/services/userIdentityService';
+import { useUserRecords } from '@/features/ViewEditRecord/hooks/useUserRecords';
+import { BelroseUserProfile } from '@/types/core';
+import { getUserProfile } from '@/features/Users/services/userProfileService';
+import useHealthProfile from '@/features/HealthProfile/hooks/useHealthProfile';
 
 // ─── Greeting helper ────────────────────────────────────────────────────────
 
@@ -48,36 +48,58 @@ function getGreeting(): string {
 export default function HomeDashboard() {
   const { user } = useAuthContext();
 
-  // ── Live data hooks ────────────────────────────────────────────────────────
+  // ── Health profile data — drives completeness + record count ──────────────
+  // Calling with user.uid means filterType: 'subject' + subjectId === userId,
+  // which is the cheapest Firestore query (single array-contains index).
+  const {
+    records,
+    grouped,
+    recordCount,
+    isLoading: profileLoading,
+  } = useHealthProfile(user?.uid ?? '');
+
+  // ── Belrose account profile (identity verification, avatar) ───────────────
+  const [profile, setProfile] = useState<BelroseUserProfile | null>(null);
+  useEffect(() => {
+    if (!user?.uid) return;
+    getUserProfile(user.uid).then(setProfile);
+  }, [user?.uid]);
+
+  // ── Identity record — same pattern as HealthProfile.tsx ───────────────────
+  // useUserRecords gives us all subject records; we find the identity record
+  // by its deterministic ID rather than making a separate Firestore query.
+  const { records: allSubjectRecords } = useUserRecords(user?.uid, {
+    filterType: 'subject',
+    subjectId: user?.uid,
+  });
+
+  const identityRecord = useMemo(
+    () =>
+      user?.uid
+        ? (allSubjectRecords.find(r => r.id === getIdentityRecordId(user.uid)) ?? null)
+        : null,
+    [allSubjectRecords, user?.uid]
+  );
+
+  const userIdentity = useMemo(
+    () => (identityRecord ? parseIdentityFromRecord(identityRecord) : null),
+    [identityRecord]
+  );
+
+  // ── Profile completeness — identical call to HealthProfile.tsx ────────────
+  // This ensures the % shown here always matches the Health Profile page.
+  const completeness = useProfileCompleteness({ profile, userIdentity, grouped, records });
+
+  // ── Live activity hooks ───────────────────────────────────────────────────
   const { notifications, unreadCount, markAsRead } = useNotifications(user?.uid);
   const unreadMessages = useUnreadMessageCount(user?.uid);
   const { requests, loading: requestsLoading } = useRecordRequests();
 
-  // ── Record count (lightweight — just the count, no decryption needed) ─────
-  const [recordCount, setRecordCount] = useState(0);
-  const [recordsLoading, setRecordsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user) return;
-    getAccessibleRecords(user.uid)
-      .then(r => setRecordCount(r.length))
-      .catch(() => setRecordCount(0))
-      .finally(() => setRecordsLoading(false));
-  }, [user]);
-
-  // ── Derived booleans for GettingStarted ───────────────────────────────────
-  const hasRecords = recordCount > 0;
-  const hasOutboundRequests = requests.length > 0;
-  // Treat profile as complete when records exist (good-enough proxy for MVP;
-  // swap in a real profile-completeness check later)
-  const hasProfile = hasRecords;
-
-  // ── Stat pills — only show once user has some activity ────────────────────
-  const showStats = recordCount > 0 || requests.length > 0 || unreadMessages > 0;
+  // ── Derived values ────────────────────────────────────────────────────────
   const pendingRequests = requests.filter(r => r.status === 'pending').length;
-
-  // ── Loading state — wait for records + requests before rendering ──────────
-  const isLoading = recordsLoading || requestsLoading;
+  const hasOutboundRequests = requests.length > 0;
+  const showStats = recordCount > 0 || requests.length > 0 || unreadMessages > 0;
+  const attentionCount = unreadCount + unreadMessages + pendingRequests;
 
   // ── Display name ──────────────────────────────────────────────────────────
   const firstName = user?.displayName?.split(' ')[0] ?? '';
@@ -93,20 +115,22 @@ export default function HomeDashboard() {
           {firstName ? `, ${firstName}` : ''}
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {unreadCount + unreadMessages + pendingRequests > 0
-            ? `You have ${unreadCount + unreadMessages + pendingRequests} thing${unreadCount + unreadMessages + pendingRequests === 1 ? '' : 's'} that need your attention.`
+          {attentionCount > 0
+            ? `You have ${attentionCount} thing${attentionCount === 1 ? '' : 's'} that need your attention.`
             : 'Everything is up to date.'}
         </p>
       </div>
 
-      {/* Getting Started — full-width, manages its own collapse */}
+      {/* Getting Started — full-width, manages its own collapsed/expanded state.
+          Receives the full completeness result so steps reflect real data. */}
       <GettingStartedWidget
-        hasRecords={hasRecords}
+        completeness={completeness}
         hasOutboundRequests={hasOutboundRequests}
-        hasProfile={hasProfile}
+        isGuest={user.isGuest ?? false}
+        isLoading={profileLoading}
       />
 
-      {/* Stat pills — returning users only */}
+      {/* Stat pills — only shown once the user has some activity */}
       {showStats && (
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-muted rounded-lg px-3 py-2.5">
@@ -148,7 +172,7 @@ export default function HomeDashboard() {
         </DashboardWidget>
       </div>
 
-      {/* Row 2: Notifications + Messages — conditional */}
+      {/* Row 2: Notifications + Messages — only shown when there's something to see */}
       {(unreadCount > 0 || unreadMessages > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <DashboardWidget

@@ -3,20 +3,24 @@
 /**
  * GettingStartedWidget
  *
- * Shows the user's setup progress as a list of actionable steps.
- * Each step checks a real condition from props to mark itself complete.
+ * Onboarding checklist driven by the real ProfileCompletenessResult.
+ * Uses completeness.criteria to evaluate each step — same data that
+ * powers the Health Profile completeness tab, so the % always matches.
+ *
+ * Steps and the criteria IDs they map to:
+ *   1. Create account          — always done
+ *   2. Request records         — hasOutboundRequests prop (not in completeness hook)
+ *   3. Upload records          — criteria 'hasRecords'    (≥3 clinical records)
+ *   4. Complete health profile — criteria 'dob' + 'gender' + 'location'
+ *   5. Connect a wearable      — coming soon (always todo)
+ *
+ * Collapsed banner shows: tier name + real % (e.g. "Well Documented · 74%")
+ * Next step nudge uses completeness.nextStep.label for free.
  *
  * States:
- *  - Expanded (default for new users): full step list with progress bar
- *  - Collapsed (all steps done OR user dismisses): small green banner
- *  - Hidden: once fully complete AND dismissed
- *
- * Steps:
- *  1. Create account           — always done by the time they see this
- *  2. Request records          — hasOutboundRequests
- *  3. Upload own records       — hasRecords
- *  4. Complete health profile  — hasProfile
- *  5. Connect a wearable       — coming soon (always shows as todo)
+ *   expanded  → full step list with progress bar (default for new users)
+ *   collapsed → small banner (user toggled, or all onboarding steps done)
+ *   hidden    → dismissed after all steps complete
  */
 
 import React, { useState } from 'react';
@@ -30,15 +34,22 @@ import {
   UserCircle,
   Watch,
   Rocket,
+  User,
 } from 'lucide-react';
+import { ProfileCompletenessResult } from '@/features/HealthProfile/hooks/useProfileCompleteness';
+import useAuth from '@/features/Auth/hooks/useAuth';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface GettingStartedWidgetProps {
-  hasRecords: boolean;
+  completeness: ProfileCompletenessResult;
+  /** Whether the user has sent at least one outbound record request */
   hasOutboundRequests: boolean;
-  hasProfile: boolean;
+  isGuest: boolean;
+  isLoading?: boolean;
 }
 
-interface Step {
+interface DisplayStep {
   id: string;
   label: string;
   description: string;
@@ -48,22 +59,37 @@ interface Step {
   comingSoon?: boolean;
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Look up a single criterion's done status by ID.
+ * Returns false if the criterion isn't found (safe default).
+ */
+function criterionDone(completeness: ProfileCompletenessResult, id: string): boolean {
+  return completeness.criteria.find(c => c.id === id)?.done ?? false;
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
 export const GettingStartedWidget: React.FC<GettingStartedWidgetProps> = ({
-  hasRecords,
+  completeness,
   hasOutboundRequests,
-  hasProfile,
+  isGuest,
+  isLoading = false,
 }) => {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(true);
   const [isDismissed, setIsDismissed] = useState(false);
 
-  const steps: Step[] = [
+  // Build display steps, each mapped to real completeness data
+  const steps: DisplayStep[] = [
     {
       id: 'account',
       label: 'Create your account',
       description: 'Done',
       icon: <UserCircle className="w-4 h-4" />,
-      done: true,
+      done: !isGuest,
+      href: '/app/auth/register',
     },
     {
       id: 'request',
@@ -78,15 +104,16 @@ export const GettingStartedWidget: React.FC<GettingStartedWidgetProps> = ({
       label: 'Upload your own records',
       description: 'PDFs, images, typed notes — any format',
       icon: <Upload className="w-4 h-4" />,
-      done: hasRecords,
+      // 'hasRecords' criterion requires ≥3 clinical records
+      done: criterionDone(completeness, 'hasRecords'),
       href: '/app/add-record',
     },
     {
       id: 'profile',
       label: 'Complete your health profile',
-      description: 'Helps the AI give you better answers',
+      description: 'Update identity, clinical, and reliability information in your profile',
       icon: <UserCircle className="w-4 h-4" />,
-      done: hasProfile,
+      done: completeness.pct >= 100,
       href: '/app/health-profile/me',
     },
     {
@@ -101,13 +128,29 @@ export const GettingStartedWidget: React.FC<GettingStartedWidgetProps> = ({
 
   const completedCount = steps.filter(s => s.done).length;
   const totalCount = steps.length;
-  const progressPercent = Math.round((completedCount / totalCount) * 100);
-  const allDone = completedCount === totalCount;
 
-  // Hide entirely if dismissed after completion
+  // "All done" means all non-coming-soon steps are complete
+  const allDone = steps.filter(s => !s.comingSoon).every(s => s.done);
+
+  // Hide entirely once dismissed
   if (isDismissed) return null;
 
-  // Collapsed banner (user toggled or all done)
+  // ── Loading skeleton ────────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+        <div className="h-4 w-48 bg-muted animate-pulse rounded" />
+        <div className="h-1.5 w-full bg-muted animate-pulse rounded-full" />
+        <div className="space-y-2.5 pt-1">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-10 bg-muted animate-pulse rounded-lg" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Collapsed banner ────────────────────────────────────────────────────
   if (!isExpanded || allDone) {
     return (
       <div className="flex items-center justify-between bg-complement-3/10 border border-complement-3/30 rounded-xl px-4 py-3">
@@ -115,11 +158,12 @@ export const GettingStartedWidget: React.FC<GettingStartedWidgetProps> = ({
           <CheckCircle2 className="w-5 h-5 text-complement-3 flex-shrink-0" />
           <div>
             <p className="text-sm font-medium text-foreground">
-              Getting started — {completedCount} of {totalCount} complete
+              {/* Show the real tier + % from completeness hook */}
+              {completeness.tier} · {completeness.pct}% complete
             </p>
-            {!allDone && (
+            {!allDone && completeness.nextStep && (
               <p className="text-xs text-muted-foreground mt-0.5">
-                {steps.find(s => !s.done)?.label} is next
+                Next: {completeness.nextStep.label}
               </p>
             )}
           </div>
@@ -145,7 +189,7 @@ export const GettingStartedWidget: React.FC<GettingStartedWidgetProps> = ({
     );
   }
 
-  // Expanded state
+  // ── Expanded state ──────────────────────────────────────────────────────
   return (
     <div className="bg-card rounded-xl border border-border p-4">
       {/* Header */}
@@ -164,15 +208,16 @@ export const GettingStartedWidget: React.FC<GettingStartedWidgetProps> = ({
         </div>
       </div>
 
-      {/* Progress bar */}
+      {/* Progress bar — driven by real completeness % not just step count */}
       <div className="w-full h-1.5 bg-muted rounded-full mb-1">
         <div
           className="h-1.5 bg-complement-3 rounded-full transition-all duration-500"
-          style={{ width: `${progressPercent}%` }}
+          style={{ width: `${completeness.pct}%` }}
         />
       </div>
       <p className="text-xs text-muted-foreground mb-4">
-        Complete these steps to unlock your AI health assistant
+        {completeness.tier} · {completeness.pct}% — complete these steps to get the most from
+        Belrose
       </p>
 
       {/* Step list */}
@@ -219,6 +264,16 @@ export const GettingStartedWidget: React.FC<GettingStartedWidgetProps> = ({
               ))}
           </div>
         ))}
+      </div>
+
+      {/* Link to full completeness tab */}
+      <div className="mt-3 pt-3 border-t border-border">
+        <button
+          onClick={() => navigate('/app/health-profile/me?tab=completeness')}
+          className="text-xs text-complement-1 hover:underline"
+        >
+          View full profile completeness →
+        </button>
       </div>
     </div>
   );
