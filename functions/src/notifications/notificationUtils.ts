@@ -19,6 +19,7 @@ import {
   DisputeCulpability,
   DisputeSeverityOptions,
   NOTIFICATION_CATEGORIES,
+  NOTIFICATION_MAPPING,
   NotificationCategory,
   NotificationPrefs,
   NotificationType,
@@ -272,12 +273,6 @@ export type NotificationDoc =
       type: 'GENERIC_NOTIFICATION';
       payload: Record<string, unknown>;
     };
-
-export const NOTIFICATION_MAPPING = Object.fromEntries(
-  Object.entries(NOTIFICATION_CATEGORIES).flatMap(([category, { notificationTypes }]) =>
-    notificationTypes.map(type => [type, category])
-  )
-) as Record<NotificationType, NotificationCategory>;
 
 export type CreateNotificationInput = NotificationDoc & {
   message: string;

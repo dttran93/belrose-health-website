@@ -14,9 +14,16 @@ import { AlertCircle, Check } from 'lucide-react';
 
 export type FollowUpStatus = 'pending' | 'done' | 'skipped';
 
+export type FollowUpItemId =
+  | 'subject'
+  | 'subject-request'
+  | 'subject-rejection'
+  | 'verify'
+  | 'link-request';
+
 export interface FollowUpItem {
   /** Unique key for this item */
-  id: string;
+  id: FollowUpItemId;
   /** Main label shown to the user */
   label: string;
   /** Secondary hint text */

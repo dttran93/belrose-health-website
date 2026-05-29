@@ -21,32 +21,26 @@
 
 import { FileObject } from '@/types/core';
 import React, { useEffect, useState } from 'react';
-import { FollowUpItem } from '../components/ui/FollowUpItems';
+import { FollowUpItem, FollowUpItemId } from '../components/ui/FollowUpItems';
 import { useReviewedByCurrentUser } from '@/features/Credibility/hooks/useVerifiedByCurrentUser';
 import { LinkIcon, ShieldCheck, User, UserX } from 'lucide-react';
-import SubjectQueryService from '@/features/Subject/services/subjectQueryService';
 import { useInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
 import useAuth from '@/features/Auth/hooks/useAuth';
 import { useSubjectAlerts } from '@/features/Subject/hooks/useSubjectAlerts';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
+import SubjectPermissionService from '@/features/Subject/services/subjectPermissionService';
 
 // ─── Options ─────────────────────────────────────────────────────────────────
 
 export interface UseRecordFollowUpsOptions {
   refreshKey?: number;
-  onAction: (fileItem: FileObject, itemId: string) => void;
+  onAction: (fileItem: FileObject, itemId: FollowUpItemId) => void;
 }
 
 // ─── Return type ─────────────────────────────────────────────────────────────
 
 export interface UseRecordFollowUpsResult {
-  /** The list of items that still need action. Empty = nothing to show. */
   followUpItems: FollowUpItem[];
-  /**
-   * True while async checks (e.g. verification lookup) are still resolving.
-   * The list may grow once loading completes, so avoid rendering until false
-   * if you don't want items appearing one-by-one.
-   */
   isLoading: boolean;
 }
 
@@ -58,16 +52,12 @@ export function useRecordFollowUps(
 ): UseRecordFollowUpsResult {
   const { onAction } = options;
 
-  // Only run async checks when the record is fully saved to Firestore
   const isEligible = fileItem.status === 'completed' && (!!fileItem.firestoreId || !!fileItem.id);
   const recordId = fileItem.firestoreId ?? fileItem.id;
 
   // ── Check 1: Subject ───────────────────────────────────────────────────────
 
-  // Also check if a consent request is already pending (request sent, not yet accepted)
   const [freshSubjects, setFreshSubjects] = useState<string[]>(fileItem.subjects ?? []);
-  const [hasPendingRequest, setHasPendingRequest] = useState(false);
-  const [isLoadingPendingRequest, setIsLoadingPendingRequest] = useState(false);
 
   useEffect(() => {
     if (!isEligible) return;
@@ -79,40 +69,43 @@ export function useRecordFollowUps(
 
   const hasSubject = freshSubjects.length > 0;
 
-  const { hasPendingRejectionResponse, isLoading: isLoadingAlerts } = useSubjectAlerts({
-    recordId,
-  });
+  const {
+    hasSubjectRequest, // ← true when current user has a pending incoming consent request
+    hasPendingRejectionResponse,
+    isLoading: isLoadingAlerts,
+  } = useSubjectAlerts({ recordId });
 
-  // ── Check 2: Verification ─────────────────────────────────────────────────
-  // Async — queries Firestore for an active verification or dispute doc
-  // useReviewedByCurrentUser safely no-ops when record.recordHash is missing
+  // ── Check 2: Can the current user manage this record? ─────────────────────
   const { user } = useAuth();
 
   const isSubject = freshSubjects.includes(user?.uid || '');
-  const isCreator = fileItem.uploadedBy === user?.uid;
+  // Uses SubjectPermissionService: uploader OR owner OR admin
+  const canManageRecord = user
+    ? SubjectPermissionService.canManageRecord(fileItem, user.uid)
+    : false; // ← NEW
 
+  // ── Check 3: Verification ─────────────────────────────────────────────────
   const {
     hasReviewed,
     reviewedCurrentVersion,
     isLoading: isLoadingReview,
   } = useReviewedByCurrentUser(fileItem);
 
-  // ── Check 3: Linked request ───────────────────────────────────────────────
+  // ── Check 4: Linked request ───────────────────────────────────────────────
   const { requests: inboundRequests, loading: isLoadingRequests } = useInboundRequests();
   const hasPendingRequests = inboundRequests.some(r => r.status === 'pending');
 
   // ── Build list ────────────────────────────────────────────────────────────
-  // Don't build anything until the record is eligible and async checks resolve
-  const isLoading =
-    isEligible &&
-    (isLoadingReview || isLoadingPendingRequest || isLoadingRequests || isLoadingAlerts);
+
+  const isLoading = isEligible && (isLoadingReview || isLoadingRequests || isLoadingAlerts);
 
   const followUpItems = React.useMemo<FollowUpItem[]>(() => {
     if (!isEligible || isLoading) return [];
 
     const items: FollowUpItem[] = [];
 
-    if (!hasSubject && !hasPendingRequest) {
+    // Only admins/owners/uploaders can tag a subject
+    if (!hasSubject && !hasSubjectRequest && canManageRecord) {
       items.push({
         id: 'subject',
         label: 'Tag a subject',
@@ -121,6 +114,20 @@ export function useRecordFollowUps(
         icon: User,
         status: 'pending',
         ctaLabel: 'Send request',
+        onAction: () => onAction(fileItem, 'subject'),
+      });
+    }
+
+    // Current user has been invited as a subject and needs to respond
+    if (hasSubjectRequest) {
+      items.push({
+        id: 'subject-request',
+        label: 'Respond to subject request',
+        subtext:
+          'You have been invited to be the subject of this record. Review and accept or decline.',
+        icon: User,
+        status: 'pending',
+        ctaLabel: 'Respond',
         onAction: () => onAction(fileItem, 'subject'),
       });
     }
@@ -175,7 +182,20 @@ export function useRecordFollowUps(
     }
 
     return items;
-  }, [isEligible, isLoading, hasSubject, hasReviewed, hasPendingRequests, fileItem, onAction]);
+  }, [
+    isEligible,
+    isLoading,
+    hasSubject,
+    hasSubjectRequest,
+    canManageRecord,
+    hasPendingRejectionResponse,
+    hasReviewed,
+    reviewedCurrentVersion,
+    hasPendingRequests,
+    isSubject,
+    fileItem,
+    onAction,
+  ]);
 
   return { followUpItems, isLoading };
 }

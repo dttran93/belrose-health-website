@@ -42,6 +42,7 @@ export declare const NOTIFICATION_CATEGORIES: {
 };
 export type NotificationCategory = keyof typeof NOTIFICATION_CATEGORIES;
 export type NotificationType = (typeof NOTIFICATION_CATEGORIES)[NotificationCategory]['notificationTypes'][number];
+export declare const NOTIFICATION_MAPPING: Record<NotificationType, NotificationCategory>;
 export interface ChannelPrefs {
     inApp: boolean;
     email: boolean;

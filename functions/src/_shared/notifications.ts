@@ -74,6 +74,12 @@ export type NotificationCategory = keyof typeof NOTIFICATION_CATEGORIES;
 export type NotificationType =
   (typeof NOTIFICATION_CATEGORIES)[NotificationCategory]['notificationTypes'][number];
 
+export const NOTIFICATION_MAPPING = Object.fromEntries(
+  Object.entries(NOTIFICATION_CATEGORIES).flatMap(([category, { notificationTypes }]) =>
+    notificationTypes.map(type => [type, category])
+  )
+) as Record<NotificationType, NotificationCategory>;
+
 // ======================================================================
 // NOTIFICATION PREFERENCES
 // ======================================================================

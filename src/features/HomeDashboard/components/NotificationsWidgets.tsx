@@ -13,26 +13,16 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { Notification } from '@/features/Notifications/hooks/useNotifications';
+import { NOTIFICATION_CATEGORIES, NOTIFICATION_MAPPING } from '@belrose/shared';
 
 interface NotificationsWidgetProps {
   notifications: Notification[];
   onMarkAsRead: (id: string) => Promise<void>;
 }
 
-// Map notification type to a short human-readable label
 function getNotificationLabel(type: Notification['type']): string {
-  switch (type) {
-    case 'SUBJECT_REQUEST_RECEIVED':
-      return 'Record request received';
-    case 'SUBJECT_ACCEPTED':
-      return 'Request accepted';
-    case 'REJECTION_PENDING_CREATOR_DECISION':
-      return 'Request needs your decision';
-    case 'REJECTION_ACKNOWLEDGED':
-      return 'Rejection acknowledged';
-    default:
-      return 'Notification';
-  }
+  const category = NOTIFICATION_MAPPING[type];
+  return NOTIFICATION_CATEGORIES[category]?.label ?? 'Notification';
 }
 
 export const NotificationsWidget: React.FC<NotificationsWidgetProps> = ({
@@ -56,7 +46,7 @@ export const NotificationsWidget: React.FC<NotificationsWidgetProps> = ({
         <button
           key={n.id}
           onClick={() => handleClick(n)}
-          className="flex items-start gap-3 py-2.5 text-left hover:bg-muted/50 -mx-1 px-1 rounded transition-colors"
+          className="flex items-start gap-3 py-2.5 text-left hover:bg-muted/50 -mx-1 px-1 transition-colors"
         >
           {/* Unread dot */}
           <span className="mt-1.5 w-2 h-2 rounded-full bg-destructive flex-shrink-0" />

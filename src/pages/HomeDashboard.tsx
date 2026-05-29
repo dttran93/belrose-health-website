@@ -15,7 +15,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Bell, FileSearch, MessageSquare } from 'lucide-react';
+import { Bell, FileSearch, ListChecks, MessageSquare } from 'lucide-react';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import useNotifications from '@/features/Notifications/hooks/useNotifications';
 import { useUnreadMessageCount } from '@/features/Messaging/hooks/useUnreadMessageCount';
@@ -33,6 +33,8 @@ import { useUserRecords } from '@/features/ViewEditRecord/hooks/useUserRecords';
 import { BelroseUserProfile } from '@/types/core';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
 import useHealthProfile from '@/features/HealthProfile/hooks/useHealthProfile';
+import { useActionsCount } from '@/features/RefineRecord/hooks/useActionsCount';
+import FollowUpsWidget from '@/features/HomeDashboard/components/FollowUpsWidget';
 
 // ─── Greeting helper ────────────────────────────────────────────────────────
 
@@ -95,11 +97,18 @@ export default function HomeDashboard() {
   const unreadMessages = useUnreadMessageCount(user?.uid);
   const { requests, loading: requestsLoading } = useRecordRequests();
 
+  // ── Actions hooks ─────────────────────────────────────────────────────────
+
+  const { count: actionsCount } = useActionsCount();
+  const { records: allRecords, loading: recordsLoading } = useUserRecords(user?.uid, {
+    filterType: 'all',
+  });
+
   // ── Derived values ────────────────────────────────────────────────────────
   const pendingRequests = requests.filter(r => r.status === 'pending').length;
   const hasOutboundRequests = requests.length > 0;
   const showStats = recordCount > 0 || requests.length > 0 || unreadMessages > 0;
-  const attentionCount = unreadCount + unreadMessages + pendingRequests;
+  const attentionCount = unreadCount + unreadMessages + pendingRequests + actionsCount;
 
   // ── Display name ──────────────────────────────────────────────────────────
   const firstName = user?.displayName?.split(' ')[0] ?? '';
@@ -129,6 +138,20 @@ export default function HomeDashboard() {
         isGuest={user.isGuest ?? false}
         isLoading={profileLoading}
       />
+
+      {actionsCount > 0 && (
+        <DashboardWidget
+          title="Actions"
+          icon={ListChecks}
+          badge={actionsCount}
+          actionLabel="View all"
+          actionHref="/app/activity?tab=actions"
+          isVisible={actionsCount > 0 || !recordsLoading}
+          isLoading={recordsLoading}
+        >
+          <FollowUpsWidget records={allRecords} />
+        </DashboardWidget>
+      )}
 
       {/* Stat pills — only shown once the user has some activity */}
       {showStats && (
