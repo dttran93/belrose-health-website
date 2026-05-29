@@ -40,7 +40,7 @@ export const quickActions: QuickActionItem[] = [
   { id: 'home', title: 'Home', url: '/app', icon: House },
   { id: 'activity', title: 'Activity Hub', url: '/app/activity', icon: Bell },
   { id: 'messages', title: 'Messages', url: '/app/messages', icon: MessageSquare },
-  { id: 'ai', title: 'AI Assistant', icon: Sparkles },
+  { id: 'ai', title: 'AI Assistant', url: '/app/ai', icon: Sparkles },
 ];
 
 export const navigationSections: NavigationSection[] = [

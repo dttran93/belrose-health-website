@@ -16,7 +16,7 @@ import {
 import { Notification } from '@/features/Notifications/hooks/useNotifications';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import { resolveNotificationTitle } from '../../services/resolveNotificationTitle';
-import { NotificationType } from '@belrose/shared';
+import { NOTIFICATION_CATEGORIES, NotificationType } from '@belrose/shared';
 
 // ============================================================================
 // TYPES
@@ -208,8 +208,8 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
             {formatTimestamp(notification.createdAt)}
           </span>
           <span className="text-xs text-muted-foreground">•</span>
-          <span className="text-xs text-muted-foreground capitalize">
-            {notification.sourceService}
+          <span className="text-xs text-muted-foreground">
+            {NOTIFICATION_CATEGORIES[notification.sourceService].label}
           </span>
         </div>
       </div>

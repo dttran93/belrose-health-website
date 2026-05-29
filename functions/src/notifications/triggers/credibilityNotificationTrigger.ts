@@ -108,7 +108,7 @@ export const onVerificationWritten = onDocumentCreated(
     await createNotificationForMultiple(targets, {
       type: 'VERIFICATION_ADDED',
       message: `${verifierName} added a ${levelName} verification to ${recordFallback}.`,
-      link: `/app/records/${data.recordId}`,
+      link: `/app/records/${data.recordId}?view=credibility`,
       payload: stripUndefined({
         recordId: data.recordId,
         recordHash: data.recordHash,
@@ -172,7 +172,7 @@ export const onVerificationUpdated = onDocumentUpdated(
       await createNotificationForMultiple(targets, {
         type: 'VERIFICATION_RETRACTED',
         message: `${verifierName} retracted their verification on ${recordFallback}.`,
-        link: `/app/records/${after.recordId}`,
+        link: `/app/records/${after.recordId}?view=credibility`,
         payload: stripUndefined({
           recordId: after.recordId,
           recordHash: after.recordHash,
@@ -271,7 +271,7 @@ export const onDisputeWritten = onDocumentCreated(
     await createNotificationForMultiple(targets, {
       type: 'DISPUTE_ADDED',
       message: `${disputerName} raised a ${severityName} dispute on ${recordFallback}.`,
-      link: `/app/records/${data.recordId}`,
+      link: `/app/records/${data.recordId}?view=credibility`,
       payload: stripUndefined({
         recordId: data.recordId,
         recordHash: data.recordHash,
@@ -326,7 +326,7 @@ export const onDisputeUpdated = onDocumentUpdated(
       await createNotificationForMultiple(targets, {
         type: 'DISPUTE_RETRACTED',
         message: `${disputerName} retracted their dispute on ${recordFallback}.`,
-        link: `/app/records/${after.recordId}`,
+        link: `/app/records/${after.recordId}?view=credibility`,
         payload: stripUndefined({
           recordId: after.recordId,
           recordHash: after.recordHash,
@@ -364,7 +364,7 @@ export const onDisputeUpdated = onDocumentUpdated(
       await createNotificationForMultiple(targets, {
         type: 'DISPUTE_MODIFIED',
         message: `${disputerName} updated their dispute on ${recordFallback}.`,
-        link: `/app/records/${after.recordId}`,
+        link: `/app/records/${after.recordId}?view=credibility`,
         payload: stripUndefined({
           recordId: after.recordId,
           recordHash: after.recordHash,

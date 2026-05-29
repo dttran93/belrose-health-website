@@ -43,10 +43,7 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
   const location = useLocation();
 
   const handleClick = (id: (typeof quickActions)[number]['id'], url?: string) => {
-    if (id === 'ai') {
-      onNewAiChat();
-      navigate('/app');
-    } else if (url) {
+    if (url) {
       navigate(url);
     }
   };

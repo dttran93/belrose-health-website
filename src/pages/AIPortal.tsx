@@ -1,7 +1,7 @@
-// src/pages/AppPortal.tsx
+// src/pages/AiPortal.tsx
 
 /**
- * The main portal page for the Belrose App. This is the landing page after login and serves as the entry point for the AI Health Assistant feature.
+ * The main portal page for the AI Assistant App.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -27,7 +27,7 @@ import { FileDragOverlay } from '@/components/ui/FileDragOverlay';
 import { ChatAttachment } from '@/features/Ai/components/ui/AttachmentBadge';
 import { AIModel, UI_MODELS } from '@/config/aiModels';
 
-export default function AppPortal() {
+export default function AIPortal() {
   const { user, loading: authLoading } = useAuthContext();
 
   const { chatId } = useParams<{ chatId: string }>();
@@ -215,7 +215,7 @@ export default function AppPortal() {
         onSendMessage={handleSendMessage}
         onClearChat={() => {
           handleNewChat();
-          navigate('/app', { replace: true }); // ✅ Clear URL when starting new chat
+          navigate('/app/ai', { replace: true }); // ✅ Clear URL when starting new chat
         }}
         selectedModel={selectedModel}
         availableModels={availableModels}

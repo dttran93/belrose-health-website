@@ -80,9 +80,6 @@ export { signSponsorship, getSponsorshipStatus } from './handlers/paymaster';
 // ==================== AI CHAT FUNCTIONS ====================
 export { aiChat } from './handlers/aiChat';
 
-// ==================== MESSAGING FUNCTIONS ====================
-export { getKeyBundle } from './handlers/getKeyBundle';
-
 // ==================== COLLECTION QUERY FUNCTIONS =====================
 export { checkEmailRegistrationStatus } from './handlers/checkEmailRegistrationStatus';
 

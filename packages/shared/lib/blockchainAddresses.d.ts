@@ -116,6 +116,7 @@ export declare const NETWORK: {
                 format: (args: import("viem/chains").OpStackRpcTransaction, action?: string | undefined) => ({
                     blockHash: `0x${string}` | null;
                     blockNumber: bigint | null;
+                    blockTimestamp?: bigint | undefined;
                     from: import("abitype").Address;
                     gas: bigint;
                     hash: import("viem").Hash;
@@ -148,6 +149,7 @@ export declare const NETWORK: {
                     value: bigint;
                     blockHash: `0x${string}` | null;
                     blockNumber: bigint | null;
+                    blockTimestamp?: bigint | undefined;
                     hash: import("viem").Hash;
                     input: import("viem").Hex;
                     transactionIndex: number | null;
@@ -168,6 +170,7 @@ export declare const NETWORK: {
                 } | {
                     blockHash: `0x${string}` | null;
                     blockNumber: bigint | null;
+                    blockTimestamp?: bigint | undefined;
                     from: import("abitype").Address;
                     gas: bigint;
                     hash: import("viem").Hash;
@@ -196,6 +199,7 @@ export declare const NETWORK: {
                 } | {
                     blockHash: `0x${string}` | null;
                     blockNumber: bigint | null;
+                    blockTimestamp?: bigint | undefined;
                     from: import("abitype").Address;
                     gas: bigint;
                     hash: import("viem").Hash;
@@ -224,6 +228,7 @@ export declare const NETWORK: {
                 } | {
                     blockHash: `0x${string}` | null;
                     blockNumber: bigint | null;
+                    blockTimestamp?: bigint | undefined;
                     from: import("abitype").Address;
                     gas: bigint;
                     hash: import("viem").Hash;
@@ -252,6 +257,7 @@ export declare const NETWORK: {
                 } | {
                     blockHash: `0x${string}` | null;
                     blockNumber: bigint | null;
+                    blockTimestamp?: bigint | undefined;
                     from: import("abitype").Address;
                     gas: bigint;
                     hash: import("viem").Hash;
@@ -287,6 +293,7 @@ export declare const NETWORK: {
                     blobGasUsed?: bigint | undefined;
                     blockHash: import("viem").Hash;
                     blockNumber: bigint;
+                    blockTimestamp?: bigint | undefined;
                     contractAddress: import("abitype").Address | null | undefined;
                     cumulativeGasUsed: bigint;
                     effectiveGasPrice: bigint;
@@ -330,6 +337,7 @@ export declare const PAYMASTER: {
     readonly address: "0x02422f03EcD403E1a902101D60a0Dad5bB9E71a7";
     readonly dailySponsorLimit: 100;
 };
+export declare function buildBundlerURL(pimlicoApiKey: string): string;
 export declare const MEMBER_ROLE_MANAGER: {
     readonly proxy: "0xdF9583C25E234A34a1E47d9830722123CA228a1a";
     readonly implementation: "0x4383C4e5EaCDE9F8cEc6c692f5d939BaaF6ff038";

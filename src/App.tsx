@@ -6,7 +6,6 @@ import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import NotFound from './pages/NotFound';
 import Auth from './pages/Auth';
 import Layout from './components/app/Layout';
-import AppPortal from './pages/AppPortal';
 import AllRecords from './pages/AllRecords';
 import ProtectedRoute from './features/Auth/ProtectedRoute';
 import AddRecord from './pages/AddRecord';
@@ -35,6 +34,8 @@ import ForProviders from './pages/ForProviders';
 import ActivityHub from './pages/ActivityHub';
 import { OnChainActivityTrayProvider } from './features/OnChainActivityTray/OnChainActivityTrayContext';
 import OnChainActivityTray from './features/OnChainActivityTray/components/OnChainActivityTray';
+import AIPortal from './pages/AIPortal';
+import HomeDashboard from './pages/HomeDashboard';
 
 const queryClient = new QueryClient();
 
@@ -100,7 +101,7 @@ const router = createBrowserRouter([
         path: '/app',
         element: <ProtectedLayout />,
         children: [
-          { index: true, element: <AppPortal /> },
+          { index: true, element: <HomeDashboard /> },
           { path: 'hash-tester', element: <HashTester /> },
           {
             path: 'blockchain-admin',
@@ -111,7 +112,8 @@ const router = createBrowserRouter([
             ),
           },
           { path: 'health-profile/:subjectId', element: <HealthProfile /> },
-          { path: 'ai/chat/:chatId', element: <AppPortal /> },
+          { path: 'ai', element: <AIPortal /> },
+          { path: 'ai/chat/:chatId', element: <AIPortal /> },
           { path: 'ai/history', element: <ChatHistoryPage /> },
           { path: 'all-records', element: <AllRecords /> },
           { path: 'record-requests', element: <RecordRequestsPage /> },

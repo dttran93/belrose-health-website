@@ -9,7 +9,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Clipboard,
   HeartPulse,
@@ -47,7 +47,7 @@ export type HealthProfileTabs =
   | 'all-data'
   | 'records'
   | 'identity'
-  | 'blockchain'
+  | 'credibility'
   | 'completeness';
 
 const PROFILE_TABS: Tab[] = [
@@ -55,7 +55,7 @@ const PROFILE_TABS: Tab[] = [
   { id: 'all-data', label: 'All Data', icon: List },
   { id: 'records', label: 'Records', icon: Clipboard },
   { id: 'identity', label: 'Identity', icon: IdCard },
-  { id: 'blockchain', label: 'Credibility', icon: ShieldCheck },
+  { id: 'credibility', label: 'Credibility', icon: ShieldCheck },
   { id: 'completeness', label: 'Compeleteness', icon: ListChecks },
 ];
 
@@ -101,11 +101,19 @@ const MissingSubjectId: React.FC = () => {
 const HealthProfile: React.FC = () => {
   const navigate = useNavigate();
   const { subjectId } = useParams<{ subjectId: string }>();
-  const [activeTab, setActiveTab] = useState<HealthProfileTabs>('summary');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [activeTab, setActiveTab] = useState<HealthProfileTabs>(
+    (searchParams.get('tab') as HealthProfileTabs) ?? 'summary'
+  );
 
   const { user } = useAuthContext();
   const resolvedSubjectId = subjectId === 'me' ? user?.uid : subjectId;
   const isGuest = (user as any)?.isGuest === true;
+
+  useEffect(() => {
+    setSearchParams(activeTab === 'summary' ? {} : { tab: activeTab }, { replace: true });
+  }, [activeTab]);
 
   // Guard: subjectId missing from URL
   if (!resolvedSubjectId) return <MissingSubjectId />;
@@ -189,7 +197,7 @@ const HealthProfile: React.FC = () => {
           />
         );
 
-      case 'blockchain':
+      case 'credibility':
         return (
           <ProfileCredibilityTab
             subjectFirebaseUid={resolvedSubjectId}
@@ -224,7 +232,7 @@ const HealthProfile: React.FC = () => {
           anchoredRecordIds={anchoredRecordIds}
           recordIds={records.map(r => r.id).filter(Boolean) as string[]}
           isLoading={blockchainLoading}
-          onViewCredibility={() => setActiveTab('blockchain')}
+          onViewCredibility={() => setActiveTab('credibility')}
         />
         <TabNavigation
           tabs={visibleTabs}

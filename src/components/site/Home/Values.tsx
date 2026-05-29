@@ -20,7 +20,7 @@ const Values: React.FC = () => {
     },
     {
       icon: <Earth size={32} />,
-      title: 'A Rebuke to the Status Quo',
+      title: 'Rebuke the Status Quo',
       description:
         'Health data is worth billions, but currently that value flows exclusively to big pharma and insurance. Belrose is decentralized and peer-to-peer so that no one, including us, will ever be the gatekeeper of your most intimate data.',
       link: '/#about',
@@ -29,7 +29,7 @@ const Values: React.FC = () => {
       icon: <HeartHandshake size={32} />,
       title: 'A Healthier, More Equitable World',
       description:
-        "We're accustomed to our data existing to serve big tech and institutions. But a future where medicine is truly preventative, not reactive, requires patients to be partners, not commodities. With Belrose, your wellbeing, not your data, is the product.",
+        "We're accustomed to our data existing to serve big tech. But a future where medicine is truly preventative, not reactive, requires patients to be partners, not commodities. With Belrose, your wellbeing, not your data, is the product.",
       link: '/#about',
     },
   ];

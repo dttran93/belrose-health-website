@@ -67,7 +67,7 @@ function buildNotificationInput(
   encryptedRecordTitleIv?: string
 ): CreateNotificationInput {
   const recordFallback = `Record ${recordId.slice(0, 8)}...`;
-  const link = `/app/records/${recordId}`;
+  const link = `/app/records/${recordId}/?view=permissions`;
 
   const payloadBase = {
     recordId,

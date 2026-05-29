@@ -222,7 +222,7 @@ export const onSubjectConsentRequestUpdated = onDocumentUpdated(
       await createNotification(afterData.requestedBy, {
         type: 'SUBJECT_ACCEPTED',
         message: `${subjectName} has accepted your subject request for ${recordName}.`,
-        link: `/app/records/${afterData.recordId}`,
+        link: `/app/records/${afterData.recordId}?view=subject`,
         payload: {
           recordId: afterData.recordId,
           requestId,

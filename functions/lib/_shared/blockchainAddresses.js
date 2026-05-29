@@ -10,6 +10,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildHealthRecordRef = exports.buildMemberRegistryRef = exports.CONTRACT_ADDRESSES = exports.HEALTH_RECORD_CORE = exports.MEMBER_ROLE_MANAGER = exports.PAYMASTER = exports.AA_INFRASTRUCTURE = exports.NETWORK = void 0;
 exports.buildRpcUrl = buildRpcUrl;
+exports.buildBundlerURL = buildBundlerURL;
 exports.buildBlockchainRef = buildBlockchainRef;
 const chains_1 = require("viem/chains");
 // ============================================================================
@@ -41,6 +42,9 @@ exports.PAYMASTER = {
     address: '0x02422f03EcD403E1a902101D60a0Dad5bB9E71a7',
     dailySponsorLimit: 100, // Max sponsored txs per user per day. Set high so we can test in dev. Change in future
 };
+function buildBundlerURL(pimlicoApiKey) {
+    return `https://api.pimlico.io/v2/${exports.NETWORK.chainId}/rpc?apikey=${pimlicoApiKey}`;
+}
 // ============================================================================
 // MEMBER ROLE MANAGER (MemberRoleManager.sol)
 // UUPS upgradeable proxy — always interact via proxy address
