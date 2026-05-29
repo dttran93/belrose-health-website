@@ -69,7 +69,7 @@ export const RequestsWidget: React.FC<RequestsWidgetProps> = ({ requests }) => {
 
         return (
           <div key={name} className="flex items-center gap-3 py-2.5">
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 text-left">
               <p className="text-sm font-medium text-foreground truncate">{name}</p>
               <p className="text-xs text-muted-foreground">
                 {formatDistanceToNow(req.createdAt.toDate(), { addSuffix: true })}

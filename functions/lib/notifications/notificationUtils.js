@@ -34,7 +34,6 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.NOTIFICATION_MAPPING = void 0;
 exports.getFirestore = getFirestore;
 exports.getUserDisplayName = getUserDisplayName;
 exports.formatRecordIdFallback = formatRecordIdFallback;
@@ -56,7 +55,6 @@ exports.deleteOldNotifications = deleteOldNotifications;
  */
 const admin = __importStar(require("firebase-admin"));
 const _shared_1 = require("../_shared");
-exports.NOTIFICATION_MAPPING = Object.fromEntries(Object.entries(_shared_1.NOTIFICATION_CATEGORIES).flatMap(([category, { notificationTypes }]) => notificationTypes.map(type => [type, category])));
 function getFirestore() {
     return admin.firestore();
 }
@@ -120,7 +118,7 @@ async function createNotification(targetUserId, notification) {
     }
     const stored = {
         ...notification,
-        sourceService: exports.NOTIFICATION_MAPPING[notification.type],
+        sourceService: _shared_1.NOTIFICATION_MAPPING[notification.type],
         read: false,
         createdAt: admin.firestore.Timestamp.now(),
     };

@@ -100,9 +100,8 @@ export const GettingStartedWidget: React.FC<GettingStartedWidgetProps> = ({
     {
       id: 'upload',
       label: 'Upload your own records',
-      description: 'PDFs, images, typed notes — any format',
+      description: 'Upload 3+ records. PDFs, images, typed notes — any format.',
       icon: <Upload className="w-4 h-4" />,
-      // 'hasRecords' criterion requires ≥3 clinical records
       done: criterionDone(completeness, 'hasRecords'),
       href: '/app/add-record',
     },

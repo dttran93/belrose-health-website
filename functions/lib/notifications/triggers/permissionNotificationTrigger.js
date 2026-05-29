@@ -32,7 +32,7 @@ const resendKey = (0, params_1.defineSecret)('RESEND_API_KEY');
  */
 function buildNotificationInput(change, changedByName, recordId, encryptedRecordTitle, encryptedRecordTitleIv) {
     const recordFallback = `Record ${recordId.slice(0, 8)}...`;
-    const link = `/app/records/${recordId}`;
+    const link = `/app/records/${recordId}/?view=permissions`;
     const payloadBase = {
         recordId,
         changedBy: change.userId,

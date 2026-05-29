@@ -150,7 +150,7 @@ exports.onSubjectConsentRequestUpdated = (0, firestore_1.onDocumentUpdated)({ do
         await (0, notificationUtils_1.createNotification)(afterData.requestedBy, {
             type: 'SUBJECT_ACCEPTED',
             message: `${subjectName} has accepted your subject request for ${recordName}.`,
-            link: `/app/records/${afterData.recordId}`,
+            link: `/app/records/${afterData.recordId}?view=subject`,
             payload: {
                 recordId: afterData.recordId,
                 requestId,
