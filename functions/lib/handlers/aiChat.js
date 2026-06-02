@@ -12,7 +12,8 @@ const claudeChatService_1 = require("../services/claudeChatService");
 const geminiService_1 = require("../services/geminiService");
 const aiChatPrompt_1 = require("../utils/aiChatPrompt");
 const openaiService_1 = require("../services/openaiService");
-const corsHandler = (0, cors_1.default)({ origin: true });
+const config_1 = require("../config");
+const corsHandler = (0, cors_1.default)({ origin: config_1.ALLOWED_ORIGINS });
 // Define secrets
 const anthropicApiKey = (0, params_1.defineSecret)('ANTHROPIC_KEY');
 const geminiApiKey = (0, params_1.defineSecret)('GEMINI_API_KEY');

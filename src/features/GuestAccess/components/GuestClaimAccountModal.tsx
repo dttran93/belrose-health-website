@@ -39,7 +39,6 @@ import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionK
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
 import { MemberRegistryBlockchain } from '@/features/Auth/services/memberRegistryBlockchain';
-import { SmartAccountService } from '@/features/BlockchainWallet/services/smartAccountService';
 import { RecoveryKeyDisplay } from '@/features/Auth/components/RecoveryKeyDisplay';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 import { toast } from 'sonner';
@@ -323,19 +322,11 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
       setProgress({ message: 'Saving your account details...' });
       const displayName = `${firstName} ${lastName}`;
 
-      // Deactivate any placeholder guest wallets — they won't be used anymore and it's cleaner to mark them as inactive than to delete them from the on-chain identity array.
-      const currentWallets = user.onChainIdentity?.linkedWallets ?? [];
-      const deactivatedWallets = currentWallets.map((w: any) => ({
-        ...w,
-        isWalletActive: false,
-      }));
-
       batch.update(doc(db, 'users', guestUid), {
         displayName,
         displayNameLower: displayName.toLowerCase(),
         firstName,
         lastName,
-        'onChainIdentity.linkedWallets': deactivatedWallets,
         isGuest: false,
         emailVerified: true,
         emailVerifiedAt: serverTimestamp(),
@@ -386,14 +377,15 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         );
       }
 
-      // ── Step 3: Generate real wallet ──────────────────────────────────────
+      // ── Step 3: Generate wallet + register on blockchain (replaces steps 3, 6, 7, 8) ──
       setProgress({ message: 'Generating your wallet...' });
-      const walletData = await WalletGenerationService.generateWallet({
-        userId: guestUid,
-        masterKey: cryptoData.masterKey,
-      });
+      const masterKeyHex = await WalletGenerationService.convertMasterKeyToHex(
+        cryptoData.masterKey
+      );
+      const registrationResult =
+        await MemberRegistryBlockchain.registerMemberOnChainComplete(masterKeyHex);
 
-      // Set real master key in session — required before smart account init
+      // Set real master key in session
       EncryptionKeyManager.setSessionKey(cryptoData.masterKey);
 
       // ── Step 4: Set password on Firebase Auth account ────────────────────
@@ -432,33 +424,13 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
       });
       await inviteBatch.commit();
 
-      // ── Step 6: Register EOA on blockchain ───────────────────────────────
-      setProgress({ message: 'Registering on the secure network...' });
-      await MemberRegistryBlockchain.registerMemberWallet(walletData.walletAddress);
-
-      // ── Step 7: Initialize smart account ─────────────────────────────────
-      setProgress({ message: 'Setting up your smart account...' });
-      await SmartAccountService.ensureFullyInitialized();
-
-      // ── Step 8: Updating user status on chain to Active ────────────────────────────────────
-      // In the sharing flow, grantGuestAccess sets status to Guest on-chain.
-      // registerMemberWallet (step 6) doesn't override it since the identity
-      // already exists. So we need to explicitly set Active here.
-      //
-      // In the request flow, registerMemberWallet creates a new identity and
-      // automatically sets Active — calling setUserStatus would revert.
-      if (guestContext !== 'record_request') {
-        setProgress({ message: 'Updating status on distributed network...' });
-        await MemberRegistryBlockchain.setUserStatus(guestUid, 2);
-      }
-
-      // ── Step 9: Deactivate placeholder guest wallet on-chain (nice-to-have) ──
+      // ── Step 6: Deactivate placeholder guest wallet on-chain (nice-to-have) ──
       // Sharing flow only — in the request flow no placeholder wallet was ever
       // registered on-chain so there's nothing to deactivate.
       if (guestContext !== 'record_request') {
         try {
           const placeholderWallet = user.onChainIdentity?.linkedWallets?.find(
-            w => w.address !== walletData.walletAddress
+            w => w.address !== registrationResult.walletAddress
           )?.address;
           if (placeholderWallet) {
             await MemberRegistryBlockchain.deactivateWallet(placeholderWallet);
@@ -469,10 +441,10 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         }
       }
 
-      // ── Step 10: Clear guest keys from memory ─────────────────────────────
+      // ── Step 7: Clear guest keys from memory ─────────────────────────────
       EncryptionKeyManager.setGuestFileKeys(new Map());
 
-      // ── Step 11: Refresh auth context so banner disappears ───────────────────
+      // ── Step 8: Refresh auth context so banner disappears ───────────────────
       setProgress({ message: 'Finalizing...' });
 
       try {

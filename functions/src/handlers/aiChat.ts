@@ -8,8 +8,9 @@ import { GeminiService } from '../services/geminiService';
 import { generateSystemPrompt } from '../utils/aiChatPrompt';
 import { OpenAIService } from '../services/openaiService';
 import { AIProvider, MediaPart } from '../_shared/aiChat';
+import { ALLOWED_ORIGINS } from '../config';
 
-const corsHandler = cors({ origin: true });
+const corsHandler = cors({ origin: ALLOWED_ORIGINS });
 
 // Define secrets
 const anthropicApiKey = defineSecret('ANTHROPIC_KEY');

@@ -15,6 +15,7 @@ import type { Request, Response } from 'express';
 import { defineSecret } from 'firebase-functions/params';
 import { AnthropicService, MODELS } from '../services/anthropicService';
 import { getRefinementEditPrompt } from '../utils/recordAiPrompts';
+import { ALLOWED_ORIGINS } from '../config';
 
 const anthropicKey = defineSecret('ANTHROPIC_KEY');
 
@@ -28,7 +29,7 @@ interface RefinementAIResponse {
 export const refineRecord = onRequest(
   {
     secrets: [anthropicKey],
-    cors: true,
+    cors: ALLOWED_ORIGINS,
     timeoutSeconds: 120,
   },
   async (req: Request, res: Response) => {

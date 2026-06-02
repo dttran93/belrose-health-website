@@ -6,6 +6,7 @@ import { defineSecret } from 'firebase-functions/params';
 import { AnthropicService, MODELS } from '../services/anthropicService';
 import { getFHIRConversionPrompt } from '../utils/recordAiPrompts';
 import { FHIRConversionRequest, FHIRConversionResponse } from '../_shared';
+import { ALLOWED_ORIGINS } from '../config';
 
 /**
  * FHIR Conversion Handler
@@ -25,7 +26,7 @@ const anthropicKey = defineSecret('ANTHROPIC_KEY');
 export const convertToFHIR = onRequest(
   {
     secrets: [anthropicKey],
-    cors: true,
+    cors: ALLOWED_ORIGINS,
     timeoutSeconds: 300,
     memory: '1GiB',
   },

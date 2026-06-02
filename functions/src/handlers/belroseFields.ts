@@ -6,6 +6,7 @@ import { defineSecret } from 'firebase-functions/params';
 import { AnthropicService, MODELS } from '../services/anthropicService';
 import { getBelroseFieldsPrompt } from '../utils/recordAiPrompts';
 import { BelroseFieldProcessingRequest, BelroseFields } from '../_shared';
+import { ALLOWED_ORIGINS } from '../config';
 
 // Define the secret
 const anthropicKey = defineSecret('ANTHROPIC_KEY');
@@ -33,7 +34,7 @@ const anthropicKey = defineSecret('ANTHROPIC_KEY');
 export const createBelroseFields = onRequest(
   {
     secrets: [anthropicKey],
-    cors: true,
+    cors: ALLOWED_ORIGINS,
   },
   async (req: Request, res: Response) => {
     // Validate HTTP method

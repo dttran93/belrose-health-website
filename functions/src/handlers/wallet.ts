@@ -9,6 +9,7 @@ import { entryPoint07Address } from 'viem/account-abstraction';
 import { privateKeyToAccount } from 'viem/accounts';
 import { createPublicClient, http } from 'viem';
 import { NETWORK } from '../_shared';
+import { ALLOWED_ORIGINS } from '../config';
 
 /**
  * Wallet Handler
@@ -61,120 +62,123 @@ interface UserWallet {
  * Create Wallet Function
  * Creates a new blockchain wallet for a user
  */
-export const createEOAWallet = onRequest({ cors: true }, async (req: Request, res: Response) => {
-  // Validate HTTP method
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method Not Allowed' });
-    return;
+export const createEOAWallet = onRequest(
+  { cors: ALLOWED_ORIGINS },
+  async (req: Request, res: Response) => {
+    // Validate HTTP method
+    if (req.method !== 'POST') {
+      res.status(405).json({ error: 'Method Not Allowed' });
+      return;
+    }
+
+    try {
+      // Extract and validate request body
+      const { userId, masterKeyHex } = req.body as CreateWalletRequest;
+
+      if (!userId) {
+        res.status(400).json({
+          error: 'Missing required fields',
+          details: 'userId is required',
+        });
+        return;
+      }
+
+      console.log('💼 Creating wallet for user:', userId);
+
+      // Authenticate the user
+      const authenticatedUserId = await authenticateUser(req, userId);
+      if (!authenticatedUserId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      // Verify user IDs match (prevent users from creating wallets for others)
+      if (authenticatedUserId !== userId) {
+        res.status(403).json({
+          error: 'Forbidden',
+          details: 'Cannot create wallet for another user',
+        });
+        return;
+      }
+
+      // Check if user exists and doesn't already have a wallet
+      const db = getFirestore();
+      const userRef = db.collection('users').doc(userId);
+      const userDoc = await userRef.get();
+
+      if (!userDoc.exists) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      const userData = userDoc.data();
+      if (userData?.wallet?.address && !userData?.isGuest) {
+        res.status(400).json({
+          error: 'Wallet already exists',
+          details: 'User already has a wallet linked to their account',
+        });
+        return;
+      }
+
+      // Validate master key
+      if (!masterKeyHex) {
+        res.status(400).json({
+          error: 'Missing encryption key',
+          details: 'Master key is required to encrypt wallet',
+        });
+        return;
+      }
+
+      // Generate the wallet
+      console.log('🔐 Generating wallet...');
+      const wallet = generateWallet();
+      console.log('✅ Generated wallet address:', wallet.address);
+
+      console.log('🔑 Using master key for wallet encryption...');
+
+      // Encrypt the private key and mnemonic
+      const encryptedData = encryptPrivateKey(wallet.privateKey, masterKeyHex);
+      const encryptedMnemonic = encryptPrivateKey(wallet.mnemonic || '', masterKeyHex);
+
+      const walletData: UserWallet = {
+        address: wallet.address.toLowerCase(),
+        origin: 'generated',
+        //Encrypted private key data
+        encryptedPrivateKey: encryptedData.encryptedKey,
+        encryptedPrivateKeyIV: encryptedData.iv,
+        keyAuthTag: encryptedData.authTag,
+        keySalt: encryptedData.salt,
+        //Encrypted Mnemonic Data
+        encryptedMnemonic: encryptedMnemonic.encryptedKey,
+        mnemonicIv: encryptedMnemonic.iv,
+        mnemonicAuthTag: encryptedMnemonic.authTag,
+        mnemonicSalt: encryptedMnemonic.salt,
+      };
+
+      // Save encrypted wallet to database
+      await userRef.update({
+        wallet: walletData,
+      });
+
+      console.log('✅ Wallet saved for user:', userId);
+
+      // Return success response
+      const response: CreateWalletResponse = {
+        success: true,
+        walletAddress: wallet.address,
+        message: 'Wallet created successfully',
+        encryptedPrivateKey: encryptedData.encryptedKey,
+        encryptedPrivateKeyIV: encryptedData.iv,
+        authTag: encryptedData.authTag,
+      };
+
+      res.status(201).json(response);
+    } catch (error: any) {
+      console.error('❌ Wallet creation error:', error);
+      handleWalletError(res, error, 'create');
+    }
   }
-
-  try {
-    // Extract and validate request body
-    const { userId, masterKeyHex } = req.body as CreateWalletRequest;
-
-    if (!userId) {
-      res.status(400).json({
-        error: 'Missing required fields',
-        details: 'userId is required',
-      });
-      return;
-    }
-
-    console.log('💼 Creating wallet for user:', userId);
-
-    // Authenticate the user
-    const authenticatedUserId = await authenticateUser(req, userId);
-    if (!authenticatedUserId) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
-
-    // Verify user IDs match (prevent users from creating wallets for others)
-    if (authenticatedUserId !== userId) {
-      res.status(403).json({
-        error: 'Forbidden',
-        details: 'Cannot create wallet for another user',
-      });
-      return;
-    }
-
-    // Check if user exists and doesn't already have a wallet
-    const db = getFirestore();
-    const userRef = db.collection('users').doc(userId);
-    const userDoc = await userRef.get();
-
-    if (!userDoc.exists) {
-      res.status(404).json({ error: 'User not found' });
-      return;
-    }
-
-    const userData = userDoc.data();
-    if (userData?.wallet?.address && !userData?.isGuest) {
-      res.status(400).json({
-        error: 'Wallet already exists',
-        details: 'User already has a wallet linked to their account',
-      });
-      return;
-    }
-
-    // Validate master key
-    if (!masterKeyHex) {
-      res.status(400).json({
-        error: 'Missing encryption key',
-        details: 'Master key is required to encrypt wallet',
-      });
-      return;
-    }
-
-    // Generate the wallet
-    console.log('🔐 Generating wallet...');
-    const wallet = generateWallet();
-    console.log('✅ Generated wallet address:', wallet.address);
-
-    console.log('🔑 Using master key for wallet encryption...');
-
-    // Encrypt the private key and mnemonic
-    const encryptedData = encryptPrivateKey(wallet.privateKey, masterKeyHex);
-    const encryptedMnemonic = encryptPrivateKey(wallet.mnemonic || '', masterKeyHex);
-
-    const walletData: UserWallet = {
-      address: wallet.address.toLowerCase(),
-      origin: 'generated',
-      //Encrypted private key data
-      encryptedPrivateKey: encryptedData.encryptedKey,
-      encryptedPrivateKeyIV: encryptedData.iv,
-      keyAuthTag: encryptedData.authTag,
-      keySalt: encryptedData.salt,
-      //Encrypted Mnemonic Data
-      encryptedMnemonic: encryptedMnemonic.encryptedKey,
-      mnemonicIv: encryptedMnemonic.iv,
-      mnemonicAuthTag: encryptedMnemonic.authTag,
-      mnemonicSalt: encryptedMnemonic.salt,
-    };
-
-    // Save encrypted wallet to database
-    await userRef.update({
-      wallet: walletData,
-    });
-
-    console.log('✅ Wallet saved for user:', userId);
-
-    // Return success response
-    const response: CreateWalletResponse = {
-      success: true,
-      walletAddress: wallet.address,
-      message: 'Wallet created successfully',
-      encryptedPrivateKey: encryptedData.encryptedKey,
-      encryptedPrivateKeyIV: encryptedData.iv,
-      authTag: encryptedData.authTag,
-    };
-
-    res.status(201).json(response);
-  } catch (error: any) {
-    console.error('❌ Wallet creation error:', error);
-    handleWalletError(res, error, 'create');
-  }
-});
+);
 
 /**
  * For generating an account abstraction smart account

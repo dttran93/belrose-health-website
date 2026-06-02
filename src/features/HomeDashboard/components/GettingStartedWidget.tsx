@@ -84,7 +84,7 @@ export const GettingStartedWidget: React.FC<GettingStartedWidgetProps> = ({
     {
       id: 'account',
       label: 'Create your account',
-      description: 'Done',
+      description: 'Create a Belrose account to get started',
       icon: <UserCircle className="w-4 h-4" />,
       done: !isGuest,
       href: '/app/auth/register',
