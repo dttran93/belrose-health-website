@@ -29,11 +29,12 @@ import { useSubjectAlerts } from '@/features/Subject/hooks/useSubjectAlerts';
 import SubjectService from '@/features/Subject/services/subjectService';
 import SubjectRemovalService from '@/features/Subject/services/subjectRemovalService';
 import { useNavigate } from 'react-router-dom';
-import { useReviewedByCurrentUser } from '@/features/Credibility/hooks/useVerifiedByCurrentUser';
+import { useReviewedByCurrentUser } from '@/features/Credibility/hooks/useReviewedByCurrentUser';
 import FollowUpBadge from '@/features/RefineRecord/components/ui/FollowUpBadge';
 import RecordFollowUpsView from '@/features/RefineRecord/components/RecordFollowUpsView';
 import { BelroseFields } from '@belrose/shared';
 import LinkRequestModal from '@/features/RequestRecord/components/Respond/LinkRequestModal';
+import { useRecordFollowUps } from '@/features/RefineRecord/hooks/useRecordFollowUps';
 
 type ViewMode =
   | 'record'
@@ -48,7 +49,7 @@ type ViewMode =
 
 export type UrlViewMode = Exclude<ViewMode, 'version-detail'>; //Initial view mode is never version-detail
 
-// Used in RecordDetail.tsx page
+// Used in RecordDetail.tsx page for urls. Excludes version-detail because you can't navigate directly there
 export const VALID_VIEWS: UrlViewMode[] = [
   'record',
   'edit',
@@ -100,7 +101,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     onSuccess: () => {
       // Clear the pending request banner after successful action
       subjectAlerts.refetch();
-      onRefreshRecord?.();
+      handleRefreshRecord();
     },
     onRejectSuccess: () => {
       navigate('/app/all-records'); // After rejecting a subject request, navigate away from the record
@@ -291,6 +292,17 @@ export const RecordFull: React.FC<RecordFullProps> = ({
 
   const handleFhirDataChange = (updatedData: any) => setCurrentFhirData(updatedData);
   const handleFhirChanged = (hasChanges: boolean) => setHasFhirChanges(hasChanges);
+  const {
+    followUpItems,
+    isLoading: followUpsLoading,
+    refetch: refetchFollowUps,
+  } = useRecordFollowUps(record);
+
+  // For record actions that may affect the follows up badge, also refetch followUps
+  const handleRefreshRecord = () => {
+    onRefreshRecord?.();
+    refetchFollowUps();
+  };
 
   const handleBelroseFieldsChange = (updatedFields: BelroseFields) => {
     setEditedBelroseFields(updatedFields);
@@ -357,7 +369,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     try {
       await SubjectService.respondToSubjectRejection(record.id, subjectId, 'dropped');
       subjectAlerts.refetch();
-      onRefreshRecord?.();
+      handleRefreshRecord();
     } catch (error) {
       console.error('Error dropping rejection:', error);
     }
@@ -367,7 +379,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     try {
       await SubjectService.respondToSubjectRejection(record.id, subjectId, 'escalated');
       subjectAlerts.refetch();
-      onRefreshRecord?.();
+      handleRefreshRecord();
     } catch (error) {
       console.error('Error escalating rejection:', error);
     }
@@ -381,7 +393,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
     try {
       await SubjectRemovalService.rejectRemoval(record.id);
       subjectAlerts.refetch();
-      onRefreshRecord?.();
+      handleRefreshRecord();
     } catch (error) {
       console.error('Error escalating rejection:', error);
     }
@@ -491,7 +503,11 @@ export const RecordFull: React.FC<RecordFullProps> = ({
 
             {/**Right: credibility + divider + subject (md+) + menu + close */}
             <div className="flex items-center gap-1 flex-shrink-0">
-              <FollowUpBadge record={record} onClick={handleFollowUpsPage} />
+              <FollowUpBadge
+                followUpItems={followUpItems}
+                isLoading={followUpsLoading}
+                onClick={handleFollowUpsPage}
+              />
               <div className="hidden md:flex items-center">
                 <SubjectBadge record={record} onClick={handleSubjectPage} />
               </div>
@@ -606,7 +622,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       {viewMode === 'subject' && (
         <SubjectManager
           record={displayRecord}
-          onSuccess={onRefreshRecord}
+          onSuccess={handleRefreshRecord}
           onBack={handleBackToRecord}
         />
       )}
@@ -668,6 +684,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
         <CredibilityView
           record={record}
           onBack={handleBackToRecord}
+          onSuccess={refetchFollowUps}
           startModVerifyFromVersions={enterVerificationInModifyMode}
           startModDisputeFromVersions={enterDisputeInModifyMode}
         />
@@ -676,7 +693,10 @@ export const RecordFull: React.FC<RecordFullProps> = ({
       {viewMode === 'follow-up' && (
         <RecordFollowUpsView
           record={record}
-          onBack={handleBackToRecord}
+          onBack={() => {
+            handleBackToRecord();
+            handleRefreshRecord();
+          }}
           onAction={(_, itemId) => {
             if (itemId === 'subject' || itemId === 'subject-rejection') setViewMode('subject');
             else if (itemId === 'verify') setViewMode('credibility');
@@ -695,7 +715,7 @@ export const RecordFull: React.FC<RecordFullProps> = ({
         onClose={() => setLinkRequestOpen(false)}
         onSuccess={() => {
           setLinkRequestOpen(false);
-          onRefreshRecord?.();
+          handleRefreshRecord();
         }}
       />
     </div>

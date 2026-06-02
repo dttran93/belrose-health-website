@@ -6,8 +6,8 @@ import SubjectQueryService, {
   PendingRejectionResponse,
   IncomingRemovalRequest,
 } from '../services/subjectQueryService';
-import { SubjectConsentRequest } from '../services/subjectConsentService';
 import { SubjectRemovalRequest } from '../services/subjectRemovalService';
+import { SubjectConsentRequest } from '@belrose/shared';
 
 interface UseSubjectAlertsOptions {
   recordId: string;

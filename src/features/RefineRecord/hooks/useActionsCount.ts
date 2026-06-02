@@ -24,7 +24,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { useUserRecords } from '@/features/ViewEditRecord/hooks/useUserRecords';
 import SubjectQueryService from '@/features/Subject/services/subjectQueryService';
-import { useInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
+import { useInboundRequests } from '@/features/RequestRecord/hooks/useInboundRequests';
 
 export function useActionsCount(): { count: number; isLoading: boolean } {
   const { user } = useAuthContext();

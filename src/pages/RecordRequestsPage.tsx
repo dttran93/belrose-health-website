@@ -20,7 +20,7 @@ import RequestListView from '@/features/RequestRecord/components/Request/Request
 import InboundRequestListView from '@/features/RequestRecord/components/Request/InboundRequestListView';
 import { Button } from '@/components/ui/Button';
 import { Plus } from 'lucide-react';
-import { useInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
+import { useInboundRequests } from '@/features/RequestRecord/hooks/useInboundRequests';
 import { markRequestComplete } from '@/features/RequestRecord/services/linkRecordService';
 import { toast } from 'sonner';
 import LinkRecordModal from '@/features/RequestRecord/components/Respond/LinkRecordModal';

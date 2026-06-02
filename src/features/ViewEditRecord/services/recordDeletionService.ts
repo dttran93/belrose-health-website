@@ -41,6 +41,7 @@ import {
   deleteFromFirestore,
   deleteFromStorage,
   deleteRecordVersions,
+  deleteSubjectRequests,
   deleteWrappedKeys,
   getFileMetadata,
 } from '@/firebase/uploadUtils';
@@ -265,6 +266,9 @@ class RecordDeletionService {
       if (metadata.storagePath) {
         await deleteFromStorage(metadata.storagePath);
       }
+      //delete related files. Verifications/Disputes/ScoreEvents specifically are kept to
+      //maintain blockchain audit trail. But might delete those in the future. TBD
+      await deleteSubjectRequests(record.id);
       await deleteRecordVersions(record.id);
       await deleteWrappedKeys(record.id);
       await deleteFromFirestore(record.id);

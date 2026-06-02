@@ -8,7 +8,6 @@
  *
  *   - Subject:  fileItem.subjects is empty
  *   - Verify:   current user has no active verification or dispute (async Firestore check)
- *   - Request:  TODO — current user has open requests, should associate them?
  *
  * This hook is intentionally decoupled from any UI. Drop it anywhere you render
  * a FileObject and want to surface outstanding actions.
@@ -22,9 +21,9 @@
 import { FileObject } from '@/types/core';
 import React, { useEffect, useState } from 'react';
 import { FollowUpItem, FollowUpItemId } from '../components/ui/FollowUpItems';
-import { useReviewedByCurrentUser } from '@/features/Credibility/hooks/useVerifiedByCurrentUser';
+import { useReviewedByCurrentUser } from '@/features/Credibility/hooks/useReviewedByCurrentUser';
 import { LinkIcon, ShieldCheck, User, UserX } from 'lucide-react';
-import { useInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
+import { useInboundRequests } from '@/features/RequestRecord/hooks/useInboundRequests';
 import useAuth from '@/features/Auth/hooks/useAuth';
 import { useSubjectAlerts } from '@/features/Subject/hooks/useSubjectAlerts';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
@@ -34,7 +33,7 @@ import SubjectPermissionService from '@/features/Subject/services/subjectPermiss
 
 export interface UseRecordFollowUpsOptions {
   refreshKey?: number;
-  onAction: (fileItem: FileObject, itemId: FollowUpItemId) => void;
+  onAction?: (fileItem: FileObject, itemId: FollowUpItemId) => void;
 }
 
 // ─── Return type ─────────────────────────────────────────────────────────────
@@ -42,13 +41,14 @@ export interface UseRecordFollowUpsOptions {
 export interface UseRecordFollowUpsResult {
   followUpItems: FollowUpItem[];
   isLoading: boolean;
+  refetch: () => void;
 }
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
 export function useRecordFollowUps(
   fileItem: FileObject,
-  options: UseRecordFollowUpsOptions
+  options: UseRecordFollowUpsOptions = {}
 ): UseRecordFollowUpsResult {
   const { onAction } = options;
 
@@ -58,6 +58,7 @@ export function useRecordFollowUps(
   // ── Check 1: Subject ───────────────────────────────────────────────────────
 
   const [freshSubjects, setFreshSubjects] = useState<string[]>(fileItem.subjects ?? []);
+  const [internalRefreshKey, setInternalRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!isEligible) return;
@@ -65,7 +66,7 @@ export function useRecordFollowUps(
     getDoc(doc(db, 'records', recordId)).then(snap => {
       if (snap.exists()) setFreshSubjects(snap.data().subjects ?? []);
     });
-  }, [isEligible, recordId, options?.refreshKey]);
+  }, [isEligible, recordId, options?.refreshKey, internalRefreshKey]);
 
   const hasSubject = freshSubjects.length > 0;
 
@@ -73,6 +74,7 @@ export function useRecordFollowUps(
     hasSubjectRequest, // ← true when current user has a pending incoming consent request
     hasPendingRejectionResponse,
     isLoading: isLoadingAlerts,
+    refetch: refetchAlerts,
   } = useSubjectAlerts({ recordId });
 
   // ── Check 2: Can the current user manage this record? ─────────────────────
@@ -89,10 +91,15 @@ export function useRecordFollowUps(
     hasReviewed,
     reviewedCurrentVersion,
     isLoading: isLoadingReview,
+    refetch: refetchReview,
   } = useReviewedByCurrentUser(fileItem);
 
   // ── Check 4: Linked request ───────────────────────────────────────────────
-  const { requests: inboundRequests, loading: isLoadingRequests } = useInboundRequests();
+  const {
+    requests: inboundRequests,
+    loading: isLoadingRequests,
+    refresh: refetchRequests,
+  } = useInboundRequests();
   const hasPendingRequests = inboundRequests.some(r => r.status === 'pending');
 
   // ── Build list ────────────────────────────────────────────────────────────
@@ -114,7 +121,7 @@ export function useRecordFollowUps(
         icon: User,
         status: 'pending',
         ctaLabel: 'Send request',
-        onAction: () => onAction(fileItem, 'subject'),
+        onAction: () => onAction?.(fileItem, 'subject'),
       });
     }
 
@@ -128,7 +135,7 @@ export function useRecordFollowUps(
         icon: User,
         status: 'pending',
         ctaLabel: 'Respond',
-        onAction: () => onAction(fileItem, 'subject'),
+        onAction: () => onAction?.(fileItem, 'subject'),
       });
     }
 
@@ -140,7 +147,7 @@ export function useRecordFollowUps(
         icon: UserX,
         status: 'pending',
         ctaLabel: 'Review',
-        onAction: () => onAction(fileItem, 'subject-rejection'),
+        onAction: () => onAction?.(fileItem, 'subject-rejection'),
       });
     }
 
@@ -154,7 +161,7 @@ export function useRecordFollowUps(
           icon: ShieldCheck,
           status: 'pending',
           ctaLabel: 'Review',
-          onAction: () => onAction(fileItem, 'verify'),
+          onAction: () => onAction?.(fileItem, 'verify'),
         });
       } else if (!reviewedCurrentVersion) {
         items.push({
@@ -164,7 +171,7 @@ export function useRecordFollowUps(
           icon: ShieldCheck,
           status: 'pending',
           ctaLabel: 'Re-verify',
-          onAction: () => onAction(fileItem, 'verify'),
+          onAction: () => onAction?.(fileItem, 'verify'),
         });
       }
     }
@@ -177,7 +184,7 @@ export function useRecordFollowUps(
         icon: LinkIcon,
         status: 'pending',
         ctaLabel: 'Link',
-        onAction: () => onAction(fileItem, 'link-request'),
+        onAction: () => onAction?.(fileItem, 'link-request'),
       });
     }
 
@@ -197,7 +204,16 @@ export function useRecordFollowUps(
     onAction,
   ]);
 
-  return { followUpItems, isLoading };
+  return {
+    followUpItems,
+    isLoading,
+    refetch: () => {
+      setInternalRefreshKey(k => k + 1);
+      refetchReview();
+      refetchAlerts();
+      refetchRequests();
+    },
+  };
 }
 
 export default useRecordFollowUps;

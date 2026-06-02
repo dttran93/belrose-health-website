@@ -13,7 +13,7 @@ import { navigationSections } from './navigation';
 import { GuestBanner, GuestFooter } from './GuestBanner';
 import useNotifications from '@/features/Notifications/hooks/useNotifications';
 import { useUnreadMessageCount } from '@/features/Messaging/hooks/useUnreadMessageCount';
-import { useInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
+import { useInboundRequests } from '@/features/RequestRecord/hooks/useInboundRequests';
 import { useActionsCount } from '@/features/RefineRecord/hooks/useActionsCount';
 
 // ── No longer accepts children — nested routes render via <Outlet /> ──────────

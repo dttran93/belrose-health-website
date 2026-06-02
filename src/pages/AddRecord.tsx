@@ -6,7 +6,7 @@ import { FileObject } from '@/types/core';
 import CombinedUploadFHIR from '@/features/AddRecord/components/CombinedUploadFHIR';
 import { useBlocker, useNavigate } from 'react-router-dom';
 import { useAuthContext } from '@/features/Auth/AuthContext';
-import { useInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
+import { useInboundRequests } from '@/features/RequestRecord/hooks/useInboundRequests';
 import { GuestUploadBlockerModal } from '@/features/GuestAccess/components/GuestUploadBlockerModal';
 import { GuestClaimAccountModal } from '@/features/GuestAccess/components/GuestClaimAccountModal';
 
