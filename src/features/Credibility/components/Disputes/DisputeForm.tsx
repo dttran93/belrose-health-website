@@ -173,7 +173,7 @@ const DisputeForm: React.FC<DisputeFormProps> = ({
   };
 
   const handleConfirmModify = async () => {
-    if (!existingDispute || !modifySeverity || !modifyCulpability) return;
+    if (!existingDispute || modifySeverity === null || modifyCulpability === null) return;
 
     // Check if at least one value changed
     const severityChanged = modifySeverity !== existingDispute.severity;
@@ -275,7 +275,9 @@ const DisputeForm: React.FC<DisputeFormProps> = ({
           </Button>
           <Button
             onClick={handleConfirmModify}
-            disabled={isSubmitting || !modifySeverity || !modifyCulpability || !hasChanges}
+            disabled={
+              isSubmitting || !modifySeverity || modifyCulpability === undefined || !hasChanges
+            }
             className="flex-1 bg-red-600 hover:bg-red-700"
           >
             {isSubmitting ? (

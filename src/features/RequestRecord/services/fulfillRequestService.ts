@@ -27,6 +27,7 @@ import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionK
 import { base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
+import { id } from 'ethers';
 
 // ── Firestore document ────────────────────────────────────────────────────────
 
@@ -154,6 +155,7 @@ export class FulfillRequestService {
           targetWalletAddress: requesterProfile.wallet.address ?? '',
           role: 'administrator',
           recordId,
+          recordIdHash: id(recordId),
         },
       });
       throw err;

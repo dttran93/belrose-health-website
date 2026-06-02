@@ -525,10 +525,7 @@ service cloud.firestore {
         request.resource.data.disputerId == resource.data.disputerId &&
         request.resource.data.recordId == resource.data.recordId &&
         request.resource.data.recordHash == resource.data.recordHash &&
-        request.resource.data.createdAt == resource.data.createdAt &&
-        // Notes hash is immutable (it's on-chain)
-        request.resource.data.notesHash == resource.data.notesHash &&
-        request.resource.data.encryptedNotes == resource.data.encryptedNotes;
+        request.resource.data.createdAt == resource.data.createdAt;
 
       // DELETE: Not allowed - use isActive flag instead
       allow delete: if false;
@@ -930,36 +927,6 @@ service cloud.firestore {
         // DELETE: Not allowed — message history is permanent
         allow delete: if false;
       }
-    }
-    
-    // ============================================
-    // SIGNAL PROTOCOL KEY BUNDLES
-    // ============================================
-    
-    match /users/{userId}/signal/{document} {
-    
-      // READ: Any authenticated user can fetch another user's public key bundle.
-      // This is required for X3DH — Alice needs Bob's public keys to initiate
-      // a session. The bundle contains ONLY public keys, never private keys.
-      // OPK consumption (the sensitive part) is handled by a Cloud Function
-      // with a Firestore transaction, not directly by clients.
-      allow read: if request.auth != null;
-    
-      // CREATE/UPDATE: Only the key owner can write their own bundle.
-      // Validation ensures only public key material is stored
-      // (private keys never leave the client device / IndexedDB).
-      allow create, update: if request.auth != null &&
-        request.auth.uid == userId &&
-        request.resource.data.registrationId is int &&
-        request.resource.data.identityKey is string &&
-        request.resource.data.signedPreKey is map &&
-        request.resource.data.signedPreKey.keyId is int &&
-        request.resource.data.signedPreKey.publicKey is string &&
-        request.resource.data.signedPreKey.signature is string &&
-        request.resource.data.oneTimePreKeys is list;
-    
-      // DELETE: Users can delete their own key bundle (e.g. account deletion)
-      allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
     // ============================================

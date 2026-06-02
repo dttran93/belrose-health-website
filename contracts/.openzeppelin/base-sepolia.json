@@ -1,0 +1,499 @@
+{
+  "manifestVersion": "3.2",
+  "proxies": [
+    {
+      "address": "0x66A8b985C61205e63D7d7DEA72Dfa5849a3e66De",
+      "kind": "uups"
+    }
+  ],
+  "impls": {
+    "989b5a8faccc5d1e831ac6361781e777a157f8abafab05f282c515b023f83785": {
+      "address": "0x89839E0c266045c9EA06FdA11152B48129e76Ef2",
+      "layout": {
+        "solcVersion": "0.8.24",
+        "storage": [
+          {
+            "label": "memberRoleManager",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_contract(MemberRoleManagerInterface)1536",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:44"
+          },
+          {
+            "label": "admin",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_address",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:46"
+          },
+          {
+            "label": "recordSubjects",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_mapping(t_bytes32,t_array(t_bytes32)dyn_storage)",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:182"
+          },
+          {
+            "label": "isSubjectOfRecord",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_mapping(t_bytes32,t_mapping(t_bytes32,t_bool))",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:185"
+          },
+          {
+            "label": "subjectMedicalHistory",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_mapping(t_bytes32,t_array(t_bytes32)dyn_storage)",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:188"
+          },
+          {
+            "label": "isSubjectActive",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_mapping(t_bytes32,t_mapping(t_bytes32,t_bool))",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:191"
+          },
+          {
+            "label": "recordIdForHash",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_mapping(t_bytes32,t_bytes32)",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:194"
+          },
+          {
+            "label": "recordVersionHistory",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_mapping(t_bytes32,t_array(t_bytes32)dyn_storage)",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:197"
+          },
+          {
+            "label": "isHashActive",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_mapping(t_bytes32,t_bool)",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:200"
+          },
+          {
+            "label": "totalAnchoredRecords",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_uint256",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:202"
+          },
+          {
+            "label": "verifications",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_mapping(t_bytes32,t_array(t_struct(Verification)2717_storage)dyn_storage)",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:585"
+          },
+          {
+            "label": "currentlyVerified",
+            "offset": 0,
+            "slot": "11",
+            "type": "t_mapping(t_bytes32,t_mapping(t_bytes32,t_bool))",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:586"
+          },
+          {
+            "label": "verificationIndex",
+            "offset": 0,
+            "slot": "12",
+            "type": "t_mapping(t_bytes32,t_mapping(t_bytes32,t_uint256))",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:587"
+          },
+          {
+            "label": "disputes",
+            "offset": 0,
+            "slot": "13",
+            "type": "t_mapping(t_bytes32,t_array(t_struct(Dispute)2734_storage)dyn_storage)",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:590"
+          },
+          {
+            "label": "currentlyDisputed",
+            "offset": 0,
+            "slot": "14",
+            "type": "t_mapping(t_bytes32,t_mapping(t_bytes32,t_bool))",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:591"
+          },
+          {
+            "label": "disputeIndex",
+            "offset": 0,
+            "slot": "15",
+            "type": "t_mapping(t_bytes32,t_mapping(t_bytes32,t_uint256))",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:592"
+          },
+          {
+            "label": "unacceptedFlagsBySubject",
+            "offset": 0,
+            "slot": "16",
+            "type": "t_mapping(t_bytes32,t_array(t_struct(UnacceptedFlag)2745_storage)dyn_storage)",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:595"
+          },
+          {
+            "label": "unacceptedFlagIndex",
+            "offset": 0,
+            "slot": "17",
+            "type": "t_mapping(t_bytes32,t_mapping(t_bytes32,t_uint256))",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:596"
+          },
+          {
+            "label": "activeUnacceptedFlagCount",
+            "offset": 0,
+            "slot": "18",
+            "type": "t_mapping(t_bytes32,t_uint256)",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:597"
+          },
+          {
+            "label": "verificationsByUser",
+            "offset": 0,
+            "slot": "19",
+            "type": "t_mapping(t_bytes32,t_array(t_bytes32)dyn_storage)",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:600"
+          },
+          {
+            "label": "disputesByUser",
+            "offset": 0,
+            "slot": "20",
+            "type": "t_mapping(t_bytes32,t_array(t_bytes32)dyn_storage)",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:601"
+          },
+          {
+            "label": "totalVerifications",
+            "offset": 0,
+            "slot": "21",
+            "type": "t_uint256",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:603"
+          },
+          {
+            "label": "totalDisputes",
+            "offset": 0,
+            "slot": "22",
+            "type": "t_uint256",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:604"
+          },
+          {
+            "label": "totalUnacceptedFlags",
+            "offset": 0,
+            "slot": "23",
+            "type": "t_uint256",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:605"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "24",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "HealthRecordCore",
+            "src": "smartContracts\\HealthRecordCore.sol:1077"
+          }
+        ],
+        "types": {
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)130_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_bytes32)dyn_storage": {
+            "label": "bytes32[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(Dispute)2734_storage)dyn_storage": {
+            "label": "struct HealthRecordCore.Dispute[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(UnacceptedFlag)2745_storage)dyn_storage": {
+            "label": "struct HealthRecordCore.UnacceptedFlag[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(Verification)2717_storage)dyn_storage": {
+            "label": "struct HealthRecordCore.Verification[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_contract(MemberRoleManagerInterface)1536": {
+            "label": "contract MemberRoleManagerInterface",
+            "numberOfBytes": "20"
+          },
+          "t_enum(DisputeCulpability)2705": {
+            "label": "enum HealthRecordCore.DisputeCulpability",
+            "members": [
+              "Unknown",
+              "NoFault",
+              "Systemic",
+              "Preventable",
+              "Reckless",
+              "Intentional"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_enum(DisputeSeverity)2698": {
+            "label": "enum HealthRecordCore.DisputeSeverity",
+            "members": [
+              "None",
+              "Negligible",
+              "Moderate",
+              "Major"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_enum(VerificationLevel)2693": {
+            "label": "enum HealthRecordCore.VerificationLevel",
+            "members": [
+              "None",
+              "Provenance",
+              "Content",
+              "Full"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_bytes32,t_array(t_bytes32)dyn_storage)": {
+            "label": "mapping(bytes32 => bytes32[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_array(t_struct(Dispute)2734_storage)dyn_storage)": {
+            "label": "mapping(bytes32 => struct HealthRecordCore.Dispute[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_array(t_struct(UnacceptedFlag)2745_storage)dyn_storage)": {
+            "label": "mapping(bytes32 => struct HealthRecordCore.UnacceptedFlag[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_array(t_struct(Verification)2717_storage)dyn_storage)": {
+            "label": "mapping(bytes32 => struct HealthRecordCore.Verification[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_bool)": {
+            "label": "mapping(bytes32 => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_bytes32)": {
+            "label": "mapping(bytes32 => bytes32)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_mapping(t_bytes32,t_bool))": {
+            "label": "mapping(bytes32 => mapping(bytes32 => bool))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_mapping(t_bytes32,t_uint256))": {
+            "label": "mapping(bytes32 => mapping(bytes32 => uint256))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_uint256)": {
+            "label": "mapping(bytes32 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Dispute)2734_storage": {
+            "label": "struct HealthRecordCore.Dispute",
+            "members": [
+              {
+                "label": "disputerIdHash",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "recordIdHash",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "severity",
+                "type": "t_enum(DisputeSeverity)2698",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "culpability",
+                "type": "t_enum(DisputeCulpability)2705",
+                "offset": 1,
+                "slot": "2"
+              },
+              {
+                "label": "notes",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "createdAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "isActive",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "5"
+              }
+            ],
+            "numberOfBytes": "192"
+          },
+          "t_struct(UnacceptedFlag)2745_storage": {
+            "label": "struct HealthRecordCore.UnacceptedFlag",
+            "members": [
+              {
+                "label": "recordIdHash",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "reporterIdHash",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "recordHash",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "createdAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "isActive",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_struct(Verification)2717_storage": {
+            "label": "struct HealthRecordCore.Verification",
+            "members": [
+              {
+                "label": "verifierIdHash",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "recordIdHash",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "level",
+                "type": "t_enum(VerificationLevel)2693",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "createdAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "isActive",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin\\contracts\\proxy\\utils\\Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin\\contracts\\proxy\\utils\\Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      },
+      "allAddresses": [
+        "0x89839E0c266045c9EA06FdA11152B48129e76Ef2",
+        "0xDC79F803594232421f49a29D9EcEbe78015d48e1"
+      ]
+    }
+  }
+}
