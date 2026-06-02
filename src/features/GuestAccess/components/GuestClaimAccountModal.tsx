@@ -377,8 +377,8 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
         );
       }
 
-      // ── Step 3: Generate wallet + register on blockchain (replaces steps 3, 6, 7, 8) ──
-      setProgress({ message: 'Generating your wallet...' });
+      // ── Step 3: Generate wallet + register on blockchain ──
+      setProgress({ message: 'Generating your distributed network account...' });
       const masterKeyHex = await WalletGenerationService.convertMasterKeyToHex(
         cryptoData.masterKey
       );
