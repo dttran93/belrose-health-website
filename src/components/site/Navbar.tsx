@@ -66,6 +66,13 @@ const Navbar: React.FC = () => {
           link: '/#why',
           color: 'supplement-1',
         },
+        {
+          icon: <Lightbulb size={32} />,
+          title: 'Learn More',
+          description: 'Dive deeper into the technical, philosophical, and business details.',
+          link: '/#who/learn-more',
+          color: 'supplement-2',
+        },
       ],
     },
     company: {
