@@ -24,7 +24,7 @@ export { sendShareInvitationEmail } from './handlers/sendShareInvitationEmail';
 export { sendAlphaApprovalEmail } from './handlers/sendAlphaApprovalEmail';
 export { sendWaitlistConfirmationEmail } from './handlers/sendWaitlistConfirmationEmail';
 export { sendPasswordChangeEmail } from './handlers/sendPasswordChangeEmail';
-export { sendMailingListConfirmationEmail } from './handlers/sendMailingListConfirmationEmail';
+export { addToMailingList } from './handlers/addToMailingList';
 
 // ==================== GUEST INVITE ====================
 export { createGuestInvite } from './handlers/createGuestInvite';

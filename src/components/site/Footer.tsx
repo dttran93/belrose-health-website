@@ -25,7 +25,7 @@ const Footer: React.FC = () => {
       { name: 'About Us', href: '/#about' },
       { name: 'Careers', href: '/#who' },
       { name: 'Contact', href: '/#who/contact' },
-      { name: 'Learn More', href: '/#who/learn-more' },
+      { name: 'Deep Dive', href: '/#who/learn-more' },
     ],
   };
 

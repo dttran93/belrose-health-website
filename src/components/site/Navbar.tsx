@@ -9,6 +9,7 @@ import {
   ChevronDown,
   Cog,
   Lightbulb,
+  Library,
 } from 'lucide-react';
 import DropdownMenu, { DropdownItem } from '@/components/ui/DropdownMenu';
 import NavCard from '@/components/site/ui/NavCard';
@@ -67,8 +68,8 @@ const Navbar: React.FC = () => {
           color: 'supplement-1',
         },
         {
-          icon: <Lightbulb size={32} />,
-          title: 'Learn More',
+          icon: <Library size={32} />,
+          title: 'Deep Dive',
           description: 'Dive deeper into the technical, philosophical, and business details.',
           link: '/#who/learn-more',
           color: 'supplement-2',

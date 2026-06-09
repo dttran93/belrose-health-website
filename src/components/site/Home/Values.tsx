@@ -19,14 +19,14 @@ const Values: React.FC = () => {
       link: '/#about',
     },
     {
-      icon: <Earth size={32} />,
-      title: 'Rebuke the Status Quo',
+      icon: <HeartHandshake size={32} />,
+      title: 'Reclaim Your Digital Life',
       description:
         'Health data is worth billions, but currently that value flows exclusively to big pharma and insurance. Belrose is decentralized and peer-to-peer so that no one, including us, will ever be the gatekeeper of your most intimate data.',
       link: '/#about',
     },
     {
-      icon: <HeartHandshake size={32} />,
+      icon: <Earth size={32} />,
       title: 'A Healthier, More Equitable World',
       description:
         "We're accustomed to our data existing to serve big tech. But a future where medicine is truly preventative, not reactive, requires patients to be partners, not commodities. With Belrose, your wellbeing, not your data, is the product.",

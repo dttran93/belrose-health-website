@@ -1,10 +1,10 @@
-// src/components/site/Company/EmailCaptureDialog.tsx
+// src/components/site/Company/EmailCaptureModal.tsx
 
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
-import { Send, Check, ExternalLink, Download } from 'lucide-react';
+import { ExternalLink, Download } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { Button } from '@/components/ui/Button';
-import { doc, getDoc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
 
 // ============================================================================
 // TYPES
@@ -39,23 +39,23 @@ const CONSENT_TEXT =
 // HELPERS
 // ============================================================================
 
-// Writes to mailingList only if consent given.
-// Waitlist + duplicate checks are handled server-side in the Cloud Function.
+// Calls the addToMailingList Cloud Function — all validation, deduplication,
+// waitlist checks, and email sending happen server-side.
 async function captureEmailLead(
   email: string,
   resource: ResourceKey,
   action: ActionType
 ): Promise<void> {
-  const normalised = email.trim().toLowerCase();
-  const db = getFirestore();
+  const addToMailingList = httpsCallable(getFunctions(), 'addToMailingList');
 
-  await setDoc(doc(db, 'mailingList', normalised), {
-    email: normalised,
-    consentText: CONSENT_TEXT,
-    consentTimestamp: serverTimestamp(),
+  // We don't need the returned status here — all outcomes (success,
+  // waitlist, duplicate) are fine from the user's perspective.
+  // Errors will throw and bubble up to handleSubmit's catch block.
+  await addToMailingList({
+    email,
     source: 'learnMoreHub',
     resourceAccessed: resource,
-    status: 'active',
+    consentText: CONSENT_TEXT,
   });
 }
 
@@ -83,6 +83,7 @@ const FormContent: React.FC<{
     const trimmed = email.trim();
     const isValid = trimmed.length > 0 && trimmed.includes('@');
     if (!isValid) {
+      // No/invalid email — skip straight through without calling the function
       onSkip();
       return;
     }
@@ -139,7 +140,7 @@ const FormContent: React.FC<{
           ) : (
             <>
               {action === 'download' ? <Download size={13} /> : <ExternalLink size={13} />}
-              Send link &amp; {actionLabel}
+              Sign up &amp; {actionLabel}
             </>
           )}
         </Button>
@@ -177,7 +178,13 @@ export const EmailCaptureDialog: React.FC<EmailCaptureDialogProps> = ({
   };
 
   const handleSubmit = async (email: string) => {
-    await captureEmailLead(email, resource, action);
+    try {
+      await captureEmailLead(email, resource, action);
+    } catch (err) {
+      // Don't block the user from the file if the function fails —
+      // log it and proceed anyway
+      console.error('Failed to capture email lead:', err);
+    }
     proceed(true);
   };
 

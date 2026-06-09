@@ -19,6 +19,11 @@ const Who: React.FC = () => {
           document.getElementById('learn-more')?.scrollIntoView({ behavior: 'smooth' });
         }, 420);
       }
+      if (window.location.hash === '#who/investors') {
+        setTimeout(() => {
+          document.getElementById('learn-more')?.scrollIntoView({ behavior: 'smooth' });
+        }, 420);
+      }
     };
 
     // Check on mount for direct deep links
