@@ -1,9 +1,10 @@
 // src/components/site/Company/LearnMoreHub.tsx
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { FileText, Github, Presentation } from 'lucide-react';
-import EmailCaptureDialog, { ActionType, ResourceKey } from './ui/EmailCaptureModal';
+import EmailCaptureDialog, { ActionType, ResourceKey, RESOURCES } from './ui/EmailCaptureModal';
 import LearnMoreCard from './ui/LearnMoreCard';
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -19,10 +20,31 @@ interface ModalState {
 
 const LearnMoreHub: React.FC = () => {
   const [modal, setModal] = useState<ModalState | null>(null);
+  // Once the user makes a decision in the modal (consent or skip),
+  // we skip straight to the file on subsequent clicks
+  const [hasDecided, setHasDecided] = useState(false);
 
-  const openModal = (resource: ResourceKey, action: ActionType) => setModal({ resource, action });
+  const openFile = useCallback((resource: ResourceKey, action: ActionType) => {
+    const res = RESOURCES[resource];
+    const url = action === 'download' ? res.downloadUrl : res.viewUrl;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, []);
 
-  const closeModal = () => setModal(null);
+  const handleAction = useCallback(
+    (resource: ResourceKey, action: ActionType) => {
+      if (hasDecided) {
+        openFile(resource, action);
+      } else {
+        setModal({ resource, action });
+      }
+    },
+    [hasDecided, openFile]
+  );
+
+  const handleModalClose = useCallback((decided: boolean) => {
+    if (decided) setHasDecided(true);
+    setModal(null);
+  }, []);
 
   return (
     <section className="px-8 md:px-[10vw] py-16 bg-gray-100">
@@ -47,8 +69,8 @@ const LearnMoreHub: React.FC = () => {
             icon={<FileText size={18} className="text-teal-600" />}
             title="Whitepaper"
             description="The Belrose Protocol's encryption, credibility system, and more explained. For researchers and the academically curious."
-            onDownload={() => openModal('whitepaper', 'download')}
-            onView={() => openModal('whitepaper', 'view')}
+            onDownload={() => handleAction('whitepaper', 'download')}
+            onView={() => handleAction('whitepaper', 'view')}
           />
 
           <LearnMoreCard
@@ -56,8 +78,8 @@ const LearnMoreHub: React.FC = () => {
             icon={<Presentation size={18} className="text-pink-500" />}
             title="Pitch Deck"
             description="The problem, solution, business model, and competitive landscape — for investors and potential partners."
-            onDownload={() => openModal('pitch', 'download')}
-            onView={() => openModal('pitch', 'view')}
+            onDownload={() => handleAction('pitch', 'download')}
+            onView={() => handleAction('pitch', 'view')}
           />
 
           <LearnMoreCard
@@ -76,7 +98,7 @@ const LearnMoreHub: React.FC = () => {
         isOpen={modal !== null}
         resource={modal?.resource ?? 'whitepaper'}
         action={modal?.action ?? 'view'}
-        onClose={closeModal}
+        onClose={handleModalClose}
       />
     </section>
   );

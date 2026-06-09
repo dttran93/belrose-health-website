@@ -20,15 +20,15 @@ export interface ResourceConfig {
 }
 
 export const RESOURCES: Record<ResourceKey, ResourceConfig> = {
-  pitch: {
-    label: 'pitch deck',
-    viewUrl: 'https://drive.google.com/file/d/1xSqq_8DlN1QupzeHHCFe9xxHkg3KQFEb/preview',
-    downloadUrl: 'https://drive.google.com/uc?export=download&id=1xSqq_8DlN1QupzeHHCFe9xxHkg3KQFEb',
-  },
   whitepaper: {
     label: 'whitepaper',
     viewUrl: 'https://drive.google.com/file/d/1Vmt2tDtHVwsHPOPwWW4_9SWrNEEMGUiJ/preview',
     downloadUrl: 'https://drive.google.com/uc?export=download&id=1Vmt2tDtHVwsHPOPwWW4_9SWrNEEMGUiJ',
+  },
+  pitch: {
+    label: 'pitch deck',
+    viewUrl: 'https://drive.google.com/file/d/1xSqq_8DlN1QupzeHHCFe9xxHkg3KQFEb/preview',
+    downloadUrl: 'https://drive.google.com/uc?export=download&id=1xSqq_8DlN1QupzeHHCFe9xxHkg3KQFEb',
   },
 };
 
@@ -39,11 +39,8 @@ const CONSENT_TEXT =
 // HELPERS
 // ============================================================================
 
-// Writes to mailingList collection only if:
-//   1. The user gave consent
-//   2. They are not already in the waitlist collection
-// The onDocumentCreated trigger in sendMailingListConfirmationEmail.ts
-// picks this up and sends the confirmation email automatically.
+// Writes to mailingList only if consent given.
+// Waitlist + duplicate checks are handled server-side in the Cloud Function.
 async function captureEmailLead(
   email: string,
   resource: ResourceKey,
@@ -63,18 +60,17 @@ async function captureEmailLead(
 }
 
 // ============================================================================
-// PHASE CONTENT COMPONENTS
+// FORM CONTENT
 // ============================================================================
-
-// ─── Form phase ───────────────────────────────────────────────────────────────
 
 const FormContent: React.FC<{
   resource: ResourceKey;
   action: ActionType;
-  onSubmit: (email: string) => void;
+  onSubmit: (email: string) => Promise<void>;
   onSkip: () => void;
 }> = ({ resource, action, onSubmit, onSkip }) => {
   const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const res = RESOURCES[resource];
   const actionLabel = action === 'download' ? 'download' : 'view';
@@ -83,11 +79,17 @@ const FormContent: React.FC<{
     inputRef.current?.focus();
   }, []);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const trimmed = email.trim();
     const isValid = trimmed.length > 0 && trimmed.includes('@');
-    // Valid email → capture then proceed; invalid/empty → skip straight through
-    isValid ? onSubmit(trimmed) : onSkip();
+    if (!isValid) {
+      onSkip();
+      return;
+    }
+    setLoading(true);
+    await onSubmit(trimmed);
+    // onSubmit calls proceed() which closes the dialog —
+    // no need to setLoading(false)
   };
 
   return (
@@ -127,9 +129,19 @@ const FormContent: React.FC<{
             Skip
           </Button>
         </AlertDialog.Cancel>
-        <Button onClick={handleSubmit} className="flex-1 flex items-center justify-center gap-1.5">
-          <Send size={13} />
-          Sign-up and {actionLabel}
+        <Button
+          onClick={handleSubmit}
+          disabled={loading}
+          className="flex-1 flex items-center justify-center gap-1.5"
+        >
+          {loading ? (
+            'Sending...'
+          ) : (
+            <>
+              {action === 'download' ? <Download size={13} /> : <ExternalLink size={13} />}
+              Send link &amp; {actionLabel}
+            </>
+          )}
         </Button>
       </div>
     </>
@@ -144,7 +156,10 @@ interface EmailCaptureDialogProps {
   isOpen: boolean;
   resource: ResourceKey;
   action: ActionType;
-  onClose: () => void;
+  // decided: true when the user actively submitted or skipped (not just
+  // dismissed by clicking the backdrop). LearnMoreHub uses this to set
+  // hasDecided and bypass the modal on subsequent clicks.
+  onClose: (decided: boolean) => void;
 }
 
 export const EmailCaptureDialog: React.FC<EmailCaptureDialogProps> = ({
@@ -156,18 +171,23 @@ export const EmailCaptureDialog: React.FC<EmailCaptureDialogProps> = ({
   const res = RESOURCES[resource];
   const targetUrl = action === 'download' ? res.downloadUrl : res.viewUrl;
 
-  const proceed = () => {
+  const proceed = (decided: boolean) => {
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
-    onClose();
+    onClose(decided);
   };
 
   const handleSubmit = async (email: string) => {
     await captureEmailLead(email, resource, action);
-    proceed();
+    proceed(true);
   };
 
   return (
-    <AlertDialog.Root open={isOpen} onOpenChange={open => !open && onClose()}>
+    <AlertDialog.Root
+      open={isOpen}
+      // Radix calls this with false when the user clicks the backdrop or
+      // presses Escape — treat that as not decided so the modal shows again
+      onOpenChange={open => !open && onClose(false)}
+    >
       <AlertDialog.Portal>
         <AlertDialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" />
         <AlertDialog.Content
@@ -178,7 +198,7 @@ export const EmailCaptureDialog: React.FC<EmailCaptureDialogProps> = ({
             resource={resource}
             action={action}
             onSubmit={handleSubmit}
-            onSkip={proceed}
+            onSkip={() => proceed(true)}
           />
         </AlertDialog.Content>
       </AlertDialog.Portal>
