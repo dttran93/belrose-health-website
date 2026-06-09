@@ -44,7 +44,7 @@ async function main() {
   // ============ PowerShell Verification String ============
   console.log('\n📝 COPY THIS TO VERIFY (PowerShell Ready):');
   // .toString() ensures BigInts don't print with an 'n' (e.g. 1000n) which breaks CLI
-  console.log(`npx hardhat verify --network sepolia ${paymasterAddress} \`
+  console.log(`npx hardhat verify --network baseSepolia ${paymasterAddress} \`
   "${ENTRYPOINT_ADDRESS}" \`
   "${VERIFYING_SIGNER}" \`
   "${MAX_COST_PER_USEROP.toString()}"`);

@@ -651,6 +651,11 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
         const requestDoc = await getDoc(requestRef);
         const requestData = requestDoc.data() as SubjectConsentRequest | undefined;
 
+        await SubjectService.rejectSubjectRequest(
+          pendingOperation.recordId,
+          reason || pendingOperation.reason
+        );
+
         // Blockchain write — hand off to tray if needed
         if (requestData?.grantedAccessOnSubjectRequest) {
           const role = requestData.requestedSubjectRole;
@@ -677,11 +682,6 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
           await refetchAll();
           (onRejectSuccess ?? onSuccess)?.();
         }
-
-        await SubjectService.rejectSubjectRequest(
-          pendingOperation.recordId,
-          reason || pendingOperation.reason
-        );
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to reject request';
         setError(message);

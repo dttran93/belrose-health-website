@@ -2,7 +2,7 @@
 import hre from 'hardhat';
 
 async function main() {
-  const PAYMASTER_ADDRESS = '0x967e757609E1118E7164e51A204772a14804E253';
+  const PAYMASTER_ADDRESS = '0x02422f03EcD403E1a902101D60a0Dad5bB9E71a7';
   const NEW_OWNER = '0x485cc0e0a6D17832aeb2FD1932697beAA57cBB36';
 
   console.log('Starting ownership transfer...');

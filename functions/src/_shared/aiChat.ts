@@ -24,8 +24,8 @@ export const AVAILABLE_MODELS: AIModelConfig[] = [
     description: "Anthropic's best combination of speed and intelligence",
   },
   {
-    id: 'gemini-3.1-flash-lite-preview',
-    name: 'Gemini 3.1 Flash Lite',
+    id: 'gemini-2.5-flash',
+    name: 'Gemini 2.5 Flash',
     provider: 'google',
     description: 'Fast and affordable',
   },
@@ -41,6 +41,6 @@ export const DEFAULT_MODEL_ID = 'claude-sonnet-4-6';
 
 export const DEFAULT_MODEL_ID_BY_PROVIDER: Record<AIProvider, string> = {
   anthropic: 'claude-sonnet-4-6',
-  google: 'gemini-3.1-flash-lite-preview',
+  google: 'gemini-2.5-flash',
   openai: 'gpt-5.4-nano',
 };

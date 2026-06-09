@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import CareersHero from './CareersHero';
 import Contact from './Contact';
 import OpenRoles from './OpenRoles';
-import Team from './Team';
+import LearnMoreHub from './LearnMoreHub';
 
 const Who: React.FC = () => {
   useEffect(() => {
@@ -12,6 +12,11 @@ const Who: React.FC = () => {
       if (window.location.hash === '#who/contact') {
         setTimeout(() => {
           document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
+        }, 420);
+      }
+      if (window.location.hash === '#who/learn-more') {
+        setTimeout(() => {
+          document.getElementById('learn-more')?.scrollIntoView({ behavior: 'smooth' });
         }, 420);
       }
     };
@@ -27,6 +32,9 @@ const Who: React.FC = () => {
     <div>
       <CareersHero />
       <OpenRoles />
+      <div id="learn-more">
+        <LearnMoreHub />
+      </div>
       <div id="contact">
         <Contact />
       </div>

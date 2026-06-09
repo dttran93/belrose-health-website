@@ -14,7 +14,6 @@ const corsHandler = cors({ origin: ALLOWED_ORIGINS });
 
 // Define secrets
 const anthropicApiKey = defineSecret('ANTHROPIC_KEY');
-const geminiApiKey = defineSecret('GEMINI_API_KEY');
 const openaiApiKey = defineSecret('OPENAI_API_KEY');
 
 interface ChatRequest {
@@ -33,7 +32,7 @@ export const aiChat = onRequest(
   {
     timeoutSeconds: 540,
     memory: '1GiB',
-    secrets: [anthropicApiKey, geminiApiKey, openaiApiKey],
+    secrets: [anthropicApiKey, openaiApiKey],
   },
   (req, res) => {
     corsHandler(req, res, async () => {
@@ -88,7 +87,7 @@ export const aiChat = onRequest(
             break;
           }
           case 'google': {
-            const service = new GeminiService(geminiApiKey.value());
+            const service = new GeminiService();
             await service.streamChat(
               message,
               systemPrompt,

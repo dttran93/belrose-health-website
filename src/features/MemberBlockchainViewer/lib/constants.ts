@@ -3,16 +3,6 @@
 import { MEMBER_ROLE_MANAGER, NETWORK } from '@belrose/shared';
 
 /**
- * MemberRoleManager Contract Configuration
- */
-
-export const MEMBER_ROLE_MANAGER_ADDRESS = MEMBER_ROLE_MANAGER.proxy;
-
-export const RPC_URL = NETWORK.rpcUrl;
-export const RPC_URL_FALLBACK = NETWORK.rpcUrlFallback;
-export const DEPLOYMENT_BLOCK = MEMBER_ROLE_MANAGER.deploymentBlock;
-
-/**
  * Contract ABI - Only the view functions needed for the admin dashboard
  *
  * Note: This is a minimal ABI containing only the functions we use.

@@ -566,21 +566,6 @@ export async function deleteSubjectRequests(recordId: string): Promise<void> {
   }
 }
 
-export async function deleteScoreEvents(recordId: string): Promise<void> {
-  const user = auth.currentUser;
-  if (!user) throw new Error('User not authenticated');
-  if (!recordId) throw new Error('Record ID is required');
-  try {
-    const snap = await getDocs(
-      query(collection(db, 'scoreEvents'), where('recordId', '==', recordId))
-    );
-    await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
-    console.log(`✅ Deleted ${snap.docs.length} score events`);
-  } catch (error) {
-    console.warn('⚠️ Score event deletion failed, continuing:', error);
-  }
-}
-
 /**
  * Cancel-safe record deletion for the AddRecord flow.
  * Cleans up Storage, Firestore, and wrapped keys.

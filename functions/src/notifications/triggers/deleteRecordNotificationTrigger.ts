@@ -19,7 +19,7 @@ import {
   buildRecordDeletedHtml,
   buildRecordDeletedText,
 } from '../emails/recordDeletionEmailTemplates';
-import { RecordDeletionEvent } from '@/_shared';
+import { RecordDeletionEvent } from '../../_shared';
 
 // ============================================================================
 // HELPER FUNCTIONS

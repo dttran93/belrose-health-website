@@ -32,7 +32,7 @@ export type SyncContext =
       targetWalletAddress: string;
       role: string | string[];
       recordId: string | string[];
-      recordIdHash?: string | string[];
+      recordIdHash: string | string[];
     }
   | { type: 'memberRegistry'; newStatus?: string }
   | { type: 'anchorRecord'; recordId: string; recordHash: string; subjectId: string }

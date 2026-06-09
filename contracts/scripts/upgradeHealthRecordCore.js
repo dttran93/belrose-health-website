@@ -51,7 +51,7 @@ async function main() {
   console.log(`   implementation: '${newImplAddress}',`);
   console.log('   (proxy address stays the same — no frontend changes needed)');
   console.log(
-    `\n📝 ACTION REQUIRED — verify on network: npx hardhat verify --network sepolia '${newImplAddress}'`
+    `\n📝 ACTION REQUIRED — verify on network: npx hardhat verify --network baseSepolia '${newImplAddress}'`
   );
 }
 

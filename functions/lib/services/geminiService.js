@@ -1,16 +1,22 @@
 "use strict";
-// functions/src/services/geminiService.ts
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GeminiService = void 0;
 const aiChat_1 = require("../_shared/aiChat");
 class GeminiService {
-    constructor(apiKey) {
-        if (!apiKey)
-            throw new Error('Gemini API key is required');
-        this.apiKey = apiKey;
+    constructor() {
+        this.projectId = 'belrose-757fe';
+        this.location = 'us-central1';
+    }
+    async getAccessToken() {
+        const response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', { headers: { 'Metadata-Flavor': 'Google' } });
+        if (!response.ok)
+            throw new Error('Failed to get access token from metadata server');
+        const data = (await response.json());
+        return data.access_token;
     }
     async streamChat(message, systemPrompt, model, history, mediaParts, onChunk, onStatus) {
         const modelName = model || aiChat_1.DEFAULT_MODEL_ID_BY_PROVIDER.google;
+        const token = await this.getAccessToken();
         const contents = [
             ...history.map(msg => ({
                 role: msg.role === 'assistant' ? 'model' : 'user',
@@ -26,20 +32,25 @@ class GeminiService {
                 ],
             },
         ];
-        const callGemini = (msgs) => {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?key=${this.apiKey}&alt=sse`;
+        // Helper: make a streaming request to Gemini
+        const callGemini = async (msgs) => {
+            const url = `https://${this.location}-aiplatform.googleapis.com/v1/projects/${this.projectId}/locations/${this.location}/publishers/google/models/${modelName}:streamGenerateContent?alt=sse`;
             return fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
                 body: JSON.stringify({
                     contents: msgs,
                     system_instruction: { parts: [{ text: systemPrompt }] },
                     tools: [{ googleSearch: {} }],
-                    generationConfig: { maxOutputTokens: 4096, temperature: 0.1 },
+                    generationConfig: { maxOutputTokens: 8192, temperature: 0.1 },
                 }),
             });
         };
-        const readStream = async (response) => {
+        // Helper: read a Gemini SSE stream, returns text + any function calls
+        const readGeminiStream = async (response) => {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let text = '';
@@ -66,8 +77,9 @@ class GeminiService {
                         for (const part of candidate.content?.parts || []) {
                             if (part.text) {
                                 text += part.text;
-                                onChunk(part.text);
+                                onChunk(part.text); // Stream text to client immediately
                             }
+                            // Gemini signals a search call via functionCall parts
                             if (part.functionCall) {
                                 functionCalls.push(part.functionCall);
                                 onStatus('searching');
@@ -81,10 +93,12 @@ class GeminiService {
             }
             return { text, functionCalls, finishReason };
         };
+        // ── Round 1: initial call ──
         let response = await callGemini(contents);
         if (!response.ok)
             throw new Error(`Gemini API error: ${response.status} - ${await response.text()}`);
-        const round1 = await readStream(response);
+        const round1 = await readGeminiStream(response);
+        // ── Round 2: if Gemini used search, send tool results back ──
         if (round1.functionCalls.length > 0) {
             const updatedContents = [
                 ...contents,
@@ -95,6 +109,7 @@ class GeminiService {
                         ...round1.functionCalls.map(fc => ({ functionCall: fc })),
                     ],
                 },
+                // Tell Gemini "search done, now answer" — it fills in the actual results
                 {
                     role: 'user',
                     parts: round1.functionCalls.map(fc => ({
@@ -109,7 +124,7 @@ class GeminiService {
             response = await callGemini(updatedContents);
             if (!response.ok)
                 throw new Error(`Gemini API error (round 2): ${response.status} - ${await response.text()}`);
-            await readStream(response);
+            await readGeminiStream(response); // streams final response to client
         }
     }
 }
