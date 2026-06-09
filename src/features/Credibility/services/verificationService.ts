@@ -214,15 +214,26 @@ export async function createVerification(
   const titleData = recordTitle ? await encryptNotificationTitle(recordTitle, recordId) : null;
 
   // Step 1: Write to blockchain
+  let blockchainRef;
   try {
     console.log('🔗 Writing verification to blockchain...');
     const tx = await blockchainHealthRecordService.verifyRecord(recordId, recordHash, level);
-    const blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
+    blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
     console.log('✅ Blockchain: Verification recorded');
+  } catch (error) {
+    console.error('❌ Blockchain verification failed:', error);
+    await BlockchainSyncQueueService.logFailure({
+      contract: 'HealthRecordCore',
+      action: 'verifyRecord',
+      userId: verifierId,
+      error: getErrorMessage(error),
+      context: { type: 'verification', recordId, recordHash, level },
+    });
+    throw error;
+  }
 
-    // Step 2: Write to Firestore
-    const verifierIdHash = ethers.keccak256(ethers.toUtf8Bytes(verifierId));
-
+  // Step 2: Firestore
+  try {
     if (existing.exists()) {
       await updateDoc(docRef, {
         level,
@@ -238,7 +249,6 @@ export async function createVerification(
         recordHash,
         recordId,
         verifierId,
-        verifierIdHash,
         level,
         isActive: true,
         createdAt: Timestamp.now(),
@@ -248,32 +258,15 @@ export async function createVerification(
       });
       console.log('✅ Firestore: Verification created');
     }
-
-    // Step 3: Update credibility score
-    await onVerificationCreated(recordId, recordHash, level, blockchainRef);
-
-    console.log('✅ Verification created successfully');
-    return verificationId;
   } catch (error) {
-    console.error('❌ Blockchain verification failed:', error);
-
-    // Log failure for diagnostics, but DON'T write to Firestore
-    await BlockchainSyncQueueService.logFailure({
-      contract: 'HealthRecordCore',
-      action: 'verifyRecord',
-      userId: verifierId,
-      error: getErrorMessage(error),
-      context: {
-        type: 'verification',
-        recordId,
-        recordHash,
-        level,
-      },
-    });
-
-    // Re-throw to prevent any further operations
+    console.error('❌ Firestore write failed after confirmed blockchain tx:', error);
     throw error;
   }
+
+  // Step 3: Credibility score
+  await onVerificationCreated(recordId, recordHash, level, blockchainRef!);
+  console.log('✅ Verification created successfully');
+  return verificationId;
 }
 
 /**
@@ -307,14 +300,26 @@ export async function retractVerification(recordHash: string, verifierId: string
 
   console.log('🔄 Retracting verification:', { recordHash, verifierId });
 
-  // Step 1: Write to blockchain
+  // Step 1: Blockchain only
+  let blockchainRef;
   try {
-    console.log('🔗 Retracting verification on blockchain...');
     const tx = await blockchainHealthRecordService.retractVerification(recordHash);
-    const blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
+    blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
     console.log('✅ Blockchain: Verification retracted');
+  } catch (error) {
+    console.error('❌ Blockchain retraction failed:', error);
+    await BlockchainSyncQueueService.logFailure({
+      contract: 'HealthRecordCore',
+      action: 'retractVerification',
+      userId: verifierId,
+      error: getErrorMessage(error),
+      context: { type: 'verification-retraction', recordId: data.recordId, recordHash },
+    });
+    throw error;
+  }
 
-    // Step 2: Update Firestore (only if blockchain succeeded)
+  // Step 2: Firestore
+  try {
     await updateDoc(docRef, {
       isActive: false,
       lastModified: Timestamp.now(),
@@ -322,30 +327,14 @@ export async function retractVerification(recordHash: string, verifierId: string
       blockchainRef,
     });
     console.log('✅ Firestore: Verification marked inactive');
-
-    // Step 3: Update credibility score
-    await onVerificationRevoked(data.recordId, data.recordHash, data.level, blockchainRef);
-
-    console.log('✅ Verification retracted successfully');
   } catch (error) {
-    console.error('❌ Blockchain retraction failed:', error);
-
-    // Log failure for diagnostics, DON'T update Firestore
-    await BlockchainSyncQueueService.logFailure({
-      contract: 'HealthRecordCore',
-      action: 'retractVerification',
-      userId: verifierId,
-      error: getErrorMessage(error),
-      context: {
-        type: 'verification-retraction',
-        recordId: data.recordId,
-        recordHash: recordHash,
-      },
-    });
-
-    // Re-throw to prevent any further operations
+    console.error('❌ Firestore write failed after confirmed blockchain retraction:', error);
     throw error;
   }
+
+  // Step 3: Credibility score
+  await onVerificationRevoked(data.recordId, data.recordHash, data.level, blockchainRef!);
+  console.log('✅ Verification retracted successfully');
 }
 
 /**
@@ -389,30 +378,14 @@ export async function modifyVerificationLevel(
 
   console.log('🔄 Modifying verification level:', { recordHash, oldLevel, newLevel });
 
-  // Step 1: Write to blockchain
+  // Step 1: Blockchain only
+  let blockchainRef;
   try {
-    console.log('🔗 Modifying verification level on blockchain...');
     const tx = await blockchainHealthRecordService.modifyVerificationLevel(recordHash, newLevel);
-    const blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
+    blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
     console.log('✅ Blockchain: Verification level updated');
-
-    // Step 2: Update Firestore
-    await updateDoc(docRef, {
-      level: newLevel,
-      lastModified: Timestamp.now(),
-      chainStatus: 'confirmed',
-      blockchainRef,
-    });
-    console.log('✅ Firestore: Verification level updated');
-
-    // Step 3: Update credibility score
-    await onVerificationModified(data.recordId, recordHash, oldLevel, newLevel, blockchainRef);
-
-    console.log('✅ Verification level modified successfully');
   } catch (error) {
     console.error('❌ Blockchain modification failed:', error);
-
-    // Log failure for diagnostics, DON'T update Firestore
     await BlockchainSyncQueueService.logFailure({
       contract: 'HealthRecordCore',
       action: 'modifyVerificationLevel',
@@ -421,15 +394,31 @@ export async function modifyVerificationLevel(
       context: {
         type: 'verification-modification',
         recordId: data.recordId,
-        recordHash: recordHash,
-        oldLevel: oldLevel,
-        newLevel: newLevel,
+        recordHash,
+        oldLevel,
+        newLevel,
       },
     });
-
-    // Re-throw to prevent any further operations
     throw error;
   }
+
+  // Step 2: Firestore
+  try {
+    await updateDoc(docRef, {
+      level: newLevel,
+      lastModified: Timestamp.now(),
+      chainStatus: 'confirmed',
+      blockchainRef,
+    });
+    console.log('✅ Firestore: Verification level updated');
+  } catch (error) {
+    console.error('❌ Firestore write failed after confirmed blockchain modification:', error);
+    throw error;
+  }
+
+  // Step 3: Credibility score
+  await onVerificationModified(data.recordId, recordHash, oldLevel, newLevel, blockchainRef!);
+  console.log('✅ Verification level modified successfully');
 }
 
 /**

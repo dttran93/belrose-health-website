@@ -543,7 +543,7 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
   }
 
   enum DisputeCulpability {
-    None, //For returning missing
+    Unknown,
     NoFault,
     Systemic,
     Preventable,
@@ -709,7 +709,7 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    * @param recordIdHash The record this hash is claimed to be for
    * @param recordHash The hash being disputed
    * @param severity 1=Negligible, 2=Moderate, 3=Major
-   * @param culpability 1=NoFault, 2=Systemic, 3=Preventable, 4=Reckless, 5=Intentional
+   * @param culpability 0=Unknown, 1=NoFault, 2=Systemic, 3=Preventable, 4=Reckless, 5=Intentional
    * @param notes Off-chain reference for detailed reasoning (IPFS hash, etc.)
    */
   function disputeRecord(
@@ -722,7 +722,7 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
     require(recordIdHash != bytes32(0), "Record ID cannot be empty");
     require(recordHash != bytes32(0), "Record hash cannot be empty");
     require(severity >= 1 && severity <= 3, "Severity must be 1-3");
-    require(culpability >= 1 && culpability <= 5, "Culpability must be 1-5");
+    require(culpability <= 5, "Culpability must be 0-5");
 
     bytes32 disputerIdHash = memberRoleManager.getUserForWallet(msg.sender);
     require(disputerIdHash != bytes32(0), "Wallet not registered");
@@ -783,7 +783,7 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    */
   function modifyDispute(bytes32 recordHash, uint8 newSeverity, uint8 newCulpability) external {
     require(newSeverity >= 1 && newSeverity <= 3, "Severity must be 1-3");
-    require(newCulpability >= 1 && newCulpability <= 5, "Culpability must be 1-5");
+    require(newCulpability <= 5, "Culpability must be 0-5");
 
     bytes32 disputerIdHash = memberRoleManager.getUserForWallet(msg.sender);
     require(disputerIdHash != bytes32(0), "Wallet not registered");
@@ -983,7 +983,7 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
     )
   {
     if (!currentlyDisputed[recordHash][userIdHash]) {
-      return (false, bytes32(0), DisputeSeverity.None, DisputeCulpability.None, "", 0, false);
+      return (false, bytes32(0), DisputeSeverity.None, DisputeCulpability.Unknown, "", 0, false);
     }
 
     uint256 idx = disputeIndex[recordHash][userIdHash];

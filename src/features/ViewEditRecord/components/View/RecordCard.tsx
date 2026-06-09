@@ -7,6 +7,7 @@ import { CredibilityBadge } from '@/features/Credibility/components/ui/Credibili
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import SubjectBadge from '@/features/Subject/components/SubjectBadge';
 import FollowUpBadge from '@/features/RefineRecord/components/ui/FollowUpBadge';
+import { useRecordFollowUps } from '@/features/RefineRecord/hooks/useRecordFollowUps';
 
 interface HealthRecordCardProps {
   record: FileObject;
@@ -45,6 +46,7 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
   className = '',
 }) => {
   const displayName = record.fileName || 'Unknown Document';
+  const { followUpItems, isLoading } = useRecordFollowUps(record);
 
   return (
     <div
@@ -65,7 +67,11 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
 
           {/* Right: credibility + divider + menu — always visible, never scrolls */}
           <div className="flex items-center gap-1 flex-shrink-0">
-            <FollowUpBadge record={record} onClick={() => onFollowUp?.(record)} />
+            <FollowUpBadge
+              followUpItems={followUpItems}
+              isLoading={isLoading}
+              onClick={() => onFollowUp?.(record)}
+            />
             {/* SubjectBadge: hidden on mobile, shown md+ */}
             <div className="hidden md:flex items-center">
               <SubjectBadge record={record} onClick={() => onSubject?.(record)} />

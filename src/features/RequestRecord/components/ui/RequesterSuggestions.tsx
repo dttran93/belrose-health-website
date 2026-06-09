@@ -13,7 +13,7 @@
  */
 
 import React, { useState } from 'react';
-import { useInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
+import { useInboundRequests } from '@/features/RequestRecord/hooks/useInboundRequests';
 import { RequestNoteService } from '@/features/RequestRecord/services/requestNoteService';
 import { RequestNote } from '@/features/RequestRecord/components/Request/NewRequestForm';
 import { BelroseUserProfile } from '@/types/core';

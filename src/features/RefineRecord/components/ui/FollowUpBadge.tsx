@@ -14,12 +14,12 @@
 
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
-import { FileObject } from '@/types/core';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import useRecordFollowUps from '../../hooks/useRecordFollowUps';
+import { FollowUpItem } from './FollowUpItems';
 
 interface FollowUpBadgeProps {
-  record: FileObject;
+  followUpItems: FollowUpItem[];
+  isLoading: boolean;
   onClick: () => void;
   size?: 'sm' | 'md' | 'lg';
 }
@@ -36,11 +36,12 @@ const iconSizes = {
   lg: 'w-4 h-4',
 };
 
-export const FollowUpBadge: React.FC<FollowUpBadgeProps> = ({ record, onClick, size = 'sm' }) => {
-  const { followUpItems, isLoading } = useRecordFollowUps(record, {
-    onAction: () => onClick(),
-  });
-
+export const FollowUpBadge: React.FC<FollowUpBadgeProps> = ({
+  followUpItems = [],
+  isLoading,
+  onClick,
+  size = 'sm',
+}) => {
   // Render loading or when there's nothing when there's no action
   if (isLoading) {
     return (

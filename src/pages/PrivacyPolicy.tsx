@@ -158,7 +158,7 @@ const sections: Section[] = [
           — only you hold the decryption keys. We store only the encrypted ciphertext so you can
           retrieve it.
         </P>
-        <P>You are the sole data controller of your encrypted health records.</P>
+        <P>You are the sole data controller of your unencrypted health records.</P>
 
         <H3>3. Analytics Data (Plausible)</H3>
         <P>
@@ -267,7 +267,7 @@ const sections: Section[] = [
           </LI>
           <LI>
             <strong className="font-semibold text-slate-700">Stripe Inc.</strong> — Payment
-            processing
+            processing and Identity Verification
           </LI>
           <LI>
             <strong className="font-semibold text-slate-700">Resend</strong> — Transactional email
@@ -354,7 +354,7 @@ const sections: Section[] = [
         <UL>
           <LI>Client-side encryption of all health records — we cannot read your data</LI>
           <LI>Encrypted data transmission over HTTPS (TLS)</LI>
-          <LI>Firebase Authentication for secure identity management</LI>
+          <LI>Firebase Authentication for secure account management</LI>
           <LI>Blockchain-based verification of record integrity</LI>
           <LI>Role-based access controls within the platform</LI>
           <LI>EU-hosted, cookieless analytics — no personal data collected about site visitors</LI>

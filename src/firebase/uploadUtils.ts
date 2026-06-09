@@ -546,6 +546,26 @@ export async function deleteWrappedKeys(documentId: string): Promise<void> {
   }
 }
 
+export async function deleteSubjectRequests(recordId: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('User not authenticated');
+  if (!recordId) throw new Error('Record ID is required');
+  try {
+    const [consentSnap, removalSnap] = await Promise.all([
+      getDocs(query(collection(db, 'subjectConsentRequests'), where('recordId', '==', recordId))),
+      getDocs(query(collection(db, 'subjectRemovalRequests'), where('recordId', '==', recordId))),
+    ]);
+    const deletes = [
+      ...consentSnap.docs.map(d => deleteDoc(d.ref)),
+      ...removalSnap.docs.map(d => deleteDoc(d.ref)),
+    ];
+    await Promise.all(deletes);
+    console.log(`✅ Deleted ${deletes.length} subject request documents`);
+  } catch (error) {
+    console.warn('⚠️ Subject request deletion failed, continuing:', error);
+  }
+}
+
 /**
  * Cancel-safe record deletion for the AddRecord flow.
  * Cleans up Storage, Firestore, and wrapped keys.

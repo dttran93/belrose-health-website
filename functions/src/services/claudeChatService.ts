@@ -46,7 +46,7 @@ export class ClaudeChatService {
         },
         body: JSON.stringify({
           model: model || DEFAULT_MODEL_ID_BY_PROVIDER.anthropic,
-          max_tokens: 4096,
+          max_tokens: 16000,
           temperature: 0.2,
           system: systemPrompt,
           messages: msgs,

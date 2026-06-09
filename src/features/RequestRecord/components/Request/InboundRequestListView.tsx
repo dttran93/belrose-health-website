@@ -1,7 +1,7 @@
 // src/features/RecordRequest/components/InboundRequestListView.tsx
 
 import { AlertCircle, Inbox, Loader2 } from 'lucide-react';
-import { InboundRequestFilter } from '../../hooks/usePendingInboundRequests';
+import { InboundRequestFilter } from '../../hooks/useInboundRequests';
 import InboundRequestCard from '../ui/InboundRequestCard';
 import { RecordRequest } from '@belrose/shared';
 

@@ -1,6 +1,6 @@
 import hre from 'hardhat';
 
-const PAYMASTER_ADDRESS = '0x967e757609E1118E7164e51A204772a14804E253';
+const PAYMASTER_ADDRESS = '0x02422f03EcD403E1a902101D60a0Dad5bB9E71a7';
 
 async function main() {
   const [signer] = await hre.ethers.getSigners();

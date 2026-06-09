@@ -44,12 +44,13 @@ const account_abstraction_1 = require("viem/account-abstraction");
 const accounts_1 = require("viem/accounts");
 const viem_1 = require("viem");
 const _shared_1 = require("../_shared");
+const config_1 = require("../config");
 // ==================== CREATE WALLET ====================
 /**
  * Create Wallet Function
  * Creates a new blockchain wallet for a user
  */
-exports.createEOAWallet = (0, https_1.onRequest)({ cors: true }, async (req, res) => {
+exports.createEOAWallet = (0, https_1.onRequest)({ cors: config_1.ALLOWED_ORIGINS }, async (req, res) => {
     // Validate HTTP method
     if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method Not Allowed' });

@@ -67,13 +67,13 @@ export const citations: Record<string, Citation> = {
     title: 'Analysis of the demise of Google Health',
     source: 'MIT Technology Review',
     apaCitation:
-      'Talbot, D. (2020, April 2). How a broken medical system killed Google Health. MIT Technology Review. https://www.technologyreview.com/2011/06/29/193325/how-a-broken-medical-system-killed-google-health/',
+      'Talbot, D. (2011, June 29). How a broken medical system killed Google Health. MIT Technology Review. https://www.technologyreview.com/2011/06/29/193325/how-a-broken-medical-system-killed-google-health/',
     url: 'https://www.technologyreview.com/2011/06/29/193325/how-a-broken-medical-system-killed-google-health/',
   },
   'ms-healthvault': {
     num: 7,
     year: '2019',
-    title: 'The shutdown of Mirosoft HealthVault',
+    title: 'The shutdown of Microsoft HealthVault',
     source: "Becker's Hospital Review",
     apaCitation:
       'Drees, J. (2019, April 8). Microsoft to shut down patient medical records service HealthVault by November. Becker’s Hospital Review | Healthcare News & Analysis. https://www.beckershospitalreview.com/healthcare-information-technology/microsoft-to-shut-down-patient-medical-records-service-healthvault-by-november/',

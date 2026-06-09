@@ -18,6 +18,7 @@
   "main": "lib/index.js",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.0",
+    "@google/genai": "^2.8.0",
     "cors": "^2.8.5",
     "ethers": "^6.15.0",
     "firebase-admin": "^12.7.0",

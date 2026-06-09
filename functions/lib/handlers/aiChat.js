@@ -12,15 +12,15 @@ const claudeChatService_1 = require("../services/claudeChatService");
 const geminiService_1 = require("../services/geminiService");
 const aiChatPrompt_1 = require("../utils/aiChatPrompt");
 const openaiService_1 = require("../services/openaiService");
-const corsHandler = (0, cors_1.default)({ origin: true });
+const config_1 = require("../config");
+const corsHandler = (0, cors_1.default)({ origin: config_1.ALLOWED_ORIGINS });
 // Define secrets
 const anthropicApiKey = (0, params_1.defineSecret)('ANTHROPIC_KEY');
-const geminiApiKey = (0, params_1.defineSecret)('GEMINI_API_KEY');
 const openaiApiKey = (0, params_1.defineSecret)('OPENAI_API_KEY');
 exports.aiChat = (0, https_1.onRequest)({
     timeoutSeconds: 540,
     memory: '1GiB',
-    secrets: [anthropicApiKey, geminiApiKey, openaiApiKey],
+    secrets: [anthropicApiKey, openaiApiKey],
 }, (req, res) => {
     corsHandler(req, res, async () => {
         if (req.method !== 'POST') {
@@ -52,7 +52,7 @@ exports.aiChat = (0, https_1.onRequest)({
                     break;
                 }
                 case 'google': {
-                    const service = new geminiService_1.GeminiService(geminiApiKey.value());
+                    const service = new geminiService_1.GeminiService();
                     await service.streamChat(message, systemPrompt, model, conversationHistory, mediaParts, sendChunk, sendStatus);
                     break;
                 }

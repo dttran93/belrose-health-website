@@ -30,6 +30,7 @@ type ReviewTab = 'verify' | 'dispute';
 interface CredibilityViewProps {
   record: FileObject;
   onBack: () => void;
+  onSuccess?: () => void;
   startModVerifyFromVersions?: boolean;
   startModDisputeFromVersions?: boolean;
 }
@@ -37,6 +38,7 @@ interface CredibilityViewProps {
 export const CredibilityView: React.FC<CredibilityViewProps> = ({
   record,
   onBack,
+  onSuccess,
   startModVerifyFromVersions = false,
   startModDisputeFromVersions = false,
 }) => {
@@ -78,6 +80,7 @@ export const CredibilityView: React.FC<CredibilityViewProps> = ({
 
       // 4. refreshKey after successful Operation
       setCredibilityRefreshKey(k => k + 1);
+      onSuccess?.();
 
       console.log('Credibility data synchronized.');
     } catch (error) {

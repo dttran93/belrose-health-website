@@ -1,17 +1,8 @@
 // src/features/Credibility/components/ui/CredibilityActionDialog.tsx
 
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
-import {
-  ShieldCheck,
-  ShieldAlert,
-  XCircle,
-  AlertTriangle,
-  FileX,
-  ThumbsUp,
-  ThumbsDown,
-} from 'lucide-react';
+import { ShieldCheck, ShieldAlert, XCircle, FileX } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { useState } from 'react';
 import type {
   CredibilityOperationType,
   CredibilityPreparationProgress,
@@ -298,7 +289,7 @@ const ConfirmDisputeContent: React.FC<{
   onClose: () => void;
 }> = ({ severity, culpability, notes, isModify, onConfirm, onClose }) => {
   const severityConfig = getSeverityConfig(severity || 1);
-  const culpabilityConfig = getCulpabilityConfig(culpability || 1);
+  const culpabilityConfig = getCulpabilityConfig(culpability || 0);
 
   return (
     <>

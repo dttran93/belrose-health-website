@@ -3,15 +3,6 @@
 import { HEALTH_RECORD_CORE, NETWORK } from '@belrose/shared';
 
 /**
- * HealthRecordCore Contract Configuration
- */
-
-export const HEALTH_RECORD_CORE_ADDRESS = HEALTH_RECORD_CORE.proxy;
-export const RPC_URL = NETWORK.rpcUrl;
-export const RPC_URL_FALLBACK = NETWORK.rpcUrlFallback;
-export const DEPLOYMENT_BLOCK = HEALTH_RECORD_CORE.deploymentBlock;
-
-/**
  * Contract ABI - View functions and events needed for the admin dashboard
  *
  * This is a minimal ABI containing only the functions we use for reading data.

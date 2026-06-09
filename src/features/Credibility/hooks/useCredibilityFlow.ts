@@ -426,7 +426,7 @@ export function useCredibilityFlow({
       !pendingOperation ||
       pendingOperation.type !== 'dispute' ||
       !pendingOperation.disputeSeverity ||
-      !pendingOperation.disputeCulpability
+      pendingOperation.disputeCulpability === undefined
     ) {
       return;
     }
@@ -582,7 +582,7 @@ export function useCredibilityFlow({
     const auth = getAuth();
     const disputerId = auth.currentUser?.uid;
 
-    if (!disputeRecordHash || !disputerId || !disputeSeverity || !disputeCulpability) {
+    if (!disputeRecordHash || !disputerId || !disputeSeverity || disputeCulpability === undefined) {
       setError('Missing required dispute information');
       setPhase('error');
       return;

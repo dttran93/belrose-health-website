@@ -6,6 +6,7 @@ const https_1 = require("firebase-functions/v2/https");
 const params_1 = require("firebase-functions/params");
 const anthropicService_1 = require("../services/anthropicService");
 const recordAiPrompts_1 = require("../utils/recordAiPrompts");
+const config_1 = require("../config");
 // Define the secret
 const anthropicKey = (0, params_1.defineSecret)('ANTHROPIC_KEY');
 /**
@@ -14,7 +15,7 @@ const anthropicKey = (0, params_1.defineSecret)('ANTHROPIC_KEY');
  */
 exports.analyzeImageWithAI = (0, https_1.onRequest)({
     secrets: [anthropicKey],
-    cors: true,
+    cors: config_1.ALLOWED_ORIGINS,
 }, async (req, res) => {
     // Validate HTTP method
     if (req.method !== 'POST') {

@@ -25,7 +25,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { FileObject } from '@/types/core';
 import { Role } from '@/features/Permissions/services/permissionsService';
-import { useInboundRequests } from '../../hooks/usePendingInboundRequests';
+import { useInboundRequests } from '../../hooks/useInboundRequests';
 import { LinkModalOverlay, ExecutingPhase, ErrorPhase, PickRolePhase } from '../ui/LinkModalShell';
 import { RecordRequest } from '@belrose/shared';
 import { FulfillRequestService } from '../../services/fulfillRequestService';

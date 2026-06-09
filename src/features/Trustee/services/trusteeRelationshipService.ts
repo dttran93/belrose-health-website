@@ -498,7 +498,6 @@ export class TrusteeRelationshipService {
     await updateDoc(relationshipRef, {
       status: 'declined',
       isActive: false,
-
       revokedAt: Timestamp.now(),
       revokedBy: trusteeId,
       statusUpdateReason: 'trustee_resigned',

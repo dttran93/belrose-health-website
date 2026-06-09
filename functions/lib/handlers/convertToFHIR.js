@@ -6,6 +6,7 @@ const https_1 = require("firebase-functions/v2/https");
 const params_1 = require("firebase-functions/params");
 const anthropicService_1 = require("../services/anthropicService");
 const recordAiPrompts_1 = require("../utils/recordAiPrompts");
+const config_1 = require("../config");
 /**
  * FHIR Conversion Handler
  * Converts medical document text into FHIR format using AI
@@ -21,7 +22,7 @@ const anthropicKey = (0, params_1.defineSecret)('ANTHROPIC_KEY');
  */
 exports.convertToFHIR = (0, https_1.onRequest)({
     secrets: [anthropicKey],
-    cors: true,
+    cors: config_1.ALLOWED_ORIGINS,
     timeoutSeconds: 300,
     memory: '1GiB',
 }, async (req, res) => {

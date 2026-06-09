@@ -52,7 +52,20 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({
 
     // Only prompt blockchain anchoring on first save (not edits)
     if (!hasIdentityRecord && !subjectFlow.isSubject) {
-      setSavedRecord(record);
+      const labelledRecord: FileObject = {
+        ...record,
+        belroseFields: {
+          title: 'Belrose Health Identity Record',
+          visitType: '',
+          summary: '',
+          completedDate: '',
+          provider: '',
+          institution: '',
+          patient: '',
+          detailedNarrative: '',
+        },
+      };
+      setSavedRecord(labelledRecord);
       subjectFlow.initiateAddSubjectAsSelf?.(record.id);
     } else {
       onSaved?.();

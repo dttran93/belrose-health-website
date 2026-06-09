@@ -370,6 +370,7 @@ export async function createDispute(
   const titleData = recordTitle ? await encryptNotificationTitle(recordTitle, recordId) : null;
 
   // Step 1: Write to blockchain FIRST
+  let blockchainRef;
   try {
     console.log('🔗 Writing dispute to blockchain...');
     const tx = await blockchainHealthRecordService.disputeRecord(
@@ -379,10 +380,30 @@ export async function createDispute(
       culpability,
       notesHash
     );
-    const blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
+    blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
     console.log('✅ Blockchain: Dispute recorded');
+  } catch (error) {
+    // Log failure for diagnostics, DON'T write to Firestore
+    console.error('❌ Blockchain dispute creation failed:', error);
+    await BlockchainSyncQueueService.logFailure({
+      contract: 'HealthRecordCore',
+      action: 'createDispute',
+      userId: disputerId,
+      error: getErrorMessage(error),
+      context: {
+        type: 'dispute',
+        recordId,
+        recordHash,
+        severity,
+        culpability,
+      },
+    });
 
-    // Step 2: Write to Firestore
+    throw new Error('Blockchain dispute creation failed: ' + getErrorMessage(error));
+  }
+
+  // Step 2: Write to Firestore
+  try {
     if (existing.exists()) {
       await updateDoc(docRef, {
         severity,
@@ -414,33 +435,18 @@ export async function createDispute(
       });
       console.log('✅ Firestore: Dispute created');
     }
-
-    // Step 3: Update credibility score
-    await onDisputeCreated(recordId, recordHash, severity, culpability, blockchainRef);
-
-    console.log('✅ Dispute created successfully');
-    return disputeId;
   } catch (error) {
-    console.error('❌ Blockchain dispute creation failed:', error);
-
-    // Log failure for diagnostics, DON'T write to Firestore
-    await BlockchainSyncQueueService.logFailure({
-      contract: 'HealthRecordCore',
-      action: 'createDispute',
-      userId: disputerId,
-      error: getErrorMessage(error),
-      context: {
-        type: 'dispute',
-        recordId,
-        recordHash,
-        severity,
-        culpability,
-      },
-    });
+    console.error('❌ Firestore write failed after confirmed blockchain tx:', error);
 
     // Re-throw to prevent any further operations
     throw error;
   }
+
+  // Step 3: Update credibility score
+  await onDisputeCreated(recordId, recordHash, severity, culpability, blockchainRef);
+
+  console.log('✅ Dispute created successfully');
+  return disputeId;
 }
 
 /**
@@ -471,14 +477,26 @@ export async function retractDispute(recordHash: string, disputerId: string): Pr
 
   console.log('🔄 Retracting dispute:', { recordHash, disputerId });
 
-  // Step 1: Write to blockchain
+  // Step 1: Blockchain only
+  let blockchainRef;
   try {
-    console.log('🔗 Retracting dispute on blockchain...');
     const tx = await blockchainHealthRecordService.retractDispute(recordHash);
-    const blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
+    blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
     console.log('✅ Blockchain: Dispute retracted');
+  } catch (error) {
+    console.error('❌ Blockchain retraction failed:', error);
+    await BlockchainSyncQueueService.logFailure({
+      contract: 'HealthRecordCore',
+      action: 'retractDispute',
+      userId: disputerId,
+      error: getErrorMessage(error),
+      context: { type: 'dispute-retraction', recordId: data.recordId, recordHash },
+    });
+    throw error;
+  }
 
-    // Step 2: Update Firestore (only if blockchain succeeded)
+  // Step 2: Firestore
+  try {
     await updateDoc(docRef, {
       isActive: false,
       lastModified: Timestamp.now(),
@@ -486,36 +504,14 @@ export async function retractDispute(recordHash: string, disputerId: string): Pr
       blockchainRef,
     });
     console.log('✅ Firestore: Dispute marked inactive');
-
-    // Step 3: Update credibility score
-    await onDisputeRevoked(
-      data.recordId,
-      recordHash,
-      data.severity,
-      data.culpability,
-      blockchainRef
-    );
-
-    console.log('✅ Dispute retracted successfully');
   } catch (error) {
-    console.error('❌ Blockchain retraction failed:', error);
-
-    // Log failure for diagnostics, DON'T update Firestore
-    await BlockchainSyncQueueService.logFailure({
-      contract: 'HealthRecordCore',
-      action: 'retractDispute',
-      userId: disputerId,
-      error: getErrorMessage(error),
-      context: {
-        type: 'dispute-retraction',
-        recordId: data.recordId,
-        recordHash,
-      },
-    });
-
-    // Re-throw to prevent any further operations
+    console.error('❌ Firestore write failed after confirmed blockchain retraction:', error);
     throw error;
   }
+
+  // Step 3: Credibility score
+  await onDisputeRevoked(data.recordId, recordHash, data.severity, data.culpability, blockchainRef);
+  console.log('✅ Dispute retracted successfully');
 }
 
 /**
@@ -567,43 +563,18 @@ export async function modifyDispute(
     newCulpability,
   });
 
-  // Step 1: Write to blockchain
+  // Step 1: Blockchain only
+  let blockchainRef;
   try {
-    console.log('🔗 Modifying dispute on blockchain...');
     const tx = await blockchainHealthRecordService.modifyDispute(
       recordHash,
       newSeverity,
       newCulpability
     );
-    const blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
+    blockchainRef = buildHealthRecordRef(tx.txHash, tx.blockNumber);
     console.log('✅ Blockchain: Dispute modified');
-
-    // Step 2: Update Firestore
-    await updateDoc(docRef, {
-      severity: newSeverity,
-      culpability: newCulpability,
-      lastModified: Timestamp.now(),
-      chainStatus: 'confirmed',
-      blockchainRef,
-    });
-    console.log('✅ Firestore: Dispute updated');
-
-    // Step 3: Update credibility score
-    await onDisputeModified(
-      data.recordId,
-      recordHash,
-      oldSeverity,
-      oldCulpability,
-      newSeverity,
-      newCulpability,
-      blockchainRef
-    );
-
-    console.log('✅ Dispute modified successfully');
   } catch (error) {
     console.error('❌ Blockchain modification failed:', error);
-
-    // Log failure for diagnostics, DON'T update Firestore
     await BlockchainSyncQueueService.logFailure({
       contract: 'HealthRecordCore',
       action: 'modifyDispute',
@@ -619,10 +590,35 @@ export async function modifyDispute(
         newCulpability,
       },
     });
-
-    // Re-throw to prevent any further operations
     throw error;
   }
+
+  // Step 2: Firestore
+  try {
+    await updateDoc(docRef, {
+      severity: newSeverity,
+      culpability: newCulpability,
+      lastModified: Timestamp.now(),
+      chainStatus: 'confirmed',
+      blockchainRef,
+    });
+    console.log('✅ Firestore: Dispute updated');
+  } catch (error) {
+    console.error('❌ Firestore write failed after confirmed blockchain modification:', error);
+    throw error;
+  }
+
+  // Step 3: Credibility score
+  await onDisputeModified(
+    data.recordId,
+    recordHash,
+    oldSeverity,
+    oldCulpability,
+    newSeverity,
+    newCulpability,
+    blockchainRef
+  );
+  console.log('✅ Dispute modified successfully');
 }
 
 /**

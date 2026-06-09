@@ -103,7 +103,7 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
   };
 
   const handleSubmitDispute = async () => {
-    if (!severity || !culpability) return;
+    if (severity === null || culpability === null) return;
     initiateDispute(severity, culpability, disputeNotes || undefined);
   };
 
@@ -113,6 +113,8 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
 
   const canSubmitVerification = selectedLevel !== null && !verification?.isActive;
   const canSubmitDispute = severity !== null && culpability !== null;
+  const activeDispute = existingDispute?.isActive ? existingDispute : null;
+  const activeVerification = verification?.isActive ? verification : null;
 
   // ============================================================
   // RENDER
@@ -213,7 +215,7 @@ export const RecordReviewPanel: React.FC<RecordReviewPanelProps> = ({
               onSelectSeverity={setSeverity}
               onSelectCulpability={setCulpability}
               onNotesChange={setDisputeNotes}
-              existingDispute={existingDispute}
+              existingDispute={activeDispute}
               initiateRetractDispute={initiateRetractDispute}
               initiateModifyDispute={initiateModifyDispute}
               isSubmitting={isLoading}

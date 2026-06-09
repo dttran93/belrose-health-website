@@ -21,7 +21,8 @@ import { getAuth } from 'firebase/auth';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { WalletOrigin, UserWallet } from '@/types/core';
 import { hexToUint8Array } from '@/utils/dataFormattingUtils';
-import { buildRpcUrl, NETWORK } from '@belrose/shared';
+import { buildRpcUrl } from '@belrose/shared';
+import { requireEnv } from '@/utils/utils';
 
 // ============================================================================
 // TYPES
@@ -58,13 +59,7 @@ export interface CanSignResult {
 // CONSTANTS
 // ============================================================================
 
-const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
-
-if (!ALCHEMY_API_KEY) {
-  throw new Error('RPC API KEY MISSING');
-}
-
-const RPC_URL = buildRpcUrl(ALCHEMY_API_KEY);
+const RPC_URL = buildRpcUrl(requireEnv('VITE_ALCHEMY_API_KEY'));
 
 // ============================================================================
 // HELPER FUNCTIONS (Private)

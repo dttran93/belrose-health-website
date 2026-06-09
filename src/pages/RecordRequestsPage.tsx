@@ -20,7 +20,7 @@ import RequestListView from '@/features/RequestRecord/components/Request/Request
 import InboundRequestListView from '@/features/RequestRecord/components/Request/InboundRequestListView';
 import { Button } from '@/components/ui/Button';
 import { Plus } from 'lucide-react';
-import { useInboundRequests } from '@/features/RequestRecord/hooks/usePendingInboundRequests';
+import { useInboundRequests } from '@/features/RequestRecord/hooks/useInboundRequests';
 import { markRequestComplete } from '@/features/RequestRecord/services/linkRecordService';
 import { toast } from 'sonner';
 import LinkRecordModal from '@/features/RequestRecord/components/Respond/LinkRecordModal';
@@ -123,7 +123,9 @@ const RecordRequestsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-        {REQUIRE_IDENTITY_VERIFICATION && !user.identityVerified && <IdentityVerificationBanner />}
+        {REQUIRE_IDENTITY_VERIFICATION && !user.identityVerified && tab === 'sent' && (
+          <IdentityVerificationBanner />
+        )}
         {/* Header */}
         <div className="flex items-start text-left justify-between">
           {/* Identity gate banner */}

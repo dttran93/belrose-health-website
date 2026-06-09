@@ -13,9 +13,9 @@ const HeroSection: React.FC = () => {
               <span className="text-destructive"> Until Now</span>
             </h1>
             <p className="text-xl text-gray-600">
-              No centralization, government, or doomed IT implementations. Belrose's tamper-proof
-              records can be stored anywhere, integrate with any system, and are 100% owned by the
-              patient.
+              No Big Government or Big Tech. Belrose's tamper-proof records integrate with any
+              system and are the sovereign property of the patient. Even Belrose employees can't see
+              what is uploaded.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/auth">
