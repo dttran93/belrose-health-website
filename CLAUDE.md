@@ -61,14 +61,47 @@ npm run serve        # Start Firebase emulators
 npm run deploy       # Deploy to Firebase
 ```
 
+## Smart Contract Deployment - CRITICAL RULES
+
+HealthRecordCore and MemberRole Manager use UUPS upgradeable proxy pattern. Proxy addresses are permanent and what frontend/users interact with. NEVER do a fresh deploy of these contracts, it would always be done manually.
+
+### Proxy Addresses (DO NOT CHANGE)
+
+BaseSepolia - Test Net
+
+- MEMBER_ROLE_MANAGER BaseSepolia TestNet proxy: '0xdF9583C25E234A34a1E47d9830722123CA228a1a'
+- HEALTH_RECORD_CORE BaseSepolia TestNet proxy: '0x66A8b985C61205e63D7d7DEA72Dfa5849a3e66De'
+
+Base Mainnet
+
+- MEMBER_ROLE_MANAGER Base Mainnet proxy: To be deployed
+- HEALTH_RECORD_CORE Base Mainnet proxy: To be deployed
+
+### The Correct Flow for Upgradeable Smart Contract Changes
+
 **Smart Contracts (`cd contracts`):**
 
 ```bash
-npm run compile          # Compile Solidity
-npm run test             # Run Hardhat tests
-npm run deploy:sepolia   # Deploy to Base Sepolia testnet
-npm run deploy:base      # Deploy to Base mainnet
+# 1. Compile Solidity cleanly
+npm run compile
+# 2. Run Hardhat tests
+npm run test
+# 3. run upgrade script for HealthRecord Core or MemberRoleManager
+npx hardhat run scripts/upgradeHealthRecordCore.js --network baseSepolia # if HealthRecordCore changed
+npx hardhat run scripts/upgradeMemberRoleManager.js --network baseSepolia #if MemberRoleManager changed
+# 4. Verify on Chain
+npx hardhat verify --network baseSepolia ${newImplementationAddress}
 ```
+
+#5. Update implementation addresses in the repo
+
+- Update implementation addresses in packages/shared/src/blockchainAddresses.ts
+
+NEVER
+
+- run npm run deploy:base directly, always go through upgrades script. It will break frontend references
+- Skip Sepolia before mainnet
+- Fresh deploy contracts that have a proxy - always upgrade
 
 ## Firebase Emulators (local dev)
 
