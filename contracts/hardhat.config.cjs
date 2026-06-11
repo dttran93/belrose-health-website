@@ -1,7 +1,8 @@
 require('@nomicfoundation/hardhat-toolbox');
 require('@openzeppelin/hardhat-upgrades');
 require('hardhat-contract-sizer');
-require('dotenv/config');
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env.local') });
+require('dotenv').config(); // also pick up local .env if present
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -39,7 +40,9 @@ module.exports = {
       chainId: 11155111,
     },
     baseSepolia: {
-      url: 'https://sepolia.base.org',
+      url: process.env.VITE_ALCHEMY_API_KEY
+        ? `https://base-sepolia.g.alchemy.com/v2/${process.env.VITE_ALCHEMY_API_KEY}`
+        : 'https://sepolia.base.org',
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 84532,
       timeout: 120000,

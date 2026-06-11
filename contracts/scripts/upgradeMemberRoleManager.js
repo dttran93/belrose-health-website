@@ -2,8 +2,8 @@
 import hre from 'hardhat';
 const { ethers, upgrades } = hre;
 
-const MEMBER_ROLE_MANAGER_PROXY = '0xC31477f563dC8f7529Ba6AE7E410ABdB84C27d7C';
-const HEALTH_RECORD_CORE_PROXY = '0x97F9eD2af3f9a30Eac958D0994a0F131Eda11A57';
+const HEALTH_RECORD_CORE_PROXY = '0x66A8b985C61205e63D7d7DEA72Dfa5849a3e66De';
+const MEMBER_ROLE_MANAGER_PROXY = '0xdF9583C25E234A34a1E47d9830722123CA228a1a';
 
 async function main() {
   console.log('🚀 Starting MemberRoleManager upgrade...');
