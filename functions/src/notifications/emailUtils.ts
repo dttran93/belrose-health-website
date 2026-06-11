@@ -36,6 +36,18 @@ async function getUserEmailAndPrefs(userId: string) {
   if (!userDoc.exists) return null;
 
   const data = userDoc.data()!;
+
+  // Dependent accounts: route emails to the guardian instead
+  if (data.isDependent && data.dependentCreatedBy) {
+    const guardianDoc = await admin.firestore().collection('users').doc(data.dependentCreatedBy).get();
+    if (!guardianDoc.exists) return null;
+    const guardianData = guardianDoc.data()!;
+    return {
+      email: guardianData.email as string | undefined,
+      prefs: (guardianData.notificationPrefs ?? {}) as NotificationPrefs,
+    };
+  }
+
   return {
     email: data.email as string | undefined,
     prefs: (data.notificationPrefs ?? {}) as NotificationPrefs,

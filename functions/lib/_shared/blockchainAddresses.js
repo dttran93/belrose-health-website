@@ -60,7 +60,7 @@ exports.MEMBER_ROLE_MANAGER = {
 // ============================================================================
 exports.HEALTH_RECORD_CORE = {
     proxy: '0x66A8b985C61205e63D7d7DEA72Dfa5849a3e66De',
-    implementation: '0xDC79F803594232421f49a29D9EcEbe78015d48e1',
+    implementation: '0x985559cb258591967312867b0a37a058f08e92bd',
     deploymentBlock: 41800191,
 };
 // ============================================================================

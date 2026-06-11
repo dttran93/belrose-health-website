@@ -26,6 +26,9 @@ export { sendWaitlistConfirmationEmail } from './handlers/sendWaitlistConfirmati
 export { sendPasswordChangeEmail } from './handlers/sendPasswordChangeEmail';
 export { addToMailingList } from './handlers/addToMailingList';
 
+// ==================== DEPENDENT ACCOUNTS ====================
+export { createDependentAccount } from './handlers/createDependentAccount';
+
 // ==================== GUEST INVITE ====================
 export { createGuestInvite } from './handlers/createGuestInvite';
 export { redeemGuestInvite } from './handlers/redeemGuestInvite';

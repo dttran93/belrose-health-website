@@ -9,6 +9,7 @@ import ChangeNameModal from '@/features/Settings/components/ChangeNameModal';
 import ChangeEmailModal from '@/features/Settings/components/ChangeEmailModal';
 import ChangePhotoModal from '@/features/Settings/components/ChangePhotoModal';
 import TrusteePage from '@/features/Trustee/components/TrusteePage';
+import DependentsSettingsPage from '@/features/Dependents/components/DependentsSettingsPage';
 import SearchDiscoverabilityToggle from '@/features/Settings/components/SearchDiscoveryabilityToggle';
 import SettingsNav from '@/features/Settings/components/SettingsNav';
 import AccountSettings from '@/features/Settings/components/AccountSettings';
@@ -134,6 +135,9 @@ const SettingsPage = () => {
 
       case 'trustees':
         return <TrusteePage />;
+
+      case 'dependents':
+        return <DependentsSettingsPage />;
 
       case 'notifications':
         return <NotificationSettings />;

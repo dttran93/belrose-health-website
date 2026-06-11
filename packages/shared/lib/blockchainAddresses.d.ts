@@ -345,7 +345,7 @@ export declare const MEMBER_ROLE_MANAGER: {
 };
 export declare const HEALTH_RECORD_CORE: {
     readonly proxy: "0x66A8b985C61205e63D7d7DEA72Dfa5849a3e66De";
-    readonly implementation: "0xDC79F803594232421f49a29D9EcEbe78015d48e1";
+    readonly implementation: "0x985559cb258591967312867b0a37a058f08e92bd";
     readonly deploymentBlock: 41800191;
 };
 export declare const CONTRACT_ADDRESSES: {
