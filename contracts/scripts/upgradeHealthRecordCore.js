@@ -8,15 +8,21 @@ const MEMBER_ROLE_MANAGER_PROXY = '0xdF9583C25E234A34a1E47d9830722123CA228a1a';
 async function main() {
   console.log('🚀 Starting HealthRecordCore upgrade...');
   console.log('📍 Proxy address (will not change):', HEALTH_RECORD_CORE_PROXY);
-  const oldImplAddress = await upgrades.erc1967.getImplementationAddress(HEALTH_RECORD_CORE_PROXY);
+
+  // RPC sanity check
+  const network = await ethers.provider.getNetwork();
+  console.log('🔗 Connected to chain ID:', network.chainId.toString(), '(expected: 84532 for Base Sepolia)');
+  const code = await ethers.provider.getCode(HEALTH_RECORD_CORE_PROXY);
+  console.log('📦 Bytecode at proxy:', code === '0x' ? 'EMPTY ❌ (contract not found)' : `OK ✅ (${code.length / 2 - 1} bytes)`);
+
+  const slot = '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc';
+  const raw = await ethers.provider.getStorage(HEALTH_RECORD_CORE_PROXY, slot);
+  const oldImplAddress = '0x' + raw.slice(-40);
   console.log('📍 Current implementation address (Will be changed):', oldImplAddress);
 
   const HealthRecordCoreV2 = await ethers.getContractFactory('HealthRecordCore');
 
-  console.log('\n📋 Importing existing proxy into upgrades registry...');
-  await upgrades.forceImport(HEALTH_RECORD_CORE_PROXY, HealthRecordCoreV2, { kind: 'uups' });
-  console.log('✅ Proxy imported successfully');
-
+  // No forceImport — upgradeProxy handles registry internally
   console.log('\n📦 Deploying new implementation...');
   const upgraded = await upgrades.upgradeProxy(HEALTH_RECORD_CORE_PROXY, HealthRecordCoreV2, {
     kind: 'uups',
@@ -24,10 +30,9 @@ async function main() {
   });
   await upgraded.waitForDeployment();
 
-  const newImplAddress = await upgrades.erc1967.getImplementationAddress(
-    await upgraded.getAddress(),
-    { provider: ethers.provider } // forces on-chain lookup
-  );
+  // Read implementation slot directly — OZ plugin may return cached (stale) address
+  const newRaw = await ethers.provider.getStorage(HEALTH_RECORD_CORE_PROXY, slot);
+  const newImplAddress = '0x' + newRaw.slice(-40);
 
   console.log('✅ Proxy upgraded successfully!');
   console.log('📍 Proxy address (unchanged):', await upgraded.getAddress());

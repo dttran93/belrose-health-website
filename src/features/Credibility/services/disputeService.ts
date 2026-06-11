@@ -313,17 +313,12 @@ export async function createDispute(
 ): Promise<string> {
   const db = getFirestore();
 
-  // CHECK 1: Ensure user is not disputing their own record
+  // CHECK 1: Ensure record exists before allowing dispute creation
   const recordRef = doc(db, 'records', recordId);
   const recordSnap = await getDoc(recordRef);
 
   if (!recordSnap.exists()) {
     throw new Error('Record not found.');
-  }
-
-  const recordData = recordSnap.data();
-  if (recordData.uploadedBy === disputerId) {
-    throw new Error('Conflict of Interest: You cannot dispute a record you created yourself.');
   }
 
   // CHECK 2: Ensure there isn't already an existing active dispute

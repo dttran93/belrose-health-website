@@ -624,7 +624,9 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
 
     bytes32 verifierIdHash = memberRoleManager.getUserForWallet(msg.sender);
     require(verifierIdHash != bytes32(0), "Wallet not registered");
+    require(recordIdForHash[recordHash] == recordIdHash, "Hash does not belong to this record");
     require(!currentlyVerified[recordHash][verifierIdHash], "Already verified this hash");
+    require(!currentlyDisputed[recordHash][verifierIdHash], "Cannot verify a hash you are actively disputing");
 
     uint256 newIndex = verifications[recordHash].length;
 
@@ -726,7 +728,9 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
 
     bytes32 disputerIdHash = memberRoleManager.getUserForWallet(msg.sender);
     require(disputerIdHash != bytes32(0), "Wallet not registered");
+    require(recordIdForHash[recordHash] == recordIdHash, "Hash does not belong to this record");
     require(!currentlyDisputed[recordHash][disputerIdHash], "Already disputed this hash");
+    require(!currentlyVerified[recordHash][disputerIdHash], "Cannot dispute a hash you are actively verifying");
 
     uint256 newIndex = disputes[recordHash].length;
 
@@ -795,6 +799,11 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
 
     DisputeSeverity oldSeverity = dispute.severity;
     DisputeCulpability oldCulpability = dispute.culpability;
+
+    require(
+      oldSeverity != DisputeSeverity(newSeverity) || oldCulpability != DisputeCulpability(newCulpability),
+      "Values unchanged"
+    );
 
     dispute.severity = DisputeSeverity(newSeverity);
     dispute.culpability = DisputeCulpability(newCulpability);
