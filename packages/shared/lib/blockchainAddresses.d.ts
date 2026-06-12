@@ -340,7 +340,7 @@ export declare const PAYMASTER: {
 export declare function buildBundlerURL(pimlicoApiKey: string): string;
 export declare const MEMBER_ROLE_MANAGER: {
     readonly proxy: "0xdF9583C25E234A34a1E47d9830722123CA228a1a";
-    readonly implementation: "0x4383C4e5EaCDE9F8cEc6c692f5d939BaaF6ff038";
+    readonly implementation: "0x97f9ed2af3f9a30eac958d0994a0f131eda11a57";
     readonly deploymentBlock: 41800192;
 };
 export declare const HEALTH_RECORD_CORE: {

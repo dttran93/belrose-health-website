@@ -52,6 +52,7 @@ const MEMBER_ROLE_MANAGER_ADDRESS = _shared_1.MEMBER_ROLE_MANAGER.proxy;
 const CHAIN_ID = _shared_1.NETWORK.chainId;
 const MEMBER_ROLE_MANAGER_ABI = [
     'function addMemberBatch(address[] calldata walletAddresses, bytes32 userIdHash) external',
+    'function bootstrapDependentTrustee(bytes32 trustorIdHash, bytes32 trusteeIdHash) external',
 ];
 function getAdminWallet() {
     const privateKey = process.env.ADMIN_WALLET_PRIVATE_KEY;
@@ -146,6 +147,21 @@ exports.createDependentAccount = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_P
             contractAddress: MEMBER_ROLE_MANAGER_ADDRESS,
         };
         console.log('✅ Both wallets registered on-chain:', tx.hash);
+        // Bootstrap on-chain trustee relationship.
+        // Dependent accounts have no independent signer at creation time, so the normal
+        // propose → accept two-wallet flow is not possible. The admin wallet writes the
+        // Active + Controller relationship directly in the same admin batch as addMemberBatch.
+        // Revocation uses the normal onlyActiveMember flow — no admin involvement after this.
+        const guardianIdHash = ethers_1.ethers.id(guardianUid);
+        const trusteeTx = await contract.bootstrapDependentTrustee(userIdHash, guardianIdHash);
+        const trusteeReceipt = await trusteeTx.wait();
+        const trusteeBlockchainRef = {
+            txHash: trusteeTx.hash,
+            chainId: CHAIN_ID,
+            blockNumber: trusteeReceipt.blockNumber,
+            contractAddress: MEMBER_ROLE_MANAGER_ADDRESS,
+        };
+        console.log('✅ On-chain trustee relationship bootstrapped:', trusteeTx.hash);
         const encryptedWallet = (0, backendWalletService_1.encryptPrivateKey)(wallet.privateKey, masterKeyHex);
         const encryptedMnemonic = (0, backendWalletService_1.encryptPrivateKey)(wallet.mnemonic || '', masterKeyHex);
         await dependentRef.update({
@@ -191,8 +207,8 @@ exports.createDependentAccount = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_P
             revokedAt: null,
             revokedBy: null,
             statusUpdateReason: null,
-            inviteBlockchainRef: null,
-            acceptBlockchainRef: null,
+            inviteBlockchainRef: trusteeBlockchainRef,
+            acceptBlockchainRef: trusteeBlockchainRef,
             revocationBlockchainRef: null,
             editBlockchainRef: null,
         });
