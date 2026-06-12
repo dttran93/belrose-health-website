@@ -2,19 +2,34 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getFirestore, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
-import { Users, Loader2, HelpCircle, Plus, ShieldCheck } from 'lucide-react';
+import {
+  Users,
+  Loader2,
+  HelpCircle,
+  Plus,
+  ArrowLeftRight,
+  SendHorizontal,
+  Trash2,
+} from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
+import { toast } from 'sonner';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
 import { UserCard } from '@/features/Users/components/ui/UserCard';
+import { AccountSwitchService } from '@/features/Dependents/services/accountSwitchService';
 import type { TrusteeRelationship } from '@/features/Trustee/services/trusteeRelationshipService';
 import type { BelroseUserProfile } from '@/types/core';
+import type { MenuItem } from '@/features/Users/components/ui/UserMenu';
+import HandoffDialog from './HandoffDialog';
+import RemoveDialog from './RemoveDialog';
 
-interface DependentEntry {
+export interface DependentEntry {
   relationship: TrusteeRelationship;
   profile: BelroseUserProfile | null;
 }
+
+// ── Tooltip ───────────────────────────────────────────────────────────────────
 
 const DependentTooltip = () => (
   <Tooltip.Provider>
@@ -42,41 +57,77 @@ const DependentTooltip = () => (
   </Tooltip.Provider>
 );
 
+// ── Page ───────────────────────────────────────────────────────────────────────
+
 export const DependentsSettingsPage: React.FC = () => {
   const navigate = useNavigate();
   const [dependents, setDependents] = useState<DependentEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [handoffTarget, setHandoffTarget] = useState<DependentEntry | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<DependentEntry | null>(null);
 
   useEffect(() => {
-    const load = async () => {
-      const currentUser = getAuth().currentUser;
-      if (!currentUser) return;
+    const currentUser = getAuth().currentUser;
+    if (!currentUser) return;
 
-      const db = getFirestore();
-      const snap = await getDocs(
-        query(
-          collection(db, 'trusteeRelationships'),
-          where('trusteeId', '==', currentUser.uid),
-          where('isDependentRelationship', '==', true),
-          where('isActive', '==', true)
-        )
-      );
+    const db = getFirestore();
+    setIsLoading(true);
 
-      const relationships = snap.docs.map(d => d.data() as TrusteeRelationship);
+    const unsubscribe = onSnapshot(
+      query(
+        collection(db, 'trusteeRelationships'),
+        where('trusteeId', '==', currentUser.uid),
+        where('isDependentRelationship', '==', true),
+        where('isActive', '==', true)
+      ),
+      async snapshot => {
+        const relationships = snapshot.docs.map(d => d.data() as TrusteeRelationship);
+        const entries = await Promise.all(
+          relationships.map(async rel => ({
+            relationship: rel,
+            profile: await getUserProfile(rel.trustorId),
+          }))
+        );
+        setDependents(entries);
+        setIsLoading(false);
+      },
+      err => {
+        console.error('Failed to load dependents:', err);
+        setIsLoading(false);
+      }
+    );
 
-      const entries = await Promise.all(
-        relationships.map(async rel => ({
-          relationship: rel,
-          profile: await getUserProfile(rel.trustorId),
-        }))
-      );
-
-      setDependents(entries);
-      setIsLoading(false);
-    };
-
-    load();
+    return () => unsubscribe();
   }, []);
+
+  const buildMenuItems = (entry: DependentEntry): MenuItem[] => [
+    {
+      key: 'switch',
+      label: 'Switch to account',
+      icon: ArrowLeftRight,
+      onClick: async () => {
+        try {
+          await AccountSwitchService.switchToDependent(entry.relationship.trustorId);
+        } catch {
+          toast.error('Failed to switch account.');
+        }
+      },
+    },
+    {
+      key: 'handoff',
+      label: 'Initiate handoff',
+      icon: SendHorizontal,
+      onClick: () => setHandoffTarget(entry),
+    },
+    { type: 'divider', key: 'divider-actions' },
+    {
+      key: 'remove',
+      label: entry.profile?.isDependent ? 'Delete account' : 'Remove guardian access',
+      icon: Trash2,
+      destructive: true,
+      onClick: () => setRemoveTarget(entry),
+    },
+  ];
 
   return (
     <div className="w-full max-w-5xl mx-auto p-8 space-y-6">
@@ -93,7 +144,8 @@ export const DependentsSettingsPage: React.FC = () => {
           </p>
         </div>
       </div>
-      {/*Container*/}
+
+      {/* Container */}
       <div className="border border-accent rounded-lg">
         <div className="px-4 py-3 bg-accent flex items-center justify-between rounded-t-lg">
           <div className="flex items-center gap-2">
@@ -133,26 +185,27 @@ export const DependentsSettingsPage: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-2">
-              {dependents.map(({ relationship, profile }) => (
+              {dependents.map(entry => (
                 <UserCard
-                  key={relationship.trustorId}
-                  user={profile}
-                  userId={relationship.trustorId}
+                  key={entry.relationship.trustorId}
+                  user={entry.profile}
+                  userId={entry.relationship.trustorId}
                   color="primary"
                   showAffiliations={false}
-                  menuType="none"
-                  content={
-                    <span className="flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
-                      <ShieldCheck className="w-3 h-3" />
-                      Controller
-                    </span>
-                  }
+                  additionalItems={buildMenuItems(entry)}
                 />
               ))}
             </div>
           )}
         </div>
       </div>
+
+      <HandoffDialog dependent={handoffTarget} onClose={() => setHandoffTarget(null)} />
+      <RemoveDialog
+        dependent={removeTarget}
+        onClose={() => setRemoveTarget(null)}
+        onRemoved={uid => setDependents(prev => prev.filter(e => e.relationship.trustorId !== uid))}
+      />
     </div>
   );
 };

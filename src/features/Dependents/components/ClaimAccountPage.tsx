@@ -48,7 +48,7 @@ const ClaimAccountPage: React.FC = () => {
         <div className="flex flex-col items-center gap-4 text-center">
           <CheckCircle2 className="w-12 h-12 text-green-500" />
           <p className="text-lg font-semibold text-slate-900">Account claimed!</p>
-          <p className="text-sm text-slate-500">Taking you to your dashboard…</p>
+          <p className="text-sm text-slate-500">Getting things ready…</p>
         </div>
       </div>
     );

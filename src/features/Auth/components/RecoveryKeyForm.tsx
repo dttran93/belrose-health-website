@@ -166,6 +166,7 @@ export const RecoveryKeyForm: React.FC<RecoveryKeyFormProps> = ({ onBackToLogin 
         'encryption.masterKeyIV': iv,
         'encryption.masterKeySalt': salt,
         'encryption.lastPasswordUpdate': new Date().toISOString(),
+        passwordSelfSetAt: new Date().toISOString(),
       });
 
       toast.success('Password updated successfully!');

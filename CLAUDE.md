@@ -131,6 +131,11 @@ NEVER
 - React Query (`queryClient`) — all async server state
 - Toasts via Sonner
 
+**Blockchain write dialogs** — Any operation that writes to the chain shows a modal to prime the user for extra latency. Two variants:
+
+1. **Tray pattern** (preferred when possible): The dialog advances to a `submitted` phase that renders `OnChainSubmittedContent`, which dismisses itself and hands off to `OnChainActivityTray` (bottom-right corner) so the user can continue navigating. Used in `PermissionActionDialog`, `CredibilityActionDialog`, `SubjectActionDialog`.
+2. **Blocking dialog** (when the user must act after the transaction): Keep the dialog open until the user completes the next step. Used in `RegistrationProgressDialog` (user must save the recovery phrase) and `CreateDependentProgressDialog` (same reason).
+
 ## Shared Package (`packages/shared`)
 
 Shared TypeScript library consumed by both frontend and functions. Key modules:

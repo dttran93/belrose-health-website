@@ -29,9 +29,13 @@ exports.claimDependentAccount = (0, https_1.onCall)({ secrets: [emailUtils_1.res
     }
     const guardianUid = userData.dependentCreatedBy;
     const dependentDisplayName = (userData.displayName || userData.firstName || 'Your dependent');
-    // 1. Flip the user doc — clear isDependent and remove the dependentCreatedBy field entirely
+    // 1. Flip the user doc — clear isDependent and remove the dependentCreatedBy field entirely.
+    //    Reset emailVerified to false: the account was created with a placeholder email that was
+    //    never actually verified. Explicitly resetting ensures the ProtectedRoute email gate fires
+    //    correctly after the user adds a real email on AccountSetupPage.
     await db.collection('users').doc(dependentUid).update({
         isDependent: false,
+        emailVerified: false,
         dependentCreatedBy: firestore_1.FieldValue.delete(),
     });
     // 2. Update the trustee relationship — guardian remains a controller trustee

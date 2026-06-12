@@ -30,6 +30,8 @@ export { addToMailingList } from './handlers/addToMailingList';
 export { createDependentAccount } from './handlers/createDependentAccount';
 export { switchToDependent, switchToGuardian } from './handlers/switchAccount';
 export { claimDependentAccount } from './handlers/claimDependentAccount';
+export { initiateHandoff } from './handlers/initiateHandoff';
+export { removeDependentRelationship } from './handlers/removeDependentRelationship';
 
 // ==================== GUEST INVITE ====================
 export { createGuestInvite } from './handlers/createGuestInvite';

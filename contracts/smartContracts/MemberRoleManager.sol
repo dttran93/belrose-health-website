@@ -1089,7 +1089,8 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
    * wallet signatures. This works when both parties are independent users who can sign
    * transactions. Dependent accounts are different: at creation time there is no independent
    * person behind the dependent's wallet — the guardian has created this account. The guardian
-   * cannot sign two separate on-chain transactions as two different identities without a complex key-handoff ceremony.
+   * cannot sign two separate on-chain transactions as two different identities without a
+   * complex key-handoff ceremony.
    *
    * The CF already uses the admin wallet for addMemberBatch (member registration), so
    * extending the same admin-privileged bootstrap to include the trustee relationship does

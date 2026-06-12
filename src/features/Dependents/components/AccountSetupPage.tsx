@@ -11,7 +11,8 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/Button';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { UserSettingsService } from '@/features/Settings/services/userSettingsService';
@@ -29,11 +30,34 @@ interface TrusteeEntry {
 // ── Email section ──────────────────────────────────────────────────────────────
 
 function EmailSection({ user }: { user: BelroseUserProfile }) {
+  const { refreshUser } = useAuthContext();
   const isPlaceholder = user.email?.endsWith(PLACEHOLDER_DOMAIN) ?? false;
   const [newEmail, setNewEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [sent, setSent] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
+
+  const handleCheckVerification = async () => {
+    setIsChecking(true);
+    try {
+      await refreshUser();
+      const authUser = getAuth().currentUser;
+      if (authUser?.emailVerified) {
+        await updateDoc(doc(getFirestore(), 'users', user.uid), {
+          emailVerified: true,
+          emailVerifiedAt: new Date().toISOString(),
+        });
+        toast.success('Email verified!');
+      } else {
+        toast.error('Not verified yet — check your inbox and click the link.');
+      }
+    } catch {
+      toast.error('Something went wrong. Please try again.');
+    } finally {
+      setIsChecking(false);
+    }
+  };
 
   if (!isPlaceholder && user.emailVerified) {
     return (
@@ -56,10 +80,18 @@ function EmailSection({ user }: { user: BelroseUserProfile }) {
         status="warn"
         statusLabel="Unverified"
       >
-        <p className="text-sm text-slate-600 mb-3">
-          A verification link was sent to <strong>{user.email}</strong>. Check your inbox and click
-          the link to verify.
+        <p className="text-sm text-slate-600 mb-4">
+          A verification link was sent to <strong>{user.email}</strong>. Click it, then confirm
+          below.
         </p>
+        <Button
+          onClick={handleCheckVerification}
+          disabled={isChecking}
+          className="w-full flex items-center justify-center gap-2"
+        >
+          {isChecking ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+          {isChecking ? 'Checking…' : "I've verified my email"}
+        </Button>
       </SectionCard>
     );
   }
@@ -70,12 +102,21 @@ function EmailSection({ user }: { user: BelroseUserProfile }) {
       <SectionCard
         icon={<Mail className="w-4 h-4" />}
         title="Email"
-        status="ok"
-        statusLabel="Link sent"
+        status="warn"
+        statusLabel="Verify email"
       >
-        <p className="text-sm text-slate-600">
-          Verification link sent to <strong>{newEmail}</strong>. Click it to confirm the change.
+        <p className="text-sm text-slate-600 mb-4">
+          Verification link sent to <strong>{newEmail}</strong>. Click it in your inbox, then
+          confirm below.
         </p>
+        <Button
+          onClick={handleCheckVerification}
+          disabled={isChecking}
+          className="w-full flex items-center justify-center gap-2"
+        >
+          {isChecking ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+          {isChecking ? 'Checking…' : "I've verified my email"}
+        </Button>
       </SectionCard>
     );
   }
@@ -138,7 +179,22 @@ function EmailSection({ user }: { user: BelroseUserProfile }) {
 
 // ── Password section ───────────────────────────────────────────────────────────
 
-function PasswordSection() {
+function PasswordSection({ user }: { user: BelroseUserProfile }) {
+  if (user.passwordSelfSetAt) {
+    return (
+      <SectionCard
+        icon={<Lock className="w-4 h-4" />}
+        title="Password"
+        status="ok"
+        statusLabel="Set by you"
+      >
+        <p className="text-sm text-slate-600">
+          You set your own password using your recovery phrase.
+        </p>
+      </SectionCard>
+    );
+  }
+
   return (
     <SectionCard
       icon={<Lock className="w-4 h-4" />}
@@ -253,6 +309,8 @@ const AccountSetupPage: React.FC = () => {
   const navigate = useNavigate();
   const [trustees, setTrustees] = useState<TrusteeEntry[]>([]);
   const [loadingTrustees, setLoadingTrustees] = useState(true);
+  const isEmailPlaceholder = user?.email?.endsWith(PLACEHOLDER_DOMAIN) ?? true;
+  const canContinue = !isEmailPlaceholder && (user?.emailVerified ?? false);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -297,20 +355,27 @@ const AccountSetupPage: React.FC = () => {
         {/* Sections */}
         <div className="space-y-4 mb-8">
           <EmailSection user={user} />
-          <PasswordSection />
+          <PasswordSection user={user} />
           {loadingTrustees ? (
             <div className="border border-slate-200 rounded-xl p-5 flex items-center gap-3 text-slate-400">
               <Loader2 className="w-4 h-4 animate-spin" />
               <span className="text-sm">Loading trustees…</span>
             </div>
-          ) : (
+          ) : trustees.length > 0 ? (
             <TrusteeSection trustees={trustees} />
-          )}
+          ) : null}
         </div>
 
         {/* Continue */}
+        {!canContinue && (
+          <p className="text-xs text-center text-amber-600 mb-3 flex items-center justify-center gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+            Set a real email above before continuing.
+          </p>
+        )}
         <Button
           onClick={() => navigate('/app', { replace: true })}
+          disabled={!canContinue}
           className="w-full flex items-center justify-center gap-2"
         >
           Continue to Belrose

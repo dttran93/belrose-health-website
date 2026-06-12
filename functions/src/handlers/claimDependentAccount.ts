@@ -33,9 +33,13 @@ export const claimDependentAccount = onCall(
     const guardianUid = userData.dependentCreatedBy as string;
     const dependentDisplayName = (userData.displayName || userData.firstName || 'Your dependent') as string;
 
-    // 1. Flip the user doc — clear isDependent and remove the dependentCreatedBy field entirely
+    // 1. Flip the user doc — clear isDependent and remove the dependentCreatedBy field entirely.
+    //    Reset emailVerified to false: the account was created with a placeholder email that was
+    //    never actually verified. Explicitly resetting ensures the ProtectedRoute email gate fires
+    //    correctly after the user adds a real email on AccountSetupPage.
     await db.collection('users').doc(dependentUid).update({
       isDependent: false,
+      emailVerified: false,
       dependentCreatedBy: FieldValue.delete(),
     });
 
