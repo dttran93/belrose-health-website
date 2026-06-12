@@ -29,8 +29,6 @@ export const CreateDependentPage: React.FC = () => {
     finish,
   } = useCreateDependent();
 
-  const dependentDisplayName = formData.firstName || 'dependent';
-
   if (step === 'done') {
     return (
       <div className="max-w-lg mx-auto py-16 px-4 text-center">
@@ -53,7 +51,7 @@ export const CreateDependentPage: React.FC = () => {
   return (
     <div className="max-w-xl mx-auto py-8 px-4">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-8">
+      <div className="flex items-center justify-between gap-3 mb-8">
         <button
           onClick={() => navigate('/app/settings/dependents')}
           className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
@@ -66,6 +64,7 @@ export const CreateDependentPage: React.FC = () => {
             Create a Belrose account for someone in your care
           </p>
         </div>
+        <div />
       </div>
 
       {/* Step indicator */}
@@ -101,7 +100,6 @@ export const CreateDependentPage: React.FC = () => {
 
       {/* Card */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-
         {/* ── Step 1: Info ── */}
         {step === 'info' && (
           <div className="space-y-5">
@@ -137,41 +135,14 @@ export const CreateDependentPage: React.FC = () => {
               </div>
             </div>
 
-            <div>
-              <label className="flex items-center gap-2 cursor-pointer mb-3">
-                <input
-                  type="checkbox"
-                  checked={formData.hasOwnEmail}
-                  onChange={e => updateFormData({ hasOwnEmail: e.target.checked, email: '' })}
-                  className="rounded border-slate-300"
-                />
-                <span className="text-sm text-slate-700">
-                  {dependentDisplayName} has their own email address
-                </span>
-              </label>
-
-              {formData.hasOwnEmail && (
-                <InputField
-                  type="email"
-                  value={formData.email}
-                  onChange={e => updateFormData({ email: e.target.value })}
-                  placeholder="jane@example.com"
-                  className="px-3 py-2 text-sm"
-                />
-              )}
-
-              {!formData.hasOwnEmail && (
-                <p className="text-xs text-slate-400">
-                  A placeholder email will be generated automatically. You can update it to a real
-                  email later when{' '}
-                  {formData.firstName || 'they'} is ready to manage their own account.
-                </p>
-              )}
-            </div>
+            <p className="text-xs text-slate-400">
+              A placeholder email will be generated automatically. {formData.firstName || 'They'}{' '}
+              can add a real email when they claim the account.
+            </p>
 
             <Button
               onClick={() => goToStep('password')}
-              disabled={!formData.firstName || !formData.lastName || (formData.hasOwnEmail && !formData.email)}
+              disabled={!formData.firstName || !formData.lastName}
               className="w-full"
             >
               Continue
@@ -268,7 +239,9 @@ export const CreateDependentPage: React.FC = () => {
 
             <RecoveryKeyDisplay
               recoveryKey={result.recoveryKey}
-              onAcknowledge={acknowledged => updateFormData({ acknowledgedRecoveryKey: acknowledged })}
+              onAcknowledge={acknowledged =>
+                updateFormData({ acknowledgedRecoveryKey: acknowledged })
+              }
               onComplete={finish}
               isCompleted={formData.acknowledgedRecoveryKey}
               isActivated={true}

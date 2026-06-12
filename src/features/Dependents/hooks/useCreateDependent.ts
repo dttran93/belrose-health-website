@@ -13,8 +13,6 @@ export type CreateDependentStep = 'info' | 'password' | 'recovery' | 'done';
 export interface DependentFormData {
   firstName: string;
   lastName: string;
-  hasOwnEmail: boolean;
-  email: string;
   // Password the guardian sets for the dependent's independent login / future handoff.
   // Not used for guardian account switching — that will use custom token sessions in V2.
   password: string;
@@ -25,8 +23,6 @@ export interface DependentFormData {
 const initialFormData: DependentFormData = {
   firstName: '',
   lastName: '',
-  hasOwnEmail: false,
-  email: '',
   password: '',
   confirmPassword: '',
   acknowledgedRecoveryKey: false,
@@ -62,9 +58,7 @@ export function useCreateDependent() {
     setError(null);
 
     try {
-      const email = formData.hasOwnEmail
-        ? formData.email.trim()
-        : generatePlaceholderEmail();
+      const email = generatePlaceholderEmail();
 
       const accountResult = await DependentAccountService.createAccount({
         firstName: formData.firstName.trim(),
