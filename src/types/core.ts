@@ -40,6 +40,10 @@ export interface BelroseUserProfile extends User {
   credibility?: CredibilityScore;
   isGuest?: boolean; //For guest accounts
   isPlatformAdmin?: boolean; // For platform admin privileges
+  isDependent?: boolean; // Account created by a guardian on behalf of someone else
+  dependentCreatedBy?: string; // UID of the guardian who created this account
+  signInProvider?: string; // Firebase sign-in provider for current session ('password', 'custom', etc.)
+  passwordSelfSetAt?: string; // ISO timestamp of when the user last set their own password via recovery flow
 
   onChainIdentity?: {
     userIdHash: string; // The keccak256 hash of the UID. Intentionally not a search path for users. Want to maintain privacy separation between on-chain/off-chain identities.

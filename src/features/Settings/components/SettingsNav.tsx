@@ -7,13 +7,14 @@ import {
   GlobeLock,
   HeartHandshake,
   Key,
-  Settings2,
+  Users,
 } from 'lucide-react';
 
 const settingsSections = [
   { id: 'general', name: 'General', icon: CircleUserRound },
   { id: 'account', name: 'Account', icon: Key },
   { id: 'trustees', name: 'Trustees', icon: HeartHandshake },
+  { id: 'dependents', name: 'Dependents', icon: Users },
   { id: 'notifications', name: 'Notifications', icon: Bell },
   { id: 'privacy', name: 'Privacy & Security', icon: GlobeLock },
   { id: 'billing', name: 'Billing & Plans', icon: CreditCard },

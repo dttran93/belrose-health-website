@@ -89,6 +89,9 @@ export interface TrusteeRelationship {
   acceptBlockchainRef: BlockchainRef | null;
   revocationBlockchainRef: BlockchainRef | null;
   editBlockchainRef: BlockchainRef | null;
+
+  // Set to true for auto-created relationships on dependent accounts
+  isDependentRelationship?: boolean;
 }
 
 // ============================================================================

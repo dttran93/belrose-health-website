@@ -1082,6 +1082,53 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   }
 
   /**
+   * @notice Admin-only bootstrap for dependent account trustee relationships.
+   *
+   * WHY THIS FUNCTION EXISTS:
+   * The normal trustee flow is propose (trustor) → accept (trustee), requiring two separate
+   * wallet signatures. This works when both parties are independent users who can sign
+   * transactions. Dependent accounts are different: at creation time there is no independent
+   * person behind the dependent's wallet — the guardian has created this account. The guardian
+   * cannot sign two separate on-chain transactions as two different identities without a
+   * complex key-handoff ceremony.
+   *
+   * The CF already uses the admin wallet for addMemberBatch (member registration), so
+   * extending the same admin-privileged bootstrap to include the trustee relationship does
+   * not expand the trust surface. Revocation flows through the normal onlyActiveMember
+   * revokeTrustee path — no admin involvement after creation.
+   *
+   * @param trustorIdHash  keccak256 of the dependent's Firebase UID
+   * @param trusteeIdHash  keccak256 of the guardian's Firebase UID
+   */
+  function bootstrapDependentTrustee(
+    bytes32 trustorIdHash,
+    bytes32 trusteeIdHash
+  ) external onlyAdmin {
+    require(trustorIdHash != bytes32(0), "Invalid trustor");
+    require(trusteeIdHash != bytes32(0), "Invalid trustee");
+    require(trustorIdHash != trusteeIdHash, "Cannot appoint yourself");
+    require(userStatus[trustorIdHash] != MemberStatus.NotRegistered, "Trustor not registered");
+    require(userStatus[trusteeIdHash] != MemberStatus.NotRegistered, "Trustee not registered");
+
+    TrusteeStatus currentStatus = trusteeRelationships[trustorIdHash][trusteeIdHash].status;
+    require(
+      currentStatus == TrusteeStatus.None || currentStatus == TrusteeStatus.Revoked,
+      "Relationship already active or pending"
+    );
+
+    trusteeRelationships[trustorIdHash][trusteeIdHash] = TrusteeRelationship({
+      status: TrusteeStatus.Active,
+      level: TrusteeLevel.Controller
+    });
+
+    // Emit both events to preserve the full provenance trail that indexers and the
+    // sync queue expect. Identical timestamps signal an atomic bootstrap — not a
+    // two-step user interaction.
+    emit TrusteeProposed(trustorIdHash, trusteeIdHash, TrusteeLevel.Controller, block.timestamp);
+    emit TrusteeAccepted(trustorIdHash, trusteeIdHash, TrusteeLevel.Controller, block.timestamp);
+  }
+
+  /**
    * @notice Trustor updates the trust level of an active relationship
    * @dev Only callable by the trustor — no re-acceptance required
    * @param trusteeIdHash The identity hash of the trustee

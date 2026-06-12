@@ -1,7 +1,7 @@
 // src/components/auth/components/ResetPasswordForm.tsx
 
 import React, { useState } from 'react';
-import { Mail, ArrowLeft, AlertCircle, KeyRound, Lock } from 'lucide-react';
+import { Mail, AlertCircle, KeyRound, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { authService } from '@/features/Auth/services/authServices';
 import { toast } from 'sonner';

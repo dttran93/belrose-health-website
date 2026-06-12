@@ -348,8 +348,15 @@ export async function createNotification(
   targetUserId: string,
   notification: CreateNotificationInput
 ): Promise<string> {
+  // Dependent accounts route notifications to their guardian
+  let userDoc = await getFirestore().collection('users').doc(targetUserId).get();
+  const userData = userDoc.data();
+  if (userData?.isDependent && userData?.dependentCreatedBy) {
+    targetUserId = userData.dependentCreatedBy as string;
+    userDoc = await getFirestore().collection('users').doc(targetUserId).get();
+  }
+
   // Check in-app preference before writing
-  const userDoc = await getFirestore().collection('users').doc(targetUserId).get();
   const prefs = (userDoc.data()?.notificationPrefs ?? {}) as NotificationPrefs;
   const effective = prefs[notification.type] ??
     DEFAULT_NOTIFICATION_PREFS[notification.type] ?? { inApp: true, email: true };

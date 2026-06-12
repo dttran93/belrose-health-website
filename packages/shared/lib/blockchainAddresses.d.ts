@@ -340,12 +340,12 @@ export declare const PAYMASTER: {
 export declare function buildBundlerURL(pimlicoApiKey: string): string;
 export declare const MEMBER_ROLE_MANAGER: {
     readonly proxy: "0xdF9583C25E234A34a1E47d9830722123CA228a1a";
-    readonly implementation: "0x4383C4e5EaCDE9F8cEc6c692f5d939BaaF6ff038";
+    readonly implementation: "0x97f9ed2af3f9a30eac958d0994a0f131eda11a57";
     readonly deploymentBlock: 41800192;
 };
 export declare const HEALTH_RECORD_CORE: {
     readonly proxy: "0x66A8b985C61205e63D7d7DEA72Dfa5849a3e66De";
-    readonly implementation: "0xDC79F803594232421f49a29D9EcEbe78015d48e1";
+    readonly implementation: "0x985559cb258591967312867b0a37a058f08e92bd";
     readonly deploymentBlock: 41800191;
 };
 export declare const CONTRACT_ADDRESSES: {

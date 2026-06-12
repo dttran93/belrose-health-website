@@ -11,7 +11,12 @@ async function main() {
 
   const MemberRoleManagerV2 = await ethers.getContractFactory('MemberRoleManager');
 
-  // No forceImport — upgradeProxy handles registry internally
+  // forceImport registers the existing on-chain proxy in the OZ manifest so
+  // upgradeProxy can verify storage layout compatibility before deploying.
+  console.log('\n📋 Registering existing proxy in local manifest...');
+  await upgrades.forceImport(MEMBER_ROLE_MANAGER_PROXY, MemberRoleManagerV2, { kind: 'uups' });
+  console.log('✅ Proxy registered');
+
   console.log('\n📦 Deploying new implementation...');
   const upgraded = await upgrades.upgradeProxy(MEMBER_ROLE_MANAGER_PROXY, MemberRoleManagerV2, {
     kind: 'uups',
