@@ -2,12 +2,13 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import InputField from '@/components/ui/InputField';
 import { RecoveryKeyDisplay } from '@/features/Auth/components/RecoveryKeyDisplay';
 import PasswordStrengthIndicator from '@/features/Auth/components/ui/PasswordStrengthIndicator';
 import { useCreateDependent } from '../hooks/useCreateDependent';
+import { CreateDependentProgressDialog } from './CreateDependentProgressDialog';
 
 const STEPS = [
   { key: 'info', label: 'Dependent Info' },
@@ -24,6 +25,8 @@ export const CreateDependentPage: React.FC = () => {
     isSubmitting,
     result,
     error,
+    dialogPhase,
+    closeDialogError,
     goToStep,
     createAccount,
     finish,
@@ -205,22 +208,9 @@ export const CreateDependentPage: React.FC = () => {
                 disabled={isSubmitting || !formData.password || !formData.confirmPassword}
                 className="flex-1"
               >
-                {isSubmitting ? (
-                  <span className="flex items-center gap-2 justify-center">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Creating account...
-                  </span>
-                ) : (
-                  'Create Account'
-                )}
+                Create Account
               </Button>
             </div>
-
-            {isSubmitting && (
-              <p className="text-xs text-slate-400 text-center">
-                Generating encryption keys and registering on the network — this takes a moment.
-              </p>
-            )}
           </div>
         )}
 
@@ -249,6 +239,12 @@ export const CreateDependentPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      <CreateDependentProgressDialog
+        phase={dialogPhase}
+        error={error}
+        onClose={closeDialogError}
+      />
     </div>
   );
 };

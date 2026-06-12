@@ -7,6 +7,7 @@ import {
   generatePlaceholderEmail,
   type CreateDependentAccountResult,
 } from '../services/dependentAccountService';
+import type { DependentCreationDialogPhase } from '../components/CreateDependentProgressDialog';
 
 export type CreateDependentStep = 'info' | 'password' | 'recovery' | 'done';
 
@@ -34,6 +35,7 @@ export function useCreateDependent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<CreateDependentAccountResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dialogPhase, setDialogPhase] = useState<DependentCreationDialogPhase>('idle');
 
   function updateFormData(updates: Partial<DependentFormData>) {
     setFormData(prev => ({ ...prev, ...updates }));
@@ -65,8 +67,10 @@ export function useCreateDependent() {
         lastName: formData.lastName.trim(),
         email,
         password: formData.password,
+        onProgress: phase => setDialogPhase(phase),
       });
 
+      setDialogPhase('idle');
       setResult(accountResult);
       goToStep('recovery');
     } catch (err: any) {
@@ -75,10 +79,16 @@ export function useCreateDependent() {
           ? 'An account with this email already exists'
           : err?.message || 'Failed to create account. Please try again.';
       setError(message);
+      setDialogPhase('error');
       toast.error('Failed to create dependent account');
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function closeDialogError() {
+    setDialogPhase('idle');
+    setError(null);
   }
 
   function finish() {
@@ -100,6 +110,8 @@ export function useCreateDependent() {
     isSubmitting,
     result,
     error,
+    dialogPhase,
+    closeDialogError,
     goToStep,
     createAccount,
     finish,

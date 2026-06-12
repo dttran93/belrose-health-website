@@ -16,6 +16,7 @@ export interface CreateDependentAccountParams {
   lastName: string;
   email: string; // real email or placeholder
   password: string; // guardian sets this on behalf of the dependent
+  onProgress?: (phase: 'keys' | 'registering') => void;
 }
 
 export interface CreateDependentAccountResult {
@@ -34,11 +35,12 @@ export class DependentAccountService {
   static async createAccount(
     params: CreateDependentAccountParams
   ): Promise<CreateDependentAccountResult> {
-    const { firstName, lastName, email, password } = params;
+    const { firstName, lastName, email, password, onProgress } = params;
 
     // ── Client-side crypto generation ─────────────────────────────────────────
     // All key material is generated here. Only encrypted forms leave the client.
 
+    onProgress?.('keys');
     console.log('🔐 Generating encryption keys for dependent...');
 
     const masterKey = await EncryptionKeyManager.generateMasterKey();
@@ -60,6 +62,7 @@ export class DependentAccountService {
     const masterKeyHex = await WalletGenerationService.convertMasterKeyToHex(masterKey);
 
     console.log('✅ Crypto material generated');
+    onProgress?.('registering');
 
     // ── Call Cloud Function with encrypted material only ──────────────────────
     const functions = getFunctions();
