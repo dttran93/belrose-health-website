@@ -1,7 +1,7 @@
 // src/features/Dependents/hooks/useSwitchableAccounts.ts
 
-import { useState, useEffect, useCallback } from 'react';
-import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
+import { getFirestore, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
@@ -20,47 +20,58 @@ export function useSwitchableAccounts() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSwitching, setIsSwitching] = useState(false);
 
-  const load = useCallback(async () => {
+  useEffect(() => {
     if (!user) return;
+
+    if (user.isDependent && user.dependentCreatedBy) {
+      // Dependent: guardian is fixed at account creation — one-time fetch is fine
+      setIsLoading(true);
+      getUserProfile(user.dependentCreatedBy)
+        .then(profile => {
+          setGuardian({ uid: user.dependentCreatedBy!, profile });
+          setDependents([]);
+        })
+        .catch(err => console.error('Failed to load guardian profile:', err))
+        .finally(() => setIsLoading(false));
+      return;
+    }
+
+    // Guardian: real-time listener so newly created dependents appear immediately
+    const db = getFirestore();
     setIsLoading(true);
 
-    try {
-      if (user.isDependent && user.dependentCreatedBy) {
-        const guardianProfile = await getUserProfile(user.dependentCreatedBy);
-        setGuardian({ uid: user.dependentCreatedBy, profile: guardianProfile });
-        setDependents([]);
-      } else {
-        const db = getFirestore();
-        const snap = await getDocs(
-          query(
-            collection(db, 'trusteeRelationships'),
-            where('trusteeId', '==', user.uid),
-            where('isDependentRelationship', '==', true),
-            where('isActive', '==', true)
-          )
-        );
-
-        const entries = await Promise.all(
-          snap.docs.map(async d => {
-            const rel = d.data();
-            const profile = await getUserProfile(rel.trustorId);
-            return { uid: rel.trustorId, profile };
-          })
-        );
-
-        setDependents(entries);
-        setGuardian(null);
+    const unsubscribe = onSnapshot(
+      query(
+        collection(db, 'trusteeRelationships'),
+        where('trusteeId', '==', user.uid),
+        where('isDependentRelationship', '==', true),
+        where('isActive', '==', true)
+      ),
+      async snapshot => {
+        try {
+          const entries = await Promise.all(
+            snapshot.docs.map(async d => {
+              const rel = d.data();
+              const profile = await getUserProfile(rel.trustorId);
+              return { uid: rel.trustorId, profile };
+            })
+          );
+          setDependents(entries);
+          setGuardian(null);
+        } catch (err) {
+          console.error('Failed to load switchable accounts:', err);
+        } finally {
+          setIsLoading(false);
+        }
+      },
+      err => {
+        console.error('Switchable accounts listener error:', err);
+        setIsLoading(false);
       }
-    } catch (err) {
-      console.error('Failed to load switchable accounts:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user?.uid, user?.isDependent]);
+    );
 
-  useEffect(() => {
-    load();
-  }, [load]);
+    return () => unsubscribe();
+  }, [user?.uid, user?.isDependent, user?.dependentCreatedBy]);
 
   const switchToDependent = async (dependentUid: string) => {
     setIsSwitching(true);
