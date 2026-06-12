@@ -31,9 +31,18 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
-  // Logged in but email not verified → send to verification hub
-  // (except if they're already on the verification page)
-  if (!user.emailVerified && location.pathname !== '/verification') {
+  // Dependent logging in directly (not via guardian custom-token switch) → handoff screen.
+  // signInProvider === 'password' means they used their own credentials, not a guardian switch.
+  if (user.isDependent && user.signInProvider === 'password' && location.pathname !== '/claim-account') {
+    return <Navigate to="/claim-account" replace />;
+  }
+
+  // Logged in but email not verified → send to verification hub.
+  // Exempt: dependents (guardian verified consent at creation), and accounts still on a placeholder
+  // email (they can't verify until they update to a real email — future feature).
+  const isPlaceholderEmail = user.email?.endsWith('@placeholder.belrose.health') ?? false;
+  const VERIFICATION_EXEMPT = ['/verification', '/account-setup'];
+  if (!user.emailVerified && !user.isDependent && !isPlaceholderEmail && !VERIFICATION_EXEMPT.includes(location.pathname)) {
     return (
       <Navigate
         to="/verification"

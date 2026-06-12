@@ -47,6 +47,8 @@ export const useAuth = (): AuthContextData => {
           onChainIdentity: profile.onChainIdentity || undefined,
           affiliations: profile.affiliations || [],
           isGuest: profile.isGuest || false,
+          isDependent: profile.isDependent || false,
+          dependentCreatedBy: profile.dependentCreatedBy || undefined,
         } as BelroseUserProfile;
 
         if (profile.email !== user.email && user.email) {
@@ -59,6 +61,7 @@ export const useAuth = (): AuthContextData => {
         }
         const idTokenResult = await user.getIdTokenResult(true);
         mergedUser.isPlatformAdmin = idTokenResult.claims.platformAdmin === true;
+        mergedUser.signInProvider = idTokenResult.signInProvider ?? undefined;
       }
     } catch (error) {
       console.error('Error fetching or syncing user profile:', error);

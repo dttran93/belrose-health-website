@@ -81,10 +81,11 @@ exports.createDependentAccount = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_P
         throw new https_1.HttpsError('invalid-argument', 'Missing required fields');
     }
     // ── Step 1: Create Firebase Auth user ─────────────────────────────────────
+    const isPlaceholder = email.endsWith('@placeholder.belrose.health');
     let dependentUid;
     try {
         const displayName = `${firstName} ${lastName}`.trim();
-        const authUser = await admin.auth().createUser({ email, password, displayName, emailVerified: false });
+        const authUser = await admin.auth().createUser({ email, password, displayName, emailVerified: isPlaceholder });
         dependentUid = authUser.uid;
         console.log('✅ Firebase Auth user created:', dependentUid);
     }
@@ -103,7 +104,7 @@ exports.createDependentAccount = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_P
         await dependentRef.set({
             uid: dependentUid,
             email,
-            emailVerified: false,
+            emailVerified: isPlaceholder,
             displayName,
             displayNameLower: displayName.toLowerCase(),
             firstName,

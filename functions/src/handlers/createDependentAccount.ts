@@ -92,10 +92,11 @@ export const createDependentAccount = onCall(
     }
 
     // ── Step 1: Create Firebase Auth user ─────────────────────────────────────
+    const isPlaceholder = email.endsWith('@placeholder.belrose.health');
     let dependentUid: string;
     try {
       const displayName = `${firstName} ${lastName}`.trim();
-      const authUser = await admin.auth().createUser({ email, password, displayName, emailVerified: true });
+      const authUser = await admin.auth().createUser({ email, password, displayName, emailVerified: isPlaceholder });
       dependentUid = authUser.uid;
       console.log('✅ Firebase Auth user created:', dependentUid);
     } catch (err: any) {
@@ -115,7 +116,7 @@ export const createDependentAccount = onCall(
       await dependentRef.set({
         uid: dependentUid,
         email,
-        emailVerified: true,
+        emailVerified: isPlaceholder,
         displayName,
         displayNameLower: displayName.toLowerCase(),
         firstName,

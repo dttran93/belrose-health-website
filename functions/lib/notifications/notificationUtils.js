@@ -107,8 +107,14 @@ function formatRecordIdFallback(recordId) {
  * @returns The created notification document ID
  */
 async function createNotification(targetUserId, notification) {
+    // Dependent accounts route notifications to their guardian
+    let userDoc = await getFirestore().collection('users').doc(targetUserId).get();
+    const userData = userDoc.data();
+    if (userData?.isDependent && userData?.dependentCreatedBy) {
+        targetUserId = userData.dependentCreatedBy;
+        userDoc = await getFirestore().collection('users').doc(targetUserId).get();
+    }
     // Check in-app preference before writing
-    const userDoc = await getFirestore().collection('users').doc(targetUserId).get();
     const prefs = (userDoc.data()?.notificationPrefs ?? {});
     const effective = prefs[notification.type] ??
         _shared_1.DEFAULT_NOTIFICATION_PREFS[notification.type] ?? { inApp: true, email: true };

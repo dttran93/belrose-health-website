@@ -37,6 +37,8 @@ import OnChainActivityTray from './features/OnChainActivityTray/components/OnCha
 import AIPortal from './pages/AIPortal';
 import HomeDashboard from './pages/HomeDashboard';
 import CreateDependentPage from './features/Dependents/components/CreateDependentPage';
+import ClaimAccountPage from './features/Dependents/components/ClaimAccountPage';
+import AccountSetupPage from './features/Dependents/components/AccountSetupPage';
 
 const queryClient = new QueryClient();
 
@@ -84,6 +86,10 @@ const router = createBrowserRouter([
       { path: '/', element: <Index /> },
       { path: '/privacy', element: <PrivacyPolicy /> },
       { path: '/for-providers', element: <ForProviders /> },
+
+      // ── Dependent account handoff (auth-gated, no sidebar/encryption gate) ──
+      { path: '/claim-account', element: <ProtectedRoute><ClaimAccountPage /></ProtectedRoute> },
+      { path: '/account-setup', element: <ProtectedRoute><AccountSetupPage /></ProtectedRoute> },
 
       // ── Auth & verification ──
       { path: '/auth', element: <Auth /> },

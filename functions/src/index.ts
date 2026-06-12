@@ -28,6 +28,8 @@ export { addToMailingList } from './handlers/addToMailingList';
 
 // ==================== DEPENDENT ACCOUNTS ====================
 export { createDependentAccount } from './handlers/createDependentAccount';
+export { switchToDependent, switchToGuardian } from './handlers/switchAccount';
+export { claimDependentAccount } from './handlers/claimDependentAccount';
 
 // ==================== GUEST INVITE ====================
 export { createGuestInvite } from './handlers/createGuestInvite';
