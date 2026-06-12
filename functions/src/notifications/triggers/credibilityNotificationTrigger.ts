@@ -10,7 +10,7 @@
  */
 
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
 import { Resend } from 'resend';
 import { defineSecret } from 'firebase-functions/params';
 import { createNotificationForMultiple, getUserDisplayName } from '../notificationUtils';
