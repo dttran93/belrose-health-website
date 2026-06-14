@@ -15,6 +15,7 @@ interface UserSearchProps {
   showFilters?: boolean;
   autoFocus?: boolean;
   className?: string;
+  renderCardContent?: (user: BelroseUserProfile) => React.ReactNode;
 }
 
 export const UserSearch: React.FC<UserSearchProps> = ({
@@ -24,6 +25,7 @@ export const UserSearch: React.FC<UserSearchProps> = ({
   showFilters = false,
   autoFocus = true,
   className = '',
+  renderCardContent,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchType, setSearchType] = useState<SearchType>('all');
@@ -162,6 +164,7 @@ export const UserSearch: React.FC<UserSearchProps> = ({
               menuType="acceptOrCancel"
               onAccept={() => handleSelectUser(user)}
               onCancel={handleClear}
+              content={renderCardContent?.(user)}
             />
           ))}
         </div>

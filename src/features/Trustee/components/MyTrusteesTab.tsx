@@ -136,6 +136,18 @@ export const MyTrusteesTab: React.FC<MyTrusteesTabProps> = ({ onRefreshNeeded })
             onUserSelect={handleUserSelected}
             placeholder="Search by name, email, or user ID..."
             autoFocus
+            renderCardContent={user => {
+              const activeRow = active.find(r => r.trusteeId === user.uid);
+              if (activeRow) return <TrustLevelBadge level={activeRow.trustLevel} />;
+              const pendingRow = pending.find(r => r.trusteeId === user.uid);
+              if (pendingRow)
+                return (
+                  <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border border-gray-300 bg-gray-100 text-gray-600">
+                    Pending
+                  </span>
+                );
+              return null;
+            }}
           />
         </div>
       )}

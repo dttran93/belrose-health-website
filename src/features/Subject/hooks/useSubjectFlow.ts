@@ -34,6 +34,7 @@ import { doc, getDoc, getFirestore, updateDoc } from 'firebase/firestore';
 import SubjectQueryService, { IncomingSubjectRequest } from '../services/subjectQueryService';
 import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
 import { RejectionReasons, SubjectConsentRequest } from '@belrose/shared';
+import { TrusteeRelationshipService } from '@/features/Trustee/services/trusteeRelationshipService';
 
 // ============================================================================
 // TYPES
@@ -144,6 +145,11 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
   const [incomingRequests, setIncomingRequests] = useState<IncomingSubjectRequest[]>([]);
   const [isLoadingRequests, setIsLoadingRequests] = useState(true);
 
+  // Controller-anchor state: true when the selected user is a trustor the current user controls
+  const [isControllerOfSelected, setIsControllerOfSelected] = useState(false);
+  // Set of trustor UIDs for which the current user is an active controller (for badge display)
+  const [controllerTrustorIds, setControllerTrustorIds] = useState<Set<string>>(new Set());
+
   // onChain Activity Tray. UI display for blockchain processing in background
   const { addActivity, updateActivity } = useOnChainActivityTray();
   const [submittedLabel, setSubmittedLabel] = useState('');
@@ -227,6 +233,8 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
     setSelectedRole('viewer');
     setSelectedUser(null);
     setRevokeAccess(true);
+    setIsControllerOfSelected(false);
+    setControllerTrustorIds(new Set());
   }, []);
 
   /**
@@ -366,13 +374,17 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
         setPhase('confirming');
       }
     } else {
-      // For other, go to user search phase
+      // Pre-load controller trustors so the search phase can badge them
+      const controllerRels = await TrusteeRelationshipService.getActiveControllerTrustors();
+      setControllerTrustorIds(new Set(controllerRels.map(r => r.trustorId)));
       setPhase('searching');
     }
   }, [subjectChoice, selectedRole, recordId, runPreparation]);
 
   /**
-   * Select a user in the request flow and proceed to confirmation
+   * Select a user in the request flow and proceed to confirmation.
+   * If the current user is an active controller of the selected user, branches to
+   * the direct-anchor path (no consent request needed).
    */
   const selectUserAndProceed = useCallback(
     async (user: BelroseUserProfile) => {
@@ -385,7 +397,10 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
         selectedUser: user,
       });
 
-      // No blockchain preparation needed for consent requests
+      // Check for active controller relationship — determines which confirm screen to show
+      const controllerRel = await TrusteeRelationshipService.getControllerRelationshipWith(user.uid);
+      setIsControllerOfSelected(!!controllerRel);
+
       setPhase('confirming');
     },
     [recordId, selectedRole]
@@ -547,6 +562,52 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
     refetchAll,
     onSuccess,
   ]);
+
+  // ==========================================================================
+  // CONTROLLER ANCHOR FLOW
+  // ==========================================================================
+
+  /**
+   * Anchor the selected user as subject directly, using controller trustee authority.
+   * Re-verifies the relationship before proceeding (belt-and-suspenders).
+   */
+  const confirmAnchorSubjectAsController = useCallback(async () => {
+    if (!selectedUser) return;
+
+    const auth = getAuth();
+    const userId = auth.currentUser?.uid;
+    if (!userId) {
+      setError('You must be signed in');
+      setPhase('error');
+      return;
+    }
+
+    // Belt-and-suspenders: re-verify the controller relationship is still active
+    const rel = await TrusteeRelationshipService.getControllerRelationshipWith(selectedUser.uid);
+    if (!rel) {
+      setError('Controller relationship no longer exists or has been revoked');
+      setPhase('error');
+      return;
+    }
+
+    const activityId = addActivity({ label: 'Anchoring subject as controller', link: recordLink });
+
+    const txPromise = SubjectService.anchorSubjectAsController(recordId, selectedUser.uid);
+
+    setSubmittedLabel('Anchoring subject as controller');
+    setPhase('submitted');
+
+    txPromise
+      .then(async () => {
+        updateActivity(activityId, { status: 'confirmed' });
+        await refetchAll();
+        onSuccess?.();
+      })
+      .catch(err => {
+        const message = err instanceof Error ? err.message : 'Failed to anchor subject';
+        updateActivity(activityId, { status: 'failed', errorMessage: message });
+      });
+  }, [selectedUser, recordId, recordLink, addActivity, updateActivity, refetchAll, onSuccess]);
 
   // ==========================================================================
   // ACCEPT SUBJECT REQUEST FLOW
@@ -863,10 +924,13 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
       onGoBackToSearching: goBackToSearching,
       onConfirmSetSubjectAsSelf: confirmSetSubjectAsSelf,
       onConfirmRequestConsent: confirmRequestConsent,
+      onConfirmAnchorSubjectAsController: confirmAnchorSubjectAsController,
       onConfirmAcceptRequest: confirmAcceptRequest,
       onConfirmRejectRequest: confirmRejectRequest,
       onConfirmRemoveSubjectStatus: confirmRemoveSubjectStatus,
       submittedLabel,
+      isControllerOfSelected,
+      controllerTrustorIds,
     },
 
     // Current status

@@ -80,6 +80,30 @@ service cloud.firestore {
         request.auth.uid in record.viewers);
     }
 
+    // Check if a controller trustee is anchoring their trustor as a subject.
+    // The write includes a `controllerAnchorFor` proof field containing the trustorId,
+    // which lets the rule look up the specific trusteeRelationships doc without needing
+    // to compute an array diff (not possible in Firestore rules).
+    function isControllerAddingTrustorAsSubject() {
+      let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
+      let subjectsBefore = resource.data.get('subjects', []);
+      let subjectsAfter = request.resource.data.subjects;
+      let trustorId = request.resource.data.get('controllerAnchorFor', '');
+      let trustorRelId = trustorId + '_' + request.auth.uid;
+      let relExists = trustorId != '' &&
+        exists(/databases/$(database)/documents/trusteeRelationships/$(trustorRelId));
+      return affectedKeys.hasOnly(['subjects', 'lastModified', 'controllerAnchorFor']) &&
+        subjectsAfter.size() == subjectsBefore.size() + 1 &&
+        trustorId in subjectsAfter &&
+        !(trustorId in subjectsBefore) &&
+        !(request.auth.uid in subjectsAfter && !(request.auth.uid in subjectsBefore)) &&
+        (request.auth.uid in resource.data.get('owners', []) ||
+         request.auth.uid in resource.data.get('administrators', [])) &&
+        relExists &&
+        get(/databases/$(database)/documents/trusteeRelationships/$(trustorRelId)).data.isActive == true &&
+        get(/databases/$(database)/documents/trusteeRelationships/$(trustorRelId)).data.trustLevel == 'controller';
+    }
+
     // Check if subject is only editing viewers they have permission to modify
     function isSubjectEditingViewers() {
       let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
@@ -292,6 +316,17 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewers', 'trustees', 'lastModified']) &&
           resource.data.get('viewers', []).removeAll([request.auth.uid]) == request.resource.data.get('viewers', []) &&
           resource.data.get('trustees', []).removeAll([request.auth.uid]) == request.resource.data.get('trustees', [])
+        ) ||
+        // BRANCH 7: Controller trustee anchoring their trustor as subject (no consent needed)
+        (
+          isControllerAddingTrustorAsSubject()
+        ) ||
+        // BRANCH 8: Cleanup of controllerAnchorFor proof field after controller anchor
+        (
+          (request.auth.uid in resource.data.get('owners', []) ||
+           request.auth.uid in resource.data.get('administrators', [])) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['controllerAnchorFor']) &&
+          request.resource.data.diff(resource.data).removedKeys().hasOnly(['controllerAnchorFor'])
         )
       );
 

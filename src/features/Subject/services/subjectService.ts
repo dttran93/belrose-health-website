@@ -150,6 +150,54 @@ export class SubjectService {
   }
 
   /**
+   * Anchor a trustor as the subject of a record on behalf of a controller trustee.
+   * The caller must be an active controller trustee of trustorId (verified on-chain by isControllerOf).
+   * No consent request is needed — controller authority is sufficient.
+   */
+  static async anchorSubjectAsController(recordId: string, trustorId: string): Promise<void> {
+    const user = getAuth().currentUser;
+    if (!user) throw new Error('User not authenticated');
+
+    const db = getFirestore();
+    const recordRef = doc(db, 'records', recordId);
+    const recordDoc = await getDoc(recordRef);
+    if (!recordDoc.exists()) throw new Error('Record not found');
+
+    const recordData = { id: recordDoc.id, ...recordDoc.data() } as FileObject;
+
+    if (!recordData.recordHash) {
+      throw new Error('Record does not have a hash for blockchain anchoring');
+    }
+
+    if (recordData.subjects?.includes(trustorId)) {
+      return; // already a subject — idempotent
+    }
+
+    console.log('👤 Controller anchoring trustor as subject:', { recordId, trustorId });
+
+    // Step 1: Anchor on blockchain — passes trustorId hash as subjectIdHash
+    await SubjectBlockchainService.anchorSubjectAsController(
+      recordId,
+      recordData.recordHash,
+      user.uid,
+      trustorId
+    );
+    console.log('✅ Blockchain: Subject anchored as controller');
+
+    // Step 2: Update Firestore
+    await SubjectMembershipService.addSubjectAsController(recordId, trustorId);
+    console.log('✅ Firestore: Subject added');
+
+    // Step 3: Fan out access to the trustor's own trustees (non-fatal)
+    try {
+      await TrusteePermissionService.grantAccessForNewRecord(trustorId, recordId);
+      console.log('✅ Access granted to trustor\'s trustees');
+    } catch (trusteeError) {
+      console.error('⚠️ Failed to grant trustee access for new record:', trusteeError);
+    }
+  }
+
+  /**
    * Request another user to confirm they are the subject of a record
    *
    * This creates a pending request that the target user must respond to.

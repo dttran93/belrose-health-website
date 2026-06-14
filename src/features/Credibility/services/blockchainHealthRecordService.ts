@@ -550,6 +550,27 @@ export class blockchainHealthRecordService {
     return result;
   }
 
+  /**
+   * Anchor a trustor as a subject on behalf of the caller, who must be their active controller.
+   * Passes the trustor's ID hash as subjectIdHash; the contract verifies isControllerOf().
+   */
+  static async anchorRecordAsController(
+    recordId: string,
+    recordHash: string,
+    trustorId: string
+  ): Promise<TransactionResult> {
+    console.log('⛓️ Anchoring record as controller...', {
+      recordId,
+      recordHash: recordHash.slice(0, 12) + '...',
+      trustorId,
+    });
+    const recordIdHash = id(recordId);
+    const subjectIdHash = id(trustorId);
+    const result = await this.executeWrite('anchorRecord', [recordIdHash, recordHash, subjectIdHash]);
+    console.log('✅ Record anchored as controller:', result.txHash);
+    return result;
+  }
+
   /** Deactivate your subject link (soft delete) */
   static async unanchorRecord(recordId: string): Promise<TransactionResult> {
     console.log('⛓️ Unanchoring record...', { recordId });

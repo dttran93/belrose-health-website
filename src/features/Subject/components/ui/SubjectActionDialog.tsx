@@ -32,6 +32,7 @@ import {
   Link,
   Unlink,
   Shield,
+  ShieldAlert,
   ShieldCheck,
   Crown,
   ArrowLeft,
@@ -78,6 +79,9 @@ interface SubjectActionDialogProps {
   record: FileObject;
   currentSubjects: string[];
   isSubject: boolean;
+  // Controller-anchor state
+  isControllerOfSelected: boolean;
+  controllerTrustorIds: Set<string>;
   // Callbacks
   onClose: () => void;
   onProceedFromSelection: () => void;
@@ -86,6 +90,7 @@ interface SubjectActionDialogProps {
   onGoBackToSearching: () => void;
   onConfirmSetSubjectAsSelf: () => void;
   onConfirmRequestConsent: () => void;
+  onConfirmAnchorSubjectAsController: () => void;
   onConfirmAcceptRequest: () => void;
   onConfirmRejectRequest: (reason: RejectionReasons) => void;
   onConfirmRemoveSubjectStatus: (reason: RejectionReasons) => void;
@@ -158,6 +163,8 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
   record,
   currentSubjects,
   isSubject,
+  isControllerOfSelected,
+  controllerTrustorIds,
   onClose,
   onProceedFromSelection,
   onSelectUser,
@@ -165,6 +172,7 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
   onGoBackToSearching,
   onConfirmSetSubjectAsSelf,
   onConfirmRequestConsent,
+  onConfirmAnchorSubjectAsController,
   onConfirmAcceptRequest,
   onConfirmRejectRequest,
   onConfirmRemoveSubjectStatus,
@@ -214,6 +222,7 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
               record={record}
               currentSubjects={currentSubjects}
               selectedRole={selectedRole}
+              controllerTrustorIds={controllerTrustorIds}
               onSelectUser={onSelectUser}
               onGoBack={onGoBackToSelection}
               onClose={onClose}
@@ -244,13 +253,24 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
             />
           )}
 
-          {/* Confirming Phase - Request Consent */}
-          {phase === 'confirming' && selectedUser && subjectChoice === 'other' && (
+          {/* Confirming Phase - Request Consent (non-controller path) */}
+          {phase === 'confirming' && selectedUser && subjectChoice === 'other' && !isControllerOfSelected && (
             <ConfirmRequestConsentContent
               record={record}
               selectedUser={selectedUser}
               selectedRole={selectedRole}
               onConfirm={onConfirmRequestConsent}
+              onGoBack={onGoBackToSearching}
+              onClose={onClose}
+            />
+          )}
+
+          {/* Confirming Phase - Controller Anchor (no consent needed) */}
+          {phase === 'confirming' && selectedUser && subjectChoice === 'other' && isControllerOfSelected && (
+            <ConfirmAnchorSubjectContent
+              record={record}
+              selectedUser={selectedUser}
+              onConfirm={onConfirmAnchorSubjectAsController}
               onGoBack={onGoBackToSearching}
               onClose={onClose}
             />
@@ -494,14 +514,15 @@ const SearchingContent: React.FC<{
   record: FileObject;
   currentSubjects: string[];
   selectedRole: SubjectRole;
+  controllerTrustorIds: Set<string>;
   onSelectUser: (user: BelroseUserProfile) => void;
   onGoBack: () => void;
   onClose: () => void;
-}> = ({ record, currentSubjects, selectedRole, onSelectUser, onGoBack, onClose }) => {
+}> = ({ record, currentSubjects, selectedRole, controllerTrustorIds, onSelectUser, onGoBack, onClose }) => {
   const { user } = useAuthContext();
 
-  const handleUserSelect = (user: BelroseUserProfile) => {
-    onSelectUser(user);
+  const handleUserSelect = (u: BelroseUserProfile) => {
+    onSelectUser(u);
   };
 
   return (
@@ -537,6 +558,14 @@ const SearchingContent: React.FC<{
           excludeUserIds={[...currentSubjects, user?.uid || '']}
           placeholder="Search by name, email, or user ID..."
           autoFocus
+          renderCardContent={u =>
+            controllerTrustorIds.has(u.uid) ? (
+              <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border bg-red-50 border-red-200 text-red-600">
+                <ShieldAlert className="w-3 h-3" />
+                Controller
+              </span>
+            ) : null
+          }
         />
       </div>
 
@@ -701,6 +730,73 @@ const ConfirmSetSubjectAsSelfContent: React.FC<{
     </div>
   );
 };
+
+const ConfirmAnchorSubjectContent: React.FC<{
+  record: FileObject;
+  selectedUser: BelroseUserProfile;
+  onConfirm: () => void;
+  onGoBack: () => void;
+  onClose: () => void;
+}> = ({ record, selectedUser, onConfirm, onGoBack, onClose }) => (
+  <div>
+    <AlertDialog.Title className="text-lg font-bold flex items-center justify-between gap-2 mb-3">
+      <div className="flex items-center gap-2">
+        <ShieldAlert className="w-5 h-5 text-red-600" />
+        Anchor Subject as Controller
+      </div>
+      <button onClick={onClose} className="p-1 rounded hover:bg-gray-100">
+        <X className="w-5 h-5 text-gray-500" />
+      </button>
+    </AlertDialog.Title>
+
+    <AlertDialog.Description className="text-sm text-gray-600 mb-4">
+      You are anchoring <strong>{selectedUser.displayName || selectedUser.email || 'this user'}</strong> as
+      the subject of this record using your controller trustee authority.
+    </AlertDialog.Description>
+
+    {/* User Info */}
+    <div className="mb-4">
+      <p className="text-xs text-gray-500 mb-2">Subject</p>
+      <UserCard
+        user={selectedUser}
+        variant="compact"
+        color="primary"
+        menuType="none"
+        content={
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border bg-red-50 border-red-200 text-red-600">
+            <ShieldAlert className="w-3 h-3" />
+            Controller
+          </span>
+        }
+      />
+    </div>
+
+    {/* Record Info */}
+    <div className="p-3 border rounded-lg bg-gray-50 mb-4">
+      <p className="text-xs text-gray-500 mb-1">Record</p>
+      <p className="font-medium text-gray-900">
+        {record.belroseFields?.title || record.fileName || 'Untitled Record'}
+      </p>
+    </div>
+
+    {/* Info Note */}
+    <div className="p-3 bg-red-50 border border-red-200 rounded-lg mb-4">
+      <p className="text-xs text-red-800 leading-relaxed">
+        As their controller trustee, you can anchor them as subject directly — no consent request
+        needed. Their subject link will be recorded on the distributed network.
+      </p>
+    </div>
+
+    <div className="flex gap-3">
+      <Button variant="outline" className="flex-1" onClick={onGoBack}>
+        Back
+      </Button>
+      <Button onClick={onConfirm} className="flex-1 bg-red-600 hover:bg-red-700">
+        Anchor Subject
+      </Button>
+    </div>
+  </div>
+);
 
 const ConfirmRequestConsentContent: React.FC<{
   record: FileObject;

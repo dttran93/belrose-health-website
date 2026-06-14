@@ -594,4 +594,40 @@ export class TrusteeRelationshipService {
     if (!snap.exists()) return null;
     return snap.data() as TrusteeRelationship;
   }
+
+  /**
+   * Check whether the current user is an active controller trustee of the given trustorId.
+   * Uses a direct document lookup (no composite index needed).
+   */
+  static async getControllerRelationshipWith(
+    trustorId: string
+  ): Promise<TrusteeRelationship | null> {
+    const currentUser = getAuth().currentUser;
+    if (!currentUser) return null;
+
+    const rel = await TrusteeRelationshipService.getRelationship(trustorId, currentUser.uid);
+    if (rel && rel.isActive && rel.trustLevel === 'controller') return rel;
+    return null;
+  }
+
+  /**
+   * Returns all active relationships where the current user is a controller trustee.
+   * Filters client-side after the trusteeId + isActive index query to avoid a new composite index.
+   */
+  static async getActiveControllerTrustors(): Promise<TrusteeRelationship[]> {
+    const currentUser = getAuth().currentUser;
+    if (!currentUser) return [];
+
+    const db = getFirestore();
+    const q = query(
+      collection(db, 'trusteeRelationships'),
+      where('trusteeId', '==', currentUser.uid),
+      where('isActive', '==', true)
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+      .map(d => d.data() as TrusteeRelationship)
+      .filter(r => r.trustLevel === 'controller');
+  }
 }
