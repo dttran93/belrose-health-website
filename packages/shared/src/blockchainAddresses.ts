@@ -16,7 +16,7 @@ import { baseSepolia } from 'viem/chains';
 export const NETWORK = {
   chainId: 84532,
   name: 'base-sepolia',
-  rpcUrlFallback: 'https://sepolia.base.org',
+  rpcUrlFallback: 'https://base-sepolia-rpc.publicnode.com',
   explorerUrl: 'https://sepolia.basescan.org/',
   chainViem: baseSepolia,
 } as const;
