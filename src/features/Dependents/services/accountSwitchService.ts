@@ -6,6 +6,7 @@
 
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getAuth, signInWithCustomToken } from 'firebase/auth';
+import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 
 export const AccountSwitchService = {
   async switchToDependent(dependentUid: string): Promise<void> {
@@ -16,6 +17,7 @@ export const AccountSwitchService = {
     );
     const result = await fn({ dependentUid });
     await signInWithCustomToken(getAuth(), result.data.token);
+    EncryptionKeyManager.clearSession();
   },
 
   async switchToGuardian(guardianUid: string): Promise<void> {
@@ -26,5 +28,6 @@ export const AccountSwitchService = {
     );
     const result = await fn({ guardianUid });
     await signInWithCustomToken(getAuth(), result.data.token);
+    EncryptionKeyManager.clearSession();
   },
 };
