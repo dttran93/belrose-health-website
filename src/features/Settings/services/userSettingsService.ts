@@ -95,6 +95,18 @@ export class UserSettingsService {
       throw new Error('New email is the same as current email');
     }
 
+    // Proactive duplicate check — verifyBeforeUpdateEmail() fails silently on duplicates
+    // because it's a two-step flow (sends link first, applies change on click).
+    const fns = getFunctions();
+    const checkStatus = httpsCallable<{ email: string }, { isRegistered: boolean }>(
+      fns,
+      'checkEmailRegistrationStatus'
+    );
+    const { data: statusData } = await checkStatus({ email: newEmail });
+    if (statusData.isRegistered) {
+      throw new Error('This email is already registered to another account.');
+    }
+
     try {
       // Re-authenticate user first (required for sensitive operations)
       const credential = EmailAuthProvider.credential(user.email, currentPassword);
