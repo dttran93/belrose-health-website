@@ -15,6 +15,7 @@ import SettingsNav from '@/features/Settings/components/SettingsNav';
 import AccountSettings from '@/features/Settings/components/AccountSettings';
 import ChangePasswordModal from '@/features/Settings/components/ChangePasswordModal';
 import NotificationSettings from '@/features/Settings/components/NotificationSettings';
+import GuestInvitesSettings from '@/features/Settings/components/GuestInvitesSettings';
 
 const SettingsPage = () => {
   const auth = getAuth();
@@ -138,6 +139,9 @@ const SettingsPage = () => {
 
       case 'dependents':
         return <DependentsSettingsPage />;
+
+      case 'guest-invites':
+        return <GuestInvitesSettings />;
 
       case 'notifications':
         return <NotificationSettings />;
