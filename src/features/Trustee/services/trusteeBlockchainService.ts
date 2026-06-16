@@ -24,7 +24,8 @@ type TrusteeAction =
   | 'acceptTrustee'
   | 'revokeTrustee'
   | 'grantRoleAsTrusteeBatch'
-  | 'updateTrusteeLevel';
+  | 'updateTrusteeLevel'
+  | 'downgradeTrusteeLevel';
 
 export class TrusteeBlockchainService {
   // ==========================================================================
@@ -181,6 +182,36 @@ export class TrusteeBlockchainService {
     }
   }
 
+  /**
+   * Trustee self-downgrades their trust level on-chain
+   * msg.sender = trustee's wallet
+   */
+  static async downgradeTrusteeLevel(
+    trustorId: string,
+    trusteeId: string,
+    newLevel: TrusteeLevel
+  ): Promise<TrusteeResult> {
+    const walletAddress = await this.requireUserWalletAddress(trusteeId);
+
+    try {
+      console.log('⛓️ Downgrading trustee level on blockchain...', { trustorId, trusteeId, newLevel });
+      const result = await BlockchainRoleManagerService.downgradeTrusteeLevel(trustorId, newLevel);
+      const blockchainRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
+      console.log('✅ Trustee level downgraded on blockchain');
+      return { success: true, blockchainRef };
+    } catch (error) {
+      await this.logTrusteeFailure({
+        action: 'downgradeTrusteeLevel',
+        trustorId,
+        trusteeId,
+        callerId: trusteeId,
+        walletAddress,
+        error,
+      });
+      return { success: false, blockchainRef: null };
+    }
+  }
+
   static async updateTrusteeLevel(
     trustorId: string,
     trusteeId: string,
@@ -229,6 +260,7 @@ export class TrusteeBlockchainService {
       proposeTrustee: 'trustee-propose',
       acceptTrustee: 'trustee-accept',
       revokeTrustee: 'trustee-revoke',
+      downgradeTrusteeLevel: 'trustee-level-update',
       grantRoleAsTrusteeBatch: 'trustee-grant',
       updateTrusteeLevel: 'trustee-level-update',
     } as const;

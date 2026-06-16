@@ -327,6 +327,37 @@ service cloud.firestore {
            request.auth.uid in resource.data.get('administrators', [])) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['controllerAnchorFor']) &&
           request.resource.data.diff(resource.data).removedKeys().hasOnly(['controllerAnchorFor'])
+        ) ||
+        // BRANCH 9: Trustee self-adjusting their own role (step-down or resign).
+        // A trustee can downgrade or remove themselves from role arrays on records
+        // where they hold trustee-derived access (trustees[] marker).
+        // "Other users unchanged" guards + "no escalation" guards prevent abuse.
+        (
+          // Caller must have trustee-derived access on this record
+          request.auth.uid in resource.data.get('trustees', []) &&
+          // Only role arrays and trustees[] can change — no other fields
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['owners', 'administrators', 'viewers', 'trustees']) &&
+          // Other users' role memberships must be unchanged (caller's uid filtered out)
+          resource.data.get('owners', []).removeAll([request.auth.uid]) ==
+            request.resource.data.get('owners', []).removeAll([request.auth.uid]) &&
+          resource.data.get('administrators', []).removeAll([request.auth.uid]) ==
+            request.resource.data.get('administrators', []).removeAll([request.auth.uid]) &&
+          resource.data.get('viewers', []).removeAll([request.auth.uid]) ==
+            request.resource.data.get('viewers', []).removeAll([request.auth.uid]) &&
+          // trustees[] can only remove the caller — no other trustee entry changes
+          resource.data.get('trustees', []).removeAll([request.auth.uid]) ==
+            request.resource.data.get('trustees', []).removeAll([request.auth.uid]) &&
+          // No escalation: caller cannot gain a role higher than they currently hold
+          !(request.auth.uid in request.resource.data.get('owners', []) &&
+            !(request.auth.uid in resource.data.get('owners', []))) &&
+          !(request.auth.uid in request.resource.data.get('administrators', []) &&
+            !(request.auth.uid in resource.data.get('administrators', [])) &&
+            !(request.auth.uid in resource.data.get('owners', []))) &&
+          !(request.auth.uid in request.resource.data.get('viewers', []) &&
+            !(request.auth.uid in resource.data.get('viewers', [])) &&
+            !(request.auth.uid in resource.data.get('administrators', [])) &&
+            !(request.auth.uid in resource.data.get('owners', [])))
         )
       );
 
@@ -739,6 +770,21 @@ service cloud.firestore {
             .hasOnly(['status', 'isActive', 'revokedAt', 'revokedBy', 'statusUpdateReason', 'revocationBlockchainRef']) &&
           request.resource.data.trustorId == resource.data.trustorId &&
           request.resource.data.trusteeId == resource.data.trusteeId
+        ) ||
+        // BRANCH 4: Trustee self-downgrading trust level (upgrades require trustor)
+        (
+          isTrustee() &&
+          resource.data.status == 'active' &&
+          request.resource.data.status == resource.data.status &&
+          request.resource.data.trustorId == resource.data.trustorId &&
+          request.resource.data.trusteeId == resource.data.trusteeId &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['trustLevel', 'statusUpdateReason', 'editBlockchainRef']) &&
+          (
+            (resource.data.trustLevel == 'controller' &&
+             (request.resource.data.trustLevel == 'custodian' || request.resource.data.trustLevel == 'observer')) ||
+            (resource.data.trustLevel == 'custodian' && request.resource.data.trustLevel == 'observer')
+          )
         )
       );
 

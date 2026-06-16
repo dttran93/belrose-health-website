@@ -337,6 +337,16 @@ const MEMBER_ROLE_MANAGER_ABI = [
     stateMutability: 'nonpayable',
     type: 'function',
   },
+  {
+    inputs: [
+      { internalType: 'bytes32', name: 'trustorIdHash', type: 'bytes32' },
+      { internalType: 'uint8', name: 'newLevel', type: 'uint8' },
+    ],
+    name: 'downgradeTrusteeLevel',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
 
   // ============================================================================
   // TRUSTEE RELATIONSHIPS - VIEW FUNCTIONS
@@ -1124,6 +1134,20 @@ export class BlockchainRoleManagerService {
     const trusteeIdHash = ethers.id(trusteeId);
     const result = await this.executeWrite('updateTrusteeLevel', [trusteeIdHash, newLevel]);
     console.log('✅ Trustee level updated:', result.txHash);
+    return result;
+  }
+
+  /**
+   * Trustee self-downgrades their trust level (callable by trustee only)
+   */
+  static async downgradeTrusteeLevel(
+    trustorId: string,
+    newLevel: TrusteeLevel
+  ): Promise<TransactionResult> {
+    console.log('🔗 Downgrading trustee level on blockchain...', { trustorId, newLevel });
+    const trustorIdHash = ethers.id(trustorId);
+    const result = await this.executeWrite('downgradeTrusteeLevel', [trustorIdHash, newLevel]);
+    console.log('✅ Trustee level downgraded:', result.txHash);
     return result;
   }
 

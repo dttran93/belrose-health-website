@@ -502,14 +502,29 @@ export class TrusteePermissionService {
     });
 
     const db = getFirestore();
-    const records = await this.getRecordsForTrustor(trustorId);
 
-    if (records.length === 0) {
-      console.log('ℹ️ No records found for trustor — nothing to update');
+    // Only touch records where the trustee's access was granted via this relationship.
+    // Records where they have independent access (e.g. they're the uploader) are excluded —
+    // they were never added to trustees[] at invite time (hadPriorAccess guard).
+    const keysQuery = query(
+      collection(db, 'wrappedKeys'),
+      where('userId', '==', trusteeId),
+      where('grantedBy', '==', trustorId),
+      where('isActive', '==', true)
+    );
+    const keysSnapshot = await getDocs(keysQuery);
+    const trusteeDerivedRecordIds = new Set(
+      keysSnapshot.docs.map(d => d.data().recordId as string)
+    );
+
+    if (trusteeDerivedRecordIds.size === 0) {
+      console.log('ℹ️ No trustee-derived records found — nothing to update');
       return;
     }
 
+    const records = await this.getRecordsForTrustor(trustorId);
     const accessList: TrusteeRecordAccess[] = records
+      .filter(({ recordId }) => trusteeDerivedRecordIds.has(recordId))
       .map(({ recordId, trustorRole }) => ({
         recordId,
         role: this.resolveTrusteeRole(newTrustLevel, trustorRole),
@@ -517,13 +532,12 @@ export class TrusteePermissionService {
       .filter((r): r is TrusteeRecordAccess => r.role !== null);
 
     if (accessList.length === 0) {
-      console.log('ℹ️ Trustor has no roles on any records — nothing to update');
+      console.log('ℹ️ No trustee-derived records with roles to update');
       return;
     }
 
     for (const { recordId, role } of accessList) {
       try {
-        // After (removes from all first, then adds to correct one)
         await updateDoc(doc(db, 'records', recordId), {
           owners: arrayRemove(trusteeId),
           administrators: arrayRemove(trusteeId),

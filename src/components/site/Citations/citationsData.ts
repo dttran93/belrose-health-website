@@ -338,8 +338,18 @@ export const citations: Record<string, Citation> = {
       'HEALTH INFORMATION BILL TO SUPPORT COORDINATED CARE ACROSS SINGAPORE’S HEALTHCARE ECOSYSTEM. (2026, January 12). Ministry of Health. https://www.moh.gov.sg/newsroom/health-information-bill-to-support-coordinated-care-across-singapore-s-healthcare-ecosystem/',
     url: 'https://www.moh.gov.sg/newsroom/health-information-bill-to-support-coordinated-care-across-singapore-s-healthcare-ecosystem/',
   },
-  'sg-hack': {
+  'sg-emjsurvey': {
     num: 35,
+    year: '2019',
+    title:
+      'GPs primary concerns regarding NEHR relate to government overreach and ethics, 2019 survey finds',
+    source: 'European Medical Journal',
+    apaCitation:
+      'See, Q. Y. (2020). Attitudes and Perceptions of General Practitioners towards the National Electronic Health Record (NEHR) in Singapore. European Medical Journal, 86–93. https://doi.org/10.33590/emj/19-00184',
+    url: 'https://www.emjreviews.com/innovations/article/attitudes-and-perceptions-of-general-practitioners-towards-the-national-electronic-health-record-nehr-in-singapore/',
+  },
+  'sg-hack': {
+    num: 36,
     year: '2018',
     title:
       'Singapore Ministry of Health announces data breach affecting 1.5 million patients including Prime Minister Loong',
@@ -349,7 +359,7 @@ export const citations: Record<string, Citation> = {
     url: "https://www.moh.gov.sg/newsroom/singhealth's-it-system-target-of-cyberattack/",
   },
   'databroker-rev': {
-    num: 36,
+    num: 37,
     year: '2025',
     title: 'UnitedHealth Group announces Optum insights made $18.8 billion in 2024',
     source: 'UnitedHealth Group',
@@ -358,7 +368,7 @@ export const citations: Record<string, Citation> = {
     url: "https://www.moh.gov.sg/newsroom/singhealth's-it-system-target-of-cyberattack/",
   },
   '7t-prevention': {
-    num: 37,
+    num: 38,
     year: '2018',
     title:
       'Singapore Ministry of Health announces data breach of 1.5 million patients including Prime Minister Loong',
@@ -368,7 +378,7 @@ export const citations: Record<string, Citation> = {
     url: "https://www.moh.gov.sg/newsroom/singhealth's-it-system-target-of-cyberattack/",
   },
   'gdpr-text': {
-    num: 38,
+    num: 39,
     year: '2016',
     title:
       'GDPR Article 15(3) states "the controller shall provide a copy of personal data... in a commonly used electronic form"',
@@ -378,7 +388,7 @@ export const citations: Record<string, Citation> = {
     url: 'https://www.legislation.gov.uk/eur/2016/679/article/15',
   },
   'ico-deadline': {
-    num: 39,
+    num: 40,
     year: '2025',
     title:
       'Per ICO: "[Controllers] must comply with a SAR... within one month of receipt of the request"',
@@ -388,7 +398,7 @@ export const citations: Record<string, Citation> = {
     url: 'https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/individual-rights/right-of-access/what-should-we-consider-when-responding-to-a-request/#HowLongToComply',
   },
   'ico-how': {
-    num: 40,
+    num: 41,
     year: '2025',
     title: 'ICO guidance references controllers "[asking] the person for their preferred format"',
     source: "Information Commissioner's Office",
@@ -397,7 +407,7 @@ export const citations: Record<string, Citation> = {
     url: 'https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/individual-rights/right-of-access/how-can-we-supply-information-to-the-requester/?search=burden',
   },
   'cures-act-fhir': {
-    num: 41,
+    num: 42,
     year: '2020',
     title:
       'ONC 21st Century Cures Act Final Rule establishes FHIR R4 as mandatory standard for health IT certification',
@@ -407,7 +417,7 @@ export const citations: Record<string, Citation> = {
     url: 'https://www.federalregister.gov/documents/2020/05/01/2020-07419/21st-century-cures-act-interoperability-information-blocking-and-the-onc-health-it-certification',
   },
   'dua-act-2025': {
-    num: 42,
+    num: 43,
     year: '2025',
     title:
       'Data (Use and Access) Act 2025 mandates standardised data frameworks across NHS and social care in England, including FHIR',

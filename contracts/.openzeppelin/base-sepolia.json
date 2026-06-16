@@ -1366,6 +1366,389 @@
         "0x4383C4e5EaCDE9F8cEc6c692f5d939BaaF6ff038",
         "0x97F9eD2af3f9a30Eac958D0994a0F131Eda11A57"
       ]
+    },
+    "dc794cb2603b8c09f7819b4e83f57d32c114a2b4c20d101ade114c5d783ed52f": {
+      "address": "0x97F9eD2af3f9a30Eac958D0994a0F131Eda11A57",
+      "layout": {
+        "solcVersion": "0.8.24",
+        "storage": [
+          {
+            "label": "admin",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_address",
+            "contract": "MemberRoleManager",
+            "src": "smartContracts\\MemberRoleManager.sol:60"
+          },
+          {
+            "label": "wallets",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_mapping(t_address,t_struct(UserInfo)1751_storage)",
+            "contract": "MemberRoleManager",
+            "src": "smartContracts\\MemberRoleManager.sol:160"
+          },
+          {
+            "label": "userStatus",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_mapping(t_bytes32,t_enum(MemberStatus)1716)",
+            "contract": "MemberRoleManager",
+            "src": "smartContracts\\MemberRoleManager.sol:163"
+          },
+          {
+            "label": "userWallets",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_mapping(t_bytes32,t_array(t_address)dyn_storage)",
+            "contract": "MemberRoleManager",
+            "src": "smartContracts\\MemberRoleManager.sol:166"
+          },
+          {
+            "label": "userList",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_array(t_bytes32)dyn_storage",
+            "contract": "MemberRoleManager",
+            "src": "smartContracts\\MemberRoleManager.sol:169"
+          },
+          {
+            "label": "totalUsers",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_uint256",
+            "contract": "MemberRoleManager",
+            "src": "smartContracts\\MemberRoleManager.sol:170"
+          },
+          {
+            "label": "recordRoles",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_mapping(t_bytes32,t_struct(RecordRole)2418_storage)",
+            "contract": "MemberRoleManager",
+            "src": "smartContracts\\MemberRoleManager.sol:408"
+          },
+          {
+            "label": "ownersByRecord",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_mapping(t_bytes32,t_array(t_bytes32)dyn_storage)",
+            "contract": "MemberRoleManager",
+            "src": "smartContracts\\MemberRoleManager.sol:411"
+          },
+          {
+            "label": "adminsByRecord",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_mapping(t_bytes32,t_array(t_bytes32)dyn_storage)",
+            "contract": "MemberRoleManager",
+            "src": "smartContracts\\MemberRoleManager.sol:412"
+          },
+          {
+            "label": "viewersByRecord",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_mapping(t_bytes32,t_array(t_bytes32)dyn_storage)",
+            "contract": "MemberRoleManager",
+            "src": "smartContracts\\MemberRoleManager.sol:413"
+          },
+          {
+            "label": "recordsByUser",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_mapping(t_bytes32,t_array(t_bytes32)dyn_storage)",
+            "contract": "MemberRoleManager",
+            "src": "smartContracts\\MemberRoleManager.sol:416"
+          },
+          {
+            "label": "totalRoles",
+            "offset": 0,
+            "slot": "11",
+            "type": "t_uint256",
+            "contract": "MemberRoleManager",
+            "src": "smartContracts\\MemberRoleManager.sol:418"
+          },
+          {
+            "label": "healthRecordCore",
+            "offset": 0,
+            "slot": "12",
+            "type": "t_contract(HealthRecordCoreInterface)1554",
+            "contract": "MemberRoleManager",
+            "src": "smartContracts\\MemberRoleManager.sol:420"
+          },
+          {
+            "label": "roleGrantedBy",
+            "offset": 0,
+            "slot": "13",
+            "type": "t_mapping(t_bytes32,t_bytes32)",
+            "contract": "MemberRoleManager",
+            "src": "smartContracts\\MemberRoleManager.sol:421"
+          },
+          {
+            "label": "trusteeRelationships",
+            "offset": 0,
+            "slot": "14",
+            "type": "t_mapping(t_bytes32,t_mapping(t_bytes32,t_struct(TrusteeRelationship)4252_storage))",
+            "contract": "MemberRoleManager",
+            "src": "smartContracts\\MemberRoleManager.sol:990"
+          },
+          {
+            "label": "guestAccessByRecord",
+            "offset": 0,
+            "slot": "15",
+            "type": "t_mapping(t_bytes32,t_mapping(t_bytes32,t_struct(GuestAccess)5346_storage))",
+            "contract": "MemberRoleManager",
+            "src": "smartContracts\\MemberRoleManager.sol:1392"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "16",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "MemberRoleManager",
+            "src": "smartContracts\\MemberRoleManager.sol:1534"
+          }
+        ],
+        "types": {
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)130_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_address)dyn_storage": {
+            "label": "address[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_bytes32)dyn_storage": {
+            "label": "bytes32[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_contract(HealthRecordCoreInterface)1554": {
+            "label": "contract HealthRecordCoreInterface",
+            "numberOfBytes": "20"
+          },
+          "t_enum(MemberStatus)1716": {
+            "label": "enum MemberRoleManager.MemberStatus",
+            "members": [
+              "NotRegistered",
+              "Inactive",
+              "Active",
+              "Verified",
+              "VerifiedProvider",
+              "Guest"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_enum(TrusteeLevel)4240": {
+            "label": "enum MemberRoleManager.TrusteeLevel",
+            "members": [
+              "Observer",
+              "Custodian",
+              "Controller"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_enum(TrusteeStatus)4245": {
+            "label": "enum MemberRoleManager.TrusteeStatus",
+            "members": [
+              "None",
+              "Pending",
+              "Active",
+              "Revoked"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_address,t_struct(UserInfo)1751_storage)": {
+            "label": "mapping(address => struct MemberRoleManager.UserInfo)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_array(t_address)dyn_storage)": {
+            "label": "mapping(bytes32 => address[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_array(t_bytes32)dyn_storage)": {
+            "label": "mapping(bytes32 => bytes32[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_bytes32)": {
+            "label": "mapping(bytes32 => bytes32)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_enum(MemberStatus)1716)": {
+            "label": "mapping(bytes32 => enum MemberRoleManager.MemberStatus)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_mapping(t_bytes32,t_struct(GuestAccess)5346_storage))": {
+            "label": "mapping(bytes32 => mapping(bytes32 => struct MemberRoleManager.GuestAccess))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_mapping(t_bytes32,t_struct(TrusteeRelationship)4252_storage))": {
+            "label": "mapping(bytes32 => mapping(bytes32 => struct MemberRoleManager.TrusteeRelationship))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(GuestAccess)5346_storage)": {
+            "label": "mapping(bytes32 => struct MemberRoleManager.GuestAccess)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RecordRole)2418_storage)": {
+            "label": "mapping(bytes32 => struct MemberRoleManager.RecordRole)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(TrusteeRelationship)4252_storage)": {
+            "label": "mapping(bytes32 => struct MemberRoleManager.TrusteeRelationship)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(GuestAccess)5346_storage": {
+            "label": "struct MemberRoleManager.GuestAccess",
+            "members": [
+              {
+                "label": "grantedAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "expiresAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "grantedByIdHash",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "guestEmailHash",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_struct(RecordRole)2418_storage": {
+            "label": "struct MemberRoleManager.RecordRole",
+            "members": [
+              {
+                "label": "role",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "isActive",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(TrusteeRelationship)4252_storage": {
+            "label": "struct MemberRoleManager.TrusteeRelationship",
+            "members": [
+              {
+                "label": "status",
+                "type": "t_enum(TrusteeStatus)4245",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "level",
+                "type": "t_enum(TrusteeLevel)4240",
+                "offset": 1,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(UserInfo)1751_storage": {
+            "label": "struct MemberRoleManager.UserInfo",
+            "members": [
+              {
+                "label": "userIdHash",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "isWalletActive",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin\\contracts\\proxy\\utils\\Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin\\contracts\\proxy\\utils\\Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      },
+      "allAddresses": [
+        "0x97F9eD2af3f9a30Eac958D0994a0F131Eda11A57",
+        "0xF3E0c2229782c270fb829Bc7fE4eeF17aCF51dbB"
+      ]
     }
   }
 }

@@ -332,6 +332,8 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
         targetUserProfile: trusteeProfile,
         trustLevel,
       });
+      // Seed the selector to the current level (disabled) so the user must pick a different one
+      setSelectedTrustLevel(trustLevel);
 
       const ready = await runPreparation(currentUserId, trusteeId, false);
       if (ready) setPhase('confirming');
@@ -397,7 +399,7 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
   );
 
   const confirmEditLevel = useCallback(async () => {
-    if (!pendingOperation || pendingOperation.type !== 'editLevel') return;
+    if (!pendingOperation || (pendingOperation.type !== 'editLevel' && pendingOperation.type !== 'revoke')) return;
 
     // Capture before dialog closes — selectedTrustLevel is React state, grab it now
     const { targetUserId } = pendingOperation;
@@ -447,6 +449,11 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
         trustLevel,
       });
 
+      // Seed selector to one level below current so step-down is pre-selected
+      const LEVEL_ORDER: TrustLevel[] = ['observer', 'custodian', 'controller'];
+      const currentIdx = LEVEL_ORDER.indexOf(trustLevel);
+      setSelectedTrustLevel(currentIdx > 0 ? LEVEL_ORDER[currentIdx - 1]! : 'observer');
+
       const ready = await runPreparation(currentUserId, trustorId, false);
       if (ready) setPhase('confirming');
     },
@@ -485,6 +492,35 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
       });
   }, [pendingOperation, addActivity, updateActivity, onSuccess]);
 
+  const confirmStepDown = useCallback(async () => {
+    if (!pendingOperation || pendingOperation.type !== 'resign') return;
+
+    const { targetUserId } = pendingOperation;
+    const levelToSet = selectedTrustLevel;
+    const trustorName = pendingOperation.targetUserProfile?.displayName || 'user';
+
+    const activityId = addActivity({
+      label: `Stepping down to ${levelToSet} for ${trustorName}`,
+      link: trusteeLink,
+    });
+
+    const txPromise = TrusteeRelationshipService.stepDownTrusteeLevel(targetUserId, levelToSet);
+
+    setSubmittedLabel(`Stepping down to ${levelToSet} for ${trustorName}`);
+    setPhase('submitted');
+
+    txPromise
+      .then(() => {
+        updateActivity(activityId, { status: 'confirmed' });
+        toast.success('Trust level updated');
+        onSuccess?.();
+      })
+      .catch(err => {
+        const message = err instanceof Error ? err.message : 'Failed to step down';
+        updateActivity(activityId, { status: 'failed', errorMessage: message });
+      });
+  }, [pendingOperation, selectedTrustLevel, addActivity, updateActivity, onSuccess]);
+
   // ==========================================================================
   // RETURN
   // ==========================================================================
@@ -507,6 +543,7 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
       onConfirmRevoke: confirmRevoke,
       onConfirmEditLevel: confirmEditLevel,
       onConfirmResign: confirmResign,
+      onConfirmStepDown: confirmStepDown,
       submittedLabel,
     },
 
