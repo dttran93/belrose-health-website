@@ -1,7 +1,7 @@
 export declare const NETWORK: {
     readonly chainId: 84532;
     readonly name: "base-sepolia";
-    readonly rpcUrlFallback: "https://sepolia.base.org";
+    readonly rpcUrlFallback: "https://base-sepolia-rpc.publicnode.com";
     readonly explorerUrl: "https://sepolia.basescan.org/";
     readonly chainViem: {
         blockExplorers: {
@@ -340,7 +340,7 @@ export declare const PAYMASTER: {
 export declare function buildBundlerURL(pimlicoApiKey: string): string;
 export declare const MEMBER_ROLE_MANAGER: {
     readonly proxy: "0xdF9583C25E234A34a1E47d9830722123CA228a1a";
-    readonly implementation: "0x97f9ed2af3f9a30eac958d0994a0f131eda11a57";
+    readonly implementation: "0xf3e0c2229782c270fb829bc7fe4eef17acf51dbb";
     readonly deploymentBlock: 41800192;
 };
 export declare const HEALTH_RECORD_CORE: {

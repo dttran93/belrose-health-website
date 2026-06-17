@@ -1,7 +1,4 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_NOTIFICATION_PREFS = exports.NOTIFICATION_MAPPING = exports.NOTIFICATION_CATEGORIES = void 0;
-exports.NOTIFICATION_CATEGORIES = {
+export const NOTIFICATION_CATEGORIES = {
     recordEditing: {
         label: 'Record Editing',
         description: 'Get notifications when your records are edited.',
@@ -68,8 +65,8 @@ exports.NOTIFICATION_CATEGORIES = {
         notificationTypes: ['GENERIC_NOTIFICATION'],
     },
 };
-exports.NOTIFICATION_MAPPING = Object.fromEntries(Object.entries(exports.NOTIFICATION_CATEGORIES).flatMap(([category, { notificationTypes }]) => notificationTypes.map(type => [type, category])));
+export const NOTIFICATION_MAPPING = Object.fromEntries(Object.entries(NOTIFICATION_CATEGORIES).flatMap(([category, { notificationTypes }]) => notificationTypes.map(type => [type, category])));
 // All notifications are active by default. Object is only updated when the user changes the preference
-exports.DEFAULT_NOTIFICATION_PREFS = Object.fromEntries(Object.values(exports.NOTIFICATION_CATEGORIES)
+export const DEFAULT_NOTIFICATION_PREFS = Object.fromEntries(Object.values(NOTIFICATION_CATEGORIES)
     .flatMap(cat => cat.notificationTypes)
     .map(type => [type, { inApp: true, email: true }]));

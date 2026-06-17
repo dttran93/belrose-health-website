@@ -11,6 +11,8 @@ import * as admin from 'firebase-admin';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { ethers } from 'ethers';
 import { MEMBER_ROLE_MANAGER, NETWORK } from '../_shared/';
+import { MemberRoleManager__factory } from '../_shared/typechain';
+import type { MemberRoleManager } from '../_shared/typechain';
 import { encryptPrivateKey, generateWallet } from '../services/backendWalletService';
 import { computeSmartAccountAddress } from './wallet';
 
@@ -39,11 +41,6 @@ interface CreateDependentAccountResult {
 
 const MEMBER_ROLE_MANAGER_ADDRESS = MEMBER_ROLE_MANAGER.proxy;
 const CHAIN_ID = NETWORK.chainId;
-
-const MEMBER_ROLE_MANAGER_ABI = [
-  'function addMemberBatch(address[] calldata walletAddresses, bytes32 userIdHash) external',
-  'function bootstrapDependentTrustee(bytes32 trustorIdHash, bytes32 trusteeIdHash) external',
-];
 
 function getAdminWallet(): ethers.Wallet {
   const privateKey = process.env.ADMIN_WALLET_PRIVATE_KEY;
@@ -152,9 +149,10 @@ export const createDependentAccount = onCall(
 
       console.log('⛓️ Registering both wallets on-chain...');
       const userIdHash = ethers.id(dependentUid);
-      const contract = new ethers.Contract(MEMBER_ROLE_MANAGER_ADDRESS, MEMBER_ROLE_MANAGER_ABI, getAdminWallet());
+      const contract: MemberRoleManager = MemberRoleManager__factory.connect(MEMBER_ROLE_MANAGER_ADDRESS, getAdminWallet());
       const tx = await contract.addMemberBatch([wallet.address, smartAccountAddress], userIdHash);
       const receipt = await tx.wait();
+      if (!receipt) throw new Error('Transaction was dropped or replaced');
       const blockchainRef = {
         txHash: tx.hash,
         chainId: CHAIN_ID,
@@ -171,6 +169,7 @@ export const createDependentAccount = onCall(
       const guardianIdHash = ethers.id(guardianUid);
       const trusteeTx = await contract.bootstrapDependentTrustee(userIdHash, guardianIdHash);
       const trusteeReceipt = await trusteeTx.wait();
+      if (!trusteeReceipt) throw new Error('Trustee transaction was dropped or replaced');
       const trusteeBlockchainRef = {
         txHash: trusteeTx.hash,
         chainId: CHAIN_ID,

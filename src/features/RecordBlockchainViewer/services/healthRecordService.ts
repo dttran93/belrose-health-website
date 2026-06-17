@@ -17,15 +17,14 @@ import {
   DisputeCulpability,
   SubjectLink,
   RecordVersion,
-  HealthRecordCoreContract,
 } from '../lib/types';
-import { HEALTH_RECORD_CORE_ABI } from '../lib/constants';
 import {
   getProfilesByUserIdHashes,
   transformToUserProfile,
 } from '@/features/MemberBlockchainViewer/services/userProfileService';
 import { VerificationLevelOptions } from '@/features/Credibility/hooks/useCredibilityFlow';
-import { buildRpcUrl, DisputeSeverityOptions, HEALTH_RECORD_CORE } from '@belrose/shared';
+import { buildRpcUrl, DisputeSeverityOptions, HEALTH_RECORD_CORE, HealthRecordCore__factory } from '@belrose/shared';
+import type { HealthRecordCore } from '@belrose/shared';
 import { requireEnv } from '@/utils/utils';
 
 // ===============================================================
@@ -38,7 +37,7 @@ const HEALTH_RECORD_CORE_ADDRESS = HEALTH_RECORD_CORE.proxy;
 const DEPLOYMENT_BLOCK = HEALTH_RECORD_CORE.deploymentBlock;
 
 let provider: ethers.JsonRpcProvider | null = null;
-let contract: (HealthRecordCoreContract & ethers.Contract) | null = null;
+let contract: HealthRecordCore | null = null;
 
 /**
  * Get or create the provider instance
@@ -53,13 +52,13 @@ function getProvider(): ethers.JsonRpcProvider {
 /**
  * Get or create the contract instance
  */
-function getContract(): HealthRecordCoreContract & ethers.Contract {
+function getContract(): HealthRecordCore {
   if (!contract) {
     contract = new ethers.Contract(
       HEALTH_RECORD_CORE_ADDRESS,
-      HEALTH_RECORD_CORE_ABI,
+      HealthRecordCore__factory.abi,
       getProvider()
-    ) as HealthRecordCoreContract & ethers.Contract;
+    ) as unknown as HealthRecordCore;
   }
   return contract;
 }
@@ -68,9 +67,12 @@ function getContract(): HealthRecordCoreContract & ethers.Contract {
 // HELPER: Query events in chunks (to avoid RPC limits)
 // ===============================================================
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function queryFilterInChunks(
-  contract: ethers.Contract,
-  filter: ethers.DeferredTopicFilter,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  contract: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  filter: any,
   fromBlock: number,
   toBlock: number | string,
   chunkSize: number = 10000,

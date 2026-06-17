@@ -7,35 +7,11 @@ const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const ethers_1 = require("ethers");
 const _shared_1 = require("../_shared/");
+const typechain_1 = require("../_shared/typechain");
 const backendWalletService_1 = require("../services/backendWalletService");
 const wallet_1 = require("./wallet");
 const MEMBER_ROLE_MANAGER_ADDRESS = _shared_1.MEMBER_ROLE_MANAGER.proxy;
 const CHAIN_ID = _shared_1.NETWORK.chainId;
-const MEMBER_ROLE_MANAGER_ABI = [
-    // Admin Functions
-    'function addMember(address wallet, bytes32 userIdHash) external',
-    'function addMemberBatch(address[] calldata walletAddresses, bytes32 userIdHash) external',
-    'function setUserStatus(bytes32 userIdHash, uint8 newStatus) external',
-    'function deactivateWallet(address wallet) external',
-    'function reactivateWallet(address wallet) external',
-    'function initializeRecordRole(bytes32 recordIdHash, address targetWallet, string role) external',
-    // Trustee Functions
-    'function proposeTrustee(bytes32 trusteeIdHash, uint8 level) external',
-    'function acceptTrustee(bytes32 trustorIdHash) external',
-    'function revokeTrustee(bytes32 trustorIdHash, bytes32 trusteeIdHash) external',
-    'function updateTrusteeLevel(bytes32 trusteeIdHash, uint8 newLevel) external',
-    // View Functions
-    'function getRecordOwners(bytes32 recordIdHash) external view returns (bytes32[])',
-    'function getRecordAdmins(bytes32 recordIdHash) external view returns (bytes32[])',
-    'function getRecordViewers(bytes32 recordIdHash) external view returns (bytes32[])',
-    'function getRecordRoleStats(bytes32 recordIdHash) external view returns (uint256 ownerCount, uint256 adminCount, uint256 viewerCount)',
-    'function getUserForWallet(address wallet) external view returns (bytes32)',
-    'function wallets(address wallet) external view returns (bytes32 userIdHash, bool isWalletActive)',
-    'function isControllerOf(bytes32 trustorIdHash, bytes32 trusteeIdHash) external view returns (bool)',
-    'function getTrusteeRelationship(bytes32 trustorIdHash, bytes32 trusteeIdHash) external view returns (uint8 status, uint8 level)',
-    'function isActiveMember(address wallet) external view returns (bool)',
-    'function getUserStatus(bytes32 userIdHash) external view returns (uint8)',
-];
 // ============================================================================
 // HELPERS
 // ============================================================================
@@ -50,11 +26,14 @@ function getAdminWallet() {
     const provider = new ethers_1.ethers.JsonRpcProvider(rpcUrl);
     return new ethers_1.ethers.Wallet(privateKey, provider);
 }
-/**
- * Get contract instance with admin signer
- */
 function getAdminContract() {
-    return new ethers_1.ethers.Contract(MEMBER_ROLE_MANAGER_ADDRESS, MEMBER_ROLE_MANAGER_ABI, getAdminWallet());
+    return typechain_1.MemberRoleManager__factory.connect(MEMBER_ROLE_MANAGER_ADDRESS, getAdminWallet());
+}
+async function awaitTx(tx) {
+    const receipt = await awaitTx(tx);
+    if (!receipt)
+        throw new https_1.HttpsError('internal', 'Transaction was dropped or replaced');
+    return receipt;
 }
 function buildMemberRegistryRef(txHash, blockNumber) {
     return {
@@ -95,7 +74,7 @@ exports.registerMemberOnChainComplete = (0, https_1.onCall)({ secrets: ['ADMIN_W
     const userIdHash = ethers_1.ethers.id(userId);
     const contract = getAdminContract();
     const tx = await contract.addMemberBatch([wallet.address, smartAccountAddress], userIdHash);
-    const receipt = await tx.wait();
+    const receipt = await awaitTx(tx);
     const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
     console.log('✅ Both wallets registered on-chain:', tx.hash);
     // Encrypt wallet data
@@ -183,7 +162,7 @@ exports.registerMemberOnChain = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_PR
         const contract = getAdminContract();
         // Smart Contract Call
         const tx = await contract.addMember(walletAddress, userIdHash);
-        const receipt = await tx.wait();
+        const receipt = await awaitTx(tx);
         const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
         //4. Update Firestore
         await db
@@ -227,7 +206,7 @@ exports.updateMemberStatus = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_PRIVA
         const userIdHash = ethers_1.ethers.id(userId);
         const contract = getAdminContract();
         const tx = await contract.setUserStatus(userIdHash, status);
-        const receipt = await tx.wait();
+        const receipt = await awaitTx(tx);
         const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
         // Sync the status change to Firestore
         const statusMap = {
@@ -283,7 +262,7 @@ exports.deactivateWalletOnChain = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_
         // Call smart contract
         const contract = getAdminContract();
         const tx = await contract.deactivateWallet(walletAddress);
-        const receipt = await tx.wait();
+        const receipt = await awaitTx(tx);
         const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
         // Update Firestore - mark wallet as inactive
         const updatedWallets = linkedWallets.map((w) => w.address.toLowerCase() === walletAddress.toLowerCase()
@@ -337,7 +316,7 @@ exports.reactivateWalletOnChain = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_
         // Call smart contract
         const contract = getAdminContract();
         const tx = await contract.reactivateWallet(walletAddress);
-        const receipt = await tx.wait();
+        const receipt = await awaitTx(tx);
         const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
         // Update Firestore - mark wallet as active
         const updatedWallets = linkedWallets.map((w) => w.address.toLowerCase() === walletAddress.toLowerCase()
@@ -412,7 +391,7 @@ exports.initializeRoleOnChain = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_PR
         }
         // 4. Execution
         const tx = await contract.initializeRecordRole(recordIdHash, walletAddress, role);
-        const receipt = await tx.wait();
+        const receipt = await awaitTx(tx);
         const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
         await db
             .collection('records')
@@ -476,7 +455,7 @@ exports.initializeRoleOnChainForRequester = (0, https_1.onCall)({ secrets: ['ADM
             throw new https_1.HttpsError('already-exists', 'Record already initialized on chain');
         }
         const tx = await contract.initializeRecordRole(recordIdHash, activeWallet.address, role);
-        const receipt = await tx.wait();
+        const receipt = await awaitTx(tx);
         const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
         await db
             .collection('records')

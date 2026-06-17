@@ -1,9 +1,7 @@
 // src/features/MemberManagement/services/memberRoleService.ts
 
 import { ethers } from 'ethers';
-import { MEMBER_ROLE_MANAGER_ABI } from '../lib/constants';
 import type {
-  MemberRoleManagerContract,
   UserData,
   WalletInfo,
   RoleAssignment,
@@ -13,7 +11,8 @@ import type {
 } from '../lib/types';
 import { TrusteeStatus, TrusteeLevel } from '../lib/types';
 import { getProfilesByUserIdHashes, transformToUserProfile } from './userProfileService';
-import { buildRpcUrl, MEMBER_ROLE_MANAGER } from '@belrose/shared';
+import { buildRpcUrl, MEMBER_ROLE_MANAGER, MemberRoleManager__factory } from '@belrose/shared';
+import type { MemberRoleManager } from '@belrose/shared';
 import { requireEnv } from '@/utils/utils';
 
 /**
@@ -30,7 +29,7 @@ const DEPLOYMENT_BLOCK = MEMBER_ROLE_MANAGER.deploymentBlock;
 
 // Singleton provider and contract instances
 let provider: ethers.JsonRpcProvider | null = null;
-let contract: ethers.Contract | null = null;
+let contract: MemberRoleManager | null = null;
 
 /**
  * Get or create the provider instance
@@ -45,15 +44,15 @@ function getProvider(): ethers.JsonRpcProvider {
 /**
  * Get or create the contract instance
  */
-function getContract(): MemberRoleManagerContract & ethers.Contract {
+function getContract(): MemberRoleManager {
   if (!contract) {
     contract = new ethers.Contract(
       MEMBER_ROLE_MANAGER_ADDRESS,
-      MEMBER_ROLE_MANAGER_ABI,
+      MemberRoleManager__factory.abi,
       getProvider()
-    );
+    ) as unknown as MemberRoleManager;
   }
-  return contract as MemberRoleManagerContract & ethers.Contract;
+  return contract;
 }
 
 /**
@@ -209,7 +208,7 @@ export async function getUserRoles(
 
   // Query RoleGranted events for this user to get tx hashes
   try {
-    const filter = contract.filters.RoleGranted(null, userIdHash);
+    const filter = contract.filters.RoleGranted(undefined, userIdHash);
     const events = await queryFilterInChunks(contract, filter, DEPLOYMENT_BLOCK, 'latest');
 
     // Create a map of recordId hash -> txHash
@@ -339,9 +338,12 @@ export async function getAllRoleAssignments(users: UserData[]): Promise<RoleAssi
 /**
  * Helper to query events in chunks to bypass RPC limits (e.g., 10,000 blocks)
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function queryFilterInChunks(
-  contract: ethers.Contract,
-  filter: ethers.DeferredTopicFilter,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  contract: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  filter: any,
   fromBlock: number,
   toBlock: number | string,
   chunkSize: number = 10000

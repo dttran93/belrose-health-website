@@ -12,24 +12,12 @@ import { WalletService } from './walletService';
 import { getFirestore, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { MemberRegistryBlockchain } from '@/features/Auth/services/memberRegistryBlockchain';
-import { MEMBER_ROLE_MANAGER, NETWORK } from '@belrose/shared';
+import { MEMBER_ROLE_MANAGER, NETWORK, MemberRoleManager__factory } from '@belrose/shared';
 
 const CHAIN = NETWORK.chainViem;
 
-// ABI for checking if wallet is already registered
 const MEMBER_ROLE_MANAGER_ADDRESS = MEMBER_ROLE_MANAGER.proxy;
-const MEMBER_ROLE_MANAGER_ABI = [
-  {
-    name: 'wallets',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'wallet', type: 'address' }],
-    outputs: [
-      { name: 'userIdHash', type: 'bytes32' },
-      { name: 'isWalletActive', type: 'bool' },
-    ],
-  },
-] as const;
+const MEMBER_ROLE_MANAGER_ABI = MemberRoleManager__factory.abi;
 
 // ==================== TYPES ====================
 
