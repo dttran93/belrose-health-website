@@ -16,7 +16,7 @@ import { baseSepolia } from 'viem/chains';
 export const NETWORK = {
   chainId: 84532,
   name: 'base-sepolia',
-  rpcUrlFallback: 'https://sepolia.base.org',
+  rpcUrlFallback: 'https://base-sepolia-rpc.publicnode.com',
   explorerUrl: 'https://sepolia.basescan.org/',
   chainViem: baseSepolia,
 } as const;
@@ -56,7 +56,7 @@ export function buildBundlerURL(pimlicoApiKey: string) {
 
 export const MEMBER_ROLE_MANAGER = {
   proxy: '0xdF9583C25E234A34a1E47d9830722123CA228a1a',
-  implementation: '0x97f9ed2af3f9a30eac958d0994a0f131eda11a57',
+  implementation: '0xf3e0c2229782c270fb829bc7fe4eef17acf51dbb',
   deploymentBlock: 41800192,
 } as const;
 

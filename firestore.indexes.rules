@@ -180,6 +180,14 @@
       ]
     },
     {
+      "collectionGroup": "guestInvites",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "invitedBy", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "providers_england",
       "queryScope": "COLLECTION",
       "fields": [

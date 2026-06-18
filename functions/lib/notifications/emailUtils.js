@@ -69,14 +69,20 @@ async function resolveEmailRecipients(userId) {
     if (!data.isDependent || !data.dependentCreatedBy) {
         if (!data.email)
             return [];
-        return [{
+        return [
+            {
                 email: data.email,
                 prefs: (data.notificationPrefs ?? {}),
                 isDependent: false,
-            }];
+            },
+        ];
     }
     // Dependent account
-    const guardianDoc = await admin.firestore().collection('users').doc(data.dependentCreatedBy).get();
+    const guardianDoc = await admin
+        .firestore()
+        .collection('users')
+        .doc(data.dependentCreatedBy)
+        .get();
     if (!guardianDoc.exists)
         return [];
     const guardianData = guardianDoc.data();
@@ -93,7 +99,7 @@ async function resolveEmailRecipients(userId) {
             dependentDisplayName,
         });
     }
-    // Real-email dependent also gets their own copy
+    // Real-email dependent also gets their own copy. Practically this should never happen because isDependent is removed once a real email is provided, but we support it for completeness.
     if (!isPlaceholder && dependentEmail) {
         recipients.push({
             email: dependentEmail,
@@ -126,13 +132,17 @@ async function sendEmailIfEnabled(userId, type, payload, resend) {
                 continue;
             }
         }
-        // Prepend a context note for guardian emails about a dependent's account
+        // For guardian-bound emails: suffix the subject, inject a pill into the header, clean up plain text
         const finalPayload = recipient.isDependent && recipient.dependentDisplayName
-            ? {
-                ...payload,
-                html: `<p style="font-size:12px;color:#6b7280;background:#f3f4f6;padding:8px 12px;border-radius:6px;margin-bottom:16px;">This notification is about <strong>${recipient.dependentDisplayName}</strong>'s account, which you manage.</p>${payload.html}`,
-                text: `[Re: ${recipient.dependentDisplayName}'s account]\n\n${payload.text}`,
-            }
+            ? (() => {
+                const name = recipient.dependentDisplayName;
+                const pill = `<span style="display:inline-block;background:#8b5cf620;color:#c4b5fd;font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;padding:4px 10px;border-radius:100px;border:1px solid #8b5cf640;margin-left:8px;">👤 ${name}</span>`;
+                return {
+                    subject: `${payload.subject} — ${name}'s account`,
+                    html: payload.html.replace('<h1', `${pill}<h1`),
+                    text: `[${name}'s account]\n\n${payload.text}`,
+                };
+            })()
             : payload;
         await resend.emails.send({
             to: recipient.email,

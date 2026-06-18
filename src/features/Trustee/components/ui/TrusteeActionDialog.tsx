@@ -52,6 +52,7 @@ interface TrusteeActionDialogProps {
   onConfirmRevoke: () => void;
   onConfirmEditLevel: () => void;
   onConfirmResign: () => void;
+  onConfirmStepDown: () => void;
   submittedLabel: string;
 }
 
@@ -126,7 +127,7 @@ const PreparingContent: React.FC = () => (
       Preparing Distributed Network
     </AlertDialog.Title>
     <AlertDialog.Description className="text-sm text-gray-600 text-center">
-      Verifying blockchain accounts...
+      Verifying distributed network accounts...
       <br />
       This may take a moment.
     </AlertDialog.Description>
@@ -174,10 +175,11 @@ const ErrorContent: React.FC<{ error?: string | null; onClose: () => void }> = (
 const TrustLevelSelector: React.FC<{
   selected: TrustLevel;
   onChange: (level: TrustLevel) => void;
-  disabledLevel?: TrustLevel; // for editLevel: disable current level
-}> = ({ selected, onChange, disabledLevel }) => (
+  disabledLevel?: TrustLevel;
+  levels?: TrustLevel[]; // defaults to all three; pass subset to restrict choices
+}> = ({ selected, onChange, disabledLevel, levels = TRUST_LEVELS }) => (
   <div className="space-y-2">
-    {TRUST_LEVELS.map(level => {
+    {levels.map(level => {
       const config = TRUST_LEVEL_CONFIG[level];
       const Icon = config.icon;
       const isSelected = selected === level;
@@ -366,7 +368,7 @@ const ConfirmDeclineContent: React.FC<{
 
     <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg mb-4">
       <p className="text-xs text-gray-600">
-        No blockchain transaction required. The user will be notified.
+        No distributed network transaction required. The user will be notified.
       </p>
     </div>
 
@@ -388,49 +390,87 @@ const ConfirmDeclineContent: React.FC<{
 const ConfirmRevokeContent: React.FC<{
   targetUser: BelroseUserProfile | null;
   trustLevel?: TrustLevel;
-  onConfirm: () => void;
+  selectedTrustLevel: TrustLevel;
+  setSelectedTrustLevel: (level: TrustLevel) => void;
+  onConfirmEditLevel: () => void;
+  onConfirmRevoke: () => void;
   onClose: () => void;
-}> = ({ targetUser, trustLevel, onConfirm, onClose }) => (
+}> = ({
+  targetUser,
+  trustLevel,
+  selectedTrustLevel,
+  setSelectedTrustLevel,
+  onConfirmEditLevel,
+  onConfirmRevoke,
+  onClose,
+}) => (
   <div>
     <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
-      <UserMinus className="w-5 h-5 text-red-600" />
-      Revoke Trustee
+      <Pencil className="w-5 h-5 text-primary" />
+      Update or Revoke Trustee
     </AlertDialog.Title>
 
     <AlertDialog.Description className="text-sm text-gray-600 mb-4">
-      You are revoking trustee access for <strong>{targetUser?.displayName || 'this user'}</strong>.
+      Adjust <strong>{targetUser?.displayName || 'this user'}</strong>'s trust level, or remove
+      their access entirely.
     </AlertDialog.Description>
 
     {targetUser && (
       <div className="mb-4">
-        <UserCard user={targetUser} variant="default" color="red" menuType="none" />
+        <UserCard user={targetUser} variant="default" color="primary" menuType="none" />
       </div>
     )}
 
-    {trustLevel && (
-      <div className="mb-4 flex items-center gap-2 text-sm text-gray-600">
-        <span>Current level:</span>
-        <TrustLevelBadge level={trustLevel} />
-      </div>
-    )}
+    <p className="text-sm font-medium text-gray-700 mb-2">Select new trust level</p>
+    <TrustLevelSelector
+      selected={selectedTrustLevel}
+      onChange={setSelectedTrustLevel}
+      disabledLevel={trustLevel}
+    />
 
-    <div className="p-3 bg-red-50 border border-red-200 rounded-lg mb-4">
-      <p className="text-xs text-red-800 leading-relaxed">
-        <strong>This will:</strong> revoke their blockchain trustee role, remove their access to
-        your records, and remove their encryption keys.
+    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+      <p className="text-xs text-blue-800">
+        The change will be recorded on the distributed network and their record access will be
+        updated.
       </p>
     </div>
 
-    <div className="flex gap-3">
+    <div className="flex gap-3 mb-4">
       <AlertDialog.Cancel asChild>
         <Button variant="outline" className="flex-1" onClick={onClose}>
           Cancel
         </Button>
       </AlertDialog.Cancel>
-      <Button onClick={onConfirm} className="flex-1 bg-red-600 hover:bg-red-700">
-        Revoke Trustee
+      <Button
+        onClick={onConfirmEditLevel}
+        className="flex-1"
+        disabled={selectedTrustLevel === trustLevel}
+      >
+        Change Level
       </Button>
     </div>
+
+    <div className="flex items-center gap-3 mb-4">
+      <div className="flex-1 border-t border-gray-200" />
+      <span className="text-xs text-gray-400">or</span>
+      <div className="flex-1 border-t border-gray-200" />
+    </div>
+
+    <div className="p-3 bg-red-50 border border-red-200 rounded-lg mb-3">
+      <p className="text-xs text-red-800 leading-relaxed">
+        <strong>Fully revoking will:</strong> remove their trustee role, revoke access to records
+        you added them to, and delete their encryption keys.
+      </p>
+    </div>
+
+    <Button
+      onClick={onConfirmRevoke}
+      variant="outline"
+      className="w-full border-red-300 text-red-600 hover:bg-red-50"
+    >
+      <UserMinus className="w-4 h-4 mr-2" />
+      Fully Revoke Access
+    </Button>
   </div>
 );
 
@@ -496,54 +536,114 @@ const ConfirmEditLevelContent: React.FC<{
 
 // ── Resign ────────────────────────────────────────────────────────────────────
 
+const LEVEL_ORDER: TrustLevel[] = ['observer', 'custodian', 'controller'];
+
 const ConfirmResignContent: React.FC<{
   targetUser: BelroseUserProfile | null;
   trustLevel?: TrustLevel;
-  onConfirm: () => void;
+  selectedTrustLevel: TrustLevel;
+  setSelectedTrustLevel: (level: TrustLevel) => void;
+  onConfirmStepDown: () => void;
+  onConfirmResign: () => void;
   onClose: () => void;
-}> = ({ targetUser, trustLevel, onConfirm, onClose }) => (
-  <div>
-    <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
-      <LogOut className="w-5 h-5 text-orange-500" />
-      Resign as Trustee
-    </AlertDialog.Title>
+}> = ({
+  targetUser,
+  trustLevel,
+  selectedTrustLevel,
+  setSelectedTrustLevel,
+  onConfirmStepDown,
+  onConfirmResign,
+  onClose,
+}) => {
+  const canStepDown = trustLevel !== undefined && trustLevel !== 'observer';
+  const levelsBelow = trustLevel
+    ? LEVEL_ORDER.filter(l => LEVEL_ORDER.indexOf(l) < LEVEL_ORDER.indexOf(trustLevel))
+    : [];
 
-    <AlertDialog.Description className="text-sm text-gray-600 mb-4">
-      You are resigning as trustee for <strong>{targetUser?.displayName || 'this user'}</strong>.
-    </AlertDialog.Description>
+  return (
+    <div>
+      <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
+        <LogOut className="w-5 h-5 text-orange-500" />
+        Step Down or Resign as Trustee
+      </AlertDialog.Title>
 
-    {targetUser && (
-      <div className="mb-4">
-        <UserCard user={targetUser} variant="default" color="yellow" menuType="none" />
+      <AlertDialog.Description className="text-sm text-gray-600 mb-4">
+        Reduce your responsibilities for{' '}
+        <strong>{targetUser?.displayName || 'this user'}</strong>, or resign entirely.
+      </AlertDialog.Description>
+
+      {targetUser && (
+        <div className="mb-4">
+          <UserCard user={targetUser} variant="default" color="yellow" menuType="none" />
+        </div>
+      )}
+
+      {canStepDown && (
+        <>
+          <p className="text-sm font-medium text-gray-700 mb-2">Step down to a lower level</p>
+          <TrustLevelSelector
+            selected={selectedTrustLevel}
+            onChange={setSelectedTrustLevel}
+            levels={levelsBelow}
+          />
+
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+            <p className="text-xs text-blue-800">
+              The change will be recorded on the distributed network. Your access will be updated to
+              match the new level.
+            </p>
+          </div>
+
+          <div className="flex gap-3 mb-4">
+            <AlertDialog.Cancel asChild>
+              <Button variant="outline" className="flex-1" onClick={onClose}>
+                Cancel
+              </Button>
+            </AlertDialog.Cancel>
+            <Button onClick={onConfirmStepDown} className="flex-1">
+              Step Down
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex-1 border-t border-gray-200" />
+            <span className="text-xs text-gray-400">or</span>
+            <div className="flex-1 border-t border-gray-200" />
+          </div>
+        </>
+      )}
+
+      <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg mb-3">
+        <p className="text-xs text-orange-800 leading-relaxed">
+          <strong>Fully resigning will:</strong> remove your trustee role entirely and revoke all
+          access to their records.
+        </p>
       </div>
-    )}
 
-    {trustLevel && (
-      <div className="mb-4 flex items-center gap-2 text-sm text-gray-600">
-        <span>Your current level:</span>
-        <TrustLevelBadge level={trustLevel} />
-      </div>
-    )}
-
-    <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg mb-4">
-      <p className="text-xs text-orange-800 leading-relaxed">
-        <strong>This will:</strong> remove your blockchain trustee role and revoke your access to
-        their records. The trustor will be notified.
-      </p>
-    </div>
-
-    <div className="flex gap-3">
-      <AlertDialog.Cancel asChild>
-        <Button variant="outline" className="flex-1" onClick={onClose}>
-          Cancel
+      {canStepDown ? (
+        <Button
+          onClick={onConfirmResign}
+          variant="outline"
+          className="w-full border-orange-300 text-orange-600 hover:bg-orange-50"
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Fully Resign
         </Button>
-      </AlertDialog.Cancel>
-      <Button onClick={onConfirm} className="flex-1 bg-orange-600 hover:bg-orange-700">
-        Resign
-      </Button>
+      ) : (
+        <div className="flex gap-3">
+          <AlertDialog.Cancel asChild>
+            <Button variant="outline" className="flex-1" onClick={onClose}>
+              Cancel
+            </Button>
+          </AlertDialog.Cancel>
+          <Button onClick={onConfirmResign} className="flex-1 bg-orange-600 hover:bg-orange-700">
+            Resign
+          </Button>
+        </div>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 // ============================================================================
 // MAIN DIALOG
@@ -565,6 +665,7 @@ export const TrusteeActionDialog: React.FC<TrusteeActionDialogProps> = ({
   onConfirmRevoke,
   onConfirmEditLevel,
   onConfirmResign,
+  onConfirmStepDown,
   submittedLabel,
 }) => {
   if (!isOpen) return null;
@@ -609,7 +710,10 @@ export const TrusteeActionDialog: React.FC<TrusteeActionDialogProps> = ({
             <ConfirmRevokeContent
               targetUser={targetUser}
               trustLevel={trustLevel}
-              onConfirm={onConfirmRevoke}
+              selectedTrustLevel={selectedTrustLevel}
+              setSelectedTrustLevel={setSelectedTrustLevel}
+              onConfirmEditLevel={onConfirmEditLevel}
+              onConfirmRevoke={onConfirmRevoke}
               onClose={onClose}
             />
           )}
@@ -627,7 +731,10 @@ export const TrusteeActionDialog: React.FC<TrusteeActionDialogProps> = ({
             <ConfirmResignContent
               targetUser={targetUser}
               trustLevel={trustLevel}
-              onConfirm={onConfirmResign}
+              selectedTrustLevel={selectedTrustLevel}
+              setSelectedTrustLevel={setSelectedTrustLevel}
+              onConfirmStepDown={onConfirmStepDown}
+              onConfirmResign={onConfirmResign}
               onClose={onClose}
             />
           )}

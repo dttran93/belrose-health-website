@@ -5,39 +5,13 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { ethers } from 'ethers';
 import { BlockchainRef, MEMBER_ROLE_MANAGER, NETWORK } from '../_shared/';
+import { MemberRoleManager__factory } from '../_shared/typechain';
+import type { MemberRoleManager } from '../_shared/typechain';
 import { encryptPrivateKey, generateWallet } from '../services/backendWalletService';
 import { computeSmartAccountAddress } from './wallet';
 
 const MEMBER_ROLE_MANAGER_ADDRESS = MEMBER_ROLE_MANAGER.proxy;
 const CHAIN_ID = NETWORK.chainId;
-
-const MEMBER_ROLE_MANAGER_ABI = [
-  // Admin Functions
-  'function addMember(address wallet, bytes32 userIdHash) external',
-  'function addMemberBatch(address[] calldata walletAddresses, bytes32 userIdHash) external',
-  'function setUserStatus(bytes32 userIdHash, uint8 newStatus) external',
-  'function deactivateWallet(address wallet) external',
-  'function reactivateWallet(address wallet) external',
-  'function initializeRecordRole(bytes32 recordIdHash, address targetWallet, string role) external',
-
-  // Trustee Functions
-  'function proposeTrustee(bytes32 trusteeIdHash, uint8 level) external',
-  'function acceptTrustee(bytes32 trustorIdHash) external',
-  'function revokeTrustee(bytes32 trustorIdHash, bytes32 trusteeIdHash) external',
-  'function updateTrusteeLevel(bytes32 trusteeIdHash, uint8 newLevel) external',
-
-  // View Functions
-  'function getRecordOwners(bytes32 recordIdHash) external view returns (bytes32[])',
-  'function getRecordAdmins(bytes32 recordIdHash) external view returns (bytes32[])',
-  'function getRecordViewers(bytes32 recordIdHash) external view returns (bytes32[])',
-  'function getRecordRoleStats(bytes32 recordIdHash) external view returns (uint256 ownerCount, uint256 adminCount, uint256 viewerCount)',
-  'function getUserForWallet(address wallet) external view returns (bytes32)',
-  'function wallets(address wallet) external view returns (bytes32 userIdHash, bool isWalletActive)',
-  'function isControllerOf(bytes32 trustorIdHash, bytes32 trusteeIdHash) external view returns (bool)',
-  'function getTrusteeRelationship(bytes32 trustorIdHash, bytes32 trusteeIdHash) external view returns (uint8 status, uint8 level)',
-  'function isActiveMember(address wallet) external view returns (bool)',
-  'function getUserStatus(bytes32 userIdHash) external view returns (uint8)',
-];
 
 // ============================================================================
 // HELPERS
@@ -54,15 +28,14 @@ function getAdminWallet(): ethers.Wallet {
   return new ethers.Wallet(privateKey, provider);
 }
 
-/**
- * Get contract instance with admin signer
- */
-function getAdminContract(): ethers.Contract {
-  return new ethers.Contract(
-    MEMBER_ROLE_MANAGER_ADDRESS,
-    MEMBER_ROLE_MANAGER_ABI,
-    getAdminWallet()
-  );
+function getAdminContract(): MemberRoleManager {
+  return MemberRoleManager__factory.connect(MEMBER_ROLE_MANAGER_ADDRESS, getAdminWallet());
+}
+
+async function awaitTx(tx: ethers.ContractTransactionResponse): Promise<ethers.ContractTransactionReceipt> {
+  const receipt = await awaitTx(tx);
+  if (!receipt) throw new HttpsError('internal', 'Transaction was dropped or replaced');
+  return receipt;
 }
 
 function buildMemberRegistryRef(txHash: string, blockNumber: number): BlockchainRef {
@@ -114,7 +87,7 @@ export const registerMemberOnChainComplete = onCall(
     const contract = getAdminContract();
 
     const tx = await contract.addMemberBatch([wallet.address, smartAccountAddress], userIdHash);
-    const receipt = await tx.wait();
+    const receipt = await awaitTx(tx);
     const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
     console.log('✅ Both wallets registered on-chain:', tx.hash);
 
@@ -220,7 +193,7 @@ export const registerMemberOnChain = onCall(
 
       // Smart Contract Call
       const tx = await contract.addMember(walletAddress, userIdHash);
-      const receipt = await tx.wait();
+      const receipt = await awaitTx(tx);
       const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
 
       //4. Update Firestore
@@ -274,7 +247,7 @@ export const updateMemberStatus = onCall(
       const userIdHash = ethers.id(userId);
       const contract = getAdminContract();
       const tx = await contract.setUserStatus(userIdHash, status);
-      const receipt = await tx.wait();
+      const receipt = await awaitTx(tx);
       const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
 
       // Sync the status change to Firestore
@@ -344,7 +317,7 @@ export const deactivateWalletOnChain = onCall(
       // Call smart contract
       const contract = getAdminContract();
       const tx = await contract.deactivateWallet(walletAddress);
-      const receipt = await tx.wait();
+      const receipt = await awaitTx(tx);
       const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
 
       // Update Firestore - mark wallet as inactive
@@ -414,7 +387,7 @@ export const reactivateWalletOnChain = onCall(
       // Call smart contract
       const contract = getAdminContract();
       const tx = await contract.reactivateWallet(walletAddress);
-      const receipt = await tx.wait();
+      const receipt = await awaitTx(tx);
       const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
 
       // Update Firestore - mark wallet as active
@@ -512,7 +485,7 @@ export const initializeRoleOnChain = onCall(
 
       // 4. Execution
       const tx = await contract.initializeRecordRole(recordIdHash, walletAddress, role);
-      const receipt = await tx.wait();
+      const receipt = await awaitTx(tx);
       const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
 
       await db
@@ -587,7 +560,7 @@ export const initializeRoleOnChainForRequester = onCall(
       }
 
       const tx = await contract.initializeRecordRole(recordIdHash, activeWallet.address, role);
-      const receipt = await tx.wait();
+      const receipt = await awaitTx(tx);
       const blockchainRef = buildMemberRegistryRef(tx.hash, receipt.blockNumber);
 
       await db

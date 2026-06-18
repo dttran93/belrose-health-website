@@ -335,8 +335,14 @@ export class TrusteeRelationshipService {
     if (!success) throw new Error('Blockchain update failed — see sync queue for details');
     console.log('✅ Blockchain: Trust level updated');
 
-    // Step 2: Update record permissions to reflect new trust level
-    await TrusteePermissionService.updateTrusteeAccess(trustorId, trusteeId, newTrustLevel);
+    // Step 2: Update record permissions to reflect new trust level.
+    // Fan-out errors are non-fatal — the blockchain trust-level write at step 1 has
+    // already committed, so the relationship doc must stay in sync regardless.
+    try {
+      await TrusteePermissionService.updateTrusteeAccess(trustorId, trusteeId, newTrustLevel);
+    } catch (err) {
+      console.error('⚠️ Permission fan-out failed during trust level edit (non-fatal):', err);
+    }
 
     // Step 3: Update Firestore
     await updateDoc(relationshipRef, {
@@ -346,6 +352,66 @@ export class TrusteeRelationshipService {
     });
 
     console.log(`✅ Trust level updated: ${trustorId} → ${trusteeId} (${newTrustLevel})`);
+  }
+
+  /**
+   * Trustee self-downgrades their own trust level.
+   * Only the trustee can call this, and only to a strictly lower level.
+   * Upgrades require trustor approval via editTrusteeRelationship.
+   *
+   * @param trustorId - The userId of the trustor
+   * @param newTrustLevel - The new (lower) trust level
+   */
+  static async stepDownTrusteeLevel(trustorId: string, newTrustLevel: TrustLevel): Promise<void> {
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+    if (!currentUser) throw new Error('User not authenticated');
+
+    const trusteeId = currentUser.uid;
+    const db = getFirestore();
+    const relationshipId = getTrusteeRelationshipId(trustorId, trusteeId);
+    const relationshipRef = doc(db, 'trusteeRelationships', relationshipId);
+    const existing = await getDoc(relationshipRef);
+
+    if (!existing.exists()) throw new Error('Trustee relationship not found');
+
+    const data = existing.data() as TrusteeRelationship;
+
+    if (data.status !== 'active') throw new Error('Can only step down from an active relationship');
+
+    const LEVEL_ORDER: TrustLevel[] = ['observer', 'custodian', 'controller'];
+    if (LEVEL_ORDER.indexOf(newTrustLevel) >= LEVEL_ORDER.indexOf(data.trustLevel)) {
+      throw new Error('Can only step down to a lower trust level');
+    }
+
+    // Step 1: Update on blockchain — trustee signs, trustorIdHash passed as arg
+    console.log('🔗 Downgrading trust level on blockchain...');
+    const { success, blockchainRef: editBlockchainRef } =
+      await TrusteeBlockchainService.downgradeTrusteeLevel(
+        trustorId,
+        trusteeId,
+        trustLevelMap[newTrustLevel]
+      );
+    if (!success) throw new Error('Blockchain update failed — see sync queue for details');
+    console.log('✅ Blockchain: Trust level downgraded');
+
+    // Step 2: Update record permissions to reflect new (lower) trust level.
+    // Fan-out errors are non-fatal — the blockchain is already updated, so the
+    // relationship doc must be kept in sync regardless of partial permission failures.
+    try {
+      await TrusteePermissionService.updateTrusteeAccess(trustorId, trusteeId, newTrustLevel);
+    } catch (err) {
+      console.error('⚠️ Permission fan-out failed during step-down (non-fatal):', err);
+    }
+
+    // Step 3: Update Firestore
+    await updateDoc(relationshipRef, {
+      trustLevel: newTrustLevel,
+      statusUpdateReason: 'trust_level_downgrade',
+      editBlockchainRef,
+    });
+
+    console.log(`✅ Trust level stepped down: ${trusteeId} → ${newTrustLevel} (trustor: ${trustorId})`);
   }
 
   // ============================================================================
@@ -593,5 +659,41 @@ export class TrusteeRelationshipService {
 
     if (!snap.exists()) return null;
     return snap.data() as TrusteeRelationship;
+  }
+
+  /**
+   * Check whether the current user is an active controller trustee of the given trustorId.
+   * Uses a direct document lookup (no composite index needed).
+   */
+  static async getControllerRelationshipWith(
+    trustorId: string
+  ): Promise<TrusteeRelationship | null> {
+    const currentUser = getAuth().currentUser;
+    if (!currentUser) return null;
+
+    const rel = await TrusteeRelationshipService.getRelationship(trustorId, currentUser.uid);
+    if (rel && rel.isActive && rel.trustLevel === 'controller') return rel;
+    return null;
+  }
+
+  /**
+   * Returns all active relationships where the current user is a controller trustee.
+   * Filters client-side after the trusteeId + isActive index query to avoid a new composite index.
+   */
+  static async getActiveControllerTrustors(): Promise<TrusteeRelationship[]> {
+    const currentUser = getAuth().currentUser;
+    if (!currentUser) return [];
+
+    const db = getFirestore();
+    const q = query(
+      collection(db, 'trusteeRelationships'),
+      where('trusteeId', '==', currentUser.uid),
+      where('isActive', '==', true)
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+      .map(d => d.data() as TrusteeRelationship)
+      .filter(r => r.trustLevel === 'controller');
   }
 }

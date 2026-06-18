@@ -72,7 +72,14 @@ export class TrusteePermissionService {
   private static async getRecordsForTrustor(
     trustorId: string,
     trusteeId?: string
-  ): Promise<{ recordId: string; trustorRole: Role | null; currentTrusteeRole?: Role | null }[]> {
+  ): Promise<
+    {
+      recordId: string;
+      trustorRole: Role | null;
+      currentTrusteeRole?: Role | null;
+      recordTrustees: string[];
+    }[]
+  > {
     const db = getFirestore();
     const q = query(collection(db, 'records'), where('subjects', 'array-contains', trustorId));
     const snapshot = await getDocs(q);
@@ -85,14 +92,16 @@ export class TrusteePermissionService {
       else if (data.administrators?.includes(trustorId)) trustorRole = 'administrator';
       else if (data.viewers?.includes(trustorId)) trustorRole = 'viewer';
 
-      if (!trusteeId) return { recordId: d.id, trustorRole };
+      const recordTrustees: string[] = data.trustees ?? [];
+
+      if (!trusteeId) return { recordId: d.id, trustorRole, recordTrustees };
 
       let currentTrusteeRole: Role | null = null;
       if (data.owners?.includes(trusteeId)) currentTrusteeRole = 'owner';
       else if (data.administrators?.includes(trusteeId)) currentTrusteeRole = 'administrator';
       else if (data.viewers?.includes(trusteeId)) currentTrusteeRole = 'viewer';
 
-      return { recordId: d.id, trustorRole, currentTrusteeRole };
+      return { recordId: d.id, trustorRole, currentTrusteeRole, recordTrustees };
     });
   }
 
@@ -502,14 +511,50 @@ export class TrusteePermissionService {
     });
 
     const db = getFirestore();
-    const records = await this.getRecordsForTrustor(trustorId);
 
-    if (records.length === 0) {
-      console.log('ℹ️ No records found for trustor — nothing to update');
+    // Only touch records where the trustee's access was granted via this relationship.
+    // Records where they have independent access (e.g. they're the uploader) are excluded —
+    // they were never added to trustees[] at invite time (hadPriorAccess guard).
+    const keysQuery = query(
+      collection(db, 'wrappedKeys'),
+      where('userId', '==', trusteeId),
+      where('grantedBy', '==', trustorId),
+      where('isActive', '==', true)
+    );
+    const keysSnapshot = await getDocs(keysQuery);
+    const trusteeDerivedRecordIds = new Set(
+      keysSnapshot.docs.map(d => d.data().recordId as string)
+    );
+
+    if (trusteeDerivedRecordIds.size === 0) {
+      console.log('ℹ️ No trustee-derived records found — nothing to update');
       return;
     }
 
-    const accessList: TrusteeRecordAccess[] = records
+    // Fetch only the specific records already identified from wrappedKeys rather than
+    // querying all trustor records — the trustee (who may be the caller) has individual
+    // read access to these records but cannot do a broad subjects-contains collection query.
+    const recordSnapshots = await Promise.all(
+      [...trusteeDerivedRecordIds].map(id => getDoc(doc(db, 'records', id)))
+    );
+
+    const accessList: TrusteeRecordAccess[] = recordSnapshots
+      .filter(snap => snap.exists())
+      .map(snap => {
+        const data = snap.data()!;
+        let trustorRole: Role | null = null;
+        if (data.owners?.includes(trustorId)) trustorRole = 'owner';
+        else if (data.administrators?.includes(trustorId)) trustorRole = 'administrator';
+        else if (data.viewers?.includes(trustorId)) trustorRole = 'viewer';
+        return {
+          recordId: snap.id,
+          trustorRole,
+          recordTrustees: (data.trustees ?? []) as string[],
+        };
+      })
+      // Only update records tagged in trustees[] — records where the trustee had prior
+      // independent access were promoted at invite time but NOT added to trustees[].
+      .filter(({ recordTrustees }) => recordTrustees.includes(trusteeId))
       .map(({ recordId, trustorRole }) => ({
         recordId,
         role: this.resolveTrusteeRole(newTrustLevel, trustorRole),
@@ -517,13 +562,21 @@ export class TrusteePermissionService {
       .filter((r): r is TrusteeRecordAccess => r.role !== null);
 
     if (accessList.length === 0) {
-      console.log('ℹ️ Trustor has no roles on any records — nothing to update');
+      console.log('ℹ️ No trustee-derived records with roles to update');
       return;
     }
 
+    // Blockchain: update per-record roles before mirroring to Firestore
+    const { success } = await TrusteeBlockchainService.changeRoleAsTrusteeBatch(
+      trustorId,
+      trusteeId,
+      accessList.map(r => r.recordId),
+      accessList.map(r => r.role)
+    );
+    if (!success) throw new Error('Blockchain role update failed — see sync queue');
+
     for (const { recordId, role } of accessList) {
       try {
-        // After (removes from all first, then adds to correct one)
         await updateDoc(doc(db, 'records', recordId), {
           owners: arrayRemove(trusteeId),
           administrators: arrayRemove(trusteeId),

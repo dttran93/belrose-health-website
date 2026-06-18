@@ -6,7 +6,7 @@
 // Pending: accept/decline via UserCard menuType="acceptOrCancel".
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { ShieldCheck, Loader2, HelpCircle, LogOut } from 'lucide-react';
+import { ShieldCheck, Loader2, HelpCircle, LogOut, TrendingDown } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
@@ -144,6 +144,17 @@ export const MyTrustorsTab: React.FC<MyTrustorsTabProps> = ({ onRefreshNeeded })
                   content={<TrustLevelBadge level={row.trustLevel} />}
                   menuType="default"
                   additionalItems={[
+                    ...(row.trustLevel !== 'observer'
+                      ? [
+                          {
+                            key: 'stepDown',
+                            label: 'Step Down Trust Level',
+                            icon: TrendingDown,
+                            onClick: () => handleResign(row),
+                            destructive: false,
+                          },
+                        ]
+                      : []),
                     {
                       key: 'resign',
                       label: 'Resign as Trustee',

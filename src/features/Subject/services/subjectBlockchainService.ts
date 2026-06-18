@@ -79,6 +79,36 @@ export class SubjectBlockchainService {
   }
 
   /**
+   * Anchor a trustor as subject on behalf of a controller trustee.
+   * The caller's wallet must satisfy isControllerOf(trustorIdHash) on-chain.
+   */
+  static async anchorSubjectAsController(
+    recordId: string,
+    recordHash: string,
+    controllerId: string,
+    trustorId: string
+  ): Promise<boolean> {
+    const walletAddress = await this.requireUserWalletAddress(controllerId);
+
+    try {
+      console.log('⛓️ Anchoring subject as controller...', { recordId, trustorId });
+      await blockchainHealthRecordService.anchorRecordAsController(recordId, recordHash, trustorId);
+      console.log('✅ Subject anchored as controller');
+      return true;
+    } catch (error) {
+      await this.logAnchorFailure({
+        action: 'anchorRecord',
+        recordId,
+        recordHash,
+        userId: controllerId,
+        walletAddress,
+        error,
+      });
+      return false;
+    }
+  }
+
+  /**
    * Unanchor a subject from a record on the blockchain
    * Logs to sync queue if blockchain call fails
    */

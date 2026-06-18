@@ -78,4 +78,9 @@ module.exports = {
   sourcify: {
     enabled: false,
   },
+  typechain: {
+    outDir: '../packages/shared/src/typechain',
+    target: 'ethers-v6',
+    dontOverrideCompile: false, // toolbox sets this to true for .cjs config files — override it
+  },
 };

@@ -1,7 +1,4 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.DENY_REASONS = void 0;
-exports.DENY_REASONS = [
+export const DENY_REASONS = [
     { value: 'wrong_recipient', label: 'Wrong recipient — I am not the stated provider' },
     { value: 'never_held', label: 'Never saw this patient, never held these records' },
     {

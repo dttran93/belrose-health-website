@@ -46,14 +46,11 @@ const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-admin/firestore");
 const ethers_1 = require("ethers");
 const _shared_1 = require("../_shared/");
+const typechain_1 = require("../_shared/typechain");
 const backendWalletService_1 = require("../services/backendWalletService");
 const wallet_1 = require("./wallet");
 const MEMBER_ROLE_MANAGER_ADDRESS = _shared_1.MEMBER_ROLE_MANAGER.proxy;
 const CHAIN_ID = _shared_1.NETWORK.chainId;
-const MEMBER_ROLE_MANAGER_ABI = [
-    'function addMemberBatch(address[] calldata walletAddresses, bytes32 userIdHash) external',
-    'function bootstrapDependentTrustee(bytes32 trustorIdHash, bytes32 trusteeIdHash) external',
-];
 function getAdminWallet() {
     const privateKey = process.env.ADMIN_WALLET_PRIVATE_KEY;
     const rpcUrl = process.env.RPC_URL || _shared_1.NETWORK.rpcUrlFallback;
@@ -137,9 +134,11 @@ exports.createDependentAccount = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_P
         const smartAccountAddress = await (0, wallet_1.computeSmartAccountAddress)(wallet.privateKey);
         console.log('⛓️ Registering both wallets on-chain...');
         const userIdHash = ethers_1.ethers.id(dependentUid);
-        const contract = new ethers_1.ethers.Contract(MEMBER_ROLE_MANAGER_ADDRESS, MEMBER_ROLE_MANAGER_ABI, getAdminWallet());
+        const contract = typechain_1.MemberRoleManager__factory.connect(MEMBER_ROLE_MANAGER_ADDRESS, getAdminWallet());
         const tx = await contract.addMemberBatch([wallet.address, smartAccountAddress], userIdHash);
         const receipt = await tx.wait();
+        if (!receipt)
+            throw new Error('Transaction was dropped or replaced');
         const blockchainRef = {
             txHash: tx.hash,
             chainId: CHAIN_ID,
@@ -155,6 +154,8 @@ exports.createDependentAccount = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_P
         const guardianIdHash = ethers_1.ethers.id(guardianUid);
         const trusteeTx = await contract.bootstrapDependentTrustee(userIdHash, guardianIdHash);
         const trusteeReceipt = await trusteeTx.wait();
+        if (!trusteeReceipt)
+            throw new Error('Trustee transaction was dropped or replaced');
         const trusteeBlockchainRef = {
             txHash: trusteeTx.hash,
             chainId: CHAIN_ID,

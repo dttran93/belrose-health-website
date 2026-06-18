@@ -18,31 +18,12 @@
 
 import { createPublicClient, http, type Address } from 'viem';
 import { SmartAccountService } from './smartAccountService';
-import { MEMBER_ROLE_MANAGER, NETWORK } from '@belrose/shared';
+import { MEMBER_ROLE_MANAGER, NETWORK, MemberRoleManager__factory } from '@belrose/shared';
 
 // ==================== SMART CONTRACT CONFIG ====================
 
 const MEMBER_ROLE_MANAGER_ADDRESS = MEMBER_ROLE_MANAGER.proxy;
-
-const MEMBER_ROLE_MANAGER_ABI = [
-  {
-    name: 'isActiveMember',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'wallet', type: 'address' }],
-    outputs: [{ type: 'bool' }],
-  },
-  {
-    name: 'wallets',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'wallet', type: 'address' }],
-    outputs: [
-      { name: 'userIdHash', type: 'bytes32' },
-      { name: 'isWalletActive', type: 'bool' },
-    ],
-  },
-] as const;
+const MEMBER_ROLE_MANAGER_ABI = MemberRoleManager__factory.abi;
 
 // ==================== TYPES ====================
 

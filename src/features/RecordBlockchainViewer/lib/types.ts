@@ -52,12 +52,12 @@ export interface HealthRecordCoreContract {
   getUserDisputes(userIdHash: string): Promise<string[]>;
 
   // Unaccepted Flags
-  getUnacceptedUpdateFlags(subjectIdHash: string): Promise<UnacceptedUpdateFlagStruct[]>;
+  getUnacceptedFlags(subjectIdHash: string): Promise<UnacceptedUpdateFlagStruct[]>;
   getActiveUnacceptedFlagCount(subjectIdHash: string): Promise<bigint>;
-  getUnacceptedUpdateFlag(
+  getUnacceptedFlag(
     subjectIdHash: string,
-    flagIndex: number
-  ): Promise<[string, string, bigint, number, bigint, boolean]>;
+    recordIdHash: string
+  ): Promise<[boolean, boolean, string, string, bigint]>;
   hasActiveUnacceptedFlags(subjectIdHash: string): Promise<boolean>;
 
   // Event filters
@@ -72,7 +72,6 @@ export interface HealthRecordCoreContract {
     RecordDisputed(): ethers.DeferredTopicFilter;
     DisputeRetracted(): ethers.DeferredTopicFilter;
     UnacceptedUpdateFlagged(): ethers.DeferredTopicFilter;
-    UnacceptedUpdateResolved(): ethers.DeferredTopicFilter;
   };
 
   queryFilter(
@@ -108,11 +107,10 @@ interface DisputeStruct {
 }
 
 interface UnacceptedUpdateFlagStruct {
-  recordId: string;
-  noteHash: string;
+  recordIdHash: string;
+  reporterIdHash: string;
+  recordHash: string;
   createdAt: bigint;
-  resolution: number;
-  resolvedAt: bigint;
   isActive: boolean;
 }
 
@@ -217,13 +215,11 @@ export interface Dispute {
 
 export interface UnacceptedUpdateFlag {
   subjectIdHash: string;
-  recordId: string;
-  noteHash: string;
+  recordIdHash: string;
+  reporterIdHash: string;
+  recordHash: string;
   createdAt: number;
-  resolution: ResolutionType;
-  resolvedAt: number;
   isActive: boolean;
-  flagIndex: number;
 }
 
 // ===============================================================

@@ -15,19 +15,16 @@ import {
   Dispute,
   UnacceptedUpdateFlag,
   DisputeCulpability,
-  ResolutionType,
   SubjectLink,
   RecordVersion,
-  HealthRecordCoreContract,
 } from '../lib/types';
-import { HEALTH_RECORD_CORE_ABI } from '../lib/constants';
 import {
   getProfilesByUserIdHashes,
   transformToUserProfile,
 } from '@/features/MemberBlockchainViewer/services/userProfileService';
 import { VerificationLevelOptions } from '@/features/Credibility/hooks/useCredibilityFlow';
-import { buildRpcUrl, DisputeSeverityOptions, HEALTH_RECORD_CORE } from '@belrose/shared';
-import { NETWORK } from '@belrose/shared';
+import { buildRpcUrl, DisputeSeverityOptions, HEALTH_RECORD_CORE, HealthRecordCore__factory } from '@belrose/shared';
+import type { HealthRecordCore } from '@belrose/shared';
 import { requireEnv } from '@/utils/utils';
 
 // ===============================================================
@@ -40,14 +37,14 @@ const HEALTH_RECORD_CORE_ADDRESS = HEALTH_RECORD_CORE.proxy;
 const DEPLOYMENT_BLOCK = HEALTH_RECORD_CORE.deploymentBlock;
 
 let provider: ethers.JsonRpcProvider | null = null;
-let contract: (HealthRecordCoreContract & ethers.Contract) | null = null;
+let contract: HealthRecordCore | null = null;
 
 /**
  * Get or create the provider instance
  */
 function getProvider(): ethers.JsonRpcProvider {
   if (!provider) {
-    provider = new ethers.JsonRpcProvider(NETWORK.rpcUrlFallback);
+    provider = new ethers.JsonRpcProvider(RPC_URL);
   }
   return provider;
 }
@@ -55,13 +52,13 @@ function getProvider(): ethers.JsonRpcProvider {
 /**
  * Get or create the contract instance
  */
-function getContract(): HealthRecordCoreContract & ethers.Contract {
+function getContract(): HealthRecordCore {
   if (!contract) {
     contract = new ethers.Contract(
       HEALTH_RECORD_CORE_ADDRESS,
-      HEALTH_RECORD_CORE_ABI,
+      HealthRecordCore__factory.abi,
       getProvider()
-    ) as HealthRecordCoreContract & ethers.Contract;
+    ) as unknown as HealthRecordCore;
   }
   return contract;
 }
@@ -70,13 +67,16 @@ function getContract(): HealthRecordCoreContract & ethers.Contract {
 // HELPER: Query events in chunks (to avoid RPC limits)
 // ===============================================================
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function queryFilterInChunks(
-  contract: ethers.Contract,
-  filter: ethers.DeferredTopicFilter,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  contract: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  filter: any,
   fromBlock: number,
   toBlock: number | string,
-  chunkSize: number = 2000,
-  delayMs: number = 500
+  chunkSize: number = 10000,
+  delayMs: number = 0
 ): Promise<(ethers.EventLog | ethers.Log)[]> {
   const currentBlock =
     typeof toBlock === 'number'
@@ -609,43 +609,42 @@ export async function getAllUnacceptedFlags(): Promise<UnacceptedUpdateFlag[]> {
 
     console.log(`📋 Found ${flaggedEvents.length} UnacceptedUpdateFlagged events`);
 
-    // Group by subject to avoid duplicate fetches
-    const subjectFlagIndexMap = new Map<string, number[]>();
+    // Collect unique (subjectIdHash, recordIdHash) pairs — these identify each flag
+    const flagKeys = new Map<string, { subjectIdHash: string; recordIdHash: string }>();
 
     for (const event of flaggedEvents) {
       if (event instanceof ethers.EventLog && event.args) {
-        const subjectIdHash = event.args.subjectIdHash;
-        const flagIndex = Number(event.args.flagIndex);
-
-        if (!subjectFlagIndexMap.has(subjectIdHash)) {
-          subjectFlagIndexMap.set(subjectIdHash, []);
+        const subjectIdHash = event.args[0] as string;
+        const recordIdHash = event.args[1] as string;
+        const key = `${subjectIdHash}-${recordIdHash}`;
+        if (!flagKeys.has(key)) {
+          flagKeys.set(key, { subjectIdHash, recordIdHash });
         }
-        subjectFlagIndexMap.get(subjectIdHash)!.push(flagIndex);
       }
     }
 
-    // Fetch flag details for each subject
     const flags: UnacceptedUpdateFlag[] = [];
 
-    for (const [subjectIdHash, flagIndices] of subjectFlagIndexMap) {
-      for (const flagIndex of flagIndices) {
-        try {
-          const [recordId, noteHash, createdAt, resolution, resolvedAt, isActive] =
-            await contract.getUnacceptedUpdateFlag(subjectIdHash, flagIndex);
+    for (const { subjectIdHash, recordIdHash } of flagKeys.values()) {
+      try {
+        const [exists, isActive, reporterIdHash, recordHash, createdAt] =
+          await contract.getUnacceptedFlag(subjectIdHash, recordIdHash);
 
-          flags.push({
-            subjectIdHash,
-            recordId,
-            noteHash,
-            createdAt: Number(createdAt),
-            resolution: parseResolutionType(Number(resolution)),
-            resolvedAt: Number(resolvedAt),
-            isActive,
-            flagIndex,
-          });
-        } catch (error) {
-          console.warn(`Failed to fetch flag ${flagIndex} for subject ${subjectIdHash}:`, error);
-        }
+        if (!exists) continue;
+
+        flags.push({
+          subjectIdHash,
+          recordIdHash,
+          reporterIdHash,
+          recordHash,
+          createdAt: Number(createdAt),
+          isActive,
+        });
+      } catch (error) {
+        console.warn(
+          `Failed to fetch flag for subject ${subjectIdHash} / record ${recordIdHash}:`,
+          error
+        );
       }
     }
 
@@ -663,17 +662,15 @@ export async function getFlagsForSubject(subjectIdHash: string): Promise<Unaccep
   const contract = getContract();
 
   try {
-    const rawFlags = await contract.getUnacceptedUpdateFlags(subjectIdHash);
+    const rawFlags = await contract.getUnacceptedFlags(subjectIdHash);
 
-    return rawFlags.map((f: any, index: number) => ({
+    return rawFlags.map((f) => ({
       subjectIdHash,
-      recordId: f.recordId,
-      noteHash: f.noteHash,
+      recordIdHash: f.recordIdHash,
+      reporterIdHash: f.reporterIdHash,
+      recordHash: f.recordHash,
       createdAt: Number(f.createdAt),
-      resolution: parseResolutionType(Number(f.resolution)),
-      resolvedAt: Number(f.resolvedAt),
       isActive: f.isActive,
-      flagIndex: index,
     }));
   } catch (error) {
     console.error(`❌ Failed to fetch flags for subject ${subjectIdHash}:`, error);
@@ -709,10 +706,3 @@ function parseDisputeCulpability(value: number): DisputeCulpability {
   return DisputeCulpability.None;
 }
 
-/**
- * Parse resolution type from contract value
- */
-function parseResolutionType(value: number): ResolutionType {
-  if (value >= 0 && value <= 4) return value as ResolutionType;
-  return ResolutionType.None;
-}

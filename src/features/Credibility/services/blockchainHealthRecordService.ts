@@ -18,6 +18,7 @@ import {
   TransactionResult,
 } from '@/features/BlockchainWallet/services/paymasterService';
 import { buildRpcUrl, HEALTH_RECORD_CORE, NETWORK } from '@belrose/shared';
+import { HealthRecordCore__factory } from '@belrose/shared';
 import { requireEnv } from '@/utils/utils';
 
 // ============================================================================
@@ -29,387 +30,10 @@ const RPC_URL = buildRpcUrl(requireEnv('VITE_ALCHEMY_API_KEY'));
 const RPC_URL_FALLBACK = NETWORK.rpcUrlFallback;
 
 // ============================================================================
-// ABI (only the functions we need)
+// ABI
 // ============================================================================
 
-const HEALTH_RECORD_CORE_ABI = [
-  // ==================== RECORD ANCHORING - WRITE ====================
-  {
-    inputs: [
-      { name: 'recordIdHash', type: 'bytes32' },
-      { name: 'recordHash', type: 'bytes32' },
-      { name: 'subjectIdHash', type: 'bytes32' },
-    ],
-    name: 'anchorRecord',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'recordIdHash', type: 'bytes32' },
-      { name: 'subjectIdHash', type: 'bytes32' },
-    ],
-    name: 'unanchorRecord',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'recordIdHash', type: 'bytes32' },
-      { name: 'subjectIdHash', type: 'bytes32' },
-    ],
-    name: 'reanchorRecord',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'recordIdHash', type: 'bytes32' },
-      { name: 'newHash', type: 'bytes32' },
-    ],
-    name: 'addRecordHash',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-
-  // ==================== RECORD ANCHORING - VIEW ====================
-  {
-    inputs: [{ name: 'recordIdHash', type: 'bytes32' }],
-    name: 'getRecordSubjects',
-    outputs: [{ name: '', type: 'bytes32[]' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'userIdHash', type: 'bytes32' }],
-    name: 'getSubjectMedicalHistory',
-    outputs: [{ name: '', type: 'bytes32[]' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'recordIdHash', type: 'bytes32' },
-      { name: 'userIdHash', type: 'bytes32' },
-    ],
-    name: 'isSubject',
-    outputs: [{ name: '', type: 'bool' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'recordIdHash', type: 'bytes32' },
-      { name: 'userIdHash', type: 'bytes32' },
-    ],
-    name: 'isActiveSubject',
-    outputs: [{ name: '', type: 'bool' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'recordIdHash', type: 'bytes32' }],
-    name: 'getActiveRecordSubjects',
-    outputs: [{ name: '', type: 'bytes32[]' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'recordIdHash', type: 'bytes32' }],
-    name: 'getSubjectStats',
-    outputs: [
-      { name: 'total', type: 'uint256' },
-      { name: 'active', type: 'uint256' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'recordIdHash', type: 'bytes32' }],
-    name: 'getRecordVersionHistory',
-    outputs: [{ name: '', type: 'bytes32[]' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'recordHash', type: 'bytes32' }],
-    name: 'getRecordIdForHash',
-    outputs: [{ name: '', type: 'bytes32' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'recordHash', type: 'bytes32' }],
-    name: 'doesHashExist',
-    outputs: [{ name: '', type: 'bool' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'recordIdHash', type: 'bytes32' }],
-    name: 'getVersionCount',
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'getTotalAnchoredRecords',
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-
-  // ==================== VERIFICATIONS - WRITE ====================
-  {
-    inputs: [
-      { name: 'recordIdHash', type: 'bytes32' },
-      { name: 'recordHash', type: 'bytes32' },
-      { name: 'level', type: 'uint8' },
-    ],
-    name: 'verifyRecord',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'recordHash', type: 'bytes32' }],
-    name: 'retractVerification',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'recordHash', type: 'bytes32' },
-      { name: 'newLevel', type: 'uint8' },
-    ],
-    name: 'modifyVerificationLevel',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-
-  // ==================== VERIFICATIONS - VIEW ====================
-  {
-    inputs: [{ name: 'recordHash', type: 'bytes32' }],
-    name: 'getVerifications',
-    outputs: [
-      {
-        components: [
-          { name: 'verifierIdHash', type: 'bytes32' },
-          { name: 'recordIdHash', type: 'bytes32' },
-          { name: 'level', type: 'uint8' },
-          { name: 'createdAt', type: 'uint256' },
-          { name: 'isActive', type: 'bool' },
-        ],
-        name: '',
-        type: 'tuple[]',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'recordHash', type: 'bytes32' },
-      { name: 'userIdHash', type: 'bytes32' },
-    ],
-    name: 'hasUserVerified',
-    outputs: [{ name: '', type: 'bool' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'recordHash', type: 'bytes32' },
-      { name: 'userIdHash', type: 'bytes32' },
-    ],
-    name: 'getUserVerification',
-    outputs: [
-      { name: 'exists', type: 'bool' },
-      { name: 'recordIdHash', type: 'bytes32' },
-      { name: 'level', type: 'uint8' },
-      { name: 'createdAt', type: 'uint256' },
-      { name: 'isActive', type: 'bool' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'recordHash', type: 'bytes32' }],
-    name: 'getVerificationStats',
-    outputs: [
-      { name: 'total', type: 'uint256' },
-      { name: 'active', type: 'uint256' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'userIdHash', type: 'bytes32' }],
-    name: 'getUserVerifications',
-    outputs: [{ name: '', type: 'bytes32[]' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-
-  // ==================== DISPUTES - WRITE ====================
-  {
-    inputs: [
-      { name: 'recordIdHash', type: 'bytes32' },
-      { name: 'recordHash', type: 'bytes32' },
-      { name: 'severity', type: 'uint8' },
-      { name: 'culpability', type: 'uint8' },
-      { name: 'notes', type: 'string' },
-    ],
-    name: 'disputeRecord',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'recordHash', type: 'bytes32' }],
-    name: 'retractDispute',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'recordHash', type: 'bytes32' },
-      { name: 'newSeverity', type: 'uint8' },
-      { name: 'newCulpability', type: 'uint8' },
-    ],
-    name: 'modifyDispute',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-
-  // ==================== DISPUTES - VIEW ====================
-  {
-    inputs: [{ name: 'recordHash', type: 'bytes32' }],
-    name: 'getDisputes',
-    outputs: [
-      {
-        components: [
-          { name: 'disputerIdHash', type: 'bytes32' },
-          { name: 'recordIdHash', type: 'bytes32' },
-          { name: 'severity', type: 'uint8' },
-          { name: 'culpability', type: 'uint8' },
-          { name: 'notes', type: 'string' },
-          { name: 'createdAt', type: 'uint256' },
-          { name: 'isActive', type: 'bool' },
-        ],
-        name: '',
-        type: 'tuple[]',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'recordHash', type: 'bytes32' },
-      { name: 'userIdHash', type: 'bytes32' },
-    ],
-    name: 'hasUserDisputed',
-    outputs: [{ name: '', type: 'bool' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'recordHash', type: 'bytes32' },
-      { name: 'userIdHash', type: 'bytes32' },
-    ],
-    name: 'getUserDispute',
-    outputs: [
-      { name: 'exists', type: 'bool' },
-      { name: 'recordIdHash', type: 'bytes32' },
-      { name: 'severity', type: 'uint8' },
-      { name: 'culpability', type: 'uint8' },
-      { name: 'notes', type: 'string' },
-      { name: 'createdAt', type: 'uint256' },
-      { name: 'isActive', type: 'bool' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'recordHash', type: 'bytes32' }],
-    name: 'getDisputeStats',
-    outputs: [
-      { name: 'total', type: 'uint256' },
-      { name: 'active', type: 'uint256' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'userIdHash', type: 'bytes32' }],
-    name: 'getUserDisputes',
-    outputs: [{ name: '', type: 'bytes32[]' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-
-  // ==================== UNACCEPTED UPDATE FLAGS - VIEW ====================
-  {
-    inputs: [{ name: 'subjectIdHash', type: 'bytes32' }],
-    name: 'getUnacceptedFlags',
-    outputs: [
-      {
-        components: [
-          { name: 'recordIdHash', type: 'bytes32' },
-          { name: 'reporterIdHash', type: 'bytes32' },
-          { name: 'recordHash', type: 'bytes32' },
-          { name: 'createdAt', type: 'uint256' },
-          { name: 'isActive', type: 'bool' },
-        ],
-        name: '',
-        type: 'tuple[]',
-      },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'subjectIdHash', type: 'bytes32' },
-      { name: 'recordIdHash', type: 'bytes32' },
-    ],
-    name: 'getUnacceptedFlag',
-    outputs: [
-      { name: 'exists', type: 'bool' },
-      { name: 'isActive', type: 'bool' },
-      { name: 'reporterIdHash', type: 'bytes32' },
-      { name: 'recordContentHash', type: 'bytes32' },
-      { name: 'createdAt', type: 'uint256' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'subjectIdHash', type: 'bytes32' }],
-    name: 'getActiveUnacceptedFlagCount',
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'subjectIdHash', type: 'bytes32' }],
-    name: 'hasActiveUnacceptedFlags',
-    outputs: [{ name: '', type: 'bool' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-];
+const HEALTH_RECORD_CORE_ABI = HealthRecordCore__factory.abi;
 
 // ============================================================================
 // TYPES
@@ -547,6 +171,27 @@ export class blockchainHealthRecordService {
       ethers.ZeroHash,
     ]);
     console.log('✅ Record anchored:', result.txHash);
+    return result;
+  }
+
+  /**
+   * Anchor a trustor as a subject on behalf of the caller, who must be their active controller.
+   * Passes the trustor's ID hash as subjectIdHash; the contract verifies isControllerOf().
+   */
+  static async anchorRecordAsController(
+    recordId: string,
+    recordHash: string,
+    trustorId: string
+  ): Promise<TransactionResult> {
+    console.log('⛓️ Anchoring record as controller...', {
+      recordId,
+      recordHash: recordHash.slice(0, 12) + '...',
+      trustorId,
+    });
+    const recordIdHash = id(recordId);
+    const subjectIdHash = id(trustorId);
+    const result = await this.executeWrite('anchorRecord', [recordIdHash, recordHash, subjectIdHash]);
+    console.log('✅ Record anchored as controller:', result.txHash);
     return result;
   }
 

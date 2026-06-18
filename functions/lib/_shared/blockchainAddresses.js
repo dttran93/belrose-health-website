@@ -19,7 +19,7 @@ const chains_1 = require("viem/chains");
 exports.NETWORK = {
     chainId: 84532,
     name: 'base-sepolia',
-    rpcUrlFallback: 'https://sepolia.base.org',
+    rpcUrlFallback: 'https://base-sepolia-rpc.publicnode.com',
     explorerUrl: 'https://sepolia.basescan.org/',
     chainViem: chains_1.baseSepolia,
 };
@@ -51,7 +51,7 @@ function buildBundlerURL(pimlicoApiKey) {
 // ============================================================================
 exports.MEMBER_ROLE_MANAGER = {
     proxy: '0xdF9583C25E234A34a1E47d9830722123CA228a1a',
-    implementation: '0x97f9ed2af3f9a30eac958d0994a0f131eda11a57',
+    implementation: '0xf3e0c2229782c270fb829bc7fe4eef17acf51dbb',
     deploymentBlock: 41800192,
 };
 // ============================================================================

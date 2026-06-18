@@ -263,7 +263,8 @@ const countryData: CountryEntry[] = [
           submit regardless of patient preference. Although patients will be able to place access
           restrictions, those restrictions can be overridden by doctors
           <CitationLink id="sg-hib" />. 2027 will be the first real test of whether legal coercion
-          can overcome the privacy preferences of citizens.
+          can overcome the privacy preferences of citizens
+          <CitationLink id="sg-emjsurvey" />.
         </p>
         <p className="text-left mb-4">
           But Singapore also illustrates another dark-side of centralization: catastrophic data

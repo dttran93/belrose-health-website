@@ -1150,6 +1150,29 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     emit TrusteeLevelUpdated(trustorIdHash, trusteeIdHash, oldLevel, newLevel, block.timestamp);
   }
 
+  /**
+   * @notice Trustee self-downgrades their own trust level
+   * @dev Only the trustee can call this, and only to a strictly lower level.
+   *      Trustees cannot self-upgrade — that requires trustor approval via updateTrusteeLevel.
+   * @param trustorIdHash The identity hash of the trustor
+   * @param newLevel The new (lower) trust level
+   */
+  function downgradeTrusteeLevel(
+    bytes32 trustorIdHash,
+    TrusteeLevel newLevel
+  ) external onlyActiveMember {
+    bytes32 trusteeIdHash = _getCallerIdHash();
+    TrusteeRelationship storage r = trusteeRelationships[trustorIdHash][trusteeIdHash];
+
+    require(r.status == TrusteeStatus.Active, "No active trustee relationship");
+    require(uint8(newLevel) < uint8(r.level), "Can only downgrade to a lower level");
+
+    TrusteeLevel oldLevel = r.level;
+    r.level = newLevel;
+
+    emit TrusteeLevelUpdated(trustorIdHash, trusteeIdHash, oldLevel, newLevel, block.timestamp);
+  }
+
   // =================== TRUSTEE - ROLE GRANT HELPERS ===================
 
   /**

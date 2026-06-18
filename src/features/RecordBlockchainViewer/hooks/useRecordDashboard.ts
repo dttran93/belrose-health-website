@@ -184,8 +184,9 @@ export function useHealthRecordDashboard(): UseHealthRecordDashboardReturn {
     const query = searchQuery.toLowerCase();
     return unacceptedFlags.filter(f => {
       if (f.subjectIdHash.toLowerCase().includes(query)) return true;
-      if (f.recordId?.toLowerCase().includes(query)) return true;
-      if (f.noteHash.toLowerCase().includes(query)) return true;
+      if (f.recordIdHash.toLowerCase().includes(query)) return true;
+      if (f.reporterIdHash.toLowerCase().includes(query)) return true;
+      if (f.recordHash.toLowerCase().includes(query)) return true;
       return false;
     });
   }, [unacceptedFlags, searchQuery]);

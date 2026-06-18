@@ -10,6 +10,7 @@
 import {
   arrayRemove,
   arrayUnion,
+  deleteField,
   doc,
   getDoc,
   getFirestore,
@@ -47,6 +48,27 @@ export class SubjectMembershipService {
       subjects: arrayUnion(subjectId),
       lastModified: serverTimestamp(),
     });
+  }
+
+  // Controller trustee variant: includes a `controllerAnchorFor` proof field so the
+  // Firestore security rule can verify the specific trustee relationship without needing
+  // to compute an array diff (which rules cannot do). The field is cleaned up immediately
+  // after; if cleanup fails it persists harmlessly as metadata.
+  static async addSubjectAsController(recordId: string, subjectId: string): Promise<void> {
+    const db = getFirestore();
+    const recordRef = doc(db, 'records', recordId);
+
+    await updateDoc(recordRef, {
+      subjects: arrayUnion(subjectId),
+      controllerAnchorFor: subjectId,
+      lastModified: serverTimestamp(),
+    });
+
+    try {
+      await updateDoc(recordRef, { controllerAnchorFor: deleteField() });
+    } catch {
+      // Non-fatal — field persists as benign metadata
+    }
   }
 
   static async removeSubject(recordId: string, subjectId: string): Promise<void> {
