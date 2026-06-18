@@ -208,21 +208,7 @@ export class TrusteePermissionService {
       return;
     }
 
-    const recordIds = accessList.map(r => r.recordId);
-
-    // Step 1: Batch grant on blockchain
-    console.log(`🔗 Batch granting blockchain roles across ${recordIds.length} records...`);
-    const roles = accessList.map(r => r.role);
-    const { success } = await TrusteeBlockchainService.grantRoleAsTrusteeBatch(
-      trustorId,
-      trusteeId,
-      recordIds,
-      roles
-    );
-    if (!success) throw new Error('Blockchain batch grant failed — see sync queue for details');
-    console.log('✅ Blockchain batch grant complete');
-
-    // Step 2: Create inactive wrappedKeys + update Firestore arrays per record
+    // Create inactive wrappedKeys + update Firestore arrays per record
     // We do these together so the record stays consistent even if we crash partway through
     const db = getFirestore();
 
@@ -291,6 +277,17 @@ export class TrusteePermissionService {
       console.log('ℹ️ No pending wrappedKeys found to activate');
       return;
     }
+
+    // Blockchain: trustee self-grants roles across all pending records.
+    // Runs on the trustee's client so msg.sender = trustee, which is what the contract requires.
+    const recordIds = snapshot.docs.map(d => d.data().recordId as string);
+    const { success } = await TrusteeBlockchainService.grantRoleAsTrusteeBatch(
+      trustorId,
+      trusteeId,
+      recordIds
+    );
+    if (!success) throw new Error('Blockchain role grant failed during trustee activation');
+    console.log(`✅ Blockchain roles granted across ${recordIds.length} records`);
 
     // Batch activate all pending wrappedKeys
     const batch = writeBatch(db);
@@ -464,8 +461,7 @@ export class TrusteePermissionService {
         const { success } = await TrusteeBlockchainService.grantRoleAsTrusteeBatch(
           subjectId,
           trusteeId,
-          [recordId],
-          [role]
+          [recordId]
         );
         if (!success) {
           console.error(
@@ -565,15 +561,6 @@ export class TrusteePermissionService {
       console.log('ℹ️ No trustee-derived records with roles to update');
       return;
     }
-
-    // Blockchain: update per-record roles before mirroring to Firestore
-    const { success } = await TrusteeBlockchainService.changeRoleAsTrusteeBatch(
-      trustorId,
-      trusteeId,
-      accessList.map(r => r.recordId),
-      accessList.map(r => r.role)
-    );
-    if (!success) throw new Error('Blockchain role update failed — see sync queue');
 
     for (const { recordId, role } of accessList) {
       try {

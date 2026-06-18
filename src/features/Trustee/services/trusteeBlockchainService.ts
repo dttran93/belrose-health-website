@@ -3,7 +3,6 @@
 import { ethers, id } from 'ethers';
 import {
   BlockchainRoleManagerService,
-  RoleType,
   TrusteeLevel,
 } from '@/features/Permissions/services/blockchainRoleManagerService';
 import {
@@ -11,7 +10,6 @@ import {
   SyncContext,
 } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
-import { getUserProfile } from '@/features/Users/services/userProfileService';
 import { BlockchainRef, buildMemberRegistryRef } from '@belrose/shared';
 
 interface TrusteeResult {
@@ -148,24 +146,14 @@ export class TrusteeBlockchainService {
   static async grantRoleAsTrusteeBatch(
     trustorId: string,
     trusteeId: string,
-    recordIds: string[],
-    roles: string[]
+    recordIds: string[]
   ): Promise<TrusteeResult> {
-    let trusteeWallet: string | undefined;
+    const walletAddress = await this.requireUserWalletAddress(trusteeId);
 
     try {
-      // Need trustee's wallet address for grantRoleBatch
-      const trusteeProfile = await getUserProfile(trusteeId);
-      trusteeWallet = trusteeProfile?.onChainIdentity?.linkedWallets.find(
-        w => w.isWalletActive
-      )?.address;
-
-      if (!trusteeWallet) throw new Error('Trustee has no active wallet');
-
-      const result = await BlockchainRoleManagerService.grantRoleBatch(
+      const result = await BlockchainRoleManagerService.grantRoleAsTrusteeBatch(
         recordIds,
-        trusteeWallet,
-        roles as RoleType[]
+        ethers.id(trustorId)
       );
       const blockchainRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
       return { success: true, blockchainRef };
@@ -175,49 +163,7 @@ export class TrusteeBlockchainService {
         trustorId,
         trusteeId,
         callerId: trusteeId,
-        walletAddress: trusteeWallet ?? '',
-        error,
-        recordIds,
-      });
-      return { success: false, blockchainRef: null };
-    }
-  }
-
-  /**
-   * Batch-update the trustee's per-record blockchain roles when trust level changes.
-   * Mirrors grantRoleAsTrusteeBatch but calls changeRoleBatch so existing roles are updated.
-   * Called by TrusteePermissionService.updateTrusteeAccess before the Firestore loop.
-   */
-  static async changeRoleAsTrusteeBatch(
-    trustorId: string,
-    trusteeId: string,
-    recordIds: string[],
-    roles: string[]
-  ): Promise<TrusteeResult> {
-    let trusteeWallet: string | undefined;
-
-    try {
-      const trusteeProfile = await getUserProfile(trusteeId);
-      trusteeWallet = trusteeProfile?.onChainIdentity?.linkedWallets.find(
-        w => w.isWalletActive
-      )?.address;
-
-      if (!trusteeWallet) throw new Error('Trustee has no active wallet');
-
-      const result = await BlockchainRoleManagerService.changeRoleBatch(
-        recordIds,
-        trusteeWallet,
-        roles as RoleType[]
-      );
-      const blockchainRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
-      return { success: true, blockchainRef };
-    } catch (error) {
-      await this.logTrusteeFailure({
-        action: 'changeRoleAsTrusteeBatch',
-        trustorId,
-        trusteeId,
-        callerId: trusteeId,
-        walletAddress: trusteeWallet ?? '',
+        walletAddress,
         error,
         recordIds,
       });
@@ -237,7 +183,11 @@ export class TrusteeBlockchainService {
     const walletAddress = await this.requireUserWalletAddress(trusteeId);
 
     try {
-      console.log('⛓️ Downgrading trustee level on blockchain...', { trustorId, trusteeId, newLevel });
+      console.log('⛓️ Downgrading trustee level on blockchain...', {
+        trustorId,
+        trusteeId,
+        newLevel,
+      });
       const result = await BlockchainRoleManagerService.downgradeTrusteeLevel(trustorId, newLevel);
       const blockchainRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
       console.log('✅ Trustee level downgraded on blockchain');
