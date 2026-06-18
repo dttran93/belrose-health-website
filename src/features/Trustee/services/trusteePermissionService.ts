@@ -531,15 +531,30 @@ export class TrusteePermissionService {
       return;
     }
 
-    const records = await this.getRecordsForTrustor(trustorId);
-    const accessList: TrusteeRecordAccess[] = records
-      .filter(
-        ({ recordId, recordTrustees }) =>
-          // Only update records that are both wrappedKey-derived AND tagged in trustees[].
-          // Records where the trustee had prior independent access were promoted at invite
-          // time but NOT added to trustees[] — skip them to avoid a BRANCH 9 denial.
-          trusteeDerivedRecordIds.has(recordId) && recordTrustees.includes(trusteeId)
-      )
+    // Fetch only the specific records already identified from wrappedKeys rather than
+    // querying all trustor records — the trustee (who may be the caller) has individual
+    // read access to these records but cannot do a broad subjects-contains collection query.
+    const recordSnapshots = await Promise.all(
+      [...trusteeDerivedRecordIds].map(id => getDoc(doc(db, 'records', id)))
+    );
+
+    const accessList: TrusteeRecordAccess[] = recordSnapshots
+      .filter(snap => snap.exists())
+      .map(snap => {
+        const data = snap.data()!;
+        let trustorRole: Role | null = null;
+        if (data.owners?.includes(trustorId)) trustorRole = 'owner';
+        else if (data.administrators?.includes(trustorId)) trustorRole = 'administrator';
+        else if (data.viewers?.includes(trustorId)) trustorRole = 'viewer';
+        return {
+          recordId: snap.id,
+          trustorRole,
+          recordTrustees: (data.trustees ?? []) as string[],
+        };
+      })
+      // Only update records tagged in trustees[] — records where the trustee had prior
+      // independent access were promoted at invite time but NOT added to trustees[].
+      .filter(({ recordTrustees }) => recordTrustees.includes(trusteeId))
       .map(({ recordId, trustorRole }) => ({
         recordId,
         role: this.resolveTrusteeRole(newTrustLevel, trustorRole),
