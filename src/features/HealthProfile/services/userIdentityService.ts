@@ -8,7 +8,7 @@ import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionK
 import { RecordHashService } from '@/features/ViewEditRecord/services/generateRecordHash';
 import { auth } from '@/firebase/config';
 import { updateFirestoreRecord } from '@/firebase/uploadUtils';
-import { ethers } from 'ethers';
+import { ethers, id } from 'ethers';
 
 export function getIdentityRecordId(userId: string): string {
   const userIdHash = ethers.id(userId); // keccak256 of userId
@@ -119,6 +119,7 @@ export async function saveUserIdentityRecord(
       doc(db, 'records', recordId),
       removeUndefinedValues({
         id: recordId,
+        recordIdHash: id(recordId),
         isEncrypted: !!encryptedData,
         fileName: encryptedData ? null : fileName,
         fileType: 'application/fhir+json',
