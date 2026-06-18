@@ -24,6 +24,7 @@ type TrusteeAction =
   | 'acceptTrustee'
   | 'revokeTrustee'
   | 'grantRoleAsTrusteeBatch'
+  | 'changeRoleAsTrusteeBatch'
   | 'updateTrusteeLevel'
   | 'downgradeTrusteeLevel';
 
@@ -183,6 +184,48 @@ export class TrusteeBlockchainService {
   }
 
   /**
+   * Batch-update the trustee's per-record blockchain roles when trust level changes.
+   * Mirrors grantRoleAsTrusteeBatch but calls changeRoleBatch so existing roles are updated.
+   * Called by TrusteePermissionService.updateTrusteeAccess before the Firestore loop.
+   */
+  static async changeRoleAsTrusteeBatch(
+    trustorId: string,
+    trusteeId: string,
+    recordIds: string[],
+    roles: string[]
+  ): Promise<TrusteeResult> {
+    let trusteeWallet: string | undefined;
+
+    try {
+      const trusteeProfile = await getUserProfile(trusteeId);
+      trusteeWallet = trusteeProfile?.onChainIdentity?.linkedWallets.find(
+        w => w.isWalletActive
+      )?.address;
+
+      if (!trusteeWallet) throw new Error('Trustee has no active wallet');
+
+      const result = await BlockchainRoleManagerService.changeRoleBatch(
+        recordIds,
+        trusteeWallet,
+        roles as RoleType[]
+      );
+      const blockchainRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
+      return { success: true, blockchainRef };
+    } catch (error) {
+      await this.logTrusteeFailure({
+        action: 'changeRoleAsTrusteeBatch',
+        trustorId,
+        trusteeId,
+        callerId: trusteeId,
+        walletAddress: trusteeWallet ?? '',
+        error,
+        recordIds,
+      });
+      return { success: false, blockchainRef: null };
+    }
+  }
+
+  /**
    * Trustee self-downgrades their trust level on-chain
    * msg.sender = trustee's wallet
    */
@@ -262,11 +305,12 @@ export class TrusteeBlockchainService {
       revokeTrustee: 'trustee-revoke',
       downgradeTrusteeLevel: 'trustee-level-update',
       grantRoleAsTrusteeBatch: 'trustee-grant',
+      changeRoleAsTrusteeBatch: 'trustee-grant',
       updateTrusteeLevel: 'trustee-level-update',
     } as const;
 
     const context: SyncContext =
-      action === 'grantRoleAsTrusteeBatch'
+      action === 'grantRoleAsTrusteeBatch' || action === 'changeRoleAsTrusteeBatch'
         ? {
             type: 'trustee-grant',
             trustorId,

@@ -72,7 +72,14 @@ export class TrusteePermissionService {
   private static async getRecordsForTrustor(
     trustorId: string,
     trusteeId?: string
-  ): Promise<{ recordId: string; trustorRole: Role | null; currentTrusteeRole?: Role | null }[]> {
+  ): Promise<
+    {
+      recordId: string;
+      trustorRole: Role | null;
+      currentTrusteeRole?: Role | null;
+      recordTrustees: string[];
+    }[]
+  > {
     const db = getFirestore();
     const q = query(collection(db, 'records'), where('subjects', 'array-contains', trustorId));
     const snapshot = await getDocs(q);
@@ -85,14 +92,16 @@ export class TrusteePermissionService {
       else if (data.administrators?.includes(trustorId)) trustorRole = 'administrator';
       else if (data.viewers?.includes(trustorId)) trustorRole = 'viewer';
 
-      if (!trusteeId) return { recordId: d.id, trustorRole };
+      const recordTrustees: string[] = data.trustees ?? [];
+
+      if (!trusteeId) return { recordId: d.id, trustorRole, recordTrustees };
 
       let currentTrusteeRole: Role | null = null;
       if (data.owners?.includes(trusteeId)) currentTrusteeRole = 'owner';
       else if (data.administrators?.includes(trusteeId)) currentTrusteeRole = 'administrator';
       else if (data.viewers?.includes(trusteeId)) currentTrusteeRole = 'viewer';
 
-      return { recordId: d.id, trustorRole, currentTrusteeRole };
+      return { recordId: d.id, trustorRole, currentTrusteeRole, recordTrustees };
     });
   }
 
@@ -524,7 +533,13 @@ export class TrusteePermissionService {
 
     const records = await this.getRecordsForTrustor(trustorId);
     const accessList: TrusteeRecordAccess[] = records
-      .filter(({ recordId }) => trusteeDerivedRecordIds.has(recordId))
+      .filter(
+        ({ recordId, recordTrustees }) =>
+          // Only update records that are both wrappedKey-derived AND tagged in trustees[].
+          // Records where the trustee had prior independent access were promoted at invite
+          // time but NOT added to trustees[] — skip them to avoid a BRANCH 9 denial.
+          trusteeDerivedRecordIds.has(recordId) && recordTrustees.includes(trusteeId)
+      )
       .map(({ recordId, trustorRole }) => ({
         recordId,
         role: this.resolveTrusteeRole(newTrustLevel, trustorRole),
@@ -535,6 +550,15 @@ export class TrusteePermissionService {
       console.log('ℹ️ No trustee-derived records with roles to update');
       return;
     }
+
+    // Blockchain: update per-record roles before mirroring to Firestore
+    const { success } = await TrusteeBlockchainService.changeRoleAsTrusteeBatch(
+      trustorId,
+      trusteeId,
+      accessList.map(r => r.recordId),
+      accessList.map(r => r.role)
+    );
+    if (!success) throw new Error('Blockchain role update failed — see sync queue');
 
     for (const { recordId, role } of accessList) {
       try {

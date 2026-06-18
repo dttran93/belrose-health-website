@@ -335,8 +335,14 @@ export class TrusteeRelationshipService {
     if (!success) throw new Error('Blockchain update failed — see sync queue for details');
     console.log('✅ Blockchain: Trust level updated');
 
-    // Step 2: Update record permissions to reflect new trust level
-    await TrusteePermissionService.updateTrusteeAccess(trustorId, trusteeId, newTrustLevel);
+    // Step 2: Update record permissions to reflect new trust level.
+    // Fan-out errors are non-fatal — the blockchain trust-level write at step 1 has
+    // already committed, so the relationship doc must stay in sync regardless.
+    try {
+      await TrusteePermissionService.updateTrusteeAccess(trustorId, trusteeId, newTrustLevel);
+    } catch (err) {
+      console.error('⚠️ Permission fan-out failed during trust level edit (non-fatal):', err);
+    }
 
     // Step 3: Update Firestore
     await updateDoc(relationshipRef, {
@@ -389,8 +395,14 @@ export class TrusteeRelationshipService {
     if (!success) throw new Error('Blockchain update failed — see sync queue for details');
     console.log('✅ Blockchain: Trust level downgraded');
 
-    // Step 2: Update record permissions to reflect new (lower) trust level
-    await TrusteePermissionService.updateTrusteeAccess(trustorId, trusteeId, newTrustLevel);
+    // Step 2: Update record permissions to reflect new (lower) trust level.
+    // Fan-out errors are non-fatal — the blockchain is already updated, so the
+    // relationship doc must be kept in sync regardless of partial permission failures.
+    try {
+      await TrusteePermissionService.updateTrusteeAccess(trustorId, trusteeId, newTrustLevel);
+    } catch (err) {
+      console.error('⚠️ Permission fan-out failed during step-down (non-fatal):', err);
+    }
 
     // Step 3: Update Firestore
     await updateDoc(relationshipRef, {
