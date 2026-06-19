@@ -249,7 +249,7 @@ service cloud.firestore {
         resource.data.uploadedBy == request.auth.uid ||
         request.auth.uid in resource.data.owners ||
         request.auth.uid in resource.data.administrators ||
-        request.auth.uid in resource.data.get('sharers', []) ||
+        ('sharers' in resource.data && request.auth.uid in resource.data.sharers) ||
         request.auth.uid in resource.data.viewers ||
         request.auth.uid in resource.data.subjects
       );
