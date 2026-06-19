@@ -62,6 +62,7 @@ const mapFirestoreToFileObject = (docId: string, data: DocumentData): FileObject
     owners: data.owners || [],
     administrators: data.administrators,
     viewers: data.viewers || [],
+    sharers: data.sharers || [],
     subjects: data.subjects || [],
     trustees: data.trustees || [],
 

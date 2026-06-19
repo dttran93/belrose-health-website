@@ -40,7 +40,7 @@ import { TrusteeRelationshipService } from '@/features/Trustee/services/trusteeR
 // TYPES
 // ============================================================================
 
-export type SubjectRole = 'viewer' | 'administrator' | 'owner';
+export type SubjectRole = 'sharer' | 'administrator' | 'owner';
 export type SubjectChoice = 'self' | 'other';
 
 export type SubjectDialogPhase =
@@ -76,7 +76,7 @@ interface PendingOperation {
 // Role hierarchy for comparison
 const ROLE_HIERARCHY: Record<SubjectRole | 'none', number> = {
   none: 0,
-  viewer: 1,
+  sharer: 1,
   administrator: 2,
   owner: 3,
 };
@@ -92,7 +92,7 @@ export const getUserRoleForRecord = (userId: string, record: FileObject): Subjec
   if (record.owners?.includes(userId)) return 'owner';
   if (record.administrators?.includes(userId)) return 'administrator';
   if (record.uploadedBy === userId) return 'administrator';
-  if (record.viewers?.includes(userId)) return 'viewer';
+  if (record.sharers?.includes(userId)) return 'sharer';
   return null;
 };
 
@@ -113,7 +113,7 @@ export const isRoleDowngrade = (
  */
 export const getMinimumAllowedRole = (userId: string, record: FileObject): SubjectRole => {
   const currentRole = getUserRoleForRecord(userId, record);
-  return currentRole || 'viewer';
+  return currentRole || 'sharer';
 };
 
 // ============================================================================
@@ -134,7 +134,7 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
 
   // Selection state (for the selecting/searching phases)
   const [subjectChoice, setSubjectChoice] = useState<SubjectChoice>('self');
-  const [selectedRole, setSelectedRole] = useState<SubjectRole>('viewer');
+  const [selectedRole, setSelectedRole] = useState<SubjectRole>('sharer');
   const [selectedUser, setSelectedUser] = useState<BelroseUserProfile | null>(null);
   const [revokeAccess, setRevokeAccess] = useState<boolean>(true);
 
@@ -230,7 +230,7 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
     setPendingOperation(null);
     setPreparationProgress(null);
     setSubjectChoice('self');
-    setSelectedRole('viewer');
+    setSelectedRole('sharer');
     setSelectedUser(null);
     setRevokeAccess(true);
     setIsControllerOfSelected(false);
@@ -440,7 +440,7 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
 
     // Capture these now before closing the dialog — closures in .then()/.catch()
     // will still reference them correctly
-    const targetRole = pendingOperation.selectedRole || 'viewer';
+    const targetRole = pendingOperation.selectedRole || 'sharer';
     const currentRole = getUserRoleForRecord(userId, record);
 
     const activityId = addActivity({ label: 'Setting subject status', link: recordLink });
@@ -502,14 +502,14 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
       console.log('🔄 Step 2: Creating consent request...');
       const recordTitle = record.belroseFields?.title || record.fileName;
       await SubjectService.requestSubjectConsent(recordId, selectedUser.uid, {
-        role: pendingOperation.selectedRole || 'viewer',
+        role: pendingOperation.selectedRole || 'sharer',
         recordTitle,
       });
       console.log('✅ Step 2 complete');
 
       // Step 3: Grant the role so the subject can preview the record
       console.log('🔄 Step 3: Checking/granting role...');
-      const targetRole = pendingOperation.selectedRole || 'viewer';
+      const targetRole = pendingOperation.selectedRole || 'sharer';
       const currentRole = getUserRoleForRecord(selectedUser.uid, record);
       const needsRoleGrant =
         !currentRole || ROLE_HIERARCHY[targetRole] > ROLE_HIERARCHY[currentRole || 'none'];

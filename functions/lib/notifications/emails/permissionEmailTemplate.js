@@ -10,11 +10,13 @@ const emailUtils_1 = require("../emailUtils");
 const ROLE_LABELS = {
     owner: 'Owner',
     administrator: 'Administrator',
+    sharer: 'Sharer',
     viewer: 'Viewer',
 };
 const ROLE_DESCRIPTIONS = {
     owner: 'You can view, edit, share, and manage all aspects of this record.',
     administrator: 'You can view, edit, and share this record.',
+    sharer: 'You can view and share this record with others.',
     viewer: 'You can view this record.',
 };
 // ─── Shared layout helpers ────────────────────────────────────────────────────

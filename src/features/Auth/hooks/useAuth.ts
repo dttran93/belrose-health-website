@@ -59,7 +59,7 @@ export const useAuth = (): AuthContextData => {
             user.emailVerified
           );
         }
-        const idTokenResult = await user.getIdTokenResult(true);
+        const idTokenResult = await user.getIdTokenResult();
         mergedUser.isPlatformAdmin = idTokenResult.claims.platformAdmin === true;
         mergedUser.signInProvider = idTokenResult.signInProvider ?? undefined;
       }

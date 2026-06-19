@@ -56,7 +56,7 @@ export type NotificationDoc =
         requestId: string;
         subjectId: string;
         requestedBy: string;
-        requestedSubjectRole: 'viewer' | 'administrator' | 'owner';
+        requestedSubjectRole: 'sharer' | 'administrator' | 'owner';
         encryptedRecordTitle?: string;
         encryptedRecordTitleIv?: string;
       };
@@ -119,8 +119,8 @@ export type NotificationDoc =
       payload: {
         recordId: string;
         changedBy: string;
-        newRole: 'owner' | 'administrator' | 'viewer';
-        previousRole?: 'owner' | 'administrator' | 'viewer' | null; // present for upgrades
+        newRole: 'owner' | 'administrator' | 'sharer' | 'viewer';
+        previousRole?: 'owner' | 'administrator' | 'sharer' | 'viewer' | null; // present for upgrades
         encryptedRecordTitle?: string;
         encryptedRecordTitleIv?: string;
       };
@@ -130,8 +130,8 @@ export type NotificationDoc =
       payload: {
         recordId: string;
         changedBy: string;
-        previousRole: 'owner' | 'administrator' | 'viewer';
-        newRole?: 'owner' | 'administrator' | 'viewer' | null; // present for downgrades, null for full revocation
+        previousRole: 'owner' | 'administrator' | 'sharer' | 'viewer';
+        newRole?: 'owner' | 'administrator' | 'sharer' | 'viewer' | null; // present for downgrades, null for full revocation
         encryptedRecordTitle?: string;
         encryptedRecordTitleIv?: string;
       };

@@ -43,6 +43,7 @@ export interface MemberRoleManagerInterface extends Interface {
       | "getRecordAdmins"
       | "getRecordOwners"
       | "getRecordRoleStats"
+      | "getRecordSharers"
       | "getRecordViewers"
       | "getRecordsByUser"
       | "getRoleDetails"
@@ -50,6 +51,7 @@ export interface MemberRoleManagerInterface extends Interface {
       | "getRoleGranter"
       | "getTotalRoles"
       | "getTotalUsers"
+      | "getTrusteeGrantedRecords"
       | "getTrusteeRelationship"
       | "getUserForWallet"
       | "getUserStatus"
@@ -84,6 +86,7 @@ export interface MemberRoleManagerInterface extends Interface {
       | "roleGrantedBy"
       | "setHealthRecordCore"
       | "setUserStatus"
+      | "sharersByRecord"
       | "totalRoles"
       | "totalUsers"
       | "transferAdmin"
@@ -185,6 +188,10 @@ export interface MemberRoleManagerInterface extends Interface {
     values: [BytesLike]
   ): string;
   encodeFunctionData(
+    functionFragment: "getRecordSharers",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
     functionFragment: "getRecordViewers",
     values: [BytesLike]
   ): string;
@@ -211,6 +218,10 @@ export interface MemberRoleManagerInterface extends Interface {
   encodeFunctionData(
     functionFragment: "getTotalUsers",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getTrusteeGrantedRecords",
+    values: [BytesLike, BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "getTrusteeRelationship",
@@ -349,6 +360,10 @@ export interface MemberRoleManagerInterface extends Interface {
     values: [BytesLike, BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "sharersByRecord",
+    values: [BytesLike, BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "totalRoles",
     values?: undefined
   ): string;
@@ -457,6 +472,10 @@ export interface MemberRoleManagerInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "getRecordSharers",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "getRecordViewers",
     data: BytesLike
   ): Result;
@@ -482,6 +501,10 @@ export interface MemberRoleManagerInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "getTotalUsers",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getTrusteeGrantedRecords",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -606,6 +629,10 @@ export interface MemberRoleManagerInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "setUserStatus",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "sharersByRecord",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "totalRoles", data: BytesLike): Result;
@@ -1179,12 +1206,19 @@ export interface MemberRoleManager extends BaseContract {
   getRecordRoleStats: TypedContractMethod<
     [recordIdHash: BytesLike],
     [
-      [bigint, bigint, bigint] & {
+      [bigint, bigint, bigint, bigint] & {
         ownerCount: bigint;
         adminCount: bigint;
+        sharerCount: bigint;
         viewerCount: bigint;
       }
     ],
+    "view"
+  >;
+
+  getRecordSharers: TypedContractMethod<
+    [recordIdHash: BytesLike],
+    [string[]],
     "view"
   >;
 
@@ -1221,6 +1255,12 @@ export interface MemberRoleManager extends BaseContract {
   getTotalRoles: TypedContractMethod<[], [bigint], "view">;
 
   getTotalUsers: TypedContractMethod<[], [bigint], "view">;
+
+  getTrusteeGrantedRecords: TypedContractMethod<
+    [trustorIdHash: BytesLike, trusteeIdHash: BytesLike],
+    [string[]],
+    "view"
+  >;
 
   getTrusteeRelationship: TypedContractMethod<
     [trustorIdHash: BytesLike, trusteeIdHash: BytesLike],
@@ -1415,6 +1455,12 @@ export interface MemberRoleManager extends BaseContract {
     "nonpayable"
   >;
 
+  sharersByRecord: TypedContractMethod<
+    [arg0: BytesLike, arg1: BigNumberish],
+    [string],
+    "view"
+  >;
+
   totalRoles: TypedContractMethod<[], [bigint], "view">;
 
   totalUsers: TypedContractMethod<[], [bigint], "view">;
@@ -1571,14 +1617,18 @@ export interface MemberRoleManager extends BaseContract {
   ): TypedContractMethod<
     [recordIdHash: BytesLike],
     [
-      [bigint, bigint, bigint] & {
+      [bigint, bigint, bigint, bigint] & {
         ownerCount: bigint;
         adminCount: bigint;
+        sharerCount: bigint;
         viewerCount: bigint;
       }
     ],
     "view"
   >;
+  getFunction(
+    nameOrSignature: "getRecordSharers"
+  ): TypedContractMethod<[recordIdHash: BytesLike], [string[]], "view">;
   getFunction(
     nameOrSignature: "getRecordViewers"
   ): TypedContractMethod<[recordIdHash: BytesLike], [string[]], "view">;
@@ -1612,6 +1662,13 @@ export interface MemberRoleManager extends BaseContract {
   getFunction(
     nameOrSignature: "getTotalUsers"
   ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "getTrusteeGrantedRecords"
+  ): TypedContractMethod<
+    [trustorIdHash: BytesLike, trusteeIdHash: BytesLike],
+    [string[]],
+    "view"
+  >;
   getFunction(
     nameOrSignature: "getTrusteeRelationship"
   ): TypedContractMethod<
@@ -1818,6 +1875,13 @@ export interface MemberRoleManager extends BaseContract {
     [userIdHash: BytesLike, newStatus: BigNumberish],
     [void],
     "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "sharersByRecord"
+  ): TypedContractMethod<
+    [arg0: BytesLike, arg1: BigNumberish],
+    [string],
+    "view"
   >;
   getFunction(
     nameOrSignature: "totalRoles"

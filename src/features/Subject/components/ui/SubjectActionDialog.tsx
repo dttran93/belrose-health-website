@@ -31,6 +31,7 @@ import {
   AlertTriangle,
   Link,
   Unlink,
+  Share2,
   Shield,
   ShieldAlert,
   ShieldCheck,
@@ -110,13 +111,13 @@ const ROLE_CONFIG: Record<
     bgColor: string;
   }
 > = {
-  viewer: {
-    label: 'Viewer',
-    description: 'Can view the record but cannot edit or manage it',
-    icon: Shield,
-    color: 'text-yellow-600',
-    borderColor: 'border-yellow-200',
-    bgColor: 'bg-yellow-50',
+  sharer: {
+    label: 'Sharer',
+    description: 'Can view and share the record, but cannot edit it',
+    icon: Share2,
+    color: 'text-green-600',
+    borderColor: 'border-green-200',
+    bgColor: 'bg-green-50',
   },
   administrator: {
     label: 'Administrator',
@@ -137,7 +138,7 @@ const ROLE_CONFIG: Record<
 };
 
 const ROLE_HIERARCHY: Record<SubjectRole, number> = {
-  viewer: 1,
+  sharer: 1,
   administrator: 2,
   owner: 3,
 };
@@ -344,7 +345,7 @@ const SelectingContent: React.FC<{
 }) => {
   const { user } = useAuthContext();
   const userCurrentRole = user?.uid ? getUserRoleForRecord(user.uid, record) : null;
-  const minimumRole = user?.uid ? getMinimumAllowedRole(user.uid, record) : 'viewer';
+  const minimumRole = user?.uid ? getMinimumAllowedRole(user.uid, record) : 'sharer';
   const minimumRoleLevel = ROLE_HIERARCHY[minimumRole];
 
   // Filter roles based on user's current role (for self)
@@ -467,7 +468,7 @@ const SelectingContent: React.FC<{
           })}
         </div>
 
-        {subjectChoice === 'self' && userCurrentRole && userCurrentRole !== 'viewer' && (
+        {subjectChoice === 'self' && userCurrentRole && userCurrentRole !== 'sharer' && (
           <p className="text-xs text-gray-500 mt-2 italic">
             Lower permission levels are not shown to prevent downgrading.
           </p>

@@ -51,7 +51,7 @@ export enum MemberStatus {
   Guest = 5,
 }
 
-export type RoleType = 'owner' | 'administrator' | 'viewer';
+export type RoleType = 'owner' | 'administrator' | 'sharer' | 'viewer';
 
 /**
  * Wallet info from the wallets() mapping

@@ -398,7 +398,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   // =================== ROLE MANAGEMENT - STRUCTURE ===================
 
   struct RecordRole {
-    string role; // "owner", "administrator", "viewer"
+    string role; // "owner", "administrator", "sharer", "viewer"
     bool isActive;
   }
 
@@ -410,6 +410,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   // recordIdHash => list of identity hashes with each role type
   mapping(bytes32 => bytes32[]) public ownersByRecord;
   mapping(bytes32 => bytes32[]) public adminsByRecord;
+  mapping(bytes32 => bytes32[]) public sharersByRecord;
   mapping(bytes32 => bytes32[]) public viewersByRecord;
 
   // userIdHash => list of recordIdHashes where they have a role
@@ -443,7 +444,15 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     bytes32 h = keccak256(bytes(role));
     return (h == keccak256(bytes("owner")) ||
       h == keccak256(bytes("administrator")) ||
+      h == keccak256(bytes("sharer")) ||
       h == keccak256(bytes("viewer")));
+  }
+
+  function _isSharerOrAbove(bytes32 recordIdHash, bytes32 userIdHash) internal view returns (bool) {
+    return
+      _hasRole(recordIdHash, userIdHash, "sharer") ||
+      _hasRole(recordIdHash, userIdHash, "administrator") ||
+      _hasRole(recordIdHash, userIdHash, "owner");
   }
 
   function _grantRoleInternal(
@@ -485,6 +494,8 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
       ownersByRecord[recordIdHash].push(userIdHash);
     } else if (roleHash == keccak256(bytes("administrator"))) {
       adminsByRecord[recordIdHash].push(userIdHash);
+    } else if (roleHash == keccak256(bytes("sharer"))) {
+      sharersByRecord[recordIdHash].push(userIdHash);
     } else if (roleHash == keccak256(bytes("viewer"))) {
       viewersByRecord[recordIdHash].push(userIdHash);
     }
@@ -501,6 +512,8 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
       _removeFromBytes32Array(ownersByRecord[recordIdHash], userIdHash);
     } else if (roleHash == keccak256(bytes("administrator"))) {
       _removeFromBytes32Array(adminsByRecord[recordIdHash], userIdHash);
+    } else if (roleHash == keccak256(bytes("sharer"))) {
+      _removeFromBytes32Array(sharersByRecord[recordIdHash], userIdHash);
     } else if (roleHash == keccak256(bytes("viewer"))) {
       _removeFromBytes32Array(viewersByRecord[recordIdHash], userIdHash);
     }
@@ -615,6 +628,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     bool ownerExists = ownersByRecord[recordIdHash].length > 0;
     bool userIsOwner = _hasRole(recordIdHash, userIdHash, "owner");
     bool userIsAdmin = _hasRole(recordIdHash, userIdHash, "administrator");
+    bool userIsSharer = _hasRole(recordIdHash, userIdHash, "sharer");
     bool userIsSubject = _isActiveSubject(recordIdHash, userIdHash);
 
     if (roleHash == keccak256(bytes("owner"))) {
@@ -628,17 +642,28 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
         userIsOwner || userIsAdmin,
         "Only owners and administrators can grant administrator role"
       );
-    } else if (roleHash == keccak256(bytes("viewer"))) {
+    } else if (roleHash == keccak256(bytes("sharer"))) {
       require(
-        userIsOwner || userIsAdmin || userIsSubject,
-        "Only owners, administrators, or subjects can grant viewer role"
+        userIsOwner || userIsAdmin || userIsSharer || userIsSubject,
+        "Only owners, administrators, sharers, or subjects can grant sharer role"
       );
-
-      if (userIsSubject && !userIsOwner && !userIsAdmin) {
+      if ((userIsSharer || userIsSubject) && !userIsOwner && !userIsAdmin) {
         string memory userRole = _getUserRole(recordIdHash, userIdHash);
         require(
           bytes(userRole).length > 0,
-          "Subject must have an active role to grant viewer permissions"
+          "Must have an active role to grant sharer permissions"
+        );
+      }
+    } else if (roleHash == keccak256(bytes("viewer"))) {
+      require(
+        userIsOwner || userIsAdmin || userIsSharer || userIsSubject,
+        "Only owners, administrators, sharers, or subjects can grant viewer role"
+      );
+      if ((userIsSharer || userIsSubject) && !userIsOwner && !userIsAdmin) {
+        string memory userRole = _getUserRole(recordIdHash, userIdHash);
+        require(
+          bytes(userRole).length > 0,
+          "Must have an active role to grant viewer permissions"
         );
       }
     }
@@ -687,6 +712,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     bool ownerExists = ownersByRecord[recordIdHash].length > 0;
     bool userIsOwner = _hasRole(recordIdHash, userIdHash, "owner");
     bool userIsAdmin = _hasRole(recordIdHash, userIdHash, "administrator");
+    bool userIsSharer = _hasRole(recordIdHash, userIdHash, "sharer");
     bool userIsTarget = userIdHash == targetIdHash;
 
     if (newRoleHash == keccak256(bytes("owner"))) {
@@ -700,15 +726,29 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
         userIsOwner || userIsAdmin,
         "Only owners and administrators can promote to administrator"
       );
+    } else if (newRoleHash == keccak256(bytes("sharer"))) {
+      if (ownerExists) {
+        require(
+          userIsOwner || (userIsAdmin && userIsTarget) || (userIsSharer && userIsTarget),
+          "Only owners can change others to sharer. Admins and sharers can only demote themselves."
+        );
+      } else {
+        require(userIsAdmin || (userIsSharer && userIsTarget), "Only administrators can demote to sharer");
+      }
     } else if (newRoleHash == keccak256(bytes("viewer"))) {
       if (ownerExists) {
         require(
-          userIsOwner || (userIsAdmin && userIsTarget),
-          "Only owners can demote others. Administrators can only demote themselves."
+          userIsOwner || (userIsAdmin && userIsTarget) || (userIsSharer && userIsTarget),
+          "Only owners can demote others. Administrators and sharers can only demote themselves."
         );
       } else {
         require(userIsAdmin, "Only administrators can demote to viewer");
       }
+      // Subject minimum: active subjects cannot be demoted below sharer
+      require(
+        !_isActiveSubject(recordIdHash, targetIdHash),
+        "Cannot demote an active subject below sharer"
+      );
     }
 
     if (
@@ -775,16 +815,22 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
 
     bool isSelfRevoke = userIdHash == targetIdHash;
 
+    // Subject minimum: active subjects cannot have their role fully revoked
+    require(
+      !_isActiveSubject(recordIdHash, targetIdHash),
+      "Cannot revoke an active subject's role. Active subjects must hold at least sharer role."
+    );
+
     if (!isSelfRevoke) {
       bool userIsOwner = _hasRole(recordIdHash, userIdHash, "owner");
       bool userIsAdmin = _hasRole(recordIdHash, userIdHash, "administrator");
       bytes32 grantedBy = roleGrantedBy[targetRoleKey];
       bool userGrantedThisRole = (grantedBy == userIdHash);
 
-      if (roleHash == keccak256(bytes("viewer"))) {
+      if (roleHash == keccak256(bytes("viewer")) || roleHash == keccak256(bytes("sharer"))) {
         require(
           userIsOwner || userIsAdmin || userGrantedThisRole,
-          "Only owners, administrators, or the granter can revoke viewers"
+          "Only owners, administrators, or the granter can revoke viewer/sharer roles"
         );
       } else {
         require(userIsOwner || userIsAdmin, "Only owners and administrators can revoke roles");
@@ -899,6 +945,13 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   }
 
   /**
+   * @notice Get all sharer identities of a record
+   */
+  function getRecordSharers(bytes32 recordIdHash) external view returns (bytes32[] memory) {
+    return sharersByRecord[recordIdHash];
+  }
+
+  /**
    * @notice Get all viewer identities of a record
    */
   function getRecordViewers(bytes32 recordIdHash) external view returns (bytes32[] memory) {
@@ -917,10 +970,11 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
    */
   function getRecordRoleStats(
     bytes32 recordIdHash
-  ) external view returns (uint256 ownerCount, uint256 adminCount, uint256 viewerCount) {
+  ) external view returns (uint256 ownerCount, uint256 adminCount, uint256 sharerCount, uint256 viewerCount) {
     return (
       ownersByRecord[recordIdHash].length,
       adminsByRecord[recordIdHash].length,
+      sharersByRecord[recordIdHash].length,
       viewersByRecord[recordIdHash].length
     );
   }
@@ -986,6 +1040,13 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
 
   // trustorIdHash => trusteeIdHash => TrusteeRelationship
   mapping(bytes32 => mapping(bytes32 => TrusteeRelationship)) public trusteeRelationships;
+
+  // trustorIdHash => trusteeIdHash => recordIdHash[] (records granted via grantRoleAsTrusteeBatch)
+  mapping(bytes32 => mapping(bytes32 => bytes32[])) private _trusteeGrantedRecords;
+
+  // Dedup set for _trusteeGrantedRecords — O(1) contains check
+  // trustorIdHash => trusteeIdHash => recordIdHash => bool
+  mapping(bytes32 => mapping(bytes32 => mapping(bytes32 => bool))) private _trusteeGrantedRecordSet;
 
   //==================== TRUSTEE - EVENTS ====================
   event TrusteeProposed(
@@ -1367,6 +1428,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
       bool ownerExists = ownersByRecord[recordIdHash].length > 0;
       bool userIsOwner = _hasRole(recordIdHash, userIdHash, "owner");
       bool userIsAdmin = _hasRole(recordIdHash, userIdHash, "administrator");
+      bool userIsSharer = _hasRole(recordIdHash, userIdHash, "sharer");
       bool userIsTarget = userIdHash == targetIdHash;
 
       if (newRoleHash == keccak256(bytes("owner"))) {
@@ -1377,12 +1439,20 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
         }
       } else if (newRoleHash == keccak256(bytes("administrator"))) {
         if (!userIsOwner && !userIsAdmin) continue;
+      } else if (newRoleHash == keccak256(bytes("sharer"))) {
+        if (ownerExists) {
+          if (!userIsOwner && !(userIsAdmin && userIsTarget) && !(userIsSharer && userIsTarget)) continue;
+        } else {
+          if (!userIsAdmin && !(userIsSharer && userIsTarget)) continue;
+        }
       } else if (newRoleHash == keccak256(bytes("viewer"))) {
         if (ownerExists) {
-          if (!userIsOwner && !(userIsAdmin && userIsTarget)) continue;
+          if (!userIsOwner && !(userIsAdmin && userIsTarget) && !(userIsSharer && userIsTarget)) continue;
         } else {
           if (!userIsAdmin) continue;
         }
+        // Subject minimum: cannot demote an active subject below sharer
+        if (_isActiveSubject(recordIdHash, targetIdHash)) continue;
       }
 
       if (
@@ -1420,6 +1490,9 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
 
       // Never revoke owners in batch — only an owner can revoke themselves
       if (roleHash == keccak256(bytes("owner"))) continue;
+
+      // Subject minimum: skip if target is an active subject (minimum role = sharer)
+      if (_isActiveSubject(recordIdHashes[i], targetIdHash)) continue;
 
       _removeFromRoleArray(recordIdHashes[i], targetIdHash, role);
       recordRoles[targetRoleKey].isActive = false;
@@ -1638,13 +1711,5 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   // New variables must be appended HERE (before __gap), never inserted above.
   // ===============================================================
 
-  // Records granted to a trustee via grantRoleAsTrusteeBatch, tracked for cleanup on revocation.
-  // Appended in v2 upgrade. trustorIdHash => trusteeIdHash => recordIdHash[]
-  mapping(bytes32 => mapping(bytes32 => bytes32[])) private _trusteeGrantedRecords;
-
-  // Dedup set for _trusteeGrantedRecords — O(1) contains check to avoid double-tracking.
-  // Appended in v2 upgrade. trustorIdHash => trusteeIdHash => recordIdHash => bool
-  mapping(bytes32 => mapping(bytes32 => mapping(bytes32 => bool))) private _trusteeGrantedRecordSet;
-
-  uint256[48] private __gap;
+  uint256[50] private __gap;
 }

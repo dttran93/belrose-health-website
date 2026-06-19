@@ -177,6 +177,7 @@ export interface FileObject {
   owners?: string[]; // Array of user IDs with ultimate ownership access to record (read, update, delete, share)
   administrators: string[]; //Array of userIDs with administrative access to records, can't remove others
   viewers?: string[]; // Array of user IDs with view access to record
+  sharers?: string[]; // Array of user IDs who can view and share the record (but not edit)
   subjects?: string[]; //The subject of this record. Made it an array for edge cases where there are multiple subjects (couples therapy, mother/newborn, family history, genetic testing)
   trustees?: string[]; // userIds who have access via an active trustee relationship
 

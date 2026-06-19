@@ -316,6 +316,7 @@ const ConfirmRevokeContent: React.FC<ConfirmRevokeContentProps> = ({
 }) => {
   const isOwner = role === 'owner';
   const isAdmin = role === 'administrator';
+  const isSharer = role === 'sharer';
 
   return (
     <>
@@ -363,8 +364,8 @@ const ConfirmRevokeContent: React.FC<ConfirmRevokeContentProps> = ({
           </button>
         )}
 
-        {/* Demote to Viewer (Owner or Admin) */}
-        {(isOwner || isAdmin) && (
+        {/* Demote to Viewer (Owner, Admin, or Sharer) */}
+        {(isOwner || isAdmin || isSharer) && (
           <button
             onClick={() => onConfirm('demote-viewer')}
             className="w-full text-left p-3 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors"

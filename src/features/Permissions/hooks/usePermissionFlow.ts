@@ -40,6 +40,7 @@ interface UsePermissionFlowOptions {
 
 const roleLabels: Record<Role, string> = {
   viewer: 'Viewer',
+  sharer: 'Sharer',
   administrator: 'Administrator',
   owner: 'Owner',
 };
@@ -191,9 +192,11 @@ export function usePermissionFlow({ recordId, recordTitle, onSuccess }: UsePermi
           )
         : role === 'viewer'
           ? PermissionsService.grantViewer(primaryRecordId, targetUserId, recordTitle)
-          : role === 'administrator'
-            ? PermissionsService.grantAdmin(primaryRecordId, targetUserId, recordTitle)
-            : PermissionsService.grantOwner(primaryRecordId, targetUserId, recordTitle);
+          : role === 'sharer'
+            ? PermissionsService.grantSharer(primaryRecordId, targetUserId, recordTitle)
+            : role === 'administrator'
+              ? PermissionsService.grantAdmin(primaryRecordId, targetUserId, recordTitle)
+              : PermissionsService.grantOwner(primaryRecordId, targetUserId, recordTitle);
 
       // Close dialog immediately
       setSubmittedLabel(activityLabel);
@@ -300,18 +303,22 @@ export function usePermissionFlow({ recordId, recordTitle, onSuccess }: UsePermi
       const txPromise =
         role === 'viewer'
           ? PermissionsService.removeViewer(primaryRecordId, targetUserId, recordTitle)
-          : role === 'administrator'
-            ? PermissionsService.removeAdmin(primaryRecordId, targetUserId, recordTitle, {
+          : role === 'sharer'
+            ? PermissionsService.removeSharer(primaryRecordId, targetUserId, recordTitle, {
                 demoteToViewer: action === 'demote-viewer',
               })
-            : PermissionsService.removeOwner(primaryRecordId, targetUserId, recordTitle, {
-                demoteTo:
-                  action === 'demote-admin'
-                    ? 'administrator'
-                    : action === 'demote-viewer'
-                      ? 'viewer'
-                      : undefined,
-              });
+            : role === 'administrator'
+              ? PermissionsService.removeAdmin(primaryRecordId, targetUserId, recordTitle, {
+                  demoteToViewer: action === 'demote-viewer',
+                })
+              : PermissionsService.removeOwner(primaryRecordId, targetUserId, recordTitle, {
+                  demoteTo:
+                    action === 'demote-admin'
+                      ? 'administrator'
+                      : action === 'demote-viewer'
+                        ? 'viewer'
+                        : undefined,
+                });
 
       // Close dialog immediately
       setSubmittedLabel(activityLabel);

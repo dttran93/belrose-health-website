@@ -42,7 +42,7 @@ export interface IncomingSubjectRequest {
   recordId: string;
   recordTitle?: string;
   requestedBy: string;
-  requestedSubjectRole: 'viewer' | 'administrator' | 'owner';
+  requestedSubjectRole: 'sharer' | 'administrator' | 'owner';
   requestedAt: Timestamp;
   status: SubjectRequestStatus;
 }

@@ -1,17 +1,19 @@
 import { APP_URL, MARKETING_URL, SUPPORT_EMAIL } from '../emailUtils';
 import { formatRecordIdFallback } from '../notificationUtils';
 
-type Role = 'owner' | 'administrator' | 'viewer';
+type Role = 'owner' | 'administrator' | 'sharer' | 'viewer';
 
 const ROLE_LABELS: Record<Role, string> = {
   owner: 'Owner',
   administrator: 'Administrator',
+  sharer: 'Sharer',
   viewer: 'Viewer',
 };
 
 const ROLE_DESCRIPTIONS: Record<Role, string> = {
   owner: 'You can view, edit, share, and manage all aspects of this record.',
   administrator: 'You can view, edit, and share this record.',
+  sharer: 'You can view and share this record with others.',
   viewer: 'You can view this record.',
 };
 

@@ -339,9 +339,9 @@ export declare const PAYMASTER: {
 };
 export declare function buildBundlerURL(pimlicoApiKey: string): string;
 export declare const MEMBER_ROLE_MANAGER: {
-    readonly proxy: "0xdF9583C25E234A34a1E47d9830722123CA228a1a";
-    readonly implementation: "0xf3e0c2229782c270fb829bc7fe4eef17acf51dbb";
-    readonly deploymentBlock: 41800192;
+    readonly proxy: "0x15B6247f1305ed1Ab3947765DF01d26D849B62d7";
+    readonly implementation: "0x71B59aAF2396616DF801dE88d931dc0d64C2FA12";
+    readonly deploymentBlock: 43049543;
 };
 export declare const HEALTH_RECORD_CORE: {
     readonly proxy: "0x66A8b985C61205e63D7d7DEA72Dfa5849a3e66De";
@@ -350,7 +350,7 @@ export declare const HEALTH_RECORD_CORE: {
 };
 export declare const CONTRACT_ADDRESSES: {
     readonly paymaster: "0x02422f03EcD403E1a902101D60a0Dad5bB9E71a7";
-    readonly memberRoleManager: "0xdF9583C25E234A34a1E47d9830722123CA228a1a";
+    readonly memberRoleManager: "0x15B6247f1305ed1Ab3947765DF01d26D849B62d7";
     readonly healthRecordCore: "0x66A8b985C61205e63D7d7DEA72Dfa5849a3e66De";
     readonly entryPoint: "0x0000000071727De22E5E9d8BAf0edAc6f37da032";
 };

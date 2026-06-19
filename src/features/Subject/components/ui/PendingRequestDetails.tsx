@@ -33,7 +33,7 @@ import { SubjectConsentRequest } from '@belrose/shared';
 
 // Role configuration for display
 const ROLE_CONFIG: Record<
-  'viewer' | 'administrator' | 'owner',
+  'sharer' | 'administrator' | 'owner',
   {
     label: string;
     description: string;
@@ -42,12 +42,12 @@ const ROLE_CONFIG: Record<
     bgColor: string;
   }
 > = {
-  viewer: {
-    label: 'Viewer',
-    description: 'Can view the record but cannot edit or manage it',
+  sharer: {
+    label: 'Sharer',
+    description: 'Can view and share the record, but cannot edit it',
     icon: Shield,
-    color: 'text-yellow-600',
-    bgColor: 'bg-yellow-50',
+    color: 'text-green-600',
+    bgColor: 'bg-green-50',
   },
   administrator: {
     label: 'Administrator',

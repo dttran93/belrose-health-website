@@ -249,7 +249,7 @@ export const SubjectManager: React.FC<SubjectManagerProps> = ({
       </p>
       <ol className="list-decimal list-inside space-y-1 text-xs">
         <li>Setting a subject helps organize records by person</li>
-        <li>Subjects must be either record viewers, administrators, or owners</li>
+        <li>Subjects must be either record sharers, administrators, or owners</li>
         <li>Adding someone else as a subject requires their consent</li>
         <li>A record can have multiple subjects (e.g., for family records)</li>
         <li>Subject links are recorded on the distributed network for verification</li>

@@ -4,6 +4,7 @@ import { FileObject } from '@/types/core';
 import { Button } from '@/components/ui/Button';
 import { OwnerManagement } from './OwnerManagement';
 import AdminManagement from './AdministratorManagement';
+import SharerManagement from './SharerManagement';
 import ViewerManagement from './ViewerManagement';
 import { useRecordTrustees } from '@/features/Trustee/hooks/useRecordTrustees';
 
@@ -13,7 +14,7 @@ interface PermissionsManagerProps {
   onPermissionChange?: () => void;
 }
 
-type PermissionViewMode = 'manager' | 'add-subject' | 'add-owner' | 'add-viewer';
+type PermissionViewMode = 'manager' | 'add-subject' | 'add-owner' | 'add-sharer' | 'add-viewer';
 
 export const PermissionsManager: React.FC<PermissionsManagerProps> = ({
   record,
@@ -26,6 +27,7 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({
   const allRecordUserIds = [
     ...(record.owners ?? []),
     ...(record.administrators ?? []),
+    ...(record.sharers ?? []),
     ...(record.viewers ?? []),
   ];
 
@@ -76,6 +78,22 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({
           onBack={handleManagerScreen}
           onAddMode={() => setViewMode('add-owner')}
           isAddMode={viewMode === 'add-owner'}
+          trusteeMap={trusteeMap}
+          trustorMap={trustorMap}
+        />
+      )}
+
+      {/* Sharers Section */}
+      {(viewMode === 'manager' || viewMode === 'add-sharer') && (
+        <SharerManagement
+          record={record}
+          currentSharers={record.sharers}
+          onSuccess={() => {
+            onPermissionChange?.();
+          }}
+          onBack={handleManagerScreen}
+          onAddMode={() => setViewMode('add-sharer')}
+          isAddMode={viewMode === 'add-sharer'}
           trusteeMap={trusteeMap}
           trustorMap={trustorMap}
         />

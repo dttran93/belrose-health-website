@@ -8,7 +8,7 @@
  * can be reused in LinkRecordModal and anywhere else.
  */
 
-import { Shield, ShieldCheck, Crown } from 'lucide-react';
+import { Shield, ShieldCheck, Crown, Share2 } from 'lucide-react';
 import { Role } from '@/features/Permissions/services/permissionsService';
 
 interface RoleSelectorProps {
@@ -34,6 +34,14 @@ export const ROLE_CONFIG: Record<
     textColor: 'text-yellow-600',
     bgColor: 'bg-yellow-50',
     borderColor: 'border-yellow-300',
+  },
+  sharer: {
+    label: 'Sharer',
+    description: 'Can view and share the record, but cannot edit it.',
+    icon: Share2,
+    textColor: 'text-green-600',
+    bgColor: 'bg-green-50',
+    borderColor: 'border-green-300',
   },
   administrator: {
     label: 'Administrator',
