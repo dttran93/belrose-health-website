@@ -17,6 +17,14 @@ service cloud.firestore {
     // DATABASE-SCOPED HELPER FUNCTIONS
     // ============================================
 
+    // Check if the authenticated user is a platform admin.
+    // Reads from the custom auth claim set via Admin SDK — same source the
+    // frontend RequiresPlatformAdmin guard uses (idTokenResult.claims.platformAdmin).
+    // Using the token avoids a get() call and works reliably for list queries.
+    function isPlatformAdmin() {
+      return request.auth.token.get('platformAdmin', false) == true;
+    }
+
     // Check if user has any role on a record
     function hasRoleOnRecord(recordId) {
       let record = get(/databases/$(database)/documents/records/$(recordId));
@@ -110,11 +118,21 @@ service cloud.firestore {
     // ============================================
 
     match /users/{userId} {
-      // Owner can read/write their own profile
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      
-      // Any authenticated user can read profiles (needed for sharing)
+      // Any authenticated user can read profiles (needed for sharing/search)
       allow read: if request.auth != null;
+
+      // Owner can create their own profile, but cannot self-assign platform admin
+      allow create: if request.auth != null &&
+        request.auth.uid == userId &&
+        request.resource.data.get('isPlatformAdmin', false) != true;
+
+      // Owner can update their own profile, but cannot change isPlatformAdmin
+      allow update: if request.auth != null &&
+        request.auth.uid == userId &&
+        request.resource.data.get('isPlatformAdmin', false) == resource.data.get('isPlatformAdmin', false);
+
+      // Owner can delete their own profile
+      allow delete: if request.auth != null && request.auth.uid == userId;
       
       // --- NOTIFICATIONS SUBCOLLECTION ---
       match /notifications/{notificationId} {
@@ -243,8 +261,11 @@ service cloud.firestore {
     // ============================================
 
     match /records/{recordId} {
-      // READ: User can read if they have any role on the record
+      // READ: User can read if they have any role on the record, or are a platform admin.
+      // isPlatformAdmin() is checked first so collection-wide admin scans short-circuit
+      // before any resource.data access (avoids evaluation errors on unfiltered list queries).
       allow read: if request.auth != null && (
+        isPlatformAdmin() ||
         !exists(/databases/$(database)/documents/records/$(recordId)) ||
         resource.data.uploadedBy == request.auth.uid ||
         request.auth.uid in resource.data.owners ||
@@ -527,13 +548,13 @@ service cloud.firestore {
 
     match /verifications/{verificationId} {
       
-      // READ: Allow if user is verifier OR has role on the associated record
-      // Note: For queries by recordId, the get() call happens per-document
+      // READ: Allow if user is verifier, has role on the record, or is a platform admin.
+      // isPlatformAdmin() first so unfiltered admin list queries short-circuit before
+      // hasRoleOnRecord() tries to get() a path containing unknown resource.data.recordId.
       allow read: if request.auth != null && (
+        isPlatformAdmin() ||
         !exists(/databases/$(database)/documents/verifications/$(verificationId)) ||
-        // User is the verifier (can always read their own)
         resource.data.verifierId == request.auth.uid ||
-        // User has a role on the record this verification belongs to
         hasRoleOnRecord(resource.data.recordId)
       );
 
@@ -570,8 +591,11 @@ service cloud.firestore {
     // ============================================
   
     match /disputes/{disputeId} {
-      // READ: Allow if user is disputer OR has role on the associated record
+      // READ: Allow if user is disputer, has role on the record, or is a platform admin.
+      // isPlatformAdmin() first — same reason as verifications: hasRoleOnRecord()
+      // uses resource.data.recordId which is unknown during unfiltered list queries.
       allow read: if request.auth != null && (
+        isPlatformAdmin() ||
         !exists(/databases/$(database)/documents/disputes/$(disputeId)) ||
         resource.data.disputerId == request.auth.uid ||
         hasRoleOnRecord(resource.data.recordId)
@@ -1051,7 +1075,7 @@ service cloud.firestore {
         request.resource.data.retryCount == 0;
 
       allow read, update: if request.auth != null &&
-        (resource.data.userId == request.auth.uid || isServerWrite());
+        (isPlatformAdmin() || resource.data.userId == request.auth.uid || isServerWrite());
 
       allow delete: if isServerWrite();
     }
