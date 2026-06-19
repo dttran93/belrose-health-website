@@ -12,13 +12,11 @@ import { SharingService } from '@/features/Sharing/services/sharingService';
 import { BlockchainRoleManagerService } from './blockchainRoleManagerService';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
 import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
-import { SubjectRole } from '@/features/Subject/hooks/useSubjectFlow';
 import writePermissionChangeEvent from './writePermissionChangeEvent';
-import { buildMemberRegistryRef } from '@belrose/shared';
-import { BlockchainRef } from '@belrose/shared';
+import { buildMemberRegistryRef, BlockchainRef, RecordRole } from '@belrose/shared';
 import { ethers, id } from 'ethers';
 
-export type Role = 'owner' | 'administrator' | 'viewer';
+export type Role = RecordRole;
 
 export class PermissionsService {
   // ============================================================================
@@ -36,7 +34,7 @@ export class PermissionsService {
   static grantRole = async (
     recordId: string,
     userId: string,
-    role: SubjectRole,
+    role: RecordRole,
     recordTitle?: string
   ): Promise<void> => {
     switch (role) {
@@ -45,6 +43,9 @@ export class PermissionsService {
         break;
       case 'administrator':
         await PermissionsService.grantAdmin(recordId, userId, recordTitle);
+        break;
+      case 'sharer':
+        await PermissionsService.grantSharer(recordId, userId, recordTitle);
         break;
       case 'viewer':
         await PermissionsService.grantViewer(recordId, userId, recordTitle);
@@ -63,7 +64,7 @@ export class PermissionsService {
   static removeRole = async (
     recordId: string,
     userId: string,
-    role: SubjectRole
+    role: RecordRole
   ): Promise<void> => {
     switch (role) {
       case 'owner':
@@ -71,6 +72,9 @@ export class PermissionsService {
         break;
       case 'administrator':
         await PermissionsService.removeAdmin(recordId, userId);
+        break;
+      case 'sharer':
+        await PermissionsService.removeSharer(recordId, userId);
         break;
       case 'viewer':
         await PermissionsService.removeViewer(recordId, userId);
@@ -105,11 +109,12 @@ export class PermissionsService {
    * Get current highest role for a user on a record
    */
   static getUserRole(
-    recordData: { owners?: string[]; administrators?: string[]; viewers?: string[] },
+    recordData: { owners?: string[]; administrators?: string[]; sharers?: string[]; viewers?: string[] },
     userId: string
   ): Role | null {
     if (recordData.owners?.includes(userId)) return 'owner';
     if (recordData.administrators?.includes(userId)) return 'administrator';
+    if (recordData.sharers?.includes(userId)) return 'sharer';
     if (recordData.viewers?.includes(userId)) return 'viewer';
     return null;
   }
@@ -172,7 +177,7 @@ export class PermissionsService {
       throw new Error('Target user does not exist or has no profile');
     }
 
-    // Check 5: Check existing role - don't demote owners/admins
+    // Check 5: Check existing role - don't demote to viewer from an equal/higher role
     const existingRole = this.getUserRole(recordData, targetUserId);
 
     if (existingRole === 'owner') {
@@ -180,6 +185,9 @@ export class PermissionsService {
     }
     if (existingRole === 'administrator') {
       throw new Error('User is already an administrator (higher role than viewer)');
+    }
+    if (existingRole === 'sharer') {
+      throw new Error('User is already a sharer (higher role than viewer)');
     }
     if (existingRole === 'viewer') {
       throw new Error('User is already a viewer');
@@ -256,6 +264,140 @@ export class PermissionsService {
     });
 
     console.log('✅ Viewer access granted successfully');
+  }
+
+  /**
+   * Add a sharer to a record.
+   * Sharer can view and grant viewer/sharer access but cannot edit.
+   * This is the minimum role granted to active subjects.
+   */
+  static async grantSharer(
+    recordId: string,
+    targetUserId: string,
+    recordTitle?: string
+  ): Promise<void> {
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    const db = getFirestore();
+    const recordRef = doc(db, 'records', recordId);
+    const recordDoc = await getDoc(recordRef);
+
+    if (!recordDoc.exists()) {
+      throw new Error('Record not found');
+    }
+
+    const recordData = recordDoc.data();
+
+    // Check 2: Only admins/owners/sharers/subjects can grant sharer
+    const isCurrentUserAdmin = recordData.administrators?.includes(currentUser.uid);
+    const isCurrentUserOwner = recordData.owners?.includes(currentUser.uid);
+    const isCurrentUserSharer = recordData.sharers?.includes(currentUser.uid);
+    const isCurrentUserSubject = recordData.subjects?.includes(currentUser.uid);
+
+    if (!isCurrentUserAdmin && !isCurrentUserOwner && !isCurrentUserSharer && !isCurrentUserSubject) {
+      throw new Error('You do not have permission to share this record');
+    }
+
+    // Check 3: If caller is sharer/subject (not admin/owner), verify they have an active role
+    if ((isCurrentUserSharer || isCurrentUserSubject) && !isCurrentUserAdmin && !isCurrentUserOwner) {
+      const currentUserRole = this.getUserRole(recordData, currentUser.uid);
+      if (!currentUserRole) {
+        throw new Error('Must have an active role to grant sharer access');
+      }
+    }
+
+    // Check 4: Find and make sure targetUserId exists
+    const targetProfile = await getUserProfile(targetUserId);
+    if (!targetProfile) {
+      throw new Error('Target user does not exist or has no profile');
+    }
+
+    // Check 5: Don't demote from a higher role
+    const existingRole = this.getUserRole(recordData, targetUserId);
+
+    if (existingRole === 'owner') {
+      throw new Error('User is already an owner (higher role than sharer)');
+    }
+    if (existingRole === 'administrator') {
+      throw new Error('User is already an administrator (higher role than sharer)');
+    }
+    if (existingRole === 'sharer') {
+      throw new Error('User is already a sharer');
+    }
+
+    // Check 6: Ensure wallets exist for blockchain transaction
+    const userWalletAddress = await this.getUserWalletAddress(currentUser.uid);
+    const targetWalletAddress = await this.getUserWalletAddress(targetUserId);
+
+    console.log('🔄 Granting sharer access:', targetUserId);
+
+    let blockchainRef: BlockchainRef;
+
+    try {
+      console.log('🔗 Granting sharer role on blockchain...');
+      const tx = await BlockchainRoleManagerService.grantRole(recordId, targetWalletAddress, 'sharer');
+      blockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
+      console.log('✅ Blockchain: Sharer role granted');
+    } catch (blockchainError) {
+      console.error('⚠️ Blockchain update failed:', blockchainError);
+      const errorMessage =
+        blockchainError instanceof Error ? blockchainError.message : String(blockchainError);
+      await BlockchainSyncQueueService.logFailure({
+        contract: 'MemberRoleManager',
+        action: 'grantRole',
+        userId: currentUser.uid,
+        userWalletAddress,
+        error: errorMessage,
+        context: {
+          type: 'permission',
+          targetUserId,
+          targetWalletAddress,
+          role: 'sharer',
+          recordId,
+          recordIdHash: id(recordId),
+        },
+      });
+      throw blockchainError;
+    }
+
+    // Step 2: Grant encryption access
+    await SharingService.grantEncryptionAccess(recordId, targetUserId, currentUser.uid);
+
+    // Step 3: Write event log
+    await writePermissionChangeEvent(
+      recordId,
+      currentUser.uid,
+      [
+        existingRole
+          ? {
+              userId: targetUserId,
+              action: 'upgraded' as const,
+              previousRole: existingRole as Role,
+              newRole: 'sharer' as const,
+            }
+          : {
+              userId: targetUserId,
+              action: 'granted' as const,
+              previousRole: null,
+              newRole: 'sharer' as const,
+            },
+      ],
+      blockchainRef,
+      recordTitle
+    );
+
+    // Step 4: Add to sharers, remove from viewers (highest role only)
+    await updateDoc(recordRef, {
+      sharers: arrayUnion(targetUserId),
+      viewers: arrayRemove(targetUserId),
+    });
+
+    console.log('✅ Sharer access granted successfully');
   }
 
   /**
@@ -405,9 +547,10 @@ export class PermissionsService {
       recordTitle
     );
 
-    // Step 4: Update arrays - add to admins, remove from viewers (highest role only)
+    // Step 4: Update arrays - add to admins, remove from lower roles (highest role only)
     await updateDoc(recordRef, {
       administrators: arrayUnion(targetUserId),
+      sharers: arrayRemove(targetUserId),
       viewers: arrayRemove(targetUserId),
     });
 
@@ -562,6 +705,7 @@ export class PermissionsService {
     await updateDoc(recordRef, {
       owners: arrayUnion(targetUserId),
       administrators: arrayRemove(targetUserId),
+      sharers: arrayRemove(targetUserId),
       viewers: arrayRemove(targetUserId),
     });
 
@@ -705,6 +849,146 @@ export class PermissionsService {
     });
 
     console.log('✅ Viewer access removed successfully');
+  }
+
+  /**
+   * Remove a sharer from a record.
+   * Admins/owners can remove any sharer; sharers can remove access they personally granted;
+   * users can always remove themselves.
+   */
+  static async removeSharer(
+    recordId: string,
+    targetUserId: string,
+    recordTitle?: string,
+    options?: { demoteToViewer?: boolean }
+  ): Promise<void> {
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+      throw new Error('User not authenticated');
+    }
+
+    const db = getFirestore();
+    const recordRef = doc(db, 'records', recordId);
+    const recordDoc = await getDoc(recordRef);
+
+    if (!recordDoc.exists()) {
+      throw new Error('Record not found');
+    }
+
+    const recordData = recordDoc.data();
+
+    const isAdmin = recordData.administrators?.includes(currentUser.uid);
+    const isOwner = recordData.owners?.includes(currentUser.uid);
+    const isSelfRemoval = targetUserId === currentUser.uid;
+    const isCurrentUserSharer = recordData.sharers?.includes(currentUser.uid);
+    const isCurrentUserSubject = recordData.subjects?.includes(currentUser.uid);
+
+    if (!isAdmin && !isOwner && !isSelfRemoval && !isCurrentUserSharer && !isCurrentUserSubject) {
+      throw new Error('You do not have permission to remove sharers');
+    }
+
+    // Sharers/subjects can only remove access they personally granted
+    let isSharerWhoGranted = false;
+    if ((isCurrentUserSharer || isCurrentUserSubject) && !isAdmin && !isOwner && !isSelfRemoval) {
+      try {
+        const wrappedKeyDoc = await getDoc(doc(db, 'wrappedKeys', `${recordId}_${targetUserId}`));
+        if (wrappedKeyDoc.exists()) {
+          isSharerWhoGranted = wrappedKeyDoc.data()?.grantedBy === currentUser.uid;
+        }
+      } catch (error) {
+        console.error('Error checking wrapped key:', error);
+      }
+    }
+
+    if ((isCurrentUserSharer || isCurrentUserSubject) && !isAdmin && !isOwner && !isSelfRemoval && !isSharerWhoGranted) {
+      throw new Error('Sharers can only remove permissions they personally granted');
+    }
+
+    // Check target is actually a sharer
+    if (!recordData.sharers?.includes(targetUserId)) {
+      throw new Error('User is not a sharer of this record');
+    }
+
+    // Cannot remove an active subject's access (minimum sharer)
+    const isTargetSubject = recordData.subjects?.includes(targetUserId);
+    if (isTargetSubject) {
+      throw new Error("Cannot remove a subject's access. Please remove them as subject first.");
+    }
+
+    const userWalletAddress = await this.getUserWalletAddress(currentUser.uid);
+    const targetWalletAddress = await this.getUserWalletAddress(targetUserId);
+
+    console.log('🔄 Removing sharer access:', targetUserId);
+
+    const demoteToViewer = options?.demoteToViewer ?? false;
+
+    let blockchainRef: BlockchainRef;
+
+    try {
+      if (demoteToViewer) {
+        console.log('🔗 Demoting sharer to viewer on blockchain...');
+        const tx = await BlockchainRoleManagerService.changeRole(
+          recordId,
+          targetWalletAddress,
+          'viewer'
+        );
+        blockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
+        console.log('✅ Blockchain: Sharer demoted to viewer');
+      } else {
+        console.log('🔗 Revoking sharer role on blockchain...');
+        const tx = await BlockchainRoleManagerService.revokeRole(recordId, targetWalletAddress);
+        blockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
+        console.log('✅ Blockchain: Sharer role revoked');
+      }
+    } catch (blockchainError) {
+      console.error('⚠️ Blockchain update failed:', blockchainError);
+      const errorMessage =
+        blockchainError instanceof Error ? blockchainError.message : String(blockchainError);
+      await BlockchainSyncQueueService.logFailure({
+        contract: 'MemberRoleManager',
+        action: demoteToViewer ? 'changeRole' : 'revokeRole',
+        userId: currentUser.uid,
+        userWalletAddress,
+        error: errorMessage,
+        context: {
+          type: 'permission',
+          targetUserId,
+          targetWalletAddress,
+          role: 'sharer',
+          recordId,
+          recordIdHash: id(recordId),
+        },
+      });
+      throw blockchainError;
+    }
+
+    // Step 2: Revoke encryption access (only on full revoke — viewer still needs the key)
+    if (!demoteToViewer) {
+      await SharingService.revokeEncryptionAccess(recordId, targetUserId, currentUser.uid);
+    }
+
+    // Step 3: Write event log
+    await writePermissionChangeEvent(
+      recordId,
+      currentUser.uid,
+      [
+        demoteToViewer
+          ? { userId: targetUserId, action: 'downgraded' as const, previousRole: 'sharer' as const, newRole: 'viewer' as const }
+          : { userId: targetUserId, action: 'revoked' as const, previousRole: 'sharer' as const, newRole: null },
+      ],
+      blockchainRef,
+      recordTitle
+    );
+
+    // Step 4: Update role arrays
+    await updateDoc(recordRef, {
+      sharers: arrayRemove(targetUserId),
+      ...(demoteToViewer && { viewers: arrayUnion(targetUserId) }),
+    });
+
+    console.log('✅ Sharer access removed successfully');
   }
 
   /**
@@ -1105,6 +1389,7 @@ export class PermissionsService {
       const data = recordDoc.data();
       const isOwner = data.owners?.includes(currentUser.uid);
       const isAdmin = data.administrators?.includes(currentUser.uid);
+      const isSharer = data.sharers?.includes(currentUser.uid);
       const isSubject = data.subjects?.includes(currentUser.uid);
 
       const canGrant =
@@ -1114,7 +1399,7 @@ export class PermissionsService {
             : isOwner || isAdmin
           : role === 'administrator'
             ? isOwner || isAdmin
-            : isOwner || isAdmin || isSubject;
+            : isOwner || isAdmin || isSharer || isSubject;
 
       if (!canGrant) {
         console.warn(`⚠️ No permission to grant ${role} on record ${recordId} — skipping`);
@@ -1131,8 +1416,12 @@ export class PermissionsService {
         console.warn(`⚠️ Target is already an owner on record ${recordId} — skipping`);
         continue;
       }
-      if (existingRole === 'administrator' && role === 'viewer') {
-        console.warn(`⚠️ Cannot demote admin to viewer via batch on record ${recordId} — skipping`);
+      if (existingRole === 'administrator' && (role === 'viewer' || role === 'sharer')) {
+        console.warn(`⚠️ Cannot demote admin to ${role} via batch on record ${recordId} — skipping`);
+        continue;
+      }
+      if (existingRole === 'sharer' && role === 'viewer') {
+        console.warn(`⚠️ Cannot demote sharer to viewer via batch on record ${recordId} — skipping`);
         continue;
       }
 
@@ -1214,11 +1503,18 @@ export class PermissionsService {
             await updateDoc(recordRef, {
               owners: arrayUnion(targetUserId),
               administrators: arrayRemove(targetUserId),
+              sharers: arrayRemove(targetUserId),
               viewers: arrayRemove(targetUserId),
             });
           } else if (role === 'administrator') {
             await updateDoc(recordRef, {
               administrators: arrayUnion(targetUserId),
+              sharers: arrayRemove(targetUserId),
+              viewers: arrayRemove(targetUserId),
+            });
+          } else if (role === 'sharer') {
+            await updateDoc(recordRef, {
+              sharers: arrayUnion(targetUserId),
               viewers: arrayRemove(targetUserId),
             });
           } else {
@@ -1356,6 +1652,7 @@ export class PermissionsService {
           await updateDoc(doc(db, 'records', recordId), {
             owners: arrayRemove(targetUserId),
             administrators: arrayRemove(targetUserId),
+            sharers: arrayRemove(targetUserId),
             viewers: arrayRemove(targetUserId),
           });
 
@@ -1479,12 +1776,16 @@ export class PermissionsService {
     }
 
     // ── Step 2: Encryption + Firestore per record (parallel) ─────────────────
-    const roleOrder = { viewer: 0, administrator: 1, owner: 2 };
+    const roleOrder: Record<Role, number> = { viewer: 0, sharer: 1, administrator: 2, owner: 3 };
 
     await Promise.all(
       eligible.map(async ({ recordId, existingRole, newRole }) => {
         try {
-          if (existingRole === 'viewer' && newRole !== 'viewer') {
+          if (
+            (existingRole === 'viewer' || existingRole === 'sharer') &&
+            newRole !== 'viewer' &&
+            newRole !== 'sharer'
+          ) {
             await SharingService.grantEncryptionAccess(recordId, targetUserId, currentUser.uid);
           }
 
@@ -1492,12 +1793,9 @@ export class PermissionsService {
             recordId,
             currentUser.uid,
             [
-              {
-                userId: targetUserId,
-                action: roleOrder[newRole] > roleOrder[existingRole] ? 'upgraded' : 'downgraded',
-                previousRole: existingRole,
-                newRole,
-              },
+              roleOrder[newRole] > roleOrder[existingRole]
+                ? { userId: targetUserId, action: 'upgraded' as const, previousRole: existingRole, newRole }
+                : { userId: targetUserId, action: 'downgraded' as const, previousRole: existingRole, newRole },
             ],
             batchBlockchainRef
           );
@@ -1506,15 +1804,23 @@ export class PermissionsService {
           if (newRole === 'owner') {
             update.owners = arrayUnion(targetUserId);
             update.administrators = arrayRemove(targetUserId);
+            update.sharers = arrayRemove(targetUserId);
             update.viewers = arrayRemove(targetUserId);
           } else if (newRole === 'administrator') {
             update.administrators = arrayUnion(targetUserId);
             update.owners = arrayRemove(targetUserId);
+            update.sharers = arrayRemove(targetUserId);
+            update.viewers = arrayRemove(targetUserId);
+          } else if (newRole === 'sharer') {
+            update.sharers = arrayUnion(targetUserId);
+            update.owners = arrayRemove(targetUserId);
+            update.administrators = arrayRemove(targetUserId);
             update.viewers = arrayRemove(targetUserId);
           } else {
             update.viewers = arrayUnion(targetUserId);
             update.owners = arrayRemove(targetUserId);
             update.administrators = arrayRemove(targetUserId);
+            update.sharers = arrayRemove(targetUserId);
           }
           await updateDoc(doc(db, 'records', recordId), update);
 
@@ -1553,14 +1859,18 @@ export class PermissionsService {
       const isSubject = recordData.subjects?.includes(currentUser.uid);
       const userRole = this.getUserRole(recordData, currentUser.uid);
 
+      const isSharer = recordData.sharers?.includes(currentUser.uid);
+
       switch (role) {
         case 'owner':
           // Only owners can manage owners (or admins if no owners exist)
           return recordData.owners?.length > 0 ? isOwner : isAdmin;
         case 'administrator':
           return isOwner || isAdmin;
+        case 'sharer':
+          return isOwner || isAdmin || isSharer || (isSubject && userRole !== null);
         case 'viewer':
-          return isOwner || isAdmin || (isSubject && userRole !== null);
+          return isOwner || isAdmin || isSharer || (isSubject && userRole !== null);
         default:
           return false;
       }
@@ -1576,9 +1886,11 @@ export class PermissionsService {
   static async getRecordRoles(recordId: string): Promise<{
     owners: string[];
     administrators: string[];
+    sharers: string[];
     viewers: string[];
     canManageOwners: boolean;
     canManageAdmins: boolean;
+    canManageSharers: boolean;
     canManageViewers: boolean;
   } | null> {
     try {
@@ -1589,18 +1901,21 @@ export class PermissionsService {
 
       const recordData = recordDoc.data();
 
-      const [canManageOwners, canManageAdmins, canManageViewers] = await Promise.all([
+      const [canManageOwners, canManageAdmins, canManageSharers, canManageViewers] = await Promise.all([
         this.canManageRole(recordId, 'owner'),
         this.canManageRole(recordId, 'administrator'),
+        this.canManageRole(recordId, 'sharer'),
         this.canManageRole(recordId, 'viewer'),
       ]);
 
       return {
         owners: recordData.owners || [],
         administrators: recordData.administrators || [],
+        sharers: recordData.sharers || [],
         viewers: recordData.viewers || [],
         canManageOwners,
         canManageAdmins,
+        canManageSharers,
         canManageViewers,
       };
     } catch (err) {

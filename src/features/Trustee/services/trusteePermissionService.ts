@@ -90,6 +90,7 @@ export class TrusteePermissionService {
       let trustorRole: Role | null = null;
       if (data.owners?.includes(trustorId)) trustorRole = 'owner';
       else if (data.administrators?.includes(trustorId)) trustorRole = 'administrator';
+      else if (data.sharers?.includes(trustorId)) trustorRole = 'sharer';
       else if (data.viewers?.includes(trustorId)) trustorRole = 'viewer';
 
       const recordTrustees: string[] = data.trustees ?? [];
@@ -99,6 +100,7 @@ export class TrusteePermissionService {
       let currentTrusteeRole: Role | null = null;
       if (data.owners?.includes(trusteeId)) currentTrusteeRole = 'owner';
       else if (data.administrators?.includes(trusteeId)) currentTrusteeRole = 'administrator';
+      else if (data.sharers?.includes(trusteeId)) currentTrusteeRole = 'sharer';
       else if (data.viewers?.includes(trusteeId)) currentTrusteeRole = 'viewer';
 
       return { recordId: d.id, trustorRole, currentTrusteeRole, recordTrustees };
@@ -128,7 +130,7 @@ export class TrusteePermissionService {
 
     // If trustee already has an equal or higher role, no change needed
     if (currentTrusteeRole !== undefined && resolved !== null && currentTrusteeRole !== null) {
-      const rank: Record<Role, number> = { viewer: 1, administrator: 2, owner: 3 };
+      const rank: Record<Role, number> = { viewer: 1, sharer: 2, administrator: 3, owner: 4 };
       if (rank[currentTrusteeRole] >= rank[resolved]) {
         console.log(`ℹ️ Trustee already has equal/higher role (${currentTrusteeRole}) — skipping`);
         return null;
@@ -141,12 +143,14 @@ export class TrusteePermissionService {
   /**
    * Get the Firestore role array name for a given role.
    */
-  private static roleToArray(role: Role): 'owners' | 'administrators' | 'viewers' {
+  private static roleToArray(role: Role): 'owners' | 'administrators' | 'sharers' | 'viewers' {
     switch (role) {
       case 'owner':
         return 'owners';
       case 'administrator':
         return 'administrators';
+      case 'sharer':
+        return 'sharers';
       case 'viewer':
         return 'viewers';
     }
@@ -229,6 +233,7 @@ export class TrusteePermissionService {
         if (trustorIsAdminOrOwner) {
           if (roleArray !== 'owners') update.owners = arrayRemove(trusteeId);
           if (roleArray !== 'administrators') update.administrators = arrayRemove(trusteeId);
+          if (roleArray !== 'sharers') update.sharers = arrayRemove(trusteeId);
           if (roleArray !== 'viewers') update.viewers = arrayRemove(trusteeId);
         }
 
@@ -332,11 +337,12 @@ export class TrusteePermissionService {
       const { recordId } = wrappedKeyDoc.data();
 
       try {
-        // Remove from role arrays + trustees[] — we check all three role arrays
+        // Remove from role arrays + trustees[] — we check all four role arrays
         // since we don't know which role they were granted without re-querying
         await updateDoc(doc(db, 'records', recordId), {
           owners: arrayRemove(trusteeId),
           administrators: arrayRemove(trusteeId),
+          sharers: arrayRemove(trusteeId),
           viewers: arrayRemove(trusteeId),
           trustees: arrayRemove(trusteeId),
         });
@@ -381,6 +387,7 @@ export class TrusteePermissionService {
         await updateDoc(doc(db, 'records', recordId), {
           owners: arrayRemove(trusteeId),
           administrators: arrayRemove(trusteeId),
+          sharers: arrayRemove(trusteeId),
           viewers: arrayRemove(trusteeId),
           trustees: arrayRemove(trusteeId),
         });
@@ -434,6 +441,7 @@ export class TrusteePermissionService {
     let subjectRole: Role | null = null;
     if (recordData.owners?.includes(subjectId)) subjectRole = 'owner';
     else if (recordData.administrators?.includes(subjectId)) subjectRole = 'administrator';
+    else if (recordData.sharers?.includes(subjectId)) subjectRole = 'sharer';
     else if (recordData.viewers?.includes(subjectId)) subjectRole = 'viewer';
 
     for (const relationshipDoc of snapshot.docs) {
@@ -443,6 +451,7 @@ export class TrusteePermissionService {
       let currentTrusteeRole: Role | null = null;
       if (recordData.owners?.includes(trusteeId)) currentTrusteeRole = 'owner';
       else if (recordData.administrators?.includes(trusteeId)) currentTrusteeRole = 'administrator';
+      else if (recordData.sharers?.includes(trusteeId)) currentTrusteeRole = 'sharer';
       else if (recordData.viewers?.includes(trusteeId)) currentTrusteeRole = 'viewer';
 
       const role = this.resolveTrusteeRole(
@@ -477,6 +486,7 @@ export class TrusteePermissionService {
         await updateDoc(doc(db, 'records', recordId), {
           owners: arrayRemove(trusteeId),
           administrators: arrayRemove(trusteeId),
+          sharers: arrayRemove(trusteeId),
           viewers: arrayRemove(trusteeId),
           [this.roleToArray(role)]: arrayUnion(trusteeId),
           ...(!currentTrusteeRole && { trustees: arrayUnion(trusteeId) }),
@@ -541,6 +551,7 @@ export class TrusteePermissionService {
         let trustorRole: Role | null = null;
         if (data.owners?.includes(trustorId)) trustorRole = 'owner';
         else if (data.administrators?.includes(trustorId)) trustorRole = 'administrator';
+        else if (data.sharers?.includes(trustorId)) trustorRole = 'sharer';
         else if (data.viewers?.includes(trustorId)) trustorRole = 'viewer';
         return {
           recordId: snap.id,
@@ -567,6 +578,7 @@ export class TrusteePermissionService {
         await updateDoc(doc(db, 'records', recordId), {
           owners: arrayRemove(trusteeId),
           administrators: arrayRemove(trusteeId),
+          sharers: arrayRemove(trusteeId),
           viewers: arrayRemove(trusteeId),
           [this.roleToArray(role)]: arrayUnion(trusteeId),
         });

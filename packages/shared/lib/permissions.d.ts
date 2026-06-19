@@ -1,7 +1,8 @@
 import { BlockchainRef } from './blockchainAddresses';
 import { TimestampLike } from './timestamp';
 export type PermissionAction = 'granted' | 'revoked' | 'upgraded' | 'downgraded';
-export type RecordRole = 'owner' | 'administrator' | 'viewer';
+export type RecordRole = 'owner' | 'administrator' | 'sharer' | 'viewer';
+export declare const ROLE_HIERARCHY: Record<RecordRole, number>;
 export type PermissionChange = {
     action: 'granted';
     userId: string;

@@ -42,7 +42,7 @@ export class SubjectConsentService {
     recordId: string;
     subjectId: string;
     requestedBy: string;
-    requestedSubjectRole: 'viewer' | 'administrator' | 'owner';
+    requestedSubjectRole: 'sharer' | 'administrator' | 'owner';
     recordTitle: string;
   }): Promise<{ requestId: string }> {
     const db = getFirestore();

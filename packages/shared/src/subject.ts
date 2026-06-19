@@ -10,7 +10,7 @@ export interface SubjectConsentRequest {
   recordId: string;
   subjectId: string;
   requestedBy: string;
-  requestedSubjectRole: 'viewer' | 'administrator' | 'owner';
+  requestedSubjectRole: 'sharer' | 'administrator' | 'owner';
   status: SubjectRequestStatus;
   createdAt: TimestampLike;
   respondedAt?: TimestampLike;

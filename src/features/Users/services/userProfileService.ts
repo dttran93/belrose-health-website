@@ -182,6 +182,7 @@ async function getFirstDegreeConnectionIds(currentUserId: string): Promise<Set<s
       or(
         firestoreWhere('owners', 'array-contains', currentUserId),
         firestoreWhere('administrators', 'array-contains', currentUserId),
+        firestoreWhere('sharers', 'array-contains', currentUserId),
         firestoreWhere('viewers', 'array-contains', currentUserId),
         firestoreWhere('subjects', 'array-contains', currentUserId),
         firestoreWhere('uploadedBy', '==', currentUserId)
@@ -195,6 +196,7 @@ async function getFirstDegreeConnectionIds(currentUserId: string): Promise<Set<s
       const allParticipants: string[] = [
         ...(data.owners || []),
         ...(data.administrators || []),
+        ...(data.sharers || []),
         ...(data.viewers || []),
         ...(data.subjects || []),
         ...(data.uploadedBy ? [data.uploadedBy] : []),

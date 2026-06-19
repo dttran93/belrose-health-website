@@ -9,6 +9,7 @@ service firebase.storage {
           request.auth.uid == record.uploadedBy ||
           request.auth.uid in record.owners ||
           request.auth.uid in record.administrators ||
+          request.auth.uid in record.get('sharers', []) ||
           request.auth.uid in record.viewers ||
           request.auth.uid in record.subjects
         );

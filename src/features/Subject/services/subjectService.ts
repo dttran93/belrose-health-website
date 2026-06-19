@@ -211,7 +211,7 @@ export class SubjectService {
     recordId: string,
     subjectId: string,
     options?: {
-      role?: 'viewer' | 'administrator' | 'owner';
+      role?: 'sharer' | 'administrator' | 'owner';
       recordTitle?: string;
     }
   ): Promise<{ success: true }> {
@@ -302,7 +302,7 @@ export class SubjectService {
       recordId,
       subjectId,
       requestedBy: user.uid,
-      requestedSubjectRole: options?.role || 'viewer',
+      requestedSubjectRole: options?.role || 'sharer',
       recordTitle,
     });
 
