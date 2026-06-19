@@ -722,9 +722,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
       }
     }
 
-    _grantRoleInternal(recordIdHash, targetIdHash, newRole, userIdHash);
-
-    emit RoleChanged(recordIdHash, targetIdHash, oldRole, newRole, userIdHash, block.timestamp);
+    _applyChangeRole(recordIdHash, userIdHash, targetIdHash, newRole, oldRole);
   }
 
   /**
@@ -1079,6 +1077,27 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     trusteeRelationships[trustorIdHash][trusteeIdHash].status = TrusteeStatus.Revoked;
 
     emit TrusteeRevoked(trustorIdHash, trusteeIdHash, callerIdHash, block.timestamp);
+
+    // Revoke all roles the trustee acquired through grantRoleAsTrusteeBatch, including owner.
+    // Normal revokeRole blocks owner removal, but trustee-derived roles are conditional on the
+    // relationship — if that relationship ends, so do the roles regardless of level.
+    bytes32[] storage grantedRecords = _trusteeGrantedRecords[trustorIdHash][trusteeIdHash];
+    for (uint256 i = 0; i < grantedRecords.length; i++) {
+      bytes32 recordIdHash = grantedRecords[i];
+      delete _trusteeGrantedRecordSet[trustorIdHash][trusteeIdHash][recordIdHash];
+
+      if (!_hasActiveRole(recordIdHash, trusteeIdHash)) continue;
+
+      bytes32 roleKey = _getRoleKey(recordIdHash, trusteeIdHash);
+      string memory role = recordRoles[roleKey].role;
+
+      _removeFromRoleArray(recordIdHash, trusteeIdHash, role);
+      recordRoles[roleKey].isActive = false;
+      delete roleGrantedBy[roleKey];
+
+      emit RoleRevoked(recordIdHash, trusteeIdHash, role, callerIdHash, block.timestamp);
+    }
+    delete _trusteeGrantedRecords[trustorIdHash][trusteeIdHash];
   }
 
   /**
@@ -1148,6 +1167,8 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     r.level = newLevel;
 
     emit TrusteeLevelUpdated(trustorIdHash, trusteeIdHash, oldLevel, newLevel, block.timestamp);
+
+    _syncTrusteeRoles(trustorIdHash, trusteeIdHash, newLevel);
   }
 
   /**
@@ -1171,6 +1192,8 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     r.level = newLevel;
 
     emit TrusteeLevelUpdated(trustorIdHash, trusteeIdHash, oldLevel, newLevel, block.timestamp);
+
+    _syncTrusteeRoles(trustorIdHash, trusteeIdHash, newLevel);
   }
 
   // =================== TRUSTEE - ROLE GRANT HELPERS ===================
@@ -1201,6 +1224,43 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
 
     // Controller — full mirror including owner
     return trustorRole;
+  }
+
+  function _applyChangeRole(
+    bytes32 recordIdHash,
+    bytes32 userIdHash,
+    bytes32 targetIdHash,
+    string memory newRole,
+    string memory oldRole
+  ) internal {
+    _grantRoleInternal(recordIdHash, targetIdHash, newRole, userIdHash);
+    emit RoleChanged(recordIdHash, targetIdHash, oldRole, newRole, userIdHash, block.timestamp);
+  }
+
+  /**
+   * @dev Resyncs a trustee's roles across all tracked records to match their new trust level.
+   *      Called by updateTrusteeLevel and downgradeTrusteeLevel. Bypasses the owner-demotion
+   *      guard in changeRole because trustee-derived roles are conditional on the relationship.
+   */
+  function _syncTrusteeRoles(
+    bytes32 trustorIdHash,
+    bytes32 trusteeIdHash,
+    TrusteeLevel newLevel
+  ) internal {
+    bytes32[] storage grantedRecords = _trusteeGrantedRecords[trustorIdHash][trusteeIdHash];
+    for (uint256 i = 0; i < grantedRecords.length; i++) {
+      bytes32 recordIdHash = grantedRecords[i];
+      if (!_hasActiveRole(recordIdHash, trusteeIdHash)) continue;
+
+      string memory newRole = _resolveTrusteeRole(recordIdHash, trustorIdHash, newLevel);
+      if (!_isValidRole(newRole)) continue;
+
+      bytes32 roleKey = _getRoleKey(recordIdHash, trusteeIdHash);
+      string memory oldRole = recordRoles[roleKey].role;
+      if (keccak256(bytes(oldRole)) == keccak256(bytes(newRole))) continue;
+
+      _applyChangeRole(recordIdHash, trustorIdHash, trusteeIdHash, newRole, oldRole);
+    }
   }
 
   /**
@@ -1255,13 +1315,21 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     TrusteeRelationship memory r = trusteeRelationships[trustorIdHash][trusteeIdHash];
     require(r.status == TrusteeStatus.Active, "No active trustee relationship");
 
-    string[] memory roles = new string[](recordIdHashes.length);
     for (uint256 i = 0; i < recordIdHashes.length; i++) {
-      roles[i] = _resolveTrusteeRole(recordIdHashes[i], trustorIdHash, r.level);
-    }
+      bytes32 recordIdHash = recordIdHashes[i];
+      string memory role = _resolveTrusteeRole(recordIdHash, trustorIdHash, r.level);
 
-    // granter is trustorIdHash since permission flows from trustor's role on each record
-    _grantRoleBatchInternal(recordIdHashes, trusteeIdHash, roles, trustorIdHash);
+      if (!_isValidRole(role)) continue;
+      if (!_hasActiveRole(recordIdHash, trustorIdHash)) continue;
+      if (_hasActiveRole(recordIdHash, trusteeIdHash)) continue;
+
+      _grantRoleInternal(recordIdHash, trusteeIdHash, role, trustorIdHash);
+
+      if (!_trusteeGrantedRecordSet[trustorIdHash][trusteeIdHash][recordIdHash]) {
+        _trusteeGrantedRecords[trustorIdHash][trusteeIdHash].push(recordIdHash);
+        _trusteeGrantedRecordSet[trustorIdHash][trusteeIdHash][recordIdHash] = true;
+      }
+    }
   }
 
   /**
@@ -1281,21 +1349,50 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     require(targetIdHash != bytes32(0), "Target wallet not registered");
 
     for (uint256 i = 0; i < recordIdHashes.length; i++) {
-      if (!_isValidRole(newRoles[i])) continue;
-      if (!_hasActiveRole(recordIdHashes[i], userIdHash)) continue; // caller must have role
-      if (!_hasActiveRole(recordIdHashes[i], targetIdHash)) continue; // target must have role to change
-      bytes32 targetRoleKey = _getRoleKey(recordIdHashes[i], targetIdHash);
-      string memory oldRole = recordRoles[targetRoleKey].role;
+      bytes32 recordIdHash = recordIdHashes[i];
+      string memory newRole = newRoles[i];
 
-      _grantRoleInternal(recordIdHashes[i], targetIdHash, newRoles[i], userIdHash);
-      emit RoleChanged(
-        recordIdHashes[i],
-        targetIdHash,
-        oldRole,
-        newRoles[i],
-        userIdHash,
-        block.timestamp
-      );
+      if (!_isValidRole(newRole)) continue;
+      if (!_hasActiveRole(recordIdHash, userIdHash)) continue;
+      if (!_hasActiveRole(recordIdHash, targetIdHash)) continue;
+
+      bytes32 targetRoleKey = _getRoleKey(recordIdHash, targetIdHash);
+      string memory oldRole = recordRoles[targetRoleKey].role;
+      bytes32 oldRoleHash = keccak256(bytes(oldRole));
+      bytes32 newRoleHash = keccak256(bytes(newRole));
+
+      if (oldRoleHash == newRoleHash) continue;
+      if (oldRoleHash == keccak256(bytes("owner"))) continue;
+
+      bool ownerExists = ownersByRecord[recordIdHash].length > 0;
+      bool userIsOwner = _hasRole(recordIdHash, userIdHash, "owner");
+      bool userIsAdmin = _hasRole(recordIdHash, userIdHash, "administrator");
+      bool userIsTarget = userIdHash == targetIdHash;
+
+      if (newRoleHash == keccak256(bytes("owner"))) {
+        if (ownerExists) {
+          if (!userIsOwner) continue;
+        } else {
+          if (!userIsAdmin) continue;
+        }
+      } else if (newRoleHash == keccak256(bytes("administrator"))) {
+        if (!userIsOwner && !userIsAdmin) continue;
+      } else if (newRoleHash == keccak256(bytes("viewer"))) {
+        if (ownerExists) {
+          if (!userIsOwner && !(userIsAdmin && userIsTarget)) continue;
+        } else {
+          if (!userIsAdmin) continue;
+        }
+      }
+
+      if (
+        oldRoleHash == keccak256(bytes("administrator")) &&
+        newRoleHash == keccak256(bytes("viewer")) &&
+        !ownerExists &&
+        adminsByRecord[recordIdHash].length <= 1
+      ) continue;
+
+      _applyChangeRole(recordIdHash, userIdHash, targetIdHash, newRole, oldRole);
     }
   }
 
@@ -1355,6 +1452,17 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   ) external view returns (TrusteeStatus status, TrusteeLevel level) {
     TrusteeRelationship memory r = trusteeRelationships[trustorIdHash][trusteeIdHash];
     return (r.status, r.level);
+  }
+
+  /**
+   * @notice Get all records the trustee was granted access to via grantRoleAsTrusteeBatch
+   * @dev Debug/inspection helper — used to verify trustee role tracking
+   */
+  function getTrusteeGrantedRecords(
+    bytes32 trustorIdHash,
+    bytes32 trusteeIdHash
+  ) external view returns (bytes32[] memory) {
+    return _trusteeGrantedRecords[trustorIdHash][trusteeIdHash];
   }
 
   // ===============================================================
@@ -1527,7 +1635,16 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   // STORAGE GAP
   // Safe upgrade buffer — future versions can consume these slots
   // without shifting the storage layout of existing variables.
+  // New variables must be appended HERE (before __gap), never inserted above.
   // ===============================================================
 
-  uint256[50] private __gap;
+  // Records granted to a trustee via grantRoleAsTrusteeBatch, tracked for cleanup on revocation.
+  // Appended in v2 upgrade. trustorIdHash => trusteeIdHash => recordIdHash[]
+  mapping(bytes32 => mapping(bytes32 => bytes32[])) private _trusteeGrantedRecords;
+
+  // Dedup set for _trusteeGrantedRecords — O(1) contains check to avoid double-tracking.
+  // Appended in v2 upgrade. trustorIdHash => trusteeIdHash => recordIdHash => bool
+  mapping(bytes32 => mapping(bytes32 => mapping(bytes32 => bool))) private _trusteeGrantedRecordSet;
+
+  uint256[48] private __gap;
 }

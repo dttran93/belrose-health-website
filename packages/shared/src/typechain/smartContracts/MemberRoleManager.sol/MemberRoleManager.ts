@@ -50,6 +50,7 @@ export interface MemberRoleManagerInterface extends Interface {
       | "getRoleGranter"
       | "getTotalRoles"
       | "getTotalUsers"
+      | "getTrusteeGrantedRecords"
       | "getTrusteeRelationship"
       | "getUserForWallet"
       | "getUserStatus"
@@ -211,6 +212,10 @@ export interface MemberRoleManagerInterface extends Interface {
   encodeFunctionData(
     functionFragment: "getTotalUsers",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getTrusteeGrantedRecords",
+    values: [BytesLike, BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "getTrusteeRelationship",
@@ -482,6 +487,10 @@ export interface MemberRoleManagerInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "getTotalUsers",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getTrusteeGrantedRecords",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -1222,6 +1231,12 @@ export interface MemberRoleManager extends BaseContract {
 
   getTotalUsers: TypedContractMethod<[], [bigint], "view">;
 
+  getTrusteeGrantedRecords: TypedContractMethod<
+    [trustorIdHash: BytesLike, trusteeIdHash: BytesLike],
+    [string[]],
+    "view"
+  >;
+
   getTrusteeRelationship: TypedContractMethod<
     [trustorIdHash: BytesLike, trusteeIdHash: BytesLike],
     [[bigint, bigint] & { status: bigint; level: bigint }],
@@ -1612,6 +1627,13 @@ export interface MemberRoleManager extends BaseContract {
   getFunction(
     nameOrSignature: "getTotalUsers"
   ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "getTrusteeGrantedRecords"
+  ): TypedContractMethod<
+    [trustorIdHash: BytesLike, trusteeIdHash: BytesLike],
+    [string[]],
+    "view"
+  >;
   getFunction(
     nameOrSignature: "getTrusteeRelationship"
   ): TypedContractMethod<
