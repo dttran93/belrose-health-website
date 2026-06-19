@@ -33,7 +33,7 @@ function getAdminContract(): MemberRoleManager {
 }
 
 async function awaitTx(tx: ethers.ContractTransactionResponse): Promise<ethers.ContractTransactionReceipt> {
-  const receipt = await awaitTx(tx);
+  const receipt = await tx.wait();
   if (!receipt) throw new HttpsError('internal', 'Transaction was dropped or replaced');
   return receipt;
 }

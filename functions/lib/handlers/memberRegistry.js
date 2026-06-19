@@ -30,7 +30,7 @@ function getAdminContract() {
     return typechain_1.MemberRoleManager__factory.connect(MEMBER_ROLE_MANAGER_ADDRESS, getAdminWallet());
 }
 async function awaitTx(tx) {
-    const receipt = await awaitTx(tx);
+    const receipt = await tx.wait();
     if (!receipt)
         throw new https_1.HttpsError('internal', 'Transaction was dropped or replaced');
     return receipt;
