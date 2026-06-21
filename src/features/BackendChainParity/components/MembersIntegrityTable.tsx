@@ -3,6 +3,7 @@
 import React from 'react';
 import { ExternalLink } from 'lucide-react';
 import { IntegrityStatusBadge } from './IntegrityStatusBadge';
+import { CopyableHash } from './ui/CopyableHash';
 import type { MemberIntegrityItem, IntegrityStatus } from '../lib/types';
 
 const BASESCAN_ADDR_URL = 'https://sepolia.basescan.org/address/';
@@ -15,11 +16,6 @@ const MEMBER_STATUS_LABEL: Record<number, string> = {
   4: 'VerifiedProvider',
   5: 'Guest',
 };
-
-function truncate(s: string | undefined, chars = 10): string {
-  if (!s) return '—';
-  return `${s.slice(0, chars)}…${s.slice(-4)}`;
-}
 
 interface MembersIntegrityTableProps {
   items: MemberIntegrityItem[];
@@ -76,7 +72,7 @@ export const MembersIntegrityTable: React.FC<MembersIntegrityTableProps> = ({
                 <div className="text-xs text-gray-400">{item.email}</div>
               </td>
               <td className="px-4 py-3 font-mono text-xs text-gray-500">
-                {truncate(item.userIdHash)}
+                <CopyableHash value={item.userIdHash} />
               </td>
               <td className="px-4 py-3 text-xs">
                 {item.firestoreStatus ? (
@@ -105,11 +101,11 @@ export const MembersIntegrityTable: React.FC<MembersIntegrityTableProps> = ({
               <td className="px-4 py-3 text-xs">
                 {item.firestoreWalletAddress ? (
                   <div className="flex items-center gap-1">
-                    <span
+                    <CopyableHash
+                      value={item.firestoreWalletAddress}
+                      chars={8}
                       className={`font-mono ${item.walletMismatch ? 'text-amber-600' : 'text-gray-500'}`}
-                    >
-                      {truncate(item.firestoreWalletAddress, 8)}
-                    </span>
+                    />
                     <a
                       href={`${BASESCAN_ADDR_URL}${item.firestoreWalletAddress}`}
                       target="_blank"

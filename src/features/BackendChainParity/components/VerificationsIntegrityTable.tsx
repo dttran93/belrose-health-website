@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { IntegrityStatusBadge } from './IntegrityStatusBadge';
+import { CopyableHash } from './ui/CopyableHash';
 import type {
   VerificationIntegrityItem,
   DisputeIntegrityItem,
@@ -22,11 +23,6 @@ const DISPUTE_SEVERITY: Record<number, string> = {
   2: 'Moderate',
   3: 'Major',
 };
-
-function truncate(s: string | undefined, chars = 10): string {
-  if (!s) return '—';
-  return `${s.slice(0, chars)}…${s.slice(-4)}`;
-}
 
 type SubTab = 'verifications' | 'disputes';
 
@@ -86,12 +82,8 @@ export const VerificationsIntegrityTable: React.FC<VerificationsIntegrityTablePr
         ))}
       </div>
 
-      {subTab === 'verifications' && (
-        <VerificationsTable items={filteredVerifications} />
-      )}
-      {subTab === 'disputes' && (
-        <DisputesTable items={filteredDisputes} />
-      )}
+      {subTab === 'verifications' && <VerificationsTable items={filteredVerifications} />}
+      {subTab === 'disputes' && <DisputesTable items={filteredDisputes} />}
     </div>
   );
 };
@@ -127,16 +119,16 @@ const VerificationsTable: React.FC<{ items: VerificationIntegrityItem[] }> = ({ 
                 <IntegrityStatusBadge status={item.integrityStatus} />
               </td>
               <td className="px-4 py-3 font-mono text-xs text-gray-500">
-                {truncate(item.firestoreId, 10)}
+                <CopyableHash value={item.firestoreId} />
               </td>
               <td className="px-4 py-3 font-mono text-xs text-gray-500">
-                {truncate(item.verifierIdHash)}
+                <CopyableHash value={item.verifierIdHash} />
               </td>
               <td className="px-4 py-3 font-mono text-xs text-gray-500">
-                {truncate(item.recordHash)}
+                <CopyableHash value={item.recordHash} />
               </td>
               <td className="px-4 py-3 text-xs text-gray-600">
-                {item.level ? VERIFICATION_LEVEL[item.level] ?? item.level : '—'}
+                {item.level ? (VERIFICATION_LEVEL[item.level] ?? item.level) : '—'}
               </td>
               <td className="px-4 py-3 text-xs">
                 <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700">
@@ -145,8 +137,18 @@ const VerificationsTable: React.FC<{ items: VerificationIntegrityItem[] }> = ({ 
               </td>
               <td className="px-4 py-3 text-xs">
                 {item.existsOnChain !== undefined ? (
-                  <span className={item.existsOnChain && item.isActiveOnChain ? 'text-emerald-600' : 'text-red-600'}>
-                    {item.existsOnChain ? (item.isActiveOnChain ? 'Active' : 'Inactive') : 'Not found'}
+                  <span
+                    className={
+                      item.existsOnChain && item.isActiveOnChain
+                        ? 'text-emerald-600'
+                        : 'text-red-600'
+                    }
+                  >
+                    {item.existsOnChain
+                      ? item.isActiveOnChain
+                        ? 'Active'
+                        : 'Inactive'
+                      : 'Not found'}
                   </span>
                 ) : (
                   <span className="text-gray-400">—</span>
@@ -201,16 +203,16 @@ const DisputesTable: React.FC<{ items: DisputeIntegrityItem[] }> = ({ items }) =
                 <IntegrityStatusBadge status={item.integrityStatus} />
               </td>
               <td className="px-4 py-3 font-mono text-xs text-gray-500">
-                {truncate(item.firestoreId, 10)}
+                <CopyableHash value={item.firestoreId} />
               </td>
               <td className="px-4 py-3 font-mono text-xs text-gray-500">
-                {truncate(item.disputerIdHash)}
+                <CopyableHash value={item.disputerIdHash} />
               </td>
               <td className="px-4 py-3 font-mono text-xs text-gray-500">
-                {truncate(item.recordHash)}
+                <CopyableHash value={item.recordHash} />
               </td>
               <td className="px-4 py-3 text-xs text-gray-600">
-                {item.severity ? DISPUTE_SEVERITY[item.severity] ?? item.severity : '—'}
+                {item.severity ? (DISPUTE_SEVERITY[item.severity] ?? item.severity) : '—'}
               </td>
               <td className="px-4 py-3 text-xs">
                 <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700">
@@ -219,8 +221,18 @@ const DisputesTable: React.FC<{ items: DisputeIntegrityItem[] }> = ({ items }) =
               </td>
               <td className="px-4 py-3 text-xs">
                 {item.existsOnChain !== undefined ? (
-                  <span className={item.existsOnChain && item.isActiveOnChain ? 'text-emerald-600' : 'text-red-600'}>
-                    {item.existsOnChain ? (item.isActiveOnChain ? 'Active' : 'Inactive') : 'Not found'}
+                  <span
+                    className={
+                      item.existsOnChain && item.isActiveOnChain
+                        ? 'text-emerald-600'
+                        : 'text-red-600'
+                    }
+                  >
+                    {item.existsOnChain
+                      ? item.isActiveOnChain
+                        ? 'Active'
+                        : 'Inactive'
+                      : 'Not found'}
                   </span>
                 ) : (
                   <span className="text-gray-400">—</span>

@@ -1,6 +1,6 @@
 // src/features/BackendChainParity/components/BackendChainParityDashboard.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { RefreshCw, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/Button';
@@ -60,6 +60,27 @@ const BackendChainParityDashboard: React.FC = () => {
   const membersSummary = members.data ? computeSummary(members.data) : undefined;
   const verificationsSummary = verifications.data ? computeSummary(verifications.data) : undefined;
   const disputesSummary = disputes.data ? computeSummary(disputes.data) : undefined;
+
+  // Keyed by recordId so RecordsIntegrityTable can show counts per record in the expanded panel
+  const verificationsMap = useMemo(() => {
+    const map: Record<string, typeof verifications.data> = {};
+    for (const v of verifications.data ?? []) {
+      if (v.recordId) {
+        (map[v.recordId] ??= []).push(v);
+      }
+    }
+    return map;
+  }, [verifications.data]);
+
+  const disputesMap = useMemo(() => {
+    const map: Record<string, typeof disputes.data> = {};
+    for (const d of disputes.data ?? []) {
+      if (d.recordId) {
+        (map[d.recordId] ??= []).push(d);
+      }
+    }
+    return map;
+  }, [disputes.data]);
 
   function handleRefresh() {
     queryClient.invalidateQueries({ queryKey: ['backend-chain-parity'] });
@@ -224,6 +245,9 @@ const BackendChainParityDashboard: React.FC = () => {
                 items={records.data ?? []}
                 searchQuery={searchQuery}
                 statusFilter={statusFilter}
+                verificationsMap={verificationsMap}
+                disputesMap={disputesMap}
+                onViewVerifications={() => setActiveTab('verifications')}
               />
             )}
           </div>

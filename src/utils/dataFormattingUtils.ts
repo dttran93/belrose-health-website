@@ -405,3 +405,14 @@ export function formatLargeNumber(num: number): string {
 export function truncate(str: string, maxLen: number): string {
   return str.length > maxLen ? str.slice(0, maxLen - 1) + '…' : str;
 }
+
+/**
+ * Truncate a hash/ID for display, showing the start and last 4 characters.
+ * Returns '—' for empty/undefined values.
+ * Example: "0xabcdef1234...5678"
+ */
+export function truncateHash(s: string | undefined, chars = 10): string {
+  if (!s) return '—';
+  if (s.length <= chars + 4) return s;
+  return `${s.slice(0, chars)}…${s.slice(-4)}`;
+}
