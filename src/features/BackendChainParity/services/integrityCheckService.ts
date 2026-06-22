@@ -96,10 +96,18 @@ export async function checkRecordIntegrity(record: FirestoreRecord): Promise<Rec
 
   try {
     const contract = getHealthContract();
-    const hashExists = await contract.doesHashExist(record.recordHash);
 
-    if (!hashExists) {
+    // getRecordIdForHash reverts if the hash is not active on-chain
+    let returnedRecordIdHash: string;
+    try {
+      returnedRecordIdHash = await contract.getRecordIdForHash(record.recordHash);
+    } catch {
       return { ...base, integrityStatus: 'missing', hashExistsOnChain: false };
+    }
+
+    // Verify the hash is bound to the expected record, not a different one
+    if (returnedRecordIdHash.toLowerCase() !== record.recordIdHash!.toLowerCase()) {
+      return { ...base, integrityStatus: 'mismatch', hashExistsOnChain: true };
     }
 
     // Check each subject's active status on-chain

@@ -76,7 +76,6 @@ export const RecordsIntegrityTable: React.FC<RecordsIntegrityTableProps> = ({
             <th className="px-4 py-3 text-center font-medium text-gray-600">Record Hash</th>
             <th className="px-4 py-3 text-center font-medium text-gray-600">Subjects</th>
             <th className="px-4 py-3 text-center font-medium text-gray-600">Credibility</th>
-            <th className="px-4 py-3 text-center font-medium text-gray-600">Init Tx</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -129,24 +128,11 @@ export const RecordsIntegrityTable: React.FC<RecordsIntegrityTableProps> = ({
                       );
                     })()}
                   </td>
-                  <td className="px-4 py-3 text-center">
-                    {item.blockchainRef?.txHash && (
-                      <a
-                        href={`${BASESCAN_TX_URL}${item.blockchainRef.txHash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={e => e.stopPropagation()}
-                        className="inline-flex text-blue-600 hover:text-blue-800"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    )}
-                  </td>
                 </tr>
 
                 {isExpanded && (
                   <tr className="bg-gray-50">
-                    <td colSpan={8} className="px-6 py-5">
+                    <td colSpan={7} className="px-6 py-5">
                       <ExpandedRow
                         item={item}
                         verifications={verificationsMap[item.firestoreId] ?? []}
@@ -278,18 +264,6 @@ const ExpandedRow: React.FC<ExpandedRowProps> = ({
             </div>
             <div className="flex items-center justify-between gap-2 text-xs font-mono text-gray-600">
               <CopyableHash value={item.recordHash} />
-              {item.blockchainRef?.txHash && (
-                <a
-                  href={`${BASESCAN_TX_URL}${item.blockchainRef.txHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-shrink-0 flex items-center gap-1 text-blue-600 hover:text-blue-800 font-sans"
-                  onClick={e => e.stopPropagation()}
-                >
-                  <ExternalLink className="w-3 h-3" />
-                  <span>Init Tx</span>
-                </a>
-              )}
               <VersionReviewBadge
                 stats={{
                   verifications: {
