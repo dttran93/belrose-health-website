@@ -434,31 +434,57 @@ service cloud.firestore {
 
     match /subjectConsentRequests/{requestId} {
       // READ: User can read if they:
-      // 1. Are the target user (receiving the request)
-      // 2. Requested it themselves
-      // 3. Are an admin/owner of the record
+      // 1. Are a platform admin
+      // 2. Are the target user (receiving the request)
+      // 3. Requested it themselves
+      // 4. Are an admin/owner of the record
       allow read: if request.auth != null && (
-      !exists(/databases/$(database)/documents/subjectConsentRequests/$(requestId)) ||
+        isPlatformAdmin() ||
+        !exists(/databases/$(database)/documents/subjectConsentRequests/$(requestId)) ||
         resource.data.subjectId == request.auth.uid ||
         resource.data.requestedBy == request.auth.uid ||
         (request.auth.uid in get(/databases/$(database)/documents/records/$(resource.data.recordId)).data.owners ||
          request.auth.uid in get(/databases/$(database)/documents/records/$(resource.data.recordId)).data.administrators)
       );
 
-      // CREATE: Must be authenticated AND:
-      // 1. Be an admin/owner of the record
-      // 2. Set themselves as requestedBy
-      // 3. Include required fields
-      // 4. Status must be 'pending'
-      allow create: if request.auth != null &&
-        isAdminOrOwnerOfRecord(request.resource.data.recordId) &&
-        request.resource.data.requestedBy == request.auth.uid &&
-        request.resource.data.status == 'pending' &&
-        request.resource.data.recordId != null &&
-        request.resource.data.subjectId != null &&
-        request.resource.data.createdAt is timestamp &&
-        (!('grantedAccessOnSubjectRequest' in request.resource.data.keys()) || 
-         request.resource.data.grantedAccessOnSubjectRequest is bool);
+      // CREATE: Three branches:
+      // 1. Admin/owner sends a pending consent request to another user
+      // 2. Subject self-adds (setSubjectAsSelf) — audit record, status 'self_consented'
+      // 3. Controller anchors trustor — audit record, status 'controller_consented'
+      allow create: if request.auth != null && (
+        // BRANCH 1: Standard pending request by admin/owner
+        (
+          isAdminOrOwnerOfRecord(request.resource.data.recordId) &&
+          request.resource.data.requestedBy == request.auth.uid &&
+          request.resource.data.status == 'pending' &&
+          request.resource.data.recordId != null &&
+          request.resource.data.subjectId != null &&
+          request.resource.data.createdAt is timestamp &&
+          (!('grantedAccessOnSubjectRequest' in request.resource.data.keys()) ||
+           request.resource.data.grantedAccessOnSubjectRequest is bool)
+        ) ||
+        // BRANCH 2: Self-add — subject and requester are the same person
+        (
+          isAdminOrOwnerOfRecord(request.resource.data.recordId) &&
+          request.resource.data.requestedBy == request.auth.uid &&
+          request.resource.data.subjectId == request.auth.uid &&
+          request.resource.data.status == 'self_consented' &&
+          request.resource.data.recordId != null &&
+          request.resource.data.createdAt is timestamp &&
+          request.resource.data.respondedAt is timestamp
+        ) ||
+        // BRANCH 3: Controller anchoring trustor on their behalf
+        (
+          isAdminOrOwnerOfRecord(request.resource.data.recordId) &&
+          request.resource.data.requestedBy == request.auth.uid &&
+          request.resource.data.subjectId != request.auth.uid &&
+          request.resource.data.status == 'controller_consented' &&
+          request.resource.data.recordId != null &&
+          request.resource.data.subjectId != null &&
+          request.resource.data.createdAt is timestamp &&
+          request.resource.data.respondedAt is timestamp
+        )
+      );
 
       // UPDATE: Two branches:
       // 1. Subject can accept/reject
