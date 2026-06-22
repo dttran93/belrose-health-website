@@ -247,7 +247,8 @@ const BackendChainParityDashboard: React.FC = () => {
                 statusFilter={statusFilter}
                 verificationsMap={verificationsMap}
                 disputesMap={disputesMap}
-                onViewVerifications={() => setActiveTab('verifications')}
+                onViewVerifications={hash => { setActiveTab('verifications'); if (hash) setSearchQuery(hash); }}
+                onViewMember={uid => { setActiveTab('members'); setSearchQuery(uid); }}
               />
             )}
           </div>

@@ -48,7 +48,8 @@ export const VerificationsIntegrityTable: React.FC<VerificationsIntegrityTablePr
     return (
       item.firestoreId.toLowerCase().includes(q) ||
       (item.verifierIdHash?.toLowerCase().includes(q) ?? false) ||
-      (item.recordId?.toLowerCase().includes(q) ?? false)
+      (item.recordId?.toLowerCase().includes(q) ?? false) ||
+      (item.recordHash?.toLowerCase().includes(q) ?? false)
     );
   });
 
@@ -59,7 +60,8 @@ export const VerificationsIntegrityTable: React.FC<VerificationsIntegrityTablePr
     return (
       item.firestoreId.toLowerCase().includes(q) ||
       (item.disputerIdHash?.toLowerCase().includes(q) ?? false) ||
-      (item.recordId?.toLowerCase().includes(q) ?? false)
+      (item.recordId?.toLowerCase().includes(q) ?? false) ||
+      (item.recordHash?.toLowerCase().includes(q) ?? false)
     );
   });
 
