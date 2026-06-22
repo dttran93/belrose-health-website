@@ -24,6 +24,7 @@ interface RecordsIntegrityTableProps {
   disputesMap: Record<string, DisputeIntegrityItem[] | undefined>;
   onViewVerifications: (recordHash?: string) => void;
   onViewMember: (uid: string) => void;
+  onClearSearch: () => void;
 }
 
 export const RecordsIntegrityTable: React.FC<RecordsIntegrityTableProps> = ({
@@ -34,6 +35,7 @@ export const RecordsIntegrityTable: React.FC<RecordsIntegrityTableProps> = ({
   disputesMap,
   onViewVerifications,
   onViewMember,
+  onClearSearch,
 }) => {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
@@ -51,7 +53,14 @@ export const RecordsIntegrityTable: React.FC<RecordsIntegrityTableProps> = ({
 
   if (filtered.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-400">No records match the current filter.</div>
+      <div className="text-center py-12 text-gray-400">
+        <p>No records match the current filter.</p>
+        {searchQuery && (
+          <button onClick={onClearSearch} className="mt-2 text-sm text-blue-500 hover:text-blue-700">
+            Clear search
+          </button>
+        )}
+      </div>
     );
   }
 

@@ -21,12 +21,14 @@ interface MembersIntegrityTableProps {
   items: MemberIntegrityItem[];
   searchQuery: string;
   statusFilter: IntegrityStatus | 'all';
+  onClearSearch: () => void;
 }
 
 export const MembersIntegrityTable: React.FC<MembersIntegrityTableProps> = ({
   items,
   searchQuery,
   statusFilter,
+  onClearSearch,
 }) => {
   const filtered = items.filter(item => {
     if (statusFilter !== 'all' && item.integrityStatus !== statusFilter) return false;
@@ -43,7 +45,14 @@ export const MembersIntegrityTable: React.FC<MembersIntegrityTableProps> = ({
 
   if (filtered.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-400">No members match the current filter.</div>
+      <div className="text-center py-12 text-gray-400">
+        <p>No members match the current filter.</p>
+        {searchQuery && (
+          <button onClick={onClearSearch} className="mt-2 text-sm text-blue-500 hover:text-blue-700">
+            Clear search
+          </button>
+        )}
+      </div>
     );
   }
 

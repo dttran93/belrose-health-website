@@ -31,6 +31,7 @@ interface VerificationsIntegrityTableProps {
   disputes: DisputeIntegrityItem[];
   searchQuery: string;
   statusFilter: IntegrityStatus | 'all';
+  onClearSearch: () => void;
 }
 
 export const VerificationsIntegrityTable: React.FC<VerificationsIntegrityTableProps> = ({
@@ -38,6 +39,7 @@ export const VerificationsIntegrityTable: React.FC<VerificationsIntegrityTablePr
   disputes,
   searchQuery,
   statusFilter,
+  onClearSearch,
 }) => {
   const [subTab, setSubTab] = useState<SubTab>('verifications');
 
@@ -84,17 +86,22 @@ export const VerificationsIntegrityTable: React.FC<VerificationsIntegrityTablePr
         ))}
       </div>
 
-      {subTab === 'verifications' && <VerificationsTable items={filteredVerifications} />}
-      {subTab === 'disputes' && <DisputesTable items={filteredDisputes} />}
+      {subTab === 'verifications' && <VerificationsTable items={filteredVerifications} searchQuery={searchQuery} onClearSearch={onClearSearch} />}
+      {subTab === 'disputes' && <DisputesTable items={filteredDisputes} searchQuery={searchQuery} onClearSearch={onClearSearch} />}
     </div>
   );
 };
 
-const VerificationsTable: React.FC<{ items: VerificationIntegrityItem[] }> = ({ items }) => {
+const VerificationsTable: React.FC<{ items: VerificationIntegrityItem[]; searchQuery: string; onClearSearch: () => void }> = ({ items, searchQuery, onClearSearch }) => {
   if (items.length === 0) {
     return (
       <div className="text-center py-12 text-gray-400">
-        No verifications match the current filter.
+        <p>No verifications match the current filter.</p>
+        {searchQuery && (
+          <button onClick={onClearSearch} className="mt-2 text-sm text-blue-500 hover:text-blue-700">
+            Clear search
+          </button>
+        )}
       </div>
     );
   }
@@ -176,10 +183,17 @@ const VerificationsTable: React.FC<{ items: VerificationIntegrityItem[] }> = ({ 
   );
 };
 
-const DisputesTable: React.FC<{ items: DisputeIntegrityItem[] }> = ({ items }) => {
+const DisputesTable: React.FC<{ items: DisputeIntegrityItem[]; searchQuery: string; onClearSearch: () => void }> = ({ items, searchQuery, onClearSearch }) => {
   if (items.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-400">No disputes match the current filter.</div>
+      <div className="text-center py-12 text-gray-400">
+        <p>No disputes match the current filter.</p>
+        {searchQuery && (
+          <button onClick={onClearSearch} className="mt-2 text-sm text-blue-500 hover:text-blue-700">
+            Clear search
+          </button>
+        )}
+      </div>
     );
   }
 

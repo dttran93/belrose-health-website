@@ -1,7 +1,7 @@
 // src/features/BackendChainParity/components/BackendChainParityDashboard.tsx
 
 import React, { useState, useMemo } from 'react';
-import { RefreshCw, Loader2 } from 'lucide-react';
+import { RefreshCw, Loader2, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/Button';
 import { SummaryCards } from './SummaryCards';
@@ -156,13 +156,24 @@ const BackendChainParityDashboard: React.FC = () => {
       {activeTab !== 'summary' && !['trustees', 'role-events'].includes(activeTab) && (
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col sm:flex-row gap-3">
-            <input
-              type="text"
-              placeholder="Search by ID, hash, name, email, or wallet..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="flex-1 px-3 py-1.5 bg-background border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                placeholder="Search by ID, hash, name, email, or wallet..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full px-3 py-1.5 bg-background border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  aria-label="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
             <div className="flex gap-2 flex-wrap">
               {statusFilterOptions.map(opt => (
                 <button
@@ -249,6 +260,7 @@ const BackendChainParityDashboard: React.FC = () => {
                 disputesMap={disputesMap}
                 onViewVerifications={hash => { setActiveTab('verifications'); if (hash) setSearchQuery(hash); }}
                 onViewMember={uid => { setActiveTab('members'); setSearchQuery(uid); }}
+                onClearSearch={() => setSearchQuery('')}
               />
             )}
           </div>
@@ -265,6 +277,7 @@ const BackendChainParityDashboard: React.FC = () => {
                 items={members.data ?? []}
                 searchQuery={searchQuery}
                 statusFilter={statusFilter}
+                onClearSearch={() => setSearchQuery('')}
               />
             )}
           </div>
@@ -280,6 +293,7 @@ const BackendChainParityDashboard: React.FC = () => {
                 disputes={disputes.data ?? []}
                 searchQuery={searchQuery}
                 statusFilter={statusFilter}
+                onClearSearch={() => setSearchQuery('')}
               />
             )}
           </div>
