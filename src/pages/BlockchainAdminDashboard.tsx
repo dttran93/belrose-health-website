@@ -17,6 +17,12 @@ interface Tab {
 
 const tabs: Tab[] = [
   {
+    id: 'chain-parity',
+    label: 'Backend ↔ Chain Parity',
+    icon: <GitCompare className="w-4 h-4" />,
+    description: 'Reconcile Firestore state against on-chain data to detect mismatches',
+  },
+  {
     id: 'members',
     label: 'Members & Roles',
     icon: <Users className="w-4 h-4" />,
@@ -27,12 +33,6 @@ const tabs: Tab[] = [
     label: 'Health Records',
     icon: <FileText className="w-4 h-4" />,
     description: 'View anchored records, verifications, and disputes',
-  },
-  {
-    id: 'chain-parity',
-    label: 'Backend ↔ Chain Parity',
-    icon: <GitCompare className="w-4 h-4" />,
-    description: 'Reconcile Firestore state against on-chain data to detect mismatches',
   },
 ];
 

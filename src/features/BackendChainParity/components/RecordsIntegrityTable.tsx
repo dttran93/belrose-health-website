@@ -1,20 +1,39 @@
 // src/features/BackendChainParity/components/RecordsIntegrityTable.tsx
 
 import React, { useState } from 'react';
-import { AlertTriangle, ArrowUpRight, CheckCircle, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
+import { AlertTriangle, ArrowUpRight, CheckCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { IntegrityStatusBadge } from './IntegrityStatusBadge';
 import { CopyableHash } from './ui/CopyableHash';
 import { VersionReviewBadge } from '@/features/ViewEditRecord/components/Edit/VersionReviewBadge';
-import { useSubjectConsentRefs } from '../hooks/useSubjectConsentRefs';
+import type { RecordIntegrityItem } from '../services/recordSubjectIntegrityService';
 import type {
-  RecordIntegrityItem,
   IntegrityStatus,
   VerificationIntegrityItem,
   DisputeIntegrityItem,
+  SubjectSyncStatus,
 } from '../lib/types';
-import { NETWORK } from '@belrose/shared';
 
-const BASESCAN_TX_URL = `${NETWORK.explorerUrl}/tx/`;
+const SUBJECT_STATUS_CONFIG: Record<
+  SubjectSyncStatus,
+  { dotClass: string; label: string; textClass: string }
+> = {
+  active_sync: {
+    dotClass: 'bg-emerald-500',
+    label: 'active on-chain',
+    textClass: 'text-emerald-600',
+  },
+  missing_from_chain: {
+    dotClass: 'bg-red-500',
+    label: 'missing from chain',
+    textClass: 'text-red-500',
+  },
+  missing_from_backend: {
+    dotClass: 'bg-amber-500',
+    label: 'missing from backend',
+    textClass: 'text-amber-600',
+  },
+  removed_sync: { dotClass: 'bg-gray-300', label: 'removed (synced)', textClass: 'text-gray-400' },
+};
 
 interface RecordsIntegrityTableProps {
   items: RecordIntegrityItem[];
@@ -47,7 +66,7 @@ export const RecordsIntegrityTable: React.FC<RecordsIntegrityTableProps> = ({
       item.firestoreId.toLowerCase().includes(q) ||
       (item.recordIdHash?.toLowerCase().includes(q) ?? false) ||
       (item.recordHash?.toLowerCase().includes(q) ?? false) ||
-      item.subjects.some(uid => uid.toLowerCase().includes(q))
+      item.backendSubjects.some((uid: string) => uid.toLowerCase().includes(q))
     );
   });
 
@@ -56,7 +75,10 @@ export const RecordsIntegrityTable: React.FC<RecordsIntegrityTableProps> = ({
       <div className="text-center py-12 text-gray-400">
         <p>No records match the current filter.</p>
         {searchQuery && (
-          <button onClick={onClearSearch} className="mt-2 text-sm text-blue-500 hover:text-blue-700">
+          <button
+            onClick={onClearSearch}
+            className="mt-2 text-sm text-blue-500 hover:text-blue-700"
+          >
             Clear search
           </button>
         )}
@@ -106,22 +128,27 @@ export const RecordsIntegrityTable: React.FC<RecordsIntegrityTableProps> = ({
                   <td className="px-4 py-3 font-mono text-xs text-gray-500">
                     <CopyableHash value={item.recordHash} />
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-500">{item.subjects.length}</td>
+                  <td className="px-4 py-3 text-xs text-center text-gray-500">
+                    {item.backendSubjects.length}
+                  </td>
                   <td className="px-4 py-3 text-center">
                     {(() => {
                       const vCount = verificationsMap[item.firestoreId]?.length ?? 0;
                       const dCount = disputesMap[item.firestoreId]?.length ?? 0;
-                      if (vCount === 0 && dCount === 0) return <span className="text-gray-300 text-xs">—</span>;
+                      if (vCount === 0 && dCount === 0)
+                        return <span className="text-gray-300 text-xs">—</span>;
                       return (
                         <div className="flex items-center justify-center gap-2 text-xs">
                           {vCount > 0 && (
                             <span className="flex items-center gap-0.5 text-emerald-600">
-                              <CheckCircle className="w-3 h-3" />{vCount}
+                              <CheckCircle className="w-3 h-3" />
+                              {vCount}
                             </span>
                           )}
                           {dCount > 0 && (
                             <span className="flex items-center gap-0.5 text-amber-500">
-                              <AlertTriangle className="w-3 h-3" />{dCount}
+                              <AlertTriangle className="w-3 h-3" />
+                              {dCount}
                             </span>
                           )}
                         </div>
@@ -169,9 +196,21 @@ const ExpandedRow: React.FC<ExpandedRowProps> = ({
   onViewVerifications,
   onViewMember,
 }) => {
-  const activeVerifications = verifications.filter(v => v.isActiveOnChain !== false);
-  const activeDisputes = disputes.filter(d => d.isActiveOnChain !== false);
-  const { data: consentRefsMap = {} } = useSubjectConsentRefs(item.firestoreId);
+  // Group verifications and disputes by their recordHash so each hash row
+  // gets its own accurate V&D counts (same pattern as VersionHistory.tsx)
+  const versByHash = new Map<string, VerificationIntegrityItem[]>();
+  for (const v of verifications) {
+    if (!v.recordHash) continue;
+    const key = v.recordHash.toLowerCase();
+    versByHash.set(key, [...(versByHash.get(key) ?? []), v]);
+  }
+
+  const dispsByHash = new Map<string, DisputeIntegrityItem[]>();
+  for (const d of disputes) {
+    if (!d.recordHash) continue;
+    const key = d.recordHash.toLowerCase();
+    dispsByHash.set(key, [...(dispsByHash.get(key) ?? []), d]);
+  }
 
   return (
     <div className="space-y-4">
@@ -192,90 +231,105 @@ const ExpandedRow: React.FC<ExpandedRowProps> = ({
         {/* Subjects */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            Subjects ({item.subjects.length})
+            Subjects ({item.backendSubjects.length} backend · {item.onChainSubjects.length}{' '}
+            on-chain)
           </div>
-          {item.subjectStatuses && item.subjectStatuses.length > 0 ? (
-            <div className="space-y-2">
-              {item.subjectStatuses.map(s => {
-                const anchorTxHash = consentRefsMap[s.uid]?.txHash;
+          {item.subjectComparisons && item.subjectComparisons.length > 0 ? (
+            <div className="divide-y divide-gray-100">
+              {item.subjectComparisons.map(s => {
+                const cfg = SUBJECT_STATUS_CONFIG[s.syncStatus];
                 return (
-                  <div key={s.uid} className="flex items-center gap-2 text-xs">
-                    <IntegrityStatusBadge
-                      status={s.isActiveOnChain ? 'synced' : 'missing'}
-                      showLabel={false}
-                    />
-                    <div className="font-mono min-w-0 flex-1">
-                      <div className="flex items-center gap-1">
-                        <span className="text-gray-500 truncate min-w-0">{s.uid}</span>
-                        <button
-                          onClick={e => { e.stopPropagation(); onViewMember(s.uid); }}
-                          title="View in Members tab"
-                          className="flex-shrink-0 text-gray-400 hover:text-blue-600 transition-colors"
-                        >
-                          <ArrowUpRight className="w-3 h-3" />
-                        </button>
-                      </div>
-                      <div className="text-gray-400 text-left">
-                        <CopyableHash value={s.userIdHash} className="text-gray-400" />
+                  <div key={s.userIdHash} className="flex items-start gap-2 py-2 text-xs">
+                    <span className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${cfg.dotClass}`} />
+                    <div className="text-left min-w-0 flex-1">
+                      {s.uid ? (
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono text-gray-700 truncate">{s.uid}</span>
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              onViewMember(s.uid!);
+                            }}
+                            title="View in Members tab"
+                            className="flex-shrink-0 text-gray-400 hover:text-blue-600 transition-colors"
+                          >
+                            <ArrowUpRight className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="italic text-left text-gray-400">uid unknown</span>
+                      )}
+                      <div className="font-mono text-left text-gray-400 mt-0.5">
+                        <CopyableHash value={s.userIdHash} />
                       </div>
                     </div>
-                    <span
-                      className={`whitespace-nowrap ${s.isActiveOnChain ? 'text-emerald-600' : 'text-red-500'}`}
-                    >
-                      {s.isActiveOnChain ? 'active on-chain' : 'not active'}
-                    </span>
-                    {anchorTxHash ? (
-                      <a
-                        href={`${BASESCAN_TX_URL}${anchorTxHash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="View anchor transaction"
-                        className="flex-shrink-0 text-blue-500 hover:text-blue-700"
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    ) : (
-                      <span className="w-3 h-3 flex-shrink-0" />
-                    )}
+                    <span className={`flex-shrink-0 ${cfg.textClass}`}>{cfg.label}</span>
                   </div>
                 );
               })}
             </div>
+          ) : item.integrityStatus === 'not_applicable' ? (
+            <div className="text-xs text-gray-400">Not yet anchored on chain.</div>
           ) : (
-            <div className="text-xs text-gray-400">
-              {item.integrityStatus === 'not_applicable'
-                ? 'Not yet anchored to blockchain.'
-                : item.subjects.length === 0
-                  ? 'No subjects on this record.'
-                  : 'Subject chain data unavailable.'}
-            </div>
+            <div className="text-xs text-gray-400">No subjects.</div>
           )}
           {item.error && (
             <div className="mt-3 text-xs text-red-600 bg-red-50 rounded p-2">{item.error}</div>
           )}
         </div>
 
-        {/* Record Hash + Credibility */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 flex flex-col gap-4">
-          <div>
-            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Record Hash & Credibility
-            </div>
-            <div className="flex items-center justify-between gap-2 text-xs font-mono text-gray-600">
-              <CopyableHash value={item.recordHash} />
-              <VersionReviewBadge
-                stats={{
-                  verifications: {
-                    total: verifications.length,
-                    active: activeVerifications.length,
-                  },
-                  disputes: { total: disputes.length, active: activeDisputes.length },
-                }}
-                onClick={() => onViewVerifications(item.recordHash)}
-              />
-            </div>
+        {/* Hashes */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Hashes ({item.backendHashes.length} backend · {item.onChainHashes.length} on-chain)
           </div>
+          {item.hashComparisons && item.hashComparisons.length > 0 ? (
+            <div className="divide-y divide-gray-100">
+              {item.hashComparisons.map(h => {
+                const cfg = SUBJECT_STATUS_CONFIG[h.syncStatus];
+                return (
+                  <div key={h.hash} className="flex items-start gap-2 py-2 text-xs">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1.5 font-mono text-gray-700">
+                        <div className="flex items-center gap-1">
+                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dotClass}`} />
+                          <CopyableHash value={h.hash} />
+                          {h.isCurrentHash && (
+                            <span className="text-[10px] font-sans font-medium text-blue-600 bg-blue-50 rounded px-1 py-0.5 leading-none">
+                              current
+                            </span>
+                          )}
+                        </div>
+                        {(() => {
+                          const hashVers = versByHash.get(h.hash) ?? [];
+                          const hashDisps = dispsByHash.get(h.hash) ?? [];
+                          return (
+                            <VersionReviewBadge
+                              stats={{
+                                verifications: {
+                                  total: hashVers.length,
+                                  active: hashVers.filter(v => v.isActiveOnChain !== false).length,
+                                },
+                                disputes: {
+                                  total: hashDisps.length,
+                                  active: hashDisps.filter(d => d.isActiveOnChain !== false).length,
+                                },
+                              }}
+                              onClick={() => onViewVerifications(h.hash)}
+                            />
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : item.integrityStatus === 'not_applicable' ? (
+            <div className="text-xs text-gray-400">Not yet anchored on chain.</div>
+          ) : (
+            <div className="text-xs text-gray-400">No hashes.</div>
+          )}
         </div>
       </div>
     </div>

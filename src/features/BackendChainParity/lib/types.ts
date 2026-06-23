@@ -25,6 +25,7 @@ export interface FirestoreRecord {
   id: string;
   recordHash?: string;
   recordIdHash?: string;
+  previousRecordHash?: string[] | null;
   blockchainRoleInitialization?: {
     blockchainInitialized?: boolean;
     blockchainRef?: BlockchainRef;
@@ -92,23 +93,27 @@ export interface FirestoreSyncQueueItem {
 // INTEGRITY RESULT TYPES (Firestore data + chain check outcome)
 // ============================================================================
 
-export interface SubjectIntegrityStatus {
-  uid: string;
-  userIdHash: string;
+export type SubjectSyncStatus =
+  | 'active_sync' // in backend + active on-chain
+  | 'missing_from_backend' // active on-chain but not in backend
+  | 'missing_from_chain' // in backend but not active on-chain
+  | 'removed_sync'; // not in backend + not active on-chain (both agree it's removed)
+
+export interface SubjectComparison {
+  uid?: string; // Firebase UID — undefined when only known from chain
+  userIdHash: string; // keccak256(uid) or raw chain hash if uid unknown
   isActiveOnChain: boolean;
+  syncStatus: SubjectSyncStatus;
 }
 
-export interface RecordIntegrityItem {
-  firestoreId: string;
-  recordHash?: string;
-  recordIdHash?: string;
-  blockchainRef?: BlockchainRef;
-  isBlockchainInitialized: boolean;
-  subjects: string[];
-  integrityStatus: IntegrityStatus;
-  hashExistsOnChain?: boolean;
-  subjectStatuses?: SubjectIntegrityStatus[];
-  error?: string;
+// Re-uses the same 4-status matrix as subjects
+export type HashSyncStatus = SubjectSyncStatus;
+
+export interface HashComparison {
+  hash: string;
+  isCurrentHash: boolean; // true if this is record.recordHash (vs a previousRecordHash)
+  isActiveOnChain: boolean;
+  syncStatus: HashSyncStatus;
 }
 
 export interface MemberIntegrityItem {
@@ -185,12 +190,24 @@ export function computeSummary(items: { integrityStatus: IntegrityStatus }[]): P
   };
   for (const item of items) {
     switch (item.integrityStatus) {
-      case 'synced': summary.synced++; break;
-      case 'mismatch': summary.mismatch++; break;
-      case 'missing': summary.missing++; break;
-      case 'pending': summary.pending++; break;
-      case 'not_applicable': summary.notApplicable++; break;
-      case 'failed': summary.failed++; break;
+      case 'synced':
+        summary.synced++;
+        break;
+      case 'mismatch':
+        summary.mismatch++;
+        break;
+      case 'missing':
+        summary.missing++;
+        break;
+      case 'pending':
+        summary.pending++;
+        break;
+      case 'not_applicable':
+        summary.notApplicable++;
+        break;
+      case 'failed':
+        summary.failed++;
+        break;
     }
   }
   return summary;

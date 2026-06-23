@@ -11,16 +11,13 @@ import {
 import type { HealthRecordCore, MemberRoleManager } from '@belrose/shared';
 import { requireEnv } from '@/utils/utils';
 import type {
-  FirestoreRecord,
   FirestoreUser,
   FirestoreVerification,
   FirestoreDispute,
-  RecordIntegrityItem,
   MemberIntegrityItem,
   VerificationIntegrityItem,
   DisputeIntegrityItem,
   IntegrityStatus,
-  SubjectIntegrityStatus,
 } from '../lib/types';
 
 // ============================================================================
@@ -73,60 +70,6 @@ const FIRESTORE_STATUS_TO_NUMBER: Record<string, number> = {
   VerifiedProvider: 4,
   Guest: 5,
 };
-
-// ============================================================================
-// RECORD INTEGRITY CHECK
-// ============================================================================
-
-export async function checkRecordIntegrity(record: FirestoreRecord): Promise<RecordIntegrityItem> {
-  const isBlockchainInitialized =
-    record.blockchainRoleInitialization?.blockchainInitialized ?? false;
-  const base: Omit<RecordIntegrityItem, 'integrityStatus'> = {
-    firestoreId: record.id,
-    recordHash: record.recordHash,
-    recordIdHash: record.recordIdHash,
-    blockchainRef: record.blockchainRoleInitialization?.blockchainRef,
-    isBlockchainInitialized,
-    subjects: record.subjects ?? [],
-  };
-
-  if (!isBlockchainInitialized || !record.recordHash || !record.recordIdHash) {
-    return { ...base, integrityStatus: 'not_applicable' };
-  }
-
-  try {
-    const contract = getHealthContract();
-
-    // getRecordIdForHash reverts if the hash is not active on-chain
-    let returnedRecordIdHash: string;
-    try {
-      returnedRecordIdHash = await contract.getRecordIdForHash(record.recordHash);
-    } catch {
-      return { ...base, integrityStatus: 'missing', hashExistsOnChain: false };
-    }
-
-    // Verify the hash is bound to the expected record, not a different one
-    if (returnedRecordIdHash.toLowerCase() !== record.recordIdHash!.toLowerCase()) {
-      return { ...base, integrityStatus: 'mismatch', hashExistsOnChain: true };
-    }
-
-    // Check each subject's active status on-chain
-    const subjectStatuses: SubjectIntegrityStatus[] = await Promise.all(
-      (record.subjects ?? []).map(async uid => {
-        const userIdHash = ethers.id(uid);
-        const isActiveOnChain = await contract.isActiveSubject(record.recordIdHash!, userIdHash);
-        return { uid, userIdHash, isActiveOnChain };
-      })
-    );
-
-    const allSubjectsSynced = subjectStatuses.every(s => s.isActiveOnChain);
-    const integrityStatus: IntegrityStatus = allSubjectsSynced ? 'synced' : 'mismatch';
-
-    return { ...base, integrityStatus, hashExistsOnChain: true, subjectStatuses };
-  } catch (error) {
-    return { ...base, integrityStatus: 'failed', error: String(error) };
-  }
-}
 
 // ============================================================================
 // MEMBER INTEGRITY CHECK
