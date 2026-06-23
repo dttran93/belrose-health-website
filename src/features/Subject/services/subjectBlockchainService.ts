@@ -47,23 +47,23 @@ export class SubjectBlockchainService {
   // =======================================================================
 
   /**
-   * Anchor a subject to a record on the blockchain
-   * Logs to sync queue if blockchain call fails
+   * Anchor a subject to a record on the blockchain.
+   * Returns the transaction result on success, null on failure (failure is logged to sync queue).
    */
   static async anchorSubject(
     recordId: string,
     recordHash: string,
     userId: string
-  ): Promise<boolean> {
+  ): Promise<{ txHash: string; blockNumber: number } | null> {
     const walletAddress = await this.requireUserWalletAddress(userId);
 
     try {
       console.log('⛓️ Anchoring subject on blockchain...', { recordId, userId });
 
-      await blockchainHealthRecordService.anchorRecord(recordId, recordHash);
+      const result = await blockchainHealthRecordService.anchorRecord(recordId, recordHash);
 
       console.log('✅ Subject anchored on blockchain');
-      return true;
+      return result;
     } catch (error) {
       await this.logAnchorFailure({
         action: 'anchorRecord',
@@ -74,27 +74,28 @@ export class SubjectBlockchainService {
         error,
       });
 
-      return false;
+      return null;
     }
   }
 
   /**
    * Anchor a trustor as subject on behalf of a controller trustee.
    * The caller's wallet must satisfy isControllerOf(trustorIdHash) on-chain.
+   * Returns the transaction result on success, null on failure.
    */
   static async anchorSubjectAsController(
     recordId: string,
     recordHash: string,
     controllerId: string,
     trustorId: string
-  ): Promise<boolean> {
+  ): Promise<{ txHash: string; blockNumber: number } | null> {
     const walletAddress = await this.requireUserWalletAddress(controllerId);
 
     try {
       console.log('⛓️ Anchoring subject as controller...', { recordId, trustorId });
-      await blockchainHealthRecordService.anchorRecordAsController(recordId, recordHash, trustorId);
+      const result = await blockchainHealthRecordService.anchorRecordAsController(recordId, recordHash, trustorId);
       console.log('✅ Subject anchored as controller');
-      return true;
+      return result;
     } catch (error) {
       await this.logAnchorFailure({
         action: 'anchorRecord',
@@ -104,7 +105,7 @@ export class SubjectBlockchainService {
         walletAddress,
         error,
       });
-      return false;
+      return null;
     }
   }
 

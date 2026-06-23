@@ -17,6 +17,14 @@ service cloud.firestore {
     // DATABASE-SCOPED HELPER FUNCTIONS
     // ============================================
 
+    // Check if the authenticated user is a platform admin.
+    // Reads from the custom auth claim set via Admin SDK — same source the
+    // frontend RequiresPlatformAdmin guard uses (idTokenResult.claims.platformAdmin).
+    // Using the token avoids a get() call and works reliably for list queries.
+    function isPlatformAdmin() {
+      return request.auth.token.get('platformAdmin', false) == true;
+    }
+
     // Check if user has any role on a record
     function hasRoleOnRecord(recordId) {
       let record = get(/databases/$(database)/documents/records/$(recordId));
@@ -110,11 +118,21 @@ service cloud.firestore {
     // ============================================
 
     match /users/{userId} {
-      // Owner can read/write their own profile
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      
-      // Any authenticated user can read profiles (needed for sharing)
+      // Any authenticated user can read profiles (needed for sharing/search)
       allow read: if request.auth != null;
+
+      // Owner can create their own profile, but cannot self-assign platform admin
+      allow create: if request.auth != null &&
+        request.auth.uid == userId &&
+        request.resource.data.get('isPlatformAdmin', false) != true;
+
+      // Owner can update their own profile, but cannot change isPlatformAdmin
+      allow update: if request.auth != null &&
+        request.auth.uid == userId &&
+        request.resource.data.get('isPlatformAdmin', false) == resource.data.get('isPlatformAdmin', false);
+
+      // Owner can delete their own profile
+      allow delete: if request.auth != null && request.auth.uid == userId;
       
       // --- NOTIFICATIONS SUBCOLLECTION ---
       match /notifications/{notificationId} {
@@ -243,8 +261,11 @@ service cloud.firestore {
     // ============================================
 
     match /records/{recordId} {
-      // READ: User can read if they have any role on the record
+      // READ: User can read if they have any role on the record, or are a platform admin.
+      // isPlatformAdmin() is checked first so collection-wide admin scans short-circuit
+      // before any resource.data access (avoids evaluation errors on unfiltered list queries).
       allow read: if request.auth != null && (
+        isPlatformAdmin() ||
         !exists(/databases/$(database)/documents/records/$(recordId)) ||
         resource.data.uploadedBy == request.auth.uid ||
         request.auth.uid in resource.data.owners ||
@@ -413,31 +434,57 @@ service cloud.firestore {
 
     match /subjectConsentRequests/{requestId} {
       // READ: User can read if they:
-      // 1. Are the target user (receiving the request)
-      // 2. Requested it themselves
-      // 3. Are an admin/owner of the record
+      // 1. Are a platform admin
+      // 2. Are the target user (receiving the request)
+      // 3. Requested it themselves
+      // 4. Are an admin/owner of the record
       allow read: if request.auth != null && (
-      !exists(/databases/$(database)/documents/subjectConsentRequests/$(requestId)) ||
+        isPlatformAdmin() ||
+        !exists(/databases/$(database)/documents/subjectConsentRequests/$(requestId)) ||
         resource.data.subjectId == request.auth.uid ||
         resource.data.requestedBy == request.auth.uid ||
         (request.auth.uid in get(/databases/$(database)/documents/records/$(resource.data.recordId)).data.owners ||
          request.auth.uid in get(/databases/$(database)/documents/records/$(resource.data.recordId)).data.administrators)
       );
 
-      // CREATE: Must be authenticated AND:
-      // 1. Be an admin/owner of the record
-      // 2. Set themselves as requestedBy
-      // 3. Include required fields
-      // 4. Status must be 'pending'
-      allow create: if request.auth != null &&
-        isAdminOrOwnerOfRecord(request.resource.data.recordId) &&
-        request.resource.data.requestedBy == request.auth.uid &&
-        request.resource.data.status == 'pending' &&
-        request.resource.data.recordId != null &&
-        request.resource.data.subjectId != null &&
-        request.resource.data.createdAt is timestamp &&
-        (!('grantedAccessOnSubjectRequest' in request.resource.data.keys()) || 
-         request.resource.data.grantedAccessOnSubjectRequest is bool);
+      // CREATE: Three branches:
+      // 1. Admin/owner sends a pending consent request to another user
+      // 2. Subject self-adds (setSubjectAsSelf) — audit record, status 'self_consented'
+      // 3. Controller anchors trustor — audit record, status 'controller_consented'
+      allow create: if request.auth != null && (
+        // BRANCH 1: Standard pending request by admin/owner
+        (
+          isAdminOrOwnerOfRecord(request.resource.data.recordId) &&
+          request.resource.data.requestedBy == request.auth.uid &&
+          request.resource.data.status == 'pending' &&
+          request.resource.data.recordId != null &&
+          request.resource.data.subjectId != null &&
+          request.resource.data.createdAt is timestamp &&
+          (!('grantedAccessOnSubjectRequest' in request.resource.data.keys()) ||
+           request.resource.data.grantedAccessOnSubjectRequest is bool)
+        ) ||
+        // BRANCH 2: Self-add — subject and requester are the same person
+        (
+          isAdminOrOwnerOfRecord(request.resource.data.recordId) &&
+          request.resource.data.requestedBy == request.auth.uid &&
+          request.resource.data.subjectId == request.auth.uid &&
+          request.resource.data.status == 'self_consented' &&
+          request.resource.data.recordId != null &&
+          request.resource.data.createdAt is timestamp &&
+          request.resource.data.respondedAt is timestamp
+        ) ||
+        // BRANCH 3: Controller anchoring trustor on their behalf
+        (
+          isAdminOrOwnerOfRecord(request.resource.data.recordId) &&
+          request.resource.data.requestedBy == request.auth.uid &&
+          request.resource.data.subjectId != request.auth.uid &&
+          request.resource.data.status == 'controller_consented' &&
+          request.resource.data.recordId != null &&
+          request.resource.data.subjectId != null &&
+          request.resource.data.createdAt is timestamp &&
+          request.resource.data.respondedAt is timestamp
+        )
+      );
 
       // UPDATE: Two branches:
       // 1. Subject can accept/reject
@@ -527,13 +574,13 @@ service cloud.firestore {
 
     match /verifications/{verificationId} {
       
-      // READ: Allow if user is verifier OR has role on the associated record
-      // Note: For queries by recordId, the get() call happens per-document
+      // READ: Allow if user is verifier, has role on the record, or is a platform admin.
+      // isPlatformAdmin() first so unfiltered admin list queries short-circuit before
+      // hasRoleOnRecord() tries to get() a path containing unknown resource.data.recordId.
       allow read: if request.auth != null && (
+        isPlatformAdmin() ||
         !exists(/databases/$(database)/documents/verifications/$(verificationId)) ||
-        // User is the verifier (can always read their own)
         resource.data.verifierId == request.auth.uid ||
-        // User has a role on the record this verification belongs to
         hasRoleOnRecord(resource.data.recordId)
       );
 
@@ -570,8 +617,11 @@ service cloud.firestore {
     // ============================================
   
     match /disputes/{disputeId} {
-      // READ: Allow if user is disputer OR has role on the associated record
+      // READ: Allow if user is disputer, has role on the record, or is a platform admin.
+      // isPlatformAdmin() first — same reason as verifications: hasRoleOnRecord()
+      // uses resource.data.recordId which is unknown during unfiltered list queries.
       allow read: if request.auth != null && (
+        isPlatformAdmin() ||
         !exists(/databases/$(database)/documents/disputes/$(disputeId)) ||
         resource.data.disputerId == request.auth.uid ||
         hasRoleOnRecord(resource.data.recordId)
@@ -1051,7 +1101,7 @@ service cloud.firestore {
         request.resource.data.retryCount == 0;
 
       allow read, update: if request.auth != null &&
-        (resource.data.userId == request.auth.uid || isServerWrite());
+        (isPlatformAdmin() || resource.data.userId == request.auth.uid || isServerWrite());
 
       allow delete: if isServerWrite();
     }

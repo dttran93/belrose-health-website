@@ -17,7 +17,7 @@
  * Access is handled in the useSubjectFlow with imports from PermissionService
  */
 
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import SubjectBlockchainService from './subjectBlockchainService';
 import { SubjectRejectionService } from './subjectRejectionService';
@@ -27,7 +27,7 @@ import SubjectPermissionService from './subjectPermissionService';
 import { FileObject } from '@/types/core';
 import SubjectRemovalService from './subjectRemovalService';
 import { TrusteePermissionService } from '@/features/Trustee/services/trusteePermissionService';
-import { CreatorResponseStatus, RejectionReasons, SubjectConsentRequest } from '@belrose/shared';
+import { buildHealthRecordRef, CreatorResponseStatus, RejectionReasons, SubjectConsentRequest } from '@belrose/shared';
 
 // ============================================================================
 // TYPES
@@ -121,7 +121,7 @@ export class SubjectService {
 
       // Step 1: Anchor on blockchain (requires wallet signature)
       console.log('🔗 Anchoring subject on blockchain...');
-      const blockchainAnchored = await SubjectBlockchainService.anchorSubject(
+      const txResult = await SubjectBlockchainService.anchorSubject(
         recordId,
         recordData.recordHash,
         user.uid
@@ -141,8 +141,32 @@ export class SubjectService {
         console.error('⚠️ Failed to grant trustee access for new record:', trusteeError);
       }
 
+      // Step 4: Create audit consent request doc with blockchain ref (non-fatal)
+      try {
+        const db = getFirestore();
+        const requestId = getConsentRequestId(recordId, user.uid);
+        const now = Timestamp.now();
+        const role: SubjectConsentRequest['requestedSubjectRole'] =
+          recordData.owners?.includes(user.uid) ? 'owner'
+          : recordData.administrators?.includes(user.uid) ? 'administrator'
+          : 'sharer';
+        await setDoc(doc(db, 'subjectConsentRequests', requestId), {
+          recordId,
+          subjectId: user.uid,
+          requestedBy: user.uid,
+          requestedSubjectRole: role,
+          status: 'self_consented',
+          createdAt: now,
+          respondedAt: now,
+          grantedAccessOnSubjectRequest: false,
+          ...(txResult ? { blockchainRef: buildHealthRecordRef(txResult.txHash, txResult.blockNumber) } : {}),
+        } satisfies SubjectConsentRequest);
+      } catch (consentError) {
+        console.warn('⚠️ Failed to create self-add consent record:', consentError);
+      }
+
       console.log('✅ Subject set as self successfully');
-      return { success: true, recordId, subjectId: user.uid, blockchainAnchored };
+      return { success: true, recordId, subjectId: user.uid, blockchainAnchored: txResult !== null };
     } catch (error) {
       console.error('❌ Error setting subject as self:', error);
       throw error;
@@ -154,7 +178,11 @@ export class SubjectService {
    * The caller must be an active controller trustee of trustorId (verified on-chain by isControllerOf).
    * No consent request is needed — controller authority is sufficient.
    */
-  static async anchorSubjectAsController(recordId: string, trustorId: string): Promise<void> {
+  static async anchorSubjectAsController(
+    recordId: string,
+    trustorId: string,
+    role: SubjectConsentRequest['requestedSubjectRole'] = 'sharer'
+  ): Promise<void> {
     const user = getAuth().currentUser;
     if (!user) throw new Error('User not authenticated');
 
@@ -176,7 +204,7 @@ export class SubjectService {
     console.log('👤 Controller anchoring trustor as subject:', { recordId, trustorId });
 
     // Step 1: Anchor on blockchain — passes trustorId hash as subjectIdHash
-    await SubjectBlockchainService.anchorSubjectAsController(
+    const txResult = await SubjectBlockchainService.anchorSubjectAsController(
       recordId,
       recordData.recordHash,
       user.uid,
@@ -194,6 +222,26 @@ export class SubjectService {
       console.log('✅ Access granted to trustor\'s trustees');
     } catch (trusteeError) {
       console.error('⚠️ Failed to grant trustee access for new record:', trusteeError);
+    }
+
+    // Step 4: Create audit consent request doc with blockchain ref (non-fatal)
+    try {
+      const db = getFirestore();
+      const requestId = getConsentRequestId(recordId, trustorId);
+      const now = Timestamp.now();
+      await setDoc(doc(db, 'subjectConsentRequests', requestId), {
+        recordId,
+        subjectId: trustorId,
+        requestedBy: user.uid,
+        requestedSubjectRole: role,
+        status: 'controller_consented',
+        createdAt: now,
+        respondedAt: now,
+        grantedAccessOnSubjectRequest: false,
+        ...(txResult ? { blockchainRef: buildHealthRecordRef(txResult.txHash, txResult.blockNumber) } : {}),
+      } satisfies SubjectConsentRequest);
+    } catch (consentError) {
+      console.warn('⚠️ Failed to create controller consent record:', consentError);
     }
   }
 

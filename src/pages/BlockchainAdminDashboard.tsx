@@ -1,11 +1,12 @@
 // src/pages/BlockchainAdminDashboard.tsx
 
 import React, { useState } from 'react';
-import { Users, FileText } from 'lucide-react';
+import { Users, FileText, GitCompare } from 'lucide-react';
 import MemberDashboard from '@/features/MemberBlockchainViewer/components/MemberBlockchainDashboard';
 import RecordDashboard from '@/features/RecordBlockchainViewer/components/RecordDashboard';
+import BackendChainParityDashboard from '@/features/BackendChainParity/components/BackendChainParityDashboard';
 
-type TabId = 'members' | 'records';
+type TabId = 'members' | 'records' | 'chain-parity';
 
 interface Tab {
   id: TabId;
@@ -15,6 +16,12 @@ interface Tab {
 }
 
 const tabs: Tab[] = [
+  {
+    id: 'chain-parity',
+    label: 'Backend ↔ Chain Parity',
+    icon: <GitCompare className="w-4 h-4" />,
+    description: 'Reconcile Firestore state against on-chain data to detect mismatches',
+  },
   {
     id: 'members',
     label: 'Members & Roles',
@@ -38,7 +45,7 @@ const tabs: Tab[] = [
  */
 const BlockchainAdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('members');
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshKey] = useState(0);
   const activeTabInfo = tabs.find(t => t.id === activeTab);
 
   return (
@@ -80,6 +87,7 @@ const BlockchainAdminDashboard: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 pb-8">
         {activeTab === 'members' && <MemberDashboard key={`members-${refreshKey}`} />}
         {activeTab === 'records' && <RecordDashboard key={`records-${refreshKey}`} />}
+        {activeTab === 'chain-parity' && <BackendChainParityDashboard />}
       </div>
     </div>
   );

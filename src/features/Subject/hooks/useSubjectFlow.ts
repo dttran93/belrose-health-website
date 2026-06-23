@@ -398,7 +398,9 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
       });
 
       // Check for active controller relationship — determines which confirm screen to show
-      const controllerRel = await TrusteeRelationshipService.getControllerRelationshipWith(user.uid);
+      const controllerRel = await TrusteeRelationshipService.getControllerRelationshipWith(
+        user.uid
+      );
       setIsControllerOfSelected(!!controllerRel);
 
       setPhase('confirming');
@@ -592,7 +594,11 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
 
     const activityId = addActivity({ label: 'Anchoring subject as controller', link: recordLink });
 
-    const txPromise = SubjectService.anchorSubjectAsController(recordId, selectedUser.uid);
+    const txPromise = SubjectService.anchorSubjectAsController(
+      recordId,
+      selectedUser.uid,
+      selectedRole
+    );
 
     setSubmittedLabel('Anchoring subject as controller');
     setPhase('submitted');
