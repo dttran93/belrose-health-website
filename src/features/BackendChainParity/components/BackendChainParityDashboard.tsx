@@ -11,12 +11,22 @@ import { VerificationsIntegrityTable } from './VerificationsIntegrityTable';
 import { SyncFailuresTable } from './SyncFailuresTable';
 import { useRecordsIntegrity } from '../hooks/useRecordsIntegrity';
 import { useMembersIntegrity } from '../hooks/useMembersIntegrity';
-import { useVerificationsIntegrity, useDisputesIntegrity } from '../hooks/useVerificationsIntegrity';
+import {
+  useVerificationsIntegrity,
+  useDisputesIntegrity,
+} from '../hooks/useVerificationsIntegrity';
 import { useSyncFailures } from '../hooks/useSyncFailures';
 import { computeSummary } from '../lib/types';
 import type { IntegrityStatus } from '../lib/types';
 
-type TabId = 'summary' | 'records' | 'members' | 'verifications' | 'sync-failures' | 'trustees' | 'role-events';
+type TabId =
+  | 'summary'
+  | 'records'
+  | 'members'
+  | 'verifications'
+  | 'sync-failures'
+  | 'trustees'
+  | 'role-events';
 
 const TABS: Array<{ id: TabId; label: string; phase2?: boolean }> = [
   { id: 'summary', label: 'Summary' },
@@ -42,10 +52,7 @@ const BackendChainParityDashboard: React.FC = () => {
   const syncFailures = useSyncFailures();
 
   const isAnyLoading =
-    records.isFetching ||
-    members.isFetching ||
-    verifications.isFetching ||
-    disputes.isFetching;
+    records.isFetching || members.isFetching || verifications.isFetching || disputes.isFetching;
 
   const lastChecked = [
     records.dataUpdatedAt,
@@ -208,7 +215,11 @@ const BackendChainParityDashboard: React.FC = () => {
               {[
                 { label: 'Records', summary: recordsSummary, tab: 'records' as TabId },
                 { label: 'Members', summary: membersSummary, tab: 'members' as TabId },
-                { label: 'Verifications', summary: verificationsSummary, tab: 'verifications' as TabId },
+                {
+                  label: 'Verifications',
+                  summary: verificationsSummary,
+                  tab: 'verifications' as TabId,
+                },
                 { label: 'Disputes', summary: disputesSummary, tab: 'verifications' as TabId },
               ].map(({ label, summary, tab }) => (
                 <div
@@ -258,8 +269,14 @@ const BackendChainParityDashboard: React.FC = () => {
                 statusFilter={statusFilter}
                 verificationsMap={verificationsMap}
                 disputesMap={disputesMap}
-                onViewVerifications={hash => { setActiveTab('verifications'); if (hash) setSearchQuery(hash); }}
-                onViewMember={uid => { setActiveTab('members'); setSearchQuery(uid); }}
+                onViewVerifications={hash => {
+                  setActiveTab('verifications');
+                  if (hash) setSearchQuery(hash);
+                }}
+                onViewMember={uid => {
+                  setActiveTab('members');
+                  setSearchQuery(uid);
+                }}
                 onClearSearch={() => setSearchQuery('')}
               />
             )}
@@ -306,10 +323,7 @@ const BackendChainParityDashboard: React.FC = () => {
             ) : syncFailures.error ? (
               <ErrorState error={String(syncFailures.error)} />
             ) : (
-              <SyncFailuresTable
-                items={syncFailures.data ?? []}
-                searchQuery={searchQuery}
-              />
+              <SyncFailuresTable items={syncFailures.data ?? []} searchQuery={searchQuery} />
             )}
           </div>
         )}
@@ -342,9 +356,7 @@ const LoadingState: React.FC<{ label: string }> = ({ label }) => (
   <div className="flex items-center justify-center py-16">
     <div className="text-center">
       <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-3" />
-      <p className="text-gray-500 text-sm">
-        Checking {label} against blockchain…
-      </p>
+      <p className="text-gray-500 text-sm">Checking {label} against blockchain…</p>
     </div>
   </div>
 );

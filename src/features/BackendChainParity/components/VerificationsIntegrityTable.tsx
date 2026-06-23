@@ -107,9 +107,9 @@ const VerificationsTable: React.FC<{ items: VerificationIntegrityItem[]; searchQ
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200">
+    <div className="overflow-auto rounded-xl border border-gray-200 max-h-[80vh]">
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b border-gray-200">
+        <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
           <tr>
             <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
             <th className="px-4 py-3 text-left font-medium text-gray-600">Firestore ID</th>
@@ -198,9 +198,9 @@ const DisputesTable: React.FC<{ items: DisputeIntegrityItem[]; searchQuery: stri
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200">
+    <div className="overflow-auto rounded-xl border border-gray-200 max-h-[80vh]">
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b border-gray-200">
+        <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
           <tr>
             <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
             <th className="px-4 py-3 text-left font-medium text-gray-600">Firestore ID</th>

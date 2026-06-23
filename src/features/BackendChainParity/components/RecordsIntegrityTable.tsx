@@ -87,9 +87,9 @@ export const RecordsIntegrityTable: React.FC<RecordsIntegrityTableProps> = ({
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200">
+    <div className="overflow-auto rounded-xl border border-gray-200 max-h-[80vh]">
       <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b border-gray-200">
+        <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
           <tr>
             <th className="w-6 px-3 py-3" />
             <th className="px-4 py-3 text-center font-medium text-gray-600">Status</th>
