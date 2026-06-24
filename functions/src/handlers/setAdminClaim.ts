@@ -14,6 +14,9 @@ export const setPlatformAdmin = onCall(async request => {
     throw new HttpsError('invalid-argument', 'A valid uid is required');
   }
 
-  await admin.auth().setCustomUserClaims(uid, { platformAdmin: true });
+  await Promise.all([
+    admin.auth().setCustomUserClaims(uid, { platformAdmin: true }),
+    admin.firestore().collection('users').doc(uid).update({ isPlatformAdmin: true }),
+  ]);
   return { success: true };
 });
