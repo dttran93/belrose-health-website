@@ -72,10 +72,18 @@ exports.createDependentAccount = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_P
         throw new https_1.HttpsError('permission-denied', 'Dependent accounts cannot create other accounts');
     }
     const { email, password, firstName, lastName, encryptedMasterKey, masterKeyIV, masterKeySalt, publicKey, encryptedPrivateKey, encryptedPrivateKeyIV, recoveryKeyHash, masterKeyHex, } = request.data;
-    if (!email || !password || !firstName || !lastName ||
-        !encryptedMasterKey || !masterKeyIV || !masterKeySalt ||
-        !publicKey || !encryptedPrivateKey || !encryptedPrivateKeyIV ||
-        !recoveryKeyHash || !masterKeyHex) {
+    if (!email ||
+        !password ||
+        !firstName ||
+        !lastName ||
+        !encryptedMasterKey ||
+        !masterKeyIV ||
+        !masterKeySalt ||
+        !publicKey ||
+        !encryptedPrivateKey ||
+        !encryptedPrivateKeyIV ||
+        !recoveryKeyHash ||
+        !masterKeyHex) {
         throw new https_1.HttpsError('invalid-argument', 'Missing required fields');
     }
     // ── Step 1: Create Firebase Auth user ─────────────────────────────────────
@@ -83,7 +91,9 @@ exports.createDependentAccount = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_P
     let dependentUid;
     try {
         const displayName = `${firstName} ${lastName}`.trim();
-        const authUser = await admin.auth().createUser({ email, password, displayName, emailVerified: isPlaceholder });
+        const authUser = await admin
+            .auth()
+            .createUser({ email, password, displayName, emailVerified: isPlaceholder });
         dependentUid = authUser.uid;
         console.log('✅ Firebase Auth user created:', dependentUid);
     }
@@ -181,13 +191,25 @@ exports.createDependentAccount = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_P
             },
             onChainIdentity: {
                 userIdHash,
-                status: 'Active',
-                linkedWallets: [
-                    { address: wallet.address.toLowerCase(), type: 'eoa', isWalletActive: true, registeredAt: now, blockchainRef },
-                    { address: smartAccountAddress.toLowerCase(), type: 'smartAccount', isWalletActive: true, registeredAt: now, blockchainRef },
+                onChainStatus: [
+                    { status: 'Active', statusUpdatedAt: now, statusBlockchainRef: blockchainRef },
                 ],
-                registeredAt: now,
-                blockchainRef,
+                linkedWallets: [
+                    {
+                        address: wallet.address.toLowerCase(),
+                        type: 'eoa',
+                        isWalletActive: true,
+                        registeredAt: now,
+                        blockchainRef,
+                    },
+                    {
+                        address: smartAccountAddress.toLowerCase(),
+                        type: 'smartAccount',
+                        isWalletActive: true,
+                        registeredAt: now,
+                        blockchainRef,
+                    },
+                ],
             },
         });
         console.log('✅ Wallet data saved to Firestore');

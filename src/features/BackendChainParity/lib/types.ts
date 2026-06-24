@@ -35,6 +35,15 @@ export interface FirestoreRecord {
   fileName?: string;
 }
 
+export interface FirestoreLinkedWallet {
+  address: string;
+  type?: 'eoa' | 'smart-account';
+  isWalletActive?: boolean;
+  blockchainRef?: BlockchainRef;
+  linkedAt?: Timestamp;
+  trusteeId?: string;
+}
+
 export interface FirestoreUser {
   uid: string;
   displayName?: string;
@@ -43,7 +52,8 @@ export interface FirestoreUser {
   email?: string;
   onChainIdentity?: {
     userIdHash?: string;
-    status?: string;
+    onChainStatus?: Array<{ status: string; statusUpdatedAt?: any; statusBlockchainRef?: any }>;
+    linkedWallets?: FirestoreLinkedWallet[];
   };
   wallet?: {
     address?: string;
@@ -124,6 +134,7 @@ export interface MemberIntegrityItem {
   firestoreStatus?: string;
   firestoreWalletAddress?: string;
   firestoreSmartAccountAddress?: string;
+  linkedWallets?: FirestoreLinkedWallet[];
   integrityStatus: IntegrityStatus;
   onChainStatus?: number;
   onChainWallets?: string[];

@@ -1,6 +1,12 @@
+import { BlockchainRef } from './blockchainAddresses';
 import { TimestampLike } from './timestamp';
 
-export type SubjectRequestStatus = 'pending' | 'accepted' | 'rejected';
+export type SubjectRequestStatus =
+  | 'pending'
+  | 'accepted'
+  | 'rejected'
+  | 'self_consented' // subject added themselves via setSubjectAsSelf
+  | 'controller_consented'; // controller anchored trustor via anchorSubjectAsController
 
 /**
  * Document structure for subjectConsentRequests collection
@@ -18,6 +24,7 @@ export interface SubjectConsentRequest {
   rejection?: SubjectRejectionData;
   encryptedRecordTitle?: string;
   encryptedRecordTitleIv?: string;
+  blockchainRef?: BlockchainRef;
 }
 
 export type SubjectRejectionType = 'request_rejected' | 'removed_after_acceptance';

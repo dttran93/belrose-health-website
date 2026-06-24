@@ -47,12 +47,8 @@ export interface BelroseUserProfile extends User {
 
   onChainIdentity?: {
     userIdHash: string; // The keccak256 hash of the UID. Intentionally not a search path for users. Want to maintain privacy separation between on-chain/off-chain identities.
-    status: 'Inactive' | 'Active' | 'Verified';
-    statusUpdatedAt?: any;
-    statusBlockchainRef?: BlockchainRef;
-
-    // The collection of all linked wallets to this identity on the contract
-    linkedWallets: LinkedWalletRecord[];
+    onChainStatus: onChainIdentityStatus[]; // Log of history of on-chain status changes for this identity
+    linkedWallets: LinkedWalletRecord[]; // The collection of all linked wallets to this identity on the contract
   };
 
   //Other Info
@@ -85,11 +81,20 @@ export interface UserWallet {
  */
 export interface LinkedWalletRecord {
   address: string;
-  type: 'eoa' | 'smart-account' | 'controller-trustee';
+  type: 'eoa' | 'smart-account';
   blockchainRef: BlockchainRef;
   linkedAt: any; // Timestamp
   isWalletActive: boolean; // Reflects contract's isWalletActive status
   trusteeId?: string;
+}
+
+/**
+ * Represents on-chain status of account overall (not just the wallet). Keeps an audit record of any changes in on-chain status (Guest/Active/Inactive/Verified etc.)
+ */
+export interface onChainIdentityStatus {
+  status: 'NotRegistered' | 'Inactive' | 'Active' | 'Verified' | 'VerifiedProvider' | 'Guest'; //Practically NotRegistered will never happen, but technically its on chain so just here for completeness.
+  statusUpdatedAt?: any;
+  statusBlockchainRef?: BlockchainRef;
 }
 
 // Authentication context data structure

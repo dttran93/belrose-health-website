@@ -81,10 +81,18 @@ export const createDependentAccount = onCall(
     } = request.data as CreateDependentAccountRequest;
 
     if (
-      !email || !password || !firstName || !lastName ||
-      !encryptedMasterKey || !masterKeyIV || !masterKeySalt ||
-      !publicKey || !encryptedPrivateKey || !encryptedPrivateKeyIV ||
-      !recoveryKeyHash || !masterKeyHex
+      !email ||
+      !password ||
+      !firstName ||
+      !lastName ||
+      !encryptedMasterKey ||
+      !masterKeyIV ||
+      !masterKeySalt ||
+      !publicKey ||
+      !encryptedPrivateKey ||
+      !encryptedPrivateKeyIV ||
+      !recoveryKeyHash ||
+      !masterKeyHex
     ) {
       throw new HttpsError('invalid-argument', 'Missing required fields');
     }
@@ -94,7 +102,9 @@ export const createDependentAccount = onCall(
     let dependentUid: string;
     try {
       const displayName = `${firstName} ${lastName}`.trim();
-      const authUser = await admin.auth().createUser({ email, password, displayName, emailVerified: isPlaceholder });
+      const authUser = await admin
+        .auth()
+        .createUser({ email, password, displayName, emailVerified: isPlaceholder });
       dependentUid = authUser.uid;
       console.log('✅ Firebase Auth user created:', dependentUid);
     } catch (err: any) {
@@ -149,7 +159,10 @@ export const createDependentAccount = onCall(
 
       console.log('⛓️ Registering both wallets on-chain...');
       const userIdHash = ethers.id(dependentUid);
-      const contract: MemberRoleManager = MemberRoleManager__factory.connect(MEMBER_ROLE_MANAGER_ADDRESS, getAdminWallet());
+      const contract: MemberRoleManager = MemberRoleManager__factory.connect(
+        MEMBER_ROLE_MANAGER_ADDRESS,
+        getAdminWallet()
+      );
       const tx = await contract.addMemberBatch([wallet.address, smartAccountAddress], userIdHash);
       const receipt = await tx.wait();
       if (!receipt) throw new Error('Transaction was dropped or replaced');
@@ -197,13 +210,25 @@ export const createDependentAccount = onCall(
         },
         onChainIdentity: {
           userIdHash,
-          status: 'Active',
-          linkedWallets: [
-            { address: wallet.address.toLowerCase(), type: 'eoa', isWalletActive: true, registeredAt: now, blockchainRef },
-            { address: smartAccountAddress.toLowerCase(), type: 'smartAccount', isWalletActive: true, registeredAt: now, blockchainRef },
+          onChainStatus: [
+            { status: 'Active', statusUpdatedAt: now, statusBlockchainRef: blockchainRef },
           ],
-          registeredAt: now,
-          blockchainRef,
+          linkedWallets: [
+            {
+              address: wallet.address.toLowerCase(),
+              type: 'eoa',
+              isWalletActive: true,
+              registeredAt: now,
+              blockchainRef,
+            },
+            {
+              address: smartAccountAddress.toLowerCase(),
+              type: 'smartAccount',
+              isWalletActive: true,
+              registeredAt: now,
+              blockchainRef,
+            },
+          ],
         },
       });
       console.log('✅ Wallet data saved to Firestore');

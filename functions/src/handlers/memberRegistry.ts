@@ -32,7 +32,9 @@ function getAdminContract(): MemberRoleManager {
   return MemberRoleManager__factory.connect(MEMBER_ROLE_MANAGER_ADDRESS, getAdminWallet());
 }
 
-async function awaitTx(tx: ethers.ContractTransactionResponse): Promise<ethers.ContractTransactionReceipt> {
+async function awaitTx(
+  tx: ethers.ContractTransactionResponse
+): Promise<ethers.ContractTransactionReceipt> {
   const receipt = await tx.wait();
   if (!receipt) throw new HttpsError('internal', 'Transaction was dropped or replaced');
   return receipt;
@@ -112,7 +114,13 @@ export const registerMemberOnChainComplete = onCall(
       },
       onChainIdentity: {
         userIdHash,
-        status: 'Active',
+        onChainStatus: [
+          {
+            status: 'Active',
+            statusUpdatedAt: Timestamp.now(),
+            statusBlockchainRef: blockchainRef,
+          },
+        ],
         linkedWallets: [
           {
             address: wallet.address.toLowerCase(),
@@ -129,8 +137,6 @@ export const registerMemberOnChainComplete = onCall(
             blockchainRef,
           },
         ],
-        registeredAt: Timestamp.now(),
-        blockchainRef,
       },
     });
 
@@ -202,7 +208,6 @@ export const registerMemberOnChain = onCall(
         .doc(userId)
         .update({
           'onChainIdentity.userIdHash': userIdHash,
-          'onChainIdentity.status': userData.onChainIdentity?.status || 'Active',
           'onChainIdentity.linkedWallets': FieldValue.arrayUnion({
             address: walletAddress,
             type: walletLabel,
@@ -258,11 +263,16 @@ export const updateMemberStatus = onCall(
         4: 'VerifiedProvider',
         5: 'Guest',
       };
-      await getFirestore().collection('users').doc(userId).update({
-        'onChainIdentity.status': statusMap[status],
-        'onChainIdentity.statusUpdatedAt': Timestamp.now(),
-        'onChainIdentity.statusBlockchainRef': blockchainRef,
-      });
+      await getFirestore()
+        .collection('users')
+        .doc(userId)
+        .update({
+          'onChainIdentity.onChainStatus': FieldValue.arrayUnion({
+            status: statusMap[status],
+            statusUpdatedAt: Timestamp.now(),
+            statusBlockchainRef: blockchainRef,
+          }),
+        });
 
       return { success: true, blockchainRef };
     } catch (error: any) {

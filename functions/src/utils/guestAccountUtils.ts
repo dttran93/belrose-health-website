@@ -131,7 +131,7 @@ export async function createOrRetrieveGuestAccount(email: string): Promise<Guest
     },
     onChainIdentity: {
       userIdHash: guestIdHash,
-      status: 'Active',
+      onChainStatus: [{ status: 'Guest', statusUpdatedAt: new Date(), statusBlockchainRef: null }],
       linkedWallets: [
         {
           address: guestWallet,

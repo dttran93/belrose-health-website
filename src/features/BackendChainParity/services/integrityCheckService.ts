@@ -83,14 +83,18 @@ export async function checkMemberIntegrity(user: FirestoreUser): Promise<MemberI
     user.email ||
     user.uid;
 
+  const onChainStatuses = user.onChainIdentity?.onChainStatus ?? [];
+  const currentFirestoreStatus = onChainStatuses[onChainStatuses.length - 1]?.status;
+
   const base: Omit<MemberIntegrityItem, 'integrityStatus'> = {
     uid: user.uid,
     displayName,
     email: user.email ?? '',
     userIdHash,
-    firestoreStatus: user.onChainIdentity?.status,
+    firestoreStatus: currentFirestoreStatus,
     firestoreWalletAddress: user.wallet?.address,
     firestoreSmartAccountAddress: user.wallet?.smartAccountAddress,
+    linkedWallets: user.onChainIdentity?.linkedWallets,
   };
 
   if (!userIdHash) {
@@ -111,7 +115,7 @@ export async function checkMemberIntegrity(user: FirestoreUser): Promise<MemberI
       return { ...base, integrityStatus: 'missing', onChainStatus, onChainWallets };
     }
 
-    const expectedStatus = FIRESTORE_STATUS_TO_NUMBER[user.onChainIdentity?.status ?? ''];
+    const expectedStatus = FIRESTORE_STATUS_TO_NUMBER[currentFirestoreStatus ?? ''];
     const statusMismatch = expectedStatus !== undefined && expectedStatus !== onChainStatus;
 
     const onChainWalletsLower = onChainWallets.map(w => w.toLowerCase());
