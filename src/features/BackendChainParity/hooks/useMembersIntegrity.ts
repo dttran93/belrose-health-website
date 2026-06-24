@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs, getFirestore } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
-import { checkMemberIntegrity } from '../services/integrityCheckService';
+import { checkMemberIntegrity } from '../services/memberIntegrityService';
 import type { FirestoreUser, MemberIntegrityItem } from '../lib/types';
 
 const db = getFirestore(getApp());

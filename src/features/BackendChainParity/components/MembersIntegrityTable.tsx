@@ -4,7 +4,13 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import { IntegrityStatusBadge } from './IntegrityStatusBadge';
 import { CopyableHash } from './ui/CopyableHash';
-import type { MemberIntegrityItem, IntegrityStatus, FirestoreLinkedWallet } from '../lib/types';
+import { formatTimestamp } from '@/utils/dataFormattingUtils';
+import type {
+  MemberIntegrityItem,
+  IntegrityStatus,
+  FirestoreLinkedWallet,
+  onChainIdentityStatus,
+} from '../lib/types';
 
 const BASESCAN_ADDR_URL = 'https://sepolia.basescan.org/address/';
 const BASESCAN_TX_URL = 'https://sepolia.basescan.org/tx/';
@@ -28,6 +34,70 @@ interface MembersIntegrityTableProps {
   searchQuery: string;
   statusFilter: IntegrityStatus | 'all';
   onClearSearch: () => void;
+}
+
+function AccountTypeBadge({
+  isGuest,
+  isDependent,
+  isPlatformAdmin,
+}: {
+  isGuest?: boolean;
+  isDependent?: boolean;
+  isPlatformAdmin?: boolean;
+}) {
+  if (isGuest) {
+    return (
+      <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+        Guest
+      </span>
+    );
+  }
+  if (isDependent) {
+    return (
+      <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+        Dependent
+      </span>
+    );
+  }
+  if (isPlatformAdmin) {
+    return (
+      <span className="px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-700">
+        Admin
+      </span>
+    );
+  }
+  return (
+    <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500">
+      Member
+    </span>
+  );
+}
+
+function FirestoreStatusBadge({
+  isGuest,
+  identityVerified,
+  healthcareProviderVerified,
+}: {
+  isGuest?: boolean;
+  identityVerified?: boolean;
+  healthcareProviderVerified?: boolean;
+}) {
+  if (isGuest) {
+    return <span className="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-700">Guest</span>;
+  }
+  if (healthcareProviderVerified) {
+    return (
+      <span className="px-2 py-0.5 rounded text-xs bg-teal-100 text-teal-700">
+        Provider Verified
+      </span>
+    );
+  }
+  if (identityVerified) {
+    return (
+      <span className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-700">ID Verified</span>
+    );
+  }
+  return <span className="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700">Active</span>;
 }
 
 function WalletCards({ wallets }: { wallets: FirestoreLinkedWallet[] }) {
@@ -70,6 +140,45 @@ function WalletCards({ wallets }: { wallets: FirestoreLinkedWallet[] }) {
               <CopyableHash value={w.blockchainRef.txHash} chars={8} className="font-mono" />
               <a
                 href={`${BASESCAN_TX_URL}${w.blockchainRef.txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:text-blue-700"
+              >
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function StatusHistoryCards({ history }: { history: onChainIdentityStatus[] }) {
+  if (history.length === 0) {
+    return <p className="text-xs text-gray-400 italic">No status history recorded</p>;
+  }
+
+  const sorted = [...history].reverse();
+
+  return (
+    <div className="flex flex-col gap-2">
+      {sorted.map((entry, i) => (
+        <div key={i} className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="px-1.5 py-0.5 rounded font-medium bg-blue-50 text-blue-700">
+            {entry.status}
+          </span>
+          <span className="text-gray-400">{formatTimestamp(entry.statusUpdatedAt)}</span>
+          {entry.statusBlockchainRef?.txHash && (
+            <div className="flex items-center gap-1 text-gray-400">
+              <span>Tx:</span>
+              <CopyableHash
+                value={entry.statusBlockchainRef.txHash}
+                chars={8}
+                className="font-mono"
+              />
+              <a
+                href={`${BASESCAN_TX_URL}${entry.statusBlockchainRef.txHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-500 hover:text-blue-700"
@@ -133,7 +242,7 @@ export const MembersIntegrityTable: React.FC<MembersIntegrityTableProps> = ({
     );
   }
 
-  const TOTAL_COLS = 8;
+  const TOTAL_COLS = 9;
 
   return (
     <div className="overflow-auto rounded-xl border border-gray-200 max-h-[80vh]">
@@ -144,13 +253,13 @@ export const MembersIntegrityTable: React.FC<MembersIntegrityTableProps> = ({
             <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
             <th className="px-4 py-3 text-left font-medium text-gray-600">User</th>
             <th className="px-4 py-3 text-left font-medium text-gray-600">Identity</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-600">Account Type</th>
             <th className="px-4 py-3 text-left font-medium text-gray-600">Firestore Status</th>
             <th className="px-4 py-3 text-left font-medium text-gray-600">On-Chain Status</th>
             <th className="px-4 py-3 text-left font-medium text-gray-600">Wallets</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-600">Details</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">
+        <tbody className="divide-y text-left divide-gray-100">
           {filtered.map(item => {
             const isExpanded = expandedRows.has(item.uid);
             const walletCount = item.linkedWallets?.length ?? 0;
@@ -179,29 +288,28 @@ export const MembersIntegrityTable: React.FC<MembersIntegrityTableProps> = ({
                     <div className="text-xs text-gray-400">{item.email}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex flex-col gap-0.5">
-                      <CopyableHash
-                        value={item.uid}
-                        chars={10}
-                        className="font-mono text-xs text-gray-600"
-                      />
-                      {item.userIdHash && (
-                        <CopyableHash
-                          value={item.userIdHash}
-                          chars={10}
-                          className="font-mono text-xs text-gray-400"
-                        />
-                      )}
+                    <div className="flex flex-col">
+                      <div className="font-mono text-xs text-gray-600">
+                        ID: <CopyableHash value={item.uid} chars={10} />
+                      </div>
+                      <div className="font-mono text-xs text-gray-400">
+                        #: {item.userIdHash && <CopyableHash value={item.userIdHash} chars={10} />}
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-xs">
-                    {item.firestoreStatus ? (
-                      <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700">
-                        {item.firestoreStatus}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
+                    <AccountTypeBadge
+                      isGuest={item.isGuest}
+                      isDependent={item.isDependent}
+                      isPlatformAdmin={item.isPlatformAdmin}
+                    />
+                  </td>
+                  <td className="px-4 py-3 text-xs">
+                    <FirestoreStatusBadge
+                      isGuest={item.isGuest}
+                      identityVerified={item.identityVerified}
+                      healthcareProviderVerified={item.healthcareProviderVerified}
+                    />
                   </td>
                   <td className="px-4 py-3 text-xs">
                     {item.onChainStatus !== undefined ? (
@@ -230,21 +338,23 @@ export const MembersIntegrityTable: React.FC<MembersIntegrityTableProps> = ({
                       {walletCount} {walletCount === 1 ? 'wallet' : 'wallets'}
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-400">
-                    {item.walletMismatch && (
-                      <span className="text-amber-600 block">Wallet not on-chain</span>
-                    )}
-                    {item.statusMismatch && (
-                      <span className="text-amber-600 block">Status mismatch</span>
-                    )}
-                    {item.error && <span className="text-red-600 block">{item.error}</span>}
-                  </td>
                 </tr>
                 {isExpanded && (
                   <tr className="bg-gray-50 border-t border-gray-100">
                     <td />
-                    <td colSpan={TOTAL_COLS - 1} className="px-6 py-3">
-                      <WalletCards wallets={item.linkedWallets ?? []} />
+                    <td colSpan={TOTAL_COLS - 1} className="px-6 py-4">
+                      <div className="flex gap-8">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-500 mb-2">Wallets</p>
+                          <WalletCards wallets={item.linkedWallets ?? []} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-500 mb-2">
+                            On-Chain Status History
+                          </p>
+                          <StatusHistoryCards history={item.onChainStatusHistory ?? []} />
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 )}

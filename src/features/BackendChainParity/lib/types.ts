@@ -1,6 +1,9 @@
 // src/features/BackendChainParity/lib/types.ts
 
 import type { Timestamp } from 'firebase/firestore';
+import type { onChainIdentityStatus } from '@/types/core';
+
+export type { onChainIdentityStatus };
 
 export type IntegrityStatus =
   | 'synced'
@@ -50,9 +53,14 @@ export interface FirestoreUser {
   firstName?: string;
   lastName?: string;
   email?: string;
+  isGuest?: boolean;
+  isDependent?: boolean;
+  isPlatformAdmin?: boolean;
+  identityVerified?: boolean;
+  healthcareProviderVerified?: boolean;
   onChainIdentity?: {
     userIdHash?: string;
-    onChainStatus?: Array<{ status: string; statusUpdatedAt?: any; statusBlockchainRef?: any }>;
+    onChainStatus?: onChainIdentityStatus[];
     linkedWallets?: FirestoreLinkedWallet[];
   };
   wallet?: {
@@ -135,12 +143,18 @@ export interface MemberIntegrityItem {
   firestoreWalletAddress?: string;
   firestoreSmartAccountAddress?: string;
   linkedWallets?: FirestoreLinkedWallet[];
+  onChainStatusHistory?: onChainIdentityStatus[];
   integrityStatus: IntegrityStatus;
   onChainStatus?: number;
   onChainWallets?: string[];
   walletMismatch?: boolean;
   statusMismatch?: boolean;
   error?: string;
+  isGuest?: boolean;
+  isDependent?: boolean;
+  isPlatformAdmin?: boolean;
+  identityVerified?: boolean;
+  healthcareProviderVerified?: boolean;
 }
 
 export interface VerificationIntegrityItem {

@@ -153,7 +153,7 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
 
       // ── Step 2: Hand off to activity tray ───────────────────────────────────
       const activityId = addActivity({ label: `Guest invite sent to ${emailToUse}` });
-      setSubmittedLabel(`Guest invite sent to ${emailToUse}`);
+      setSubmittedLabel(`Guest invite sending to ${emailToUse}`);
       setPhase('submitted');
 
       // ── Step 3: Blockchain and guest access ───────────────────────────────────
@@ -175,20 +175,31 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
         guestEmailHash,
         durationToUse.seconds
       )
-        .then(async () => {
-          await Promise.all(
-            recordsToShare.map(r =>
+        .then(async txResult => {
+          await Promise.all([
+            // Patch the guest's onChainStatus with the real txHash now that it's confirmed
+            updateDoc(doc(db, 'users', guestUid), {
+              'onChainIdentity.onChainStatus': [
+                {
+                  status: 'Guest',
+                  statusUpdatedAt: new Date(),
+                  statusBlockchainRef: {
+                    txHash: txResult.txHash,
+                    blockNumber: txResult.blockNumber,
+                  },
+                },
+              ],
+            }),
+            ...recordsToShare.map(r =>
               SharingService.grantEncryptionAccess(r.id, guestUid, currentUser.uid, {
                 isGuest: true,
                 expiresAt: new Date(Date.now() + durationToUse.seconds * 1000),
               })
-            )
-          );
-          await Promise.all(
-            recordsToShare.map(r =>
+            ),
+            ...recordsToShare.map(r =>
               updateDoc(doc(db, 'records', r.id), { viewers: arrayUnion(guestUid) })
-            )
-          );
+            ),
+          ]);
           updateActivity(activityId, { status: 'confirmed' });
           onSuccess?.();
         })

@@ -37,6 +37,8 @@ export interface BelroseUserProfile extends User {
   emailVerifiedAt?: any;
   identityVerified: boolean;
   identityVerifiedAt?: any;
+  healthcareProviderVerified?: boolean; //if Belrose has verified they are a certified healthcare provider
+  healthcareProviderVerifiedAt?: Timestamp; //if Belrose has verified they are a certified healthcare provider
   credibility?: CredibilityScore;
   isGuest?: boolean; //For guest accounts
   isPlatformAdmin?: boolean; // For platform admin privileges

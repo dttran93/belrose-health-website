@@ -1,17 +1,13 @@
 // src/features/BackendChainParity/services/recordSubjectIntegrityService.ts
 
 import { ethers, id } from 'ethers';
-import { buildRpcUrl, HEALTH_RECORD_CORE, HealthRecordCore__factory } from '@belrose/shared';
-import type { HealthRecordCore } from '@belrose/shared';
-import { requireEnv } from '@/utils/utils';
 import type {
   FirestoreRecord,
   HashComparison,
   IntegrityStatus,
   SubjectComparison,
 } from '../lib/types';
-
-const RPC_URL = buildRpcUrl(requireEnv('VITE_ALCHEMY_API_KEY'));
+import { getHealthContract } from '../lib/contracts';
 
 export interface RecordIntegrityItem {
   firestoreId: string;
@@ -29,27 +25,6 @@ export interface RecordIntegrityItem {
   hashExistsOnChain?: boolean;
   hasBackendCredibilityReview?: boolean;
   error?: string;
-}
-
-let provider: ethers.JsonRpcProvider | null = null;
-let healthContract: HealthRecordCore | null = null;
-
-function getProvider(): ethers.JsonRpcProvider {
-  if (!provider) {
-    provider = new ethers.JsonRpcProvider(RPC_URL);
-  }
-  return provider;
-}
-
-function getHealthContract(): HealthRecordCore {
-  if (!healthContract) {
-    healthContract = new ethers.Contract(
-      HEALTH_RECORD_CORE.proxy,
-      HealthRecordCore__factory.abi,
-      getProvider()
-    ) as unknown as HealthRecordCore;
-  }
-  return healthContract;
 }
 
 export async function checkRecordIntegrity(
