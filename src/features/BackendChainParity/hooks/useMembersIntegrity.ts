@@ -3,9 +3,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs, getFirestore } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
-import { checkMemberIntegrity, buildChainOnlyItem } from '../services/memberIntegrityService';
+import type { BelroseUserProfile } from '@/types/core';
+import {
+  checkMemberIntegrity,
+  buildChainOnlyItem,
+  MemberIntegrityItem,
+} from '../services/memberIntegrityService';
 import { getMemberContract } from '../lib/contracts';
-import type { FirestoreUser, MemberIntegrityItem } from '../lib/types';
 
 const db = getFirestore(getApp());
 
@@ -15,10 +19,7 @@ async function fetchMembersIntegrity(): Promise<MemberIntegrityItem[]> {
     getMemberContract().getAllUsers(),
   ]);
 
-  const users: FirestoreUser[] = snapshot.docs.map(doc => ({
-    uid: doc.id,
-    ...(doc.data() as Omit<FirestoreUser, 'uid'>),
-  }));
+  const users = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }) as BelroseUserProfile);
 
   const firestoreHashSet = new Set<string>(
     users

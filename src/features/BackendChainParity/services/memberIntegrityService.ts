@@ -1,7 +1,32 @@
 // src/features/BackendChainParity/services/memberIntegrityService.ts
 
-import type { FirestoreUser, MemberIntegrityItem, IntegrityStatus } from '../lib/types';
+import type { BelroseUserProfile, LinkedWalletRecord, onChainIdentityStatus } from '@/types/core';
+import type { IntegrityStatus } from '../lib/types';
 import { getMemberContract } from '../lib/contracts';
+import { id } from 'ethers';
+
+export interface MemberIntegrityItem {
+  uid: string;
+  displayName: string;
+  email: string;
+  userIdHash?: string;
+  firestoreStatus?: string;
+  firestoreWalletAddress?: string;
+  firestoreSmartAccountAddress?: string;
+  linkedWallets?: LinkedWalletRecord[];
+  onChainStatusHistory?: onChainIdentityStatus[];
+  integrityStatus: IntegrityStatus;
+  onChainStatus?: number;
+  onChainWallets?: string[];
+  walletMismatch?: boolean;
+  statusMismatch?: boolean;
+  error?: string;
+  isGuest?: boolean;
+  isDependent?: boolean;
+  isPlatformAdmin?: boolean;
+  identityVerified?: boolean;
+  healthcareProviderVerified?: boolean;
+}
 
 const FIRESTORE_STATUS_TO_NUMBER: Record<string, number> = {
   Inactive: 1,
@@ -40,8 +65,8 @@ export async function buildChainOnlyItem(userIdHash: string): Promise<MemberInte
   }
 }
 
-export async function checkMemberIntegrity(user: FirestoreUser): Promise<MemberIntegrityItem> {
-  const userIdHash = user.onChainIdentity?.userIdHash;
+export async function checkMemberIntegrity(user: BelroseUserProfile): Promise<MemberIntegrityItem> {
+  let userIdHash = user.onChainIdentity?.userIdHash;
   const displayName =
     user.displayName ||
     `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() ||
@@ -69,7 +94,7 @@ export async function checkMemberIntegrity(user: FirestoreUser): Promise<MemberI
   };
 
   if (!userIdHash) {
-    return { ...base, integrityStatus: 'not_applicable' };
+    userIdHash = id(user.uid);
   }
 
   try {

@@ -1,9 +1,9 @@
 // src/features/BackendChainParity/lib/types.ts
 
 import type { Timestamp } from 'firebase/firestore';
-import type { onChainIdentityStatus } from '@/types/core';
+import type { onChainIdentityStatus, LinkedWalletRecord } from '@/types/core';
 
-export type { onChainIdentityStatus };
+export type { onChainIdentityStatus, LinkedWalletRecord };
 
 export type IntegrityStatus =
   | 'synced'
@@ -39,36 +39,6 @@ export interface FirestoreRecord {
   fileName?: string;
 }
 
-export interface FirestoreLinkedWallet {
-  address: string;
-  type?: 'eoa' | 'smart-account';
-  isWalletActive?: boolean;
-  blockchainRef?: BlockchainRef;
-  linkedAt?: Timestamp;
-  trusteeId?: string;
-}
-
-export interface FirestoreUser {
-  uid: string;
-  displayName?: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  isGuest?: boolean;
-  isDependent?: boolean;
-  isPlatformAdmin?: boolean;
-  identityVerified?: boolean;
-  healthcareProviderVerified?: boolean;
-  onChainIdentity?: {
-    userIdHash?: string;
-    onChainStatus?: onChainIdentityStatus[];
-    linkedWallets?: FirestoreLinkedWallet[];
-  };
-  wallet?: {
-    address?: string;
-    smartAccountAddress?: string;
-  };
-}
 
 export interface FirestoreVerification {
   id: string;
@@ -143,7 +113,7 @@ export interface MemberIntegrityItem {
   firestoreStatus?: string;
   firestoreWalletAddress?: string;
   firestoreSmartAccountAddress?: string;
-  linkedWallets?: FirestoreLinkedWallet[];
+  linkedWallets?: LinkedWalletRecord[];
   onChainStatusHistory?: onChainIdentityStatus[];
   integrityStatus: IntegrityStatus;
   onChainStatus?: number;

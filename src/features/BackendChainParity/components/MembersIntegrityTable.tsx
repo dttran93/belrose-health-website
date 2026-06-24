@@ -5,15 +5,12 @@ import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import { IntegrityStatusBadge } from './IntegrityStatusBadge';
 import { CopyableHash } from './ui/CopyableHash';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
-import type {
-  MemberIntegrityItem,
-  IntegrityStatus,
-  FirestoreLinkedWallet,
-  onChainIdentityStatus,
-} from '../lib/types';
+import type { IntegrityStatus, LinkedWalletRecord, onChainIdentityStatus } from '../lib/types';
+import { MemberIntegrityItem } from '../services/memberIntegrityService';
+import { NETWORK } from '@belrose/shared';
 
-const BASESCAN_ADDR_URL = 'https://sepolia.basescan.org/address/';
-const BASESCAN_TX_URL = 'https://sepolia.basescan.org/tx/';
+const BASESCAN_ADDR_URL = `${NETWORK.explorerUrl}/address/`;
+const BASESCAN_TX_URL = `${NETWORK.explorerUrl}/tx/`;
 
 const MEMBER_STATUS_LABEL: Record<number, string> = {
   0: 'NotRegistered',
@@ -100,7 +97,7 @@ function FirestoreStatusBadge({
   return <span className="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700">Active</span>;
 }
 
-function WalletCards({ wallets }: { wallets: FirestoreLinkedWallet[] }) {
+function WalletCards({ wallets }: { wallets: LinkedWalletRecord[] }) {
   if (wallets.length === 0) {
     return <p className="text-xs text-gray-400 italic">No wallet records in Firestore</p>;
   }
@@ -168,7 +165,9 @@ function StatusHistoryCards({ history }: { history: onChainIdentityStatus[] }) {
           <span className="px-1.5 py-0.5 rounded font-medium bg-blue-50 text-blue-700">
             {entry.status}
           </span>
-          <span className="text-gray-400">{formatTimestamp(entry.statusUpdatedAt)}</span>
+          {entry.statusUpdatedAt && (
+            <span className="text-gray-400">{formatTimestamp(entry.statusUpdatedAt)}</span>
+          )}
           {entry.statusBlockchainRef?.txHash && (
             <div className="flex items-center gap-1 text-gray-400">
               <span>Tx:</span>
