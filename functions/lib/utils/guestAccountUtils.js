@@ -50,7 +50,6 @@ exports.writeGuestInviteDoc = writeGuestInviteDoc;
  */
 const admin = __importStar(require("firebase-admin"));
 const crypto = __importStar(require("crypto"));
-const ethers_1 = require("ethers");
 // ── RSA key pair generation ───────────────────────────────────────────────────
 /**
  * Generate an RSA-OAEP 2048-bit key pair using Node crypto.
@@ -102,12 +101,11 @@ async function createOrRetrieveGuestAccount(email) {
     }
     // ── Generate RSA key pair ──────────────────────────────────────────────────
     const { publicKeyBase64, privateKeyBase64 } = generateRsaKeyPair();
-    // ── Derive deterministic on-chain identity from UID ───────────────────────
-    const guestIdHash = ethers_1.ethers.keccak256(ethers_1.ethers.toUtf8Bytes(guestUid));
-    const guestWallet = ethers_1.ethers.getAddress('0x' + ethers_1.ethers.keccak256(ethers_1.ethers.toUtf8Bytes(`guest:${guestUid}`)).slice(-40));
     // ── Write/update Firestore user profile ───────────────────────────────────
     // Minimal profile that SharingKeyManagementService needs —
     // specifically encryption.publicKey for wrapping file keys.
+    // No onChainIdentity block — guests are registered on-chain only when they
+    // claim a real account via GuestClaimAccountModal.
     const guestProfile = {
         uid: guestUid,
         email,
@@ -119,20 +117,6 @@ async function createOrRetrieveGuestAccount(email) {
         encryption: {
             publicKey: publicKeyBase64,
         },
-        onChainIdentity: {
-            userIdHash: guestIdHash,
-            onChainStatus: [{ status: 'Guest', statusUpdatedAt: new Date(), statusBlockchainRef: null }],
-            linkedWallets: [
-                {
-                    address: guestWallet,
-                    type: 'eoa',
-                    txHash: '',
-                    blockNumber: 0,
-                    linkedAt: new Date(),
-                    isWalletActive: true,
-                },
-            ],
-        },
     };
     await db.collection('users').doc(guestUid).set(guestProfile, { merge: true });
     console.log(`✅ Guest user profile written to Firestore: ${guestUid}`);
@@ -141,8 +125,6 @@ async function createOrRetrieveGuestAccount(email) {
         publicKeyBase64,
         privateKeyBase64,
         isNewGuest,
-        guestIdHash,
-        guestWallet,
     };
 }
 // ── Guest invite document ─────────────────────────────────────────────────────
@@ -169,8 +151,6 @@ async function writeGuestInviteDoc(params) {
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
         isNewGuest: params.isNewGuest,
-        guestIdHash: params.guestIdHash,
-        guestWallet: params.guestWallet,
         inviteCode,
     });
     console.log(`✅ guestInvites document created (context: ${params.context ?? 'sharing'})`);

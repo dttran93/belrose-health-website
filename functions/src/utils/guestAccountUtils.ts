@@ -14,7 +14,6 @@
 
 import * as admin from 'firebase-admin';
 import * as crypto from 'crypto';
-import { ethers } from 'ethers';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -23,8 +22,6 @@ export interface GuestAccountResult {
   publicKeyBase64: string;
   privateKeyBase64: string;
   isNewGuest: boolean;
-  guestIdHash: string;
-  guestWallet: string;
 }
 
 export interface GuestInviteDocResult {
@@ -37,8 +34,6 @@ export interface WriteGuestInviteParams {
   invitedBy: string;
   guestEmail: string;
   recordIds: string[];
-  guestIdHash: string;
-  guestWallet: string;
   isNewGuest: boolean;
   durationSeconds?: number;
   // Optional context — helps distinguish invite type in Firestore if needed
@@ -109,15 +104,11 @@ export async function createOrRetrieveGuestAccount(email: string): Promise<Guest
   // ── Generate RSA key pair ──────────────────────────────────────────────────
   const { publicKeyBase64, privateKeyBase64 } = generateRsaKeyPair();
 
-  // ── Derive deterministic on-chain identity from UID ───────────────────────
-  const guestIdHash = ethers.keccak256(ethers.toUtf8Bytes(guestUid));
-  const guestWallet = ethers.getAddress(
-    '0x' + ethers.keccak256(ethers.toUtf8Bytes(`guest:${guestUid}`)).slice(-40)
-  );
-
   // ── Write/update Firestore user profile ───────────────────────────────────
   // Minimal profile that SharingKeyManagementService needs —
   // specifically encryption.publicKey for wrapping file keys.
+  // No onChainIdentity block — guests are registered on-chain only when they
+  // claim a real account via GuestClaimAccountModal.
   const guestProfile = {
     uid: guestUid,
     email,
@@ -129,20 +120,6 @@ export async function createOrRetrieveGuestAccount(email: string): Promise<Guest
     encryption: {
       publicKey: publicKeyBase64,
     },
-    onChainIdentity: {
-      userIdHash: guestIdHash,
-      onChainStatus: [{ status: 'Guest', statusUpdatedAt: new Date(), statusBlockchainRef: null }],
-      linkedWallets: [
-        {
-          address: guestWallet,
-          type: 'eoa',
-          txHash: '',
-          blockNumber: 0,
-          linkedAt: new Date(),
-          isWalletActive: true,
-        },
-      ],
-    },
   };
 
   await db.collection('users').doc(guestUid).set(guestProfile, { merge: true });
@@ -153,8 +130,6 @@ export async function createOrRetrieveGuestAccount(email: string): Promise<Guest
     publicKeyBase64,
     privateKeyBase64,
     isNewGuest,
-    guestIdHash,
-    guestWallet,
   };
 }
 
@@ -187,8 +162,6 @@ export async function writeGuestInviteDoc(
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
     isNewGuest: params.isNewGuest,
-    guestIdHash: params.guestIdHash,
-    guestWallet: params.guestWallet,
     inviteCode,
   });
 

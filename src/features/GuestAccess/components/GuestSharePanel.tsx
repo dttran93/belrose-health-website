@@ -4,9 +4,7 @@ import React, { useState } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { FileObject } from '@/types/core';
 import { Stethoscope } from 'lucide-react';
-import { ethers } from 'ethers';
 import { getAuth } from 'firebase/auth';
-import { BlockchainRoleManagerService } from '@/features/Permissions/services/blockchainRoleManagerService';
 import { arrayUnion, doc, getFirestore, updateDoc } from 'firebase/firestore';
 import { SharingService } from '@/features/Sharing/services/sharingService';
 import {
@@ -17,7 +15,6 @@ import { RecordPicker } from '@/features/Ai/components/ui/RecordPicker';
 import { getShareableRecords } from '../services/guestShareableRecords';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
 import { GuestFeatureGate } from './GuestFeatureGate';
-import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
 
 interface GuestSharePanelProps {
   record?: FileObject; // optional — pre-selects this record if provided
@@ -36,16 +33,6 @@ const DURATION_OPTIONS = [
 
 const DEFAULT_DURATION = DURATION_OPTIONS[2]; // 7 days is default
 
-function deriveGuestWallet(guestUid: string): string {
-  const hash = ethers.keccak256(ethers.toUtf8Bytes(`guest:${guestUid}`));
-  return ethers.getAddress('0x' + hash.slice(-40));
-}
-
-// Helper — hash an email consistently for the blockchain audit trail
-function hashEmail(email: string): string {
-  return ethers.keccak256(ethers.toUtf8Bytes(email.toLowerCase().trim()));
-}
-
 export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
   record,
   patientName,
@@ -61,10 +48,6 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
   const [loadingRecords, setLoadingRecords] = useState(false);
   const [isRecordPickerOpen, setIsRecordPickerOpen] = useState(false);
 
-  // OnChainActivityTray — UI display for blockchain processing in background
-  const { addActivity, updateActivity } = useOnChainActivityTray();
-  const [submittedLabel, setSubmittedLabel] = useState('');
-
   const fetchShareableRecords = async () => {
     const auth = getAuth();
     const uid = auth.currentUser?.uid;
@@ -72,15 +55,10 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
 
     setLoadingRecords(true);
     try {
-      // Fetch encrypted records
       const records = await getShareableRecords(uid);
-
-      // Decrypt so RecordPicker can display titles, providers, dates
       const decrypted = await RecordDecryptionService.decryptRecords(records);
       setAvailableRecords(decrypted);
 
-      // If a primary record was pre-selected but came in encrypted,
-      // replace it with the decrypted version so the chip shows the title
       if (record) {
         const decryptedPrimary = decrypted.find(r => r.id === record.id);
         if (decryptedPrimary) {
@@ -126,7 +104,6 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
     if (!email || selectedRecords.length === 0) return;
     setError(null);
 
-    // Capture before closing
     const recordsToShare = [...selectedRecords];
     const durationToUse = duration;
     const emailToUse = email;
@@ -138,7 +115,7 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
 
       // ── Step 1: Cloud Function ─────────────────────────────────────────────
       // Creates guest Firebase Auth account, writes guest Firestore profile
-      // with RSA public key, creates guestInvites doc, sends email
+      // with RSA public key, creates guestInvites doc, sends email.
       setPhase('executing');
       const functions = getFunctions();
       const createGuestInvite = httpsCallable(functions, 'createGuestInvite');
@@ -150,65 +127,29 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
       })) as { data: { guestUid: string } };
 
       const { guestUid } = result.data;
-
-      // ── Step 2: Hand off to activity tray ───────────────────────────────────
-      const activityId = addActivity({ label: `Guest invite sent to ${emailToUse}` });
-      setSubmittedLabel(`Guest invite sending to ${emailToUse}`);
-      setPhase('submitted');
-
-      // ── Step 3: Blockchain and guest access ───────────────────────────────────
-      // Derives a deterministic placeholder wallet for the guest so they
-      // slot into the existing wallets/userIdHash infrastructure on-chain.
-      // Fires GuestAccessGranted event with expiry for the audit trail.
-      const guestWallet = deriveGuestWallet(guestUid);
-      const guestIdHash = ethers.keccak256(ethers.toUtf8Bytes(guestUid));
-      const guestEmailHash = hashEmail(email);
       const db = getFirestore();
 
-      console.log('🔗 Granting guest access on blockchain...');
-      BlockchainRoleManagerService.grantGuestAccess(
-        recordsToShare.map(
-          r => r.recordIdHash ?? ethers.keccak256(ethers.toUtf8Bytes(r.firestoreId ?? r.id))
+      // ── Step 2: Grant encryption access + Firestore viewer role ────────────
+      // Fire-and-forget — guest can't open the link until they click the email,
+      // by which point these Firestore writes will have long completed.
+      Promise.all([
+        ...recordsToShare.map(r =>
+          SharingService.grantEncryptionAccess(r.id, guestUid, currentUser.uid, {
+            isGuest: true,
+            expiresAt: new Date(Date.now() + durationToUse.seconds * 1000),
+          })
         ),
-        guestWallet,
-        guestIdHash,
-        guestEmailHash,
-        durationToUse.seconds
-      )
-        .then(async txResult => {
-          await Promise.all([
-            // Patch the guest's onChainStatus with the real txHash now that it's confirmed
-            updateDoc(doc(db, 'users', guestUid), {
-              'onChainIdentity.onChainStatus': [
-                {
-                  status: 'Guest',
-                  statusUpdatedAt: new Date(),
-                  statusBlockchainRef: {
-                    txHash: txResult.txHash,
-                    blockNumber: txResult.blockNumber,
-                  },
-                },
-              ],
-            }),
-            ...recordsToShare.map(r =>
-              SharingService.grantEncryptionAccess(r.id, guestUid, currentUser.uid, {
-                isGuest: true,
-                expiresAt: new Date(Date.now() + durationToUse.seconds * 1000),
-              })
-            ),
-            ...recordsToShare.map(r =>
-              updateDoc(doc(db, 'records', r.id), { viewers: arrayUnion(guestUid) })
-            ),
-          ]);
-          updateActivity(activityId, { status: 'confirmed' });
-          onSuccess?.();
-        })
-        .catch(err => {
-          const message = err instanceof Error ? err.message : 'Failed to complete guest setup';
-          updateActivity(activityId, { status: 'failed', errorMessage: message });
-        });
+        ...recordsToShare.map(r =>
+          updateDoc(doc(db, 'records', r.id), { viewers: arrayUnion(guestUid) })
+        ),
+      ]).catch(err => {
+        console.error('⚠️ Post-invite encryption setup failed:', err);
+      });
+
+      // ── Step 3: Close dialog ───────────────────────────────────────────────
+      handleClose();
+      onSuccess?.();
     } catch (err: any) {
-      // Cloud Function failed — invite never sent, show error in dialog
       console.error('❌ Guest invite failed:', err);
       setError(err.message || 'Failed to send invite. Please try again.');
       setPhase('error');
@@ -248,6 +189,7 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
           onConfirmGrant={() => {}}
           onConfirmRevoke={() => {}}
           onConfirmGuestInvite={handleConfirm}
+          submittedLabel=""
           guestInviteProps={{
             email,
             setEmail,
@@ -259,7 +201,6 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
             onOpenRecordPicker: () => setIsRecordPickerOpen(true),
             onRemoveRecord: handleRemoveRecord,
           }}
-          submittedLabel={submittedLabel}
         />
 
         {/* Record picker — shown on top of main dialog */}

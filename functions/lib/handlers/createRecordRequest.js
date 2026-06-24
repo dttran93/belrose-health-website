@@ -76,7 +76,7 @@ exports.createRecordRequest = (0, https_1.onCall)({ secrets: [resendKey] }, asyn
     // Always created so the invite/fulfill URL flow works regardless of whether
     // the provider is a full user. For full users, we override providerPublicKey
     // below with their actual RSA key so they can decrypt the note in-app.
-    const { guestUid: providerGuestUid, privateKeyBase64: providerPrivateKey, isNewGuest, guestIdHash, guestWallet, publicKeyBase64: guestPublicKey, } = await (0, guestAccountUtils_1.createOrRetrieveGuestAccount)(targetEmail);
+    const { guestUid: providerGuestUid, privateKeyBase64: providerPrivateKey, isNewGuest, publicKeyBase64: guestPublicKey, } = await (0, guestAccountUtils_1.createOrRetrieveGuestAccount)(targetEmail);
     // ── Check if provider is already a full Belrose user ─────────────────────
     // If so, use their actual RSA public key instead of the guest one so they
     // can decrypt the note using their normal session private key.
@@ -170,8 +170,6 @@ exports.createRecordRequest = (0, https_1.onCall)({ secrets: [resendKey] }, asyn
         invitedBy: requesterId,
         guestEmail: targetEmail,
         recordIds: [],
-        guestIdHash,
-        guestWallet,
         isNewGuest,
         durationSeconds: 2 * 365 * 24 * 60 * 60, // 2 years - provider may delay, but if more than 2 years probably a ghost account, should be cleaned up
         context: 'record_request',

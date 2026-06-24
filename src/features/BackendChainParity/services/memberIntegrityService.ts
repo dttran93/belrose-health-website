@@ -106,8 +106,9 @@ export async function checkMemberIntegrity(user: BelroseUserProfile): Promise<Me
 
     const onChainStatus = Number(onChainStatusBigInt);
 
-    // 0 = NotRegistered — userIdHash set in Firestore but not found on-chain
+    // 0 = NotRegistered — guest accounts intentionally stay off-chain until claim
     if (onChainStatus === 0) {
+      if (user.isGuest) return { ...base, integrityStatus: 'pending', onChainStatus };
       return { ...base, integrityStatus: 'missing', onChainStatus, onChainWallets };
     }
 

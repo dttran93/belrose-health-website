@@ -76,7 +76,7 @@ export const createGuestInvite = onCall(
     }
 
     // ── Create or retrieve guest account ──────────────────────────────────────
-    const { guestUid, privateKeyBase64, isNewGuest, guestIdHash, guestWallet } =
+    const { guestUid, privateKeyBase64, isNewGuest } =
       await createOrRetrieveGuestAccount(guestEmail);
 
     // ── Create a guestInvites document ───────────────────────────────────────
@@ -99,8 +99,6 @@ export const createGuestInvite = onCall(
       invitedBy: patientUid,
       guestEmail,
       recordIds,
-      guestIdHash,
-      guestWallet,
       isNewGuest,
       durationSeconds,
       context: 'sharing',

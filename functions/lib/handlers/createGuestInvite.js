@@ -76,7 +76,7 @@ exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async 
         }
     }
     // ── Create or retrieve guest account ──────────────────────────────────────
-    const { guestUid, privateKeyBase64, isNewGuest, guestIdHash, guestWallet } = await (0, guestAccountUtils_1.createOrRetrieveGuestAccount)(guestEmail);
+    const { guestUid, privateKeyBase64, isNewGuest } = await (0, guestAccountUtils_1.createOrRetrieveGuestAccount)(guestEmail);
     // ── Create a guestInvites document ───────────────────────────────────────
     // This is the server-side record of the invite. Used to validate the
     // invite link and to clean up expired invites later.
@@ -94,8 +94,6 @@ exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async 
         invitedBy: patientUid,
         guestEmail,
         recordIds,
-        guestIdHash,
-        guestWallet,
         isNewGuest,
         durationSeconds,
         context: 'sharing',

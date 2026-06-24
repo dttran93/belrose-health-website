@@ -47,7 +47,10 @@ exports.setPlatformAdmin = (0, https_1.onCall)(async (request) => {
     if (!uid || typeof uid !== 'string') {
         throw new https_1.HttpsError('invalid-argument', 'A valid uid is required');
     }
-    await admin.auth().setCustomUserClaims(uid, { platformAdmin: true });
+    await Promise.all([
+        admin.auth().setCustomUserClaims(uid, { platformAdmin: true }),
+        admin.firestore().collection('users').doc(uid).update({ isPlatformAdmin: true }),
+    ]);
     return { success: true };
 });
 //# sourceMappingURL=setAdminClaim.js.map
