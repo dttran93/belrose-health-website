@@ -3,19 +3,37 @@
 import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs, getFirestore } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
-import { checkMemberIntegrity } from '../services/memberIntegrityService';
+import { checkMemberIntegrity, buildChainOnlyItem } from '../services/memberIntegrityService';
+import { getMemberContract } from '../lib/contracts';
 import type { FirestoreUser, MemberIntegrityItem } from '../lib/types';
 
 const db = getFirestore(getApp());
 
 async function fetchMembersIntegrity(): Promise<MemberIntegrityItem[]> {
-  const snapshot = await getDocs(collection(db, 'users'));
+  const [snapshot, allOnChainHashes] = await Promise.all([
+    getDocs(collection(db, 'users')),
+    getMemberContract().getAllUsers(),
+  ]);
+
   const users: FirestoreUser[] = snapshot.docs.map(doc => ({
     uid: doc.id,
     ...(doc.data() as Omit<FirestoreUser, 'uid'>),
   }));
 
-  return Promise.all(users.map(user => checkMemberIntegrity(user)));
+  const firestoreHashSet = new Set<string>(
+    users
+      .map(u => u.onChainIdentity?.userIdHash?.toLowerCase())
+      .filter((h): h is string => Boolean(h))
+  );
+
+  const chainOnlyHashes = allOnChainHashes.filter(h => !firestoreHashSet.has(h.toLowerCase()));
+
+  const [firestoreItems, chainOnlyItems] = await Promise.all([
+    Promise.all(users.map(user => checkMemberIntegrity(user))),
+    Promise.all(chainOnlyHashes.map(h => buildChainOnlyItem(h))),
+  ]);
+
+  return [...firestoreItems, ...chainOnlyItems];
 }
 
 export function useMembersIntegrity() {

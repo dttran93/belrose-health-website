@@ -11,6 +11,35 @@ const FIRESTORE_STATUS_TO_NUMBER: Record<string, number> = {
   Guest: 5,
 };
 
+export async function buildChainOnlyItem(userIdHash: string): Promise<MemberIntegrityItem> {
+  try {
+    const contract = getMemberContract();
+    const [onChainStatusBigInt, onChainWallets] = await Promise.all([
+      contract.userStatus(userIdHash),
+      contract.getWalletsForUser(userIdHash),
+    ]);
+
+    return {
+      uid: userIdHash,
+      displayName: 'Unknown (chain-only)',
+      email: '',
+      userIdHash,
+      integrityStatus: 'chain_only',
+      onChainStatus: Number(onChainStatusBigInt),
+      onChainWallets,
+    };
+  } catch (error) {
+    return {
+      uid: userIdHash,
+      displayName: 'Unknown (chain-only)',
+      email: '',
+      userIdHash,
+      integrityStatus: 'failed',
+      error: String(error),
+    };
+  }
+}
+
 export async function checkMemberIntegrity(user: FirestoreUser): Promise<MemberIntegrityItem> {
   const userIdHash = user.onChainIdentity?.userIdHash;
   const displayName =

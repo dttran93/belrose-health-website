@@ -1,7 +1,7 @@
 // src/features/BackendChainParity/components/IntegrityStatusBadge.tsx
 
 import React from 'react';
-import { CheckCircle, AlertTriangle, XCircle, Clock, Minus, AlertCircle } from 'lucide-react';
+import { CheckCircle, AlertTriangle, XCircle, Clock, Minus, AlertCircle, Link } from 'lucide-react';
 import type { IntegrityStatus } from '../lib/types';
 
 interface IntegrityStatusBadgeProps {
@@ -32,6 +32,11 @@ const STATUS_CONFIG: Record<
     label: 'Pending',
     icon: <Clock className="w-3.5 h-3.5" />,
     className: 'bg-blue-50 text-blue-700 border-blue-200',
+  },
+  chain_only: {
+    label: 'Chain Only',
+    icon: <Link className="w-3.5 h-3.5" />,
+    className: 'bg-orange-50 text-orange-700 border-orange-200',
   },
   not_applicable: {
     label: 'N/A',
