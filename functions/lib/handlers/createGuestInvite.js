@@ -40,9 +40,10 @@ const admin = __importStar(require("firebase-admin"));
 const params_1 = require("firebase-functions/params");
 const resend_1 = require("resend");
 const guestAccountUtils_1 = require("../utils/guestAccountUtils");
+const config_1 = require("../config");
 const resendKey = (0, params_1.defineSecret)('RESEND_API_KEY');
 // ==================== MAIN FUNCTION ====================
-exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey] }, async (request) => {
+exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey], cors: config_1.ALLOWED_ORIGINS }, async (request) => {
     // ── Auth check ──────────────────────────────────────────────────────────
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'You must be logged in to share records.');

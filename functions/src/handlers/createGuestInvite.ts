@@ -5,6 +5,7 @@ import * as admin from 'firebase-admin';
 import { defineSecret } from 'firebase-functions/params';
 import { Resend } from 'resend';
 import { createOrRetrieveGuestAccount, writeGuestInviteDoc } from '../utils/guestAccountUtils';
+import { ALLOWED_ORIGINS } from '../config';
 
 const resendKey = defineSecret('RESEND_API_KEY');
 
@@ -29,7 +30,7 @@ interface CreateGuestInviteResult {
 // ==================== MAIN FUNCTION ====================
 
 export const createGuestInvite = onCall(
-  { secrets: [resendKey] },
+  { secrets: [resendKey], cors: ALLOWED_ORIGINS },
   async (request): Promise<CreateGuestInviteResult> => {
     // ── Auth check ──────────────────────────────────────────────────────────
     if (!request.auth) {

@@ -130,21 +130,24 @@ export const GuestSharePanel: React.FC<GuestSharePanelProps> = ({
       const db = getFirestore();
 
       // ── Step 2: Grant encryption access + Firestore viewer role ────────────
-      // Fire-and-forget — guest can't open the link until they click the email,
-      // by which point these Firestore writes will have long completed.
-      Promise.all([
-        ...recordsToShare.map(r =>
-          SharingService.grantEncryptionAccess(r.id, guestUid, currentUser.uid, {
-            isGuest: true,
-            expiresAt: new Date(Date.now() + durationToUse.seconds * 1000),
-          })
-        ),
-        ...recordsToShare.map(r =>
-          updateDoc(doc(db, 'records', r.id), { viewers: arrayUnion(guestUid) })
-        ),
-      ]).catch(err => {
+      // Awaited so the access view refreshes with correct state after onSuccess fires.
+      // Wrapped in its own try/catch — a failure here shouldn't surface as an invite
+      // error since the guest account and email were already created in Step 1.
+      try {
+        await Promise.all([
+          ...recordsToShare.map(r =>
+            SharingService.grantEncryptionAccess(r.id, guestUid, currentUser.uid, {
+              isGuest: true,
+              expiresAt: new Date(Date.now() + durationToUse.seconds * 1000),
+            })
+          ),
+          ...recordsToShare.map(r =>
+            updateDoc(doc(db, 'records', r.id), { viewers: arrayUnion(guestUid) })
+          ),
+        ]);
+      } catch (err) {
         console.error('⚠️ Post-invite encryption setup failed:', err);
-      });
+      }
 
       // ── Step 3: Close dialog ───────────────────────────────────────────────
       handleClose();
