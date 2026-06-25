@@ -9,8 +9,11 @@ admin.initializeApp({
 const UID_TO_MAKE_ADMIN = 'GslflWMb4xUnlQC1qjyGSWlltBH2';
 
 async function bootstrap() {
-  await admin.auth().setCustomUserClaims(UID_TO_MAKE_ADMIN, { platformAdmin: true });
-  console.log(`✅ platformAdmin claim set for ${UID_TO_MAKE_ADMIN}`);
+  await Promise.all([
+    admin.auth().setCustomUserClaims(UID_TO_MAKE_ADMIN, { platformAdmin: true }),
+    admin.firestore().collection('users').doc(UID_TO_MAKE_ADMIN).update({ isPlatformAdmin: true }),
+  ]);
+  console.log(`✅ platformAdmin claim + Firestore field set for ${UID_TO_MAKE_ADMIN}`);
   process.exit(0);
 }
 

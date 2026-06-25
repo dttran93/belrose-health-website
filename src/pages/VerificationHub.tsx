@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import { VerificationResult, VerifiedData } from '@/features/IdentityVerification/identity.types';
 import { getAuth, sendEmailVerification } from 'firebase/auth';
-import { getFirestore, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { getFirestore, doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { authService } from '@/features/Auth/services/authServices';
@@ -111,7 +111,7 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
           const userDocRef = doc(db, 'users', userId);
           await updateDoc(userDocRef, {
             emailVerified: true,
-            emailVerifiedAt: new Date().toISOString(),
+            emailVerifiedAt: serverTimestamp(),
           });
         }
 
@@ -163,7 +163,7 @@ const VerificationHub: React.FC<VerificationHubProps> = ({
       const userDocRef = doc(db, 'users', userId);
       await updateDoc(userDocRef, {
         identityVerified: result.verified,
-        identityVerifiedAt: result.verified ? new Date().toISOString() : null,
+        identityVerifiedAt: result.verified ? serverTimestamp() : null,
       });
     }
 

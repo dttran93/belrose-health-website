@@ -97,7 +97,13 @@ exports.registerMemberOnChainComplete = (0, https_1.onCall)({ secrets: ['ADMIN_W
         },
         onChainIdentity: {
             userIdHash,
-            status: 'Active',
+            onChainStatus: [
+                {
+                    status: 'Active',
+                    statusUpdatedAt: firestore_1.Timestamp.now(),
+                    statusBlockchainRef: blockchainRef,
+                },
+            ],
             linkedWallets: [
                 {
                     address: wallet.address.toLowerCase(),
@@ -114,8 +120,6 @@ exports.registerMemberOnChainComplete = (0, https_1.onCall)({ secrets: ['ADMIN_W
                     blockchainRef,
                 },
             ],
-            registeredAt: firestore_1.Timestamp.now(),
-            blockchainRef,
         },
     });
     console.log('✅ Registration complete for user:', userId);
@@ -170,7 +174,6 @@ exports.registerMemberOnChain = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_PR
             .doc(userId)
             .update({
             'onChainIdentity.userIdHash': userIdHash,
-            'onChainIdentity.status': userData.onChainIdentity?.status || 'Active',
             'onChainIdentity.linkedWallets': firestore_1.FieldValue.arrayUnion({
                 address: walletAddress,
                 type: walletLabel,
@@ -216,10 +219,15 @@ exports.updateMemberStatus = (0, https_1.onCall)({ secrets: ['ADMIN_WALLET_PRIVA
             4: 'VerifiedProvider',
             5: 'Guest',
         };
-        await (0, firestore_1.getFirestore)().collection('users').doc(userId).update({
-            'onChainIdentity.status': statusMap[status],
-            'onChainIdentity.statusUpdatedAt': firestore_1.Timestamp.now(),
-            'onChainIdentity.statusBlockchainRef': blockchainRef,
+        await (0, firestore_1.getFirestore)()
+            .collection('users')
+            .doc(userId)
+            .update({
+            'onChainIdentity.onChainStatus': firestore_1.FieldValue.arrayUnion({
+                status: statusMap[status],
+                statusUpdatedAt: firestore_1.Timestamp.now(),
+                statusBlockchainRef: blockchainRef,
+            }),
         });
         return { success: true, blockchainRef };
     }

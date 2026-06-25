@@ -98,6 +98,7 @@ const BackendChainParityDashboard: React.FC = () => {
     { value: 'synced', label: 'Synced' },
     { value: 'mismatch', label: 'Mismatch' },
     { value: 'missing', label: 'Missing' },
+    { value: 'chain_only', label: 'Chain Only' },
     { value: 'pending', label: 'Pending' },
     { value: 'failed', label: 'Failed' },
     { value: 'not_applicable', label: 'N/A' },

@@ -83,8 +83,6 @@ export const createRecordRequest = onCall(
       guestUid: providerGuestUid,
       privateKeyBase64: providerPrivateKey,
       isNewGuest,
-      guestIdHash,
-      guestWallet,
       publicKeyBase64: guestPublicKey,
     } = await createOrRetrieveGuestAccount(targetEmail);
 
@@ -206,8 +204,6 @@ export const createRecordRequest = onCall(
       invitedBy: requesterId,
       guestEmail: targetEmail,
       recordIds: [],
-      guestIdHash,
-      guestWallet,
       isNewGuest,
       durationSeconds: 2 * 365 * 24 * 60 * 60, // 2 years - provider may delay, but if more than 2 years probably a ghost account, should be cleaned up
       context: 'record_request',

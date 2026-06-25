@@ -1,7 +1,16 @@
 // src/features/BackendChainParity/components/RecordsIntegrityTable.tsx
 
 import React, { useState } from 'react';
-import { AlertTriangle, ArrowUpRight, CheckCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+} from 'lucide-react';
+import { NETWORK } from '@belrose/shared';
+import { useSubjectConsentRefs } from '../hooks/useSubjectConsentRefs';
 import { IntegrityStatusBadge } from './IntegrityStatusBadge';
 import { CopyableHash } from './ui/CopyableHash';
 import { VersionReviewBadge } from '@/features/ViewEditRecord/components/Edit/VersionReviewBadge';
@@ -12,6 +21,8 @@ import type {
   DisputeIntegrityItem,
   SubjectSyncStatus,
 } from '../lib/types';
+
+const BASESCAN_TX_URL = `${NETWORK.explorerUrl}/tx/`;
 
 const SUBJECT_STATUS_CONFIG: Record<
   SubjectSyncStatus,
@@ -66,7 +77,8 @@ export const RecordsIntegrityTable: React.FC<RecordsIntegrityTableProps> = ({
       item.firestoreId.toLowerCase().includes(q) ||
       (item.recordIdHash?.toLowerCase().includes(q) ?? false) ||
       (item.recordHash?.toLowerCase().includes(q) ?? false) ||
-      item.backendSubjects.some((uid: string) => uid.toLowerCase().includes(q))
+      item.backendSubjects.some((uid: string) => uid.toLowerCase().includes(q)) ||
+      (item.subjectComparisons?.some(s => s.userIdHash?.toLowerCase().includes(q)) ?? false)
     );
   });
 
@@ -196,6 +208,7 @@ const ExpandedRow: React.FC<ExpandedRowProps> = ({
   onViewVerifications,
   onViewMember,
 }) => {
+  const { data: consentRefs } = useSubjectConsentRefs(item.firestoreId);
   // Group verifications and disputes by their recordHash so each hash row
   // gets its own accurate V&D counts (same pattern as VersionHistory.tsx)
   const versByHash = new Map<string, VerificationIntegrityItem[]>();
@@ -263,7 +276,20 @@ const ExpandedRow: React.FC<ExpandedRowProps> = ({
                         <CopyableHash value={s.userIdHash} />
                       </div>
                     </div>
-                    <span className={`flex-shrink-0 ${cfg.textClass}`}>{cfg.label}</span>
+                    <span className={`flex-shrink-0 flex items-center gap-1 ${cfg.textClass}`}>
+                      {cfg.label}
+                      {s.uid && consentRefs?.[s.uid]?.txHash && (
+                        <a
+                          href={`${BASESCAN_TX_URL}${consentRefs[s.uid]!.txHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="View anchoring tx"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </span>
                   </div>
                 );
               })}

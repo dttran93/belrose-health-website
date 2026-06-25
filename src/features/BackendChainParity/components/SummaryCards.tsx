@@ -39,11 +39,12 @@ function mergeSummaries(...summaries: (ParitySummary | undefined)[]): ParitySumm
       synced: acc.synced + s.synced,
       mismatch: acc.mismatch + s.mismatch,
       missing: acc.missing + s.missing,
+      chainOnly: acc.chainOnly + s.chainOnly,
       pending: acc.pending + s.pending,
       notApplicable: acc.notApplicable + s.notApplicable,
       failed: acc.failed + s.failed,
     }),
-    { total: 0, synced: 0, mismatch: 0, missing: 0, pending: 0, notApplicable: 0, failed: 0 }
+    { total: 0, synced: 0, mismatch: 0, missing: 0, chainOnly: 0, pending: 0, notApplicable: 0, failed: 0 }
   );
 }
 

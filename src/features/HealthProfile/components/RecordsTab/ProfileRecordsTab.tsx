@@ -159,6 +159,7 @@ export const ProfileRecordsTab: React.FC<ProfileRecordsTabProps> = ({ records, i
         onAccess={rec => navigateToRecord(rec, 'access')}
         onCredibility={rec => navigateToRecord(rec, 'credibility')}
         onPermissions={rec => navigateToRecord(rec, 'permissions')}
+        onFollowUp={rec => navigateToRecord(rec, 'follow-up')}
         onDelete={handleDelete}
         onCopy={handleCopyRecord}
         onDownload={handleDownloadRecord}

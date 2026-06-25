@@ -1,6 +1,5 @@
 //src/features/Credibility/services/verificationService.ts
 
-import { ethers, id } from 'ethers';
 import {
   getFirestore,
   doc,

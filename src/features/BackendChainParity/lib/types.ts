@@ -1,11 +1,15 @@
 // src/features/BackendChainParity/lib/types.ts
 
 import type { Timestamp } from 'firebase/firestore';
+import type { onChainIdentityStatus, LinkedWalletRecord } from '@/types/core';
+
+export type { onChainIdentityStatus, LinkedWalletRecord };
 
 export type IntegrityStatus =
   | 'synced'
   | 'mismatch'
   | 'missing'
+  | 'chain_only'
   | 'pending'
   | 'not_applicable'
   | 'failed';
@@ -35,21 +39,6 @@ export interface FirestoreRecord {
   fileName?: string;
 }
 
-export interface FirestoreUser {
-  uid: string;
-  displayName?: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  onChainIdentity?: {
-    userIdHash?: string;
-    status?: string;
-  };
-  wallet?: {
-    address?: string;
-    smartAccountAddress?: string;
-  };
-}
 
 export interface FirestoreVerification {
   id: string;
@@ -124,12 +113,19 @@ export interface MemberIntegrityItem {
   firestoreStatus?: string;
   firestoreWalletAddress?: string;
   firestoreSmartAccountAddress?: string;
+  linkedWallets?: LinkedWalletRecord[];
+  onChainStatusHistory?: onChainIdentityStatus[];
   integrityStatus: IntegrityStatus;
   onChainStatus?: number;
   onChainWallets?: string[];
   walletMismatch?: boolean;
   statusMismatch?: boolean;
   error?: string;
+  isGuest?: boolean;
+  isDependent?: boolean;
+  isPlatformAdmin?: boolean;
+  identityVerified?: boolean;
+  healthcareProviderVerified?: boolean;
 }
 
 export interface VerificationIntegrityItem {
@@ -173,6 +169,7 @@ export interface ParitySummary {
   synced: number;
   mismatch: number;
   missing: number;
+  chainOnly: number;
   pending: number;
   notApplicable: number;
   failed: number;
@@ -184,6 +181,7 @@ export function computeSummary(items: { integrityStatus: IntegrityStatus }[]): P
     synced: 0,
     mismatch: 0,
     missing: 0,
+    chainOnly: 0,
     pending: 0,
     notApplicable: 0,
     failed: 0,
@@ -198,6 +196,9 @@ export function computeSummary(items: { integrityStatus: IntegrityStatus }[]): P
         break;
       case 'missing':
         summary.missing++;
+        break;
+      case 'chain_only':
+        summary.chainOnly++;
         break;
       case 'pending':
         summary.pending++;

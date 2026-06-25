@@ -44,7 +44,7 @@ const tabs: Tab[] = [
  * - HealthRecordCore contract data (anchored records, verifications, disputes)
  */
 const BlockchainAdminDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabId>('members');
+  const [activeTab, setActiveTab] = useState<TabId>('chain-parity');
   const [refreshKey] = useState(0);
   const activeTabInfo = tabs.find(t => t.id === activeTab);
 
