@@ -77,7 +77,8 @@ export const RecordsIntegrityTable: React.FC<RecordsIntegrityTableProps> = ({
       item.firestoreId.toLowerCase().includes(q) ||
       (item.recordIdHash?.toLowerCase().includes(q) ?? false) ||
       (item.recordHash?.toLowerCase().includes(q) ?? false) ||
-      item.backendSubjects.some((uid: string) => uid.toLowerCase().includes(q))
+      item.backendSubjects.some((uid: string) => uid.toLowerCase().includes(q)) ||
+      (item.subjectComparisons?.some(s => s.userIdHash?.toLowerCase().includes(q)) ?? false)
     );
   });
 
