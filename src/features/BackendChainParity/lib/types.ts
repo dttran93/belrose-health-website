@@ -1,37 +1,17 @@
 // src/features/BackendChainParity/lib/types.ts
 
-import type { Timestamp } from 'firebase/firestore';
 import type { onChainIdentityStatus, LinkedWalletRecord } from '@/types/core';
-import type { BlockchainRef, TimestampLike } from '@belrose/shared';
 
 export type { onChainIdentityStatus, LinkedWalletRecord };
 
 export type IntegrityStatus =
-  | 'synced'
-  | 'mismatch'
-  | 'missing'
-  | 'chain_only'
-  | 'pending'
-  | 'not_applicable'
-  | 'failed';
-
-// ============================================================================
-// RAW FIRESTORE SHAPES (what we read from Firestore)
-// ============================================================================
-
-export interface FirestoreSyncQueueItem {
-  id: string;
-  contract?: string;
-  action?: string;
-  userId?: string;
-  userWalletAddress?: string;
-  error?: string;
-  retryCount?: number;
-  createdAt?: Timestamp;
-  lastAttemptAt?: Timestamp;
-  status?: string;
-  context?: Record<string, unknown>;
-}
+  | 'synced' // Everything matches on chain and on firebase
+  | 'mismatch' // Data is in both firebase or on chain, but things don't match (recordhash associated with ID, verification level, dispute culpability etc.)
+  | 'missing' // Data is in firebase but not on chain
+  | 'chain_only' // Data is on chain but not in firebase
+  | 'pending' // Data is not on chain but isn't supposed to be yet (e.g. guest access)
+  | 'not_applicable' // Data is not on chain and isn't supposed to be at all (record without any chain activity)
+  | 'failed'; // couldn't check
 
 // ============================================================================
 // INTEGRITY RESULT TYPES (Firestore data + chain check outcome)
