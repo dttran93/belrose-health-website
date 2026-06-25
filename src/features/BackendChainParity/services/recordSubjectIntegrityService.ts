@@ -7,7 +7,7 @@ import { FileObject } from '@/types/core';
 
 export interface RecordIntegrityItem {
   firestoreId: string;
-  recordHash?: string | null;
+  recordHash: string | null;
   recordIdHash?: string;
   backendSubjects: string[];
   onChainSubjects: string[];
@@ -197,19 +197,6 @@ export async function checkRecordIntegrity(
     } else {
       integrityStatus = 'synced';
     }
-
-    console.log(
-      'record integrity check:',
-      record.id,
-      'backendSubjects:',
-      backendSubjects.length,
-      'onChainSubjects:',
-      onChainSubjects.length,
-      'hasBackendCredibilityReview:',
-      hasBackendCredibilityReview,
-      'integrity status: ',
-      integrityStatus
-    );
 
     return {
       ...base,

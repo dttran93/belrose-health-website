@@ -1,7 +1,8 @@
 // src/features/BackendChainParity/components/BackendChainParityDashboard.tsx
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { RefreshCw, Loader2, X } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/Button';
 import { SummaryCards } from './SummaryCards';
@@ -10,6 +11,7 @@ import { MembersIntegrityTable } from './MembersIntegrityTable';
 import { CredibilityIntegrityTable } from './CredibilityIntegrityTable';
 import { SyncFailuresTable } from './SyncFailuresTable';
 import { TrusteesIntegrityTable } from './TrusteesIntegrityTable';
+import { PermissionsIntegrityTable } from './PermissionsIntegrityTable';
 import { useRecordsIntegrity } from '../hooks/useRecordsIntegrity';
 import { useMembersIntegrity } from '../hooks/useMembersIntegrity';
 import {
@@ -18,6 +20,7 @@ import {
 } from '../hooks/useVerificationsIntegrity';
 import { useSyncFailures } from '../hooks/useSyncFailures';
 import { useTrusteesIntegrity } from '../hooks/useTrusteesIntegrity';
+import { usePermissionsIntegrity } from '../hooks/usePermissionsIntegrity';
 import { computeSummary } from '../lib/types';
 import type { IntegrityStatus } from '../lib/types';
 
@@ -28,7 +31,7 @@ type TabId =
   | 'credibility'
   | 'sync-failures'
   | 'trustees'
-  | 'role-events';
+  | 'permissions';
 
 const TABS: Array<{ id: TabId; label: string; phase2?: boolean }> = [
   { id: 'summary', label: 'Summary' },
@@ -36,14 +39,25 @@ const TABS: Array<{ id: TabId; label: string; phase2?: boolean }> = [
   { id: 'members', label: 'Members' },
   { id: 'credibility', label: 'Credibility' },
   { id: 'trustees', label: 'Trustees' },
-  { id: 'role-events', label: 'Role Events', phase2: true },
+  { id: 'permissions', label: 'Permissions' },
   { id: 'sync-failures', label: 'Chain Failures' },
 ];
 
 const BackendChainParityDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabId>('summary');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<IntegrityStatus | 'all'>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = (searchParams.get('tab') ?? 'summary') as TabId;
+  const searchQuery = searchParams.get('search') ?? '';
+  const statusFilter = (searchParams.get('status') ?? 'all') as IntegrityStatus | 'all';
+
+  function setActiveTab(tab: TabId) {
+    setSearchParams(prev => { prev.set('tab', tab); prev.delete('search'); return prev; });
+  }
+  function setSearchQuery(q: string) {
+    setSearchParams(prev => { q ? prev.set('search', q) : prev.delete('search'); return prev; });
+  }
+  function setStatusFilter(s: IntegrityStatus | 'all') {
+    setSearchParams(prev => { s !== 'all' ? prev.set('status', s) : prev.delete('status'); return prev; });
+  }
 
   const queryClient = useQueryClient();
 
@@ -53,13 +67,15 @@ const BackendChainParityDashboard: React.FC = () => {
   const disputes = useDisputesIntegrity();
   const syncFailures = useSyncFailures();
   const trustees = useTrusteesIntegrity();
+  const permissions = usePermissionsIntegrity();
 
   const isAnyLoading =
     records.isFetching ||
     members.isFetching ||
     verifications.isFetching ||
     disputes.isFetching ||
-    trustees.isFetching;
+    trustees.isFetching ||
+    permissions.isFetching;
 
   const lastChecked = [
     records.dataUpdatedAt,
@@ -67,6 +83,7 @@ const BackendChainParityDashboard: React.FC = () => {
     verifications.dataUpdatedAt,
     disputes.dataUpdatedAt,
     trustees.dataUpdatedAt,
+    permissions.dataUpdatedAt,
   ]
     .filter(Boolean)
     .reduce((a, b) => Math.min(a, b), Infinity);
@@ -76,6 +93,7 @@ const BackendChainParityDashboard: React.FC = () => {
   const verificationsSummary = verifications.data ? computeSummary(verifications.data) : undefined;
   const disputesSummary = disputes.data ? computeSummary(disputes.data) : undefined;
   const trusteesSummary = trustees.data ? computeSummary(trustees.data) : undefined;
+  const permissionsSummary = permissions.data ? computeSummary(permissions.data) : undefined;
 
   // Keyed by recordId so RecordsIntegrityTable can show counts per record in the expanded panel
   const verificationsMap = useMemo(() => {
@@ -279,14 +297,6 @@ const BackendChainParityDashboard: React.FC = () => {
                 statusFilter={statusFilter}
                 verificationsMap={verificationsMap}
                 disputesMap={disputesMap}
-                onViewVerifications={hash => {
-                  setActiveTab('credibility');
-                  if (hash) setSearchQuery(hash);
-                }}
-                onViewMember={uid => {
-                  setActiveTab('members');
-                  setSearchQuery(uid);
-                }}
                 onClearSearch={() => setSearchQuery('')}
               />
             )}
@@ -355,19 +365,20 @@ const BackendChainParityDashboard: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'role-events' && (
-          <div className="pt-8 text-center">
-            <div className="inline-block bg-white border border-gray-200 rounded-xl px-8 py-10">
-              <div className="text-gray-400 text-sm mb-2 font-medium uppercase tracking-wide">
-                Phase 2
-              </div>
-              <div className="text-gray-700 font-semibold text-lg mb-1">Role Event Parity</div>
-              <div className="text-gray-400 text-sm max-w-sm">
-                Bidirectional reconciliation between Firestore{' '}
-                <code className="text-xs bg-gray-100 px-1 rounded">permissionChangeEvents</code>{' '}
-                and on-chain state — coming in a future release.
-              </div>
-            </div>
+        {activeTab === 'permissions' && (
+          <div className="pt-2">
+            {permissions.isLoading ? (
+              <LoadingState label="record permissions" />
+            ) : permissions.error ? (
+              <ErrorState error={String(permissions.error)} />
+            ) : (
+              <PermissionsIntegrityTable
+                items={permissions.data ?? []}
+                searchQuery={searchQuery}
+                statusFilter={statusFilter}
+                onClearSearch={() => setSearchQuery('')}
+              />
+            )}
           </div>
         )}
       </div>

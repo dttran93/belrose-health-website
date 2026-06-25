@@ -64,13 +64,19 @@ function EventLog({ events }: { events: OnChainTrusteeEvent[] }) {
     <div className="flex flex-col gap-2">
       {events.map((event, i) => (
         <div key={i} className="flex flex-wrap items-center gap-1.5 text-xs">
-          <span className={`px-1.5 py-0.5 rounded font-medium ${ACTION_STYLE[event.action] ?? 'bg-gray-100 text-gray-600'}`}>
+          <span
+            className={`px-1.5 py-0.5 rounded font-medium ${ACTION_STYLE[event.action] ?? 'bg-gray-100 text-gray-600'}`}
+          >
             {ACTION_LABEL[event.action] ?? event.action}
           </span>
           {event.trustLevel && (
             <span className="text-gray-400 capitalize">· {event.trustLevel}</span>
           )}
-          <CopyableHash value={event.blockchainRef.txHash} chars={8} className="font-mono text-gray-600" />
+          <CopyableHash
+            value={event.blockchainRef.txHash}
+            chars={8}
+            className="font-mono text-gray-600"
+          />
           <a
             href={`${BASESCAN_TX_URL}${event.blockchainRef.txHash}`}
             target="_blank"
@@ -80,7 +86,11 @@ function EventLog({ events }: { events: OnChainTrusteeEvent[] }) {
             <ExternalLink className="w-3 h-3" />
           </a>
           {event.recordedAt && (
-            <span className="text-gray-400">{formatTimestamp(event.recordedAt as unknown as import('@belrose/shared').TimestampLike)}</span>
+            <span className="text-gray-400">
+              {formatTimestamp(
+                event.recordedAt as unknown as import('@belrose/shared').TimestampLike
+              )}
+            </span>
           )}
         </div>
       ))}
@@ -105,9 +115,10 @@ function ChainStateCell({ item }: { item: TrusteeIntegrityItem }) {
 
   const statusLabel = CHAIN_STATUS_LABEL[item.onChainStatus] ?? String(item.onChainStatus);
   const statusStyle = CHAIN_STATUS_STYLES[item.onChainStatus] ?? 'bg-gray-100 text-gray-500';
-  const levelLabel = item.onChainLevel !== undefined
-    ? CHAIN_LEVEL_LABEL[item.onChainLevel] ?? String(item.onChainLevel)
-    : null;
+  const levelLabel =
+    item.onChainLevel !== undefined
+      ? (CHAIN_LEVEL_LABEL[item.onChainLevel] ?? String(item.onChainLevel))
+      : null;
 
   return (
     <div className="flex flex-col gap-1">
@@ -119,9 +130,6 @@ function ChainStateCell({ item }: { item: TrusteeIntegrityItem }) {
           <span className="text-xs text-gray-400">· {levelLabel}</span>
         )}
       </div>
-      {item.mismatchReasons?.map((reason, i) => (
-        <span key={i} className="text-xs text-amber-600">⚠ {reason}</span>
-      ))}
     </div>
   );
 }
@@ -193,7 +201,9 @@ export const TrusteesIntegrityTable: React.FC<TrusteesIntegrityTableProps> = ({
         <tbody className="divide-y text-left divide-gray-100">
           {filtered.map(item => {
             const isExpanded = expandedRows.has(item.id);
-            const proposeEvent = [...item.onChainEvents].reverse().find(e => e.action === 'propose');
+            const proposeEvent = [...item.onChainEvents]
+              .reverse()
+              .find(e => e.action === 'propose');
 
             return (
               <React.Fragment key={item.id}>
@@ -303,9 +313,7 @@ export const TrusteesIntegrityTable: React.FC<TrusteesIntegrityTableProps> = ({
                       <div className="flex gap-8 flex-wrap">
                         {/* On-Chain Event Log */}
                         <div className="flex-1 min-w-48">
-                          <p className="text-xs font-medium text-gray-500 mb-2">
-                            On-Chain Events
-                          </p>
+                          <p className="text-xs font-medium text-gray-500 mb-2">On-Chain Events</p>
                           <EventLog events={item.onChainEvents} />
                         </div>
 
@@ -315,20 +323,32 @@ export const TrusteesIntegrityTable: React.FC<TrusteesIntegrityTableProps> = ({
                           <div className="flex flex-col gap-1.5 text-xs">
                             {item.createdAt && (
                               <div className="flex gap-2">
-                                <span className="text-gray-500 font-medium w-20 shrink-0">Created:</span>
-                                <span className="text-gray-600">{formatTimestamp(item.createdAt)}</span>
+                                <span className="text-gray-500 font-medium w-20 shrink-0">
+                                  Created:
+                                </span>
+                                <span className="text-gray-600">
+                                  {formatTimestamp(item.createdAt)}
+                                </span>
                               </div>
                             )}
                             {item.respondedAt && (
                               <div className="flex gap-2">
-                                <span className="text-gray-500 font-medium w-20 shrink-0">Responded:</span>
-                                <span className="text-gray-600">{formatTimestamp(item.respondedAt)}</span>
+                                <span className="text-gray-500 font-medium w-20 shrink-0">
+                                  Responded:
+                                </span>
+                                <span className="text-gray-600">
+                                  {formatTimestamp(item.respondedAt)}
+                                </span>
                               </div>
                             )}
                             {item.revokedAt && (
                               <div className="flex gap-2">
-                                <span className="text-gray-500 font-medium w-20 shrink-0">Revoked:</span>
-                                <span className="text-gray-600">{formatTimestamp(item.revokedAt)}</span>
+                                <span className="text-gray-500 font-medium w-20 shrink-0">
+                                  Revoked:
+                                </span>
+                                <span className="text-gray-600">
+                                  {formatTimestamp(item.revokedAt)}
+                                </span>
                               </div>
                             )}
                           </div>

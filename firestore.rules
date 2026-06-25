@@ -396,8 +396,22 @@ service cloud.firestore {
         request.auth.uid in resource.data.owners ||
         (resource.data.owners.size() == 0 && request.auth.uid in resource.data.administrators)
       );
+
+      // --- PERMISSION HISTORY SUBCOLLECTION ---
+      match /permissionHistory/{eventId} {
+        // Read: platform admins or any user with a role on this record
+        allow read: if request.auth != null && (isPlatformAdmin() || hasRoleOnRecord(recordId));
+
+        // Create: must have a role and must be the one making the change
+        allow create: if request.auth != null
+          && request.resource.data.changedBy == request.auth.uid
+          && hasRoleOnRecord(recordId);
+
+        // Immutable audit log
+        allow update, delete: if false;
+      }
     }
-       
+
     // ============================================
     // RECORD VERSIONS
     // ============================================
@@ -756,25 +770,6 @@ service cloud.firestore {
       );
     }
     
-    // ============================================
-    // PERMISSION CHANGE EVENT LOG
-    // ============================================
-    match /permissionChangeEvents/{eventId} {
-
-      // Create: must be authenticated and have a role on the record
-      // changedBy must match the authenticated user — can't write events on behalf of others
-      allow create: if request.auth != null
-        && request.resource.data.changedBy == request.auth.uid
-        && hasRoleOnRecord(request.resource.data.recordId);
-
-      // Read: must be authenticated and have a role on the record
-      allow read: if request.auth != null
-        && hasRoleOnRecord(resource.data.recordId);
-
-      // Update/Delete: nobody — audit log is immutable
-      allow update, delete: if false;
-    }
-
     // ============================================
     // TRUSTEE RELATIONSHIPS
     // ============================================
