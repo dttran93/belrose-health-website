@@ -3,11 +3,11 @@
 import React, { useState } from 'react';
 import { VerificationsTable } from './VerificationsTable';
 import { DisputesTable } from './DisputesTable';
+import type { IntegrityStatus } from '../lib/types';
 import type {
   VerificationIntegrityItem,
   DisputeIntegrityItem,
-  IntegrityStatus,
-} from '../lib/types';
+} from '../services/credibilityIntegrityService';
 
 type SubTab = 'verifications' | 'disputes';
 
@@ -33,7 +33,7 @@ export const CredibilityIntegrityTable: React.FC<CredibilityIntegrityTableProps>
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
-      item.firestoreId.toLowerCase().includes(q) ||
+      item.recordId.toLowerCase().includes(q) ||
       (item.verifierIdHash?.toLowerCase().includes(q) ?? false) ||
       (item.recordId?.toLowerCase().includes(q) ?? false) ||
       (item.recordHash?.toLowerCase().includes(q) ?? false)
@@ -45,7 +45,7 @@ export const CredibilityIntegrityTable: React.FC<CredibilityIntegrityTableProps>
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
-      item.firestoreId.toLowerCase().includes(q) ||
+      item.recordId.toLowerCase().includes(q) ||
       (item.disputerIdHash?.toLowerCase().includes(q) ?? false) ||
       (item.recordId?.toLowerCase().includes(q) ?? false) ||
       (item.recordHash?.toLowerCase().includes(q) ?? false)

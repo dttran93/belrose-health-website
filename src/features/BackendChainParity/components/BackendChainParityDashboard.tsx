@@ -9,6 +9,7 @@ import { RecordsIntegrityTable } from './RecordsIntegrityTable';
 import { MembersIntegrityTable } from './MembersIntegrityTable';
 import { CredibilityIntegrityTable } from './CredibilityIntegrityTable';
 import { SyncFailuresTable } from './SyncFailuresTable';
+import { TrusteesIntegrityTable } from './TrusteesIntegrityTable';
 import { useRecordsIntegrity } from '../hooks/useRecordsIntegrity';
 import { useMembersIntegrity } from '../hooks/useMembersIntegrity';
 import {
@@ -16,6 +17,7 @@ import {
   useDisputesIntegrity,
 } from '../hooks/useVerificationsIntegrity';
 import { useSyncFailures } from '../hooks/useSyncFailures';
+import { useTrusteesIntegrity } from '../hooks/useTrusteesIntegrity';
 import { computeSummary } from '../lib/types';
 import type { IntegrityStatus } from '../lib/types';
 
@@ -33,9 +35,9 @@ const TABS: Array<{ id: TabId; label: string; phase2?: boolean }> = [
   { id: 'records', label: 'Records' },
   { id: 'members', label: 'Members' },
   { id: 'credibility', label: 'Credibility' },
-  { id: 'sync-failures', label: 'Sync Failures' },
-  { id: 'trustees', label: 'Trustees', phase2: true },
+  { id: 'trustees', label: 'Trustees' },
   { id: 'role-events', label: 'Role Events', phase2: true },
+  { id: 'sync-failures', label: 'Chain Failures' },
 ];
 
 const BackendChainParityDashboard: React.FC = () => {
@@ -50,15 +52,21 @@ const BackendChainParityDashboard: React.FC = () => {
   const verifications = useVerificationsIntegrity();
   const disputes = useDisputesIntegrity();
   const syncFailures = useSyncFailures();
+  const trustees = useTrusteesIntegrity();
 
   const isAnyLoading =
-    records.isFetching || members.isFetching || verifications.isFetching || disputes.isFetching;
+    records.isFetching ||
+    members.isFetching ||
+    verifications.isFetching ||
+    disputes.isFetching ||
+    trustees.isFetching;
 
   const lastChecked = [
     records.dataUpdatedAt,
     members.dataUpdatedAt,
     verifications.dataUpdatedAt,
     disputes.dataUpdatedAt,
+    trustees.dataUpdatedAt,
   ]
     .filter(Boolean)
     .reduce((a, b) => Math.min(a, b), Infinity);
@@ -67,6 +75,7 @@ const BackendChainParityDashboard: React.FC = () => {
   const membersSummary = members.data ? computeSummary(members.data) : undefined;
   const verificationsSummary = verifications.data ? computeSummary(verifications.data) : undefined;
   const disputesSummary = disputes.data ? computeSummary(disputes.data) : undefined;
+  const trusteesSummary = trustees.data ? computeSummary(trustees.data) : undefined;
 
   // Keyed by recordId so RecordsIntegrityTable can show counts per record in the expanded panel
   const verificationsMap = useMemo(() => {
@@ -329,20 +338,33 @@ const BackendChainParityDashboard: React.FC = () => {
           </div>
         )}
 
-        {(activeTab === 'trustees' || activeTab === 'role-events') && (
+        {activeTab === 'trustees' && (
+          <div className="pt-2">
+            {trustees.isLoading ? (
+              <LoadingState label="trustee relationships" />
+            ) : trustees.error ? (
+              <ErrorState error={String(trustees.error)} />
+            ) : (
+              <TrusteesIntegrityTable
+                items={trustees.data ?? []}
+                searchQuery={searchQuery}
+                statusFilter={statusFilter}
+                onClearSearch={() => setSearchQuery('')}
+              />
+            )}
+          </div>
+        )}
+
+        {activeTab === 'role-events' && (
           <div className="pt-8 text-center">
             <div className="inline-block bg-white border border-gray-200 rounded-xl px-8 py-10">
               <div className="text-gray-400 text-sm mb-2 font-medium uppercase tracking-wide">
                 Phase 2
               </div>
-              <div className="text-gray-700 font-semibold text-lg mb-1">
-                {activeTab === 'trustees' ? 'Trustee Relationship Parity' : 'Role Event Parity'}
-              </div>
+              <div className="text-gray-700 font-semibold text-lg mb-1">Role Event Parity</div>
               <div className="text-gray-400 text-sm max-w-sm">
                 Bidirectional reconciliation between Firestore{' '}
-                <code className="text-xs bg-gray-100 px-1 rounded">
-                  {activeTab === 'trustees' ? 'trusteeRelationships' : 'permissionChangeEvents'}
-                </code>{' '}
+                <code className="text-xs bg-gray-100 px-1 rounded">permissionChangeEvents</code>{' '}
                 and on-chain state — coming in a future release.
               </div>
             </div>

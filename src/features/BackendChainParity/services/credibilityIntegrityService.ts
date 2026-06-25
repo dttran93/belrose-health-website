@@ -29,7 +29,7 @@ export interface VerificationIntegrityItem {
 export async function checkVerificationIntegrity(
   ver: VerificationDoc
 ): Promise<VerificationIntegrityItem> {
-  const expectedRecordIdHash = (ver.recordIdHash || id(ver.recordId)).toLowerCase();
+  const expectedRecordIdHash = id(ver.recordId).toLowerCase();
 
   const base: Omit<VerificationIntegrityItem, 'integrityStatus'> = {
     recordId: ver.recordId,

@@ -7,6 +7,7 @@ import {
   checkVerificationIntegrity,
   checkDisputeIntegrity,
   VerificationIntegrityItem,
+  DisputeIntegrityItem,
 } from '../services/credibilityIntegrityService';
 import type { VerificationDoc, DisputeDoc } from '@belrose/shared';
 

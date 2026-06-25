@@ -43,6 +43,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  arrayUnion,
   query,
   collection,
   where,
@@ -67,6 +68,15 @@ export type StatusUpdate =
   | 'trust_level_upgrade'
   | 'trust_level_downgrade';
 
+export type OnChainTrusteeAction = 'propose' | 'accept' | 'revoke' | 'decline' | 'level-update';
+
+export interface OnChainTrusteeEvent {
+  action: OnChainTrusteeAction;
+  trustLevel?: TrustLevel; // present on 'propose' and 'level-update'
+  blockchainRef: BlockchainRef;
+  recordedAt: Timestamp;
+}
+
 export interface TrusteeRelationship {
   // Core identifiers
   trustorId: string;
@@ -84,11 +94,9 @@ export interface TrusteeRelationship {
   revokedBy: string | null; // uid — could be either party
   statusUpdateReason: StatusUpdate | null;
 
-  // Controller only — blockchain tx hash from the controller appointment
-  inviteBlockchainRef: BlockchainRef | null;
-  acceptBlockchainRef: BlockchainRef | null;
-  revocationBlockchainRef: BlockchainRef | null;
-  editBlockchainRef: BlockchainRef | null;
+  // Append-only audit log of every blockchain operation on this relationship.
+  // Each write appends a new entry; history is never overwritten.
+  onChainEvents: OnChainTrusteeEvent[];
 
   // Set to true for auto-created relationships on dependent accounts
   isDependentRelationship?: boolean;
@@ -191,25 +199,28 @@ export class TrusteeRelationshipService {
     await TrusteePermissionService.grantPendingTrusteeAccess(trusteeId, trustLevel);
     console.log('✅ Pending permissions granted');
 
+    const proposeEvent: OnChainTrusteeEvent = {
+      action: 'propose',
+      trustLevel,
+      blockchainRef: inviteBlockchainRef!,
+      recordedAt: now,
+    };
+
     // Step 2: Write relationship doc
     if (existing.exists()) {
       console.log('🔄 Reactivating existing trustee relationship as new invite');
       await updateDoc(relationshipRef, {
         trustLevel,
         status: 'pending',
-        isActive: false, // stays false until trustee accepts
+        isActive: false,
         createdAt: now,
         respondedAt: null,
         revokedAt: null,
         revokedBy: null,
         statusUpdateReason: null,
-        inviteBlockchainRef,
-        acceptBlockchainRef: null,
-        revocationBlockchainRef: null,
-        editBlockchainRef: null,
+        onChainEvents: arrayUnion(proposeEvent),
       });
     } else {
-      // First time — create new document
       console.log('🔄 Creating new trustee relationship invite');
       await setDoc(relationshipRef, {
         trustorId,
@@ -222,10 +233,7 @@ export class TrusteeRelationshipService {
         revokedAt: null,
         revokedBy: null,
         statusUpdateReason: null,
-        inviteBlockchainRef,
-        acceptBlockchainRef: null,
-        revocationBlockchainRef: null,
-        editBlockchainRef: null,
+        onChainEvents: [proposeEvent],
       } satisfies TrusteeRelationship);
     }
 
@@ -280,7 +288,11 @@ export class TrusteeRelationshipService {
       revokedAt: Timestamp.now(),
       revokedBy: trustorId,
       statusUpdateReason: 'trustor_revoked',
-      revocationBlockchainRef,
+      onChainEvents: arrayUnion({
+        action: 'revoke',
+        blockchainRef: revocationBlockchainRef!,
+        recordedAt: Timestamp.now(),
+      } satisfies OnChainTrusteeEvent),
     });
 
     console.log(`✅ Trustee revoked: ${trustorId} revoked ${trusteeId}`);
@@ -348,7 +360,12 @@ export class TrusteeRelationshipService {
     await updateDoc(relationshipRef, {
       trustLevel: newTrustLevel,
       statusUpdateReason: isUpgrade ? 'trust_level_upgrade' : 'trust_level_downgrade',
-      editBlockchainRef,
+      onChainEvents: arrayUnion({
+        action: 'level-update',
+        trustLevel: newTrustLevel,
+        blockchainRef: editBlockchainRef!,
+        recordedAt: Timestamp.now(),
+      } satisfies OnChainTrusteeEvent),
     });
 
     console.log(`✅ Trust level updated: ${trustorId} → ${trusteeId} (${newTrustLevel})`);
@@ -408,10 +425,17 @@ export class TrusteeRelationshipService {
     await updateDoc(relationshipRef, {
       trustLevel: newTrustLevel,
       statusUpdateReason: 'trust_level_downgrade',
-      editBlockchainRef,
+      onChainEvents: arrayUnion({
+        action: 'level-update',
+        trustLevel: newTrustLevel,
+        blockchainRef: editBlockchainRef!,
+        recordedAt: Timestamp.now(),
+      } satisfies OnChainTrusteeEvent),
     });
 
-    console.log(`✅ Trust level stepped down: ${trusteeId} → ${newTrustLevel} (trustor: ${trustorId})`);
+    console.log(
+      `✅ Trust level stepped down: ${trusteeId} → ${newTrustLevel} (trustor: ${trustorId})`
+    );
   }
 
   // ============================================================================
@@ -478,7 +502,11 @@ export class TrusteeRelationshipService {
       isActive: true,
       status: 'active',
       respondedAt: Timestamp.now(),
-      acceptBlockchainRef,
+      onChainEvents: arrayUnion({
+        action: 'accept',
+        blockchainRef: acceptBlockchainRef!,
+        recordedAt: Timestamp.now(),
+      } satisfies OnChainTrusteeEvent),
     });
 
     console.log(`✅ Trustee invite accepted: ${trusteeId} accepted invite from ${trustorId}`);
@@ -490,6 +518,8 @@ export class TrusteeRelationshipService {
    *
    * Rolls back all permissions granted at invite time:
    * removes from role arrays and deletes inactive wrappedKeys.
+   *
+   * TODO: Add decline Invite function to blockchain
    *
    * @param trustorId - The userId of the trustor who sent the invite
    */
@@ -570,7 +600,11 @@ export class TrusteeRelationshipService {
       revokedAt: Timestamp.now(),
       revokedBy: trusteeId,
       statusUpdateReason: 'trustee_resigned',
-      revocationBlockchainRef,
+      onChainEvents: arrayUnion({
+        action: 'revoke',
+        blockchainRef: revocationBlockchainRef!,
+        recordedAt: Timestamp.now(),
+      } satisfies OnChainTrusteeEvent),
     });
 
     console.log(`✅ Trustee resigned: ${trusteeId} resigned from ${trustorId}'s account`);

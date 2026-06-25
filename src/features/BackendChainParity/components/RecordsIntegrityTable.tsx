@@ -15,12 +15,11 @@ import { IntegrityStatusBadge } from './IntegrityStatusBadge';
 import { CopyableHash } from './ui/CopyableHash';
 import { VersionReviewBadge } from '@/features/ViewEditRecord/components/Edit/VersionReviewBadge';
 import type { RecordIntegrityItem } from '../services/recordSubjectIntegrityService';
+import type { IntegrityStatus, SubjectSyncStatus } from '../lib/types';
 import type {
-  IntegrityStatus,
-  VerificationIntegrityItem,
   DisputeIntegrityItem,
-  SubjectSyncStatus,
-} from '../lib/types';
+  VerificationIntegrityItem,
+} from '../services/credibilityIntegrityService';
 
 const BASESCAN_TX_URL = `${NETWORK.explorerUrl}/tx/`;
 

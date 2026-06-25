@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs, getFirestore, query, where } from 'firebase/firestore';
-import type { BlockchainRef } from '../lib/types';
+import type { BlockchainRef } from '@belrose/shared';
 
 /** Keyed by subjectId — only populated if the consent request has a blockchainRef */
 export type SubjectConsentRefsMap = Record<string, BlockchainRef | undefined>;

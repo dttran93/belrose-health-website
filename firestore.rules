@@ -816,7 +816,7 @@ service cloud.firestore {
           resource.data.status == 'pending' &&
           request.resource.data.status in ['active', 'declined'] &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'isActive', 'respondedAt', 'revokedBy', 'acceptBlockchainRef']) &&
+            .hasOnly(['status', 'isActive', 'respondedAt', 'revokedBy', 'onChainEvents']) &&
           request.resource.data.trustorId == resource.data.trustorId &&
           request.resource.data.trusteeId == resource.data.trusteeId
         )||
@@ -826,7 +826,7 @@ service cloud.firestore {
           resource.data.status == 'active' &&
           request.resource.data.status == 'declined' &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'isActive', 'revokedAt', 'revokedBy', 'statusUpdateReason', 'revocationBlockchainRef']) &&
+            .hasOnly(['status', 'isActive', 'revokedAt', 'revokedBy', 'statusUpdateReason', 'onChainEvents']) &&
           request.resource.data.trustorId == resource.data.trustorId &&
           request.resource.data.trusteeId == resource.data.trusteeId
         ) ||
@@ -838,7 +838,7 @@ service cloud.firestore {
           request.resource.data.trustorId == resource.data.trustorId &&
           request.resource.data.trusteeId == resource.data.trusteeId &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['trustLevel', 'statusUpdateReason', 'editBlockchainRef']) &&
+            .hasOnly(['trustLevel', 'statusUpdateReason', 'onChainEvents']) &&
           (
             (resource.data.trustLevel == 'controller' &&
              (request.resource.data.trustLevel == 'custodian' || request.resource.data.trustLevel == 'observer')) ||
