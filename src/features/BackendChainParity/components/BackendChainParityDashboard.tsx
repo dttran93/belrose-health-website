@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { SummaryCards } from './SummaryCards';
 import { RecordsIntegrityTable } from './RecordsIntegrityTable';
 import { MembersIntegrityTable } from './MembersIntegrityTable';
-import { VerificationsIntegrityTable } from './VerificationsIntegrityTable';
+import { CredibilityIntegrityTable } from './CredibilityIntegrityTable';
 import { SyncFailuresTable } from './SyncFailuresTable';
 import { useRecordsIntegrity } from '../hooks/useRecordsIntegrity';
 import { useMembersIntegrity } from '../hooks/useMembersIntegrity';
@@ -23,7 +23,7 @@ type TabId =
   | 'summary'
   | 'records'
   | 'members'
-  | 'verifications'
+  | 'credibility'
   | 'sync-failures'
   | 'trustees'
   | 'role-events';
@@ -32,7 +32,7 @@ const TABS: Array<{ id: TabId; label: string; phase2?: boolean }> = [
   { id: 'summary', label: 'Summary' },
   { id: 'records', label: 'Records' },
   { id: 'members', label: 'Members' },
-  { id: 'verifications', label: 'Verifications & Disputes' },
+  { id: 'credibility', label: 'Credibility' },
   { id: 'sync-failures', label: 'Sync Failures' },
   { id: 'trustees', label: 'Trustees', phase2: true },
   { id: 'role-events', label: 'Role Events', phase2: true },
@@ -271,7 +271,7 @@ const BackendChainParityDashboard: React.FC = () => {
                 verificationsMap={verificationsMap}
                 disputesMap={disputesMap}
                 onViewVerifications={hash => {
-                  setActiveTab('verifications');
+                  setActiveTab('credibility');
                   if (hash) setSearchQuery(hash);
                 }}
                 onViewMember={uid => {
@@ -301,12 +301,12 @@ const BackendChainParityDashboard: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'verifications' && (
+        {activeTab === 'credibility' && (
           <div className="pt-2">
             {verifications.isLoading || disputes.isLoading ? (
               <LoadingState label="verifications & disputes" />
             ) : (
-              <VerificationsIntegrityTable
+              <CredibilityIntegrityTable
                 verifications={verifications.data ?? []}
                 disputes={disputes.data ?? []}
                 searchQuery={searchQuery}

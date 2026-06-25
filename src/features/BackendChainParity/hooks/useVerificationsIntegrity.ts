@@ -3,32 +3,31 @@
 import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs, getFirestore } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
-import { checkVerificationIntegrity, checkDisputeIntegrity } from '../services/integrityCheckService';
-import type {
-  FirestoreVerification,
-  FirestoreDispute,
+import {
+  checkVerificationIntegrity,
+  checkDisputeIntegrity,
   VerificationIntegrityItem,
-  DisputeIntegrityItem,
-} from '../lib/types';
+} from '../services/credibilityIntegrityService';
+import type { VerificationDoc, DisputeDoc } from '@belrose/shared';
 
 const db = getFirestore(getApp());
 
 async function fetchVerificationsIntegrity(): Promise<VerificationIntegrityItem[]> {
   const snapshot = await getDocs(collection(db, 'verifications'));
-  const items: FirestoreVerification[] = snapshot.docs.map(doc => ({
+  const items = snapshot.docs.map(doc => ({
     id: doc.id,
-    ...(doc.data() as Omit<FirestoreVerification, 'id'>),
-  }));
+    ...(doc.data() as Omit<VerificationDoc, 'id'>),
+  })) as VerificationDoc[];
 
   return Promise.all(items.map(item => checkVerificationIntegrity(item)));
 }
 
 async function fetchDisputesIntegrity(): Promise<DisputeIntegrityItem[]> {
   const snapshot = await getDocs(collection(db, 'disputes'));
-  const items: FirestoreDispute[] = snapshot.docs.map(doc => ({
+  const items = snapshot.docs.map(doc => ({
     id: doc.id,
-    ...(doc.data() as Omit<FirestoreDispute, 'id'>),
-  }));
+    ...(doc.data() as Omit<DisputeDoc, 'id'>),
+  })) as DisputeDoc[];
 
   return Promise.all(items.map(item => checkDisputeIntegrity(item)));
 }

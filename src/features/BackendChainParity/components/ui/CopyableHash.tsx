@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { truncateHash } from '@/utils/dataFormattingUtils';
 
 interface CopyableHashProps {
-  value: string | undefined;
+  value: string | undefined | null;
   chars?: number;
   /** Show the full value without truncation (still copies on click) */
   full?: boolean;

@@ -1,17 +1,13 @@
 // src/features/BackendChainParity/services/recordSubjectIntegrityService.ts
 
 import { ethers, id } from 'ethers';
-import type {
-  FirestoreRecord,
-  HashComparison,
-  IntegrityStatus,
-  SubjectComparison,
-} from '../lib/types';
+import type { HashComparison, IntegrityStatus, SubjectComparison } from '../lib/types';
 import { getHealthContract } from '../lib/contracts';
+import { FileObject } from '@/types/core';
 
 export interface RecordIntegrityItem {
   firestoreId: string;
-  recordHash?: string;
+  recordHash?: string | null;
   recordIdHash?: string;
   backendSubjects: string[];
   onChainSubjects: string[];
@@ -28,7 +24,7 @@ export interface RecordIntegrityItem {
 }
 
 export async function checkRecordIntegrity(
-  record: FirestoreRecord,
+  record: FileObject,
   hasBackendCredibilityReview = false
 ): Promise<RecordIntegrityItem> {
   const backendSubjects = record.subjects ?? [];
