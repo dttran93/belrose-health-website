@@ -29,7 +29,7 @@ export class UserService {
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
 
-    const userData: Partial<BelroseUserProfile> = {
+    const userData = {
       uid: user.uid,
       email: user.email || '',
       emailVerified: user.emailVerified,

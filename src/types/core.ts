@@ -30,13 +30,13 @@ export interface User {
 }
 
 export interface BelroseUserProfile extends User {
-  createdAt: any;
-  updatedAt: any;
+  createdAt: Timestamp | null;
+  updatedAt: Timestamp | null;
   wallet: UserWallet;
   emailVerified: boolean;
-  emailVerifiedAt?: any;
+  emailVerifiedAt?: Timestamp | null;
   identityVerified: boolean;
-  identityVerifiedAt?: any;
+  identityVerifiedAt?: Timestamp | null;
   healthcareProviderVerified?: boolean; //if Belrose has verified they are a certified healthcare provider
   healthcareProviderVerifiedAt?: Timestamp; //if Belrose has verified they are a certified healthcare provider
   credibility?: CredibilityScore;

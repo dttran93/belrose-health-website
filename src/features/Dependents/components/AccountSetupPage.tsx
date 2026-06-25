@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/Button';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { UserSettingsService } from '@/features/Settings/services/userSettingsService';
@@ -46,7 +46,7 @@ function EmailSection({ user }: { user: BelroseUserProfile }) {
       if (authUser?.emailVerified) {
         await updateDoc(doc(getFirestore(), 'users', user.uid), {
           emailVerified: true,
-          emailVerifiedAt: new Date().toISOString(),
+          emailVerifiedAt: serverTimestamp(),
         });
         toast.success('Email verified!');
       } else {
