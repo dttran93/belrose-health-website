@@ -113,7 +113,7 @@ function buildNotificationInput(
 // ============================================================================
 
 export const onPermissionChangeEventCreated = onDocumentCreated(
-  { document: 'permissionChangeEvents/{eventId}', secrets: [resendKey] },
+  { document: 'records/{recordId}/permissionHistory/{eventId}', secrets: [resendKey] },
   async event => {
     const eventId = event.params.eventId;
     const data = event.data?.data() as PermissionChangeEvent | undefined;

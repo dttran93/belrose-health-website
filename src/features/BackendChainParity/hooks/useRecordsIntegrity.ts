@@ -4,8 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs, getFirestore } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
 import { checkRecordIntegrity } from '../services/recordSubjectIntegrityService';
-import type { FirestoreRecord } from '../lib/types';
 import type { RecordIntegrityItem } from '../services/recordSubjectIntegrityService';
+import type { FileObject } from '@/types/core';
 
 const db = getFirestore(getApp());
 
@@ -23,10 +23,10 @@ async function fetchRecordsIntegrity(): Promise<RecordIntegrityItem[]> {
     if (rid) recordIdsWithCredibility.add(rid);
   }
 
-  const records: FirestoreRecord[] = recordsSnap.docs.map(doc => ({
+  const records = recordsSnap.docs.map(doc => ({
     id: doc.id,
-    ...(doc.data() as Omit<FirestoreRecord, 'id'>),
-  }));
+    ...(doc.data() as Omit<FileObject, 'id'>),
+  })) as FileObject[];
 
   return Promise.all(
     records.map(record =>

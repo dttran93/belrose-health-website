@@ -9,6 +9,7 @@ import {
   DisputeCulpability,
   DisputeSeverityOptions,
   VerificationLevelOptions,
+  TimestampLike,
 } from '@belrose/shared';
 import { collection, addDoc, serverTimestamp, getFirestore } from 'firebase/firestore';
 
@@ -113,6 +114,35 @@ export type SyncContext =
 
 export interface BlockchainSyncFailure extends BaseSyncFailure {
   context: SyncContext;
+}
+
+// Shape of a BlockchainSyncFailure document as read from Firestore —
+// extends the write type with the fields added at write time.
+export type SyncQueueRecord = BlockchainSyncFailure & {
+  id: string;
+  status?: string;
+  retryCount?: number;
+  createdAt?: TimestampLike;
+  lastAttemptAt?: TimestampLike;
+};
+
+// Decodes a standard Error(string) ABI revert: selector 0x08c379a0 + ABI-encoded string.
+// Returns the human-readable reason, or null if the error doesn't contain one.
+export function decodeRevertReason(error: string): string | null {
+  const data = error.match(/0x08c379a0([0-9a-f]+)/i)?.[1];
+  if (!data || data.length < 128) return null;
+  try {
+    const length = parseInt(data.slice(64, 128), 16);
+    if (length === 0 || length > 1024) return null;
+    const stringHex = data.slice(128, 128 + length * 2);
+    const bytes = new Uint8Array(length);
+    for (let i = 0; i < length; i++) {
+      bytes[i] = parseInt(stringHex.slice(i * 2, i * 2 + 2), 16);
+    }
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return null;
+  }
 }
 
 export class BlockchainSyncQueueService {

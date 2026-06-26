@@ -9,18 +9,18 @@ import {
   ChevronRight,
   ExternalLink,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { NETWORK } from '@belrose/shared';
 import { useSubjectConsentRefs } from '../hooks/useSubjectConsentRefs';
 import { IntegrityStatusBadge } from './IntegrityStatusBadge';
 import { CopyableHash } from './ui/CopyableHash';
 import { VersionReviewBadge } from '@/features/ViewEditRecord/components/Edit/VersionReviewBadge';
 import type { RecordIntegrityItem } from '../services/recordSubjectIntegrityService';
+import type { IntegrityStatus, SubjectSyncStatus } from '../lib/types';
 import type {
-  IntegrityStatus,
-  VerificationIntegrityItem,
   DisputeIntegrityItem,
-  SubjectSyncStatus,
-} from '../lib/types';
+  VerificationIntegrityItem,
+} from '../services/credibilityIntegrityService';
 
 const BASESCAN_TX_URL = `${NETWORK.explorerUrl}/tx/`;
 
@@ -52,8 +52,6 @@ interface RecordsIntegrityTableProps {
   statusFilter: IntegrityStatus | 'all';
   verificationsMap: Record<string, VerificationIntegrityItem[] | undefined>;
   disputesMap: Record<string, DisputeIntegrityItem[] | undefined>;
-  onViewVerifications: (recordHash?: string) => void;
-  onViewMember: (uid: string) => void;
   onClearSearch: () => void;
 }
 
@@ -63,8 +61,6 @@ export const RecordsIntegrityTable: React.FC<RecordsIntegrityTableProps> = ({
   statusFilter,
   verificationsMap,
   disputesMap,
-  onViewVerifications,
-  onViewMember,
   onClearSearch,
 }) => {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
@@ -105,7 +101,7 @@ export const RecordsIntegrityTable: React.FC<RecordsIntegrityTableProps> = ({
           <tr>
             <th className="w-6 px-3 py-3" />
             <th className="px-4 py-3 text-center font-medium text-gray-600">Status</th>
-            <th className="px-4 py-3 text-center font-medium text-gray-600">Firestore ID</th>
+            <th className="px-4 py-3 text-center font-medium text-gray-600">Record ID</th>
             <th className="px-4 py-3 text-center font-medium text-gray-600">Record ID Hash</th>
             <th className="px-4 py-3 text-center font-medium text-gray-600">Record Hash</th>
             <th className="px-4 py-3 text-center font-medium text-gray-600">Subjects</th>
@@ -176,8 +172,6 @@ export const RecordsIntegrityTable: React.FC<RecordsIntegrityTableProps> = ({
                         item={item}
                         verifications={verificationsMap[item.firestoreId] ?? []}
                         disputes={disputesMap[item.firestoreId] ?? []}
-                        onViewVerifications={onViewVerifications}
-                        onViewMember={onViewMember}
                       />
                     </td>
                   </tr>
@@ -197,17 +191,10 @@ interface ExpandedRowProps {
   item: RecordIntegrityItem;
   verifications: VerificationIntegrityItem[];
   disputes: DisputeIntegrityItem[];
-  onViewVerifications: (recordHash?: string) => void;
-  onViewMember: (uid: string) => void;
 }
 
-const ExpandedRow: React.FC<ExpandedRowProps> = ({
-  item,
-  verifications,
-  disputes,
-  onViewVerifications,
-  onViewMember,
-}) => {
+const ExpandedRow: React.FC<ExpandedRowProps> = ({ item, verifications, disputes }) => {
+  const navigate = useNavigate();
   const { data: consentRefs } = useSubjectConsentRefs(item.firestoreId);
   // Group verifications and disputes by their recordHash so each hash row
   // gets its own accurate V&D counts (same pattern as VersionHistory.tsx)
@@ -230,7 +217,7 @@ const ExpandedRow: React.FC<ExpandedRowProps> = ({
       {/* ── Identifiers ── */}
       <div className="flex flex-wrap gap-x-8 gap-y-1 text-xs font-mono text-gray-500">
         <span>
-          <span className="text-gray-400 mr-2">Firestore ID</span>
+          <span className="text-gray-400 mr-2">Record ID</span>
           <CopyableHash value={item.firestoreId} full />
         </span>
         <span>
@@ -258,16 +245,14 @@ const ExpandedRow: React.FC<ExpandedRowProps> = ({
                       {s.uid ? (
                         <div className="flex items-center gap-1">
                           <span className="font-mono text-gray-700 truncate">{s.uid}</span>
-                          <button
-                            onClick={e => {
-                              e.stopPropagation();
-                              onViewMember(s.uid!);
-                            }}
+                          <a
+                            href={`?tab=members&search=${s.uid}`}
+                            onClick={e => e.stopPropagation()}
                             title="View in Members tab"
                             className="flex-shrink-0 text-gray-400 hover:text-blue-600 transition-colors"
                           >
                             <ArrowUpRight className="w-3 h-3" />
-                          </button>
+                          </a>
                         </div>
                       ) : (
                         <span className="italic text-left text-gray-400">uid unknown</span>
@@ -341,7 +326,7 @@ const ExpandedRow: React.FC<ExpandedRowProps> = ({
                                   active: hashDisps.filter(d => d.isActiveOnChain !== false).length,
                                 },
                               }}
-                              onClick={() => onViewVerifications(h.hash)}
+                              onClick={() => navigate(`?tab=credibility&search=${h.hash}`)}
                             />
                           );
                         })()}

@@ -1,82 +1,17 @@
 // src/features/BackendChainParity/lib/types.ts
 
-import type { Timestamp } from 'firebase/firestore';
 import type { onChainIdentityStatus, LinkedWalletRecord } from '@/types/core';
 
 export type { onChainIdentityStatus, LinkedWalletRecord };
 
 export type IntegrityStatus =
-  | 'synced'
-  | 'mismatch'
-  | 'missing'
-  | 'chain_only'
-  | 'pending'
-  | 'not_applicable'
-  | 'failed';
-
-export interface BlockchainRef {
-  txHash?: string;
-  chainId?: number;
-  blockNumber?: number;
-  contractAddress?: string;
-}
-
-// ============================================================================
-// RAW FIRESTORE SHAPES (what we read from Firestore)
-// ============================================================================
-
-export interface FirestoreRecord {
-  id: string;
-  recordHash?: string;
-  recordIdHash?: string;
-  previousRecordHash?: string[] | null;
-  blockchainRoleInitialization?: {
-    blockchainInitialized?: boolean;
-    blockchainRef?: BlockchainRef;
-  };
-  subjects?: string[]; // Firebase UIDs
-  owners?: string[];
-  fileName?: string;
-}
-
-
-export interface FirestoreVerification {
-  id: string;
-  recordHash?: string;
-  recordId?: string;
-  verifierId?: string;
-  verifierIdHash?: string;
-  chainStatus?: 'pending' | 'confirmed' | 'failed';
-  blockchainRef?: BlockchainRef;
-  level?: number;
-  createdAt?: Timestamp;
-}
-
-export interface FirestoreDispute {
-  id: string;
-  recordHash?: string;
-  recordId?: string;
-  disputerId?: string;
-  disputerIdHash?: string;
-  chainStatus?: 'pending' | 'confirmed' | 'failed';
-  blockchainRef?: BlockchainRef;
-  severity?: number;
-  createdAt?: Timestamp;
-}
-
-export interface FirestoreSyncQueueItem {
-  id: string;
-  contract?: string;
-  action?: string;
-  userId?: string;
-  userWalletAddress?: string;
-  error?: string;
-  retryCount?: number;
-  createdAt?: Timestamp;
-  lastAttemptAt?: Timestamp;
-  status?: string;
-  context?: Record<string, unknown>;
-}
+  | 'synced' // Everything matches on chain and on firebase
+  | 'mismatch' // Data is in both firebase or on chain, but things don't match (recordhash associated with ID, verification level, dispute culpability etc.)
+  | 'missing' // Data is in firebase but not on chain
+  | 'chain_only' // Data is on chain but not in firebase
+  | 'pending' // Data is not on chain but isn't supposed to be yet (e.g. guest access)
+  | 'not_applicable' // Data is not on chain and isn't supposed to be at all (record without any chain activity)
+  | 'failed'; // couldn't check
 
 // ============================================================================
 // INTEGRITY RESULT TYPES (Firestore data + chain check outcome)
@@ -103,61 +38,6 @@ export interface HashComparison {
   isCurrentHash: boolean; // true if this is record.recordHash (vs a previousRecordHash)
   isActiveOnChain: boolean;
   syncStatus: HashSyncStatus;
-}
-
-export interface MemberIntegrityItem {
-  uid: string;
-  displayName: string;
-  email: string;
-  userIdHash?: string;
-  firestoreStatus?: string;
-  firestoreWalletAddress?: string;
-  firestoreSmartAccountAddress?: string;
-  linkedWallets?: LinkedWalletRecord[];
-  onChainStatusHistory?: onChainIdentityStatus[];
-  integrityStatus: IntegrityStatus;
-  onChainStatus?: number;
-  onChainWallets?: string[];
-  walletMismatch?: boolean;
-  statusMismatch?: boolean;
-  error?: string;
-  isGuest?: boolean;
-  isDependent?: boolean;
-  isPlatformAdmin?: boolean;
-  identityVerified?: boolean;
-  healthcareProviderVerified?: boolean;
-}
-
-export interface VerificationIntegrityItem {
-  firestoreId: string;
-  recordHash?: string;
-  recordId?: string;
-  verifierIdHash?: string;
-  verifierId?: string;
-  chainStatus?: string;
-  blockchainRef?: BlockchainRef;
-  level?: number;
-  createdAt?: Timestamp;
-  integrityStatus: IntegrityStatus;
-  existsOnChain?: boolean;
-  isActiveOnChain?: boolean;
-  error?: string;
-}
-
-export interface DisputeIntegrityItem {
-  firestoreId: string;
-  recordHash?: string;
-  recordId?: string;
-  disputerIdHash?: string;
-  disputerId?: string;
-  chainStatus?: string;
-  blockchainRef?: BlockchainRef;
-  severity?: number;
-  createdAt?: Timestamp;
-  integrityStatus: IntegrityStatus;
-  existsOnChain?: boolean;
-  isActiveOnChain?: boolean;
-  error?: string;
 }
 
 // ============================================================================

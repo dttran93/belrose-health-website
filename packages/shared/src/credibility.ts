@@ -12,6 +12,7 @@ export interface EncryptedField {
 
 export interface VerificationDoc {
   id: string;
+  recordIdHash: string;
   recordHash: string;
   recordId: string;
   verifierId: string;
@@ -30,6 +31,7 @@ export interface DisputeDoc {
   id: string;
   recordHash: string;
   recordId: string;
+  recordIdHash: string;
   disputerId: string;
   disputerIdHash: string;
   severity: DisputeSeverityOptions;

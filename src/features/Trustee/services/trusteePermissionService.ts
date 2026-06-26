@@ -257,6 +257,15 @@ export class TrusteePermissionService {
    *
    * Note: TrusteeRelationshipService handles flipping the relationship doc to active.
    */
+  /**
+   * Activate all pending wrappedKeys when the trustee accepts the invite.
+   * Called by TrusteeRelationshipService.acceptInvite — runs on the TRUSTEE's client.
+   *
+   * The trustee already has read access to records (they're in role arrays),
+   * and they own their own wrappedKeys so they can update them.
+   *
+   * Note: TrusteeRelationshipService handles flipping the relationship doc to active.
+   */
   static async activateTrusteeAccess(trustorId: string): Promise<void> {
     const auth = getAuth();
     const trusteeId = auth.currentUser?.uid;

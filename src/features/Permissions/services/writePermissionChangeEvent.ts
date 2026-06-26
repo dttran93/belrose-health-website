@@ -3,6 +3,7 @@
 import { encryptNotificationTitle } from '@/features/Notifications/services/encryptNotificationTitle';
 import { removeUndefinedValues } from '@/utils/dataFormattingUtils';
 import { BlockchainRef, PermissionChange } from '@belrose/shared';
+import { id } from 'ethers';
 import { addDoc, collection, getFirestore, serverTimestamp } from 'firebase/firestore';
 
 async function writePermissionChangeEvent(
@@ -17,17 +18,20 @@ async function writePermissionChangeEvent(
   try {
     const db = getFirestore();
 
-    // Encrypt the title client-side if available
     const titleData = recordTitle ? await encryptNotificationTitle(recordTitle, recordId) : null;
+    const affectedUserIds = changes.map(c => c.userId);
 
     await addDoc(
-      collection(db, 'permissionChangeEvents'),
+      collection(db, 'records', recordId, 'permissionHistory'),
       removeUndefinedValues({
         recordId,
+        recordIdHash: id(recordId),
         changedBy,
+        changedByIdHash: id(changedBy),
         changedAt: serverTimestamp(),
         changes,
         blockchainRef,
+        affectedUserIds,
         ...(titleData ?? {}),
         context,
         batchId,
