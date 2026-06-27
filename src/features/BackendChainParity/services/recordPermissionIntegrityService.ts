@@ -88,12 +88,9 @@ export async function checkRecordPermissionsIntegrity(
   try {
     const contract = getMemberContract();
 
-    // Fetch chain role arrays + recent permissionHistory in parallel
-    const [rawOwners, rawAdmins, rawSharers, rawViewers, historySnap] = await Promise.all([
-      contract.getRecordOwners(recordIdHash),
-      contract.getRecordAdmins(recordIdHash),
-      contract.getRecordSharers(recordIdHash),
-      contract.getRecordViewers(recordIdHash),
+    // Fetch all role arrays + recent permissionHistory in parallel
+    const [participants, historySnap] = await Promise.all([
+      contract.getAllRecordParticipants(recordIdHash),
       getDocs(
         query(
           collection(db, 'records', recordId, 'permissionHistory'),
@@ -105,10 +102,10 @@ export async function checkRecordPermissionsIntegrity(
 
     // Build on-chain role map: hash (lowercased) -> role
     const onChainRoleMap = new Map<string, string>();
-    for (const h of rawOwners) onChainRoleMap.set((h as string).toLowerCase(), 'owner');
-    for (const h of rawAdmins) onChainRoleMap.set((h as string).toLowerCase(), 'administrator');
-    for (const h of rawSharers) onChainRoleMap.set((h as string).toLowerCase(), 'sharer');
-    for (const h of rawViewers) onChainRoleMap.set((h as string).toLowerCase(), 'viewer');
+    for (const h of participants.owners) onChainRoleMap.set((h as string).toLowerCase(), 'owner');
+    for (const h of participants.admins) onChainRoleMap.set((h as string).toLowerCase(), 'administrator');
+    for (const h of participants.sharers) onChainRoleMap.set((h as string).toLowerCase(), 'sharer');
+    for (const h of participants.viewers) onChainRoleMap.set((h as string).toLowerCase(), 'viewer');
 
     const onChainMemberCount = onChainRoleMap.size;
 

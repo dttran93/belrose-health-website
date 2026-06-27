@@ -958,6 +958,29 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   }
 
   /**
+   * @notice Get all role arrays for a record in one call
+   */
+  function getAllRecordParticipants(
+    bytes32 recordIdHash
+  )
+    external
+    view
+    returns (
+      bytes32[] memory owners,
+      bytes32[] memory admins,
+      bytes32[] memory sharers,
+      bytes32[] memory viewers
+    )
+  {
+    return (
+      ownersByRecord[recordIdHash],
+      adminsByRecord[recordIdHash],
+      sharersByRecord[recordIdHash],
+      viewersByRecord[recordIdHash]
+    );
+  }
+
+  /**
    * @notice Get all records where a user has any role
    */
   function getRecordsByUser(bytes32 userIdHash) external view returns (bytes32[] memory) {
