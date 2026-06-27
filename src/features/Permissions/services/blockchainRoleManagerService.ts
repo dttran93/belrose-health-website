@@ -91,7 +91,7 @@ export interface TransactionResult {
 
 export type TrusteeLevel = 0 | 1 | 2; //Observer = 0, Custodian = 1, Controller = 2
 export type TrusteeLevelName = 'Observer' | 'Custodian' | 'Controller';
-export type TrusteeStatusName = 'None' | 'Pending' | 'Active' | 'Revoked';
+export type TrusteeStatusName = 'None' | 'Pending' | 'Active' | 'Revoked' | 'Declined';
 
 export interface TrusteeRelationship {
   status: TrusteeStatusName;
@@ -656,23 +656,6 @@ export class BlockchainRoleManagerService {
     return result;
   }
 
-  static async grantRoleAsTrusteeBatch(
-    recordIds: string[],
-    trustorIdHash: string
-  ): Promise<TransactionResult> {
-    const recordIdHashes = recordIds.map(recordId => id(recordId));
-    console.log('🔗 Granting trustee batch roles on blockchain...', {
-      recordIdHashes,
-      trustorIdHash,
-    });
-    const result = await this.executeWrite('grantRoleAsTrusteeBatch', [
-      recordIdHashes,
-      trustorIdHash,
-    ]);
-    console.log('✅ Trustee batch roles granted:', result.txHash);
-    return result;
-  }
-
   // ==========================================================================
   // TRUSTEE RELATIONSHIPS - WRITE FUNCTIONS
   // ==========================================================================
@@ -683,11 +666,24 @@ export class BlockchainRoleManagerService {
    * @param trusteeIdHash Identity hash of the proposed trustee
    * @param level 0=Observer, 1=Custodian, 2=Controller
    */
-  static async proposeTrustee(trusteeId: string, level: TrusteeLevel): Promise<TransactionResult> {
-    console.log('🔗 Proposing trustee on blockchain...', { trusteeId, level });
+  static async proposeTrustee(
+    trusteeId: string,
+    level: TrusteeLevel,
+    recordIds: string[]
+  ): Promise<TransactionResult> {
     const trusteeIdHash = ethers.id(trusteeId);
-    const result = await this.executeWrite('proposeTrustee', [trusteeIdHash, level]);
+    const recordIdHashes = recordIds.map(rid => id(rid));
+    console.log('🔗 Proposing trustee on blockchain...', { trusteeId, level, recordCount: recordIds.length });
+    const result = await this.executeWrite('proposeTrustee', [trusteeIdHash, level, recordIdHashes]);
     console.log('✅ Trustee proposed:', result.txHash);
+    return result;
+  }
+
+  static async declineTrustee(trustorId: string): Promise<TransactionResult> {
+    const trustorIdHash = ethers.id(trustorId);
+    console.log('🔗 Declining trustee proposal on blockchain...', { trustorId });
+    const result = await this.executeWrite('declineTrustee', [trustorIdHash]);
+    console.log('✅ Trustee proposal declined:', result.txHash);
     return result;
   }
 
@@ -768,6 +764,7 @@ export class BlockchainRoleManagerService {
         1: 'Pending',
         2: 'Active',
         3: 'Revoked',
+        4: 'Declined',
       };
       const levelMap: Record<number, TrusteeLevelName> = {
         0: 'Observer',

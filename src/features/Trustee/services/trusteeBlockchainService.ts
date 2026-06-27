@@ -1,6 +1,6 @@
 // src/features/Trustee/services/trusteeBlockchainService.ts
 
-import { ethers, id } from 'ethers';
+import { id } from 'ethers';
 import {
   BlockchainRoleManagerService,
   TrusteeLevel,
@@ -21,8 +21,7 @@ type TrusteeAction =
   | 'proposeTrustee'
   | 'acceptTrustee'
   | 'revokeTrustee'
-  | 'grantRoleAsTrusteeBatch'
-  | 'changeRoleAsTrusteeBatch'
+  | 'declineTrustee'
   | 'updateTrusteeLevel'
   | 'downgradeTrusteeLevel';
 
@@ -52,27 +51,28 @@ export class TrusteeBlockchainService {
   // ==========================================================================
 
   /**
-   * Trustor proposes a trustee relationship on-chain (Step 1)
+   * Trustor proposes a trustee relationship on-chain and grants record roles in one tx (Step 1)
    * msg.sender = trustor's wallet via PaymasterService
    */
   static async proposeTrustee(
     trustorId: string,
     trusteeId: string,
-    level: TrusteeLevel
+    level: TrusteeLevel,
+    recordIds: string[]
   ): Promise<TrusteeResult> {
     const walletAddress = await this.requireUserWalletAddress(trustorId);
 
     try {
-      console.log('⛓️ Proposing trustee on blockchain...', { trustorId, trusteeId, level });
+      console.log('⛓️ Proposing trustee on blockchain...', { trustorId, trusteeId, level, recordCount: recordIds.length });
 
-      const result = await BlockchainRoleManagerService.proposeTrustee(trusteeId, level);
+      const result = await BlockchainRoleManagerService.proposeTrustee(trusteeId, level, recordIds);
       const blockchainRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
       console.log('✅ Trustee proposed on blockchain');
       return { success: true, blockchainRef };
     } catch (error) {
       await this.logTrusteeFailure({
         action: 'proposeTrustee',
-        trustorId, //blockchain ID hashes calculated in function. Fewer arguments needed
+        trustorId,
         trusteeId,
         callerId: trustorId,
         walletAddress,
@@ -109,6 +109,32 @@ export class TrusteeBlockchainService {
   }
 
   /**
+   * Trustee declines a pending proposal on-chain
+   * msg.sender = trustee's wallet
+   */
+  static async declineTrustee(trustorId: string, trusteeId: string): Promise<TrusteeResult> {
+    const walletAddress = await this.requireUserWalletAddress(trusteeId);
+
+    try {
+      console.log('⛓️ Declining trustee proposal on blockchain...', { trustorId, trusteeId });
+      const result = await BlockchainRoleManagerService.declineTrustee(trustorId);
+      const blockchainRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
+      console.log('✅ Trustee proposal declined on blockchain');
+      return { success: true, blockchainRef };
+    } catch (error) {
+      await this.logTrusteeFailure({
+        action: 'declineTrustee',
+        trustorId,
+        trusteeId,
+        callerId: trusteeId,
+        walletAddress,
+        error,
+      });
+      return { success: false, blockchainRef: null };
+    }
+  }
+
+  /**
    * Revoke a trustee relationship on-chain
    * Callable by either party — callerId determines whose wallet signs
    */
@@ -133,39 +159,6 @@ export class TrusteeBlockchainService {
         callerId,
         walletAddress,
         error,
-      });
-      return { success: false, blockchainRef: null };
-    }
-  }
-
-  /**
-   * Trustee grants themselves access to the trustor's records in one transaction.
-   * Called after acceptTrustee — trustee fans out access to all trustor's records.
-   * The contract resolves the correct role per record based on trust level.
-   */
-  static async grantRoleAsTrusteeBatch(
-    trustorId: string,
-    trusteeId: string,
-    recordIds: string[]
-  ): Promise<TrusteeResult> {
-    const walletAddress = await this.requireUserWalletAddress(trusteeId);
-
-    try {
-      const result = await BlockchainRoleManagerService.grantRoleAsTrusteeBatch(
-        recordIds,
-        ethers.id(trustorId)
-      );
-      const blockchainRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
-      return { success: true, blockchainRef };
-    } catch (error) {
-      await this.logTrusteeFailure({
-        action: 'grantRoleAsTrusteeBatch',
-        trustorId,
-        trusteeId,
-        callerId: trusteeId,
-        walletAddress,
-        error,
-        recordIds,
       });
       return { success: false, blockchainRef: null };
     }
@@ -242,40 +235,28 @@ export class TrusteeBlockchainService {
     callerId: string;
     walletAddress: string;
     error: unknown;
-    recordIds?: string[];
   }) {
-    const { action, trustorId, trusteeId, callerId, walletAddress, error, recordIds } = params;
+    const { action, trustorId, trusteeId, callerId, walletAddress, error } = params;
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     console.error(`⚠️ Blockchain ${action} failed:`, error);
 
-    const contextTypeMap = {
+    const typeMap = {
       proposeTrustee: 'trustee-propose',
       acceptTrustee: 'trustee-accept',
       revokeTrustee: 'trustee-revoke',
+      declineTrustee: 'trustee-decline',
       downgradeTrusteeLevel: 'trustee-level-update',
-      grantRoleAsTrusteeBatch: 'trustee-grant',
-      changeRoleAsTrusteeBatch: 'trustee-grant',
       updateTrusteeLevel: 'trustee-level-update',
     } as const;
 
-    const context: SyncContext =
-      action === 'grantRoleAsTrusteeBatch' || action === 'changeRoleAsTrusteeBatch'
-        ? {
-            type: 'trustee-grant',
-            trustorId,
-            trustorIdHash: id(trustorId),
-            trusteeId,
-            trusteeIdHash: id(trusteeId),
-            recordIds: recordIds ?? [],
-          }
-        : {
-            type: contextTypeMap[action],
-            trustorId,
-            trustorIdHash: id(trustorId),
-            trusteeId,
-            trusteeIdHash: id(trusteeId),
-          };
+    const context = {
+      type: typeMap[action],
+      trustorId,
+      trustorIdHash: id(trustorId),
+      trusteeId,
+      trusteeIdHash: id(trusteeId),
+    } as SyncContext;
 
     await BlockchainSyncQueueService.logFailure({
       contract: 'MemberRoleManager',

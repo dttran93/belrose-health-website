@@ -1027,7 +1027,8 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     None, // 0 - Default/non-existent
     Pending, // 1 - Trustor proposed, awaiting trustee acceptance
     Active, // 2 - Trustee accepted, relationship is live
-    Revoked // 3 - Either party ended the relationship
+    Revoked, // 3 - Either party ended an active relationship
+    Declined // 4 - Trustee declined the pending proposal
   }
 
   // =================== TRUSTEE - STORAGE ===================
@@ -1040,7 +1041,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   // trustorIdHash => trusteeIdHash => TrusteeRelationship
   mapping(bytes32 => mapping(bytes32 => TrusteeRelationship)) public trusteeRelationships;
 
-  // trustorIdHash => trusteeIdHash => recordIdHash[] (records granted via grantRoleAsTrusteeBatch)
+  // trustorIdHash => trusteeIdHash => recordIdHash[] (records granted via proposeTrustee)
   mapping(bytes32 => mapping(bytes32 => bytes32[])) private _trusteeGrantedRecords;
 
   // Dedup set for _trusteeGrantedRecords — O(1) contains check
@@ -1073,15 +1074,27 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     TrusteeLevel newLevel,
     uint256 timestamp
   );
+  event TrusteeDeclined(
+    bytes32 indexed trustorIdHash,
+    bytes32 indexed trusteeIdHash,
+    uint256 timestamp
+  );
 
   // =================== TRUSTEE - FUNCTIONS ===================
 
   /**
-   * @notice Trustor proposes a trustee relationship (Step 1)
+   * @notice Trustor proposes a trustee relationship and grants roles on their records (Step 1)
    * @param trusteeIdHash The identity hash of the proposed trustee
    * @param level The trust level (0=Observer, 1=Custodian, 2=Controller)
+   * @param recordIdHashes Records to grant the trustee access to immediately.
+   *   Skips any record where the trustor has no active role — should not happen
+   *   in practice since callers only pass records where they are a subject.
    */
-  function proposeTrustee(bytes32 trusteeIdHash, TrusteeLevel level) external onlyActiveMember {
+  function proposeTrustee(
+    bytes32 trusteeIdHash,
+    TrusteeLevel level,
+    bytes32[] memory recordIdHashes
+  ) external onlyActiveMember {
     bytes32 trustorIdHash = _getCallerIdHash();
     require(trusteeIdHash != bytes32(0), "Invalid trustee");
     require(trustorIdHash != trusteeIdHash, "Cannot appoint yourself");
@@ -1089,8 +1102,10 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
 
     TrusteeStatus currentStatus = trusteeRelationships[trustorIdHash][trusteeIdHash].status;
     require(
-      currentStatus == TrusteeStatus.None || currentStatus == TrusteeStatus.Revoked,
-      "Proposal already exists"
+      currentStatus == TrusteeStatus.None ||
+        currentStatus == TrusteeStatus.Revoked ||
+        currentStatus == TrusteeStatus.Declined,
+      "Proposal already exists or is pending"
     );
 
     trusteeRelationships[trustorIdHash][trusteeIdHash] = TrusteeRelationship({
@@ -1099,6 +1114,56 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     });
 
     emit TrusteeProposed(trustorIdHash, trusteeIdHash, level, block.timestamp);
+
+    for (uint256 i = 0; i < recordIdHashes.length; i++) {
+      bytes32 recordIdHash = recordIdHashes[i];
+      string memory role = _resolveTrusteeRole(recordIdHash, trustorIdHash, level);
+
+      if (!_isValidRole(role)) continue;
+      if (!_hasActiveRole(recordIdHash, trustorIdHash)) continue;
+      if (_hasActiveRole(recordIdHash, trusteeIdHash)) continue;
+
+      _grantRoleInternal(recordIdHash, trusteeIdHash, role, trustorIdHash);
+
+      if (!_trusteeGrantedRecordSet[trustorIdHash][trusteeIdHash][recordIdHash]) {
+        _trusteeGrantedRecords[trustorIdHash][trusteeIdHash].push(recordIdHash);
+        _trusteeGrantedRecordSet[trustorIdHash][trusteeIdHash][recordIdHash] = true;
+      }
+    }
+  }
+
+  /**
+   * @notice Trustee declines a pending proposal (Step 2 — rejection path)
+   * @dev Revokes all roles granted at proposal time and marks the relationship Declined.
+   *   Re-proposing is allowed after Declined (same as after Revoked).
+   * @param trustorIdHash The identity hash of the trustor who proposed
+   */
+  function declineTrustee(bytes32 trustorIdHash) external onlyActiveMember {
+    bytes32 trusteeIdHash = _getCallerIdHash();
+    TrusteeRelationship storage r = trusteeRelationships[trustorIdHash][trusteeIdHash];
+    require(r.status == TrusteeStatus.Pending, "No pending proposal to decline");
+
+    r.status = TrusteeStatus.Declined;
+
+    emit TrusteeDeclined(trustorIdHash, trusteeIdHash, block.timestamp);
+
+    bytes32[] storage grantedRecords = _trusteeGrantedRecords[trustorIdHash][trusteeIdHash];
+    for (uint256 i = 0; i < grantedRecords.length; i++) {
+      bytes32 recordIdHash = grantedRecords[i];
+      delete _trusteeGrantedRecordSet[trustorIdHash][trusteeIdHash][recordIdHash];
+
+      if (!_hasActiveRole(recordIdHash, trusteeIdHash)) continue;
+
+      bytes32 roleKey = _getRoleKey(recordIdHash, trusteeIdHash);
+      string memory role = recordRoles[roleKey].role;
+
+      _removeFromRoleArray(recordIdHash, trusteeIdHash, role);
+      recordRoles[roleKey].isActive = false;
+      delete roleGrantedBy[roleKey];
+
+      emit RoleRevoked(recordIdHash, trusteeIdHash, role, trusteeIdHash, block.timestamp);
+    }
+    delete _trusteeGrantedRecords[trustorIdHash][trusteeIdHash];
   }
 
   /**
@@ -1138,7 +1203,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
 
     emit TrusteeRevoked(trustorIdHash, trusteeIdHash, callerIdHash, block.timestamp);
 
-    // Revoke all roles the trustee acquired through grantRoleAsTrusteeBatch, including owner.
+    // Revoke all roles the trustee acquired through proposeTrustee, including owner.
     // Normal revokeRole blocks owner removal, but trustee-derived roles are conditional on the
     // relationship — if that relationship ends, so do the roles regardless of level.
     bytes32[] storage grantedRecords = _trusteeGrantedRecords[trustorIdHash][trusteeIdHash];
@@ -1363,36 +1428,6 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   }
 
   /**
-   * @notice Trustee grants themselves access to multiple records in one transaction
-   * @param recordIdHashes Array of record ID Hashes
-   * @param trustorIdHash The identity hash of the trustor
-   */
-  function grantRoleAsTrusteeBatch(
-    bytes32[] memory recordIdHashes,
-    bytes32 trustorIdHash
-  ) external onlyActiveMember {
-    bytes32 trusteeIdHash = _getCallerIdHash();
-    TrusteeRelationship memory r = trusteeRelationships[trustorIdHash][trusteeIdHash];
-    require(r.status == TrusteeStatus.Active, "No active trustee relationship");
-
-    for (uint256 i = 0; i < recordIdHashes.length; i++) {
-      bytes32 recordIdHash = recordIdHashes[i];
-      string memory role = _resolveTrusteeRole(recordIdHash, trustorIdHash, r.level);
-
-      if (!_isValidRole(role)) continue;
-      if (!_hasActiveRole(recordIdHash, trustorIdHash)) continue;
-      if (_hasActiveRole(recordIdHash, trusteeIdHash)) continue;
-
-      _grantRoleInternal(recordIdHash, trusteeIdHash, role, trustorIdHash);
-
-      if (!_trusteeGrantedRecordSet[trustorIdHash][trusteeIdHash][recordIdHash]) {
-        _trusteeGrantedRecords[trustorIdHash][trusteeIdHash].push(recordIdHash);
-        _trusteeGrantedRecordSet[trustorIdHash][trusteeIdHash][recordIdHash] = true;
-      }
-    }
-  }
-
-  /**
    * @notice Batch change a target's role across multiple records
    * @param recordIdHashes Array of record IDs
    * @param targetWallet The identity whose role is being changed
@@ -1527,7 +1562,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   }
 
   /**
-   * @notice Get all records the trustee was granted access to via grantRoleAsTrusteeBatch
+   * @notice Get all records the trustee was granted access to via proposeTrustee
    * @dev Debug/inspection helper — used to verify trustee role tracking
    */
   function getTrusteeGrantedRecords(

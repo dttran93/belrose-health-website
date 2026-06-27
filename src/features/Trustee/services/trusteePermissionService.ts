@@ -47,6 +47,7 @@ import {
 import { TrusteeBlockchainService } from './trusteeBlockchainService';
 import { TrustLevel } from './trusteeRelationshipService';
 import { Role } from '@/features/Permissions/services/permissionsService';
+import { BlockchainRoleManagerService } from '@/features/Permissions/services/blockchainRoleManagerService';
 import { SharingService } from '@/features/Sharing/services/sharingService';
 import { getAuth } from 'firebase/auth';
 
@@ -69,7 +70,7 @@ export class TrusteePermissionService {
    * Optionally pass trusteeId to also return the trustee's current role on each record.
    * Used by grantPendingTrusteeAccess to skip/upgrade appropriately.
    */
-  private static async getRecordsForTrustor(
+  static async getRecordsForTrustor(
     trustorId: string,
     trusteeId?: string
   ): Promise<
@@ -292,17 +293,6 @@ export class TrusteePermissionService {
       return;
     }
 
-    // Blockchain: trustee self-grants roles across all pending records.
-    // Runs on the trustee's client so msg.sender = trustee, which is what the contract requires.
-    const recordIds = snapshot.docs.map(d => d.data().recordId as string);
-    const { success } = await TrusteeBlockchainService.grantRoleAsTrusteeBatch(
-      trustorId,
-      trusteeId,
-      recordIds
-    );
-    if (!success) throw new Error('Blockchain role grant failed during trustee activation');
-    console.log(`✅ Blockchain roles granted across ${recordIds.length} records`);
-
     // Batch activate all pending wrappedKeys
     const batch = writeBatch(db);
     snapshot.docs.forEach(d => {
@@ -475,13 +465,14 @@ export class TrusteePermissionService {
       }
 
       try {
-        // Blockchain grant for this single record
-        const { success } = await TrusteeBlockchainService.grantRoleAsTrusteeBatch(
-          subjectId,
-          trusteeId,
-          [recordId]
-        );
-        if (!success) {
+        // Trustor grants role from their own wallet (msg.sender = trustor, which holds the role)
+        const trusteeWallet = await TrusteeBlockchainService.getUserWalletAddress(trusteeId);
+        if (!trusteeWallet) {
+          console.error(`⚠️ No wallet found for trustee ${trusteeId} — skipping`);
+          continue;
+        }
+        const result = await BlockchainRoleManagerService.grantRole(recordId, trusteeWallet, role);
+        if (!result.txHash) {
           console.error(
             `⚠️ Blockchain grant failed for trustee ${trusteeId} on record ${recordId}`
           );

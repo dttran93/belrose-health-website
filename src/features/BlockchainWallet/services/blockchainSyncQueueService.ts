@@ -90,12 +90,11 @@ export type SyncContext =
       trusteeIdHash: string;
     }
   | {
-      type: 'trustee-grant';
+      type: 'trustee-decline';
       trustorId: string;
       trustorIdHash: string;
       trusteeId: string;
       trusteeIdHash: string;
-      recordIds: string[];
     }
   | {
       type: 'trustee-level-update';
