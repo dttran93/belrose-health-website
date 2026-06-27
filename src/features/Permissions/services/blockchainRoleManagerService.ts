@@ -279,20 +279,6 @@ export class BlockchainRoleManagerService {
   }
 
   /**
-   * Get all registered user identity hashes
-   */
-  static async getAllUsers(): Promise<string[]> {
-    try {
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getAllUsers');
-      return await fn();
-    } catch (error) {
-      console.error('Error getting all users:', error);
-      return [];
-    }
-  }
-
-  /**
    * Get total number of registered identities
    */
   static async getTotalUsers(): Promise<number> {

@@ -164,8 +164,6 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   // Identity (userIdHash) => list of wallet addresses
   mapping(bytes32 => address[]) public userWallets;
 
-  // For enumeration
-  bytes32[] public userList;
   uint256 public totalUsers;
 
   // =================== MEMBER REGISTRY - FUNCTIONS ===================
@@ -190,7 +188,6 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     // If new user, initialize active status
     if (userStatus[userIdHash] == MemberStatus.NotRegistered) {
       userStatus[userIdHash] = MemberStatus.Active;
-      userList.push(userIdHash);
       totalUsers++;
 
       emit MemberRegistered(wallet, userIdHash, block.timestamp);
@@ -225,7 +222,6 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
       if (i == 0 && isNewUser) {
         // First wallet of a new user — initialize identity
         userStatus[userIdHash] = MemberStatus.Active;
-        userList.push(userIdHash);
         totalUsers++;
         emit MemberRegistered(wallet, userIdHash, block.timestamp);
       } else {
@@ -339,13 +335,6 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
    */
   function getUserStatus(bytes32 userIdHash) external view returns (MemberStatus status) {
     return userStatus[userIdHash];
-  }
-
-  /**
-   * @notice Get all Users
-   */
-  function getAllUsers() external view returns (bytes32[] memory) {
-    return userList;
   }
 
   /**

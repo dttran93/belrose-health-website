@@ -39,7 +39,6 @@ export interface MemberRoleManagerInterface extends Interface {
       | "declineTrustee"
       | "downgradeTrusteeLevel"
       | "getAllRecordParticipants"
-      | "getAllUsers"
       | "getHealthRecordCore"
       | "getRecordAdmins"
       | "getRecordOwners"
@@ -89,7 +88,6 @@ export interface MemberRoleManagerInterface extends Interface {
       | "trusteeRelationships"
       | "updateTrusteeLevel"
       | "upgradeToAndCall"
-      | "userList"
       | "userStatus"
       | "userWallets"
       | "viewersByRecord"
@@ -165,10 +163,6 @@ export interface MemberRoleManagerInterface extends Interface {
   encodeFunctionData(
     functionFragment: "getAllRecordParticipants",
     values: [BytesLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getAllUsers",
-    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "getHealthRecordCore",
@@ -367,10 +361,6 @@ export interface MemberRoleManagerInterface extends Interface {
     values: [AddressLike, BytesLike]
   ): string;
   encodeFunctionData(
-    functionFragment: "userList",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
     functionFragment: "userStatus",
     values: [BytesLike]
   ): string;
@@ -432,10 +422,6 @@ export interface MemberRoleManagerInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "getAllRecordParticipants",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getAllUsers",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -616,7 +602,6 @@ export interface MemberRoleManagerInterface extends Interface {
     functionFragment: "upgradeToAndCall",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "userList", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "userStatus", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "userWallets",
@@ -1122,8 +1107,6 @@ export interface MemberRoleManager extends BaseContract {
     "view"
   >;
 
-  getAllUsers: TypedContractMethod<[], [string[]], "view">;
-
   getHealthRecordCore: TypedContractMethod<[], [string], "view">;
 
   getRecordAdmins: TypedContractMethod<
@@ -1385,8 +1368,6 @@ export interface MemberRoleManager extends BaseContract {
     "payable"
   >;
 
-  userList: TypedContractMethod<[arg0: BigNumberish], [string], "view">;
-
   userStatus: TypedContractMethod<[arg0: BytesLike], [bigint], "view">;
 
   userWallets: TypedContractMethod<
@@ -1499,9 +1480,6 @@ export interface MemberRoleManager extends BaseContract {
     ],
     "view"
   >;
-  getFunction(
-    nameOrSignature: "getAllUsers"
-  ): TypedContractMethod<[], [string[]], "view">;
   getFunction(
     nameOrSignature: "getHealthRecordCore"
   ): TypedContractMethod<[], [string], "view">;
@@ -1768,9 +1746,6 @@ export interface MemberRoleManager extends BaseContract {
     [void],
     "payable"
   >;
-  getFunction(
-    nameOrSignature: "userList"
-  ): TypedContractMethod<[arg0: BigNumberish], [string], "view">;
   getFunction(
     nameOrSignature: "userStatus"
   ): TypedContractMethod<[arg0: BytesLike], [bigint], "view">;
