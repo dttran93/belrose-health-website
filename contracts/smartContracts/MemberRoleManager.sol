@@ -617,7 +617,6 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     bool userIsOwner = _hasRole(recordIdHash, userIdHash, "owner");
     bool userIsAdmin = _hasRole(recordIdHash, userIdHash, "administrator");
     bool userIsSharer = _hasRole(recordIdHash, userIdHash, "sharer");
-    bool userIsSubject = _isActiveSubject(recordIdHash, userIdHash);
 
     if (roleHash == keccak256(bytes("owner"))) {
       if (ownerExists) {
@@ -631,29 +630,12 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
         "Only owners and administrators can grant administrator role"
       );
     } else if (roleHash == keccak256(bytes("sharer"))) {
-      require(
-        userIsOwner || userIsAdmin || userIsSharer || userIsSubject,
-        "Only owners, administrators, sharers, or subjects can grant sharer role"
-      );
-      if ((userIsSharer || userIsSubject) && !userIsOwner && !userIsAdmin) {
-        string memory userRole = _getUserRole(recordIdHash, userIdHash);
-        require(
-          bytes(userRole).length > 0,
-          "Must have an active role to grant sharer permissions"
-        );
-      }
+      require(userIsOwner || userIsAdmin, "Only owners and administrators can grant sharer role");
     } else if (roleHash == keccak256(bytes("viewer"))) {
       require(
-        userIsOwner || userIsAdmin || userIsSharer || userIsSubject,
-        "Only owners, administrators, sharers, or subjects can grant viewer role"
+        userIsOwner || userIsAdmin || userIsSharer,
+        "Only owners, administrators, and sharers can grant viewer role"
       );
-      if ((userIsSharer || userIsSubject) && !userIsOwner && !userIsAdmin) {
-        string memory userRole = _getUserRole(recordIdHash, userIdHash);
-        require(
-          bytes(userRole).length > 0,
-          "Must have an active role to grant viewer permissions"
-        );
-      }
     }
 
     require(
@@ -721,7 +703,10 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
           "Only owners can change others to sharer. Admins and sharers can only demote themselves."
         );
       } else {
-        require(userIsAdmin || (userIsSharer && userIsTarget), "Only administrators can demote to sharer");
+        require(
+          userIsAdmin || (userIsSharer && userIsTarget),
+          "Only administrators can demote to sharer"
+        );
       }
     } else if (newRoleHash == keccak256(bytes("viewer"))) {
       if (ownerExists) {
@@ -981,7 +966,11 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
    */
   function getRecordRoleStats(
     bytes32 recordIdHash
-  ) external view returns (uint256 ownerCount, uint256 adminCount, uint256 sharerCount, uint256 viewerCount) {
+  )
+    external
+    view
+    returns (uint256 ownerCount, uint256 adminCount, uint256 sharerCount, uint256 viewerCount)
+  {
     return (
       ownersByRecord[recordIdHash].length,
       adminsByRecord[recordIdHash].length,
@@ -1351,15 +1340,25 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     }
 
     string memory trustorRole = _getUserRole(recordIdHash, trustorIdHash);
+    bytes32 trustorRoleHash = keccak256(bytes(trustorRole));
 
-    if (level == TrusteeLevel.Custodian) {
-      if (keccak256(bytes(trustorRole)) == keccak256(bytes("owner"))) {
-        return "administrator";
-      }
-      return trustorRole;
+    // Sharers and viewers can only delegate viewer access — they cannot propagate
+    // sharer rights they don't have the authority to grant directly.
+    if (
+      trustorRoleHash == keccak256(bytes("sharer")) ||
+      trustorRoleHash == keccak256(bytes("viewer"))
+    ) {
+      return "viewer";
     }
 
-    // Controller — full mirror including owner
+    if (level == TrusteeLevel.Custodian) {
+      if (trustorRoleHash == keccak256(bytes("owner"))) {
+        return "administrator";
+      }
+      return trustorRole; // administrator → administrator
+    }
+
+    // Controller — full mirror (only reaches here for owner/administrator)
     return trustorRole;
   }
 
@@ -1415,8 +1414,26 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   ) internal {
     for (uint256 i = 0; i < recordIdHashes.length; i++) {
       if (!_isValidRole(roles[i])) continue;
-      if (!_hasActiveRole(recordIdHashes[i], granterIdHash)) continue; // granter must have role
-      if (_hasActiveRole(recordIdHashes[i], targetIdHash)) continue; // skip if already has role
+      if (!_hasActiveRole(recordIdHashes[i], granterIdHash)) continue;
+      if (_hasActiveRole(recordIdHashes[i], targetIdHash)) continue;
+
+      bytes32 roleHash = keccak256(bytes(roles[i]));
+      bool granterIsOwner = _hasRole(recordIdHashes[i], granterIdHash, "owner");
+      bool granterIsAdmin = _hasRole(recordIdHashes[i], granterIdHash, "administrator");
+
+      if (roleHash == keccak256(bytes("owner"))) {
+        bool ownerExists = ownersByRecord[recordIdHashes[i]].length > 0;
+        if (ownerExists ? !granterIsOwner : !granterIsAdmin) continue;
+      } else if (roleHash == keccak256(bytes("administrator"))) {
+        if (!granterIsOwner && !granterIsAdmin) continue;
+      } else if (roleHash == keccak256(bytes("sharer"))) {
+        if (!granterIsOwner && !granterIsAdmin) continue;
+      } else {
+        // viewer — owner, admin, or sharer may grant
+        bool granterIsSharer = _hasRole(recordIdHashes[i], granterIdHash, "sharer");
+        if (!granterIsOwner && !granterIsAdmin && !granterIsSharer) continue;
+      }
+
       _grantRoleInternal(recordIdHashes[i], targetIdHash, roles[i], granterIdHash);
     }
   }
@@ -1487,13 +1504,15 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
         if (!userIsOwner && !userIsAdmin) continue;
       } else if (newRoleHash == keccak256(bytes("sharer"))) {
         if (ownerExists) {
-          if (!userIsOwner && !(userIsAdmin && userIsTarget) && !(userIsSharer && userIsTarget)) continue;
+          if (!userIsOwner && !(userIsAdmin && userIsTarget) && !(userIsSharer && userIsTarget))
+            continue;
         } else {
           if (!userIsAdmin && !(userIsSharer && userIsTarget)) continue;
         }
       } else if (newRoleHash == keccak256(bytes("viewer"))) {
         if (ownerExists) {
-          if (!userIsOwner && !(userIsAdmin && userIsTarget) && !(userIsSharer && userIsTarget)) continue;
+          if (!userIsOwner && !(userIsAdmin && userIsTarget) && !(userIsSharer && userIsTarget))
+            continue;
         } else {
           if (!userIsAdmin) continue;
         }
@@ -1526,19 +1545,40 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     bytes32 targetIdHash = wallets[targetWallet].userIdHash;
     require(targetIdHash != bytes32(0), "Target wallet not registered");
 
+    bool isSelfRevoke = userIdHash == targetIdHash;
+
     for (uint256 i = 0; i < recordIdHashes.length; i++) {
       if (!_hasActiveRole(recordIdHashes[i], targetIdHash)) continue;
-      if (!_hasActiveRole(recordIdHashes[i], userIdHash)) continue;
 
       bytes32 targetRoleKey = _getRoleKey(recordIdHashes[i], targetIdHash);
       string memory role = recordRoles[targetRoleKey].role;
       bytes32 roleHash = keccak256(bytes(role));
 
-      // Never revoke owners in batch — only an owner can revoke themselves
+      // Never revoke owners in batch — owners must use voluntarilyLeaveOwnership
       if (roleHash == keccak256(bytes("owner"))) continue;
 
-      // Subject minimum: skip if target is an active subject (minimum role = sharer)
+      // Subject minimum: active subjects must hold at least sharer
       if (_isActiveSubject(recordIdHashes[i], targetIdHash)) continue;
+
+      if (!isSelfRevoke) {
+        bool userIsOwner = _hasRole(recordIdHashes[i], userIdHash, "owner");
+        bool userIsAdmin = _hasRole(recordIdHashes[i], userIdHash, "administrator");
+
+        if (roleHash == keccak256(bytes("viewer")) || roleHash == keccak256(bytes("sharer"))) {
+          bool userGrantedThisRole = roleGrantedBy[targetRoleKey] == userIdHash;
+          if (!userIsOwner && !userIsAdmin && !userGrantedThisRole) continue;
+        } else if (roleHash == keccak256(bytes("administrator"))) {
+          bool ownerExists = ownersByRecord[recordIdHashes[i]].length > 0;
+          // With an owner present only owners can revoke admins; without one, admins can too
+          if (ownerExists ? !userIsOwner : (!userIsOwner && !userIsAdmin)) continue;
+        }
+      }
+
+      // Last-admin guard: cannot leave a record with no admin and no owner
+      if (roleHash == keccak256(bytes("administrator"))) {
+        bool ownerExists = ownersByRecord[recordIdHashes[i]].length > 0;
+        if (!ownerExists && adminsByRecord[recordIdHashes[i]].length <= 1) continue;
+      }
 
       _removeFromRoleArray(recordIdHashes[i], targetIdHash, role);
       recordRoles[targetRoleKey].isActive = false;

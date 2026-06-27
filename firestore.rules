@@ -317,12 +317,14 @@ service cloud.firestore {
           request.auth.uid in resource.data.subjects) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['credibility'])
         ) ||
-        // BRANCH 5: Sharer (or above) granting/revoking viewer and sharer access.
+        // BRANCH 5: Sharer granting/revoking viewer access only. Sharers cannot modify the
+        // sharers array — only owners and administrators can grant sharer role.
         (
           request.auth.uid in resource.data.get('sharers', []) &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewers', 'sharers', 'trustees', 'lastModified']) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewers', 'trustees', 'lastModified']) &&
           resource.data.owners == request.resource.data.owners &&
           resource.data.administrators == request.resource.data.administrators &&
+          resource.data.get('sharers', []) == request.resource.data.get('sharers', []) &&
           resource.data.subjects == request.resource.data.subjects
         ) ||
         // BRANCH 6: Viewer removing themselves

@@ -112,6 +112,9 @@ export class TrusteePermissionService {
    * Resolve what role the trustee should get based on trust level + trustor's role.
    * Mirrors _resolveTrusteeRole in MemberRoleManager.sol.
    *
+   * Sharers and viewers can only delegate viewer access — they cannot propagate
+   * sharer rights they don't have the authority to grant directly.
+   *
    * Optionally pass currentTrusteeRole to skip the grant if the trustee already has
    * an equal or higher role — prevents redundant grants and unintended downgrades
    * at invite time. Don't pass this for updateTrusteeAccess (downgrades are valid there).
@@ -124,9 +127,11 @@ export class TrusteePermissionService {
     const resolved = (() => {
       if (trustLevel === 'observer') return 'viewer';
       if (!trustorRole) return null;
+      // Sharers and viewers can only delegate viewer access
+      if (trustorRole === 'sharer' || trustorRole === 'viewer') return 'viewer';
       if (trustLevel === 'custodian')
-        return trustorRole === 'owner' ? 'administrator' : trustorRole;
-      return trustorRole; // controller — full mirror
+        return trustorRole === 'owner' ? 'administrator' : trustorRole; // admin → admin
+      return trustorRole; // controller — full mirror (owner/admin only reach here)
     })();
 
     // If trustee already has an equal or higher role, no change needed
