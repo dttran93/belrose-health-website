@@ -98,13 +98,6 @@ export interface TrusteeRelationship {
   level: TrusteeLevelName;
 }
 
-export interface GuestAccessInfo {
-  grantedAt: Date;
-  expiresAt: Date;
-  grantedByIdHash: string;
-  guestEmailHash: string;
-  isExpired: boolean;
-}
 
 // ============================================================================
 // SERVICE
@@ -791,101 +784,6 @@ export class BlockchainRoleManagerService {
     } catch (error) {
       console.error('Error getting trustee relationship:', error);
       return { status: 'None', level: 'Observer' };
-    }
-  }
-
-  // ==========================================================================
-  // GUEST ACCESS - WRITE FUNCTIONS
-  // ==========================================================================
-
-  /**
-   * Grant a guest temporary viewer access to one or more records.
-   * @param recordIdHashes One or more record IDs
-   * @param guestWallet Deterministic placeholder address derived from guest UID
-   * @param guestIdHash keccak256 of guest Firebase UID
-   * @param guestEmailHash keccak256 of guest email (lowercased)
-   * @param durationSeconds How long access lasts (default 7 days = 604800)
-   */
-  static async grantGuestAccess(
-    recordIdHashes: string[],
-    guestWallet: string,
-    guestIdHash: string,
-    guestEmailHash: string,
-    durationSeconds: number = 604800
-  ): Promise<TransactionResult> {
-    console.log('🔗 Granting guest access on blockchain...', { recordIdHashes, guestWallet });
-    const result = await this.executeWrite('grantGuestAccess', [
-      recordIdHashes,
-      guestWallet,
-      guestIdHash,
-      guestEmailHash,
-      durationSeconds,
-    ]);
-    console.log('✅ Guest access granted:', result.txHash);
-    return result;
-  }
-
-  /**
-   * Revoke a guest's access to one or more records.
-   * Can be called by the granter or any owner/admin of the record.
-   */
-  static async revokeGuestAccess(
-    recordIdHashes: string[],
-    guestIdHash: string
-  ): Promise<TransactionResult> {
-    console.log('🔗 Revoking guest access on blockchain...', { recordIdHashes, guestIdHash });
-    const result = await this.executeWrite('revokeGuestAccess', [recordIdHashes, guestIdHash]);
-    console.log('✅ Guest access revoked:', result.txHash);
-    return result;
-  }
-
-  // ==========================================================================
-  // GUEST ACCESS - VIEW FUNCTIONS
-  // ==========================================================================
-
-  /**
-   * Check if a guest has active non-expired access to a record
-   */
-  static async hasActiveGuestAccess(recordId: string, guestId: string): Promise<boolean> {
-    try {
-      const recordIdHash = id(recordId);
-      const guestIdHash = id(guestId);
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('hasActiveGuestAccess');
-      return await fn(recordIdHash, guestIdHash);
-    } catch (error) {
-      console.error('Error checking guest access:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Get full guest access details for a record
-   */
-  static async getGuestAccess(recordId: string, guestId: string): Promise<GuestAccessInfo | null> {
-    try {
-      const recordIdHash = id(recordId);
-      const guestIdHash = id(guestId);
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getGuestAccess');
-      const result = await fn(recordIdHash, guestIdHash);
-
-      const grantedAt = new Date(Number(result[0]) * 1000);
-      const expiresAt = new Date(Number(result[1]) * 1000);
-
-      // grantedAt of 0 means no access was ever granted
-      if (Number(result[0]) === 0) return null;
-
-      return {
-        grantedAt,
-        expiresAt,
-        grantedByIdHash: result[2],
-        guestEmailHash: result[3],
-        isExpired: new Date() > expiresAt,
-      };
-    } catch (error) {
-      console.error('Error getting guest access:', error);
-      return null;
     }
   }
 

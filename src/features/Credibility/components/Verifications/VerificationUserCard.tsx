@@ -3,9 +3,10 @@
 import React from 'react';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { UserBadge } from '@/features/Users/components/ui/UserBadge';
-import { getVerificationConfig, VerificationDoc } from '../../services/verificationService';
+import { getVerificationConfig } from '../../services/verificationService';
 import { BelroseUserProfile } from '@/types/core';
 import { useNavigate } from 'react-router-dom';
+import { VerificationDoc } from '@belrose/shared';
 
 interface VerificationCardProps {
   verification: VerificationDoc;

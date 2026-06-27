@@ -28,7 +28,7 @@ export interface PermissionChangeEvent {
   changedByIdHash: string;
   changedAt: TimestampLike;
   changes: PermissionChange[];
-  affectedUserIds?: string[];
+  affectedUserIds: string[];
   blockchainRef: BlockchainRef;
   context?: 'trustee_grant' | 'trustee_revoke' | 'direct';
   batchId?: string;

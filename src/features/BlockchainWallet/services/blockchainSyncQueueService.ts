@@ -103,13 +103,6 @@ export type SyncContext =
       trustorIdHash: string;
       trusteeId: string;
       trusteeIdHash: string;
-    }
-  | {
-      type: 'guest-provider-role-backfill';
-      recordId: string;
-      guestUserId: string;
-      role: 'administrator';
-      note: 'Record initialized with requester before provider claimed account. Provider has Firestore access but no on-chain role.';
     };
 
 export interface BlockchainSyncFailure extends BaseSyncFailure {
