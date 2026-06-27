@@ -45,11 +45,9 @@ export interface MemberRoleManagerInterface extends Interface {
       | "getRecordRoleStats"
       | "getRecordSharers"
       | "getRecordViewers"
-      | "getRecordsByUser"
       | "getRoleDetails"
       | "getRoleDetailsByUser"
       | "getRoleGranter"
-      | "getTotalRoles"
       | "getTotalUsers"
       | "getTrusteeGrantedRecords"
       | "getTrusteeRelationship"
@@ -74,7 +72,6 @@ export interface MemberRoleManagerInterface extends Interface {
       | "proxiableUUID"
       | "reactivateWallet"
       | "recordRoles"
-      | "recordsByUser"
       | "revokeRole"
       | "revokeRoleBatch"
       | "revokeTrustee"
@@ -82,7 +79,6 @@ export interface MemberRoleManagerInterface extends Interface {
       | "setHealthRecordCore"
       | "setUserStatus"
       | "sharersByRecord"
-      | "totalRoles"
       | "totalUsers"
       | "transferAdmin"
       | "trusteeRelationships"
@@ -189,10 +185,6 @@ export interface MemberRoleManagerInterface extends Interface {
     values: [BytesLike]
   ): string;
   encodeFunctionData(
-    functionFragment: "getRecordsByUser",
-    values: [BytesLike]
-  ): string;
-  encodeFunctionData(
     functionFragment: "getRoleDetails",
     values: [BytesLike, AddressLike]
   ): string;
@@ -203,10 +195,6 @@ export interface MemberRoleManagerInterface extends Interface {
   encodeFunctionData(
     functionFragment: "getRoleGranter",
     values: [BytesLike, BytesLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getTotalRoles",
-    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "getTotalUsers",
@@ -305,10 +293,6 @@ export interface MemberRoleManagerInterface extends Interface {
     values: [BytesLike]
   ): string;
   encodeFunctionData(
-    functionFragment: "recordsByUser",
-    values: [BytesLike, BigNumberish]
-  ): string;
-  encodeFunctionData(
     functionFragment: "revokeRole",
     values: [BytesLike, AddressLike]
   ): string;
@@ -335,10 +319,6 @@ export interface MemberRoleManagerInterface extends Interface {
   encodeFunctionData(
     functionFragment: "sharersByRecord",
     values: [BytesLike, BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "totalRoles",
-    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "totalUsers",
@@ -449,10 +429,6 @@ export interface MemberRoleManagerInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "getRecordsByUser",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "getRoleDetails",
     data: BytesLike
   ): Result;
@@ -462,10 +438,6 @@ export interface MemberRoleManagerInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "getRoleGranter",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getTotalRoles",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -555,10 +527,6 @@ export interface MemberRoleManagerInterface extends Interface {
     functionFragment: "recordRoles",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(
-    functionFragment: "recordsByUser",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "revokeRole", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "revokeRoleBatch",
@@ -584,7 +552,6 @@ export interface MemberRoleManagerInterface extends Interface {
     functionFragment: "sharersByRecord",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "totalRoles", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "totalUsers", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "transferAdmin",
@@ -1146,12 +1113,6 @@ export interface MemberRoleManager extends BaseContract {
     "view"
   >;
 
-  getRecordsByUser: TypedContractMethod<
-    [userIdHash: BytesLike],
-    [string[]],
-    "view"
-  >;
-
   getRoleDetails: TypedContractMethod<
     [recordIdHash: BytesLike, wallet: AddressLike],
     [[string, boolean] & { role: string; isActive: boolean }],
@@ -1169,8 +1130,6 @@ export interface MemberRoleManager extends BaseContract {
     [string],
     "view"
   >;
-
-  getTotalRoles: TypedContractMethod<[], [bigint], "view">;
 
   getTotalUsers: TypedContractMethod<[], [bigint], "view">;
 
@@ -1296,12 +1255,6 @@ export interface MemberRoleManager extends BaseContract {
     "view"
   >;
 
-  recordsByUser: TypedContractMethod<
-    [arg0: BytesLike, arg1: BigNumberish],
-    [string],
-    "view"
-  >;
-
   revokeRole: TypedContractMethod<
     [recordIdHash: BytesLike, targetWallet: AddressLike],
     [void],
@@ -1339,8 +1292,6 @@ export interface MemberRoleManager extends BaseContract {
     [string],
     "view"
   >;
-
-  totalRoles: TypedContractMethod<[], [bigint], "view">;
 
   totalUsers: TypedContractMethod<[], [bigint], "view">;
 
@@ -1510,9 +1461,6 @@ export interface MemberRoleManager extends BaseContract {
     nameOrSignature: "getRecordViewers"
   ): TypedContractMethod<[recordIdHash: BytesLike], [string[]], "view">;
   getFunction(
-    nameOrSignature: "getRecordsByUser"
-  ): TypedContractMethod<[userIdHash: BytesLike], [string[]], "view">;
-  getFunction(
     nameOrSignature: "getRoleDetails"
   ): TypedContractMethod<
     [recordIdHash: BytesLike, wallet: AddressLike],
@@ -1533,9 +1481,6 @@ export interface MemberRoleManager extends BaseContract {
     [string],
     "view"
   >;
-  getFunction(
-    nameOrSignature: "getTotalRoles"
-  ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
     nameOrSignature: "getTotalUsers"
   ): TypedContractMethod<[], [bigint], "view">;
@@ -1665,13 +1610,6 @@ export interface MemberRoleManager extends BaseContract {
     "view"
   >;
   getFunction(
-    nameOrSignature: "recordsByUser"
-  ): TypedContractMethod<
-    [arg0: BytesLike, arg1: BigNumberish],
-    [string],
-    "view"
-  >;
-  getFunction(
     nameOrSignature: "revokeRole"
   ): TypedContractMethod<
     [recordIdHash: BytesLike, targetWallet: AddressLike],
@@ -1716,9 +1654,6 @@ export interface MemberRoleManager extends BaseContract {
     [string],
     "view"
   >;
-  getFunction(
-    nameOrSignature: "totalRoles"
-  ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
     nameOrSignature: "totalUsers"
   ): TypedContractMethod<[], [bigint], "view">;

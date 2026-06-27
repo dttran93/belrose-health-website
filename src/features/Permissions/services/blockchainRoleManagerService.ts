@@ -431,16 +431,17 @@ export class BlockchainRoleManagerService {
   }
 
   /**
-   * Get all records where an identity has any role
-   * Note: Takes userIdHash, not wallet address also returns string of recordIdHashes
+   * Get all sharers for a record
+   * Note: Returns userIdHashes, not wallet addresses
    */
-  static async getRecordsByUser(userIdHash: string): Promise<string[]> {
+  static async getRecordSharers(recordId: string): Promise<string[]> {
     try {
+      const recordIdHash = id(recordId);
       const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getRecordsByUser');
-      return await fn(userIdHash);
+      const fn = contract.getFunction('getRecordSharers');
+      return await fn(recordIdHash);
     } catch (error) {
-      console.error('Error getting records by user:', error);
+      console.error('Error getting record sharers:', error);
       return [];
     }
   }

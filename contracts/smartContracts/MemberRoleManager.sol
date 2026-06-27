@@ -401,11 +401,6 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   mapping(bytes32 => bytes32[]) public sharersByRecord;
   mapping(bytes32 => bytes32[]) public viewersByRecord;
 
-  // userIdHash => list of recordIdHashes where they have a role
-  mapping(bytes32 => bytes32[]) public recordsByUser;
-
-  uint256 public totalRoles;
-
   HealthRecordCoreInterface public healthRecordCore;
   mapping(bytes32 => bytes32) public roleGrantedBy;
 
@@ -453,19 +448,14 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
 
     RecordRole storage currentEntry = recordRoles[roleKey];
     string memory oldRole = currentEntry.role;
-    bool hasExistingEntry = bytes(oldRole).length > 0;
     bool isCurrentlyActive = currentEntry.isActive;
 
     recordRoles[roleKey] = RecordRole({ role: role, isActive: true });
-    roleGrantedBy[roleKey] = userIdHash;
 
     if (!isCurrentlyActive) {
+      roleGrantedBy[roleKey] = userIdHash;
       _addToRoleArray(recordIdHash, targetIdHash, role);
 
-      if (!hasExistingEntry) {
-        recordsByUser[targetIdHash].push(recordIdHash);
-        totalRoles++;
-      }
       emit RoleGranted(recordIdHash, targetIdHash, role, userIdHash, block.timestamp);
     } else {
       if (keccak256(bytes(oldRole)) != keccak256(bytes(role))) {
@@ -742,7 +732,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
    * @notice Allows an owner to voluntarily give up their ownership
    * @param recordIdHash The record ID Hash
    */
-  function voluntarilyLeaveOwnership(bytes32 recordIdHash) external {
+  function voluntarilyLeaveOwnership(bytes32 recordIdHash) external onlyActiveMember {
     require(recordIdHash != bytes32(0), "Record ID hash cannot be empty");
 
     bytes32 userIdHash = _getCallerIdHash();
@@ -767,7 +757,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
    * @param recordIdHash The record ID Hash
    * @param targetWallet A wallet address belonging to the target user
    */
-  function revokeRole(bytes32 recordIdHash, address targetWallet) external {
+  function revokeRole(bytes32 recordIdHash, address targetWallet) external onlyActiveMember {
     require(recordIdHash != bytes32(0), "Record ID hash cannot be empty");
     require(targetWallet != address(0), "Wallet address cannot be zero");
 
@@ -955,13 +945,6 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   }
 
   /**
-   * @notice Get all records where a user has any role
-   */
-  function getRecordsByUser(bytes32 userIdHash) external view returns (bytes32[] memory) {
-    return recordsByUser[userIdHash];
-  }
-
-  /**
    * @notice Get role statistics for a record
    */
   function getRecordRoleStats(
@@ -977,13 +960,6 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
       sharersByRecord[recordIdHash].length,
       viewersByRecord[recordIdHash].length
     );
-  }
-
-  /**
-   * @notice Get total number of roles across all records
-   */
-  function getTotalRoles() external view returns (uint256) {
-    return totalRoles;
   }
 
   /**
@@ -1345,8 +1321,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     // Sharers and viewers can only delegate viewer access — they cannot propagate
     // sharer rights they don't have the authority to grant directly.
     if (
-      trustorRoleHash == keccak256(bytes("sharer")) ||
-      trustorRoleHash == keccak256(bytes("viewer"))
+      trustorRoleHash == keccak256(bytes("sharer")) || trustorRoleHash == keccak256(bytes("viewer"))
     ) {
       return "viewer";
     }
@@ -1398,6 +1373,14 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
       _applyChangeRole(recordIdHash, trustorIdHash, trusteeIdHash, newRole, oldRole);
     }
   }
+
+  // =================================================================================================================
+  // GENERAL NOTE ON BATCH ROLE FUNCTIONS: Batch role functions are intentionally separated from single role functions
+  // This is because the "require" in the single role functions give clear error messages. The batch role functions use
+  // "continue" and silently skip ineligible records. This is better for UX so that one incorrect record doesn't crash a
+  // 20 record grant. Using single grant functions when possible and batch when necessary balances error/logging
+  // concerns with better UX.
+  // =================================================================================================================
 
   /**
    * @dev Internal batch grant — caller is responsible for permission checks before invoking
