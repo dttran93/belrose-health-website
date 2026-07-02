@@ -3,17 +3,20 @@
 import React, { useState } from 'react';
 import { VerificationsTable } from './VerificationsTable';
 import { DisputesTable } from './DisputesTable';
+import { VouchesTable } from './VouchesTable';
 import type { IntegrityStatus } from '../lib/types';
 import type {
   VerificationIntegrityItem,
   DisputeIntegrityItem,
+  VouchIntegrityItem,
 } from '../services/credibilityIntegrityService';
 
-type SubTab = 'verifications' | 'disputes';
+type SubTab = 'verifications' | 'disputes' | 'vouches';
 
 interface CredibilityIntegrityTableProps {
   verifications: VerificationIntegrityItem[];
   disputes: DisputeIntegrityItem[];
+  vouches: VouchIntegrityItem[];
   searchQuery: string;
   statusFilter: IntegrityStatus | 'all';
   onClearSearch: () => void;
@@ -22,6 +25,7 @@ interface CredibilityIntegrityTableProps {
 export const CredibilityIntegrityTable: React.FC<CredibilityIntegrityTableProps> = ({
   verifications,
   disputes,
+  vouches,
   searchQuery,
   statusFilter,
   onClearSearch,
@@ -35,7 +39,6 @@ export const CredibilityIntegrityTable: React.FC<CredibilityIntegrityTableProps>
     return (
       item.recordId.toLowerCase().includes(q) ||
       (item.verifierIdHash?.toLowerCase().includes(q) ?? false) ||
-      (item.recordId?.toLowerCase().includes(q) ?? false) ||
       (item.recordHash?.toLowerCase().includes(q) ?? false)
     );
   });
@@ -47,15 +50,32 @@ export const CredibilityIntegrityTable: React.FC<CredibilityIntegrityTableProps>
     return (
       item.recordId.toLowerCase().includes(q) ||
       (item.disputerIdHash?.toLowerCase().includes(q) ?? false) ||
-      (item.recordId?.toLowerCase().includes(q) ?? false) ||
       (item.recordHash?.toLowerCase().includes(q) ?? false)
     );
   });
 
+  const filteredVouches = vouches.filter(item => {
+    if (statusFilter !== 'all' && item.integrityStatus !== statusFilter) return false;
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      item.voucherId.toLowerCase().includes(q) ||
+      item.voucheeId.toLowerCase().includes(q) ||
+      (item.voucherIdHash?.toLowerCase().includes(q) ?? false) ||
+      (item.voucheeIdHash?.toLowerCase().includes(q) ?? false)
+    );
+  });
+
+  const tabCounts: Record<SubTab, number> = {
+    verifications: filteredVerifications.length,
+    disputes: filteredDisputes.length,
+    vouches: filteredVouches.length,
+  };
+
   return (
     <div>
       <div className="flex gap-4 border-b border-gray-200 mb-4">
-        {(['verifications', 'disputes'] as SubTab[]).map(t => (
+        {(['verifications', 'disputes', 'vouches'] as SubTab[]).map(t => (
           <button
             key={t}
             onClick={() => setSubTab(t)}
@@ -65,7 +85,7 @@ export const CredibilityIntegrityTable: React.FC<CredibilityIntegrityTableProps>
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            {t} ({t === 'verifications' ? filteredVerifications.length : filteredDisputes.length})
+            {t} ({tabCounts[t]})
           </button>
         ))}
       </div>
@@ -80,6 +100,13 @@ export const CredibilityIntegrityTable: React.FC<CredibilityIntegrityTableProps>
       {subTab === 'disputes' && (
         <DisputesTable
           items={filteredDisputes}
+          searchQuery={searchQuery}
+          onClearSearch={onClearSearch}
+        />
+      )}
+      {subTab === 'vouches' && (
+        <VouchesTable
+          items={filteredVouches}
           searchQuery={searchQuery}
           onClearSearch={onClearSearch}
         />

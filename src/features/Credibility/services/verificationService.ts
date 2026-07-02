@@ -25,6 +25,7 @@ import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services
 import { VerificationDoc, VerificationLevelOptions } from '@belrose/shared';
 import { buildHealthRecordRef } from '@belrose/shared';
 import { encryptNotificationTitle } from '@/features/Notifications/services/encryptNotificationTitle';
+import { id } from 'ethers';
 
 // ============================================================
 // TYPES
@@ -250,6 +251,7 @@ export async function createVerification(
         recordHash,
         recordId,
         verifierId,
+        verifierIdHash: id(verifierId),
         level,
         isActive: true,
         createdAt: Timestamp.now(),

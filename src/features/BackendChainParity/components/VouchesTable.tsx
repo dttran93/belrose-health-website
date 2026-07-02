@@ -1,33 +1,27 @@
-// src/features/BackendChainParity/components/VerificationsTable.tsx
+// src/features/BackendChainParity/components/VouchesTable.tsx
 
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import { NETWORK } from '@belrose/shared';
-import type { VerificationOnChainEvent } from '@belrose/shared';
+import type { VouchOnChainEvent } from '@belrose/shared';
 import { IntegrityStatusBadge } from './IntegrityStatusBadge';
 import { CopyableHash } from './ui/CopyableHash';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
-import type { VerificationIntegrityItem } from '../services/credibilityIntegrityService';
+import type { VouchIntegrityItem } from '../services/credibilityIntegrityService';
 
 const BASESCAN_TX_URL = `${NETWORK.explorerUrl}/tx/`;
 
-const VERIFICATION_LEVEL: Record<number, string> = {
-  1: 'Provenance',
-  2: 'Content',
-  3: 'Full',
-};
-
-interface VerificationsTableProps {
-  items: VerificationIntegrityItem[];
+interface VouchesTableProps {
+  items: VouchIntegrityItem[];
   searchQuery: string;
   onClearSearch: () => void;
 }
 
-function ChainStateCell({ item }: { item: VerificationIntegrityItem }) {
+function ChainStateCell({ item }: { item: VouchIntegrityItem }) {
   if (item.integrityStatus === 'pending' || item.integrityStatus === 'failed') {
     return <span className="text-gray-400">—</span>;
   }
-  if (!item.existsOnChain || item.integrityStatus === 'missing') {
+  if (item.integrityStatus === 'missing') {
     return <span className="font-medium text-red-600">Not Found</span>;
   }
   if (item.mismatchReasons && item.mismatchReasons.length > 0) {
@@ -41,10 +35,12 @@ function ChainStateCell({ item }: { item: VerificationIntegrityItem }) {
       </ul>
     );
   }
-  return <span className="font-medium text-emerald-600">Active</span>;
+  const label = item.chainStatus === 'Active' ? 'Active' : item.chainStatus ?? '—';
+  const color = item.chainStatus === 'Active' ? 'text-emerald-600' : 'text-gray-500';
+  return <span className={`font-medium ${color}`}>{label}</span>;
 }
 
-function OnChainHistoryPanel({ history }: { history?: VerificationOnChainEvent[] }) {
+function OnChainHistoryPanel({ history }: { history?: VouchOnChainEvent[] }) {
   if (!history || history.length === 0) {
     return <p className="text-xs text-gray-400 italic">No on-chain history recorded</p>;
   }
@@ -57,13 +53,6 @@ function OnChainHistoryPanel({ history }: { history?: VerificationOnChainEvent[]
             {entry.action}
           </span>
           {entry.at && <span className="text-gray-400">{formatTimestamp(entry.at)}</span>}
-          {entry.fromLevel !== undefined && entry.toLevel !== undefined && (
-            <span className="text-gray-500">
-              {VERIFICATION_LEVEL[entry.fromLevel] ?? entry.fromLevel}
-              {' → '}
-              {VERIFICATION_LEVEL[entry.toLevel] ?? entry.toLevel}
-            </span>
-          )}
           {entry.blockchainRef?.txHash && (
             <div className="flex items-center gap-1 text-gray-400">
               <span>Tx:</span>
@@ -84,13 +73,9 @@ function OnChainHistoryPanel({ history }: { history?: VerificationOnChainEvent[]
   );
 }
 
-const TOTAL_COLS = 8;
+const TOTAL_COLS = 7;
 
-export const VerificationsTable: React.FC<VerificationsTableProps> = ({
-  items,
-  searchQuery,
-  onClearSearch,
-}) => {
+export const VouchesTable: React.FC<VouchesTableProps> = ({ items, searchQuery, onClearSearch }) => {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const toggleRow = (key: string) => {
@@ -104,12 +89,9 @@ export const VerificationsTable: React.FC<VerificationsTableProps> = ({
   if (items.length === 0) {
     return (
       <div className="text-center py-12 text-gray-400">
-        <p>No verifications match the current filter.</p>
+        <p>No vouches match the current filter.</p>
         {searchQuery && (
-          <button
-            onClick={onClearSearch}
-            className="mt-2 text-sm text-blue-500 hover:text-blue-700"
-          >
+          <button onClick={onClearSearch} className="mt-2 text-sm text-blue-500 hover:text-blue-700">
             Clear search
           </button>
         )}
@@ -124,25 +106,23 @@ export const VerificationsTable: React.FC<VerificationsTableProps> = ({
           <tr>
             <th className="px-2 py-3 w-6" />
             <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-600">Record ID</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-600">Verifier</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-600">Record Hash</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-600">Level</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-600">Voucher</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-600">Vouchee</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-600">Firestore Status</th>
             <th className="px-4 py-3 text-left font-medium text-gray-600">Chain State</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-600">Latest Tx</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-600">Created</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 text-left">
           {items.map(item => {
-            const rowKey = `${item.recordHash}_${item.verifierIdHash}`;
-            const isExpanded = expandedRows.has(rowKey);
+            const isExpanded = expandedRows.has(item.vouchId);
 
             return (
-              <React.Fragment key={rowKey}>
+              <React.Fragment key={item.vouchId}>
                 <tr className="hover:bg-gray-50">
                   <td className="px-2 py-3">
                     <button
-                      onClick={() => toggleRow(rowKey)}
+                      onClick={() => toggleRow(item.vouchId)}
                       className="text-gray-400 hover:text-gray-600 transition-colors"
                       aria-label={isExpanded ? 'Collapse history' : 'Expand history'}
                     >
@@ -156,39 +136,44 @@ export const VerificationsTable: React.FC<VerificationsTableProps> = ({
                   <td className="px-4 py-3">
                     <IntegrityStatusBadge status={item.integrityStatus} />
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-gray-500">
-                    <CopyableHash value={item.recordId} />
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col">
+                      <div className="font-mono text-xs text-gray-600">
+                        ID: <CopyableHash value={item.voucherId} chars={10} />
+                      </div>
+                      <div className="font-mono text-xs text-gray-400">
+                        #: <CopyableHash value={item.voucherIdHash} chars={10} />
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-col">
                       <div className="font-mono text-xs text-gray-600">
-                        ID: <CopyableHash value={item.verifierId} chars={10} />
+                        ID: <CopyableHash value={item.voucheeId} chars={10} />
                       </div>
                       <div className="font-mono text-xs text-gray-400">
-                        #: <CopyableHash value={item.verifierIdHash} chars={10} />
+                        #: <CopyableHash value={item.voucheeIdHash} chars={10} />
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-gray-500">
-                    <CopyableHash value={item.recordHash} />
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-600">
-                    {item.level ? (VERIFICATION_LEVEL[item.level] ?? item.level) : '—'}
+                  <td className="px-4 py-3 text-xs">
+                    <span
+                      className={`px-2 py-0.5 rounded font-medium ${
+                        item.chainStatus === 'Active'
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : item.chainStatus === 'Retracted'
+                            ? 'bg-red-50 text-red-600'
+                            : 'bg-gray-100 text-gray-500'
+                      }`}
+                    >
+                      {item.chainStatus}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-xs">
                     <ChainStateCell item={item} />
                   </td>
-                  <td className="px-4 py-3">
-                    {item.blockchainRef?.txHash && (
-                      <a
-                        href={`${BASESCAN_TX_URL}${item.blockchainRef.txHash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    )}
+                  <td className="px-4 py-3 text-xs text-gray-500">
+                    {item.createdAt ? formatTimestamp(item.createdAt) : '—'}
                   </td>
                 </tr>
                 {isExpanded && (
@@ -197,6 +182,9 @@ export const VerificationsTable: React.FC<VerificationsTableProps> = ({
                     <td colSpan={TOTAL_COLS - 1} className="px-6 py-4">
                       <p className="text-xs font-medium text-gray-500 mb-2">On-Chain History</p>
                       <OnChainHistoryPanel history={item.onChainHistory} />
+                      {item.error && (
+                        <p className="mt-2 text-xs text-red-500 font-mono">{item.error}</p>
+                      )}
                     </td>
                   </tr>
                 )}
