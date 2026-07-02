@@ -183,19 +183,24 @@ export class TrusteeRelationshipService {
       }
     }
 
-    // Step 1: Blockchain proposal
+    // Step 1: Fetch records so roles can be granted atomically with the proposal
+    const trustorRecords = await TrusteePermissionService.getRecordsForTrustor(trustorId, trusteeId);
+    const recordIds = trustorRecords.map(r => r.recordId);
+
+    // Step 2: Blockchain proposal — grants record roles in the same tx
     console.log('🔗 Proposing trustee on blockchain...');
     const { success, blockchainRef: inviteBlockchainRef } =
       await TrusteeBlockchainService.proposeTrustee(
         trustorId,
         trusteeId,
-        trustLevelMap[trustLevel]
+        trustLevelMap[trustLevel],
+        recordIds
       );
     if (!success) throw new Error('Blockchain proposal failed — see sync queue for details');
     console.log('✅ Blockchain: Trustee proposed');
 
-    // Step 2: Fan out pending permissions — trustor is online so session key is available
-    // Do this BEFORE writing the relationship doc so no rollback is needed if it fails
+    // Step 3: Fan out pending permissions (wrappedKeys + Firestore arrays)
+    // Blockchain roles already granted above; trustor is online so session key is available
     await TrusteePermissionService.grantPendingTrusteeAccess(trusteeId, trustLevel);
     console.log('✅ Pending permissions granted');
 
@@ -519,8 +524,6 @@ export class TrusteeRelationshipService {
    * Rolls back all permissions granted at invite time:
    * removes from role arrays and deletes inactive wrappedKeys.
    *
-   * TODO: Add decline Invite function to blockchain
-   *
    * @param trustorId - The userId of the trustor who sent the invite
    */
   static async declineInvite(trustorId: string): Promise<void> {
@@ -543,10 +546,13 @@ export class TrusteeRelationshipService {
       throw new Error(`Cannot decline an invite with status: ${data.status}`);
     }
 
-    // Step 1: Roll back all pending permissions granted at invite time
+    // Step 1: Blockchain decline — revokes roles granted at proposal time
+    await TrusteeBlockchainService.declineTrustee(trustorId, trusteeId);
+
+    // Step 2: Roll back all pending permissions granted at invite time
     await TrusteePermissionService.rollbackPendingTrusteeAccess(trustorId, trusteeId);
 
-    // Step 2: Update relationship doc
+    // Step 3: Update relationship doc
     await updateDoc(relationshipRef, {
       isActive: false,
       status: 'declined',

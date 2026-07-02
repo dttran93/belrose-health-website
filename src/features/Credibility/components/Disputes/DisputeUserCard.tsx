@@ -10,6 +10,7 @@ import {
 } from '../../services/disputeService';
 import { BelroseUserProfile } from '@/types/core';
 import { useNavigate } from 'react-router-dom';
+import { MenuItem } from '@/features/Users/components/ui/UserMenu';
 
 interface DisputeCardProps {
   dispute: DisputeDocDecrypted;
@@ -18,6 +19,7 @@ interface DisputeCardProps {
   currentRecordHash: string | null | undefined;
   onViewUser: () => void;
   onViewDetails: () => void;
+  additionalItems?: MenuItem[];
 }
 
 const DisputeUserCard: React.FC<DisputeCardProps> = ({
@@ -27,6 +29,7 @@ const DisputeUserCard: React.FC<DisputeCardProps> = ({
   currentRecordHash,
   onViewUser,
   onViewDetails,
+  additionalItems,
 }) => {
   const severityInfo = getSeverityConfig(dispute.severity);
   const culpabilityInfo = getCulpabilityConfig(dispute.culpability);
@@ -89,6 +92,7 @@ const DisputeUserCard: React.FC<DisputeCardProps> = ({
       content={renderDisputeContent()}
       onViewUser={onViewUser}
       onViewDetails={onViewDetails}
+      additionalItems={additionalItems}
       className={isInactive ? 'opacity-60' : ''}
       metadata={[
         {

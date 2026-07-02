@@ -8,8 +8,9 @@ import {
   Trash2,
   LucideIcon,
   Blocks,
-  User,
   NotepadText,
+  UserCheck,
+  CircleUser,
 } from 'lucide-react';
 import { BelroseUserProfile } from '@/types/core';
 import { useNavigate } from 'react-router-dom';
@@ -55,6 +56,7 @@ interface UserMenuProps {
   showShare?: boolean;
   showDelete?: boolean;
   showBlockchain?: boolean;
+  showVouch?: boolean;
 
   // Additional menu items from parent
   additionalItems?: MenuItem[];
@@ -83,6 +85,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
   showViewDetails = true,
   showDelete = true,
   showBlockchain = true,
+  showVouch = true,
   additionalItems = [],
 }) => {
   const navigate = useNavigate();
@@ -128,7 +131,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
       items.push({
         key: 'user',
         label: 'User Profile',
-        icon: User,
+        icon: CircleUser,
         onClick: () => {
           if (user?.uid) {
             navigate(`/app/health-profile/${user.uid}`);
@@ -165,6 +168,25 @@ const UserMenu: React.FC<UserMenuProps> = ({
         label: 'Distributed Network Verification',
         icon: Blocks,
         onClick: createHandler(onVerifyBlockchain),
+      });
+    }
+
+    // Vouch navigation — passes the viewed user as context so the vouches page
+    // can auto-open the dialog or highlight the existing vouch for them.
+    if (showVouch && user?.uid) {
+      items.push({
+        key: 'vouch',
+        label: `Vouch for ${user.firstName}`,
+        icon: UserCheck,
+        onClick: () => {
+          navigate('/app/settings/vouches', {
+            state: {
+              targetUserId: user.uid,
+              targetDisplayName: user.displayName || user.email || user.uid,
+            },
+          });
+          setIsOpen(false);
+        },
       });
     }
 

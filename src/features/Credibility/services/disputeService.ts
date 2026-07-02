@@ -5,6 +5,7 @@ import {
   getFirestore,
   collection,
   updateDoc,
+  arrayUnion,
   doc,
   Timestamp,
   query,
@@ -399,6 +400,7 @@ export async function createDispute(
 
   // Step 2: Write to Firestore
   try {
+    const disputedEvent = { action: 'disputed' as const, at: Timestamp.now(), blockchainRef };
     if (existing.exists()) {
       await updateDoc(docRef, {
         severity,
@@ -407,7 +409,7 @@ export async function createDispute(
         notesHash,
         isActive: true,
         chainStatus: 'confirmed',
-        blockchainRef,
+        onChainHistory: arrayUnion(disputedEvent),
         error: null,
         lastModified: Timestamp.now(),
       });
@@ -425,7 +427,7 @@ export async function createDispute(
         isActive: true,
         createdAt: Timestamp.now(),
         chainStatus: 'confirmed',
-        blockchainRef,
+        onChainHistory: [disputedEvent],
         ...(titleData ?? {}),
       });
       console.log('✅ Firestore: Dispute created');
@@ -496,7 +498,7 @@ export async function retractDispute(recordHash: string, disputerId: string): Pr
       isActive: false,
       lastModified: Timestamp.now(),
       chainStatus: 'confirmed',
-      blockchainRef,
+      onChainHistory: arrayUnion({ action: 'retracted' as const, at: Timestamp.now(), blockchainRef }),
     });
     console.log('✅ Firestore: Dispute marked inactive');
   } catch (error) {
@@ -595,7 +597,15 @@ export async function modifyDispute(
       culpability: newCulpability,
       lastModified: Timestamp.now(),
       chainStatus: 'confirmed',
-      blockchainRef,
+      onChainHistory: arrayUnion({
+        action: 'modified' as const,
+        at: Timestamp.now(),
+        blockchainRef,
+        fromSeverity: oldSeverity,
+        toSeverity: newSeverity,
+        fromCulpability: oldCulpability,
+        toCulpability: newCulpability,
+      }),
     });
     console.log('✅ Firestore: Dispute updated');
   } catch (error) {

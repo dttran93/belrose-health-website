@@ -17,6 +17,7 @@ import { useMembersIntegrity } from '../hooks/useMembersIntegrity';
 import {
   useVerificationsIntegrity,
   useDisputesIntegrity,
+  useVouchesIntegrity,
 } from '../hooks/useVerificationsIntegrity';
 import { useSyncFailures } from '../hooks/useSyncFailures';
 import { useTrusteesIntegrity } from '../hooks/useTrusteesIntegrity';
@@ -65,6 +66,7 @@ const BackendChainParityDashboard: React.FC = () => {
   const members = useMembersIntegrity();
   const verifications = useVerificationsIntegrity();
   const disputes = useDisputesIntegrity();
+  const vouchesIntegrity = useVouchesIntegrity();
   const syncFailures = useSyncFailures();
   const trustees = useTrusteesIntegrity();
   const permissions = usePermissionsIntegrity();
@@ -74,6 +76,7 @@ const BackendChainParityDashboard: React.FC = () => {
     members.isFetching ||
     verifications.isFetching ||
     disputes.isFetching ||
+    vouchesIntegrity.isFetching ||
     trustees.isFetching ||
     permissions.isFetching;
 
@@ -82,6 +85,7 @@ const BackendChainParityDashboard: React.FC = () => {
     members.dataUpdatedAt,
     verifications.dataUpdatedAt,
     disputes.dataUpdatedAt,
+    vouchesIntegrity.dataUpdatedAt,
     trustees.dataUpdatedAt,
     permissions.dataUpdatedAt,
   ]
@@ -322,12 +326,13 @@ const BackendChainParityDashboard: React.FC = () => {
 
         {activeTab === 'credibility' && (
           <div className="pt-2">
-            {verifications.isLoading || disputes.isLoading ? (
-              <LoadingState label="verifications & disputes" />
+            {verifications.isLoading || disputes.isLoading || vouchesIntegrity.isLoading ? (
+              <LoadingState label="verifications, disputes & vouches" />
             ) : (
               <CredibilityIntegrityTable
                 verifications={verifications.data ?? []}
                 disputes={disputes.data ?? []}
+                vouches={vouchesIntegrity.data ?? []}
                 searchQuery={searchQuery}
                 statusFilter={statusFilter}
                 onClearSearch={() => setSearchQuery('')}

@@ -8,7 +8,7 @@ import { FileObject } from '@/types/core';
 export interface RecordIntegrityItem {
   firestoreId: string;
   recordHash: string | null;
-  recordIdHash?: string;
+  recordIdHash: string;
   backendSubjects: string[];
   onChainSubjects: string[];
   activeOnChainSubjects: string[];
@@ -55,7 +55,7 @@ export async function checkRecordIntegrity(
 
   const base: Omit<RecordIntegrityItem, 'integrityStatus'> = {
     firestoreId: record.id,
-    recordHash: record.recordHash,
+    recordHash: record.recordHash ?? null,
     recordIdHash: resolvedRecordIdHash,
     backendSubjects,
     onChainSubjects: [],

@@ -74,17 +74,19 @@ Two different hashes related to records appear throughout the contract and it is
 | **Active**           | 2     | Standard user       | Basic operations      |
 | **Verified**         | 3     | Identity verified   | Advanced features     |
 | **VerifiedProvider** | 4     | Healthcare provider | Professional features |
-| **Guest**            | 5     | Temporary access    | View shared records   |
+
+Guest access is handled entirely off-chain in Firebase and never appears on-chain — guests have no wallet and therefore no on-chain identity.
 
 ### Role Types
 
-Three types of roles for record access:
+Four types of roles for record access:
 
-| Role              | Permissions                 | Can Grant Roles To |
-| ----------------- | --------------------------- | ------------------ |
-| **Owner**         | Full control of record      | Anyone             |
-| **Administrator** | Manage record, invite users | Admins, Viewers    |
-| **Viewer**        | Read-only access            | No one             |
+| Role              | Permissions                      | Can Grant Roles To       |
+| ----------------- | -------------------------------- | ------------------------ |
+| **Owner**         | Full control of record           | Anyone                   |
+| **Administrator** | Manage record, invite users      | Admins, Sharers, Viewers |
+| **Sharer**        | Can share the record with others | Viewers                  |
+| **Viewer**        | Read-only access                 | No one                   |
 
 ### Trustee Relationships
 
@@ -217,18 +219,30 @@ await tx.wait();
 
 ### 6. Set Up a Trustee Relationship
 
-**Step 1 — Trustor proposes:**
+**Step 1 — Trustor proposes and grants access to existing records atomically:**
 
 ```typescript
 // TrusteeLevel: 0 = Observer, 1 = Custodian, 2 = Controller
-const tx = await contract.proposeTrustee(trusteeIdHash, 2); // Controller
+// recordIdHashes: all records where the trustor is currently a subject
+const tx = await contract.proposeTrustee(trusteeIdHash, 2, recordIdHashes); // Controller
 await tx.wait();
 ```
 
-**Step 2 — Trustee accepts:**
+Roles are granted to the trustee in the same transaction as the proposal. If the trustee later declines, those roles are revoked on-chain. This avoids a separate batch-grant step and the race condition that would otherwise occur between proposing and granting.
+
+**Step 2a — Trustee accepts:**
 
 ```typescript
 const tx = await contract.acceptTrustee(trustorIdHash);
+await tx.wait();
+```
+
+**Step 2b — Trustee declines:**
+
+```typescript
+// Revokes all roles granted at proposal time and marks the relationship Declined.
+// The trustor can re-propose after a decline.
+const tx = await contract.declineTrustee(trustorIdHash);
 await tx.wait();
 ```
 
@@ -255,9 +269,13 @@ await tx.wait();
 - If an owner exists → only existing owners can grant owner
 - If no owner exists → administrators can grant first owner
 
-**To grant "administrator" or "viewer" role:**
+**To grant "administrator" role:**
 
-- Only owners and administrators can grant admin or viewer role
+- Only owners and administrators can grant administrator role
+
+**To grant "sharer" or "viewer" role:**
+
+- Owners, administrators, sharers, or active subjects can grant sharer/viewer role
 
 ### Role Change Rules
 
@@ -300,13 +318,13 @@ console.log(`Role: ${role}, Active: ${isActive}`);
 ### List All People with Access
 
 ```typescript
-// Get all owner identity hashes for a record
+// Get all four role arrays for a record in one call
+const { owners, admins, sharers, viewers } = await contract.getAllRecordParticipants(recordIdHash);
+
+// Or individually if you only need one:
 const ownerHashes = await contract.getRecordOwners(recordIdHash);
-
-// Get all admin identity hashes
 const adminHashes = await contract.getRecordAdmins(recordIdHash);
-
-// Get all viewer identity hashes
+const sharerHashes = await contract.getRecordSharers(recordIdHash);
 const viewerHashes = await contract.getRecordViewers(recordIdHash);
 ```
 
@@ -325,7 +343,8 @@ const recordIdHashes = await contract.getRecordsByUser(userIdHash);
 
 ```typescript
 // How many people have each role type?
-const [ownerCount, adminCount, viewerCount] = await contract.getRecordRoleStats(recordIdHash);
+const [ownerCount, adminCount, sharerCount, viewerCount] =
+  await contract.getRecordRoleStats(recordIdHash);
 
 // Total unique users in the system
 const totalUsers = await contract.getTotalUsers();
@@ -339,7 +358,7 @@ const totalRoles = await contract.getTotalRoles();
 ```typescript
 // Check if an active trustee relationship exists and get its details
 const [status, level] = await contract.getTrusteeRelationship(trustorIdHash, trusteeIdHash);
-// status: 0=None, 1=Pending, 2=Active, 3=Revoked
+// status: 0=None, 1=Pending, 2=Active, 3=Revoked, 4=Declined
 // level: 0=Observer, 1=Custodian, 2=Controller
 
 // Check specifically if someone is a Controller of another identity
@@ -364,6 +383,12 @@ const userIdHash = await contract.getUserForWallet(walletAddress);
 // userIdHash → All wallets for that user
 const wallets = await contract.getWalletsForUser(userIdHash);
 ```
+
+## Auditing the chain and Blockchain/Backend Parity
+
+A key concern is making sure both blockchain contracts and the backend stay in sync.
+
+There are many options to maintain visibility into the full data storage of the Belrose contracts. One option, an on-chain array of all users/records/verifications and disputes would not scale well. The index array would grow unboundedly as the app grows. Solution Belrose intends to use is an event-based indexer which monitors and writes on chain events into a standard database that can then be queried and compared to backend.
 
 ## Next Steps
 

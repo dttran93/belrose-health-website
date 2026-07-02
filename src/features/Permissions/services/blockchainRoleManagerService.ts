@@ -91,20 +91,13 @@ export interface TransactionResult {
 
 export type TrusteeLevel = 0 | 1 | 2; //Observer = 0, Custodian = 1, Controller = 2
 export type TrusteeLevelName = 'Observer' | 'Custodian' | 'Controller';
-export type TrusteeStatusName = 'None' | 'Pending' | 'Active' | 'Revoked';
+export type TrusteeStatusName = 'None' | 'Pending' | 'Active' | 'Revoked' | 'Declined';
 
 export interface TrusteeRelationship {
   status: TrusteeStatusName;
   level: TrusteeLevelName;
 }
 
-export interface GuestAccessInfo {
-  grantedAt: Date;
-  expiresAt: Date;
-  grantedByIdHash: string;
-  guestEmailHash: string;
-  isExpired: boolean;
-}
 
 // ============================================================================
 // SERVICE
@@ -286,20 +279,6 @@ export class BlockchainRoleManagerService {
   }
 
   /**
-   * Get all registered user identity hashes
-   */
-  static async getAllUsers(): Promise<string[]> {
-    try {
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getAllUsers');
-      return await fn();
-    } catch (error) {
-      console.error('Error getting all users:', error);
-      return [];
-    }
-  }
-
-  /**
    * Get total number of registered identities
    */
   static async getTotalUsers(): Promise<number> {
@@ -452,16 +431,17 @@ export class BlockchainRoleManagerService {
   }
 
   /**
-   * Get all records where an identity has any role
-   * Note: Takes userIdHash, not wallet address also returns string of recordIdHashes
+   * Get all sharers for a record
+   * Note: Returns userIdHashes, not wallet addresses
    */
-  static async getRecordsByUser(userIdHash: string): Promise<string[]> {
+  static async getRecordSharers(recordId: string): Promise<string[]> {
     try {
+      const recordIdHash = id(recordId);
       const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getRecordsByUser');
-      return await fn(userIdHash);
+      const fn = contract.getFunction('getRecordSharers');
+      return await fn(recordIdHash);
     } catch (error) {
-      console.error('Error getting records by user:', error);
+      console.error('Error getting record sharers:', error);
       return [];
     }
   }
@@ -663,23 +643,6 @@ export class BlockchainRoleManagerService {
     return result;
   }
 
-  static async grantRoleAsTrusteeBatch(
-    recordIds: string[],
-    trustorIdHash: string
-  ): Promise<TransactionResult> {
-    const recordIdHashes = recordIds.map(recordId => id(recordId));
-    console.log('🔗 Granting trustee batch roles on blockchain...', {
-      recordIdHashes,
-      trustorIdHash,
-    });
-    const result = await this.executeWrite('grantRoleAsTrusteeBatch', [
-      recordIdHashes,
-      trustorIdHash,
-    ]);
-    console.log('✅ Trustee batch roles granted:', result.txHash);
-    return result;
-  }
-
   // ==========================================================================
   // TRUSTEE RELATIONSHIPS - WRITE FUNCTIONS
   // ==========================================================================
@@ -690,11 +653,24 @@ export class BlockchainRoleManagerService {
    * @param trusteeIdHash Identity hash of the proposed trustee
    * @param level 0=Observer, 1=Custodian, 2=Controller
    */
-  static async proposeTrustee(trusteeId: string, level: TrusteeLevel): Promise<TransactionResult> {
-    console.log('🔗 Proposing trustee on blockchain...', { trusteeId, level });
+  static async proposeTrustee(
+    trusteeId: string,
+    level: TrusteeLevel,
+    recordIds: string[]
+  ): Promise<TransactionResult> {
     const trusteeIdHash = ethers.id(trusteeId);
-    const result = await this.executeWrite('proposeTrustee', [trusteeIdHash, level]);
+    const recordIdHashes = recordIds.map(rid => id(rid));
+    console.log('🔗 Proposing trustee on blockchain...', { trusteeId, level, recordCount: recordIds.length });
+    const result = await this.executeWrite('proposeTrustee', [trusteeIdHash, level, recordIdHashes]);
     console.log('✅ Trustee proposed:', result.txHash);
+    return result;
+  }
+
+  static async declineTrustee(trustorId: string): Promise<TransactionResult> {
+    const trustorIdHash = ethers.id(trustorId);
+    console.log('🔗 Declining trustee proposal on blockchain...', { trustorId });
+    const result = await this.executeWrite('declineTrustee', [trustorIdHash]);
+    console.log('✅ Trustee proposal declined:', result.txHash);
     return result;
   }
 
@@ -775,6 +751,7 @@ export class BlockchainRoleManagerService {
         1: 'Pending',
         2: 'Active',
         3: 'Revoked',
+        4: 'Declined',
       };
       const levelMap: Record<number, TrusteeLevelName> = {
         0: 'Observer',
@@ -791,101 +768,6 @@ export class BlockchainRoleManagerService {
     } catch (error) {
       console.error('Error getting trustee relationship:', error);
       return { status: 'None', level: 'Observer' };
-    }
-  }
-
-  // ==========================================================================
-  // GUEST ACCESS - WRITE FUNCTIONS
-  // ==========================================================================
-
-  /**
-   * Grant a guest temporary viewer access to one or more records.
-   * @param recordIdHashes One or more record IDs
-   * @param guestWallet Deterministic placeholder address derived from guest UID
-   * @param guestIdHash keccak256 of guest Firebase UID
-   * @param guestEmailHash keccak256 of guest email (lowercased)
-   * @param durationSeconds How long access lasts (default 7 days = 604800)
-   */
-  static async grantGuestAccess(
-    recordIdHashes: string[],
-    guestWallet: string,
-    guestIdHash: string,
-    guestEmailHash: string,
-    durationSeconds: number = 604800
-  ): Promise<TransactionResult> {
-    console.log('🔗 Granting guest access on blockchain...', { recordIdHashes, guestWallet });
-    const result = await this.executeWrite('grantGuestAccess', [
-      recordIdHashes,
-      guestWallet,
-      guestIdHash,
-      guestEmailHash,
-      durationSeconds,
-    ]);
-    console.log('✅ Guest access granted:', result.txHash);
-    return result;
-  }
-
-  /**
-   * Revoke a guest's access to one or more records.
-   * Can be called by the granter or any owner/admin of the record.
-   */
-  static async revokeGuestAccess(
-    recordIdHashes: string[],
-    guestIdHash: string
-  ): Promise<TransactionResult> {
-    console.log('🔗 Revoking guest access on blockchain...', { recordIdHashes, guestIdHash });
-    const result = await this.executeWrite('revokeGuestAccess', [recordIdHashes, guestIdHash]);
-    console.log('✅ Guest access revoked:', result.txHash);
-    return result;
-  }
-
-  // ==========================================================================
-  // GUEST ACCESS - VIEW FUNCTIONS
-  // ==========================================================================
-
-  /**
-   * Check if a guest has active non-expired access to a record
-   */
-  static async hasActiveGuestAccess(recordId: string, guestId: string): Promise<boolean> {
-    try {
-      const recordIdHash = id(recordId);
-      const guestIdHash = id(guestId);
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('hasActiveGuestAccess');
-      return await fn(recordIdHash, guestIdHash);
-    } catch (error) {
-      console.error('Error checking guest access:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Get full guest access details for a record
-   */
-  static async getGuestAccess(recordId: string, guestId: string): Promise<GuestAccessInfo | null> {
-    try {
-      const recordIdHash = id(recordId);
-      const guestIdHash = id(guestId);
-      const contract = this.getReadOnlyContract();
-      const fn = contract.getFunction('getGuestAccess');
-      const result = await fn(recordIdHash, guestIdHash);
-
-      const grantedAt = new Date(Number(result[0]) * 1000);
-      const expiresAt = new Date(Number(result[1]) * 1000);
-
-      // grantedAt of 0 means no access was ever granted
-      if (Number(result[0]) === 0) return null;
-
-      return {
-        grantedAt,
-        expiresAt,
-        grantedByIdHash: result[2],
-        guestEmailHash: result[3],
-        isExpired: new Date() > expiresAt,
-      };
-    } catch (error) {
-      console.error('Error getting guest access:', error);
-      return null;
     }
   }
 

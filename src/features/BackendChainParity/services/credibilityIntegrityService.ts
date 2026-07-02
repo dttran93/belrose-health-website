@@ -1,8 +1,17 @@
 // src/features/BackendChainParity/services/credibilityIntegrityService.ts
 
-import type { VerificationDoc, DisputeDoc, BlockchainRef, TimestampLike } from '@belrose/shared';
+import type {
+  VerificationDoc,
+  DisputeDoc,
+  VouchDoc,
+  BlockchainRef,
+  TimestampLike,
+  VerificationOnChainEvent,
+  DisputeOnChainEvent,
+  VouchOnChainEvent,
+} from '@belrose/shared';
 import type { IntegrityStatus } from '../lib/types';
-import { getHealthContract } from '../lib/contracts';
+import { getHealthContract, getMemberContract } from '../lib/contracts';
 import { id } from 'ethers';
 
 // ============================================================================
@@ -16,7 +25,9 @@ export interface VerificationIntegrityItem {
   verifierIdHash: string;
   verifierId: string;
   chainStatus?: string;
+  /** Latest tx — derived from the last onChainHistory entry for the Tx column. */
   blockchainRef?: BlockchainRef;
+  onChainHistory?: VerificationOnChainEvent[];
   level: number;
   createdAt?: TimestampLike;
   integrityStatus: IntegrityStatus;
@@ -30,6 +41,7 @@ export async function checkVerificationIntegrity(
   ver: VerificationDoc
 ): Promise<VerificationIntegrityItem> {
   const expectedRecordIdHash = id(ver.recordId).toLowerCase();
+  const latestBlockchainRef = ver.onChainHistory?.at(-1)?.blockchainRef;
 
   const base: Omit<VerificationIntegrityItem, 'integrityStatus'> = {
     recordId: ver.recordId,
@@ -38,7 +50,8 @@ export async function checkVerificationIntegrity(
     verifierId: ver.verifierId,
     verifierIdHash: ver.verifierIdHash,
     chainStatus: ver.chainStatus,
-    blockchainRef: ver.blockchainRef,
+    blockchainRef: latestBlockchainRef,
+    onChainHistory: ver.onChainHistory,
     level: ver.level,
     createdAt: ver.createdAt,
   };
@@ -55,17 +68,14 @@ export async function checkVerificationIntegrity(
         contract.doesHashExist(ver.recordHash),
       ]);
 
-    // Check 1: does the verification exist on-chain?
     if (!exists) return { ...base, integrityStatus: 'missing', existsOnChain: false };
 
     const mismatchReasons: string[] = [];
 
-    // Check 2: is the record hash still active on-chain (not retracted from the record)?
     if (!hashIsActive) {
       mismatchReasons.push('record hash retracted on-chain');
     }
 
-    // Check 3: does the on-chain verification still point to the expected record?
     const onChainRecordIdHashNorm = (onChainRecordIdHash as string).toLowerCase();
     if (onChainRecordIdHashNorm !== expectedRecordIdHash) {
       mismatchReasons.push(
@@ -73,7 +83,6 @@ export async function checkVerificationIntegrity(
       );
     }
 
-    // Check 4: does the on-chain level match Firestore?
     const onChainLevelNum = Number(onChainLevel);
     if (onChainLevelNum !== ver.level) {
       mismatchReasons.push(
@@ -81,9 +90,114 @@ export async function checkVerificationIntegrity(
       );
     }
 
-    // Check 5: is the verification still active?
     if (!isActive) {
       mismatchReasons.push('verification retracted on-chain');
+    }
+
+    const integrityStatus: IntegrityStatus = mismatchReasons.length > 0 ? 'mismatch' : 'synced';
+
+    return {
+      ...base,
+      integrityStatus,
+      existsOnChain: true,
+      isActiveOnChain: !!isActive,
+      ...(mismatchReasons.length > 0 && { mismatchReasons }),
+    };
+  } catch (error) {
+    console.log('Error checking verification integrity:', error);
+    return { ...base, integrityStatus: 'failed', error: String(error) };
+  }
+}
+
+// ============================================================================
+// DISPUTE INTEGRITY CHECK
+// ============================================================================
+
+export interface DisputeIntegrityItem {
+  recordId: string;
+  recordIdHash: string;
+  recordHash: string;
+  disputerIdHash?: string;
+  disputerId?: string;
+  chainStatus?: string;
+  /** Latest tx — derived from the last onChainHistory entry for the Tx column. */
+  blockchainRef?: BlockchainRef;
+  onChainHistory?: DisputeOnChainEvent[];
+  severity: number;
+  culpability: number;
+  createdAt?: TimestampLike;
+  integrityStatus: IntegrityStatus;
+  existsOnChain?: boolean;
+  isActiveOnChain?: boolean;
+  mismatchReasons?: string[];
+  error?: string;
+}
+
+export async function checkDisputeIntegrity(dispute: DisputeDoc): Promise<DisputeIntegrityItem> {
+  const expectedRecordIdHash = id(dispute.recordId).toLowerCase();
+  const latestBlockchainRef = dispute.onChainHistory?.at(-1)?.blockchainRef;
+
+  const base: Omit<DisputeIntegrityItem, 'integrityStatus'> = {
+    recordId: dispute.recordId,
+    recordIdHash: expectedRecordIdHash,
+    recordHash: dispute.recordHash,
+    disputerIdHash: dispute.disputerIdHash,
+    disputerId: dispute.disputerId,
+    chainStatus: dispute.chainStatus,
+    blockchainRef: latestBlockchainRef,
+    onChainHistory: dispute.onChainHistory,
+    severity: dispute.severity,
+    culpability: dispute.culpability,
+    createdAt: dispute.createdAt,
+  };
+
+  if (dispute.chainStatus === 'pending') return { ...base, integrityStatus: 'pending' };
+  if (dispute.chainStatus === 'failed') return { ...base, integrityStatus: 'failed' };
+  if (!dispute.recordHash || !dispute.disputerIdHash)
+    return { ...base, integrityStatus: 'not_applicable' };
+
+  try {
+    const contract = getHealthContract();
+
+    const [
+      [exists, onChainRecordIdHash, onChainSeverity, onChainCulpability, , , isActive],
+      hashIsActive,
+    ] = await Promise.all([
+      contract.getUserDispute(dispute.recordHash, dispute.disputerIdHash),
+      contract.doesHashExist(dispute.recordHash),
+    ]);
+
+    if (!exists) return { ...base, integrityStatus: 'missing', existsOnChain: false };
+
+    const mismatchReasons: string[] = [];
+
+    if (!hashIsActive) {
+      mismatchReasons.push('record hash retracted on-chain');
+    }
+
+    const onChainRecordIdHashNorm = (onChainRecordIdHash as string).toLowerCase();
+    if (onChainRecordIdHashNorm !== expectedRecordIdHash) {
+      mismatchReasons.push(
+        `recordIdHash mismatch — on-chain: ${onChainRecordIdHashNorm.slice(0, 12)}…, expected: ${expectedRecordIdHash.slice(0, 12)}…`
+      );
+    }
+
+    const onChainSeverityNum = Number(onChainSeverity);
+    if (onChainSeverityNum !== dispute.severity) {
+      mismatchReasons.push(
+        `severity mismatch — on-chain: ${onChainSeverityNum}, firestore: ${dispute.severity}`
+      );
+    }
+
+    const onChainCulpabilityNum = Number(onChainCulpability);
+    if (onChainCulpabilityNum !== dispute.culpability) {
+      mismatchReasons.push(
+        `culpability mismatch — on-chain: ${onChainCulpabilityNum}, firestore: ${dispute.culpability}`
+      );
+    }
+
+    if (!isActive) {
+      mismatchReasons.push('dispute retracted on-chain');
     }
 
     const integrityStatus: IntegrityStatus = mismatchReasons.length > 0 ? 'mismatch' : 'synced';
@@ -101,19 +215,17 @@ export async function checkVerificationIntegrity(
 }
 
 // ============================================================================
-// DISPUTE INTEGRITY CHECK
+// VOUCH INTEGRITY CHECK
 // ============================================================================
 
-export interface DisputeIntegrityItem {
-  recordId: string;
-  recordIdHash: string;
-  recordHash: string;
-  disputerIdHash?: string;
-  disputerId?: string;
-  chainStatus?: string;
-  blockchainRef?: BlockchainRef;
-  severity: number;
-  culpability: number;
+export interface VouchIntegrityItem {
+  vouchId: string;
+  voucherId: string;
+  voucherIdHash: string;
+  voucheeId: string;
+  voucheeIdHash: string;
+  chainStatus: string;
+  onChainHistory?: VouchOnChainEvent[];
   createdAt?: TimestampLike;
   integrityStatus: IntegrityStatus;
   existsOnChain?: boolean;
@@ -122,83 +234,46 @@ export interface DisputeIntegrityItem {
   error?: string;
 }
 
-export async function checkDisputeIntegrity(dispute: DisputeDoc): Promise<DisputeIntegrityItem> {
-  const expectedRecordIdHash = id(dispute.recordId).toLowerCase();
-
-  const base: Omit<DisputeIntegrityItem, 'integrityStatus'> = {
-    recordId: dispute.recordId,
-    recordIdHash: expectedRecordIdHash,
-    recordHash: dispute.recordHash,
-    disputerIdHash: dispute.disputerIdHash,
-    disputerId: dispute.disputerId,
-    chainStatus: dispute.chainStatus,
-    blockchainRef: dispute.blockchainRef,
-    severity: dispute.severity,
-    culpability: dispute.culpability,
-    createdAt: dispute.createdAt,
+export async function checkVouchIntegrity(vouch: VouchDoc): Promise<VouchIntegrityItem> {
+  const base: Omit<VouchIntegrityItem, 'integrityStatus'> = {
+    vouchId: vouch.id,
+    voucherId: vouch.voucherId,
+    voucherIdHash: vouch.voucherIdHash,
+    voucheeId: vouch.voucheeId,
+    voucheeIdHash: vouch.voucheeIdHash,
+    chainStatus: vouch.chainStatus,
+    onChainHistory: vouch.onChainHistory,
+    createdAt: vouch.createdAt,
   };
 
-  if (dispute.chainStatus === 'pending') return { ...base, integrityStatus: 'pending' };
-  if (dispute.chainStatus === 'failed') return { ...base, integrityStatus: 'failed' };
-  if (!dispute.recordHash || !dispute.disputerIdHash)
-    return { ...base, integrityStatus: 'not_applicable' };
-
   try {
-    const contract = getHealthContract();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const isVouchedOnChain = (await (getMemberContract() as any).hasVouched(
+      vouch.voucherIdHash,
+      vouch.voucheeIdHash
+    )) as boolean;
 
-    const [[exists, onChainRecordIdHash, onChainSeverity, onChainCulpability, , , isActive], hashIsActive] =
-      await Promise.all([
-        contract.getUserDispute(dispute.recordHash, dispute.disputerIdHash),
-        contract.doesHashExist(dispute.recordHash),
-      ]);
+    const firestoreIsActive = vouch.chainStatus === 'Active';
 
-    // Check 1: does the dispute exist on-chain?
-    if (!exists) return { ...base, integrityStatus: 'missing', existsOnChain: false };
-
-    const mismatchReasons: string[] = [];
-
-    // Check 2: is the record hash still active on-chain (not retracted from the record)?
-    if (!hashIsActive) {
-      mismatchReasons.push('record hash retracted on-chain');
+    if (firestoreIsActive !== isVouchedOnChain) {
+      return {
+        ...base,
+        integrityStatus: 'mismatch',
+        existsOnChain: isVouchedOnChain,
+        isActiveOnChain: isVouchedOnChain,
+        mismatchReasons: [
+          firestoreIsActive
+            ? 'Firestore shows Active but not vouched on-chain'
+            : 'Firestore shows Retracted but still vouched on-chain',
+        ],
+      };
     }
-
-    // Check 3: does the on-chain dispute still point to the expected record?
-    const onChainRecordIdHashNorm = (onChainRecordIdHash as string).toLowerCase();
-    if (onChainRecordIdHashNorm !== expectedRecordIdHash) {
-      mismatchReasons.push(
-        `recordIdHash mismatch — on-chain: ${onChainRecordIdHashNorm.slice(0, 12)}…, expected: ${expectedRecordIdHash.slice(0, 12)}…`
-      );
-    }
-
-    // Check 4: does the on-chain severity match Firestore?
-    const onChainSeverityNum = Number(onChainSeverity);
-    if (onChainSeverityNum !== dispute.severity) {
-      mismatchReasons.push(
-        `severity mismatch — on-chain: ${onChainSeverityNum}, firestore: ${dispute.severity}`
-      );
-    }
-
-    // Check 5: does the on-chain culpability match Firestore?
-    const onChainCulpabilityNum = Number(onChainCulpability);
-    if (onChainCulpabilityNum !== dispute.culpability) {
-      mismatchReasons.push(
-        `culpability mismatch — on-chain: ${onChainCulpabilityNum}, firestore: ${dispute.culpability}`
-      );
-    }
-
-    // Check 6: is the dispute still active?
-    if (!isActive) {
-      mismatchReasons.push('dispute retracted on-chain');
-    }
-
-    const integrityStatus: IntegrityStatus = mismatchReasons.length > 0 ? 'mismatch' : 'synced';
 
     return {
       ...base,
-      integrityStatus,
-      existsOnChain: true,
-      isActiveOnChain: !!isActive,
-      ...(mismatchReasons.length > 0 && { mismatchReasons }),
+      integrityStatus: 'synced',
+      existsOnChain: isVouchedOnChain,
+      isActiveOnChain: isVouchedOnChain,
     };
   } catch (error) {
     return { ...base, integrityStatus: 'failed', error: String(error) };

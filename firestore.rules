@@ -317,12 +317,14 @@ service cloud.firestore {
           request.auth.uid in resource.data.subjects) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['credibility'])
         ) ||
-        // BRANCH 5: Sharer (or above) granting/revoking viewer and sharer access.
+        // BRANCH 5: Sharer granting/revoking viewer access only. Sharers cannot modify the
+        // sharers array — only owners and administrators can grant sharer role.
         (
           request.auth.uid in resource.data.get('sharers', []) &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewers', 'sharers', 'trustees', 'lastModified']) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewers', 'trustees', 'lastModified']) &&
           resource.data.owners == request.resource.data.owners &&
           resource.data.administrators == request.resource.data.administrators &&
+          resource.data.get('sharers', []) == request.resource.data.get('sharers', []) &&
           resource.data.subjects == request.resource.data.subjects
         ) ||
         // BRANCH 6: Viewer removing themselves
@@ -667,6 +669,44 @@ service cloud.firestore {
         request.resource.data.createdAt == resource.data.createdAt;
 
       // DELETE: Not allowed - use isActive flag instead
+      allow delete: if false;
+    }
+
+    // ============================================
+    // VOUCHES
+    // ============================================
+
+    match /vouches/{vouchId} {
+      // READ: Any authenticated user — vouches are public trust signals
+      // used for credibility score computation across the network.
+      allow read: if request.auth != null;
+
+      // CREATE: Only the voucher can create their own vouch.
+      // - voucherId must match the caller (no vouching on behalf of others)
+      // - Can't vouch for yourself
+      // - Document ID enforces uniqueness: {voucherId}_{voucheeId}
+      // - Required fields validated
+      allow create: if request.auth != null &&
+        request.resource.data.voucherId == request.auth.uid &&
+        request.resource.data.voucheeId != request.auth.uid &&
+        vouchId == request.auth.uid + '_' + request.resource.data.voucheeId &&
+        request.resource.data.chainStatus == 'Active' &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.onChainHistory is list &&
+        request.resource.data.onChainHistory.size() == 1;
+
+      // UPDATE: Only the original voucher can update (retract or re-vouch).
+      // Core identity fields are immutable after creation.
+      allow update: if request.auth != null &&
+        resource.data.voucherId == request.auth.uid &&
+        request.resource.data.voucherId == resource.data.voucherId &&
+        request.resource.data.voucherIdHash == resource.data.voucherIdHash &&
+        request.resource.data.voucheeId == resource.data.voucheeId &&
+        request.resource.data.voucheeIdHash == resource.data.voucheeIdHash &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.chainStatus in ['Active', 'Retracted'];
+
+      // DELETE: Not allowed — vouches are a permanent audit trail.
       allow delete: if false;
     }
 

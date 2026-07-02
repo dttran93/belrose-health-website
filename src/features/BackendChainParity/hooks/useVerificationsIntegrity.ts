@@ -6,10 +6,12 @@ import { getApp } from 'firebase/app';
 import {
   checkVerificationIntegrity,
   checkDisputeIntegrity,
+  checkVouchIntegrity,
   VerificationIntegrityItem,
   DisputeIntegrityItem,
+  VouchIntegrityItem,
 } from '../services/credibilityIntegrityService';
-import type { VerificationDoc, DisputeDoc } from '@belrose/shared';
+import type { VerificationDoc, DisputeDoc, VouchDoc } from '@belrose/shared';
 
 const db = getFirestore(getApp());
 
@@ -33,6 +35,16 @@ async function fetchDisputesIntegrity(): Promise<DisputeIntegrityItem[]> {
   return Promise.all(items.map(item => checkDisputeIntegrity(item)));
 }
 
+async function fetchVouchesIntegrity(): Promise<VouchIntegrityItem[]> {
+  const snapshot = await getDocs(collection(db, 'vouches'));
+  const items = snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...(doc.data() as Omit<VouchDoc, 'id'>),
+  })) as VouchDoc[];
+
+  return Promise.all(items.map(item => checkVouchIntegrity(item)));
+}
+
 export function useVerificationsIntegrity() {
   return useQuery({
     queryKey: ['backend-chain-parity', 'verifications'],
@@ -45,6 +57,14 @@ export function useDisputesIntegrity() {
   return useQuery({
     queryKey: ['backend-chain-parity', 'disputes'],
     queryFn: fetchDisputesIntegrity,
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function useVouchesIntegrity() {
+  return useQuery({
+    queryKey: ['backend-chain-parity', 'vouches'],
+    queryFn: fetchVouchesIntegrity,
     staleTime: 10 * 60 * 1000,
   });
 }

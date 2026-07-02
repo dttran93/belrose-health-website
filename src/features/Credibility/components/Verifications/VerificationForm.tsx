@@ -4,13 +4,8 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/utils/utils';
 import { CheckCircle, Loader2, Undo2, Edit2, AlertTriangle } from 'lucide-react';
-import {
-  VerificationDoc,
-  VERIFICATION_OPTIONS,
-  getVerificationConfig,
-  VerificationLevelOptions,
-} from '../../services/verificationService';
-import { DisputeDoc } from '../../services/disputeService';
+import { VERIFICATION_OPTIONS, getVerificationConfig } from '../../services/verificationService';
+import { DisputeDoc, VerificationDoc, VerificationLevelOptions } from '@belrose/shared';
 
 // ============================================================
 // TYPES
