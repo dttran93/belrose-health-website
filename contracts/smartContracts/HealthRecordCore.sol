@@ -291,13 +291,20 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
 
   /**
    * @notice Add a new Record Hash to the blockchain. In the case where a provider creates their verification first
-   * this essentially servers as the provider's "anchoring" of a record onChain. The patient is then notified to
+   * this essentially serves as the provider's "anchoring" of a record onChain. The patient is then notified to
    * add themselves as a subject to this record that has been verified.
    *
-   * Also can be used to add a new recordHash to an existing record. In the event a provider verifies a new hash to an
-   * existing record.
+   * @dev Intentionally onlyRecordParticipant (rather than onlyOwnerOrAdmin). Viewers and sharers can verify
+   * and dispute records, so they must be able to register a hash before doing so. The abuse vector
+   * (a participant submitting a fake hash) is low-risk: no one can verify a hash without the actual
+   * record content, the fake hash just pollutes version history, and owners/admins can retract it via
+   * retractRecordHash. Further, a subject submitting a fraudulently edited hash is also low risk because
+   * they are free to edit their record however they want. For it to have real credibility they would need a
+   * verifier to vouch for it, which cannot be faked in this function.
    *
-   * @dev Only owner/admin can add new versions
+   *  The real gate is the role grant itself — only owner/admin/sharer can make
+   * someone a participant in the first place.
+   *
    * @param recordIdHash The record ID
    * @param newHash The new content hash
    */
@@ -626,7 +633,10 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
     require(verifierIdHash != bytes32(0), "Wallet not registered");
     require(recordIdForHash[recordHash] == recordIdHash, "Hash does not belong to this record");
     require(!currentlyVerified[recordHash][verifierIdHash], "Already verified this hash");
-    require(!currentlyDisputed[recordHash][verifierIdHash], "Cannot verify a hash you are actively disputing");
+    require(
+      !currentlyDisputed[recordHash][verifierIdHash],
+      "Cannot verify a hash you are actively disputing"
+    );
 
     uint256 newIndex = verifications[recordHash].length;
 
@@ -730,7 +740,10 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
     require(disputerIdHash != bytes32(0), "Wallet not registered");
     require(recordIdForHash[recordHash] == recordIdHash, "Hash does not belong to this record");
     require(!currentlyDisputed[recordHash][disputerIdHash], "Already disputed this hash");
-    require(!currentlyVerified[recordHash][disputerIdHash], "Cannot dispute a hash you are actively verifying");
+    require(
+      !currentlyVerified[recordHash][disputerIdHash],
+      "Cannot dispute a hash you are actively verifying"
+    );
 
     uint256 newIndex = disputes[recordHash].length;
 
@@ -801,7 +814,8 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
     DisputeCulpability oldCulpability = dispute.culpability;
 
     require(
-      oldSeverity != DisputeSeverity(newSeverity) || oldCulpability != DisputeCulpability(newCulpability),
+      oldSeverity != DisputeSeverity(newSeverity) ||
+        oldCulpability != DisputeCulpability(newCulpability),
       "Values unchanged"
     );
 

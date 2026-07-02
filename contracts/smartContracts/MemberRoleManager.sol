@@ -1608,6 +1608,130 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   }
 
   // ===============================================================
+  // VOUCHES
+  // ===============================================================
+
+  // =================== VOUCHES - ENUMS ===================
+
+  enum VouchStatus {
+    None, // 0 - Default, never vouched
+    Active, // 1 - Currently vouching
+    Retracted // 2 - Previously vouched, now retracted
+  }
+
+  // =================== VOUCHES - EVENTS ===================
+
+  event VouchGiven(
+    bytes32 indexed voucherIdHash,
+    bytes32 indexed voucheeIdHash,
+    uint256 timestamp
+  );
+
+  event VouchRetracted(
+    bytes32 indexed voucherIdHash,
+    bytes32 indexed voucheeIdHash,
+    uint256 timestamp
+  );
+
+  // =================== VOUCHES - STORAGE ===================
+
+  // voucherIdHash => voucheeIdHash => VouchStatus (tracks full history)
+  mapping(bytes32 => mapping(bytes32 => VouchStatus)) public vouches;
+
+  // voucherIdHash => list of currently active vouchee identity hashes
+  mapping(bytes32 => bytes32[]) public vouchesGiven;
+
+  // voucheeIdHash => list of currently active voucher identity hashes
+  mapping(bytes32 => bytes32[]) public vouchesReceived;
+
+  // =================== VOUCHES - FUNCTIONS ===================
+
+  /**
+   * @notice Give a vouch to another active member
+   * @dev Re-vouching after retraction is allowed (Retracted → Active)
+   * @param voucheeIdHash The identity hash of the user being vouched for
+   */
+  function giveVouch(bytes32 voucheeIdHash) external onlyActiveMember {
+    bytes32 voucherIdHash = _getCallerIdHash();
+    require(voucheeIdHash != bytes32(0), "Invalid vouchee");
+    require(voucherIdHash != voucheeIdHash, "Cannot vouch for yourself");
+
+    MemberStatus voucheeStatus = userStatus[voucheeIdHash];
+    require(
+      voucheeStatus == MemberStatus.Active ||
+        voucheeStatus == MemberStatus.Verified ||
+        voucheeStatus == MemberStatus.VerifiedProvider,
+      "Vouchee must be an active member"
+    );
+
+    require(
+      vouches[voucherIdHash][voucheeIdHash] != VouchStatus.Active,
+      "Already vouching for this user"
+    );
+
+    vouches[voucherIdHash][voucheeIdHash] = VouchStatus.Active;
+    vouchesGiven[voucherIdHash].push(voucheeIdHash);
+    vouchesReceived[voucheeIdHash].push(voucherIdHash);
+
+    emit VouchGiven(voucherIdHash, voucheeIdHash, block.timestamp);
+  }
+
+  /**
+   * @notice Retract a previously given vouch
+   * @dev Sets status to Retracted (not None) to preserve history
+   * @param voucheeIdHash The identity hash of the user being un-vouched
+   */
+  function retractVouch(bytes32 voucheeIdHash) external onlyActiveMember {
+    bytes32 voucherIdHash = _getCallerIdHash();
+    require(
+      vouches[voucherIdHash][voucheeIdHash] == VouchStatus.Active,
+      "No active vouch for this user"
+    );
+
+    vouches[voucherIdHash][voucheeIdHash] = VouchStatus.Retracted;
+    _removeFromBytes32Array(vouchesGiven[voucherIdHash], voucheeIdHash);
+    _removeFromBytes32Array(vouchesReceived[voucheeIdHash], voucherIdHash);
+
+    emit VouchRetracted(voucherIdHash, voucheeIdHash, block.timestamp);
+  }
+
+  // =================== VOUCHES - VIEW FUNCTIONS ===================
+
+  /**
+   * @notice Check if a user is currently actively vouching for another user
+   */
+  function hasVouched(
+    bytes32 voucherIdHash,
+    bytes32 voucheeIdHash
+  ) external view returns (bool) {
+    return vouches[voucherIdHash][voucheeIdHash] == VouchStatus.Active;
+  }
+
+  /**
+   * @notice Get the full vouch status between two users (None, Active, or Retracted)
+   */
+  function getVouchStatus(
+    bytes32 voucherIdHash,
+    bytes32 voucheeIdHash
+  ) external view returns (VouchStatus) {
+    return vouches[voucherIdHash][voucheeIdHash];
+  }
+
+  /**
+   * @notice Get all identity hashes a user is currently actively vouching for
+   */
+  function getVouchesGiven(bytes32 voucherIdHash) external view returns (bytes32[] memory) {
+    return vouchesGiven[voucherIdHash];
+  }
+
+  /**
+   * @notice Get all identity hashes currently actively vouching for a user
+   */
+  function getVouchesReceived(bytes32 voucheeIdHash) external view returns (bytes32[] memory) {
+    return vouchesReceived[voucheeIdHash];
+  }
+
+  // ===============================================================
   // STORAGE GAP
   // Safe upgrade buffer — future versions can consume these slots
   // without shifting the storage layout of existing variables.

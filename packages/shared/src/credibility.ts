@@ -46,3 +46,19 @@ export interface DisputeDoc {
   encryptedRecordTitle?: string;
   encryptedRecordTitleIv?: string;
 }
+
+export type VouchChainStatus = 'None' | 'Active' | 'Retracted';
+
+export interface VouchDoc {
+  id: string; // "{voucherId}_{voucheeId}"
+  voucherId: string;
+  voucherIdHash: string;
+  voucheeId: string;
+  voucheeIdHash: string;
+  chainStatus: VouchChainStatus;
+  createdAt: TimestampLike;
+  lastModified?: TimestampLike;
+  blockchainRef?: BlockchainRef;
+  retractedAt?: TimestampLike;
+  retractBlockchainRef?: BlockchainRef;
+}

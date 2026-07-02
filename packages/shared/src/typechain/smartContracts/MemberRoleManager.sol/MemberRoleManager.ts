@@ -53,11 +53,16 @@ export interface MemberRoleManagerInterface extends Interface {
       | "getTrusteeRelationship"
       | "getUserForWallet"
       | "getUserStatus"
+      | "getVouchStatus"
+      | "getVouchesGiven"
+      | "getVouchesReceived"
       | "getWalletsForUser"
+      | "giveVouch"
       | "grantRole"
       | "grantRoleBatch"
       | "hasActiveRole"
       | "hasRole"
+      | "hasVouched"
       | "healthRecordCore"
       | "initialize"
       | "initializeRecordRole"
@@ -72,6 +77,7 @@ export interface MemberRoleManagerInterface extends Interface {
       | "proxiableUUID"
       | "reactivateWallet"
       | "recordRoles"
+      | "retractVouch"
       | "revokeRole"
       | "revokeRoleBatch"
       | "revokeTrustee"
@@ -88,6 +94,9 @@ export interface MemberRoleManagerInterface extends Interface {
       | "userWallets"
       | "viewersByRecord"
       | "voluntarilyLeaveOwnership"
+      | "vouches"
+      | "vouchesGiven"
+      | "vouchesReceived"
       | "wallets"
   ): FunctionFragment;
 
@@ -108,6 +117,8 @@ export interface MemberRoleManagerInterface extends Interface {
       | "TrusteeProposed"
       | "TrusteeRevoked"
       | "Upgraded"
+      | "VouchGiven"
+      | "VouchRetracted"
       | "WalletLinked"
   ): EventFragment;
 
@@ -217,7 +228,23 @@ export interface MemberRoleManagerInterface extends Interface {
     values: [BytesLike]
   ): string;
   encodeFunctionData(
+    functionFragment: "getVouchStatus",
+    values: [BytesLike, BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getVouchesGiven",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getVouchesReceived",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
     functionFragment: "getWalletsForUser",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "giveVouch",
     values: [BytesLike]
   ): string;
   encodeFunctionData(
@@ -235,6 +262,10 @@ export interface MemberRoleManagerInterface extends Interface {
   encodeFunctionData(
     functionFragment: "hasRole",
     values: [BytesLike, AddressLike, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "hasVouched",
+    values: [BytesLike, BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "healthRecordCore",
@@ -290,6 +321,10 @@ export interface MemberRoleManagerInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "recordRoles",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "retractVouch",
     values: [BytesLike]
   ): string;
   encodeFunctionData(
@@ -355,6 +390,18 @@ export interface MemberRoleManagerInterface extends Interface {
   encodeFunctionData(
     functionFragment: "voluntarilyLeaveOwnership",
     values: [BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "vouches",
+    values: [BytesLike, BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "vouchesGiven",
+    values: [BytesLike, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "vouchesReceived",
+    values: [BytesLike, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "wallets",
@@ -461,9 +508,22 @@ export interface MemberRoleManagerInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "getVouchStatus",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getVouchesGiven",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getVouchesReceived",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "getWalletsForUser",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(functionFragment: "giveVouch", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "grantRole", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "grantRoleBatch",
@@ -474,6 +534,7 @@ export interface MemberRoleManagerInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "hasRole", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "hasVouched", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "healthRecordCore",
     data: BytesLike
@@ -525,6 +586,10 @@ export interface MemberRoleManagerInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "recordRoles",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "retractVouch",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "revokeRole", data: BytesLike): Result;
@@ -580,6 +645,15 @@ export interface MemberRoleManagerInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "voluntarilyLeaveOwnership",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "vouches", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "vouchesGiven",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "vouchesReceived",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "wallets", data: BytesLike): Result;
@@ -928,6 +1002,50 @@ export namespace UpgradedEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
+export namespace VouchGivenEvent {
+  export type InputTuple = [
+    voucherIdHash: BytesLike,
+    voucheeIdHash: BytesLike,
+    timestamp: BigNumberish
+  ];
+  export type OutputTuple = [
+    voucherIdHash: string,
+    voucheeIdHash: string,
+    timestamp: bigint
+  ];
+  export interface OutputObject {
+    voucherIdHash: string;
+    voucheeIdHash: string;
+    timestamp: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace VouchRetractedEvent {
+  export type InputTuple = [
+    voucherIdHash: BytesLike,
+    voucheeIdHash: BytesLike,
+    timestamp: BigNumberish
+  ];
+  export type OutputTuple = [
+    voucherIdHash: string,
+    voucheeIdHash: string,
+    timestamp: bigint
+  ];
+  export interface OutputObject {
+    voucherIdHash: string;
+    voucheeIdHash: string;
+    timestamp: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
 export namespace WalletLinkedEvent {
   export type InputTuple = [
     wallet: AddressLike,
@@ -1153,10 +1271,34 @@ export interface MemberRoleManager extends BaseContract {
 
   getUserStatus: TypedContractMethod<[userIdHash: BytesLike], [bigint], "view">;
 
+  getVouchStatus: TypedContractMethod<
+    [voucherIdHash: BytesLike, voucheeIdHash: BytesLike],
+    [bigint],
+    "view"
+  >;
+
+  getVouchesGiven: TypedContractMethod<
+    [voucherIdHash: BytesLike],
+    [string[]],
+    "view"
+  >;
+
+  getVouchesReceived: TypedContractMethod<
+    [voucheeIdHash: BytesLike],
+    [string[]],
+    "view"
+  >;
+
   getWalletsForUser: TypedContractMethod<
     [userIdHash: BytesLike],
     [string[]],
     "view"
+  >;
+
+  giveVouch: TypedContractMethod<
+    [voucheeIdHash: BytesLike],
+    [void],
+    "nonpayable"
   >;
 
   grantRole: TypedContractMethod<
@@ -1179,6 +1321,12 @@ export interface MemberRoleManager extends BaseContract {
 
   hasRole: TypedContractMethod<
     [recordIdHash: BytesLike, wallet: AddressLike, role: string],
+    [boolean],
+    "view"
+  >;
+
+  hasVouched: TypedContractMethod<
+    [voucherIdHash: BytesLike, voucheeIdHash: BytesLike],
     [boolean],
     "view"
   >;
@@ -1253,6 +1401,12 @@ export interface MemberRoleManager extends BaseContract {
     [arg0: BytesLike],
     [[string, boolean] & { role: string; isActive: boolean }],
     "view"
+  >;
+
+  retractVouch: TypedContractMethod<
+    [voucheeIdHash: BytesLike],
+    [void],
+    "nonpayable"
   >;
 
   revokeRole: TypedContractMethod<
@@ -1337,6 +1491,24 @@ export interface MemberRoleManager extends BaseContract {
     [recordIdHash: BytesLike],
     [void],
     "nonpayable"
+  >;
+
+  vouches: TypedContractMethod<
+    [arg0: BytesLike, arg1: BytesLike],
+    [bigint],
+    "view"
+  >;
+
+  vouchesGiven: TypedContractMethod<
+    [arg0: BytesLike, arg1: BigNumberish],
+    [string],
+    "view"
+  >;
+
+  vouchesReceived: TypedContractMethod<
+    [arg0: BytesLike, arg1: BigNumberish],
+    [string],
+    "view"
   >;
 
   wallets: TypedContractMethod<
@@ -1505,8 +1677,24 @@ export interface MemberRoleManager extends BaseContract {
     nameOrSignature: "getUserStatus"
   ): TypedContractMethod<[userIdHash: BytesLike], [bigint], "view">;
   getFunction(
+    nameOrSignature: "getVouchStatus"
+  ): TypedContractMethod<
+    [voucherIdHash: BytesLike, voucheeIdHash: BytesLike],
+    [bigint],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "getVouchesGiven"
+  ): TypedContractMethod<[voucherIdHash: BytesLike], [string[]], "view">;
+  getFunction(
+    nameOrSignature: "getVouchesReceived"
+  ): TypedContractMethod<[voucheeIdHash: BytesLike], [string[]], "view">;
+  getFunction(
     nameOrSignature: "getWalletsForUser"
   ): TypedContractMethod<[userIdHash: BytesLike], [string[]], "view">;
+  getFunction(
+    nameOrSignature: "giveVouch"
+  ): TypedContractMethod<[voucheeIdHash: BytesLike], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "grantRole"
   ): TypedContractMethod<
@@ -1532,6 +1720,13 @@ export interface MemberRoleManager extends BaseContract {
     nameOrSignature: "hasRole"
   ): TypedContractMethod<
     [recordIdHash: BytesLike, wallet: AddressLike, role: string],
+    [boolean],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "hasVouched"
+  ): TypedContractMethod<
+    [voucherIdHash: BytesLike, voucheeIdHash: BytesLike],
     [boolean],
     "view"
   >;
@@ -1609,6 +1804,9 @@ export interface MemberRoleManager extends BaseContract {
     [[string, boolean] & { role: string; isActive: boolean }],
     "view"
   >;
+  getFunction(
+    nameOrSignature: "retractVouch"
+  ): TypedContractMethod<[voucheeIdHash: BytesLike], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "revokeRole"
   ): TypedContractMethod<
@@ -1701,6 +1899,23 @@ export interface MemberRoleManager extends BaseContract {
   getFunction(
     nameOrSignature: "voluntarilyLeaveOwnership"
   ): TypedContractMethod<[recordIdHash: BytesLike], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "vouches"
+  ): TypedContractMethod<[arg0: BytesLike, arg1: BytesLike], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "vouchesGiven"
+  ): TypedContractMethod<
+    [arg0: BytesLike, arg1: BigNumberish],
+    [string],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "vouchesReceived"
+  ): TypedContractMethod<
+    [arg0: BytesLike, arg1: BigNumberish],
+    [string],
+    "view"
+  >;
   getFunction(
     nameOrSignature: "wallets"
   ): TypedContractMethod<
@@ -1813,6 +2028,20 @@ export interface MemberRoleManager extends BaseContract {
     UpgradedEvent.InputTuple,
     UpgradedEvent.OutputTuple,
     UpgradedEvent.OutputObject
+  >;
+  getEvent(
+    key: "VouchGiven"
+  ): TypedContractEvent<
+    VouchGivenEvent.InputTuple,
+    VouchGivenEvent.OutputTuple,
+    VouchGivenEvent.OutputObject
+  >;
+  getEvent(
+    key: "VouchRetracted"
+  ): TypedContractEvent<
+    VouchRetractedEvent.InputTuple,
+    VouchRetractedEvent.OutputTuple,
+    VouchRetractedEvent.OutputObject
   >;
   getEvent(
     key: "WalletLinked"
@@ -1986,6 +2215,28 @@ export interface MemberRoleManager extends BaseContract {
       UpgradedEvent.InputTuple,
       UpgradedEvent.OutputTuple,
       UpgradedEvent.OutputObject
+    >;
+
+    "VouchGiven(bytes32,bytes32,uint256)": TypedContractEvent<
+      VouchGivenEvent.InputTuple,
+      VouchGivenEvent.OutputTuple,
+      VouchGivenEvent.OutputObject
+    >;
+    VouchGiven: TypedContractEvent<
+      VouchGivenEvent.InputTuple,
+      VouchGivenEvent.OutputTuple,
+      VouchGivenEvent.OutputObject
+    >;
+
+    "VouchRetracted(bytes32,bytes32,uint256)": TypedContractEvent<
+      VouchRetractedEvent.InputTuple,
+      VouchRetractedEvent.OutputTuple,
+      VouchRetractedEvent.OutputObject
+    >;
+    VouchRetracted: TypedContractEvent<
+      VouchRetractedEvent.InputTuple,
+      VouchRetractedEvent.OutputTuple,
+      VouchRetractedEvent.OutputObject
     >;
 
     "WalletLinked(address,bytes32,uint256)": TypedContractEvent<

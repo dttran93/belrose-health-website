@@ -16,6 +16,7 @@ import AccountSettings from '@/features/Settings/components/AccountSettings';
 import ChangePasswordModal from '@/features/Settings/components/ChangePasswordModal';
 import NotificationSettings from '@/features/Settings/components/NotificationSettings';
 import GuestInvitesSettings from '@/features/Settings/components/GuestInvitesSettings';
+import VouchesSettings from '@/features/Settings/components/VouchesSettings';
 
 const SettingsPage = () => {
   const auth = getAuth();
@@ -145,6 +146,9 @@ const SettingsPage = () => {
 
       case 'notifications':
         return <NotificationSettings />;
+
+      case 'vouches':
+        return <VouchesSettings />;
 
       case 'privacy':
         return (

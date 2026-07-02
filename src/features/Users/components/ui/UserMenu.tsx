@@ -10,6 +10,7 @@ import {
   Blocks,
   User,
   NotepadText,
+  ShieldCheck,
 } from 'lucide-react';
 import { BelroseUserProfile } from '@/types/core';
 import { useNavigate } from 'react-router-dom';
@@ -55,6 +56,7 @@ interface UserMenuProps {
   showShare?: boolean;
   showDelete?: boolean;
   showBlockchain?: boolean;
+  showVouch?: boolean;
 
   // Additional menu items from parent
   additionalItems?: MenuItem[];
@@ -83,6 +85,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
   showViewDetails = true,
   showDelete = true,
   showBlockchain = true,
+  showVouch = true,
   additionalItems = [],
 }) => {
   const navigate = useNavigate();
@@ -165,6 +168,19 @@ const UserMenu: React.FC<UserMenuProps> = ({
         label: 'Distributed Network Verification',
         icon: Blocks,
         onClick: createHandler(onVerifyBlockchain),
+      });
+    }
+
+    // Vouch navigation
+    if (showVouch && user?.uid) {
+      items.push({
+        key: 'vouch',
+        label: 'Vouches',
+        icon: ShieldCheck,
+        onClick: () => {
+          navigate('/app/settings/vouches');
+          setIsOpen(false);
+        },
       });
     }
 

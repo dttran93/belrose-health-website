@@ -7,6 +7,7 @@ import { getVerificationConfig } from '../../services/verificationService';
 import { BelroseUserProfile } from '@/types/core';
 import { useNavigate } from 'react-router-dom';
 import { VerificationDoc } from '@belrose/shared';
+import { MenuItem } from '@/features/Users/components/ui/UserMenu';
 
 interface VerificationCardProps {
   verification: VerificationDoc;
@@ -16,6 +17,7 @@ interface VerificationCardProps {
   onViewUser: () => void;
   onViewDetails: () => void;
   onClick?: () => void;
+  additionalItems?: MenuItem[];
 }
 
 const VerificationUserCard: React.FC<VerificationCardProps> = ({
@@ -26,6 +28,7 @@ const VerificationUserCard: React.FC<VerificationCardProps> = ({
   onViewUser,
   onViewDetails,
   onClick,
+  additionalItems,
 }) => {
   const levelInfo = getVerificationConfig(verification.level);
   const navigate = useNavigate();
@@ -73,6 +76,7 @@ const VerificationUserCard: React.FC<VerificationCardProps> = ({
         content={renderBadges()}
         onViewUser={onViewUser}
         onViewDetails={onViewDetails}
+        additionalItems={additionalItems}
         metadata={[
           {
             label: 'Verified',
