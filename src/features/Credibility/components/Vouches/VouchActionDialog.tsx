@@ -45,7 +45,6 @@ export const VouchActionDialog: React.FC<VouchActionDialogProps> = ({
       <AlertDialog.Portal>
         <AlertDialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" />
         <AlertDialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl p-6 shadow-2xl z-[101] w-full max-w-md">
-
           {phase === 'preparing' && (
             <NetworkPreparingContent
               title="Preparing Secure Network"
@@ -53,9 +52,7 @@ export const VouchActionDialog: React.FC<VouchActionDialogProps> = ({
             />
           )}
 
-          {phase === 'error' && (
-            <ErrorContent error={error} onClose={onClose} />
-          )}
+          {phase === 'error' && <ErrorContent error={error} onClose={onClose} />}
 
           {phase === 'submitted' && (
             <OnChainSubmittedContent
@@ -79,7 +76,6 @@ export const VouchActionDialog: React.FC<VouchActionDialogProps> = ({
               onClose={onClose}
             />
           )}
-
         </AlertDialog.Content>
       </AlertDialog.Portal>
     </AlertDialog.Root>
@@ -120,15 +116,14 @@ const ConfirmVouchContent: React.FC<{
     </AlertDialog.Title>
 
     <AlertDialog.Description className="mt-3 text-sm text-gray-600">
-      You are about to vouch for <strong>{targetDisplayName}</strong>. A vouch is a trust
-      statement that contributes to this user's credibility score across the Belrose network.
+      You are about to vouch for <strong>{targetDisplayName}</strong>. A vouch is a trust statement
+      that contributes to this user's credibility score across the Belrose network.
     </AlertDialog.Description>
 
     <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 my-4">
       <p className="text-xs text-amber-800 leading-relaxed">
-        <strong>Note:</strong> By vouching for this user, you are staking your own credibility on
-        their trustworthiness. This action is permanently recorded on the distributed network.
-        You may retract your vouch at any time, but the history is preserved.
+        <strong>Note:</strong> This action is permanently recorded on the distributed network. You
+        may retract your vouch at any time.
       </p>
     </div>
 
@@ -157,8 +152,8 @@ const ConfirmRetractContent: React.FC<{
     </AlertDialog.Title>
 
     <AlertDialog.Description className="mt-3 text-sm text-gray-600">
-      You are about to retract your vouch for <strong>{targetDisplayName}</strong>. This will
-      remove your endorsement from their credibility score.
+      You are about to retract your vouch for <strong>{targetDisplayName}</strong>. This will remove
+      your endorsement from their credibility score.
     </AlertDialog.Description>
 
     <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 my-4">

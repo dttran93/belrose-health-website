@@ -1,27 +1,112 @@
 // src/features/Credibility/components/Vouches/VouchManagement.tsx
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { ShieldCheck, ShieldOff, ShieldAlert, Loader2 } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { ShieldCheck, ShieldOff, ShieldAlert, Loader2, Plus, X } from 'lucide-react';
 import { UserCard } from '@/features/Users/components/ui/UserCard';
+import { UserSearch } from '@/features/Users/components/UserSearch';
 import { VouchActionDialog } from './VouchActionDialog';
 import { useVouchFlow } from '../../hooks/useVouchFlow';
 import { getVouchesGiven, getVouchesReceived } from '../../services/vouchService';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { BelroseUserProfile } from '@/types/core';
 import { VouchDoc } from '@belrose/shared';
+import { Button } from '@/components/ui/Button';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
+export interface VouchManagementInitialTarget {
+  userId: string;
+  displayName: string;
+}
+
 interface VouchManagementProps {
   userId: string;
+  /**
+   * When navigating from a UserCard for a specific user, pass their info here.
+   * After vouches load:
+   *   - If already actively vouching for them → switches to Given tab so they're visible.
+   *   - If not → auto-opens the VouchActionDialog to vouch for them.
+   */
+  initialTarget?: VouchManagementInitialTarget;
 }
 
 interface VouchWithProfile {
   vouch: VouchDoc;
   profile: BelroseUserProfile | null;
 }
+
+// ============================================================================
+// INITIATE VOUCH FOR USER
+// Mounts useVouchFlow for a specific target and auto-opens the dialog.
+// ============================================================================
+
+const InitiateVouchForUser: React.FC<{
+  targetUserId: string;
+  targetDisplayName: string;
+  onSuccess: () => void;
+  onCancel: () => void;
+}> = ({ targetUserId, targetDisplayName, onSuccess, onCancel }) => {
+  const flow = useVouchFlow({ targetUserId, targetDisplayName, onSuccess });
+
+  useEffect(() => {
+    if (!flow.isLoadingVouch) {
+      flow.initiateVouch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flow.isLoadingVouch]);
+
+  const handleClose = () => {
+    flow.reset();
+    onCancel();
+  };
+
+  return (
+    <VouchActionDialog
+      isOpen={flow.isDialogOpen}
+      phase={flow.phase}
+      operationType={flow.operationType}
+      targetDisplayName={targetDisplayName}
+      error={flow.error}
+      onClose={handleClose}
+      onConfirmVouch={flow.confirmVouch}
+      onConfirmRetract={flow.confirmRetract}
+    />
+  );
+};
+
+// ============================================================================
+// ADD VOUCH SEARCH PANEL
+// Thin wrapper around UserSearch. Selecting a result triggers InitiateVouchForUser.
+// ============================================================================
+
+const AddVouchSearch: React.FC<{
+  currentUserId: string;
+  activeVoucheeIds: Set<string>;
+  onSelectTarget: (target: VouchManagementInitialTarget) => void;
+  onClose: () => void;
+}> = ({ currentUserId, activeVoucheeIds, onSelectTarget, onClose }) => (
+  <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 space-y-3">
+    <div className="flex items-center justify-between">
+      <p className="text-sm font-medium text-gray-700">Find someone to vouch for</p>
+      <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+    <UserSearch
+      excludeUserIds={[currentUserId, ...activeVoucheeIds]}
+      placeholder="Search by name, email, or ID…"
+      autoFocus
+      onUserSelect={user =>
+        onSelectTarget({
+          userId: user.uid,
+          displayName: user.displayName || user.email || user.uid,
+        })
+      }
+    />
+  </div>
+);
 
 // ============================================================================
 // VOUCH ROW (for given vouches — has rescind action)
@@ -92,11 +177,14 @@ const VouchGivenRow: React.FC<{
 // MAIN COMPONENT
 // ============================================================================
 
-export const VouchManagement: React.FC<VouchManagementProps> = ({ userId }) => {
+export const VouchManagement: React.FC<VouchManagementProps> = ({ userId, initialTarget }) => {
   const [givenVouches, setGivenVouches] = useState<VouchWithProfile[]>([]);
   const [receivedVouches, setReceivedVouches] = useState<VouchWithProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'given' | 'received'>('given');
+  const [showSearch, setShowSearch] = useState(false);
+  const [pendingTarget, setPendingTarget] = useState<VouchManagementInitialTarget | null>(null);
+  const handledInitialTarget = useRef(false);
 
   const loadVouches = useCallback(async () => {
     setIsLoading(true);
@@ -127,9 +215,36 @@ export const VouchManagement: React.FC<VouchManagementProps> = ({ userId }) => {
     loadVouches();
   }, [loadVouches]);
 
+  // After the first load, handle the initialTarget prop.
+  useEffect(() => {
+    if (isLoading || !initialTarget || handledInitialTarget.current) return;
+    handledInitialTarget.current = true;
+
+    const alreadyVouched = givenVouches.some(
+      v => v.vouch.voucheeId === initialTarget.userId && v.vouch.chainStatus === 'Active'
+    );
+
+    if (alreadyVouched) {
+      // Bring the Given tab into view so the user can see/manage the existing vouch.
+      setActiveTab('given');
+    } else {
+      // Auto-open the vouch dialog for this target.
+      setPendingTarget(initialTarget);
+    }
+    // givenVouches is stable after load; isLoading flip is the reliable trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading]);
+
   const activeGiven = givenVouches.filter(v => v.vouch.chainStatus === 'Active');
   const retractedGiven = givenVouches.filter(v => v.vouch.chainStatus === 'Retracted');
   const activeReceived = receivedVouches.filter(v => v.vouch.chainStatus === 'Active');
+  const activeVoucheeIds = new Set(activeGiven.map(v => v.vouch.voucheeId));
+
+  const handleVouchSuccess = useCallback(() => {
+    setPendingTarget(null);
+    setShowSearch(false);
+    loadVouches();
+  }, [loadVouches]);
 
   if (isLoading) {
     return (
@@ -141,39 +256,71 @@ export const VouchManagement: React.FC<VouchManagementProps> = ({ userId }) => {
 
   return (
     <div className="space-y-4">
-      {/* Tab bar */}
-      <div className="flex border-b border-gray-200">
-        <button
-          onClick={() => setActiveTab('given')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'given'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Vouches Given
-          {activeGiven.length > 0 && (
-            <span className="ml-2 bg-complement-3/20 text-complement-3 text-xs rounded-full px-2 py-0.5">
-              {activeGiven.length}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('received')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'received'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Vouches Received
-          {activeReceived.length > 0 && (
-            <span className="ml-2 bg-complement-3/20 text-complement-3 text-xs rounded-full px-2 py-0.5">
-              {activeReceived.length}
-            </span>
-          )}
-        </button>
+      {/* Pending vouch dialog (from search or initialTarget) */}
+      {pendingTarget && (
+        <InitiateVouchForUser
+          targetUserId={pendingTarget.userId}
+          targetDisplayName={pendingTarget.displayName}
+          onSuccess={handleVouchSuccess}
+          onCancel={() => setPendingTarget(null)}
+        />
+      )}
+
+      {/* Tab bar + Add Vouch button */}
+      <div className="flex items-center justify-between border-b border-gray-200">
+        <div className="flex">
+          <button
+            onClick={() => setActiveTab('given')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'given'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Vouches Given
+            {activeGiven.length > 0 && (
+              <span className="ml-2 bg-complement-3/20 text-complement-3 text-xs rounded-full px-2 py-0.5">
+                {activeGiven.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('received')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'received'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Vouches Received
+            {activeReceived.length > 0 && (
+              <span className="ml-2 bg-complement-3/20 text-complement-3 text-xs rounded-full px-2 py-0.5">
+                {activeReceived.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {activeTab === 'given' && (
+          <Button className="m-2" onClick={() => setShowSearch(s => !s)}>
+            <Plus className="w-4 h-4" />
+            Add Vouch
+          </Button>
+        )}
       </div>
+
+      {/* Search panel */}
+      {activeTab === 'given' && showSearch && (
+        <AddVouchSearch
+          currentUserId={userId}
+          activeVoucheeIds={activeVoucheeIds}
+          onSelectTarget={target => {
+            setShowSearch(false);
+            setPendingTarget(target);
+          }}
+          onClose={() => setShowSearch(false)}
+        />
+      )}
 
       {/* Given tab */}
       {activeTab === 'given' && (

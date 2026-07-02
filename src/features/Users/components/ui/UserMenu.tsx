@@ -8,9 +8,9 @@ import {
   Trash2,
   LucideIcon,
   Blocks,
-  User,
   NotepadText,
-  ShieldCheck,
+  UserCheck,
+  CircleUser,
 } from 'lucide-react';
 import { BelroseUserProfile } from '@/types/core';
 import { useNavigate } from 'react-router-dom';
@@ -131,7 +131,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
       items.push({
         key: 'user',
         label: 'User Profile',
-        icon: User,
+        icon: CircleUser,
         onClick: () => {
           if (user?.uid) {
             navigate(`/app/health-profile/${user.uid}`);
@@ -171,14 +171,20 @@ const UserMenu: React.FC<UserMenuProps> = ({
       });
     }
 
-    // Vouch navigation
+    // Vouch navigation — passes the viewed user as context so the vouches page
+    // can auto-open the dialog or highlight the existing vouch for them.
     if (showVouch && user?.uid) {
       items.push({
         key: 'vouch',
-        label: 'Vouches',
-        icon: ShieldCheck,
+        label: `Vouch for ${user.firstName}`,
+        icon: UserCheck,
         onClick: () => {
-          navigate('/app/settings/vouches');
+          navigate('/app/settings/vouches', {
+            state: {
+              targetUserId: user.uid,
+              targetDisplayName: user.displayName || user.email || user.uid,
+            },
+          });
           setIsOpen(false);
         },
       });
