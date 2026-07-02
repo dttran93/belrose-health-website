@@ -689,13 +689,13 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     } else if (newRoleHash == keccak256(bytes("sharer"))) {
       if (ownerExists) {
         require(
-          userIsOwner || (userIsAdmin && userIsTarget) || (userIsSharer && userIsTarget),
-          "Only owners can change others to sharer. Admins and sharers can only demote themselves."
+          userIsOwner || userIsAdmin || (userIsSharer && userIsTarget),
+          "Only owners and administrators can change others to sharer. Sharers can only demote themselves."
         );
       } else {
         require(
           userIsAdmin || (userIsSharer && userIsTarget),
-          "Only administrators can demote to sharer"
+          "Only administrators can change to sharer"
         );
       }
     } else if (newRoleHash == keccak256(bytes("viewer"))) {
@@ -1487,7 +1487,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
         if (!userIsOwner && !userIsAdmin) continue;
       } else if (newRoleHash == keccak256(bytes("sharer"))) {
         if (ownerExists) {
-          if (!userIsOwner && !(userIsAdmin && userIsTarget) && !(userIsSharer && userIsTarget))
+          if (!userIsOwner && !userIsAdmin && !(userIsSharer && userIsTarget))
             continue;
         } else {
           if (!userIsAdmin && !(userIsSharer && userIsTarget)) continue;
