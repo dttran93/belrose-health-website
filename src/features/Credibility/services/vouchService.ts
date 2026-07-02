@@ -9,6 +9,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  arrayUnion,
   Timestamp,
   collection,
   where,
@@ -84,9 +85,11 @@ export async function createVouch(voucherId: string, voucheeId: string): Promise
       // Re-vouching after retraction
       await updateDoc(docRef, {
         chainStatus: 'Active',
-        blockchainRef,
-        retractedAt: null,
-        retractBlockchainRef: null,
+        onChainHistory: arrayUnion({
+          action: 're-vouched' as const,
+          at: Timestamp.now(),
+          blockchainRef,
+        }),
         lastModified: Timestamp.now(),
       });
       console.log('✅ Firestore: Vouch reactivated');
@@ -98,7 +101,7 @@ export async function createVouch(voucherId: string, voucheeId: string): Promise
         voucheeIdHash,
         chainStatus: 'Active',
         createdAt: Timestamp.now(),
-        blockchainRef,
+        onChainHistory: [{ action: 'vouched' as const, at: Timestamp.now(), blockchainRef }],
       } satisfies Omit<VouchDoc, 'id'>);
       console.log('✅ Firestore: Vouch created');
     }
@@ -140,10 +143,10 @@ export async function retractVouch(voucherId: string, voucheeId: string): Promis
   console.log('↩️ Retracting vouch:', { voucherId, voucheeId });
 
   // Step 1: Blockchain
-  let retractBlockchainRef;
+  let blockchainRef;
   try {
     const tx = await blockchainVouchService.retractVouch(voucheeId);
-    retractBlockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
+    blockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
     console.log('✅ Blockchain: Vouch retracted');
   } catch (error) {
     console.error('❌ Blockchain vouch retraction failed:', error);
@@ -161,8 +164,11 @@ export async function retractVouch(voucherId: string, voucheeId: string): Promis
   try {
     await updateDoc(docRef, {
       chainStatus: 'Retracted',
-      retractedAt: Timestamp.now(),
-      retractBlockchainRef,
+      onChainHistory: arrayUnion({
+        action: 'retracted' as const,
+        at: Timestamp.now(),
+        blockchainRef,
+      }),
       lastModified: Timestamp.now(),
     });
     console.log('✅ Firestore: Vouch marked retracted');
@@ -181,10 +187,7 @@ export async function retractVouch(voucherId: string, voucheeId: string): Promis
 /**
  * Get the vouch document between two users, or null if none exists.
  */
-export async function getVouch(
-  voucherId: string,
-  voucheeId: string
-): Promise<VouchDoc | null> {
+export async function getVouch(voucherId: string, voucheeId: string): Promise<VouchDoc | null> {
   const db = getFirestore();
   const vouchId = getVouchId(voucherId, voucheeId);
   try {

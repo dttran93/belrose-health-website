@@ -25,11 +25,7 @@ export interface UseVouchFlowOptions {
 // HOOK
 // ============================================================================
 
-export function useVouchFlow({
-  targetUserId,
-  targetDisplayName,
-  onSuccess,
-}: UseVouchFlowOptions) {
+export function useVouchFlow({ targetUserId, targetDisplayName, onSuccess }: UseVouchFlowOptions) {
   const [phase, setPhase] = useState<VouchDialogPhase>('idle');
   const [operationType, setOperationType] = useState<VouchOperationType>('vouch');
   const [error, setError] = useState<string | null>(null);

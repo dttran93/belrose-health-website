@@ -673,6 +673,44 @@ service cloud.firestore {
     }
 
     // ============================================
+    // VOUCHES
+    // ============================================
+
+    match /vouches/{vouchId} {
+      // READ: Any authenticated user — vouches are public trust signals
+      // used for credibility score computation across the network.
+      allow read: if request.auth != null;
+
+      // CREATE: Only the voucher can create their own vouch.
+      // - voucherId must match the caller (no vouching on behalf of others)
+      // - Can't vouch for yourself
+      // - Document ID enforces uniqueness: {voucherId}_{voucheeId}
+      // - Required fields validated
+      allow create: if request.auth != null &&
+        request.resource.data.voucherId == request.auth.uid &&
+        request.resource.data.voucheeId != request.auth.uid &&
+        vouchId == request.auth.uid + '_' + request.resource.data.voucheeId &&
+        request.resource.data.chainStatus == 'Active' &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.onChainHistory is list &&
+        request.resource.data.onChainHistory.size() == 1;
+
+      // UPDATE: Only the original voucher can update (retract or re-vouch).
+      // Core identity fields are immutable after creation.
+      allow update: if request.auth != null &&
+        resource.data.voucherId == request.auth.uid &&
+        request.resource.data.voucherId == resource.data.voucherId &&
+        request.resource.data.voucherIdHash == resource.data.voucherIdHash &&
+        request.resource.data.voucheeId == resource.data.voucheeId &&
+        request.resource.data.voucheeIdHash == resource.data.voucheeIdHash &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.chainStatus in ['Active', 'Retracted'];
+
+      // DELETE: Not allowed — vouches are a permanent audit trail.
+      allow delete: if false;
+    }
+
+    // ============================================
     // SCORE EVENTS (Credibility Audit Trail)
     // ============================================
     

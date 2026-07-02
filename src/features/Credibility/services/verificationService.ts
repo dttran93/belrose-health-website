@@ -6,6 +6,7 @@ import {
   setDoc,
   getDoc,
   updateDoc,
+  arrayUnion,
   Timestamp,
   collection,
   where,
@@ -233,12 +234,13 @@ export async function createVerification(
 
   // Step 2: Firestore
   try {
+    const verifiedEvent = { action: 'verified' as const, at: Timestamp.now(), blockchainRef };
     if (existing.exists()) {
       await updateDoc(docRef, {
         level,
         isActive: true,
         chainStatus: 'confirmed',
-        blockchainRef,
+        onChainHistory: arrayUnion(verifiedEvent),
         error: null,
         lastModified: Timestamp.now(),
       });
@@ -252,7 +254,7 @@ export async function createVerification(
         isActive: true,
         createdAt: Timestamp.now(),
         chainStatus: 'confirmed',
-        blockchainRef,
+        onChainHistory: [verifiedEvent],
         ...(titleData ?? {}),
       });
       console.log('✅ Firestore: Verification created');
@@ -323,7 +325,11 @@ export async function retractVerification(recordHash: string, verifierId: string
       isActive: false,
       lastModified: Timestamp.now(),
       chainStatus: 'confirmed',
-      blockchainRef,
+      onChainHistory: arrayUnion({
+        action: 'retracted' as const,
+        at: Timestamp.now(),
+        blockchainRef,
+      }),
     });
     console.log('✅ Firestore: Verification marked inactive');
   } catch (error) {
@@ -407,7 +413,13 @@ export async function modifyVerificationLevel(
       level: newLevel,
       lastModified: Timestamp.now(),
       chainStatus: 'confirmed',
-      blockchainRef,
+      onChainHistory: arrayUnion({
+        action: 'modified' as const,
+        at: Timestamp.now(),
+        blockchainRef,
+        fromLevel: oldLevel,
+        toLevel: newLevel,
+      }),
     });
     console.log('✅ Firestore: Verification level updated');
   } catch (error) {

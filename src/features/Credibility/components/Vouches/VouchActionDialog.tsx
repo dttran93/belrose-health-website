@@ -49,6 +49,7 @@ export const VouchActionDialog: React.FC<VouchActionDialogProps> = ({
           {phase === 'preparing' && (
             <NetworkPreparingContent
               title="Preparing Secure Network"
+              steps={['computing', 'saving', 'registering']}
             />
           )}
 

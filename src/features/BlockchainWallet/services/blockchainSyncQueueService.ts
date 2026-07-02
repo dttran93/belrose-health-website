@@ -102,7 +102,9 @@ export type SyncContext =
       trustorIdHash: string;
       trusteeId: string;
       trusteeIdHash: string;
-    };
+    }
+  | { type: 'vouch'; voucherId: string; voucheeId: string }
+  | { type: 'vouch-retraction'; voucherId: string; voucheeId: string };
 
 export interface BlockchainSyncFailure extends BaseSyncFailure {
   context: SyncContext;
