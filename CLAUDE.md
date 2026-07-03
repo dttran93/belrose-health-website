@@ -69,8 +69,8 @@ HealthRecordCore and MemberRole Manager use UUPS upgradeable proxy pattern. Prox
 
 BaseSepolia - Test Net
 
-- MEMBER_ROLE_MANAGER BaseSepolia TestNet proxy: '0xdF9583C25E234A34a1E47d9830722123CA228a1a'
-- HEALTH_RECORD_CORE BaseSepolia TestNet proxy: '0x66A8b985C61205e63D7d7DEA72Dfa5849a3e66De'
+- MEMBER_ROLE_MANAGER BaseSepolia TestNet proxy: '0x61CcF57C332D32c4d906ac64674BBA4E10CCB07B'
+- HEALTH_RECORD_CORE BaseSepolia TestNet proxy: '0xE1012A0D698cced489C47189F9DC9372d6Fb104B'
 
 Base Mainnet
 

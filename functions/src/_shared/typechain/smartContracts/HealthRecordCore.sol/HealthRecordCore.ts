@@ -52,6 +52,31 @@ export declare namespace HealthRecordCore {
     isActive: boolean;
   };
 
+  export type DisputeAgainstUserStruct = {
+    recordHash: BytesLike;
+    disputerIdHash: BytesLike;
+    severity: BigNumberish;
+    culpability: BigNumberish;
+    notes: string;
+    createdAt: BigNumberish;
+  };
+
+  export type DisputeAgainstUserStructOutput = [
+    recordHash: string,
+    disputerIdHash: string,
+    severity: bigint,
+    culpability: bigint,
+    notes: string,
+    createdAt: bigint
+  ] & {
+    recordHash: string;
+    disputerIdHash: string;
+    severity: bigint;
+    culpability: bigint;
+    notes: string;
+    createdAt: bigint;
+  };
+
   export type UnacceptedFlagStruct = {
     recordIdHash: BytesLike;
     reporterIdHash: BytesLike;
@@ -117,6 +142,7 @@ export interface HealthRecordCoreInterface extends Interface {
       | "getActiveUnacceptedFlagCount"
       | "getDisputeStats"
       | "getDisputes"
+      | "getDisputesAgainstUser"
       | "getRecordIdForHash"
       | "getRecordSubjects"
       | "getRecordVersionHistory"
@@ -205,7 +231,7 @@ export interface HealthRecordCoreInterface extends Interface {
   encodeFunctionData(functionFragment: "admin", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "anchorRecord",
-    values: [BytesLike, BytesLike, BytesLike]
+    values: [BytesLike, BytesLike, BytesLike, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "currentlyDisputed",
@@ -253,6 +279,10 @@ export interface HealthRecordCoreInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "getDisputes",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getDisputesAgainstUser",
     values: [BytesLike]
   ): string;
   encodeFunctionData(
@@ -520,6 +550,10 @@ export interface HealthRecordCoreInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "getDisputes",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getDisputesAgainstUser",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -1162,7 +1196,12 @@ export interface HealthRecordCore extends BaseContract {
   admin: TypedContractMethod<[], [string], "view">;
 
   anchorRecord: TypedContractMethod<
-    [recordIdHash: BytesLike, recordHash: BytesLike, subjectIdHash: BytesLike],
+    [
+      recordIdHash: BytesLike,
+      recordHash: BytesLike,
+      subjectIdHash: BytesLike,
+      selfVerifyLevel: BigNumberish
+    ],
     [void],
     "nonpayable"
   >;
@@ -1257,6 +1296,12 @@ export interface HealthRecordCore extends BaseContract {
   getDisputes: TypedContractMethod<
     [recordHash: BytesLike],
     [HealthRecordCore.DisputeStructOutput[]],
+    "view"
+  >;
+
+  getDisputesAgainstUser: TypedContractMethod<
+    [userIdHash: BytesLike],
+    [HealthRecordCore.DisputeAgainstUserStructOutput[]],
     "view"
   >;
 
@@ -1599,7 +1644,12 @@ export interface HealthRecordCore extends BaseContract {
   getFunction(
     nameOrSignature: "anchorRecord"
   ): TypedContractMethod<
-    [recordIdHash: BytesLike, recordHash: BytesLike, subjectIdHash: BytesLike],
+    [
+      recordIdHash: BytesLike,
+      recordHash: BytesLike,
+      subjectIdHash: BytesLike,
+      selfVerifyLevel: BigNumberish
+    ],
     [void],
     "nonpayable"
   >;
@@ -1682,6 +1732,13 @@ export interface HealthRecordCore extends BaseContract {
   ): TypedContractMethod<
     [recordHash: BytesLike],
     [HealthRecordCore.DisputeStructOutput[]],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "getDisputesAgainstUser"
+  ): TypedContractMethod<
+    [userIdHash: BytesLike],
+    [HealthRecordCore.DisputeAgainstUserStructOutput[]],
     "view"
   >;
   getFunction(

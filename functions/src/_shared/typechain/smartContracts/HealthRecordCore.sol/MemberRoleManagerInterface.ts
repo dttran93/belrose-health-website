@@ -23,6 +23,7 @@ import type {
 export interface MemberRoleManagerInterfaceInterface extends Interface {
   getFunction(
     nameOrSignature:
+      | "extendTrusteeGrantsOnAnchor"
       | "getUserForWallet"
       | "hasActiveRole"
       | "hasRole"
@@ -32,6 +33,10 @@ export interface MemberRoleManagerInterfaceInterface extends Interface {
       | "isVerifiedMember"
   ): FunctionFragment;
 
+  encodeFunctionData(
+    functionFragment: "extendTrusteeGrantsOnAnchor",
+    values: [BytesLike, BytesLike]
+  ): string;
   encodeFunctionData(
     functionFragment: "getUserForWallet",
     values: [AddressLike]
@@ -61,6 +66,10 @@ export interface MemberRoleManagerInterfaceInterface extends Interface {
     values: [AddressLike]
   ): string;
 
+  decodeFunctionResult(
+    functionFragment: "extendTrusteeGrantsOnAnchor",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "getUserForWallet",
     data: BytesLike
@@ -131,6 +140,12 @@ export interface MemberRoleManagerInterface extends BaseContract {
     event?: TCEvent
   ): Promise<this>;
 
+  extendTrusteeGrantsOnAnchor: TypedContractMethod<
+    [subjectIdHash: BytesLike, recordIdHash: BytesLike],
+    [void],
+    "nonpayable"
+  >;
+
   getUserForWallet: TypedContractMethod<
     [wallet: AddressLike],
     [string],
@@ -173,6 +188,13 @@ export interface MemberRoleManagerInterface extends BaseContract {
     key: string | FunctionFragment
   ): T;
 
+  getFunction(
+    nameOrSignature: "extendTrusteeGrantsOnAnchor"
+  ): TypedContractMethod<
+    [subjectIdHash: BytesLike, recordIdHash: BytesLike],
+    [void],
+    "nonpayable"
+  >;
   getFunction(
     nameOrSignature: "getUserForWallet"
   ): TypedContractMethod<[wallet: AddressLike], [string], "view">;

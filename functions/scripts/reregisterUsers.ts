@@ -22,7 +22,7 @@ const db = admin.firestore();
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const RPC_URL      = 'https://sepolia.base.org';
-const MRM_PROXY    = '0x15B6247f1305ed1Ab3947765DF01d26D849B62d7';
+const MRM_PROXY    = '0x61CcF57C332D32c4d906ac64674BBA4E10CCB07B';
 const PRIVATE_KEY  = process.env.ADMIN_WALLET_PRIVATE_KEY;
 
 const DRY_RUN = !process.argv.includes('--execute');

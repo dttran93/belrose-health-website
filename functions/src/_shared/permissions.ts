@@ -21,11 +21,14 @@ export type PermissionChange =
 
 export interface PermissionChangeEvent {
   recordId: string;
+  recordIdHash: string;
   encryptedRecordTitle?: string;
   encryptedRecordTitleIv?: string;
   changedBy: string;
+  changedByIdHash: string;
   changedAt: TimestampLike;
   changes: PermissionChange[];
+  affectedUserIds: string[];
   blockchainRef: BlockchainRef;
   context?: 'trustee_grant' | 'trustee_revoke' | 'direct';
   batchId?: string;

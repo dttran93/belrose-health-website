@@ -10,8 +10,37 @@ export interface EncryptedField {
   iv: string;
 }
 
+// ── On-chain history event types ──────────────────────────────────────────────
+
+export interface VerificationOnChainEvent {
+  action: 'verified' | 'retracted' | 'modified';
+  at: TimestampLike;
+  blockchainRef: BlockchainRef;
+  fromLevel?: VerificationLevelOptions;
+  toLevel?: VerificationLevelOptions;
+}
+
+export interface DisputeOnChainEvent {
+  action: 'disputed' | 'retracted' | 'modified';
+  at: TimestampLike;
+  blockchainRef: BlockchainRef;
+  fromSeverity?: DisputeSeverityOptions;
+  toSeverity?: DisputeSeverityOptions;
+  fromCulpability?: DisputeCulpability;
+  toCulpability?: DisputeCulpability;
+}
+
+export interface VouchOnChainEvent {
+  action: 'vouched' | 'retracted' | 're-vouched';
+  at: TimestampLike;
+  blockchainRef: BlockchainRef;
+}
+
+// ── Document types ────────────────────────────────────────────────────────────
+
 export interface VerificationDoc {
   id: string;
+  recordIdHash: string;
   recordHash: string;
   recordId: string;
   verifierId: string;
@@ -21,7 +50,7 @@ export interface VerificationDoc {
   createdAt: TimestampLike;
   lastModified?: TimestampLike;
   chainStatus: 'pending' | 'confirmed' | 'failed';
-  blockchainRef?: BlockchainRef;
+  onChainHistory: VerificationOnChainEvent[];
   encryptedRecordTitle?: string;
   encryptedRecordTitleIv: string;
 }
@@ -30,6 +59,7 @@ export interface DisputeDoc {
   id: string;
   recordHash: string;
   recordId: string;
+  recordIdHash: string;
   disputerId: string;
   disputerIdHash: string;
   severity: DisputeSeverityOptions;
@@ -40,7 +70,21 @@ export interface DisputeDoc {
   createdAt: TimestampLike;
   lastModified?: TimestampLike;
   chainStatus: 'pending' | 'confirmed' | 'failed';
-  blockchainRef?: BlockchainRef;
+  onChainHistory: DisputeOnChainEvent[];
   encryptedRecordTitle?: string;
   encryptedRecordTitleIv?: string;
+}
+
+export type VouchChainStatus = 'None' | 'Active' | 'Retracted';
+
+export interface VouchDoc {
+  id: string;
+  voucherId: string;
+  voucherIdHash: string;
+  voucheeId: string;
+  voucheeIdHash: string;
+  chainStatus: VouchChainStatus;
+  createdAt: TimestampLike;
+  lastModified?: TimestampLike;
+  onChainHistory: VouchOnChainEvent[];
 }
