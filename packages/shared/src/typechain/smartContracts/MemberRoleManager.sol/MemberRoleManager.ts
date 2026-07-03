@@ -38,6 +38,7 @@ export interface MemberRoleManagerInterface extends Interface {
       | "deactivateWallet"
       | "declineTrustee"
       | "downgradeTrusteeLevel"
+      | "extendTrusteeGrantsOnAnchor"
       | "getAllRecordParticipants"
       | "getHealthRecordCore"
       | "getRecordAdmins"
@@ -51,6 +52,7 @@ export interface MemberRoleManagerInterface extends Interface {
       | "getTotalUsers"
       | "getTrusteeGrantedRecords"
       | "getTrusteeRelationship"
+      | "getTrusteesForTrustor"
       | "getUserForWallet"
       | "getUserStatus"
       | "getVouchStatus"
@@ -88,6 +90,7 @@ export interface MemberRoleManagerInterface extends Interface {
       | "totalUsers"
       | "transferAdmin"
       | "trusteeRelationships"
+      | "trusteesByTrustor"
       | "updateTrusteeLevel"
       | "upgradeToAndCall"
       | "userStatus"
@@ -168,6 +171,10 @@ export interface MemberRoleManagerInterface extends Interface {
     values: [BytesLike, BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "extendTrusteeGrantsOnAnchor",
+    values: [BytesLike, BytesLike]
+  ): string;
+  encodeFunctionData(
     functionFragment: "getAllRecordParticipants",
     values: [BytesLike]
   ): string;
@@ -218,6 +225,10 @@ export interface MemberRoleManagerInterface extends Interface {
   encodeFunctionData(
     functionFragment: "getTrusteeRelationship",
     values: [BytesLike, BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getTrusteesForTrustor",
+    values: [BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "getUserForWallet",
@@ -368,6 +379,10 @@ export interface MemberRoleManagerInterface extends Interface {
     values: [BytesLike, BytesLike]
   ): string;
   encodeFunctionData(
+    functionFragment: "trusteesByTrustor",
+    values: [BytesLike, BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "updateTrusteeLevel",
     values: [BytesLike, BigNumberish]
   ): string;
@@ -448,6 +463,10 @@ export interface MemberRoleManagerInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "extendTrusteeGrantsOnAnchor",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "getAllRecordParticipants",
     data: BytesLike
   ): Result;
@@ -497,6 +516,10 @@ export interface MemberRoleManagerInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "getTrusteeRelationship",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getTrusteesForTrustor",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -624,6 +647,10 @@ export interface MemberRoleManagerInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "trusteeRelationships",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "trusteesByTrustor",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -1179,6 +1206,12 @@ export interface MemberRoleManager extends BaseContract {
     "nonpayable"
   >;
 
+  extendTrusteeGrantsOnAnchor: TypedContractMethod<
+    [subjectIdHash: BytesLike, recordIdHash: BytesLike],
+    [void],
+    "nonpayable"
+  >;
+
   getAllRecordParticipants: TypedContractMethod<
     [recordIdHash: BytesLike],
     [
@@ -1260,6 +1293,12 @@ export interface MemberRoleManager extends BaseContract {
   getTrusteeRelationship: TypedContractMethod<
     [trustorIdHash: BytesLike, trusteeIdHash: BytesLike],
     [[bigint, bigint] & { status: bigint; level: bigint }],
+    "view"
+  >;
+
+  getTrusteesForTrustor: TypedContractMethod<
+    [trustorIdHash: BytesLike],
+    [string[]],
     "view"
   >;
 
@@ -1461,6 +1500,12 @@ export interface MemberRoleManager extends BaseContract {
     "view"
   >;
 
+  trusteesByTrustor: TypedContractMethod<
+    [arg0: BytesLike, arg1: BigNumberish],
+    [string],
+    "view"
+  >;
+
   updateTrusteeLevel: TypedContractMethod<
     [trusteeIdHash: BytesLike, newLevel: BigNumberish],
     [void],
@@ -1590,6 +1635,13 @@ export interface MemberRoleManager extends BaseContract {
     "nonpayable"
   >;
   getFunction(
+    nameOrSignature: "extendTrusteeGrantsOnAnchor"
+  ): TypedContractMethod<
+    [subjectIdHash: BytesLike, recordIdHash: BytesLike],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
     nameOrSignature: "getAllRecordParticipants"
   ): TypedContractMethod<
     [recordIdHash: BytesLike],
@@ -1670,6 +1722,9 @@ export interface MemberRoleManager extends BaseContract {
     [[bigint, bigint] & { status: bigint; level: bigint }],
     "view"
   >;
+  getFunction(
+    nameOrSignature: "getTrusteesForTrustor"
+  ): TypedContractMethod<[trustorIdHash: BytesLike], [string[]], "view">;
   getFunction(
     nameOrSignature: "getUserForWallet"
   ): TypedContractMethod<[wallet: AddressLike], [string], "view">;
@@ -1863,6 +1918,13 @@ export interface MemberRoleManager extends BaseContract {
   ): TypedContractMethod<
     [arg0: BytesLike, arg1: BytesLike],
     [[bigint, bigint] & { status: bigint; level: bigint }],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "trusteesByTrustor"
+  ): TypedContractMethod<
+    [arg0: BytesLike, arg1: BigNumberish],
+    [string],
     "view"
   >;
   getFunction(

@@ -29,6 +29,8 @@ interface MemberRoleManagerInterface {
     bytes32 trustorIdHash,
     bytes32 trusteeIdHash
   ) external view returns (bool);
+
+  function extendTrusteeGrantsOnAnchor(bytes32 subjectIdHash, bytes32 recordIdHash) external;
 }
 
 /**
@@ -250,6 +252,8 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
     totalAnchoredRecords++;
 
     emit RecordAnchored(recordIdHash, recordHash, resolvedSubject, block.timestamp);
+
+    memberRoleManager.extendTrusteeGrantsOnAnchor(resolvedSubject, recordIdHash);
   }
 
   /**
@@ -287,6 +291,8 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
     isSubjectActive[recordIdHash][resolvedSubject] = true;
 
     emit RecordReanchored(recordIdHash, resolvedSubject, block.timestamp);
+
+    memberRoleManager.extendTrusteeGrantsOnAnchor(resolvedSubject, recordIdHash);
   }
 
   /**
