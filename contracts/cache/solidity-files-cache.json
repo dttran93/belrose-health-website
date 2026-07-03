@@ -836,8 +836,8 @@
       ]
     },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\contracts\\smartContracts\\HealthRecordCore.sol": {
-      "lastModificationDate": 1783073348260,
-      "contentHash": "83441a3b584af009d239e0972878b912",
+      "lastModificationDate": 1783080874500,
+      "contentHash": "788ecb1f9504f93bcb1f50fbf1cfd3cb",
       "sourceName": "smartContracts/HealthRecordCore.sol",
       "solcConfig": {
         "version": "0.8.24",
@@ -1345,8 +1345,8 @@
       ]
     },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\contracts\\smartContracts\\MemberRoleManager.sol": {
-      "lastModificationDate": 1783073376790,
-      "contentHash": "783643018c64760b2889a014025d0380",
+      "lastModificationDate": 1783073801240,
+      "contentHash": "28a1734cea231ff98e4447b11d61c8fc",
       "sourceName": "smartContracts/MemberRoleManager.sol",
       "solcConfig": {
         "version": "0.8.24",

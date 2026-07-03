@@ -210,11 +210,18 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    * @dev First subject establishes initial hash; subsequent subjects confirm it
    * @param recordIdHash The record ID
    * @param recordHash The content hash (must match current if not first subject)
+   * @param selfVerifyLevel Nudge param — 0 skips, 1-3 (Provenance/Content/Full) also records the
+   *   caller's verification of recordHash in the same transaction. Anchoring asserts "this record
+   *   is about me," which in most cases also means confirming its contents, so the frontend should
+   *   default this to a nonzero level and require the user to actively opt out. Silently skipped
+   *   (never reverts) if the caller already verified or is disputing this hash — the nudge must
+   *   never block the anchor itself.
    */
   function anchorRecord(
     bytes32 recordIdHash,
     bytes32 recordHash,
-    bytes32 subjectIdHash
+    bytes32 subjectIdHash,
+    uint8 selfVerifyLevel
   ) external onlyActiveMember onlyRecordParticipant(recordIdHash) {
     require(recordIdHash != bytes32(0), "Record ID cannot be empty");
     require(recordHash != bytes32(0), "Record hash cannot be empty");
@@ -252,6 +259,9 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
     totalAnchoredRecords++;
 
     emit RecordAnchored(recordIdHash, recordHash, resolvedSubject, block.timestamp);
+
+    bytes32 callerIdHash = memberRoleManager.getUserForWallet(msg.sender);
+    _maybeSelfVerify(recordIdHash, recordHash, callerIdHash, selfVerifyLevel);
 
     memberRoleManager.extendTrusteeGrantsOnAnchor(resolvedSubject, recordIdHash);
   }
@@ -592,6 +602,17 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
     bool isActive;
   }
 
+  /// @dev Return shape for getDisputesAgainstUser — a Dispute paired with which hash it targets,
+  ///   since Dispute itself only carries recordIdHash (a record can have several hash versions).
+  struct DisputeAgainstUser {
+    bytes32 recordHash;
+    bytes32 disputerIdHash;
+    DisputeSeverity severity;
+    DisputeCulpability culpability;
+    string notes;
+    uint256 createdAt;
+  }
+
   // =================== RECORD REVIEWS - STORAGE ===================
 
   // Verifications: RecordHash --> Verification
@@ -644,6 +665,19 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
       "Cannot verify a hash you are actively disputing"
     );
 
+    _recordVerification(recordIdHash, recordHash, verifierIdHash, level);
+  }
+
+  /**
+   * @dev Shared push+index+event logic for a new verification. Used by both verifyRecord (which
+   *   reverts on guard failure) and _maybeSelfVerify (which no-ops on guard failure instead).
+   */
+  function _recordVerification(
+    bytes32 recordIdHash,
+    bytes32 recordHash,
+    bytes32 verifierIdHash,
+    uint8 level
+  ) internal {
     uint256 newIndex = verifications[recordHash].length;
 
     verifications[recordHash].push(
@@ -668,6 +702,25 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
       VerificationLevel(level),
       block.timestamp
     );
+  }
+
+  /**
+   * @dev Best-effort self-verification nudge called from anchorRecord. Mirrors verifyRecord's
+   *   guards but silently no-ops instead of reverting on failure (already verified, actively
+   *   disputing this hash, or an invalid/zero level) — the nudge must never block the anchor.
+   */
+  function _maybeSelfVerify(
+    bytes32 recordIdHash,
+    bytes32 recordHash,
+    bytes32 verifierIdHash,
+    uint8 level
+  ) internal {
+    if (level < 1 || level > 3) return;
+    if (recordIdForHash[recordHash] != recordIdHash) return;
+    if (currentlyVerified[recordHash][verifierIdHash]) return;
+    if (currentlyDisputed[recordHash][verifierIdHash]) return;
+
+    _recordVerification(recordIdHash, recordHash, verifierIdHash, level);
   }
 
   /**
@@ -1044,6 +1097,48 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
    */
   function getUserDisputes(bytes32 userIdHash) external view returns (bytes32[] memory) {
     return disputesByUser[userIdHash];
+  }
+
+  /**
+   * @notice Get every active dispute filed against any hash this user has verified
+   * @dev Convenience join for the credibility system's I(u) input — active disputes against
+   *   records the user has verified for the purposes of calculating CulpabilityPenalty as part of EarnedTrust.
+   *   Equivalent to combining getUserVerifications(u) with getDisputes(hash) per result, provided here as a
+   *   single call. For very prolific verifiers this loop can get large; bulk/network-wide computation should
+   *   prefer replaying RecordVerified/RecordDisputed events instead.
+   */
+  function getDisputesAgainstUser(
+    bytes32 userIdHash
+  ) external view returns (DisputeAgainstUser[] memory) {
+    bytes32[] memory verifiedHashes = verificationsByUser[userIdHash];
+
+    uint256 total = 0;
+    for (uint256 i = 0; i < verifiedHashes.length; i++) {
+      Dispute[] memory hashDisputes = disputes[verifiedHashes[i]];
+      for (uint256 j = 0; j < hashDisputes.length; j++) {
+        if (hashDisputes[j].isActive) total++;
+      }
+    }
+
+    DisputeAgainstUser[] memory result = new DisputeAgainstUser[](total);
+    uint256 idx = 0;
+    for (uint256 i = 0; i < verifiedHashes.length; i++) {
+      Dispute[] memory hashDisputes = disputes[verifiedHashes[i]];
+      for (uint256 j = 0; j < hashDisputes.length; j++) {
+        if (!hashDisputes[j].isActive) continue;
+
+        result[idx++] = DisputeAgainstUser({
+          recordHash: verifiedHashes[i],
+          disputerIdHash: hashDisputes[j].disputerIdHash,
+          severity: hashDisputes[j].severity,
+          culpability: hashDisputes[j].culpability,
+          notes: hashDisputes[j].notes,
+          createdAt: hashDisputes[j].createdAt
+        });
+      }
+    }
+
+    return result;
   }
 
   // ------------------- UNACCEPTED UPDATE FLAG VIEWS -------------------
