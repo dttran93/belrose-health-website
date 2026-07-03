@@ -4,7 +4,7 @@ const { ethers } = hre;
 // Existing HealthRecordCore proxy — stays unchanged.
 // Source of truth: packages/shared/src/blockchainAddresses.ts
 const EXISTING_HRC_PROXY = {
-  baseSepolia: '0x66A8b985C61205e63D7d7DEA72Dfa5849a3e66De',
+  baseSepolia: '0xE1012A0D698cced489C47189F9DC9372d6Fb104B',
 };
 
 async function main() {

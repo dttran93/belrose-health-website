@@ -836,8 +836,8 @@
       ]
     },
     "C:\\Users\\dangt\\Documents\\Project Kennedy\\belrose-react\\Belrose\\contracts\\smartContracts\\HealthRecordCore.sol": {
-      "lastModificationDate": 1783080874500,
-      "contentHash": "788ecb1f9504f93bcb1f50fbf1cfd3cb",
+      "lastModificationDate": 1783081431153,
+      "contentHash": "11f7ce8f1730b954b2be4e00582a4fa1",
       "sourceName": "smartContracts/HealthRecordCore.sol",
       "solcConfig": {
         "version": "0.8.24",
