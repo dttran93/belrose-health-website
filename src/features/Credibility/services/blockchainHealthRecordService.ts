@@ -158,17 +158,27 @@ export class blockchainHealthRecordService {
   /**
    * Anchor yourself as a subject to a record with a hash.
    * First subject establishes the initial hash; subsequent subjects confirm it.
+   *
+   * @param selfVerifyLevel Nudge param passed to the contract — defaults to Full, since anchoring
+   *   ("this record is about me") in most cases also means confirming its contents. Pass
+   *   VerificationLevel.None to opt out. Never blocks the anchor even if the verify guard fails.
    */
-  static async anchorRecord(recordId: string, recordHash: string): Promise<TransactionResult> {
+  static async anchorRecord(
+    recordId: string,
+    recordHash: string,
+    selfVerifyLevel: VerificationLevel = VerificationLevel.Full
+  ): Promise<TransactionResult> {
     console.log('⛓️ Anchoring record...', {
       recordId,
       recordHash: recordHash.slice(0, 12) + '...',
+      selfVerifyLevel,
     });
     const recordIdHash = id(recordId);
     const result = await this.executeWrite('anchorRecord', [
       recordIdHash,
       recordHash,
       ethers.ZeroHash,
+      selfVerifyLevel,
     ]);
     console.log('✅ Record anchored:', result.txHash);
     return result;
@@ -177,20 +187,30 @@ export class blockchainHealthRecordService {
   /**
    * Anchor a trustor as a subject on behalf of the caller, who must be their active controller.
    * Passes the trustor's ID hash as subjectIdHash; the contract verifies isControllerOf().
+   *
+   * @param selfVerifyLevel Same self-verify nudge as anchorRecord — the CALLER (controller) is
+   *   credited as verifier, not the trustor, since the controller is the one actually attesting.
    */
   static async anchorRecordAsController(
     recordId: string,
     recordHash: string,
-    trustorId: string
+    trustorId: string,
+    selfVerifyLevel: VerificationLevel = VerificationLevel.Full
   ): Promise<TransactionResult> {
     console.log('⛓️ Anchoring record as controller...', {
       recordId,
       recordHash: recordHash.slice(0, 12) + '...',
       trustorId,
+      selfVerifyLevel,
     });
     const recordIdHash = id(recordId);
     const subjectIdHash = id(trustorId);
-    const result = await this.executeWrite('anchorRecord', [recordIdHash, recordHash, subjectIdHash]);
+    const result = await this.executeWrite('anchorRecord', [
+      recordIdHash,
+      recordHash,
+      subjectIdHash,
+      selfVerifyLevel,
+    ]);
     console.log('✅ Record anchored as controller:', result.txHash);
     return result;
   }

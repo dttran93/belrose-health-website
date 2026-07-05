@@ -33,7 +33,7 @@ import { FileObject, BelroseUserProfile } from '@/types/core';
 import { doc, getDoc, getFirestore, updateDoc } from 'firebase/firestore';
 import SubjectQueryService, { IncomingSubjectRequest } from '../services/subjectQueryService';
 import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
-import { RejectionReasons, SubjectConsentRequest } from '@belrose/shared';
+import { RejectionReasons, SubjectConsentRequest, VerificationLevelOptions } from '@belrose/shared';
 import { TrusteeRelationshipService } from '@/features/Trustee/services/trusteeRelationshipService';
 
 // ============================================================================
@@ -478,7 +478,7 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
    * Create a subject request for another user to accept
    * No subject write to the blockchain, all firestore. But may pass grant role to Activity Tray
    */
-  const confirmRequestConsent = useCallback(async () => {
+  const confirmRequestConsent = useCallback(async (verifyLevel?: VerificationLevelOptions) => {
     if (!pendingOperation || pendingOperation.subjectChoice !== 'other' || !selectedUser) return;
 
     const auth = getAuth();
@@ -506,6 +506,7 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
       await SubjectService.requestSubjectConsent(recordId, selectedUser.uid, {
         role: pendingOperation.selectedRole || 'sharer',
         recordTitle,
+        verifyLevel,
       });
       console.log('✅ Step 2 complete');
 
