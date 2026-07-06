@@ -88,9 +88,12 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
   };
   const sevColors = severityColors[severityInfo.color as keyof typeof severityColors];
 
+  // Most recent on-chain event carries the tx we want to link to (disputed/retracted/modified)
+  const latestBlockchainRef = dispute.onChainHistory?.at(-1)?.blockchainRef;
+
   const handleViewOnBlockchain = () => {
-    if (dispute.blockchainRef?.txHash) {
-      window.open(`${NETWORK.explorerUrl}/tx/${dispute.blockchainRef?.txHash}`, '_blank');
+    if (latestBlockchainRef?.txHash) {
+      window.open(`${NETWORK.explorerUrl}/tx/${latestBlockchainRef.txHash}`, '_blank');
     }
   };
 
@@ -232,7 +235,7 @@ export const DisputeDetailModal: React.FC<DisputeDetailModalProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={handleViewOnBlockchain}
-                disabled={!dispute.blockchainRef?.txHash}
+                disabled={!latestBlockchainRef?.txHash}
                 className="text-gray-600"
               >
                 <ExternalLink className="w-4 h-4 mr-1" />

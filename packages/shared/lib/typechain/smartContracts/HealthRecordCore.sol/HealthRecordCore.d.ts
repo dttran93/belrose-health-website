@@ -27,6 +27,29 @@ export declare namespace HealthRecordCore {
         createdAt: bigint;
         isActive: boolean;
     };
+    type DisputeAgainstUserStruct = {
+        recordHash: BytesLike;
+        disputerIdHash: BytesLike;
+        severity: BigNumberish;
+        culpability: BigNumberish;
+        notes: string;
+        createdAt: BigNumberish;
+    };
+    type DisputeAgainstUserStructOutput = [
+        recordHash: string,
+        disputerIdHash: string,
+        severity: bigint,
+        culpability: bigint,
+        notes: string,
+        createdAt: bigint
+    ] & {
+        recordHash: string;
+        disputerIdHash: string;
+        severity: bigint;
+        culpability: bigint;
+        notes: string;
+        createdAt: bigint;
+    };
     type UnacceptedFlagStruct = {
         recordIdHash: BytesLike;
         reporterIdHash: BytesLike;
@@ -69,13 +92,13 @@ export declare namespace HealthRecordCore {
     };
 }
 export interface HealthRecordCoreInterface extends Interface {
-    getFunction(nameOrSignature: "UPGRADE_INTERFACE_VERSION" | "activeUnacceptedFlagCount" | "addRecordHash" | "admin" | "anchorRecord" | "currentlyDisputed" | "currentlyVerified" | "disputeIndex" | "disputeRecord" | "disputes" | "disputesByUser" | "doesHashExist" | "flagUnacceptedUpdate" | "getActiveRecordSubjects" | "getActiveUnacceptedFlagCount" | "getDisputeStats" | "getDisputes" | "getRecordIdForHash" | "getRecordSubjects" | "getRecordVersionHistory" | "getSubjectMedicalHistory" | "getSubjectStats" | "getTotalAnchoredRecords" | "getUnacceptedFlag" | "getUnacceptedFlags" | "getUserDispute" | "getUserDisputes" | "getUserVerification" | "getUserVerifications" | "getVerificationStats" | "getVerifications" | "getVersionCount" | "hasActiveUnacceptedFlags" | "hasUserDisputed" | "hasUserVerified" | "initialize" | "isActiveSubject" | "isHashActive" | "isSubject" | "isSubjectActive" | "isSubjectOfRecord" | "memberRoleManager" | "modifyDispute" | "modifyVerificationLevel" | "proxiableUUID" | "reanchorRecord" | "recordIdForHash" | "recordSubjects" | "recordVersionHistory" | "retractDispute" | "retractRecordHash" | "retractVerification" | "revokeUnacceptedFlag" | "setMemberRoleManager" | "subjectMedicalHistory" | "totalAnchoredRecords" | "totalDisputes" | "totalUnacceptedFlags" | "totalVerifications" | "transferAdmin" | "unacceptedFlagIndex" | "unacceptedFlagsBySubject" | "unanchorRecord" | "upgradeToAndCall" | "verificationIndex" | "verifications" | "verificationsByUser" | "verifyRecord"): FunctionFragment;
+    getFunction(nameOrSignature: "UPGRADE_INTERFACE_VERSION" | "activeUnacceptedFlagCount" | "addRecordHash" | "admin" | "anchorRecord" | "currentlyDisputed" | "currentlyVerified" | "disputeIndex" | "disputeRecord" | "disputes" | "disputesByUser" | "doesHashExist" | "flagUnacceptedUpdate" | "getActiveRecordSubjects" | "getActiveUnacceptedFlagCount" | "getDisputeStats" | "getDisputes" | "getDisputesAgainstUser" | "getRecordIdForHash" | "getRecordSubjects" | "getRecordVersionHistory" | "getSubjectMedicalHistory" | "getSubjectStats" | "getTotalAnchoredRecords" | "getUnacceptedFlag" | "getUnacceptedFlags" | "getUserDispute" | "getUserDisputes" | "getUserVerification" | "getUserVerifications" | "getVerificationStats" | "getVerifications" | "getVersionCount" | "hasActiveUnacceptedFlags" | "hasUserDisputed" | "hasUserVerified" | "initialize" | "isActiveSubject" | "isHashActive" | "isSubject" | "isSubjectActive" | "isSubjectOfRecord" | "memberRoleManager" | "modifyDispute" | "modifyVerificationLevel" | "proxiableUUID" | "reanchorRecord" | "recordIdForHash" | "recordSubjects" | "recordVersionHistory" | "retractDispute" | "retractRecordHash" | "retractVerification" | "revokeUnacceptedFlag" | "setMemberRoleManager" | "subjectMedicalHistory" | "totalAnchoredRecords" | "totalDisputes" | "totalUnacceptedFlags" | "totalVerifications" | "transferAdmin" | "unacceptedFlagIndex" | "unacceptedFlagsBySubject" | "unanchorRecord" | "upgradeToAndCall" | "verificationIndex" | "verifications" | "verificationsByUser" | "verifyRecord"): FunctionFragment;
     getEvent(nameOrSignatureOrTopic: "AdminTransferred" | "DisputeModification" | "DisputeRetracted" | "Initialized" | "RecordAnchored" | "RecordDisputed" | "RecordHashAdded" | "RecordHashRetracted" | "RecordReanchored" | "RecordUnanchored" | "RecordVerified" | "UnacceptedUpdateFlagRevoked" | "UnacceptedUpdateFlagged" | "Upgraded" | "VerificationLevelModified" | "VerificationRetracted"): EventFragment;
     encodeFunctionData(functionFragment: "UPGRADE_INTERFACE_VERSION", values?: undefined): string;
     encodeFunctionData(functionFragment: "activeUnacceptedFlagCount", values: [BytesLike]): string;
     encodeFunctionData(functionFragment: "addRecordHash", values: [BytesLike, BytesLike]): string;
     encodeFunctionData(functionFragment: "admin", values?: undefined): string;
-    encodeFunctionData(functionFragment: "anchorRecord", values: [BytesLike, BytesLike, BytesLike]): string;
+    encodeFunctionData(functionFragment: "anchorRecord", values: [BytesLike, BytesLike, BytesLike, BigNumberish]): string;
     encodeFunctionData(functionFragment: "currentlyDisputed", values: [BytesLike, BytesLike]): string;
     encodeFunctionData(functionFragment: "currentlyVerified", values: [BytesLike, BytesLike]): string;
     encodeFunctionData(functionFragment: "disputeIndex", values: [BytesLike, BytesLike]): string;
@@ -88,6 +111,7 @@ export interface HealthRecordCoreInterface extends Interface {
     encodeFunctionData(functionFragment: "getActiveUnacceptedFlagCount", values: [BytesLike]): string;
     encodeFunctionData(functionFragment: "getDisputeStats", values: [BytesLike]): string;
     encodeFunctionData(functionFragment: "getDisputes", values: [BytesLike]): string;
+    encodeFunctionData(functionFragment: "getDisputesAgainstUser", values: [BytesLike]): string;
     encodeFunctionData(functionFragment: "getRecordIdForHash", values: [BytesLike]): string;
     encodeFunctionData(functionFragment: "getRecordSubjects", values: [BytesLike]): string;
     encodeFunctionData(functionFragment: "getRecordVersionHistory", values: [BytesLike]): string;
@@ -156,6 +180,7 @@ export interface HealthRecordCoreInterface extends Interface {
     decodeFunctionResult(functionFragment: "getActiveUnacceptedFlagCount", data: BytesLike): Result;
     decodeFunctionResult(functionFragment: "getDisputeStats", data: BytesLike): Result;
     decodeFunctionResult(functionFragment: "getDisputes", data: BytesLike): Result;
+    decodeFunctionResult(functionFragment: "getDisputesAgainstUser", data: BytesLike): Result;
     decodeFunctionResult(functionFragment: "getRecordIdForHash", data: BytesLike): Result;
     decodeFunctionResult(functionFragment: "getRecordSubjects", data: BytesLike): Result;
     decodeFunctionResult(functionFragment: "getRecordVersionHistory", data: BytesLike): Result;
@@ -601,7 +626,8 @@ export interface HealthRecordCore extends BaseContract {
     anchorRecord: TypedContractMethod<[
         recordIdHash: BytesLike,
         recordHash: BytesLike,
-        subjectIdHash: BytesLike
+        subjectIdHash: BytesLike,
+        selfVerifyLevel: BigNumberish
     ], [
         void
     ], "nonpayable">;
@@ -695,6 +721,11 @@ export interface HealthRecordCore extends BaseContract {
         recordHash: BytesLike
     ], [
         HealthRecordCore.DisputeStructOutput[]
+    ], "view">;
+    getDisputesAgainstUser: TypedContractMethod<[
+        userIdHash: BytesLike
+    ], [
+        HealthRecordCore.DisputeAgainstUserStructOutput[]
     ], "view">;
     getRecordIdForHash: TypedContractMethod<[
         recordHash: BytesLike
@@ -1025,7 +1056,8 @@ export interface HealthRecordCore extends BaseContract {
     getFunction(nameOrSignature: "anchorRecord"): TypedContractMethod<[
         recordIdHash: BytesLike,
         recordHash: BytesLike,
-        subjectIdHash: BytesLike
+        subjectIdHash: BytesLike,
+        selfVerifyLevel: BigNumberish
     ], [
         void
     ], "nonpayable">;
@@ -1092,6 +1124,11 @@ export interface HealthRecordCore extends BaseContract {
         recordHash: BytesLike
     ], [
         HealthRecordCore.DisputeStructOutput[]
+    ], "view">;
+    getFunction(nameOrSignature: "getDisputesAgainstUser"): TypedContractMethod<[
+        userIdHash: BytesLike
+    ], [
+        HealthRecordCore.DisputeAgainstUserStructOutput[]
     ], "view">;
     getFunction(nameOrSignature: "getRecordIdForHash"): TypedContractMethod<[recordHash: BytesLike], [string], "view">;
     getFunction(nameOrSignature: "getRecordSubjects"): TypedContractMethod<[recordIdHash: BytesLike], [string[]], "view">;

@@ -56,9 +56,12 @@ export const VerificationDetailModal: React.FC<VerificationDetailModalProps> = (
 
   const isCurrentVersion = verification.recordHash === record.recordHash;
 
+  // Most recent on-chain event carries the tx we want to link to (verified/retracted/modified)
+  const latestBlockchainRef = verification.onChainHistory?.at(-1)?.blockchainRef;
+
   const handleViewOnBlockchain = () => {
-    if (verification.blockchainRef?.txHash) {
-      window.open(`${NETWORK.explorerUrl}/tx/${verification.blockchainRef?.txHash}`, '_blank');
+    if (latestBlockchainRef?.txHash) {
+      window.open(`${NETWORK.explorerUrl}/tx/${latestBlockchainRef.txHash}`, '_blank');
     }
   };
 
@@ -183,7 +186,7 @@ export const VerificationDetailModal: React.FC<VerificationDetailModalProps> = (
                 variant="outline"
                 size="sm"
                 onClick={handleViewOnBlockchain}
-                disabled={!verification.blockchainRef?.txHash}
+                disabled={!latestBlockchainRef?.txHash}
                 className="text-gray-600"
               >
                 <ExternalLink className="w-4 h-4 mr-1" />

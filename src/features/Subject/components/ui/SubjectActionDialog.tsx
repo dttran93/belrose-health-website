@@ -27,12 +27,10 @@ import {
   UserX,
   Loader2,
   XCircle,
-  CheckCircle2,
   AlertTriangle,
   Link,
   Unlink,
   Share2,
-  Shield,
   ShieldAlert,
   ShieldCheck,
   Crown,
@@ -55,7 +53,8 @@ import { REJECTION_REASON_OPTIONS } from '../../services/subjectRejectionService
 import NetworkPreparingContent from '@/features/BlockchainWallet/components/NetworkPreparingContent';
 import RequesterSuggestions from '@/features/RequestRecord/components/ui/RequesterSuggestions';
 import { OnChainSubmittedContent } from '@/features/OnChainActivityTray/components/OnChainSubmittedModal';
-import { RejectionReasons } from '@belrose/shared';
+import { RejectionReasons, VerificationLevelOptions } from '@belrose/shared';
+import { VERIFICATION_OPTIONS } from '@/features/Credibility/services/verificationService';
 
 // ============================================================================
 // TYPES
@@ -90,7 +89,7 @@ interface SubjectActionDialogProps {
   onGoBackToSelection: () => void;
   onGoBackToSearching: () => void;
   onConfirmSetSubjectAsSelf: () => void;
-  onConfirmRequestConsent: () => void;
+  onConfirmRequestConsent: (verifyLevel?: VerificationLevelOptions) => void;
   onConfirmAnchorSubjectAsController: () => void;
   onConfirmAcceptRequest: () => void;
   onConfirmRejectRequest: (reason: RejectionReasons) => void;
@@ -255,27 +254,33 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
           )}
 
           {/* Confirming Phase - Request Consent (non-controller path) */}
-          {phase === 'confirming' && selectedUser && subjectChoice === 'other' && !isControllerOfSelected && (
-            <ConfirmRequestConsentContent
-              record={record}
-              selectedUser={selectedUser}
-              selectedRole={selectedRole}
-              onConfirm={onConfirmRequestConsent}
-              onGoBack={onGoBackToSearching}
-              onClose={onClose}
-            />
-          )}
+          {phase === 'confirming' &&
+            selectedUser &&
+            subjectChoice === 'other' &&
+            !isControllerOfSelected && (
+              <ConfirmRequestConsentContent
+                record={record}
+                selectedUser={selectedUser}
+                selectedRole={selectedRole}
+                onConfirm={onConfirmRequestConsent}
+                onGoBack={onGoBackToSearching}
+                onClose={onClose}
+              />
+            )}
 
           {/* Confirming Phase - Controller Anchor (no consent needed) */}
-          {phase === 'confirming' && selectedUser && subjectChoice === 'other' && isControllerOfSelected && (
-            <ConfirmAnchorSubjectContent
-              record={record}
-              selectedUser={selectedUser}
-              onConfirm={onConfirmAnchorSubjectAsController}
-              onGoBack={onGoBackToSearching}
-              onClose={onClose}
-            />
-          )}
+          {phase === 'confirming' &&
+            selectedUser &&
+            subjectChoice === 'other' &&
+            isControllerOfSelected && (
+              <ConfirmAnchorSubjectContent
+                record={record}
+                selectedUser={selectedUser}
+                onConfirm={onConfirmAnchorSubjectAsController}
+                onGoBack={onGoBackToSearching}
+                onClose={onClose}
+              />
+            )}
 
           {/* Confirming Phase - Accept Subject Request */}
           {phase === 'confirming' && operationType === 'acceptSubjectRequest' && !selectedUser && (
@@ -519,7 +524,15 @@ const SearchingContent: React.FC<{
   onSelectUser: (user: BelroseUserProfile) => void;
   onGoBack: () => void;
   onClose: () => void;
-}> = ({ record, currentSubjects, selectedRole, controllerTrustorIds, onSelectUser, onGoBack, onClose }) => {
+}> = ({
+  record,
+  currentSubjects,
+  selectedRole,
+  controllerTrustorIds,
+  onSelectUser,
+  onGoBack,
+  onClose,
+}) => {
   const { user } = useAuthContext();
 
   const handleUserSelect = (u: BelroseUserProfile) => {
@@ -704,8 +717,9 @@ const ConfirmSetSubjectAsSelfContent: React.FC<{
             <p className="font-medium text-blue-900">What this means</p>
             <ul className="mt-2 text-sm text-blue-800 space-y-1">
               <li>• This record is about you or pertains to you</li>
-              <li>• Your link will be recorded on the distributed network</li>
-              <li>• You can remove this link at any time</li>
+              <li>• You're also verifying that its contents are accurate</li>
+              <li>• Both will be recorded on the distributed network</li>
+              <li>• You can remove your link or verification at any time</li>
             </ul>
           </div>
         </div>
@@ -714,7 +728,9 @@ const ConfirmSetSubjectAsSelfContent: React.FC<{
       {/* Warning */}
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
         <p className="text-xs text-amber-800 leading-relaxed">
-          <strong>Note:</strong> By confirming, you are attesting that this record is about you.
+          <strong>Note:</strong> By confirming, you are attesting that this record is about you
+          <em> and</em> that its contents are accurate — this counts as your verification of the
+          record.
         </p>
       </div>
 
@@ -751,8 +767,9 @@ const ConfirmAnchorSubjectContent: React.FC<{
     </AlertDialog.Title>
 
     <AlertDialog.Description className="text-sm text-gray-600 mb-4">
-      You are anchoring <strong>{selectedUser.displayName || selectedUser.email || 'this user'}</strong> as
-      the subject of this record using your controller trustee authority.
+      You are anchoring{' '}
+      <strong>{selectedUser.displayName || selectedUser.email || 'this user'}</strong> as the
+      subject of this record using your controller trustee authority.
     </AlertDialog.Description>
 
     {/* User Info */}
@@ -784,7 +801,8 @@ const ConfirmAnchorSubjectContent: React.FC<{
     <div className="p-3 bg-red-50 border border-red-200 rounded-lg mb-4">
       <p className="text-xs text-red-800 leading-relaxed">
         As their controller trustee, you can anchor them as subject directly — no consent request
-        needed. Their subject link will be recorded on the distributed network.
+        needed. Their subject link will be recorded on the distributed network, and{' '}
+        <strong>you</strong> will be recorded as verifying the record's contents on their behalf.
       </p>
     </div>
 
@@ -803,12 +821,15 @@ const ConfirmRequestConsentContent: React.FC<{
   record: FileObject;
   selectedUser: BelroseUserProfile;
   selectedRole: SubjectRole;
-  onConfirm: () => void;
+  onConfirm: (verifyLevel?: VerificationLevelOptions) => void;
   onGoBack: () => void;
   onClose: () => void;
 }> = ({ record, selectedUser, selectedRole, onConfirm, onGoBack, onClose }) => {
   const roleConfig = ROLE_CONFIG[selectedRole];
   const RoleIcon = roleConfig.icon;
+  // Defaults to Provenance — matches "provider creates and verifies, then requests patient
+  // anchor" from the whitepaper. 0 = no verification.
+  const [verifyLevel, setVerifyLevel] = useState<VerificationLevelOptions | 0>(1);
 
   return (
     <div>
@@ -849,6 +870,30 @@ const ConfirmRequestConsentContent: React.FC<{
         </div>
       </div>
 
+      {/* Your Verification */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Your verification of this record
+        </label>
+        <select
+          value={verifyLevel}
+          onChange={e => setVerifyLevel(Number(e.target.value) as VerificationLevelOptions | 0)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+        >
+          <option value={0}>No verification</option>
+          {VERIFICATION_OPTIONS.map(option => (
+            <option key={option.value} value={option.value}>
+              {option.name}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-gray-500 mt-1">
+          {verifyLevel === 0
+            ? "You won't be recorded as verifying this record's content or origin."
+            : VERIFICATION_OPTIONS.find(o => o.value === verifyLevel)?.description}
+        </p>
+      </div>
+
       {/* Info */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
         <p className="text-xs text-gray-600 leading-relaxed">
@@ -861,7 +906,7 @@ const ConfirmRequestConsentContent: React.FC<{
         <Button variant="outline" className="flex-1" onClick={onGoBack}>
           Back
         </Button>
-        <Button onClick={onConfirm} className="flex-1">
+        <Button onClick={() => onConfirm(verifyLevel || undefined)} className="flex-1">
           Send Request
         </Button>
       </div>
@@ -901,7 +946,8 @@ const ConfirmAcceptRequestContent: React.FC<{
           <ul className="mt-2 text-sm text-green-800 space-y-1">
             <li>• This record is about you</li>
             <li>• You consent to being linked to this record</li>
-            <li>• Your link will be recorded on network</li>
+            <li>• You're also verifying that its contents are accurate</li>
+            <li>• All of this will be recorded on network</li>
           </ul>
         </div>
       </div>

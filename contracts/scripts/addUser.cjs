@@ -1,7 +1,7 @@
 const { ethers } = require('hardhat');
 
 async function main() {
-  const contractAddress = '0xdF9583C25E234A34a1E47d9830722123CA228a1a';
+  const contractAddress = '0x61CcF57C332D32c4d906ac64674BBA4E10CCB07B';
   if (!contractAddress) throw new Error('Missing CONTRACT_ADDRESS');
 
   const userIdHash = '0xc47eaa04c4ef76d274fdff0fbe74449b0c11f28521d7e4e7085142cd83ff8ce3';

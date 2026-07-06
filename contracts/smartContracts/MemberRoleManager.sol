@@ -1018,6 +1018,11 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   // trustorIdHash => trusteeIdHash => TrusteeRelationship
   mapping(bytes32 => mapping(bytes32 => TrusteeRelationship)) public trusteeRelationships;
 
+  // trustorIdHash => list of every trusteeIdHash ever proposed by this trustor (regardless of
+  // current status). Lets us enumerate "who are this trustor's trustees" on-chain, e.g. to
+  // extend trustee access automatically when the trustor anchors a new record.
+  mapping(bytes32 => bytes32[]) public trusteesByTrustor;
+
   // trustorIdHash => trusteeIdHash => recordIdHash[] (records granted via proposeTrustee)
   mapping(bytes32 => mapping(bytes32 => bytes32[])) private _trusteeGrantedRecords;
 
@@ -1085,6 +1090,12 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
       "Proposal already exists or is pending"
     );
 
+    // Only enumerate a trustee the first time this trustor ever proposes to them — re-proposals
+    // after Revoked/Declined reuse the existing entry rather than duplicating it.
+    if (currentStatus == TrusteeStatus.None) {
+      trusteesByTrustor[trustorIdHash].push(trusteeIdHash);
+    }
+
     trusteeRelationships[trustorIdHash][trusteeIdHash] = TrusteeRelationship({
       status: TrusteeStatus.Pending,
       level: level
@@ -1093,19 +1104,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     emit TrusteeProposed(trustorIdHash, trusteeIdHash, level, block.timestamp);
 
     for (uint256 i = 0; i < recordIdHashes.length; i++) {
-      bytes32 recordIdHash = recordIdHashes[i];
-      string memory role = _resolveTrusteeRole(recordIdHash, trustorIdHash, level);
-
-      if (!_isValidRole(role)) continue;
-      if (!_hasActiveRole(recordIdHash, trustorIdHash)) continue;
-      if (_hasActiveRole(recordIdHash, trusteeIdHash)) continue;
-
-      _grantRoleInternal(recordIdHash, trusteeIdHash, role, trustorIdHash);
-
-      if (!_trusteeGrantedRecordSet[trustorIdHash][trusteeIdHash][recordIdHash]) {
-        _trusteeGrantedRecords[trustorIdHash][trusteeIdHash].push(recordIdHash);
-        _trusteeGrantedRecordSet[trustorIdHash][trusteeIdHash][recordIdHash] = true;
-      }
+      _grantTrusteeAccessToRecord(recordIdHashes[i], trustorIdHash, trusteeIdHash, level);
     }
   }
 
@@ -1237,6 +1236,10 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
       "Relationship already active or pending"
     );
 
+    if (currentStatus == TrusteeStatus.None) {
+      trusteesByTrustor[trustorIdHash].push(trusteeIdHash);
+    }
+
     trusteeRelationships[trustorIdHash][trusteeIdHash] = TrusteeRelationship({
       status: TrusteeStatus.Active,
       level: TrusteeLevel.Controller
@@ -1298,6 +1301,29 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     _syncTrusteeRoles(trustorIdHash, trusteeIdHash, newLevel);
   }
 
+  /**
+   * @notice Called by HealthRecordCore right after a subject (re)anchors themselves to a record.
+   * @dev Extends the subject's active trustees' mirrored access to the record, so trustees follow
+   *   the trustor onto every record they anchor rather than only the ones enumerated at
+   *   proposeTrustee time. Called from both anchorRecord and reanchorRecord — usually a no-op on
+   *   reanchor (the trustee's grant is typically still active), but cheap insurance for the case
+   *   where a new trustee relationship formed while the subject was unanchored.
+   * @param subjectIdHash The identity who just became an active subject of recordIdHash
+   * @param recordIdHash The record they (re)anchored to
+   */
+  function extendTrusteeGrantsOnAnchor(bytes32 subjectIdHash, bytes32 recordIdHash) external {
+    require(msg.sender == address(healthRecordCore), "Only HealthRecordCore");
+
+    bytes32[] storage trustees = trusteesByTrustor[subjectIdHash];
+    for (uint256 i = 0; i < trustees.length; i++) {
+      bytes32 trusteeIdHash = trustees[i];
+      TrusteeRelationship memory r = trusteeRelationships[subjectIdHash][trusteeIdHash];
+      if (r.status != TrusteeStatus.Active) continue;
+
+      _grantTrusteeAccessToRecord(recordIdHash, subjectIdHash, trusteeIdHash, r.level);
+    }
+  }
+
   // =================== TRUSTEE - ROLE GRANT HELPERS ===================
 
   /**
@@ -1335,6 +1361,31 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
 
     // Controller — full mirror (only reaches here for owner/administrator)
     return trustorRole;
+  }
+
+  /**
+   * @dev Grants a trustee mirrored access to a single record, if eligible. Shared by proposeTrustee
+   *   (explicit record list) and extendTrusteeGrantsOnAnchor (triggered by a new anchor). Silently
+   *   no-ops on ineligible records — same "skip, don't revert" philosophy as the batch functions.
+   */
+  function _grantTrusteeAccessToRecord(
+    bytes32 recordIdHash,
+    bytes32 trustorIdHash,
+    bytes32 trusteeIdHash,
+    TrusteeLevel level
+  ) internal {
+    string memory role = _resolveTrusteeRole(recordIdHash, trustorIdHash, level);
+
+    if (!_isValidRole(role)) return;
+    if (!_hasActiveRole(recordIdHash, trustorIdHash)) return;
+    if (_hasActiveRole(recordIdHash, trusteeIdHash)) return;
+
+    _grantRoleInternal(recordIdHash, trusteeIdHash, role, trustorIdHash);
+
+    if (!_trusteeGrantedRecordSet[trustorIdHash][trusteeIdHash][recordIdHash]) {
+      _trusteeGrantedRecords[trustorIdHash][trusteeIdHash].push(recordIdHash);
+      _trusteeGrantedRecordSet[trustorIdHash][trusteeIdHash][recordIdHash] = true;
+    }
   }
 
   function _applyChangeRole(
@@ -1487,8 +1538,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
         if (!userIsOwner && !userIsAdmin) continue;
       } else if (newRoleHash == keccak256(bytes("sharer"))) {
         if (ownerExists) {
-          if (!userIsOwner && !userIsAdmin && !(userIsSharer && userIsTarget))
-            continue;
+          if (!userIsOwner && !userIsAdmin && !(userIsSharer && userIsTarget)) continue;
         } else {
           if (!userIsAdmin && !(userIsSharer && userIsTarget)) continue;
         }
@@ -1607,6 +1657,14 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     return _trusteeGrantedRecords[trustorIdHash][trusteeIdHash];
   }
 
+  /**
+   * @notice Get every identity hash ever proposed as a trustee for this trustor
+   * @dev Includes Revoked/Declined entries — filter by status via getTrusteeRelationship
+   */
+  function getTrusteesForTrustor(bytes32 trustorIdHash) external view returns (bytes32[] memory) {
+    return trusteesByTrustor[trustorIdHash];
+  }
+
   // ===============================================================
   // VOUCHES
   // ===============================================================
@@ -1621,11 +1679,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
 
   // =================== VOUCHES - EVENTS ===================
 
-  event VouchGiven(
-    bytes32 indexed voucherIdHash,
-    bytes32 indexed voucheeIdHash,
-    uint256 timestamp
-  );
+  event VouchGiven(bytes32 indexed voucherIdHash, bytes32 indexed voucheeIdHash, uint256 timestamp);
 
   event VouchRetracted(
     bytes32 indexed voucherIdHash,
@@ -1700,10 +1754,7 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   /**
    * @notice Check if a user is currently actively vouching for another user
    */
-  function hasVouched(
-    bytes32 voucherIdHash,
-    bytes32 voucheeIdHash
-  ) external view returns (bool) {
+  function hasVouched(bytes32 voucherIdHash, bytes32 voucheeIdHash) external view returns (bool) {
     return vouches[voucherIdHash][voucheeIdHash] == VouchStatus.Active;
   }
 

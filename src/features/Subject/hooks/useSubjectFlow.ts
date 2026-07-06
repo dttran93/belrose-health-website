@@ -33,8 +33,9 @@ import { FileObject, BelroseUserProfile } from '@/types/core';
 import { doc, getDoc, getFirestore, updateDoc } from 'firebase/firestore';
 import SubjectQueryService, { IncomingSubjectRequest } from '../services/subjectQueryService';
 import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
-import { RejectionReasons, SubjectConsentRequest } from '@belrose/shared';
+import { RejectionReasons, SubjectConsentRequest, VerificationLevelOptions } from '@belrose/shared';
 import { TrusteeRelationshipService } from '@/features/Trustee/services/trusteeRelationshipService';
+import { CredibilityPreparationService } from '@/features/Credibility/services/credibilityPreparationService';
 
 // ============================================================================
 // TYPES
@@ -478,92 +479,114 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
    * Create a subject request for another user to accept
    * No subject write to the blockchain, all firestore. But may pass grant role to Activity Tray
    */
-  const confirmRequestConsent = useCallback(async () => {
-    if (!pendingOperation || pendingOperation.subjectChoice !== 'other' || !selectedUser) return;
+  const confirmRequestConsent = useCallback(
+    async (verifyLevel?: VerificationLevelOptions) => {
+      if (!pendingOperation || pendingOperation.subjectChoice !== 'other' || !selectedUser) return;
 
-    const auth = getAuth();
-    const userId = auth.currentUser?.uid;
+      const auth = getAuth();
+      const userId = auth.currentUser?.uid;
 
-    if (!userId) {
-      setError('You must be signed in');
-      setPhase('error');
-      return;
-    }
-
-    setPhase('executing');
-
-    try {
-      // Step 1: Run preparation for wallet readiness and initializing on-chain
-      console.log('🔄 Step 1: Running preparation...');
-      await SubjectPreparationService.prepare(recordId, progress => {
-        setPreparationProgress(progress);
-      });
-      console.log('✅ Step 1 complete');
-
-      //Step 2: Create the consent request
-      console.log('🔄 Step 2: Creating consent request...');
-      const recordTitle = record.belroseFields?.title || record.fileName;
-      await SubjectService.requestSubjectConsent(recordId, selectedUser.uid, {
-        role: pendingOperation.selectedRole || 'sharer',
-        recordTitle,
-      });
-      console.log('✅ Step 2 complete');
-
-      // Step 3: Grant the role so the subject can preview the record
-      console.log('🔄 Step 3: Checking/granting role...');
-      const targetRole = pendingOperation.selectedRole || 'sharer';
-      const currentRole = getUserRoleForRecord(selectedUser.uid, record);
-      const needsRoleGrant =
-        !currentRole || ROLE_HIERARCHY[targetRole] > ROLE_HIERARCHY[currentRole || 'none'];
-
-      if (needsRoleGrant) {
-        const activityId = addActivity({
-          label: `Granting ${targetRole} access to subject`,
-          link: recordLink,
-        });
-
-        // Close dialog — blockchain work continues in background
-        setSubmittedLabel('Sending subject request');
-        setPhase('submitted');
-
-        PermissionsService.grantRole(recordId, selectedUser.uid, targetRole)
-          .then(async () => {
-            const requestId = `${recordId}_${selectedUser.uid}`;
-            const requestRef = doc(getFirestore(), 'subjectConsentRequests', requestId);
-            await updateDoc(requestRef, { grantedAccessOnSubjectRequest: true });
-            updateActivity(activityId, { status: 'confirmed' });
-            toast.success('Consent request sent. The user will be notified.');
-            await refetchAll();
-            onSuccess?.();
-          })
-          .catch(err => {
-            const message = err instanceof Error ? err.message : 'Failed to grant access';
-            updateActivity(activityId, { status: 'failed', errorMessage: message });
-          });
-      } else {
-        // No blockchain write needed — wrap up synchronously
-        toast.success('Consent request sent. The user will be notified.');
-        reset();
-        await refetchAll();
-        onSuccess?.();
+      if (!userId) {
+        setError('You must be signed in');
+        setPhase('error');
+        return;
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to send consent request';
-      setError(message);
-      setPhase('error');
-      toast.error(message);
-    }
-  }, [
-    pendingOperation,
-    selectedUser,
-    recordId,
-    record,
-    addActivity,
-    updateActivity,
-    reset,
-    refetchAll,
-    onSuccess,
-  ]);
+
+      setPhase('executing');
+
+      try {
+        // Step 1: Run preparation for wallet readiness and initializing on-chain
+        console.log('🔄 Step 1: Running preparation...');
+
+        // Re-fetch the canonical recordHash from Firestore rather than trusting the `record`
+        // prop — some callers (e.g. CombinedUploadFHIR) pass a locally-held snapshot that isn't
+        // guaranteed to match what's currently persisted. requestSubjectConsent below does its
+        // own fresh read for the same reason; using a stale hash here would register the wrong
+        // hash on-chain and createVerification would revert with "Hash does not belong to this
+        // record" since recordIdForHash was never bound for the hash it actually tries to verify.
+        const currentRecordHash = verifyLevel
+          ? (await getDoc(doc(getFirestore(), 'records', recordId))).data()?.recordHash
+          : undefined;
+
+        if (verifyLevel && currentRecordHash) {
+          // Verifying also requires recordHash to be registered on-chain (recordIdForHash),
+          // which SubjectPreparationService doesn't ensure — CredibilityPreparationService does
+          // (it's a superset: wallet readiness + role init + hash registration).
+          await CredibilityPreparationService.prepare(recordId, currentRecordHash);
+        } else {
+          await SubjectPreparationService.prepare(recordId, progress => {
+            setPreparationProgress(progress);
+          });
+        }
+        console.log('✅ Step 1 complete');
+
+        //Step 2: Create the consent request
+        console.log('🔄 Step 2: Creating consent request...');
+        const recordTitle = record.belroseFields?.title || record.fileName;
+        await SubjectService.requestSubjectConsent(recordId, selectedUser.uid, {
+          role: pendingOperation.selectedRole || 'sharer',
+          recordTitle,
+          verifyLevel,
+        });
+        console.log('✅ Step 2 complete');
+
+        // Step 3: Grant the role so the subject can preview the record
+        console.log('🔄 Step 3: Checking/granting role...');
+        const targetRole = pendingOperation.selectedRole || 'sharer';
+        const currentRole = getUserRoleForRecord(selectedUser.uid, record);
+        const needsRoleGrant =
+          !currentRole || ROLE_HIERARCHY[targetRole] > ROLE_HIERARCHY[currentRole || 'none'];
+
+        if (needsRoleGrant) {
+          const activityId = addActivity({
+            label: `Granting ${targetRole} access to subject`,
+            link: recordLink,
+          });
+
+          // Close dialog — blockchain work continues in background
+          setSubmittedLabel('Sending subject request');
+          setPhase('submitted');
+
+          PermissionsService.grantRole(recordId, selectedUser.uid, targetRole)
+            .then(async () => {
+              const requestId = `${recordId}_${selectedUser.uid}`;
+              const requestRef = doc(getFirestore(), 'subjectConsentRequests', requestId);
+              await updateDoc(requestRef, { grantedAccessOnSubjectRequest: true });
+              updateActivity(activityId, { status: 'confirmed' });
+              toast.success('Consent request sent. The user will be notified.');
+              await refetchAll();
+              onSuccess?.();
+            })
+            .catch(err => {
+              const message = err instanceof Error ? err.message : 'Failed to grant access';
+              updateActivity(activityId, { status: 'failed', errorMessage: message });
+            });
+        } else {
+          // No blockchain write needed — wrap up synchronously
+          toast.success('Consent request sent. The user will be notified.');
+          reset();
+          await refetchAll();
+          onSuccess?.();
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to send consent request';
+        setError(message);
+        setPhase('error');
+        toast.error(message);
+      }
+    },
+    [
+      pendingOperation,
+      selectedUser,
+      recordId,
+      record,
+      addActivity,
+      updateActivity,
+      reset,
+      refetchAll,
+      onSuccess,
+    ]
+  );
 
   // ==========================================================================
   // CONTROLLER ANCHOR FLOW

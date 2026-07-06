@@ -50,18 +50,18 @@ function buildBundlerURL(pimlicoApiKey) {
 // UUPS upgradeable proxy — always interact via proxy address
 // ============================================================================
 exports.MEMBER_ROLE_MANAGER = {
-    proxy: '0x15B6247f1305ed1Ab3947765DF01d26D849B62d7',
-    implementation: '0x71B59aAF2396616DF801dE88d931dc0d64C2FA12',
-    deploymentBlock: 43049543,
+    proxy: '0x61CcF57C332D32c4d906ac64674BBA4E10CCB07B',
+    implementation: '0x4B3F29b5E7FCE481d788c641402b8e93218ed9B3',
+    deploymentBlock: 43657997,
 };
 // ============================================================================
 // HEALTH RECORD CORE (HealthRecordCore.sol)
 // UUPS upgradeable proxy — always interact via proxy address
 // ============================================================================
 exports.HEALTH_RECORD_CORE = {
-    proxy: '0x66A8b985C61205e63D7d7DEA72Dfa5849a3e66De',
-    implementation: '0x985559cb258591967312867b0a37a058f08e92bd',
-    deploymentBlock: 41800191,
+    proxy: '0xE1012A0D698cced489C47189F9DC9372d6Fb104B',
+    implementation: '0x15eCCf880C18Af1c7BDA1ca2AB7d410D6FDaEe4D',
+    deploymentBlock: 43657997,
 };
 // ============================================================================
 // CONVENIENCE ALIASES

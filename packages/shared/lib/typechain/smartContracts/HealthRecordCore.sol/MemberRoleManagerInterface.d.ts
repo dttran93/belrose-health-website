@@ -1,7 +1,8 @@
 import type { BaseContract, BytesLike, FunctionFragment, Result, Interface, AddressLike, ContractRunner, ContractMethod, Listener } from "ethers";
 import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, TypedListener, TypedContractMethod } from "../../common";
 export interface MemberRoleManagerInterfaceInterface extends Interface {
-    getFunction(nameOrSignature: "getUserForWallet" | "hasActiveRole" | "hasRole" | "isActiveMember" | "isControllerOf" | "isOwnerOrAdmin" | "isVerifiedMember"): FunctionFragment;
+    getFunction(nameOrSignature: "extendTrusteeGrantsOnAnchor" | "getUserForWallet" | "hasActiveRole" | "hasRole" | "isActiveMember" | "isControllerOf" | "isOwnerOrAdmin" | "isVerifiedMember"): FunctionFragment;
+    encodeFunctionData(functionFragment: "extendTrusteeGrantsOnAnchor", values: [BytesLike, BytesLike]): string;
     encodeFunctionData(functionFragment: "getUserForWallet", values: [AddressLike]): string;
     encodeFunctionData(functionFragment: "hasActiveRole", values: [BytesLike, AddressLike]): string;
     encodeFunctionData(functionFragment: "hasRole", values: [BytesLike, AddressLike, string]): string;
@@ -9,6 +10,7 @@ export interface MemberRoleManagerInterfaceInterface extends Interface {
     encodeFunctionData(functionFragment: "isControllerOf", values: [BytesLike, BytesLike]): string;
     encodeFunctionData(functionFragment: "isOwnerOrAdmin", values: [BytesLike, AddressLike]): string;
     encodeFunctionData(functionFragment: "isVerifiedMember", values: [AddressLike]): string;
+    decodeFunctionResult(functionFragment: "extendTrusteeGrantsOnAnchor", data: BytesLike): Result;
     decodeFunctionResult(functionFragment: "getUserForWallet", data: BytesLike): Result;
     decodeFunctionResult(functionFragment: "hasActiveRole", data: BytesLike): Result;
     decodeFunctionResult(functionFragment: "hasRole", data: BytesLike): Result;
@@ -30,6 +32,12 @@ export interface MemberRoleManagerInterface extends BaseContract {
     listeners<TCEvent extends TypedContractEvent>(event: TCEvent): Promise<Array<TypedListener<TCEvent>>>;
     listeners(eventName?: string): Promise<Array<Listener>>;
     removeAllListeners<TCEvent extends TypedContractEvent>(event?: TCEvent): Promise<this>;
+    extendTrusteeGrantsOnAnchor: TypedContractMethod<[
+        subjectIdHash: BytesLike,
+        recordIdHash: BytesLike
+    ], [
+        void
+    ], "nonpayable">;
     getUserForWallet: TypedContractMethod<[
         wallet: AddressLike
     ], [
@@ -67,6 +75,12 @@ export interface MemberRoleManagerInterface extends BaseContract {
         boolean
     ], "view">;
     getFunction<T extends ContractMethod = ContractMethod>(key: string | FunctionFragment): T;
+    getFunction(nameOrSignature: "extendTrusteeGrantsOnAnchor"): TypedContractMethod<[
+        subjectIdHash: BytesLike,
+        recordIdHash: BytesLike
+    ], [
+        void
+    ], "nonpayable">;
     getFunction(nameOrSignature: "getUserForWallet"): TypedContractMethod<[wallet: AddressLike], [string], "view">;
     getFunction(nameOrSignature: "hasActiveRole"): TypedContractMethod<[
         recordIdHash: BytesLike,

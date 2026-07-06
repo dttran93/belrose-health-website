@@ -11,4 +11,8 @@ export * from './deletion';
 export * from './subject';
 export * from './blockchainAddresses';
 export type { HealthRecordCore, MemberRoleManager, BelrosePaymaster } from './typechain';
-export { HealthRecordCore__factory, MemberRoleManager__factory, BelrosePaymaster__factory } from './typechain';
+export {
+  HealthRecordCore__factory,
+  MemberRoleManager__factory,
+  BelrosePaymaster__factory,
+} from './typechain';

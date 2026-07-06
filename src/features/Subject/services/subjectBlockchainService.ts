@@ -9,7 +9,10 @@
  */
 
 import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
-import { blockchainHealthRecordService } from '@/features/Credibility/services/blockchainHealthRecordService';
+import {
+  blockchainHealthRecordService,
+  VerificationLevel,
+} from '@/features/Credibility/services/blockchainHealthRecordService';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 
 export class SubjectBlockchainService {
@@ -53,14 +56,19 @@ export class SubjectBlockchainService {
   static async anchorSubject(
     recordId: string,
     recordHash: string,
-    userId: string
+    userId: string,
+    selfVerifyLevel?: VerificationLevel
   ): Promise<{ txHash: string; blockNumber: number } | null> {
     const walletAddress = await this.requireUserWalletAddress(userId);
 
     try {
       console.log('⛓️ Anchoring subject on blockchain...', { recordId, userId });
 
-      const result = await blockchainHealthRecordService.anchorRecord(recordId, recordHash);
+      const result = await blockchainHealthRecordService.anchorRecord(
+        recordId,
+        recordHash,
+        selfVerifyLevel
+      );
 
       console.log('✅ Subject anchored on blockchain');
       return result;
@@ -87,13 +95,19 @@ export class SubjectBlockchainService {
     recordId: string,
     recordHash: string,
     controllerId: string,
-    trustorId: string
+    trustorId: string,
+    selfVerifyLevel?: VerificationLevel
   ): Promise<{ txHash: string; blockNumber: number } | null> {
     const walletAddress = await this.requireUserWalletAddress(controllerId);
 
     try {
       console.log('⛓️ Anchoring subject as controller...', { recordId, trustorId });
-      const result = await blockchainHealthRecordService.anchorRecordAsController(recordId, recordHash, trustorId);
+      const result = await blockchainHealthRecordService.anchorRecordAsController(
+        recordId,
+        recordHash,
+        trustorId,
+        selfVerifyLevel
+      );
       console.log('✅ Subject anchored as controller');
       return result;
     } catch (error) {

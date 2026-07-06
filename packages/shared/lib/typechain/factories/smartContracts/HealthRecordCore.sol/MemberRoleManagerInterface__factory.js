@@ -6,6 +6,24 @@ const _abi = [
     {
         inputs: [
             {
+                internalType: "bytes32",
+                name: "subjectIdHash",
+                type: "bytes32",
+            },
+            {
+                internalType: "bytes32",
+                name: "recordIdHash",
+                type: "bytes32",
+            },
+        ],
+        name: "extendTrusteeGrantsOnAnchor",
+        outputs: [],
+        stateMutability: "nonpayable",
+        type: "function",
+    },
+    {
+        inputs: [
+            {
                 internalType: "address",
                 name: "wallet",
                 type: "address",

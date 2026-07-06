@@ -2,8 +2,8 @@
 import hre from 'hardhat';
 const { ethers, upgrades } = hre;
 
-const HEALTH_RECORD_CORE_PROXY = '0x66A8b985C61205e63D7d7DEA72Dfa5849a3e66De';
-const MEMBER_ROLE_MANAGER_PROXY = '0xdF9583C25E234A34a1E47d9830722123CA228a1a';
+const HEALTH_RECORD_CORE_PROXY = '0xE1012A0D698cced489C47189F9DC9372d6Fb104B';
+const MEMBER_ROLE_MANAGER_PROXY = '0x61CcF57C332D32c4d906ac64674BBA4E10CCB07B';
 
 async function main() {
   console.log('🚀 Starting MemberRoleManager upgrade...');
@@ -43,7 +43,7 @@ async function main() {
     const value = await ethers.provider.getStorage(MEMBER_ROLE_MANAGER_PROXY, slot);
     newImplAddress = '0x' + value.slice(-40);
     console.log(`   Attempt ${i + 1}: ${newImplAddress}`);
-    if (newImplAddress.toLowerCase() !== '0xa2eb35c3db09283847def81e3a9cc0f41204fe85') break;
+    if (newImplAddress.toLowerCase() !== '0x4b3f29b5e7fce481d788c641402b8e93218ed9b3') break;
   }
 
   console.log('✅ Proxy upgraded successfully!');

@@ -24,7 +24,7 @@ const db = admin.firestore();
 
 // TODO: After deploying to baseSepolia, paste your new proxy address here
 const BASE_SEPOLIA_RPC = 'https://sepolia.base.org';
-const MEMBER_ROLE_MANAGER_ADDRESS = '0xdF9583C25E234A34a1E47d9830722123CA228a1a';
+const MEMBER_ROLE_MANAGER_ADDRESS = '0x61CcF57C332D32c4d906ac64674BBA4E10CCB07B';
 const ADMIN_PRIVATE_KEY = 'process.env.ADMIN_WALLET_PRIVATE_KEY';
 
 const DRY_RUN = !process.argv.includes('--execute');

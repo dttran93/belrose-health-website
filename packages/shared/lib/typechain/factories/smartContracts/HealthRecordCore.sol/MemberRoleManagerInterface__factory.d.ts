@@ -3,6 +3,20 @@ import type { MemberRoleManagerInterface, MemberRoleManagerInterfaceInterface } 
 export declare class MemberRoleManagerInterface__factory {
     static readonly abi: readonly [{
         readonly inputs: readonly [{
+            readonly internalType: "bytes32";
+            readonly name: "subjectIdHash";
+            readonly type: "bytes32";
+        }, {
+            readonly internalType: "bytes32";
+            readonly name: "recordIdHash";
+            readonly type: "bytes32";
+        }];
+        readonly name: "extendTrusteeGrantsOnAnchor";
+        readonly outputs: readonly [];
+        readonly stateMutability: "nonpayable";
+        readonly type: "function";
+    }, {
+        readonly inputs: readonly [{
             readonly internalType: "address";
             readonly name: "wallet";
             readonly type: "address";
