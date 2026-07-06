@@ -710,28 +710,19 @@ const ConfirmSetSubjectAsSelfContent: React.FC<{
       </div>
 
       {/* Info Card */}
-      <div className="p-4 border rounded-lg bg-blue-50 border-blue-200 mb-4">
+      <div className="p-4 border rounded-lg bg-amber-50 border-amber-200 mb-4">
         <div className="flex gap-3">
-          <Link className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+          <Link className="w-5 h-5 text-amber-800 mt-0.5 flex-shrink-0" />
           <div>
-            <p className="font-medium text-blue-900">What this means</p>
-            <ul className="mt-2 text-sm text-blue-800 space-y-1">
-              <li>• This record is about you or pertains to you</li>
+            <p className="font-medium text-amber-800">What this means</p>
+            <ul className="mt-2 text-sm text-amber-800 space-y-1">
+              <li>• This record is about you</li>
               <li>• You're also verifying that its contents are accurate</li>
               <li>• Both will be recorded on the distributed network</li>
               <li>• You can remove your link or verification at any time</li>
             </ul>
           </div>
         </div>
-      </div>
-
-      {/* Warning */}
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-        <p className="text-xs text-amber-800 leading-relaxed">
-          <strong>Note:</strong> By confirming, you are attesting that this record is about you
-          <em> and</em> that its contents are accurate — this counts as your verification of the
-          record.
-        </p>
       </div>
 
       <div className="flex gap-3">

@@ -419,6 +419,12 @@ export class TrusteePermissionService {
    *
    * Mirrors grantPendingTrusteeAccess but for a single record and activates immediately
    * since existing trustees have already accepted.
+   *
+   * Note: HealthRecordCore.anchorRecord already triggers MemberRoleManager.extendTrusteeGrantsOnAnchor
+   * as part of the anchor transaction, which may have already granted (or deliberately skipped) each
+   * trustee's on-chain role before this runs. So this reads actual on-chain role state per trustee
+   * rather than trusting Firestore's role arrays, and always mirrors Firestore/wrappedKeys regardless
+   * of whether a chain write happens here.
    */
   static async grantAccessForNewRecord(subjectId: string, recordId: string): Promise<void> {
     console.log('🔄 Granting trustee access for new record...', { subjectId, recordId });
@@ -451,23 +457,13 @@ export class TrusteePermissionService {
     for (const relationshipDoc of snapshot.docs) {
       const { trusteeId, trustLevel } = relationshipDoc.data();
 
-      // Check trustee's current role to avoid redundant grants / unintended downgrades
-      let currentTrusteeRole: Role | null = null;
-      if (recordData.owners?.includes(trusteeId)) currentTrusteeRole = 'owner';
-      else if (recordData.administrators?.includes(trusteeId)) currentTrusteeRole = 'administrator';
-      else if (recordData.sharers?.includes(trusteeId)) currentTrusteeRole = 'sharer';
-      else if (recordData.viewers?.includes(trusteeId)) currentTrusteeRole = 'viewer';
-
-      const role = this.resolveTrusteeRole(
-        trustLevel as TrustLevel,
-        subjectRole,
-        currentTrusteeRole
-      );
-
-      if (!role) {
-        console.log(`ℹ️ Skipping trustee ${trusteeId} on record ${recordId} — no role needed`);
-        continue;
-      }
+      // Need to read Firestone to see if the trustee already has independent access for setting if they'll be in the trustee array
+      // If they do, they don't go in the trustee array but may need to have their access updated
+      let hadIndependentBackendAccess = false;
+      if (recordData.owners?.includes(trusteeId)) hadIndependentBackendAccess = true;
+      else if (recordData.administrators?.includes(trusteeId)) hadIndependentBackendAccess = true;
+      else if (recordData.sharers?.includes(trusteeId)) hadIndependentBackendAccess = true;
+      else if (recordData.viewers?.includes(trusteeId)) hadIndependentBackendAccess = true;
 
       try {
         // Trustor grants role from their own wallet (msg.sender = trustor, which holds the role)
@@ -476,15 +472,48 @@ export class TrusteePermissionService {
           console.error(`⚠️ No wallet found for trustee ${trusteeId} — skipping`);
           continue;
         }
-        const result = await BlockchainRoleManagerService.grantRole(recordId, trusteeWallet, role);
-        if (!result.txHash) {
-          console.error(
-            `⚠️ Blockchain grant failed for trustee ${trusteeId} on record ${recordId}`
-          );
+
+        // Read the trustee's actual on-chain role rather than Firestore's arrays. This determines what we need to do on chain,
+        // change an existing Role or grant a new role. Firestore/wrappedKeys are always updated regardless of whether a chain call is needed.
+        const currentOnChainRoleDetails = await BlockchainRoleManagerService.getRoleDetails(
+          recordId,
+          trusteeWallet
+        );
+        const currentOnChainTrusteeRole: Role | null = currentOnChainRoleDetails.isActive
+          ? (currentOnChainRoleDetails.role as Role)
+          : null;
+
+        const desiredRole = this.resolveTrusteeRole(
+          trustLevel as TrustLevel,
+          subjectRole,
+          currentOnChainTrusteeRole
+        );
+
+        if (desiredRole) {
+          // No active role yet → grantRole; already has a different (lower) role → changeRole.
+          // grantRole reverts if any role exists, changeRole reverts if the role is unchanged,
+          // so which one applies depends entirely on currentOnChainTrusteeRole.
+          const result = currentOnChainTrusteeRole
+            ? await BlockchainRoleManagerService.changeRole(recordId, trusteeWallet, desiredRole)
+            : await BlockchainRoleManagerService.grantRole(recordId, trusteeWallet, desiredRole);
+
+          if (!result.txHash) {
+            console.error(
+              `⚠️ Blockchain ${currentOnChainTrusteeRole ? 'change' : 'grant'} failed for trustee ${trusteeId} on record ${recordId}`
+            );
+            continue;
+          }
+        }
+
+        const finalRole = desiredRole ?? currentOnChainTrusteeRole;
+        if (!finalRole) {
+          console.log(`ℹ️ Skipping trustee ${trusteeId} on record ${recordId} — no role needed`);
           continue;
         }
 
-        // Active wrappedKey since trustee already accepted the relationship
+        // Mirror Firestore + encryption regardless of whether we made a chain call above — both
+        // calls are idempotent/no-op if already up to date, and this is the only way Firestore and
+        // the trustee's wrappedKey learn about a role the auto-grant already set on-chain.
         await SharingService.grantEncryptionAccess(recordId, trusteeId, subjectId);
 
         // Only tag as trustee-derived if they didn't already have independent access
@@ -493,11 +522,11 @@ export class TrusteePermissionService {
           administrators: arrayRemove(trusteeId),
           sharers: arrayRemove(trusteeId),
           viewers: arrayRemove(trusteeId),
-          [this.roleToArray(role)]: arrayUnion(trusteeId),
-          ...(!currentTrusteeRole && { trustees: arrayUnion(trusteeId) }),
+          [this.roleToArray(finalRole)]: arrayUnion(trusteeId),
+          ...(!hadIndependentBackendAccess && { trustees: arrayUnion(trusteeId) }),
         });
 
-        console.log(`✅ Trustee ${trusteeId} granted ${role} on new record ${recordId}`);
+        console.log(`✅ Trustee ${trusteeId} at ${finalRole} on new record ${recordId}`);
       } catch (err) {
         console.error(`⚠️ Failed to grant trustee ${trusteeId} access on record ${recordId}:`, err);
       }
