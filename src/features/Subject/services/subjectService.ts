@@ -21,7 +21,10 @@ import { getFirestore, doc, getDoc, setDoc, Timestamp } from 'firebase/firestore
 import { getAuth } from 'firebase/auth';
 import SubjectBlockchainService from './subjectBlockchainService';
 import { VerificationLevel } from '@/features/Credibility/services/blockchainHealthRecordService';
-import { createVerification } from '@/features/Credibility/services/verificationService';
+import {
+  createVerification,
+  recordSelfVerification,
+} from '@/features/Credibility/services/verificationService';
 import { SubjectRejectionService } from './subjectRejectionService';
 import { getConsentRequestId, SubjectConsentService } from './subjectConsentService';
 import SubjectMembershipService from './subjectMembershipService';
@@ -153,15 +156,22 @@ export class SubjectService {
         console.error('⚠️ Failed to grant trustee access for new record:', trusteeError);
       }
 
+      const blockchainRef = txResult
+        ? buildHealthRecordRef(txResult.txHash, txResult.blockNumber)
+        : undefined;
+
       // Step 4: Create audit consent request doc with blockchain ref (non-fatal)
       try {
         const db = getFirestore();
         const requestId = getConsentRequestId(recordId, user.uid);
         const now = Timestamp.now();
-        const role: SubjectConsentRequest['requestedSubjectRole'] =
-          recordData.owners?.includes(user.uid) ? 'owner'
-          : recordData.administrators?.includes(user.uid) ? 'administrator'
-          : 'sharer';
+        const role: SubjectConsentRequest['requestedSubjectRole'] = recordData.owners?.includes(
+          user.uid
+        )
+          ? 'owner'
+          : recordData.administrators?.includes(user.uid)
+            ? 'administrator'
+            : 'sharer';
         await setDoc(doc(db, 'subjectConsentRequests', requestId), {
           recordId,
           subjectId: user.uid,
@@ -171,14 +181,37 @@ export class SubjectService {
           createdAt: now,
           respondedAt: now,
           grantedAccessOnSubjectRequest: false,
-          ...(txResult ? { blockchainRef: buildHealthRecordRef(txResult.txHash, txResult.blockNumber) } : {}),
+          ...(blockchainRef ? { blockchainRef } : {}),
         } satisfies SubjectConsentRequest);
       } catch (consentError) {
         console.warn('⚠️ Failed to create self-add consent record:', consentError);
       }
 
+      // Step 5: Mirror the anchor tx's self-verify into Firestore (non-fatal)
+      // anchorRecord defaults selfVerifyLevel to Full when omitted, so mirror that same default.
+      const appliedVerifyLevel = selfVerifyLevel ?? VerificationLevel.Full;
+      if (blockchainRef && appliedVerifyLevel !== VerificationLevel.None) {
+        try {
+          await recordSelfVerification(
+            recordId,
+            recordData.recordHash,
+            user.uid,
+            appliedVerifyLevel as VerificationLevelOptions,
+            blockchainRef
+          );
+          console.log('✅ Self-verification mirrored');
+        } catch (verifyError) {
+          console.warn('⚠️ Failed to mirror self-verification:', verifyError);
+        }
+      }
+
       console.log('✅ Subject set as self successfully');
-      return { success: true, recordId, subjectId: user.uid, blockchainAnchored: txResult !== null };
+      return {
+        success: true,
+        recordId,
+        subjectId: user.uid,
+        blockchainAnchored: txResult !== null,
+      };
     } catch (error) {
       console.error('❌ Error setting subject as self:', error);
       throw error;
@@ -233,10 +266,14 @@ export class SubjectService {
     // Step 3: Fan out access to the trustor's own trustees (non-fatal)
     try {
       await TrusteePermissionService.grantAccessForNewRecord(trustorId, recordId);
-      console.log('✅ Access granted to trustor\'s trustees');
+      console.log("✅ Access granted to trustor's trustees");
     } catch (trusteeError) {
       console.error('⚠️ Failed to grant trustee access for new record:', trusteeError);
     }
+
+    const blockchainRef = txResult
+      ? buildHealthRecordRef(txResult.txHash, txResult.blockNumber)
+      : undefined;
 
     // Step 4: Create audit consent request doc with blockchain ref (non-fatal)
     try {
@@ -252,10 +289,29 @@ export class SubjectService {
         createdAt: now,
         respondedAt: now,
         grantedAccessOnSubjectRequest: false,
-        ...(txResult ? { blockchainRef: buildHealthRecordRef(txResult.txHash, txResult.blockNumber) } : {}),
+        ...(blockchainRef ? { blockchainRef } : {}),
       } satisfies SubjectConsentRequest);
     } catch (consentError) {
       console.warn('⚠️ Failed to create controller consent record:', consentError);
+    }
+
+    // Step 5: Mirror the anchor tx's self-verify into Firestore (non-fatal)
+    // anchorRecordAsController defaults selfVerifyLevel to Full when omitted, and credits the
+    // controller (caller), not the trustor, as the verifier — matching the on-chain behavior.
+    const appliedVerifyLevel = selfVerifyLevel ?? VerificationLevel.Full;
+    if (blockchainRef && appliedVerifyLevel !== VerificationLevel.None) {
+      try {
+        await recordSelfVerification(
+          recordId,
+          recordData.recordHash,
+          user.uid,
+          appliedVerifyLevel as VerificationLevelOptions,
+          blockchainRef
+        );
+        console.log('✅ Self-verification mirrored');
+      } catch (verifyError) {
+        console.warn('⚠️ Failed to mirror self-verification:', verifyError);
+      }
     }
   }
 

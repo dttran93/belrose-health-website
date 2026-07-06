@@ -662,10 +662,13 @@ export function useFileManager(): UseFileManagerTypes {
           },
         });
 
-        // Write back originalText so extract/process chip completes for text uploads
+        // Write back originalText/recordHash so extract/process chip completes for text uploads
+        // (processFile's regular-upload path writes recordHash back too — this mirrors that so
+        // the local FileObject stays in sync with what's persisted to Firestore).
         updateFileStatus(fileId, 'processing', {
           originalText: virtualFile.originalText,
           fhirData: virtualFile.fhirData,
+          recordHash: virtualFile.recordHash,
         });
 
         updateFileStatus(fileId, 'uploading', {});

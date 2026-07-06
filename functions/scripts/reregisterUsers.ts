@@ -11,7 +11,9 @@
 import * as admin from 'firebase-admin';
 import * as path from 'path';
 import { ethers } from 'ethers';
-import 'dotenv/config';
+import * as dotenv from 'dotenv';
+
+dotenv.config({ path: path.join(__dirname, '..', '..', '.env.local') });
 
 // ── Firebase init ─────────────────────────────────────────────────────────────
 
@@ -23,7 +25,9 @@ const db = admin.firestore();
 
 const RPC_URL      = 'https://sepolia.base.org';
 const MRM_PROXY    = '0x61CcF57C332D32c4d906ac64674BBA4E10CCB07B';
-const PRIVATE_KEY  = process.env.ADMIN_WALLET_PRIVATE_KEY;
+// Admin/deployer wallet — reuses the same PRIVATE_KEY already in root .env.local
+// (same key used to deploy the contracts), rather than duplicating it elsewhere.
+const PRIVATE_KEY  = process.env.PRIVATE_KEY;
 
 const DRY_RUN = !process.argv.includes('--execute');
 
@@ -99,32 +103,25 @@ async function main() {
       const receipt = await tx.wait();
       console.log(`   ✅ Block ${receipt.blockNumber}`);
 
-      // Update Firestore — archive previous identity, write new registration
+      // Update Firestore — shape must match BelroseUserProfile.onChainIdentity in src/types/core.ts
       const now = admin.firestore.Timestamp.now();
+      const blockchainRef = {
+        txHash:          tx.hash,
+        blockNumber:     receipt.blockNumber,
+        network:         'baseSepolia',
+        contractAddress: MRM_PROXY,
+      };
       await userDoc.ref.update({
-        onChainIdentity_prev: data.onChainIdentity ?? null,
         onChainIdentity: {
           userIdHash,
-          status: 'Active',
+          onChainStatus: [{ status: 'Active', statusUpdatedAt: now, statusBlockchainRef: blockchainRef }],
           linkedWallets: walletAddresses.map((address, i) => ({
             address: address.toLowerCase(),
-            type:    i === 0 ? 'eoa' : 'smartAccount',
+            type:    i === 0 ? 'eoa' : 'smart-account',
             isWalletActive: true,
-            registeredAt:   now,
-            blockchainRef: {
-              txHash:          tx.hash,
-              blockNumber:     receipt.blockNumber,
-              network:         'baseSepolia',
-              contractAddress: MRM_PROXY,
-            },
+            linkedAt: now,
+            blockchainRef,
           })),
-          registeredAt:  now,
-          blockchainRef: {
-            txHash:          tx.hash,
-            blockNumber:     receipt.blockNumber,
-            network:         'baseSepolia',
-            contractAddress: MRM_PROXY,
-          },
         },
       });
 

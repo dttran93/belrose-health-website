@@ -73,7 +73,7 @@ function buildNotificationInput(change, changedByName, recordId, encryptedRecord
 // ============================================================================
 // TRIGGER
 // ============================================================================
-exports.onPermissionChangeEventCreated = (0, firestore_1.onDocumentCreated)({ document: 'permissionChangeEvents/{eventId}', secrets: [resendKey] }, async (event) => {
+exports.onPermissionChangeEventCreated = (0, firestore_1.onDocumentCreated)({ document: 'records/{recordId}/permissionHistory/{eventId}', secrets: [resendKey] }, async (event) => {
     const eventId = event.params.eventId;
     const data = event.data?.data();
     if (!data) {

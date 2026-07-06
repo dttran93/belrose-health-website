@@ -23,7 +23,7 @@ import {
 } from './credibilityScoreService';
 import { BlockchainSyncQueueService } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 import { VerificationDoc, VerificationLevelOptions } from '@belrose/shared';
-import { buildHealthRecordRef } from '@belrose/shared';
+import { buildHealthRecordRef, BlockchainRef } from '@belrose/shared';
 import { encryptNotificationTitle } from '@/features/Notifications/services/encryptNotificationTitle';
 import { id } from 'ethers';
 
@@ -269,6 +269,84 @@ export async function createVerification(
   // Step 3: Credibility score
   await onVerificationCreated(recordId, recordHash, level, blockchainRef!);
   console.log('✅ Verification created successfully');
+  return verificationId;
+}
+
+/**
+ * Mirror a self-verification that already happened on-chain as part of anchorRecord's
+ * selfVerifyLevel nudge (see HealthRecordCore._maybeSelfVerify).
+ *
+ * Unlike createVerification, this does NOT call verifyRecord on-chain — that already ran inside
+ * the anchor transaction. Calling it again would revert with "Already verified this hash" since
+ * _maybeSelfVerify already set currentlyVerified[recordHash][verifierIdHash] = true.
+ *
+ * _maybeSelfVerify silently no-ops (does not emit RecordVerified) if the verifier already
+ * verified this hash or is actively disputing it, and the anchor tx result gives no way to tell
+ * whether it actually fired. This mirrors those same guards so we never write a Firestore
+ * verification doc for a self-verify the contract silently skipped. Returns null when skipped.
+ */
+export async function recordSelfVerification(
+  recordId: string,
+  recordHash: string,
+  verifierId: string,
+  level: VerificationLevelOptions,
+  blockchainRef: BlockchainRef,
+  recordTitle?: string
+): Promise<string | null> {
+  const db = getFirestore();
+
+  const verificationId = getVerificationId(recordHash, verifierId);
+  const docRef = doc(db, 'verifications', verificationId);
+  const existing = await getDoc(docRef);
+
+  // Mirrors _maybeSelfVerify's "already verified this hash" no-op guard.
+  if (existing.exists()) {
+    const data = existing.data();
+    if (data?.isActive && data?.chainStatus === 'confirmed') {
+      return null;
+    }
+  }
+
+  // Mirrors _maybeSelfVerify's "actively disputing this hash" no-op guard.
+  const disputeId = getDisputeId(recordHash, verifierId);
+  const disputeExisting = await getDoc(doc(db, 'disputes', disputeId));
+  if (disputeExisting.exists() && disputeExisting.data()?.isActive) {
+    return null;
+  }
+
+  console.log('🔄 Mirroring self-verification from anchor tx:', { recordId, recordHash, level });
+
+  const titleData = recordTitle ? await encryptNotificationTitle(recordTitle, recordId) : null;
+  const verifiedEvent = { action: 'verified' as const, at: Timestamp.now(), blockchainRef };
+
+  if (existing.exists()) {
+    await updateDoc(docRef, {
+      level,
+      isActive: true,
+      chainStatus: 'confirmed',
+      onChainHistory: arrayUnion(verifiedEvent),
+      error: null,
+      lastModified: Timestamp.now(),
+    });
+    console.log('✅ Firestore: Self-verification reactivated');
+  } else {
+    await setDoc(docRef, {
+      recordHash,
+      recordId,
+      verifierId,
+      verifierIdHash: id(verifierId),
+      level,
+      isActive: true,
+      createdAt: Timestamp.now(),
+      chainStatus: 'confirmed',
+      onChainHistory: [verifiedEvent],
+      ...(titleData ?? {}),
+    });
+    console.log('✅ Firestore: Self-verification created');
+  }
+
+  await onVerificationCreated(recordId, recordHash, level, blockchainRef);
+  console.log('✅ Self-verification mirrored successfully');
   return verificationId;
 }
 
