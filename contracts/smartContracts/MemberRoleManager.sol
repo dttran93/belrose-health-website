@@ -1324,6 +1324,28 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
     }
   }
 
+  /**
+   * @notice Called by HealthRecordCore right after a subject unanchors from a record.
+   * @dev Mirror of extendTrusteeGrantsOnAnchor for the revoke side. Only touches roles that were
+   *   actually granted via the trustee relationship (tracked in _trusteeGrantedRecords) — a
+   *   trustee with independent access to this record for other reasons (e.g. also a direct
+   *   sharer) keeps it untouched.
+   * @param subjectIdHash The identity who just unanchored from recordIdHash
+   * @param recordIdHash The record they unanchored from
+   */
+  function retractTrusteeGrantsOnUnanchor(bytes32 subjectIdHash, bytes32 recordIdHash) external {
+    require(msg.sender == address(healthRecordCore), "Only HealthRecordCore");
+
+    bytes32[] storage trustees = trusteesByTrustor[subjectIdHash];
+    for (uint256 i = 0; i < trustees.length; i++) {
+      bytes32 trusteeIdHash = trustees[i];
+      TrusteeRelationship memory r = trusteeRelationships[subjectIdHash][trusteeIdHash];
+      if (r.status != TrusteeStatus.Active) continue;
+
+      _revokeTrusteeAccessFromRecord(recordIdHash, subjectIdHash, trusteeIdHash);
+    }
+  }
+
   // =================== TRUSTEE - ROLE GRANT HELPERS ===================
 
   /**
@@ -1386,6 +1408,34 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
       _trusteeGrantedRecords[trustorIdHash][trusteeIdHash].push(recordIdHash);
       _trusteeGrantedRecordSet[trustorIdHash][trusteeIdHash][recordIdHash] = true;
     }
+  }
+
+  /**
+   * @dev Revokes a trustee's mirrored access to a single record, if it was ever granted via the
+   *   trustee relationship. Mirror of _grantTrusteeAccessToRecord — only touches roles tracked in
+   *   _trusteeGrantedRecords, so a trustee with independent access (e.g. also a direct sharer)
+   *   keeps it untouched. Silently no-ops if there's nothing to revoke.
+   */
+  function _revokeTrusteeAccessFromRecord(
+    bytes32 recordIdHash,
+    bytes32 trustorIdHash,
+    bytes32 trusteeIdHash
+  ) internal {
+    if (!_trusteeGrantedRecordSet[trustorIdHash][trusteeIdHash][recordIdHash]) return;
+
+    _trusteeGrantedRecordSet[trustorIdHash][trusteeIdHash][recordIdHash] = false;
+    _removeFromBytes32Array(_trusteeGrantedRecords[trustorIdHash][trusteeIdHash], recordIdHash);
+
+    if (!_hasActiveRole(recordIdHash, trusteeIdHash)) return;
+
+    bytes32 roleKey = _getRoleKey(recordIdHash, trusteeIdHash);
+    string memory role = recordRoles[roleKey].role;
+
+    _removeFromRoleArray(recordIdHash, trusteeIdHash, role);
+    recordRoles[roleKey].isActive = false;
+    delete roleGrantedBy[roleKey];
+
+    emit RoleRevoked(recordIdHash, trusteeIdHash, role, trustorIdHash, block.timestamp);
   }
 
   function _applyChangeRole(

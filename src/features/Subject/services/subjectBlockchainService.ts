@@ -124,19 +124,23 @@ export class SubjectBlockchainService {
   }
 
   /**
-   * Unanchor a subject from a record on the blockchain
-   * Logs to sync queue if blockchain call fails
+   * Unanchor a subject from a record on the blockchain.
+   * Returns the transaction result on success (used to cite the tx that triggered
+   * MemberRoleManager.retractTrusteeGrantsOnUnanchor), null on failure — logged to sync queue.
    */
-  static async unanchorSubject(recordId: string, userId: string): Promise<boolean> {
+  static async unanchorSubject(
+    recordId: string,
+    userId: string
+  ): Promise<{ txHash: string; blockNumber: number } | null> {
     const walletAddress = await this.requireUserWalletAddress(userId);
 
     try {
       console.log('⛓️ Unanchoring subject on blockchain...', { recordId, userId });
 
-      await blockchainHealthRecordService.unanchorRecord(recordId);
+      const result = await blockchainHealthRecordService.unanchorRecord(recordId);
 
       console.log('✅ Subject unanchored on blockchain');
-      return true;
+      return result;
     } catch (error) {
       await this.logUnanchorFailure({
         action: 'unanchorRecord',
@@ -146,7 +150,7 @@ export class SubjectBlockchainService {
         error,
       });
 
-      return false;
+      return null;
     }
   }
 

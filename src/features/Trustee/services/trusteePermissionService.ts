@@ -427,15 +427,11 @@ export class TrusteePermissionService {
    * Revoke all active trustee access when the trustor REVOKES or trustee RESIGNS.
    * Called by TrusteeRelationshipService on revoke or resign.
    * Blockchain revocation is handled upstream — this handles Firestore + wrappedKeys only.
-   *
-   * blockchainRef is optional because this is also called from SubjectService.rejectSubjectStatus
-   * with no associated MemberRoleManager tx (that call site has its own known issues — see TODO
-   * there — and currently passes no ref).
    */
   static async revokeTrusteeAccess(
     trustorId: string,
     trusteeId: string,
-    blockchainRef?: BlockchainRef
+    blockchainRef: BlockchainRef
   ): Promise<void> {
     console.log('🔄 Revoking active trustee access...', { trustorId, trusteeId });
 
@@ -471,7 +467,7 @@ export class TrusteePermissionService {
           trustees: arrayRemove(trusteeId),
         });
 
-        if (previousRole && blockchainRef) {
+        if (previousRole) {
           await writePermissionChangeEvent(
             recordId,
             changedBy,
@@ -661,6 +657,142 @@ export class TrusteePermissionService {
     }
 
     console.log(`✅ Trustee fan-out complete for new record ${recordId}`);
+  }
+
+  /**
+   * Revoke each active trustee's role on a SINGLE record when the subject/trustor is removed
+   * from it. Called by SubjectService.rejectSubjectStatus.
+   *
+   * Only touches access that was actually derived from a trustee relationship on this record
+   * (tagged in the record's trustees[]) — a trustee who separately has independent access here
+   * keeps it untouched.
+   *
+   * HealthRecordCore.unanchorRecord already triggers MemberRoleManager.retractTrusteeGrantsOnUnanchor
+   * as part of the unanchor transaction, mirroring how anchorRecord's extendTrusteeGrantsOnAnchor
+   * auto-grants — so by the time this runs, every trustee-derived role on this record should
+   * already be revoked on-chain. This reads actual on-chain state per trustee rather than assuming
+   * that happened, and only falls back to an explicit revokeRole call if it somehow didn't (e.g.
+   * Firestore/chain drift). Firestore/wrappedKeys are always mirrored regardless of which path ran.
+   *
+   * unanchorTx is the subject's unanchor transaction that triggered this cleanup — cited as the
+   * audit-log source when the on-chain state already reflects the revocation. When we DO make our
+   * own revokeRole call below (the drift fallback), we cite THAT call's own ref instead.
+   */
+  static async revokeAccessForRemovedRecord(
+    subjectId: string,
+    recordId: string,
+    unanchorTx?: { txHash: string; blockNumber: number } | null
+  ): Promise<void> {
+    console.log('🔄 Revoking trustee access for removed record...', { subjectId, recordId });
+
+    const db = getFirestore();
+
+    const q = query(
+      collection(db, 'trusteeRelationships'),
+      where('trustorId', '==', subjectId),
+      where('isActive', '==', true)
+    );
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      console.log('ℹ️ No active trustees for subject — nothing to revoke');
+      return;
+    }
+
+    const recordRef = doc(db, 'records', recordId);
+    const recordDoc = await getDoc(recordRef);
+    if (!recordDoc.exists()) {
+      console.log('ℹ️ Record no longer exists — nothing to revoke');
+      return;
+    }
+
+    const recordData = recordDoc.data();
+    const trusteeDerivedIds: string[] = recordData.trustees ?? [];
+
+    for (const relationshipDoc of snapshot.docs) {
+      const { trusteeId } = relationshipDoc.data();
+
+      // Only touch access that was actually derived from this trustee relationship on this
+      // record — a trustee with independent access here (not tagged in trustees[]) keeps it.
+      if (!trusteeDerivedIds.includes(trusteeId)) continue;
+
+      const previousRole = getRoleFromRecordData(recordData, trusteeId);
+      if (!previousRole) continue;
+
+      try {
+        const trusteeWallet = await TrusteeBlockchainService.getUserWalletAddress(trusteeId);
+        if (!trusteeWallet) {
+          console.error(`⚠️ No wallet found for trustee ${trusteeId} — skipping`);
+          continue;
+        }
+
+        const currentOnChainRoleDetails = await BlockchainRoleManagerService.getRoleDetails(
+          recordId,
+          trusteeWallet
+        );
+
+        // The blockchainRef to cite for this trustee's audit-log entry, if any.
+        let roleChangeRef: BlockchainRef | undefined;
+
+        if (!currentOnChainRoleDetails.isActive) {
+          // Already revoked — retractTrusteeGrantsOnUnanchor handled it inside the unanchor tx.
+          if (unanchorTx) {
+            roleChangeRef = buildMemberRegistryRef(unanchorTx.txHash, unanchorTx.blockNumber);
+          }
+        } else {
+          // Still active despite being tagged as trustee-derived — Firestore/chain drift.
+          // Revoke it explicitly as a self-healing fallback.
+          const result = await BlockchainRoleManagerService.revokeRole(recordId, trusteeWallet);
+          if (!result.txHash) {
+            console.error(
+              `⚠️ Blockchain revoke failed for trustee ${trusteeId} on record ${recordId}`
+            );
+            continue;
+          }
+          roleChangeRef = buildMemberRegistryRef(result.txHash, result.blockNumber);
+        }
+
+        await updateDoc(recordRef, {
+          owners: arrayRemove(trusteeId),
+          administrators: arrayRemove(trusteeId),
+          sharers: arrayRemove(trusteeId),
+          viewers: arrayRemove(trusteeId),
+          trustees: arrayRemove(trusteeId),
+        });
+
+        // Deactivate rather than delete — preserves audit trail, mirrors revokeTrusteeAccess.
+        // wrappedKey format: `${recordId}_${trusteeId}` (see SharingService.grantEncryptionAccess).
+        const wrappedKeyRef = doc(db, 'wrappedKeys', `${recordId}_${trusteeId}`);
+        const wrappedKeySnap = await getDoc(wrappedKeyRef);
+        if (wrappedKeySnap.exists()) {
+          await updateDoc(wrappedKeyRef, {
+            isActive: false,
+            revokedAt: new Date(),
+            revokedBy: subjectId,
+          });
+        }
+
+        if (roleChangeRef) {
+          await writePermissionChangeEvent(
+            recordId,
+            subjectId,
+            [{ userId: trusteeId, action: 'revoked', previousRole, newRole: null }],
+            roleChangeRef,
+            undefined,
+            'trustee_revoke'
+          );
+        }
+
+        console.log(`✅ Revoked trustee ${trusteeId} access on removed record ${recordId}`);
+      } catch (err) {
+        console.error(
+          `⚠️ Failed to revoke trustee ${trusteeId} access on record ${recordId}:`,
+          err
+        );
+      }
+    }
+
+    console.log(`✅ Trustee revocation complete for removed record ${recordId}`);
   }
 
   /**

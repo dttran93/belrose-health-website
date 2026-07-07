@@ -630,7 +630,7 @@ export class SubjectService {
 
       // Step 1: Unanchor from blockchain
       console.log('🔗 Unanchoring subject from blockchain...');
-      await SubjectBlockchainService.unanchorSubject(recordId, user.uid);
+      const unanchorTxResult = await SubjectBlockchainService.unanchorSubject(recordId, user.uid);
       console.log('✅ Blockchain: Subject unanchored');
 
       // Step 2: Update Firestore (only if blockchain succeeded)
@@ -656,14 +656,12 @@ export class SubjectService {
       }
 
       // Step 3: Remove any trustees that have access through the removed subject
-      // TODO: this call is broken — revokeTrusteeAccess(trustorId, trusteeId) expects a trustee
-      // user ID as the second arg, not a recordId, so this always matches zero wrappedKeys and
-      // silently no-ops. It also doesn't match what's needed here anyway: this should revoke each
-      // active trustee's role on just THIS record, not all of one trustee's records. There's also
-      // no on-chain MemberRoleManager revocation happening for this path at all currently. Needs a
-      // proper fix (and a matching audit-log write) as a follow-up.
       try {
-        await TrusteePermissionService.revokeTrusteeAccess(user.uid, recordId);
+        await TrusteePermissionService.revokeAccessForRemovedRecord(
+          user.uid,
+          recordId,
+          unanchorTxResult
+        );
         console.log('✅ Subject trustees removed from record');
       } catch (trusteeError) {
         // Non-fatal — subject removal already succeeded

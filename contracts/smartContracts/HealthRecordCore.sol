@@ -31,6 +31,8 @@ interface MemberRoleManagerInterface {
   ) external view returns (bool);
 
   function extendTrusteeGrantsOnAnchor(bytes32 subjectIdHash, bytes32 recordIdHash) external;
+
+  function retractTrusteeGrantsOnUnanchor(bytes32 subjectIdHash, bytes32 recordIdHash) external;
 }
 
 /**
@@ -283,6 +285,8 @@ contract HealthRecordCore is Initializable, UUPSUpgradeable {
     //Don't remove from subjectMedicalHistory to preserve audit trail
 
     emit RecordUnanchored(recordIdHash, resolvedSubject, block.timestamp);
+
+    memberRoleManager.retractTrusteeGrantsOnUnanchor(resolvedSubject, recordIdHash);
   }
 
   /**

@@ -31,6 +31,7 @@ export interface MemberRoleManagerInterfaceInterface extends Interface {
       | "isControllerOf"
       | "isOwnerOrAdmin"
       | "isVerifiedMember"
+      | "retractTrusteeGrantsOnUnanchor"
   ): FunctionFragment;
 
   encodeFunctionData(
@@ -65,6 +66,10 @@ export interface MemberRoleManagerInterfaceInterface extends Interface {
     functionFragment: "isVerifiedMember",
     values: [AddressLike]
   ): string;
+  encodeFunctionData(
+    functionFragment: "retractTrusteeGrantsOnUnanchor",
+    values: [BytesLike, BytesLike]
+  ): string;
 
   decodeFunctionResult(
     functionFragment: "extendTrusteeGrantsOnAnchor",
@@ -93,6 +98,10 @@ export interface MemberRoleManagerInterfaceInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "isVerifiedMember",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "retractTrusteeGrantsOnUnanchor",
     data: BytesLike
   ): Result;
 }
@@ -184,6 +193,12 @@ export interface MemberRoleManagerInterface extends BaseContract {
     "view"
   >;
 
+  retractTrusteeGrantsOnUnanchor: TypedContractMethod<
+    [subjectIdHash: BytesLike, recordIdHash: BytesLike],
+    [void],
+    "nonpayable"
+  >;
+
   getFunction<T extends ContractMethod = ContractMethod>(
     key: string | FunctionFragment
   ): T;
@@ -232,6 +247,13 @@ export interface MemberRoleManagerInterface extends BaseContract {
   getFunction(
     nameOrSignature: "isVerifiedMember"
   ): TypedContractMethod<[wallet: AddressLike], [boolean], "view">;
+  getFunction(
+    nameOrSignature: "retractTrusteeGrantsOnUnanchor"
+  ): TypedContractMethod<
+    [subjectIdHash: BytesLike, recordIdHash: BytesLike],
+    [void],
+    "nonpayable"
+  >;
 
   filters: {};
 }
