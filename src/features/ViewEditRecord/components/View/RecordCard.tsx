@@ -3,6 +3,7 @@ import { Calendar, Edit, Eye, User, Hospital, Ellipsis, BriefcaseMedical } from 
 import { Button } from '@/components/ui/Button';
 import { FileObject } from '@/types/core';
 import HealthRecordMenu from '@/features/ViewEditRecord/components/View/RecordMenu';
+import { RecordIdentifiersPopover } from '@/features/ViewEditRecord/components/View/RecordIdentifiersPopover';
 import { CredibilityBadge } from '@/features/Credibility/components/ui/CredibilityBadge';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import SubjectBadge from '@/features/Subject/components/SubjectBadge';
@@ -54,15 +55,19 @@ export const HealthRecordCard: React.FC<HealthRecordCardProps> = ({
     >
       <div className="p-4 md:p-6">
         {/* Top bar */}
-        <div className="flex items-center justify-between mb-4 gap-2">
-          {/* Left: type badges — scrollable on mobile */}
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide min-w-0">
-            <span className="flex-shrink-0 px-2 py-1 text-xs font-medium rounded-full border">
-              {record.belroseFields?.visitType}
-            </span>
-            <span className="flex-shrink-0 px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded border">
-              {record.sourceType}
-            </span>
+
+        <div className="flex items-center justify-between mb-2">
+          {/* Left: type badges — belroseField/sourceType scrollable on mobile */}
+          <div className="flex items-center justify-between gap-2">
+            <RecordIdentifiersPopover record={record} />
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide min-w-0">
+              <span className="flex-shrink-0 px-2 py-1 text-xs font-medium rounded-full border">
+                {record.belroseFields?.visitType}
+              </span>
+              <span className="flex-shrink-0 px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded border">
+                {record.sourceType}
+              </span>
+            </div>
           </div>
 
           {/* Right: credibility + divider + menu — always visible, never scrolls */}

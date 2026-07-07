@@ -35,6 +35,7 @@ import RecordFollowUpsView from '@/features/RefineRecord/components/RecordFollow
 import { BelroseFields } from '@belrose/shared';
 import LinkRequestModal from '@/features/RequestRecord/components/Respond/LinkRequestModal';
 import { useRecordFollowUps } from '@/features/RefineRecord/hooks/useRecordFollowUps';
+import { CopyableHash } from '@/features/BackendChainParity/components/ui/CopyableHash';
 
 type ViewMode =
   | 'record'
@@ -583,6 +584,22 @@ export const RecordFull: React.FC<RecordFullProps> = ({
               </div>
             </>
           )}
+
+          {/* Record identifiers */}
+
+          <div className="flex flex-wrap justify-between items-center text-xs font-mono text-white/50 mt-3 pt-3 border-t border-white/10">
+            <div className="flex items-center gap-1">
+              <span>Record ID</span>
+              <CopyableHash value={record.id} chars={10} className="text-white" />
+              <span className="text-white/25">&middot;</span>
+              <span>Network ID</span>
+              <CopyableHash value={record.recordIdHash} chars={10} className="text-white" />
+            </div>
+            <div className="flex items-center gap-1">
+              <span>Record Hash</span>
+              <CopyableHash value={record.recordHash} chars={10} className="text-white" />
+            </div>
+          </div>
         </div>
       </div>
 
