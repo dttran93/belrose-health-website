@@ -39,9 +39,10 @@ export const ViewerManagement: React.FC<ViewerManagementProps> = ({
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const { dialogProps, initiateGrant, initiateRevoke, isLoading } = usePermissionFlow({
+  const { dialogProps, initiateGrant, initiateRevoke, initiateModify, isLoading } = usePermissionFlow({
     recordId: record.id,
     recordTitle: (record.belroseFields?.title || record.fileName) ?? undefined,
+    record,
     onSuccess: () => {
       setSelectedUser(null);
       setRefreshTrigger(prev => prev + 1);
@@ -58,6 +59,11 @@ export const ViewerManagement: React.FC<ViewerManagementProps> = ({
   const handleDeleteViewer = (userId: string) => {
     const profile = userProfiles.get(userId);
     if (profile) initiateRevoke(profile, 'viewer');
+  };
+
+  const handleModifyViewer = (userId: string) => {
+    const profile = userProfiles.get(userId);
+    if (profile) initiateModify(profile, 'viewer');
   };
 
   useEffect(() => {
@@ -148,6 +154,7 @@ export const ViewerManagement: React.FC<ViewerManagementProps> = ({
             record={record}
             color="yellow"
             onDelete={() => handleDeleteViewer(viewerId)}
+            onModify={() => handleModifyViewer(viewerId)}
             trusteeEntry={trusteeMap.get(viewerId)}
             trusteeList={trustorMap.get(viewerId) ?? []}
           />

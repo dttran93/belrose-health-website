@@ -39,9 +39,10 @@ export const SharerManagement: React.FC<SharerManagementProps> = ({
   const [userProfiles, setUserProfiles] = useState<Map<string, BelroseUserProfile>>(new Map());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const { dialogProps, initiateGrant, initiateRevoke, isLoading } = usePermissionFlow({
+  const { dialogProps, initiateGrant, initiateRevoke, initiateModify, isLoading } = usePermissionFlow({
     recordId: record.id,
     recordTitle: (record.belroseFields?.title || record.fileName) ?? undefined,
+    record,
     onSuccess: () => {
       setSelectedUser(null);
       setRefreshTrigger(prev => prev + 1);
@@ -58,6 +59,11 @@ export const SharerManagement: React.FC<SharerManagementProps> = ({
   const handleDeleteSharer = (userId: string) => {
     const profile = userProfiles.get(userId);
     if (profile) initiateRevoke(profile, 'sharer');
+  };
+
+  const handleModifySharer = (userId: string) => {
+    const profile = userProfiles.get(userId);
+    if (profile) initiateModify(profile, 'sharer');
   };
 
   useEffect(() => {
@@ -146,6 +152,7 @@ export const SharerManagement: React.FC<SharerManagementProps> = ({
             record={record}
             color="green"
             onDelete={() => handleDeleteSharer(sharerId)}
+            onModify={() => handleModifySharer(sharerId)}
             trusteeEntry={trusteeMap.get(sharerId)}
             trusteeList={trustorMap.get(sharerId) ?? []}
           />

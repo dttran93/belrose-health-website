@@ -11,6 +11,7 @@ import {
   FileText,
   Plus,
   X as XIcon,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { BelroseUserProfile, FileObject } from '@/types/core';
@@ -18,7 +19,7 @@ import { Role } from '@/features/Permissions/services/permissionsService';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { useState } from 'react';
 import NetworkPreparingContent from '@/features/BlockchainWallet/components/NetworkPreparingContent';
-import RoleSelector, { ROLE_CONFIG } from './RoleSelector';
+import RoleSelector, { ROLE_CONFIG, RoleEligibility } from './RoleSelector';
 import { OnChainSubmittedContent } from '@/features/OnChainActivityTray/components/OnChainSubmittedModal';
 
 // ============================================================================
@@ -26,8 +27,8 @@ import { OnChainSubmittedContent } from '@/features/OnChainActivityTray/componen
 // ============================================================================
 
 export type DialogPhase = 'idle' | 'preparing' | 'confirming' | 'executing' | 'submitted' | 'error';
-export type OperationType = 'grant' | 'revoke' | 'guest-invite';
-export type RevokeAction = 'full-revoke' | 'demote-admin' | 'demote-viewer';
+export type OperationType = 'grant' | 'revoke' | 'guest-invite' | 'modify';
+export type RevokeAction = 'full-revoke' | 'demote-admin' | 'demote-sharer' | 'demote-viewer';
 export type GrantVariant = 'confirm' | 'select-role';
 
 interface PermissionActionDialogProps {
@@ -42,6 +43,8 @@ interface PermissionActionDialogProps {
   onClose: () => void;
   onConfirmGrant: (role?: Role) => void;
   onConfirmRevoke: (action: RevokeAction) => void;
+  onConfirmModify?: (newRole: Role) => void;
+  eligibility?: Record<Role, RoleEligibility>;
   onConfirmGuestInvite?: () => void;
   guestInviteProps?: {
     email: string;
@@ -73,6 +76,8 @@ export const PermissionActionDialog: React.FC<PermissionActionDialogProps> = ({
   onClose,
   onConfirmGrant,
   onConfirmRevoke,
+  onConfirmModify,
+  eligibility,
   onConfirmGuestInvite,
   guestInviteProps,
   submittedLabel,
@@ -119,6 +124,15 @@ export const PermissionActionDialog: React.FC<PermissionActionDialogProps> = ({
               user={user}
               role={role}
               onConfirm={onConfirmRevoke}
+              onClose={onClose}
+            />
+          )}
+          {phase === 'confirming' && operationType === 'modify' && onConfirmModify && (
+            <ModifyAccessContent
+              user={user}
+              currentRole={role}
+              eligibility={eligibility}
+              onConfirm={onConfirmModify}
               onClose={onClose}
             />
           )}
@@ -364,6 +378,19 @@ const ConfirmRevokeContent: React.FC<ConfirmRevokeContentProps> = ({
           </button>
         )}
 
+        {/* Demote to Sharer (Owner or Admin) */}
+        {(isOwner || isAdmin) && (
+          <button
+            onClick={() => onConfirm('demote-sharer')}
+            className="w-full text-left p-3 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors"
+          >
+            <div className="font-semibold text-gray-900 text-sm">Demote to Sharer</div>
+            <div className="text-xs text-gray-500">
+              Keep sharing and viewing access, but remove management rights.
+            </div>
+          </button>
+        )}
+
         {/* Demote to Viewer (Owner, Admin, or Sharer) */}
         {(isOwner || isAdmin || isSharer) && (
           <button
@@ -380,6 +407,101 @@ const ConfirmRevokeContent: React.FC<ConfirmRevokeContentProps> = ({
             Cancel
           </Button>
         </AlertDialog.Cancel>
+      </div>
+    </>
+  );
+};
+
+// ============================================================================
+// MODIFY ACCESS CONTENT
+// ============================================================================
+
+interface ModifyAccessContentProps {
+  user: BelroseUserProfile | null;
+  currentRole: Role;
+  eligibility?: Record<Role, RoleEligibility>;
+  onConfirm: (newRole: Role) => void;
+  onClose: () => void;
+}
+
+const ModifyAccessContent: React.FC<ModifyAccessContentProps> = ({
+  user,
+  currentRole,
+  eligibility,
+  onConfirm,
+  onClose,
+}) => {
+  const [step, setStep] = useState<'select' | 'confirm'>('select');
+  const [selectedRole, setSelectedRole] = useState<Role>(currentRole);
+
+  const displayName = user?.displayName || user?.email || 'this user';
+
+  if (step === 'confirm') {
+    const newConfig = ROLE_CONFIG[selectedRole];
+    const currentConfig = ROLE_CONFIG[currentRole];
+
+    return (
+      <>
+        <AlertDialog.Title className="text-lg font-bold flex items-center gap-2">
+          <SlidersHorizontal className="w-5 h-5 text-primary" />
+          Confirm Access Change
+        </AlertDialog.Title>
+        <AlertDialog.Description className="mt-3 text-sm text-gray-600">
+          Change <strong>{displayName}</strong>'s access from{' '}
+          <strong className={currentConfig.textColor}>{currentConfig.label}</strong> to{' '}
+          <strong className={newConfig.textColor}>{newConfig.label}</strong>?
+        </AlertDialog.Description>
+
+        <div className="flex gap-3 mt-6">
+          <Button variant="outline" className="flex-1" onClick={() => setStep('select')}>
+            Back
+          </Button>
+          <Button onClick={() => onConfirm(selectedRole)} className="flex-1">
+            Confirm
+          </Button>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <AlertDialog.Title className="text-lg font-bold flex items-center gap-2">
+        <SlidersHorizontal className="w-5 h-5 text-primary" />
+        Modify Access
+      </AlertDialog.Title>
+      <AlertDialog.Description className="mt-3 text-sm text-gray-600">
+        Choose a new access level for <strong>{displayName}</strong>.
+      </AlertDialog.Description>
+
+      {user && (
+        <div className="my-4">
+          <UserCard user={user} variant="compact" color="primary" />
+        </div>
+      )}
+
+      <div className="mb-4">
+        <RoleSelector
+          value={selectedRole}
+          onChange={setSelectedRole}
+          currentRole={currentRole}
+          eligibility={eligibility}
+        />
+      </div>
+
+      <div className="flex gap-3">
+        <AlertDialog.Cancel asChild>
+          <Button variant="outline" className="flex-1" onClick={onClose}>
+            Cancel
+          </Button>
+        </AlertDialog.Cancel>
+        <Button
+          onClick={() => setStep('confirm')}
+          disabled={selectedRole === currentRole || eligibility?.[selectedRole]?.enabled === false}
+          className="flex-1"
+        >
+          Continue
+        </Button>
       </div>
     </>
   );

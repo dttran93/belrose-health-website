@@ -40,9 +40,10 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Use the new permission flow hook
-  const { dialogProps, initiateGrant, initiateRevoke, isLoading } = usePermissionFlow({
+  const { dialogProps, initiateGrant, initiateRevoke, initiateModify, isLoading } = usePermissionFlow({
     recordId: record.id,
     recordTitle: (record.belroseFields?.title || record.fileName) ?? undefined,
+    record,
     onSuccess: () => {
       setSelectedUser(null);
       setRefreshTrigger(prev => prev + 1);
@@ -66,6 +67,13 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
     const profile = userProfiles.get(userId);
     if (!profile) return;
     initiateRevoke(profile, 'administrator');
+  };
+
+  // Handle "Modify Access" menu click on an admin
+  const handleModifyAdmin = (userId: string) => {
+    const profile = userProfiles.get(userId);
+    if (!profile) return;
+    initiateModify(profile, 'administrator');
   };
 
   // Fetch user profiles for all administrators
@@ -162,6 +170,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
             record={record}
             color="blue"
             onDelete={() => handleDeleteAdmin(admin)}
+            onModify={() => handleModifyAdmin(admin)}
             trusteeEntry={trusteeMap.get(admin)}
             trusteeList={trustorMap.get(admin) ?? []}
           />

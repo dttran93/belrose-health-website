@@ -7,7 +7,8 @@ import {
   PermissionPreparationProgress,
 } from '../services/permissionPreparationService';
 import { PermissionsService, Role } from '../services/permissionsService';
-import { BelroseUserProfile } from '@/types/core';
+import { RoleEligibility } from '../components/ui/RoleSelector';
+import { BelroseUserProfile, FileObject } from '@/types/core';
 import { toast } from 'sonner';
 import { getAuth } from 'firebase/auth';
 import {
@@ -35,6 +36,8 @@ interface UsePermissionFlowOptions {
   /** Single record ID (string) or multiple (string[]) for batch operations */
   recordId: string | string[];
   recordTitle?: string; // Optional title for better notifications
+  /** Needed to compute Modify Access eligibility (role arrays + subjects) */
+  record?: FileObject;
   onSuccess?: () => void;
 }
 
@@ -49,7 +52,12 @@ const roleLabels: Record<Role, string> = {
 // HOOK
 // ============================================================================
 
-export function usePermissionFlow({ recordId, recordTitle, onSuccess }: UsePermissionFlowOptions) {
+export function usePermissionFlow({
+  recordId,
+  recordTitle,
+  record,
+  onSuccess,
+}: UsePermissionFlowOptions) {
   // Normalise to array once — everything below works with recordIds
   const recordIds = Array.isArray(recordId) ? recordId : [recordId];
   const recordLink = `/app/records/${recordIds[0]}?view=permissions`;
@@ -63,6 +71,7 @@ export function usePermissionFlow({ recordId, recordTitle, onSuccess }: UsePermi
   const [pendingOperation, setPendingOperation] = useState<PendingOperation | null>(null);
   const [preparationProgress, setPreparationProgress] =
     useState<PermissionPreparationProgress | null>(null);
+  const [eligibility, setEligibility] = useState<Record<Role, RoleEligibility> | null>(null);
 
   // OnChainActivityTray — UI display for blockchain processing in background
   const { addActivity, updateActivity } = useOnChainActivityTray();
@@ -77,6 +86,7 @@ export function usePermissionFlow({ recordId, recordTitle, onSuccess }: UsePermi
     setError(null);
     setPendingOperation(null);
     setPreparationProgress(null);
+    setEligibility(null);
   }, []);
 
   /**
@@ -231,6 +241,119 @@ export function usePermissionFlow({ recordId, recordTitle, onSuccess }: UsePermi
   );
 
   // ==========================================================================
+  // MODIFY FLOW
+  // Lets the caller pick a target role directly (rather than a fixed grant or
+  // demote button) — dispatches to a grant or a demote under the hood via
+  // PermissionsService.changeRole. Single-record only, like revoke.
+  // ==========================================================================
+
+  /**
+   * Start a modify operation — computes which roles the caller may move this
+   * user to (PermissionsService.getEligibleRoleTargets) before opening the picker.
+   */
+  const initiateModify = useCallback(
+    async (user: BelroseUserProfile, currentRole: Role) => {
+      const walletAddress = user.wallet?.address;
+      if (!walletAddress) {
+        toast.error('User does not have a wallet address');
+        return;
+      }
+
+      setPendingOperation({
+        type: 'modify',
+        role: currentRole,
+        targetUserId: user.uid,
+        targetWalletAddress: walletAddress,
+        user,
+        grantVariant: 'confirm',
+      });
+      setPhase('preparing');
+      setError(null);
+
+      try {
+        const callerId = getAuth().currentUser?.uid;
+        if (record && callerId) {
+          setEligibility(PermissionsService.getEligibleRoleTargets(record, callerId, user.uid));
+        }
+
+        // Prep covers the same ground as grant (upgrades may need it); revoke-only
+        // prerequisites are a strict subset of this, so it's safe for either outcome.
+        const prereqs = await PermissionPreparationService.verifyPrerequisites(
+          primaryRecordId,
+          walletAddress
+        );
+
+        if (!prereqs.ready) {
+          const initialRole = await getCurrentUserRole();
+          await PermissionPreparationService.prepare(
+            primaryRecordId,
+            initialRole,
+            setPreparationProgress
+          );
+
+          const finalCheck = await PermissionPreparationService.verifyPrerequisites(
+            primaryRecordId,
+            walletAddress
+          );
+          if (!finalCheck.ready) {
+            throw new Error(finalCheck.reason || 'Preparation failed');
+          }
+        }
+
+        setPhase('confirming');
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Preparation failed';
+        setError(message);
+        setPhase('error');
+      }
+    },
+    [record, primaryRecordId, getCurrentUserRole]
+  );
+
+  /**
+   * Execute a confirmed modify — dispatches to the right grant/demote call
+   * via PermissionsService.changeRole based on current vs. new role.
+   */
+  const confirmModify = useCallback(
+    async (newRole: Role) => {
+      if (!pendingOperation || pendingOperation.type !== 'modify') return;
+
+      const currentRole = pendingOperation.role;
+      const { targetUserId } = pendingOperation;
+      if (newRole === currentRole) {
+        reset();
+        return;
+      }
+
+      const activityLabel = `Changing access to ${roleLabels[newRole]}`;
+      const activityId = addActivity({ label: activityLabel, link: recordLink });
+
+      const txPromise = PermissionsService.changeRole(
+        primaryRecordId,
+        targetUserId,
+        currentRole,
+        newRole,
+        recordTitle
+      );
+
+      setSubmittedLabel(activityLabel);
+      setPhase('submitted');
+
+      txPromise
+        .then(async () => {
+          updateActivity(activityId, { status: 'confirmed' });
+          toast.success(`Access changed to ${roleLabels[newRole]}`);
+          await onSuccess?.();
+        })
+        .catch(err => {
+          const message = err instanceof Error ? err.message : 'Failed to change access';
+          updateActivity(activityId, { status: 'failed', errorMessage: message });
+        });
+    },
+    [pendingOperation, primaryRecordId, recordTitle, reset, addActivity, updateActivity, onSuccess]
+  );
+
+  // ==========================================================================
   // REVOKE FLOW
   // Revoke always operates on the primary record — batch revoke is a separate
   // concern handled by TrusteePermissionService / future bulk-action flows.
@@ -295,7 +418,9 @@ export function usePermissionFlow({ recordId, recordTitle, onSuccess }: UsePermi
           ? 'Revoking access'
           : action === 'demote-admin'
             ? 'Demoting to Administrator'
-            : 'Demoting to Viewer';
+            : action === 'demote-sharer'
+              ? 'Demoting to Sharer'
+              : 'Demoting to Viewer';
 
       const activityId = addActivity({ label: activityLabel, link: recordLink });
 
@@ -309,15 +434,22 @@ export function usePermissionFlow({ recordId, recordTitle, onSuccess }: UsePermi
               })
             : role === 'administrator'
               ? PermissionsService.removeAdmin(primaryRecordId, targetUserId, recordTitle, {
-                  demoteToViewer: action === 'demote-viewer',
+                  demoteTo:
+                    action === 'demote-sharer'
+                      ? 'sharer'
+                      : action === 'demote-viewer'
+                        ? 'viewer'
+                        : undefined,
                 })
               : PermissionsService.removeOwner(primaryRecordId, targetUserId, recordTitle, {
                   demoteTo:
                     action === 'demote-admin'
                       ? 'administrator'
-                      : action === 'demote-viewer'
-                        ? 'viewer'
-                        : undefined,
+                      : action === 'demote-sharer'
+                        ? 'sharer'
+                        : action === 'demote-viewer'
+                          ? 'viewer'
+                          : undefined,
                 });
 
       // Close dialog immediately
@@ -334,7 +466,9 @@ export function usePermissionFlow({ recordId, recordTitle, onSuccess }: UsePermi
               ? 'Access revoked successfully'
               : action === 'demote-admin'
                 ? 'Demoted to Administrator'
-                : 'Demoted to Viewer';
+                : action === 'demote-sharer'
+                  ? 'Demoted to Sharer'
+                  : 'Demoted to Viewer';
 
           toast.success(successMessage);
           await onSuccess?.();
@@ -361,15 +495,18 @@ export function usePermissionFlow({ recordId, recordTitle, onSuccess }: UsePermi
       user: pendingOperation?.user || null,
       error,
       grantVariant: pendingOperation?.grantVariant || 'confirm',
+      eligibility: eligibility ?? undefined,
       onClose: reset,
       onConfirmGrant: confirmGrant,
       onConfirmRevoke: confirmRevoke,
+      onConfirmModify: confirmModify,
       submittedLabel,
     },
 
     // Actions to initiate flows
     initiateGrant,
     initiateRevoke,
+    initiateModify,
 
     // Convenience state
     isLoading: phase === 'executing',
