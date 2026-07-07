@@ -1,9 +1,10 @@
 // scripts/upgradeHealthRecordCore.js
 import hre from 'hardhat';
+import { HEALTH_RECORD_CORE, MEMBER_ROLE_MANAGER } from './_shared/blockchainAddresses.core.js';
 const { ethers, upgrades } = hre;
 
-const HEALTH_RECORD_CORE_PROXY = '0xE1012A0D698cced489C47189F9DC9372d6Fb104B';
-const MEMBER_ROLE_MANAGER_PROXY = '0x61CcF57C332D32c4d906ac64674BBA4E10CCB07B';
+const HEALTH_RECORD_CORE_PROXY = HEALTH_RECORD_CORE.proxy;
+const MEMBER_ROLE_MANAGER_PROXY = MEMBER_ROLE_MANAGER.proxy;
 
 async function main() {
   console.log('🚀 Starting HealthRecordCore upgrade...');

@@ -1,9 +1,10 @@
 import hre from 'hardhat';
+import { HEALTH_RECORD_CORE, MEMBER_ROLE_MANAGER } from './_shared/blockchainAddresses.core.js';
 const { ethers } = hre;
 
 // Run this after a failed deployMemberRoleManager.mjs to retry the HRC wiring step.
-const NEW_MRM_PROXY   = '0x61CcF57C332D32c4d906ac64674BBA4E10CCB07B';
-const EXISTING_HRC_PROXY = '0xE1012A0D698cced489C47189F9DC9372d6Fb104B';
+const NEW_MRM_PROXY   = MEMBER_ROLE_MANAGER.proxy;
+const EXISTING_HRC_PROXY = HEALTH_RECORD_CORE.proxy;
 
 async function main() {
   console.log('\n🔗 Wiring HealthRecordCore → MemberRoleManager...\n');
