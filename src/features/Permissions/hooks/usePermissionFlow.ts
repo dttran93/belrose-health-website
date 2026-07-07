@@ -72,6 +72,7 @@ export function usePermissionFlow({
   const [preparationProgress, setPreparationProgress] =
     useState<PermissionPreparationProgress | null>(null);
   const [eligibility, setEligibility] = useState<Record<Role, RoleEligibility> | null>(null);
+  const [canFullyRevoke, setCanFullyRevoke] = useState<RoleEligibility | null>(null);
 
   // OnChainActivityTray — UI display for blockchain processing in background
   const { addActivity, updateActivity } = useOnChainActivityTray();
@@ -87,6 +88,7 @@ export function usePermissionFlow({
     setPendingOperation(null);
     setPreparationProgress(null);
     setEligibility(null);
+    setCanFullyRevoke(null);
   }, []);
 
   /**
@@ -384,6 +386,12 @@ export function usePermissionFlow({
       setError(null);
 
       try {
+        const callerId = getAuth().currentUser?.uid;
+        if (record && callerId) {
+          setEligibility(PermissionsService.getEligibleRoleTargets(record, callerId, user.uid));
+          setCanFullyRevoke(PermissionsService.canRevokeAccess(record, callerId, user.uid));
+        }
+
         // For revokes, just verify prerequisites (no new preparation needed)
         const prereqs = await PermissionPreparationService.verifyPrerequisites(
           primaryRecordId,
@@ -399,7 +407,7 @@ export function usePermissionFlow({
         setPhase('error');
       }
     },
-    [primaryRecordId]
+    [record, primaryRecordId]
   );
 
   /**
@@ -496,6 +504,7 @@ export function usePermissionFlow({
       error,
       grantVariant: pendingOperation?.grantVariant || 'confirm',
       eligibility: eligibility ?? undefined,
+      canFullyRevoke: canFullyRevoke ?? undefined,
       onClose: reset,
       onConfirmGrant: confirmGrant,
       onConfirmRevoke: confirmRevoke,

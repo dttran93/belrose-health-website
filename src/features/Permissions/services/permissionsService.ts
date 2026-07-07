@@ -74,11 +74,7 @@ export class PermissionsService {
    * @param targetUserId - The user ID to remove the role from
    * @param role - The role to remove
    */
-  static removeRole = async (
-    recordId: string,
-    userId: string,
-    role: RecordRole
-  ): Promise<void> => {
+  static removeRole = async (recordId: string, userId: string, role: RecordRole): Promise<void> => {
     switch (role) {
       case 'owner':
         await PermissionsService.removeOwner(recordId, userId);
@@ -202,7 +198,7 @@ export class PermissionsService {
     // removeOwner Rule 1 / the contract's voluntarilyLeaveOwnership-only demotion).
     if (targetRole === 'owner') {
       if (!isSelf) {
-        const reason = "Owners can only modify their own access.";
+        const reason = 'Owners can only modify their own access.';
         return {
           viewer: { enabled: false, reason },
           sharer: { enabled: false, reason },
@@ -223,7 +219,11 @@ export class PermissionsService {
     }
 
     if (!callerIsOwner && !callerIsAdmin) {
-      const reason = "You do not have permission to modify this user's access.";
+      // Self-service is limited to fully leaving a role (see canRevokeAccess) — picking a
+      // different tier for yourself is an owner/admin decision, not a unilateral one.
+      const reason = isSelf
+        ? 'You can only fully leave this role — ask an owner or administrator to change it instead.'
+        : "You do not have permission to modify this user's access.";
       return {
         viewer: { enabled: false, reason: targetRole === 'viewer' ? undefined : reason },
         sharer: { enabled: false, reason: targetRole === 'sharer' ? undefined : reason },
@@ -272,6 +272,72 @@ export class PermissionsService {
     result[targetRole] = { enabled: false };
 
     return result;
+  }
+
+  /**
+   * Whether a caller may fully revoke (as opposed to demote) a target's access.
+   * Mirrors the unconditional guards in removeViewer/removeSharer/removeAdmin/removeOwner
+   * that a `demoteTo` option doesn't relax — same UI-advisory caveat as getEligibleRoleTargets.
+   */
+  static canRevokeAccess(
+    record: RecordRoleArrays,
+    callerId: string,
+    targetUserId: string
+  ): RoleEligibility {
+    const owners = record.owners ?? [];
+    const administrators = record.administrators ?? [];
+    const hasOwners = owners.length > 0;
+    const callerIsOwner = owners.includes(callerId);
+    const callerIsAdmin = administrators.includes(callerId);
+    const isSelf = callerId === targetUserId;
+    const targetIsSubject = record.subjects?.includes(targetUserId) ?? false;
+    const targetRole = PermissionsService.getUserRole(record, targetUserId);
+
+    if (!targetRole) {
+      return { enabled: false, reason: 'This user has no active role on this record.' };
+    }
+
+    if (targetIsSubject) {
+      return {
+        enabled: false,
+        reason:
+          'This user is a subject of this record — remove them as a subject first, or demote their role instead.',
+      };
+    }
+
+    if (targetRole === 'owner') {
+      if (!isSelf) {
+        return { enabled: false, reason: 'Owners can only be removed by themselves.' };
+      }
+      if (owners.length === 1 && administrators.length === 0) {
+        return {
+          enabled: false,
+          reason: 'Cannot remove the last owner while no administrators exist.',
+        };
+      }
+      return { enabled: true };
+    }
+
+    // Self-removal is always allowed regardless of the caller's own role — mirrors the
+    // isSelfRemoval bypass in removeViewer/removeSharer/removeAdmin.
+    if (!isSelf && !callerIsOwner && !callerIsAdmin) {
+      return { enabled: false, reason: "You do not have permission to modify this user's access." };
+    }
+
+    if (targetRole === 'administrator') {
+      if (hasOwners && !callerIsOwner && !isSelf) {
+        return {
+          enabled: false,
+          reason: "Only the record owner can remove another administrator's access.",
+        };
+      }
+      if (!hasOwners && administrators.length === 1) {
+        return { enabled: false, reason: 'Cannot remove the last administrator from this record.' };
+      }
+      return { enabled: true };
+    }
+
+    return { enabled: true };
   }
 
   // ============================================================================
@@ -454,12 +520,21 @@ export class PermissionsService {
     const isCurrentUserSharer = recordData.sharers?.includes(currentUser.uid);
     const isCurrentUserSubject = recordData.subjects?.includes(currentUser.uid);
 
-    if (!isCurrentUserAdmin && !isCurrentUserOwner && !isCurrentUserSharer && !isCurrentUserSubject) {
+    if (
+      !isCurrentUserAdmin &&
+      !isCurrentUserOwner &&
+      !isCurrentUserSharer &&
+      !isCurrentUserSubject
+    ) {
       throw new Error('You do not have permission to share this record');
     }
 
     // Check 3: If caller is sharer/subject (not admin/owner), verify they have an active role
-    if ((isCurrentUserSharer || isCurrentUserSubject) && !isCurrentUserAdmin && !isCurrentUserOwner) {
+    if (
+      (isCurrentUserSharer || isCurrentUserSubject) &&
+      !isCurrentUserAdmin &&
+      !isCurrentUserOwner
+    ) {
       const currentUserRole = this.getUserRole(recordData, currentUser.uid);
       if (!currentUserRole) {
         throw new Error('Must have an active role to grant sharer access');
@@ -495,7 +570,11 @@ export class PermissionsService {
 
     try {
       console.log('🔗 Granting sharer role on blockchain...');
-      const tx = await BlockchainRoleManagerService.grantRole(recordId, targetWalletAddress, 'sharer');
+      const tx = await BlockchainRoleManagerService.grantRole(
+        recordId,
+        targetWalletAddress,
+        'sharer'
+      );
       blockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
       console.log('✅ Blockchain: Sharer role granted');
     } catch (blockchainError) {
@@ -1057,7 +1136,13 @@ export class PermissionsService {
       }
     }
 
-    if ((isCurrentUserSharer || isCurrentUserSubject) && !isAdmin && !isOwner && !isSelfRemoval && !isSharerWhoGranted) {
+    if (
+      (isCurrentUserSharer || isCurrentUserSubject) &&
+      !isAdmin &&
+      !isOwner &&
+      !isSelfRemoval &&
+      !isSharerWhoGranted
+    ) {
       throw new Error('Sharers can only remove permissions they personally granted');
     }
 
@@ -1130,8 +1215,18 @@ export class PermissionsService {
       currentUser.uid,
       [
         demoteToViewer
-          ? { userId: targetUserId, action: 'downgraded' as const, previousRole: 'sharer' as const, newRole: 'viewer' as const }
-          : { userId: targetUserId, action: 'revoked' as const, previousRole: 'sharer' as const, newRole: null },
+          ? {
+              userId: targetUserId,
+              action: 'downgraded' as const,
+              previousRole: 'sharer' as const,
+              newRole: 'viewer' as const,
+            }
+          : {
+              userId: targetUserId,
+              action: 'revoked' as const,
+              previousRole: 'sharer' as const,
+              newRole: null,
+            },
       ],
       blockchainRef,
       recordTitle
@@ -1317,7 +1412,7 @@ export class PermissionsService {
   }
 
   /**
-   * Remove owner access from a record. Owners can only remove themselves
+   * Remove owner access from a record. Owners can only be removed by themselves
    * Optionally demotes to admin or viewer instead of full revocation
    * @param recordId - The record ID
    * @param targetUserId - the user being removed as an owner
@@ -1350,9 +1445,9 @@ export class PermissionsService {
     const isCurrentUserOwner = recordData.owners?.includes(currentUser.uid);
     const isSelfRemoval = targetUserId === currentUser.uid;
 
-    // Rule 1: Only owners can remove themselves (no one can remove other owners)
+    // Rule 1: Owners can only be removed by themselves (no one can remove other owners)
     if (!isSelfRemoval) {
-      throw new Error('Owners can only remove themselves. You cannot remove other owners.');
+      throw new Error('Owners can only be removed by themselves. You cannot remove other owners.');
     }
 
     // Rule 2: Only owners can remove owners
@@ -1579,11 +1674,15 @@ export class PermissionsService {
         continue;
       }
       if (existingRole === 'administrator' && (role === 'viewer' || role === 'sharer')) {
-        console.warn(`⚠️ Cannot demote admin to ${role} via batch on record ${recordId} — skipping`);
+        console.warn(
+          `⚠️ Cannot demote admin to ${role} via batch on record ${recordId} — skipping`
+        );
         continue;
       }
       if (existingRole === 'sharer' && role === 'viewer') {
-        console.warn(`⚠️ Cannot demote sharer to viewer via batch on record ${recordId} — skipping`);
+        console.warn(
+          `⚠️ Cannot demote sharer to viewer via batch on record ${recordId} — skipping`
+        );
         continue;
       }
 
@@ -1956,8 +2055,18 @@ export class PermissionsService {
             currentUser.uid,
             [
               roleOrder[newRole] > roleOrder[existingRole]
-                ? { userId: targetUserId, action: 'upgraded' as const, previousRole: existingRole, newRole }
-                : { userId: targetUserId, action: 'downgraded' as const, previousRole: existingRole, newRole },
+                ? {
+                    userId: targetUserId,
+                    action: 'upgraded' as const,
+                    previousRole: existingRole,
+                    newRole,
+                  }
+                : {
+                    userId: targetUserId,
+                    action: 'downgraded' as const,
+                    previousRole: existingRole,
+                    newRole,
+                  },
             ],
             batchBlockchainRef
           );
@@ -2063,12 +2172,13 @@ export class PermissionsService {
 
       const recordData = recordDoc.data();
 
-      const [canManageOwners, canManageAdmins, canManageSharers, canManageViewers] = await Promise.all([
-        this.canManageRole(recordId, 'owner'),
-        this.canManageRole(recordId, 'administrator'),
-        this.canManageRole(recordId, 'sharer'),
-        this.canManageRole(recordId, 'viewer'),
-      ]);
+      const [canManageOwners, canManageAdmins, canManageSharers, canManageViewers] =
+        await Promise.all([
+          this.canManageRole(recordId, 'owner'),
+          this.canManageRole(recordId, 'administrator'),
+          this.canManageRole(recordId, 'sharer'),
+          this.canManageRole(recordId, 'viewer'),
+        ]);
 
       return {
         owners: recordData.owners || [],

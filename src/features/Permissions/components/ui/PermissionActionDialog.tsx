@@ -1,6 +1,7 @@
 // src/features/Permissions/components/PermissionActionDialog.tsx
 
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
+import * as Tooltip from '@radix-ui/react-tooltip';
 import {
   Shield,
   UserPlus,
@@ -45,6 +46,7 @@ interface PermissionActionDialogProps {
   onConfirmRevoke: (action: RevokeAction) => void;
   onConfirmModify?: (newRole: Role) => void;
   eligibility?: Record<Role, RoleEligibility>;
+  canFullyRevoke?: RoleEligibility;
   onConfirmGuestInvite?: () => void;
   guestInviteProps?: {
     email: string;
@@ -78,6 +80,7 @@ export const PermissionActionDialog: React.FC<PermissionActionDialogProps> = ({
   onConfirmRevoke,
   onConfirmModify,
   eligibility,
+  canFullyRevoke,
   onConfirmGuestInvite,
   guestInviteProps,
   submittedLabel,
@@ -123,6 +126,8 @@ export const PermissionActionDialog: React.FC<PermissionActionDialogProps> = ({
             <ConfirmRevokeContent
               user={user}
               role={role}
+              eligibility={eligibility}
+              canFullyRevoke={canFullyRevoke}
               onConfirm={onConfirmRevoke}
               onClose={onClose}
             />
@@ -318,19 +323,98 @@ const SelectRoleGrantContent: React.FC<SelectRoleGrantContentProps> = ({
 interface ConfirmRevokeContentProps {
   user: BelroseUserProfile | null;
   role: Role;
+  eligibility?: Record<Role, RoleEligibility>;
+  canFullyRevoke?: RoleEligibility;
   onConfirm: (action: RevokeAction) => void;
   onClose: () => void;
 }
 
+/** A revoke/demote choice — grayed out with a tooltip reason when the caller isn't eligible. */
+const RevokeOptionButton: React.FC<{
+  onClick: () => void;
+  eligibility?: RoleEligibility;
+  title: string;
+  description: string;
+  destructive?: boolean;
+}> = ({ onClick, eligibility, title, description, destructive }) => {
+  const disabled = eligibility?.enabled === false;
+
+  const button = (
+    <button
+      onClick={() => {
+        if (!disabled) onClick();
+      }}
+      aria-disabled={disabled}
+      className={`w-full text-left p-3 rounded-lg border transition-colors ${
+        disabled
+          ? 'cursor-not-allowed opacity-50 border-gray-200 bg-gray-50'
+          : destructive
+            ? 'border-red-200 bg-red-50 hover:bg-red-100'
+            : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+      }`}
+    >
+      <div
+        className={`font-semibold text-sm ${disabled ? 'text-gray-400' : destructive ? 'text-red-700' : 'text-gray-900'}`}
+      >
+        {title}
+      </div>
+      <div className={`text-xs ${disabled ? 'text-gray-400' : destructive ? 'text-red-600/80' : 'text-gray-500'}`}>
+        {description}
+      </div>
+    </button>
+  );
+
+  if (disabled && eligibility?.reason) {
+    return (
+      <Tooltip.Provider>
+        <Tooltip.Root>
+          <Tooltip.Trigger asChild>{button}</Tooltip.Trigger>
+          <Tooltip.Portal>
+            <Tooltip.Content
+              className="bg-gray-900 text-white rounded-lg px-3 py-2 text-xs max-w-xs shadow-xl z-[110]"
+              sideOffset={5}
+            >
+              {eligibility.reason}
+              <Tooltip.Arrow className="fill-gray-900" />
+            </Tooltip.Content>
+          </Tooltip.Portal>
+        </Tooltip.Root>
+      </Tooltip.Provider>
+    );
+  }
+
+  return button;
+};
+
 const ConfirmRevokeContent: React.FC<ConfirmRevokeContentProps> = ({
   user,
   role,
+  eligibility,
+  canFullyRevoke,
   onConfirm,
   onClose,
 }) => {
   const isOwner = role === 'owner';
   const isAdmin = role === 'administrator';
   const isSharer = role === 'sharer';
+
+  // Demote targets reuse the same eligibility table computed for the Modify Access flow —
+  // e.g. eligibility.viewer already reflects "only an owner can demote another administrator".
+  const demoteAdminEligibility = isOwner ? eligibility?.administrator : undefined;
+  const demoteSharerEligibility = isOwner || isAdmin ? eligibility?.sharer : undefined;
+  const demoteViewerEligibility = isOwner || isAdmin || isSharer ? eligibility?.viewer : undefined;
+
+  const shownEligibilities = [
+    canFullyRevoke,
+    demoteAdminEligibility,
+    demoteSharerEligibility,
+    demoteViewerEligibility,
+  ].filter((e): e is RoleEligibility => !!e);
+  const nothingAvailable =
+    shownEligibilities.length > 0 && shownEligibilities.every(e => !e.enabled);
+  const blockReason = nothingAvailable
+    ? shownEligibilities.find(e => e.reason)?.reason
+    : undefined;
 
   return (
     <>
@@ -355,51 +439,51 @@ const ConfirmRevokeContent: React.FC<ConfirmRevokeContentProps> = ({
         </div>
       )}
 
+      {nothingAvailable && (
+        <div className="mb-3 p-3 rounded-lg border border-amber-300 bg-amber-50 text-xs text-amber-800">
+          You don't have permission to change this user's access.
+          {blockReason ? ` ${blockReason}` : ''}
+        </div>
+      )}
+
       <div className="flex flex-col gap-3">
         {/* Full Revocation */}
-        <button
+        <RevokeOptionButton
           onClick={() => onConfirm('full-revoke')}
-          className="w-full text-left p-3 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 transition-colors"
-        >
-          <div className="font-semibold text-red-700 text-sm">Full Revocation</div>
-          <div className="text-xs text-red-600/80">Remove all keys and permissions.</div>
-        </button>
+          eligibility={canFullyRevoke}
+          title="Full Revocation"
+          description="Remove all keys and permissions."
+          destructive
+        />
 
         {/* Demote to Admin (Owner only) */}
         {isOwner && (
-          <button
+          <RevokeOptionButton
             onClick={() => onConfirm('demote-admin')}
-            className="w-full text-left p-3 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors"
-          >
-            <div className="font-semibold text-gray-900 text-sm">Demote to Administrator</div>
-            <div className="text-xs text-gray-500">
-              Remove ownership but keep full record management.
-            </div>
-          </button>
+            eligibility={demoteAdminEligibility}
+            title="Demote to Administrator"
+            description="Remove ownership but keep full record management."
+          />
         )}
 
         {/* Demote to Sharer (Owner or Admin) */}
         {(isOwner || isAdmin) && (
-          <button
+          <RevokeOptionButton
             onClick={() => onConfirm('demote-sharer')}
-            className="w-full text-left p-3 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors"
-          >
-            <div className="font-semibold text-gray-900 text-sm">Demote to Sharer</div>
-            <div className="text-xs text-gray-500">
-              Keep sharing and viewing access, but remove management rights.
-            </div>
-          </button>
+            eligibility={demoteSharerEligibility}
+            title="Demote to Sharer"
+            description="Keep sharing and viewing access, but remove management rights."
+          />
         )}
 
         {/* Demote to Viewer (Owner, Admin, or Sharer) */}
         {(isOwner || isAdmin || isSharer) && (
-          <button
+          <RevokeOptionButton
             onClick={() => onConfirm('demote-viewer')}
-            className="w-full text-left p-3 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors"
-          >
-            <div className="font-semibold text-gray-900 text-sm">Demote to Viewer</div>
-            <div className="text-xs text-gray-500">Keep read-only access only.</div>
-          </button>
+            eligibility={demoteViewerEligibility}
+            title="Demote to Viewer"
+            description="Keep read-only access only."
+          />
         )}
 
         <AlertDialog.Cancel asChild>
