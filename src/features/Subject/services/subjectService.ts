@@ -149,7 +149,7 @@ export class SubjectService {
 
       // Step 3: Grant access to any trustees of the subject
       try {
-        await TrusteePermissionService.grantAccessForNewRecord(user.uid, recordId);
+        await TrusteePermissionService.grantAccessForNewRecord(user.uid, recordId, txResult);
         console.log('✅ Access granted to subject trustees');
       } catch (trusteeError) {
         // Non-fatal — subject was successfully added
@@ -265,7 +265,7 @@ export class SubjectService {
 
     // Step 3: Fan out access to the trustor's own trustees (non-fatal)
     try {
-      await TrusteePermissionService.grantAccessForNewRecord(trustorId, recordId);
+      await TrusteePermissionService.grantAccessForNewRecord(trustorId, recordId, txResult);
       console.log("✅ Access granted to trustor's trustees");
     } catch (trusteeError) {
       console.error('⚠️ Failed to grant trustee access for new record:', trusteeError);
@@ -504,7 +504,12 @@ export class SubjectService {
 
     // Step 1: Anchor on blockchain
     console.log('🔗 Anchoring subject on blockchain...');
-    await SubjectBlockchainService.anchorSubject(recordId, recordHash, user.uid, selfVerifyLevel);
+    const txResult = await SubjectBlockchainService.anchorSubject(
+      recordId,
+      recordHash,
+      user.uid,
+      selfVerifyLevel
+    );
     console.log('✅ Blockchain: Subject anchored');
 
     // Step 2: Update Firestore Subject Consent
@@ -517,7 +522,7 @@ export class SubjectService {
 
     // Step 4: Grant access to subject's trustees
     try {
-      await TrusteePermissionService.grantAccessForNewRecord(user.uid, recordId);
+      await TrusteePermissionService.grantAccessForNewRecord(user.uid, recordId, txResult);
       console.log('✅ Access granted to subject trustees');
     } catch (trusteeError) {
       // Non-fatal — subject request was successfully accepted
@@ -651,6 +656,12 @@ export class SubjectService {
       }
 
       // Step 3: Remove any trustees that have access through the removed subject
+      // TODO: this call is broken — revokeTrusteeAccess(trustorId, trusteeId) expects a trustee
+      // user ID as the second arg, not a recordId, so this always matches zero wrappedKeys and
+      // silently no-ops. It also doesn't match what's needed here anyway: this should revoke each
+      // active trustee's role on just THIS record, not all of one trustee's records. There's also
+      // no on-chain MemberRoleManager revocation happening for this path at all currently. Needs a
+      // proper fix (and a matching audit-log write) as a follow-up.
       try {
         await TrusteePermissionService.revokeTrusteeAccess(user.uid, recordId);
         console.log('✅ Subject trustees removed from record');

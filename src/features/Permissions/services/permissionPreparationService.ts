@@ -29,6 +29,7 @@ import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { BlockchainRef } from '@belrose/shared';
 import { BlockchainRoleManagerService } from './blockchainRoleManagerService';
 import { NETWORK } from '@belrose/shared';
+import writePermissionChangeEvent from './writePermissionChangeEvent';
 
 // ==================== TYPES ====================
 
@@ -457,6 +458,20 @@ export class PermissionPreparationService {
       const result = await initFn({ recordId, walletAddress, role });
 
       console.log('✅ Record initialized:', result.data.blockchainRef);
+
+      // Log for audit trail (BackendChainParity needs a tx hash here) — only on a genuine new
+      // initialization. The "already exists" catch branch below returns no blockchainRef, so it's
+      // naturally skipped there.
+      const userId = getAuth().currentUser?.uid;
+      if (userId && result.data.blockchainRef) {
+        await writePermissionChangeEvent(
+          recordId,
+          userId,
+          [{ userId, action: 'granted', previousRole: null, newRole: role }],
+          result.data.blockchainRef
+        );
+      }
+
       return result.data;
     } catch (error: any) {
       // Handle "already exists" gracefully - not really an error
