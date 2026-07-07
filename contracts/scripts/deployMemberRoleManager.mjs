@@ -1,10 +1,11 @@
 import hre from 'hardhat';
+import { HEALTH_RECORD_CORE } from './_shared/blockchainAddresses.core.js';
 const { ethers } = hre;
 
 // Existing HealthRecordCore proxy — stays unchanged.
-// Source of truth: packages/shared/src/blockchainAddresses.ts
+// Source of truth: packages/shared/src/blockchainAddresses.core.ts (via `npm run copy-shared`)
 const EXISTING_HRC_PROXY = {
-  baseSepolia: '0xE1012A0D698cced489C47189F9DC9372d6Fb104B',
+  baseSepolia: HEALTH_RECORD_CORE.proxy,
 };
 
 async function main() {

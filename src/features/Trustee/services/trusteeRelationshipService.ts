@@ -184,7 +184,10 @@ export class TrusteeRelationshipService {
     }
 
     // Step 1: Fetch records so roles can be granted atomically with the proposal
-    const trustorRecords = await TrusteePermissionService.getRecordsForTrustor(trustorId, trusteeId);
+    const trustorRecords = await TrusteePermissionService.getRecordsForTrustor(
+      trustorId,
+      trusteeId
+    );
     const recordIds = trustorRecords.map(r => r.recordId);
 
     // Step 2: Blockchain proposal — grants record roles in the same tx
@@ -201,7 +204,11 @@ export class TrusteeRelationshipService {
 
     // Step 3: Fan out pending permissions (wrappedKeys + Firestore arrays)
     // Blockchain roles already granted above; trustor is online so session key is available
-    await TrusteePermissionService.grantPendingTrusteeAccess(trusteeId, trustLevel);
+    await TrusteePermissionService.grantPendingTrusteeAccess(
+      trusteeId,
+      trustLevel,
+      inviteBlockchainRef!
+    );
     console.log('✅ Pending permissions granted');
 
     const proposeEvent: OnChainTrusteeEvent = {
@@ -281,9 +288,17 @@ export class TrusteeRelationshipService {
     // For active relationships: deactivates wrappedKeys + removes from role arrays
     // For pending relationships: deletes inactive wrappedKeys + removes from role arrays
     if (data.status === 'active') {
-      await TrusteePermissionService.revokeTrusteeAccess(trustorId, trusteeId);
+      await TrusteePermissionService.revokeTrusteeAccess(
+        trustorId,
+        trusteeId,
+        revocationBlockchainRef!
+      );
     } else if (data.status === 'pending') {
-      await TrusteePermissionService.rollbackPendingTrusteeAccess(trustorId, trusteeId);
+      await TrusteePermissionService.rollbackPendingTrusteeAccess(
+        trustorId,
+        trusteeId,
+        revocationBlockchainRef!
+      );
     }
 
     // Step 3: Update Firestore relationship doc
@@ -356,7 +371,12 @@ export class TrusteeRelationshipService {
     // Fan-out errors are non-fatal — the blockchain trust-level write at step 1 has
     // already committed, so the relationship doc must stay in sync regardless.
     try {
-      await TrusteePermissionService.updateTrusteeAccess(trustorId, trusteeId, newTrustLevel);
+      await TrusteePermissionService.updateTrusteeAccess(
+        trustorId,
+        trusteeId,
+        newTrustLevel,
+        editBlockchainRef!
+      );
     } catch (err) {
       console.error('⚠️ Permission fan-out failed during trust level edit (non-fatal):', err);
     }
@@ -421,7 +441,12 @@ export class TrusteeRelationshipService {
     // Fan-out errors are non-fatal — the blockchain is already updated, so the
     // relationship doc must be kept in sync regardless of partial permission failures.
     try {
-      await TrusteePermissionService.updateTrusteeAccess(trustorId, trusteeId, newTrustLevel);
+      await TrusteePermissionService.updateTrusteeAccess(
+        trustorId,
+        trusteeId,
+        newTrustLevel,
+        editBlockchainRef!
+      );
     } catch (err) {
       console.error('⚠️ Permission fan-out failed during step-down (non-fatal):', err);
     }
@@ -547,10 +572,18 @@ export class TrusteeRelationshipService {
     }
 
     // Step 1: Blockchain decline — revokes roles granted at proposal time
-    await TrusteeBlockchainService.declineTrustee(trustorId, trusteeId);
+    console.log('🔗 Declining trustee proposal on blockchain...');
+    const { success, blockchainRef: declineBlockchainRef } =
+      await TrusteeBlockchainService.declineTrustee(trustorId, trusteeId);
+    if (!success) throw new Error('Blockchain decline failed — see sync queue for details');
+    console.log('✅ Blockchain: Trustee proposal declined');
 
     // Step 2: Roll back all pending permissions granted at invite time
-    await TrusteePermissionService.rollbackPendingTrusteeAccess(trustorId, trusteeId);
+    await TrusteePermissionService.rollbackPendingTrusteeAccess(
+      trustorId,
+      trusteeId,
+      declineBlockchainRef!
+    );
 
     // Step 3: Update relationship doc
     await updateDoc(relationshipRef, {
@@ -558,6 +591,11 @@ export class TrusteeRelationshipService {
       status: 'declined',
       respondedAt: Timestamp.now(),
       revokedBy: trusteeId,
+      onChainEvents: arrayUnion({
+        action: 'decline',
+        blockchainRef: declineBlockchainRef!,
+        recordedAt: Timestamp.now(),
+      } satisfies OnChainTrusteeEvent),
     });
 
     console.log(`✅ Trustee invite declined: ${trusteeId} declined invite from ${trustorId}`);
@@ -597,7 +635,11 @@ export class TrusteeRelationshipService {
     console.log('✅ Blockchain: Trustee resigned');
 
     // Step 2: Revoke record permissions
-    await TrusteePermissionService.revokeTrusteeAccess(trustorId, trusteeId);
+    await TrusteePermissionService.revokeTrusteeAccess(
+      trustorId,
+      trusteeId,
+      revocationBlockchainRef!
+    );
 
     // Step 3: Update Firestore
     await updateDoc(relationshipRef, {

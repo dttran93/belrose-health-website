@@ -1,9 +1,10 @@
 // scripts/upgradeHealthRecordCore.js
 import hre from 'hardhat';
+import { HEALTH_RECORD_CORE, MEMBER_ROLE_MANAGER } from './_shared/blockchainAddresses.core.js';
 const { ethers, upgrades } = hre;
 
-const HEALTH_RECORD_CORE_PROXY = '0xE1012A0D698cced489C47189F9DC9372d6Fb104B';
-const MEMBER_ROLE_MANAGER_PROXY = '0x61CcF57C332D32c4d906ac64674BBA4E10CCB07B';
+const HEALTH_RECORD_CORE_PROXY = HEALTH_RECORD_CORE.proxy;
+const MEMBER_ROLE_MANAGER_PROXY = MEMBER_ROLE_MANAGER.proxy;
 
 async function main() {
   console.log('🚀 Starting HealthRecordCore upgrade...');
@@ -22,7 +23,13 @@ async function main() {
 
   const HealthRecordCoreV2 = await ethers.getContractFactory('HealthRecordCore');
 
-  // No forceImport — upgradeProxy handles registry internally
+  // forceImport registers the existing on-chain proxy in the local OZ manifest so
+  // upgradeProxy can verify storage layout compatibility before deploying — needed because the
+  // manifest is local to this machine and may not already have this proxy registered.
+  console.log('\n📋 Registering existing proxy in local manifest...');
+  await upgrades.forceImport(HEALTH_RECORD_CORE_PROXY, HealthRecordCoreV2, { kind: 'uups' });
+  console.log('✅ Proxy registered');
+
   console.log('\n📦 Deploying new implementation...');
   const upgraded = await upgrades.upgradeProxy(HEALTH_RECORD_CORE_PROXY, HealthRecordCoreV2, {
     kind: 'uups',

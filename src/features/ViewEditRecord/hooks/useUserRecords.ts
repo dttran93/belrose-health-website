@@ -84,6 +84,7 @@ export const useUserRecords = (
               where('uploadedBy', '==', userId),
               where('owners', 'array-contains', userId),
               where('administrators', 'array-contains', userId),
+              where('sharers', 'array-contains', userId),
               where('viewers', 'array-contains', userId),
               where('subjects', 'array-contains', userId)
             ),
@@ -112,6 +113,7 @@ export const useUserRecords = (
             where('uploadedBy', '==', userId),
             where('owners', 'array-contains', userId),
             where('administrators', 'array-contains', userId),
+            where('sharers', 'array-contains', userId),
             where('viewers', 'array-contains', userId),
             where('subjects', 'array-contains', userId)
           ),

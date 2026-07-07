@@ -6,14 +6,15 @@
 // Usage: npx hardhat run scripts/verifyUpgrade.js --network sepolia
 
 import hre from 'hardhat';
+import { HEALTH_RECORD_CORE, MEMBER_ROLE_MANAGER } from './_shared/blockchainAddresses.core.js';
 const { ethers, upgrades } = hre;
 
 // ============================================================================
-// ADDRESSES — pulled from blockchainAddresses.ts
+// ADDRESSES — pulled from packages/shared/src/blockchainAddresses.core.ts via `npm run copy-shared`
 // ============================================================================
 
-const MEMBER_ROLE_MANAGER_PROXY = '0xC31477f563dC8f7529Ba6AE7E410ABdB84C27d7C';
-const HEALTH_RECORD_CORE_PROXY = '0x97F9eD2af3f9a30Eac958D0994a0F131Eda11A57';
+const MEMBER_ROLE_MANAGER_PROXY = MEMBER_ROLE_MANAGER.proxy;
+const HEALTH_RECORD_CORE_PROXY = HEALTH_RECORD_CORE.proxy;
 
 // ============================================================================
 // HELPERS

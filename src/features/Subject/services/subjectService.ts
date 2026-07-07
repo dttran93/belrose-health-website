@@ -149,7 +149,7 @@ export class SubjectService {
 
       // Step 3: Grant access to any trustees of the subject
       try {
-        await TrusteePermissionService.grantAccessForNewRecord(user.uid, recordId);
+        await TrusteePermissionService.grantAccessForNewRecord(user.uid, recordId, txResult);
         console.log('✅ Access granted to subject trustees');
       } catch (trusteeError) {
         // Non-fatal — subject was successfully added
@@ -265,7 +265,7 @@ export class SubjectService {
 
     // Step 3: Fan out access to the trustor's own trustees (non-fatal)
     try {
-      await TrusteePermissionService.grantAccessForNewRecord(trustorId, recordId);
+      await TrusteePermissionService.grantAccessForNewRecord(trustorId, recordId, txResult);
       console.log("✅ Access granted to trustor's trustees");
     } catch (trusteeError) {
       console.error('⚠️ Failed to grant trustee access for new record:', trusteeError);
@@ -504,7 +504,12 @@ export class SubjectService {
 
     // Step 1: Anchor on blockchain
     console.log('🔗 Anchoring subject on blockchain...');
-    await SubjectBlockchainService.anchorSubject(recordId, recordHash, user.uid, selfVerifyLevel);
+    const txResult = await SubjectBlockchainService.anchorSubject(
+      recordId,
+      recordHash,
+      user.uid,
+      selfVerifyLevel
+    );
     console.log('✅ Blockchain: Subject anchored');
 
     // Step 2: Update Firestore Subject Consent
@@ -517,7 +522,7 @@ export class SubjectService {
 
     // Step 4: Grant access to subject's trustees
     try {
-      await TrusteePermissionService.grantAccessForNewRecord(user.uid, recordId);
+      await TrusteePermissionService.grantAccessForNewRecord(user.uid, recordId, txResult);
       console.log('✅ Access granted to subject trustees');
     } catch (trusteeError) {
       // Non-fatal — subject request was successfully accepted
@@ -625,7 +630,7 @@ export class SubjectService {
 
       // Step 1: Unanchor from blockchain
       console.log('🔗 Unanchoring subject from blockchain...');
-      await SubjectBlockchainService.unanchorSubject(recordId, user.uid);
+      const unanchorTxResult = await SubjectBlockchainService.unanchorSubject(recordId, user.uid);
       console.log('✅ Blockchain: Subject unanchored');
 
       // Step 2: Update Firestore (only if blockchain succeeded)
@@ -652,7 +657,11 @@ export class SubjectService {
 
       // Step 3: Remove any trustees that have access through the removed subject
       try {
-        await TrusteePermissionService.revokeTrusteeAccess(user.uid, recordId);
+        await TrusteePermissionService.revokeAccessForRemovedRecord(
+          user.uid,
+          recordId,
+          unanchorTxResult
+        );
         console.log('✅ Subject trustees removed from record');
       } catch (trusteeError) {
         // Non-fatal — subject removal already succeeded

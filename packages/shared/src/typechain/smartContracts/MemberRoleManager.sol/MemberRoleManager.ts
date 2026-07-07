@@ -79,6 +79,7 @@ export interface MemberRoleManagerInterface extends Interface {
       | "proxiableUUID"
       | "reactivateWallet"
       | "recordRoles"
+      | "retractTrusteeGrantsOnUnanchor"
       | "retractVouch"
       | "revokeRole"
       | "revokeRoleBatch"
@@ -333,6 +334,10 @@ export interface MemberRoleManagerInterface extends Interface {
   encodeFunctionData(
     functionFragment: "recordRoles",
     values: [BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "retractTrusteeGrantsOnUnanchor",
+    values: [BytesLike, BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "retractVouch",
@@ -609,6 +614,10 @@ export interface MemberRoleManagerInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "recordRoles",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "retractTrusteeGrantsOnUnanchor",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -1442,6 +1451,12 @@ export interface MemberRoleManager extends BaseContract {
     "view"
   >;
 
+  retractTrusteeGrantsOnUnanchor: TypedContractMethod<
+    [subjectIdHash: BytesLike, recordIdHash: BytesLike],
+    [void],
+    "nonpayable"
+  >;
+
   retractVouch: TypedContractMethod<
     [voucheeIdHash: BytesLike],
     [void],
@@ -1858,6 +1873,13 @@ export interface MemberRoleManager extends BaseContract {
     [arg0: BytesLike],
     [[string, boolean] & { role: string; isActive: boolean }],
     "view"
+  >;
+  getFunction(
+    nameOrSignature: "retractTrusteeGrantsOnUnanchor"
+  ): TypedContractMethod<
+    [subjectIdHash: BytesLike, recordIdHash: BytesLike],
+    [void],
+    "nonpayable"
   >;
   getFunction(
     nameOrSignature: "retractVouch"

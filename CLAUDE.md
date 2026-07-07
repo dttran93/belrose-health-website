@@ -77,6 +77,22 @@ Base Mainnet
 - MEMBER_ROLE_MANAGER Base Mainnet proxy: To be deployed
 - HEALTH_RECORD_CORE Base Mainnet proxy: To be deployed
 
+### Single Source of Truth for Addresses
+
+`packages/shared/src/blockchainAddresses.core.ts` is the canonical file for all proxy/implementation
+addresses — it's dependency-free so it can be consumed outside the npm workspace. Two copies are
+generated from it and must never be hand-edited directly:
+
+- `functions/src/_shared/` — synced via `npm run copy-shared` in `/functions` (part of `npm run build`)
+- `contracts/scripts/_shared/` — synced via `npm run copy-shared` in `/contracts` (compiles the core
+  file standalone with `tsc` since `contracts/` has no dependency on viem/frontend tooling)
+
+Hardhat scripts that reference proxy addresses (`upgradeHealthRecordCore.js`, `upgradeMemberRoleManager.js`,
+`checkImpl.js`, `checkImplMRM.js`, `wireMRM.mjs`, `verifyUpgrade.js`, `deployMemberRoleManager.mjs`,
+`addUser.cjs`) import from `./_shared/blockchainAddresses.core.js` instead of hardcoding addresses.
+Run `npm run copy-shared` in `/contracts` after cloning or after editing `blockchainAddresses.core.ts`
+so that generated folder stays current (it's gitignored).
+
 ### The Correct Flow for Upgradeable Smart Contract Changes
 
 **Smart Contracts (`cd contracts`):**
@@ -86,16 +102,19 @@ Base Mainnet
 npm run compile
 # 2. Run Hardhat tests
 npm run test
-# 3. run upgrade script for HealthRecord Core or MemberRoleManager
+# 3. Sync shared addresses (only needed if blockchainAddresses.core.ts changed or _shared/ is missing)
+npm run copy-shared
+# 4. run upgrade script for HealthRecord Core or MemberRoleManager
 npx hardhat run scripts/upgradeHealthRecordCore.js --network baseSepolia # if HealthRecordCore changed
 npx hardhat run scripts/upgradeMemberRoleManager.js --network baseSepolia #if MemberRoleManager changed
-# 4. Verify on Chain
+# 5. Verify on Chain
 npx hardhat verify --network baseSepolia ${newImplementationAddress}
 ```
 
-#5. Update implementation addresses in the repo
+#6. Update implementation addresses in the repo
 
-- Update implementation addresses in packages/shared/src/blockchainAddresses.ts
+- Update implementation addresses in packages/shared/src/blockchainAddresses.core.ts
+- Re-run `npm run copy-shared` in `/contracts` (and `/functions`) so the generated copies match
 
 NEVER
 

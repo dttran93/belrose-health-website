@@ -1,7 +1,8 @@
 const { ethers } = require('hardhat');
 
 async function main() {
-  const contractAddress = '0x61CcF57C332D32c4d906ac64674BBA4E10CCB07B';
+  const { MEMBER_ROLE_MANAGER } = await import('./_shared/blockchainAddresses.core.js');
+  const contractAddress = MEMBER_ROLE_MANAGER.proxy;
   if (!contractAddress) throw new Error('Missing CONTRACT_ADDRESS');
 
   const userIdHash = '0xc47eaa04c4ef76d274fdff0fbe74449b0c11f28521d7e4e7085142cd83ff8ce3';
