@@ -33,6 +33,7 @@ import { FileObject, BelroseUserProfile } from '@/types/core';
 import { doc, getDoc, getFirestore, updateDoc } from 'firebase/firestore';
 import SubjectQueryService, { IncomingSubjectRequest } from '../services/subjectQueryService';
 import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
+import { getUserFacingErrorMessage } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 import { RejectionReasons, SubjectConsentRequest, VerificationLevelOptions } from '@belrose/shared';
 import { TrusteeRelationshipService } from '@/features/Trustee/services/trusteeRelationshipService';
 import { CredibilityPreparationService } from '@/features/Credibility/services/credibilityPreparationService';
@@ -320,7 +321,7 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
           throw new Error(prereqs.reason || 'Prerequisites not met');
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Preparation failed';
+        const message = getUserFacingErrorMessage(err, 'Preparation failed');
         setError(message);
         setPhase('error');
         return false;
@@ -466,7 +467,7 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
         onSuccess?.();
       })
       .catch(err => {
-        const message = err instanceof Error ? err.message : 'Failed to set subject status';
+        const message = getUserFacingErrorMessage(err, 'Failed to set subject status');
         updateActivity(activityId, { status: 'failed', errorMessage: message });
       });
   }, [pendingOperation, recordId, record, addActivity, updateActivity, refetchAll, onSuccess]);
@@ -558,7 +559,7 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
               onSuccess?.();
             })
             .catch(err => {
-              const message = err instanceof Error ? err.message : 'Failed to grant access';
+              const message = getUserFacingErrorMessage(err, 'Failed to grant access');
               updateActivity(activityId, { status: 'failed', errorMessage: message });
             });
         } else {
@@ -569,7 +570,7 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
           onSuccess?.();
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to send consent request';
+        const message = getUserFacingErrorMessage(err, 'Failed to send consent request');
         setError(message);
         setPhase('error');
         toast.error(message);
@@ -633,7 +634,7 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
         onSuccess?.();
       })
       .catch(err => {
-        const message = err instanceof Error ? err.message : 'Failed to anchor subject';
+        const message = getUserFacingErrorMessage(err, 'Failed to anchor subject');
         updateActivity(activityId, { status: 'failed', errorMessage: message });
       });
   }, [selectedUser, recordId, recordLink, addActivity, updateActivity, refetchAll, onSuccess]);
@@ -687,7 +688,7 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
         onSuccess?.();
       })
       .catch(err => {
-        const message = err instanceof Error ? err.message : 'Failed to accept request';
+        const message = getUserFacingErrorMessage(err, 'Failed to accept request');
         updateActivity(activityId, { status: 'failed', errorMessage: message });
       });
   }, [pendingOperation, addActivity, updateActivity, refetchAll, onSuccess]);
@@ -762,7 +763,7 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
               (onRejectSuccess ?? onSuccess)?.();
             })
             .catch(err => {
-              const message = err instanceof Error ? err.message : 'Failed to revoke access';
+              const message = getUserFacingErrorMessage(err, 'Failed to revoke access');
               updateActivity(activityId, { status: 'failed', errorMessage: message });
             });
         } else {
@@ -773,7 +774,7 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
           (onRejectSuccess ?? onSuccess)?.();
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to reject request';
+        const message = getUserFacingErrorMessage(err, 'Failed to reject request');
         setError(message);
         setPhase('error');
         toast.error(message);
@@ -874,7 +875,7 @@ export function useSubjectFlow({ record, onSuccess, onRejectSuccess }: UseSubjec
           onSuccess?.();
         })
         .catch(err => {
-          const message = err instanceof Error ? err.message : 'Failed to remove subject status';
+          const message = getUserFacingErrorMessage(err, 'Failed to remove subject status');
           updateActivity(activityId, { status: 'failed', errorMessage: message });
         });
     },

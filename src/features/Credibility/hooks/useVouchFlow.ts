@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { BlockchainPreparationService } from '@/features/BlockchainWallet/services/blockchainPreparationService';
 import { createVouch, retractVouch, getVouch } from '../services/vouchService';
 import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
+import { getUserFacingErrorMessage } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 import { VouchDoc } from '@belrose/shared';
 
 // ============================================================================
@@ -92,7 +93,7 @@ export function useVouchFlow({ targetUserId, targetDisplayName, onSuccess }: Use
       await BlockchainPreparationService.ensureReady();
       setPhase('confirming');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to prepare network';
+      const message = getUserFacingErrorMessage(err, 'Failed to prepare network');
       setError(message);
       setPhase('error');
     }
@@ -123,7 +124,7 @@ export function useVouchFlow({ targetUserId, targetDisplayName, onSuccess }: Use
         onSuccess?.();
       })
       .catch(err => {
-        const message = err instanceof Error ? err.message : 'Failed to submit vouch';
+        const message = getUserFacingErrorMessage(err, 'Failed to submit vouch');
         updateActivity(activityId, { status: 'failed', errorMessage: message });
       });
   }, [targetUserId, targetDisplayName, addActivity, updateActivity, fetchVouch, onSuccess]);
@@ -148,7 +149,7 @@ export function useVouchFlow({ targetUserId, targetDisplayName, onSuccess }: Use
       await BlockchainPreparationService.ensureReady();
       setPhase('confirming');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to prepare network';
+      const message = getUserFacingErrorMessage(err, 'Failed to prepare network');
       setError(message);
       setPhase('error');
     }
@@ -179,7 +180,7 @@ export function useVouchFlow({ targetUserId, targetDisplayName, onSuccess }: Use
         onSuccess?.();
       })
       .catch(err => {
-        const message = err instanceof Error ? err.message : 'Failed to retract vouch';
+        const message = getUserFacingErrorMessage(err, 'Failed to retract vouch');
         updateActivity(activityId, { status: 'failed', errorMessage: message });
       });
   }, [targetUserId, targetDisplayName, addActivity, updateActivity, fetchVouch, onSuccess]);

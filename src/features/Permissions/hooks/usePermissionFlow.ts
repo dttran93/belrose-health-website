@@ -18,6 +18,7 @@ import {
   RevokeAction,
 } from '../components/ui/PermissionActionDialog';
 import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
+import { getUserFacingErrorMessage } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 
 // ============================================================================
 // TYPES
@@ -168,7 +169,7 @@ export function usePermissionFlow({
 
         setPhase('confirming');
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Preparation failed';
+        const message = getUserFacingErrorMessage(err, 'Preparation failed');
         setError(message);
         setPhase('error');
       }
@@ -226,7 +227,7 @@ export function usePermissionFlow({
           await onSuccess?.();
         })
         .catch(err => {
-          const message = err instanceof Error ? err.message : 'Failed to grant access';
+          const message = getUserFacingErrorMessage(err, 'Failed to grant access');
           updateActivity(activityId, { status: 'failed', errorMessage: message });
         });
     },
@@ -304,7 +305,7 @@ export function usePermissionFlow({
 
         setPhase('confirming');
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Preparation failed';
+        const message = getUserFacingErrorMessage(err, 'Preparation failed');
         setError(message);
         setPhase('error');
       }
@@ -348,7 +349,7 @@ export function usePermissionFlow({
           await onSuccess?.();
         })
         .catch(err => {
-          const message = err instanceof Error ? err.message : 'Failed to change access';
+          const message = getUserFacingErrorMessage(err, 'Failed to change access');
           updateActivity(activityId, { status: 'failed', errorMessage: message });
         });
     },
@@ -402,7 +403,7 @@ export function usePermissionFlow({
         }
         setPhase('confirming');
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Verification failed';
+        const message = getUserFacingErrorMessage(err, 'Verification failed');
         setError(message);
         setPhase('error');
       }
@@ -482,7 +483,7 @@ export function usePermissionFlow({
           await onSuccess?.();
         })
         .catch(err => {
-          const message = err instanceof Error ? err.message : 'Failed to update access';
+          const message = getUserFacingErrorMessage(err, 'Failed to update access');
           updateActivity(activityId, { status: 'failed', errorMessage: message });
         });
     },

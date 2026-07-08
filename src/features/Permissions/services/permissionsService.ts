@@ -1472,9 +1472,7 @@ export class PermissionsService {
     const isTargetSubject = recordData.subjects?.includes(targetUserId);
 
     if (isTargetSubject && !options) {
-      throw new Error(
-        "Cannot remove a subject's access. Please remove them as subject first or demote to a different role."
-      );
+      throw new Error("Cannot remove a subject's access. Please remove them as subject first.");
     }
 
     //Check 3: Check for user's blockchain wallets
@@ -1493,7 +1491,9 @@ export class PermissionsService {
     try {
       const tx = await BlockchainRoleManagerService.voluntarilyLeaveOwnership(recordId, demoteTo);
       blockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
-      console.log(demoteTo ? `✅ Blockchain: Demoted to ${demoteTo}` : '✅ Blockchain: Ownership removed');
+      console.log(
+        demoteTo ? `✅ Blockchain: Demoted to ${demoteTo}` : '✅ Blockchain: Ownership removed'
+      );
     } catch (blockchainError) {
       console.error('⚠️ Blockchain update failed:', blockchainError);
 

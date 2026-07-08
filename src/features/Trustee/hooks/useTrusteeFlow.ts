@@ -26,6 +26,7 @@ import {
 } from '@/features/Trustee/services/trusteeRelationshipService';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
 import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
+import { getUserFacingErrorMessage } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 
 // ============================================================================
 // TYPES
@@ -153,7 +154,7 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
 
         return true;
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Preparation failed';
+        const message = getUserFacingErrorMessage(err, 'Preparation failed');
         setError(message);
         setPhase('error');
         return false;
@@ -215,7 +216,7 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
         onSuccess?.();
       })
       .catch(err => {
-        const message = err instanceof Error ? err.message : 'Failed to send invite';
+        const message = getUserFacingErrorMessage(err, 'Failed to send invite');
         updateActivity(activityId, { status: 'failed', errorMessage: message });
       });
   }, [pendingOperation, selectedTrustLevel, addActivity, updateActivity, onSuccess]);
@@ -271,7 +272,7 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
         onSuccess?.();
       })
       .catch(err => {
-        const message = err instanceof Error ? err.message : 'Failed to accept invite';
+        const message = getUserFacingErrorMessage(err, 'Failed to accept invite');
         updateActivity(activityId, { status: 'failed', errorMessage: message });
       });
   }, [pendingOperation, addActivity, updateActivity, onSuccess]);
@@ -308,7 +309,7 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
       reset();
       onSuccess?.();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to decline invite';
+      const message = getUserFacingErrorMessage(err, 'Failed to decline invite');
       setError(message);
       setPhase('error');
       toast.error(message);
@@ -368,7 +369,7 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
         onSuccess?.();
       })
       .catch(err => {
-        const message = err instanceof Error ? err.message : 'Failed to revoke trustee';
+        const message = getUserFacingErrorMessage(err, 'Failed to revoke trustee');
         updateActivity(activityId, { status: 'failed', errorMessage: message });
       });
   }, [pendingOperation, addActivity, updateActivity, onSuccess]);
@@ -426,7 +427,7 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
         onSuccess?.();
       })
       .catch(err => {
-        const message = err instanceof Error ? err.message : 'Failed to update trust level';
+        const message = getUserFacingErrorMessage(err, 'Failed to update trust level');
         updateActivity(activityId, { status: 'failed', errorMessage: message });
       });
   }, [pendingOperation, selectedTrustLevel, addActivity, updateActivity, onSuccess]);
@@ -487,7 +488,7 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
         onSuccess?.();
       })
       .catch(err => {
-        const message = err instanceof Error ? err.message : 'Failed to resign';
+        const message = getUserFacingErrorMessage(err, 'Failed to resign');
         updateActivity(activityId, { status: 'failed', errorMessage: message });
       });
   }, [pendingOperation, addActivity, updateActivity, onSuccess]);
@@ -516,7 +517,7 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
         onSuccess?.();
       })
       .catch(err => {
-        const message = err instanceof Error ? err.message : 'Failed to step down';
+        const message = getUserFacingErrorMessage(err, 'Failed to step down');
         updateActivity(activityId, { status: 'failed', errorMessage: message });
       });
   }, [pendingOperation, selectedTrustLevel, addActivity, updateActivity, onSuccess]);
