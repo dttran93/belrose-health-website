@@ -1,7 +1,7 @@
 import type { BaseContract, BigNumberish, BytesLike, FunctionFragment, Result, Interface, EventFragment, AddressLike, ContractRunner, ContractMethod, Listener } from "ethers";
 import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, TypedLogDescription, TypedListener, TypedContractMethod } from "../../common";
 export interface MemberRoleManagerInterface extends Interface {
-    getFunction(nameOrSignature: "UPGRADE_INTERFACE_VERSION" | "acceptTrustee" | "addMember" | "addMemberBatch" | "admin" | "adminsByRecord" | "bootstrapDependentTrustee" | "changeRole" | "changeRoleBatch" | "deactivateWallet" | "declineTrustee" | "downgradeTrusteeLevel" | "extendTrusteeGrantsOnAnchor" | "getAllRecordParticipants" | "getHealthRecordCore" | "getRecordAdmins" | "getRecordOwners" | "getRecordRoleStats" | "getRecordSharers" | "getRecordViewers" | "getRoleDetails" | "getRoleDetailsByUser" | "getRoleGranter" | "getTotalUsers" | "getTrusteeGrantedRecords" | "getTrusteeRelationship" | "getTrusteesForTrustor" | "getUserForWallet" | "getUserStatus" | "getVouchStatus" | "getVouchesGiven" | "getVouchesReceived" | "getWalletsForUser" | "giveVouch" | "grantRole" | "grantRoleBatch" | "hasActiveRole" | "hasRole" | "hasVouched" | "healthRecordCore" | "initialize" | "initializeRecordRole" | "isActiveMember" | "isActiveSubject" | "isControllerOf" | "isOwnerOrAdmin" | "isVerifiedMember" | "isVerifiedProvider" | "ownersByRecord" | "proposeTrustee" | "proxiableUUID" | "reactivateWallet" | "recordRoles" | "retractVouch" | "revokeRole" | "revokeRoleBatch" | "revokeTrustee" | "roleGrantedBy" | "setHealthRecordCore" | "setUserStatus" | "sharersByRecord" | "totalUsers" | "transferAdmin" | "trusteeRelationships" | "trusteesByTrustor" | "updateTrusteeLevel" | "upgradeToAndCall" | "userStatus" | "userWallets" | "viewersByRecord" | "voluntarilyLeaveOwnership" | "vouches" | "vouchesGiven" | "vouchesReceived" | "wallets"): FunctionFragment;
+    getFunction(nameOrSignature: "UPGRADE_INTERFACE_VERSION" | "acceptTrustee" | "addMember" | "addMemberBatch" | "admin" | "adminsByRecord" | "bootstrapDependentTrustee" | "changeRole" | "changeRoleBatch" | "deactivateWallet" | "declineTrustee" | "downgradeTrusteeLevel" | "extendTrusteeGrantsOnAnchor" | "getAllRecordParticipants" | "getHealthRecordCore" | "getRecordAdmins" | "getRecordOwners" | "getRecordRoleStats" | "getRecordSharers" | "getRecordViewers" | "getRoleDetails" | "getRoleDetailsByUser" | "getRoleGranter" | "getTotalUsers" | "getTrusteeGrantedRecords" | "getTrusteeRelationship" | "getTrusteesForTrustor" | "getUserForWallet" | "getUserStatus" | "getVouchStatus" | "getVouchesGiven" | "getVouchesReceived" | "getWalletsForUser" | "giveVouch" | "grantRole" | "grantRoleBatch" | "hasActiveRole" | "hasRole" | "hasVouched" | "healthRecordCore" | "initialize" | "initializeRecordRole" | "isActiveMember" | "isActiveSubject" | "isControllerOf" | "isOwnerOrAdmin" | "isVerifiedMember" | "isVerifiedProvider" | "ownersByRecord" | "proposeTrustee" | "proxiableUUID" | "reactivateWallet" | "recordRoles" | "retractTrusteeGrantsOnUnanchor" | "retractVouch" | "revokeRole" | "revokeRoleBatch" | "revokeTrustee" | "roleGrantedBy" | "setHealthRecordCore" | "setUserStatus" | "sharersByRecord" | "totalUsers" | "transferAdmin" | "trusteeRelationships" | "trusteesByTrustor" | "updateTrusteeLevel" | "upgradeToAndCall" | "userStatus" | "userWallets" | "viewersByRecord" | "voluntarilyLeaveOwnership" | "vouches" | "vouchesGiven" | "vouchesReceived" | "wallets"): FunctionFragment;
     getEvent(nameOrSignatureOrTopic: "AdminTransferred" | "HealthRecordCoreUpdated" | "Initialized" | "MemberRegistered" | "MemberStatusChanged" | "OwnershipVoluntarilyLeft" | "RoleChanged" | "RoleGranted" | "RoleRevoked" | "TrusteeAccepted" | "TrusteeDeclined" | "TrusteeLevelUpdated" | "TrusteeProposed" | "TrusteeRevoked" | "Upgraded" | "VouchGiven" | "VouchRetracted" | "WalletLinked"): EventFragment;
     encodeFunctionData(functionFragment: "UPGRADE_INTERFACE_VERSION", values?: undefined): string;
     encodeFunctionData(functionFragment: "acceptTrustee", values: [BytesLike]): string;
@@ -56,6 +56,7 @@ export interface MemberRoleManagerInterface extends Interface {
     encodeFunctionData(functionFragment: "proxiableUUID", values?: undefined): string;
     encodeFunctionData(functionFragment: "reactivateWallet", values: [AddressLike]): string;
     encodeFunctionData(functionFragment: "recordRoles", values: [BytesLike]): string;
+    encodeFunctionData(functionFragment: "retractTrusteeGrantsOnUnanchor", values: [BytesLike, BytesLike]): string;
     encodeFunctionData(functionFragment: "retractVouch", values: [BytesLike]): string;
     encodeFunctionData(functionFragment: "revokeRole", values: [BytesLike, AddressLike]): string;
     encodeFunctionData(functionFragment: "revokeRoleBatch", values: [BytesLike[], AddressLike]): string;
@@ -73,7 +74,7 @@ export interface MemberRoleManagerInterface extends Interface {
     encodeFunctionData(functionFragment: "userStatus", values: [BytesLike]): string;
     encodeFunctionData(functionFragment: "userWallets", values: [BytesLike, BigNumberish]): string;
     encodeFunctionData(functionFragment: "viewersByRecord", values: [BytesLike, BigNumberish]): string;
-    encodeFunctionData(functionFragment: "voluntarilyLeaveOwnership", values: [BytesLike]): string;
+    encodeFunctionData(functionFragment: "voluntarilyLeaveOwnership", values: [BytesLike, string]): string;
     encodeFunctionData(functionFragment: "vouches", values: [BytesLike, BytesLike]): string;
     encodeFunctionData(functionFragment: "vouchesGiven", values: [BytesLike, BigNumberish]): string;
     encodeFunctionData(functionFragment: "vouchesReceived", values: [BytesLike, BigNumberish]): string;
@@ -131,6 +132,7 @@ export interface MemberRoleManagerInterface extends Interface {
     decodeFunctionResult(functionFragment: "proxiableUUID", data: BytesLike): Result;
     decodeFunctionResult(functionFragment: "reactivateWallet", data: BytesLike): Result;
     decodeFunctionResult(functionFragment: "recordRoles", data: BytesLike): Result;
+    decodeFunctionResult(functionFragment: "retractTrusteeGrantsOnUnanchor", data: BytesLike): Result;
     decodeFunctionResult(functionFragment: "retractVouch", data: BytesLike): Result;
     decodeFunctionResult(functionFragment: "revokeRole", data: BytesLike): Result;
     decodeFunctionResult(functionFragment: "revokeRoleBatch", data: BytesLike): Result;
@@ -851,6 +853,12 @@ export interface MemberRoleManager extends BaseContract {
             isActive: boolean;
         }
     ], "view">;
+    retractTrusteeGrantsOnUnanchor: TypedContractMethod<[
+        subjectIdHash: BytesLike,
+        recordIdHash: BytesLike
+    ], [
+        void
+    ], "nonpayable">;
     retractVouch: TypedContractMethod<[
         voucheeIdHash: BytesLike
     ], [
@@ -939,7 +947,8 @@ export interface MemberRoleManager extends BaseContract {
         string
     ], "view">;
     voluntarilyLeaveOwnership: TypedContractMethod<[
-        recordIdHash: BytesLike
+        recordIdHash: BytesLike,
+        newRole: string
     ], [
         void
     ], "nonpayable">;
@@ -1199,6 +1208,12 @@ export interface MemberRoleManager extends BaseContract {
             isActive: boolean;
         }
     ], "view">;
+    getFunction(nameOrSignature: "retractTrusteeGrantsOnUnanchor"): TypedContractMethod<[
+        subjectIdHash: BytesLike,
+        recordIdHash: BytesLike
+    ], [
+        void
+    ], "nonpayable">;
     getFunction(nameOrSignature: "retractVouch"): TypedContractMethod<[voucheeIdHash: BytesLike], [void], "nonpayable">;
     getFunction(nameOrSignature: "revokeRole"): TypedContractMethod<[
         recordIdHash: BytesLike,
@@ -1278,7 +1293,12 @@ export interface MemberRoleManager extends BaseContract {
     ], [
         string
     ], "view">;
-    getFunction(nameOrSignature: "voluntarilyLeaveOwnership"): TypedContractMethod<[recordIdHash: BytesLike], [void], "nonpayable">;
+    getFunction(nameOrSignature: "voluntarilyLeaveOwnership"): TypedContractMethod<[
+        recordIdHash: BytesLike,
+        newRole: string
+    ], [
+        void
+    ], "nonpayable">;
     getFunction(nameOrSignature: "vouches"): TypedContractMethod<[arg0: BytesLike, arg1: BytesLike], [bigint], "view">;
     getFunction(nameOrSignature: "vouchesGiven"): TypedContractMethod<[
         arg0: BytesLike,

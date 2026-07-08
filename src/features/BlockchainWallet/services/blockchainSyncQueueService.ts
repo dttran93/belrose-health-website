@@ -139,6 +139,18 @@ export function decodeRevertReason(error: string): string | null {
   }
 }
 
+// Produces a user-facing error message from a caught error — prefers a decoded
+// Solidity revert reason over the raw error text (viem errors are a multi-line
+// dump of calldata/gas/signature that's meaningless to end users).
+export function getUserFacingErrorMessage(error: unknown, fallback: string): string {
+  const raw = error instanceof Error ? error.message : undefined;
+  if (raw) {
+    const decoded = decodeRevertReason(raw);
+    if (decoded) return decoded;
+  }
+  return raw ?? fallback;
+}
+
 export class BlockchainSyncQueueService {
   /**
    * Log any blockchain write failure for retry

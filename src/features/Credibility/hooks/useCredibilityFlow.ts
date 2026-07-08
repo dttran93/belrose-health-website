@@ -27,6 +27,7 @@ import {
 import { toast } from 'sonner';
 import { DialogPhase } from '../components/ui/CredibilityActionDialog';
 import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
+import { getUserFacingErrorMessage } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 import { DisputeCulpability, VerificationDoc, VerificationLevelOptions } from '@belrose/shared';
 
 // ============================================================================
@@ -181,7 +182,7 @@ export function useCredibilityFlow({
 
       return true;
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Preparation failed';
+      const message = getUserFacingErrorMessage(err, 'Preparation failed');
       setError(message);
       setPhase('error');
       return false;
@@ -247,7 +248,7 @@ export function useCredibilityFlow({
           onSuccess?.();
         })
         .catch(err => {
-          const message = err instanceof Error ? err.message : 'Failed to verify record';
+          const message = getUserFacingErrorMessage(err, 'Failed to verify record');
           updateActivity(activityId, { status: 'failed', errorMessage: message });
         });
     },
@@ -313,7 +314,7 @@ export function useCredibilityFlow({
         onSuccess?.();
       })
       .catch(err => {
-        const message = err instanceof Error ? err.message : 'Failed to retract verification';
+        const message = getUserFacingErrorMessage(err, 'Failed to retract verification');
         updateActivity(activityId, { status: 'failed', errorMessage: message });
       });
   }, [pendingOperation, addActivity, updateActivity, refetchAll, onSuccess]);
@@ -386,7 +387,7 @@ export function useCredibilityFlow({
         onSuccess?.();
       })
       .catch(err => {
-        const message = err instanceof Error ? err.message : 'Failed to modify verification';
+        const message = getUserFacingErrorMessage(err, 'Failed to modify verification');
         updateActivity(activityId, { status: 'failed', errorMessage: message });
       });
   }, [pendingOperation, addActivity, updateActivity, refetchAll, onSuccess]);
@@ -468,7 +469,7 @@ export function useCredibilityFlow({
         onSuccess?.();
       })
       .catch(err => {
-        const message = err instanceof Error ? err.message : 'Failed to file dispute';
+        const message = getUserFacingErrorMessage(err, 'Failed to file dispute');
         updateActivity(activityId, { status: 'failed', errorMessage: message });
       });
   }, [pendingOperation, recordId, recordHash, addActivity, updateActivity, refetchAll, onSuccess]);
@@ -532,7 +533,7 @@ export function useCredibilityFlow({
         onSuccess?.();
       })
       .catch(err => {
-        const message = err instanceof Error ? err.message : 'Failed to retract dispute';
+        const message = getUserFacingErrorMessage(err, 'Failed to retract dispute');
         updateActivity(activityId, { status: 'failed', errorMessage: message });
       });
   }, [pendingOperation, addActivity, updateActivity, refetchAll, onSuccess]);
@@ -616,7 +617,7 @@ export function useCredibilityFlow({
         onSuccess?.();
       })
       .catch(err => {
-        const message = err instanceof Error ? err.message : 'Failed to modify dispute';
+        const message = getUserFacingErrorMessage(err, 'Failed to modify dispute');
         updateActivity(activityId, { status: 'failed', errorMessage: message });
       });
   }, [pendingOperation, addActivity, updateActivity, refetchAll, onSuccess]);

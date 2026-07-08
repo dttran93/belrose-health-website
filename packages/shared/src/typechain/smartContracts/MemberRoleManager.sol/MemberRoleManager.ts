@@ -409,7 +409,7 @@ export interface MemberRoleManagerInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "voluntarilyLeaveOwnership",
-    values: [BytesLike]
+    values: [BytesLike, string]
   ): string;
   encodeFunctionData(
     functionFragment: "vouches",
@@ -1548,7 +1548,7 @@ export interface MemberRoleManager extends BaseContract {
   >;
 
   voluntarilyLeaveOwnership: TypedContractMethod<
-    [recordIdHash: BytesLike],
+    [recordIdHash: BytesLike, newRole: string],
     [void],
     "nonpayable"
   >;
@@ -1982,7 +1982,11 @@ export interface MemberRoleManager extends BaseContract {
   >;
   getFunction(
     nameOrSignature: "voluntarilyLeaveOwnership"
-  ): TypedContractMethod<[recordIdHash: BytesLike], [void], "nonpayable">;
+  ): TypedContractMethod<
+    [recordIdHash: BytesLike, newRole: string],
+    [void],
+    "nonpayable"
+  >;
   getFunction(
     nameOrSignature: "vouches"
   ): TypedContractMethod<[arg0: BytesLike, arg1: BytesLike], [bigint], "view">;

@@ -6,8 +6,16 @@ import { UserBadge } from '@/features/Users/components/ui/UserBadge';
 import { BelroseUserProfile, FileObject } from '@/types/core';
 import { TrusteeEntry } from '@/features/Trustee/hooks/useRecordTrustees';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { AlertCircle, ChevronDown, ChevronUp, ShieldCheck, ShieldOff } from 'lucide-react';
+import {
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  ShieldCheck,
+  ShieldOff,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { TrustLevel } from '@/features/Trustee/services/trusteeRelationshipService';
+import { MenuItem } from '@/features/Users/components/ui/UserMenu';
 
 // ============================================================================
 // TRUST LEVEL CONFIG
@@ -116,6 +124,7 @@ interface PermissionUserCardProps {
   color: 'blue' | 'red' | 'yellow' | 'green';
   onDelete?: () => void;
   onCancel?: () => void;
+  onModify?: () => void;
   menuType?: 'default' | 'cancel';
   trusteeEntry?: TrusteeEntry;
   trusteeList?: TrusteeEntry[];
@@ -128,6 +137,7 @@ export const PermissionUserCard: React.FC<PermissionUserCardProps> = ({
   color,
   onDelete,
   onCancel,
+  onModify,
   menuType = 'default',
   trusteeEntry,
   trusteeList = [],
@@ -216,6 +226,17 @@ export const PermissionUserCard: React.FC<PermissionUserCardProps> = ({
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  const additionalItems: MenuItem[] | undefined = onModify
+    ? [
+        {
+          key: 'modify',
+          label: 'Modify Access',
+          icon: SlidersHorizontal,
+          onClick: onModify,
+        },
+      ]
+    : undefined;
+
   return (
     <div className={`rounded-lg ${isTrustee ? 'bg-complement-3/30' : ''}`}>
       <UserCard
@@ -226,6 +247,7 @@ export const PermissionUserCard: React.FC<PermissionUserCardProps> = ({
         content={renderAccessContent()}
         onDelete={onDelete}
         onCancel={onCancel}
+        additionalItems={additionalItems}
         menuType={menuType}
         onViewUser={() => {}}
       />

@@ -40,9 +40,10 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // 3. Initialize the flow hook
-  const { dialogProps, initiateGrant, initiateRevoke, isLoading } = usePermissionFlow({
+  const { dialogProps, initiateGrant, initiateRevoke, initiateModify, isLoading } = usePermissionFlow({
     recordId: record.id,
     recordTitle: (record.belroseFields?.title || record.fileName) ?? undefined,
+    record,
     onSuccess: () => {
       setSelectedUser(null);
       setRefreshTrigger(prev => prev + 1);
@@ -64,6 +65,12 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
     if (!profile) return;
     // 5. Use initiateRevoke - the hook handles the 'demote' logic internally
     initiateRevoke(profile, 'owner');
+  };
+
+  const handleModifyOwner = (userId: string) => {
+    const profile = userProfiles.get(userId);
+    if (!profile) return;
+    initiateModify(profile, 'owner');
   };
 
   // Fetch access permissions for this record
@@ -167,6 +174,7 @@ export const OwnerManagement: React.FC<OwnerManagementProps> = ({
             record={record}
             color="red"
             onDelete={() => handleDeleteOwner(ownerId)}
+            onModify={() => handleModifyOwner(ownerId)}
             trusteeEntry={trusteeMap.get(ownerId)}
             trusteeList={trustorMap.get(ownerId) ?? []}
           />

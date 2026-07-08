@@ -179,6 +179,24 @@ const _abi = [
         stateMutability: "view",
         type: "function",
     },
+    {
+        inputs: [
+            {
+                internalType: "bytes32",
+                name: "subjectIdHash",
+                type: "bytes32",
+            },
+            {
+                internalType: "bytes32",
+                name: "recordIdHash",
+                type: "bytes32",
+            },
+        ],
+        name: "retractTrusteeGrantsOnUnanchor",
+        outputs: [],
+        stateMutability: "nonpayable",
+        type: "function",
+    },
 ];
 export class MemberRoleManagerInterface__factory {
     static createInterface() {
