@@ -22,6 +22,9 @@ describe('PermissionsService.getEligibleRoleTargets', () => {
 
     // Demoting yourself to a different active tier is an owner/admin decision, not
     // something a plain sharer can do to themselves (matches firestore.rules BRANCH 6b).
+    expect(eligibility.owner.enabled).toBe(false);
+    expect(eligibility.administrator.enabled).toBe(false);
+    expect(eligibility.sharer.enabled).toBe(false);
     expect(eligibility.viewer.enabled).toBe(false);
   });
 

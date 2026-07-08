@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:rules": "firebase emulators:exec --only firestore --project belrose-rules-test \"vitest run --config vitest.rules.config.ts\""
   },
   "dependencies": {
     "@idswyft/sdk": "^4.0.0",
@@ -57,6 +58,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
+    "@firebase/rules-unit-testing": "^5.0.1",
     "@types/node": "^24.1.0",
     "@types/pdf-parse": "^1.1.5",
     "@types/pdfjs-dist": "^2.10.377",
@@ -69,6 +71,7 @@
     "eslint": "^9.25.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
+    "firebase-tools": "^15.22.4",
     "globals": "^16.0.0",
     "postcss": "^8.5.4",
     "prettier": "^3.6.2",
