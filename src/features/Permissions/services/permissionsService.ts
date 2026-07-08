@@ -1485,26 +1485,15 @@ export class PermissionsService {
 
     const demoteTo = options?.demoteTo;
 
-    // Step 1: Update blockchain - both operations need to succeed together
-    // Owners must use voluntarilyRemoveOwnOwnership, if one works but the other doesn't, user is stuck
+    // Step 1: Update blockchain — leave (and optionally demote) in a single atomic call.
+    // An owner has no other way to acquire a role for themselves once they've left, so this
+    // can't be split into two transactions (see voluntarilyLeaveOwnership's contract docstring).
     let blockchainRef: BlockchainRef;
 
     try {
-      const leaveTx = await BlockchainRoleManagerService.voluntarilyLeaveOwnership(recordId);
-      blockchainRef = buildMemberRegistryRef(leaveTx.txHash, leaveTx.blockNumber);
-      console.log('✅ Blockchain: Ownership removed');
-
-      // If demoting, need to grant the new role
-      if (demoteTo) {
-        console.log(`🔗 Demoting to ${demoteTo} on blockchain...`);
-        const demoteTx = await BlockchainRoleManagerService.grantRole(
-          recordId,
-          targetWalletAddress,
-          demoteTo
-        );
-        blockchainRef = buildMemberRegistryRef(demoteTx.txHash, demoteTx.blockNumber);
-        console.log(`✅ Blockchain: Demoted to ${demoteTo}`);
-      }
+      const tx = await BlockchainRoleManagerService.voluntarilyLeaveOwnership(recordId, demoteTo);
+      blockchainRef = buildMemberRegistryRef(tx.txHash, tx.blockNumber);
+      console.log(demoteTo ? `✅ Blockchain: Demoted to ${demoteTo}` : '✅ Blockchain: Ownership removed');
     } catch (blockchainError) {
       console.error('⚠️ Blockchain update failed:', blockchainError);
 
@@ -1513,7 +1502,7 @@ export class PermissionsService {
 
       await BlockchainSyncQueueService.logFailure({
         contract: 'MemberRoleManager',
-        action: demoteTo ? 'demoteOwner' : 'voluntarilyLeaveOwnership',
+        action: 'voluntarilyLeaveOwnership',
         userId: currentUser.uid,
         userWalletAddress: userWalletAddress,
         error: errorMessage,

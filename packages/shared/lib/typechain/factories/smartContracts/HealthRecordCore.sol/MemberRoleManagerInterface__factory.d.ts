@@ -133,6 +133,20 @@ export declare class MemberRoleManagerInterface__factory {
         }];
         readonly stateMutability: "view";
         readonly type: "function";
+    }, {
+        readonly inputs: readonly [{
+            readonly internalType: "bytes32";
+            readonly name: "subjectIdHash";
+            readonly type: "bytes32";
+        }, {
+            readonly internalType: "bytes32";
+            readonly name: "recordIdHash";
+            readonly type: "bytes32";
+        }];
+        readonly name: "retractTrusteeGrantsOnUnanchor";
+        readonly outputs: readonly [];
+        readonly stateMutability: "nonpayable";
+        readonly type: "function";
     }];
     static createInterface(): MemberRoleManagerInterfaceInterface;
     static connect(address: string, runner?: ContractRunner | null): MemberRoleManagerInterface;

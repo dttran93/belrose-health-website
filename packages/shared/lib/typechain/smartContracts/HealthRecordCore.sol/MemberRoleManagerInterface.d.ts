@@ -1,7 +1,7 @@
 import type { BaseContract, BytesLike, FunctionFragment, Result, Interface, AddressLike, ContractRunner, ContractMethod, Listener } from "ethers";
 import type { TypedContractEvent, TypedDeferredTopicFilter, TypedEventLog, TypedListener, TypedContractMethod } from "../../common";
 export interface MemberRoleManagerInterfaceInterface extends Interface {
-    getFunction(nameOrSignature: "extendTrusteeGrantsOnAnchor" | "getUserForWallet" | "hasActiveRole" | "hasRole" | "isActiveMember" | "isControllerOf" | "isOwnerOrAdmin" | "isVerifiedMember"): FunctionFragment;
+    getFunction(nameOrSignature: "extendTrusteeGrantsOnAnchor" | "getUserForWallet" | "hasActiveRole" | "hasRole" | "isActiveMember" | "isControllerOf" | "isOwnerOrAdmin" | "isVerifiedMember" | "retractTrusteeGrantsOnUnanchor"): FunctionFragment;
     encodeFunctionData(functionFragment: "extendTrusteeGrantsOnAnchor", values: [BytesLike, BytesLike]): string;
     encodeFunctionData(functionFragment: "getUserForWallet", values: [AddressLike]): string;
     encodeFunctionData(functionFragment: "hasActiveRole", values: [BytesLike, AddressLike]): string;
@@ -10,6 +10,7 @@ export interface MemberRoleManagerInterfaceInterface extends Interface {
     encodeFunctionData(functionFragment: "isControllerOf", values: [BytesLike, BytesLike]): string;
     encodeFunctionData(functionFragment: "isOwnerOrAdmin", values: [BytesLike, AddressLike]): string;
     encodeFunctionData(functionFragment: "isVerifiedMember", values: [AddressLike]): string;
+    encodeFunctionData(functionFragment: "retractTrusteeGrantsOnUnanchor", values: [BytesLike, BytesLike]): string;
     decodeFunctionResult(functionFragment: "extendTrusteeGrantsOnAnchor", data: BytesLike): Result;
     decodeFunctionResult(functionFragment: "getUserForWallet", data: BytesLike): Result;
     decodeFunctionResult(functionFragment: "hasActiveRole", data: BytesLike): Result;
@@ -18,6 +19,7 @@ export interface MemberRoleManagerInterfaceInterface extends Interface {
     decodeFunctionResult(functionFragment: "isControllerOf", data: BytesLike): Result;
     decodeFunctionResult(functionFragment: "isOwnerOrAdmin", data: BytesLike): Result;
     decodeFunctionResult(functionFragment: "isVerifiedMember", data: BytesLike): Result;
+    decodeFunctionResult(functionFragment: "retractTrusteeGrantsOnUnanchor", data: BytesLike): Result;
 }
 export interface MemberRoleManagerInterface extends BaseContract {
     connect(runner?: ContractRunner | null): MemberRoleManagerInterface;
@@ -74,6 +76,12 @@ export interface MemberRoleManagerInterface extends BaseContract {
     ], [
         boolean
     ], "view">;
+    retractTrusteeGrantsOnUnanchor: TypedContractMethod<[
+        subjectIdHash: BytesLike,
+        recordIdHash: BytesLike
+    ], [
+        void
+    ], "nonpayable">;
     getFunction<T extends ContractMethod = ContractMethod>(key: string | FunctionFragment): T;
     getFunction(nameOrSignature: "extendTrusteeGrantsOnAnchor"): TypedContractMethod<[
         subjectIdHash: BytesLike,
@@ -109,6 +117,12 @@ export interface MemberRoleManagerInterface extends BaseContract {
         boolean
     ], "view">;
     getFunction(nameOrSignature: "isVerifiedMember"): TypedContractMethod<[wallet: AddressLike], [boolean], "view">;
+    getFunction(nameOrSignature: "retractTrusteeGrantsOnUnanchor"): TypedContractMethod<[
+        subjectIdHash: BytesLike,
+        recordIdHash: BytesLike
+    ], [
+        void
+    ], "nonpayable">;
     filters: {};
 }
 //# sourceMappingURL=MemberRoleManagerInterface.d.ts.map

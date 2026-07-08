@@ -729,10 +729,19 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
   }
 
   /**
-   * @notice Allows an owner to voluntarily give up their ownership
+   * @notice Allows an owner to voluntarily give up their ownership, optionally taking on a
+   * lesser role instead of losing all access entirely. Must be atomic: an owner has no other
+   * way to acquire a new role for themselves once they've lost the owner role (grantRole
+   * requires an active role to call, and changeRole refuses to touch an owner at all), so the
+   * demotion has to happen in this same transaction, not as a separate follow-up call.
    * @param recordIdHash The record ID Hash
+   * @param newRole Lesser role to take instead of leaving entirely ("administrator", "sharer",
+   * or "viewer"). Pass an empty string to leave with no replacement role.
    */
-  function voluntarilyLeaveOwnership(bytes32 recordIdHash) external onlyActiveMember {
+  function voluntarilyLeaveOwnership(
+    bytes32 recordIdHash,
+    string memory newRole
+  ) external onlyActiveMember {
     require(recordIdHash != bytes32(0), "Record ID hash cannot be empty");
 
     bytes32 userIdHash = _getCallerIdHash();
@@ -743,13 +752,29 @@ contract MemberRoleManager is Initializable, UUPSUpgradeable, MemberRoleManagerI
 
     require(hasOtherOwners || hasAdmins, "Cannot leave as last owner with no administrators");
 
-    bytes32 roleKey = _getRoleKey(recordIdHash, userIdHash);
-    _removeFromRoleArray(recordIdHash, userIdHash, "owner");
+    if (bytes(newRole).length > 0) {
+      require(_isValidRole(newRole), "Invalid role string");
+      require(
+        keccak256(bytes(newRole)) != keccak256(bytes("owner")),
+        "Use an empty string to leave entirely, not 'owner'"
+      );
+      // Subject minimum: active subjects cannot be demoted below sharer (mirrors changeRole)
+      if (keccak256(bytes(newRole)) == keccak256(bytes("viewer"))) {
+        require(
+          !_isActiveSubject(recordIdHash, userIdHash),
+          "Cannot demote an active subject below sharer"
+        );
+      }
+      _applyChangeRole(recordIdHash, userIdHash, userIdHash, newRole, "owner");
+    } else {
+      bytes32 roleKey = _getRoleKey(recordIdHash, userIdHash);
+      _removeFromRoleArray(recordIdHash, userIdHash, "owner");
 
-    recordRoles[roleKey].isActive = false;
-    delete roleGrantedBy[roleKey];
+      recordRoles[roleKey].isActive = false;
+      delete roleGrantedBy[roleKey];
 
-    emit OwnershipVoluntarilyLeft(recordIdHash, userIdHash, block.timestamp);
+      emit OwnershipVoluntarilyLeft(recordIdHash, userIdHash, block.timestamp);
+    }
   }
 
   /**

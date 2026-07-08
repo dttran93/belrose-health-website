@@ -563,16 +563,26 @@ export class BlockchainRoleManagerService {
   }
 
   /**
-   * Owner voluntarily removes their own ownership
+   * Owner voluntarily removes their own ownership, optionally taking on a lesser role
+   * instead of losing all access entirely. Must happen atomically in this one call — an
+   * owner has no other way to acquire a role for themselves once they've lost the owner
+   * role (grantRole requires an active role to call; changeRole refuses to touch an owner).
    *
    * Requirements (enforced by smart contract):
    * - Caller must be an owner of the record
    * - Cannot leave if you're the last owner AND there are no admins
+   * - If demoting to viewer, caller cannot be an active subject (subject floor is sharer)
    */
-  static async voluntarilyLeaveOwnership(recordId: string): Promise<TransactionResult> {
-    console.log('🔗 Leaving ownership on blockchain...', { recordId });
+  static async voluntarilyLeaveOwnership(
+    recordId: string,
+    newRole?: RoleType
+  ): Promise<TransactionResult> {
+    console.log('🔗 Leaving ownership on blockchain...', { recordId, newRole });
     const recordIdHash = id(recordId);
-    const result = await this.executeWrite('voluntarilyLeaveOwnership', [recordIdHash]);
+    const result = await this.executeWrite('voluntarilyLeaveOwnership', [
+      recordIdHash,
+      newRole ?? '',
+    ]);
     console.log('✅ Ownership left:', result.txHash);
     return result;
   }
