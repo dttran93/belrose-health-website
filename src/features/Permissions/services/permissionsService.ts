@@ -1264,12 +1264,15 @@ export class PermissionsService {
       throw new Error('Cannot remove the last administrator from a record');
     }
 
-    // Rule 6: Can't remove a subject's permissions (must go through subject removal route first)
+    // Rule 6: Subjects require at least sharer access — a full revoke (no demoteTo) must go
+    // through the subject removal route first, and demoteTo may never be 'viewer'.
     const isTargetSubject = recordData.subjects?.includes(targetUserId);
 
-    if (isTargetSubject && !options?.demoteTo) {
+    if (isTargetSubject && (!options?.demoteTo || options.demoteTo === 'viewer')) {
       throw new Error(
-        "Cannot remove a subject's access. Please remove them as subject first or demote to a different role."
+        options?.demoteTo === 'viewer'
+          ? 'This user is a subject of the record and requires at least Sharer access.'
+          : "Cannot remove a subject's access. Please remove them as subject first or demote to a different role."
       );
     }
 
