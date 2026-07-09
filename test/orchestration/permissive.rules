@@ -1,0 +1,14 @@
+rules_version = '2';
+
+// Intentionally permissive — this project/emulator is ONLY used by the orchestration
+// test suite (test/orchestration), never by real users or real data. Security-rule
+// correctness is owned entirely by firestore.rules + test/rules; this suite exists to
+// check PermissionsService's own orchestration logic (which sub-services it calls, with
+// what args, and what Firestore state results), not to re-litigate who's allowed to write.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
