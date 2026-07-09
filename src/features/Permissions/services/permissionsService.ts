@@ -1548,9 +1548,10 @@ export class PermissionsService {
   // ============================================================================
 
   /**
-   * Batch methods generally don't have recordTitle passed. These usually are trustee
-   * or admin operations so the individual notification isn't as important or useful.
-   * User can just click through to see the update also so not a big deal.
+   * Batch methods for granting/changing/revoking roles. Key difference is that individual
+   * grant functions throw specific errors while batch granting silently skips ineligible records
+   * This is acceptable for a better user experience, don't want 1 ineligible record to throw
+   * an entire set of record grants. But still can throw on batch preconditions (no wallet, no profile etc.)
    */
 
   /**
@@ -1604,19 +1605,28 @@ export class PermissionsService {
       const isOwner = data.owners?.includes(currentUser.uid);
       const isAdmin = data.administrators?.includes(currentUser.uid);
       const isSharer = data.sharers?.includes(currentUser.uid);
-      const isSubject = data.subjects?.includes(currentUser.uid);
 
+      // Mirrors the (fixed) single-record grant methods: owner/admin bootstrap an owner,
+      // only owner/admin grant admin or sharer, sharer may additionally grant viewer.
       const canGrant =
         role === 'owner'
           ? data.owners?.length > 0
             ? isOwner
             : isOwner || isAdmin
-          : role === 'administrator'
+          : role === 'administrator' || role === 'sharer'
             ? isOwner || isAdmin
-            : isOwner || isAdmin || isSharer || isSubject;
+            : isOwner || isAdmin || isSharer;
 
       if (!canGrant) {
         console.warn(`⚠️ No permission to grant ${role} on record ${recordId} — skipping`);
+        continue;
+      }
+
+      // Subjects require at least sharer access — mirrors grantViewer's floor check.
+      if (role === 'viewer' && data.subjects?.includes(targetUserId)) {
+        console.warn(
+          `⚠️ Target is a subject and requires at least sharer access on record ${recordId} — skipping`
+        );
         continue;
       }
 
@@ -1932,10 +1942,18 @@ export class PermissionsService {
 
       const data = recordDoc.data();
 
+      const hasOwners = data.owners?.length > 0;
       const isOwner = data.owners?.includes(currentUser.uid);
       const isAdmin = data.administrators?.includes(currentUser.uid);
       if (!isOwner && !isAdmin) {
         console.warn(`⚠️ No permission on record ${recordId} — skipping`);
+        continue;
+      }
+
+      // Bootstrap-only: a non-owner admin may only appoint an owner while none exists yet —
+      // mirrors grantOwner/grantRoleBatch.
+      if (newRole === 'owner' && hasOwners && !isOwner) {
+        console.warn(`⚠️ Only an existing owner can appoint another owner on record ${recordId} — skipping`);
         continue;
       }
 
@@ -1950,6 +1968,24 @@ export class PermissionsService {
       }
       if (existingRole === newRole) {
         console.warn(`⚠️ Target already has role ${newRole} on record ${recordId} — skipping`);
+        continue;
+      }
+
+      // Only the record owner may change a different administrator's role once owners
+      // exist — mirrors removeAdmin Rule 2.
+      const isSelf = targetUserId === currentUser.uid;
+      if (existingRole === 'administrator' && hasOwners && !isOwner && !isSelf) {
+        console.warn(
+          `⚠️ Only the record owner can change another administrator's role on record ${recordId} — skipping`
+        );
+        continue;
+      }
+
+      // Subjects require at least sharer access — mirrors grantViewer/grantRoleBatch.
+      if (newRole === 'viewer' && data.subjects?.includes(targetUserId)) {
+        console.warn(
+          `⚠️ Target is a subject and requires at least sharer access on record ${recordId} — skipping`
+        );
         continue;
       }
 
