@@ -81,6 +81,7 @@ export interface RoleDetails {
 export interface RecordRoleStats {
   ownerCount: number;
   adminCount: number;
+  sharerCount: number;
   viewerCount: number;
 }
 
@@ -97,7 +98,6 @@ export interface TrusteeRelationship {
   status: TrusteeStatusName;
   level: TrusteeLevelName;
 }
-
 
 // ============================================================================
 // SERVICE
@@ -460,11 +460,12 @@ export class BlockchainRoleManagerService {
       return {
         ownerCount: Number(result[0]),
         adminCount: Number(result[1]),
-        viewerCount: Number(result[2]),
+        sharerCount: Number(result[2]),
+        viewerCount: Number(result[3]),
       };
     } catch (error) {
       console.error('Error getting record role stats:', error);
-      return { ownerCount: 0, adminCount: 0, viewerCount: 0 };
+      return { ownerCount: 0, adminCount: 0, sharerCount: 0, viewerCount: 0 };
     }
   }
 
@@ -670,8 +671,16 @@ export class BlockchainRoleManagerService {
   ): Promise<TransactionResult> {
     const trusteeIdHash = ethers.id(trusteeId);
     const recordIdHashes = recordIds.map(rid => id(rid));
-    console.log('🔗 Proposing trustee on blockchain...', { trusteeId, level, recordCount: recordIds.length });
-    const result = await this.executeWrite('proposeTrustee', [trusteeIdHash, level, recordIdHashes]);
+    console.log('🔗 Proposing trustee on blockchain...', {
+      trusteeId,
+      level,
+      recordCount: recordIds.length,
+    });
+    const result = await this.executeWrite('proposeTrustee', [
+      trusteeIdHash,
+      level,
+      recordIdHashes,
+    ]);
     console.log('✅ Trustee proposed:', result.txHash);
     return result;
   }

@@ -1,6 +1,6 @@
 import { initializeApp, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getAuth, Auth, connectAuthEmulator } from 'firebase/auth';
+import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { connectFunctionsEmulator, getFunctions } from 'firebase/functions';
 
@@ -26,6 +26,8 @@ export const functions = getFunctions(app);
 
 if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATOR === 'true') {
   connectFunctionsEmulator(functions, 'localhost', 5001);
+  connectFirestoreEmulator(db, 'localhost', 8080);
+  connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
 }
 
 export { firebaseConfig };

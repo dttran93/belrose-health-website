@@ -358,7 +358,9 @@ const RevokeOptionButton: React.FC<{
       >
         {title}
       </div>
-      <div className={`text-xs ${disabled ? 'text-gray-400' : destructive ? 'text-red-600/80' : 'text-gray-500'}`}>
+      <div
+        className={`text-xs ${disabled ? 'text-gray-400' : destructive ? 'text-red-600/80' : 'text-gray-500'}`}
+      >
         {description}
       </div>
     </button>
@@ -412,9 +414,7 @@ const ConfirmRevokeContent: React.FC<ConfirmRevokeContentProps> = ({
   ].filter((e): e is RoleEligibility => !!e);
   const nothingAvailable =
     shownEligibilities.length > 0 && shownEligibilities.every(e => !e.enabled);
-  const blockReason = nothingAvailable
-    ? shownEligibilities.find(e => e.reason)?.reason
-    : undefined;
+  const blockReason = nothingAvailable ? shownEligibilities.find(e => e.reason)?.reason : undefined;
 
   return (
     <>
@@ -427,9 +427,12 @@ const ConfirmRevokeContent: React.FC<ConfirmRevokeContentProps> = ({
         Choose how to handle access for{' '}
         <strong>{user?.displayName || user?.uid || 'this user'}</strong>.
         {isOwner && (
-          <p className="mt-2 text-xs text-amber-600 font-medium">
-            Note: Owners can only remove themselves.
-          </p>
+          // span, not p — AlertDialog.Description itself renders as a <p>, and nesting a
+          // <p> inside a <p> is invalid HTML (React warns: "cannot be a descendant of").
+          // `block` keeps the same visual line-break layout without the invalid nesting.
+          <span className="block mt-2 text-xs text-amber-600 font-medium">
+            Note: Owners can only be removed by themselves.
+          </span>
         )}
       </AlertDialog.Description>
 

@@ -1,0 +1,10 @@
+{
+  "firestore": {
+    "rules": "test/orchestration/permissive.rules"
+  },
+  "emulators": {
+    "firestore": {
+      "port": 8090
+    }
+  }
+}

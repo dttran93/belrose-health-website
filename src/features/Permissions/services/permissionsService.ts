@@ -374,28 +374,25 @@ export class PermissionsService {
 
     const recordData = recordDoc.data();
 
-    // Check 2: Permission check - only admins/owners/subjects can grant viewer
+    // Check 2: Permission check - only admins/owners/sharers can grant viewer
+    const isCurrentUserSharer = recordData.sharers?.includes(currentUser.uid);
     const isCurrentUserAdmin = recordData.administrators?.includes(currentUser.uid);
     const isCurrentUserOwner = recordData.owners?.includes(currentUser.uid);
-    const isCurrentUserSubject = recordData.subjects?.includes(currentUser.uid);
 
-    if (!isCurrentUserAdmin && !isCurrentUserOwner && !isCurrentUserSubject) {
+    if (!isCurrentUserAdmin && !isCurrentUserOwner && !isCurrentUserSharer) {
       throw new Error('You do not have permission to share this record');
     }
 
-    // Check 3: If user is a subject, but not admin/owner, verify they have an active role
-    if (isCurrentUserSubject && !isCurrentUserAdmin && !isCurrentUserOwner) {
-      const currentUserRole = this.getUserRole(recordData, currentUser.uid);
-      if (!currentUserRole) {
-        throw new Error('Subject must have an active role to share this record');
-      }
-    }
-
-    // Check 4: Find and make sure targetUserId exists
+    // Check 3: Find and make sure targetUserId exists
     const targetProfile = await getUserProfile(targetUserId);
 
     if (!targetProfile) {
       throw new Error('Target user does not exist or has no profile');
+    }
+
+    // Check 4: If target is subject, they must get sharer or above
+    if (recordData.subjects?.includes(targetUserId)) {
+      throw new Error('This user is a subject of the record and requires at least Sharer access.');
     }
 
     // Check 5: Check existing role - don't demote to viewer from an equal/higher role
@@ -489,7 +486,7 @@ export class PermissionsService {
 
   /**
    * Add a sharer to a record.
-   * Sharer can view and grant viewer/sharer access but cannot edit.
+   * Sharer can view and grant viewer access but cannot edit.
    * This is the minimum role granted to active subjects.
    */
   static async grantSharer(
@@ -504,6 +501,7 @@ export class PermissionsService {
       throw new Error('User not authenticated');
     }
 
+    // Check 1: Does record exist
     const db = getFirestore();
     const recordRef = doc(db, 'records', recordId);
     const recordDoc = await getDoc(recordRef);
@@ -514,40 +512,21 @@ export class PermissionsService {
 
     const recordData = recordDoc.data();
 
-    // Check 2: Only admins/owners/sharers/subjects can grant sharer
+    // Check 2: Only admins/owners can grant sharer
     const isCurrentUserAdmin = recordData.administrators?.includes(currentUser.uid);
     const isCurrentUserOwner = recordData.owners?.includes(currentUser.uid);
-    const isCurrentUserSharer = recordData.sharers?.includes(currentUser.uid);
-    const isCurrentUserSubject = recordData.subjects?.includes(currentUser.uid);
 
-    if (
-      !isCurrentUserAdmin &&
-      !isCurrentUserOwner &&
-      !isCurrentUserSharer &&
-      !isCurrentUserSubject
-    ) {
+    if (!isCurrentUserAdmin && !isCurrentUserOwner) {
       throw new Error('You do not have permission to share this record');
     }
 
-    // Check 3: If caller is sharer/subject (not admin/owner), verify they have an active role
-    if (
-      (isCurrentUserSharer || isCurrentUserSubject) &&
-      !isCurrentUserAdmin &&
-      !isCurrentUserOwner
-    ) {
-      const currentUserRole = this.getUserRole(recordData, currentUser.uid);
-      if (!currentUserRole) {
-        throw new Error('Must have an active role to grant sharer access');
-      }
-    }
-
-    // Check 4: Find and make sure targetUserId exists
+    // Check 3: Find and make sure targetUserId exists
     const targetProfile = await getUserProfile(targetUserId);
     if (!targetProfile) {
       throw new Error('Target user does not exist or has no profile');
     }
 
-    // Check 5: Don't demote from a higher role
+    // Check 4: Don't demote from a higher role
     const existingRole = this.getUserRole(recordData, targetUserId);
 
     if (existingRole === 'owner') {
@@ -560,7 +539,7 @@ export class PermissionsService {
       throw new Error('User is already a sharer');
     }
 
-    // Check 6: Ensure wallets exist for blockchain transaction
+    // Check 5: Ensure wallets exist for blockchain transaction
     const userWalletAddress = await this.getUserWalletAddress(currentUser.uid);
     const targetWalletAddress = await this.getUserWalletAddress(targetUserId);
 
@@ -666,32 +645,23 @@ export class PermissionsService {
     // Check 2: Permission check - only admins/owners can grant admin
     const isCurrentUserAdmin = recordData.administrators?.includes(currentUser.uid);
     const isCurrentUserOwner = recordData.owners?.includes(currentUser.uid);
-    const isCurrentUserSubject = recordData.subjects?.includes(currentUser.uid);
 
-    if (!isCurrentUserAdmin && !isCurrentUserOwner && !isCurrentUserSubject) {
-      throw new Error('Only administrators, owners, or subjects can add administrators');
+    if (!isCurrentUserAdmin && !isCurrentUserOwner) {
+      throw new Error('Only administrators or owners can add administrators');
     }
 
-    // Check 3: If user is a subject (but not admin/owner), verify they have admin or owner role
-    if (isCurrentUserSubject && !isCurrentUserAdmin && !isCurrentUserOwner) {
-      const currentUserRole = this.getUserRole(recordData, currentUser.uid);
-      if (currentUserRole !== 'administrator' && currentUserRole !== 'owner') {
-        throw new Error('Subjects with viewer permissions cannot grant administrator access');
-      }
-    }
-
-    // Check 4: Find and make sure targetUserId exists
+    // Check 3: Find and make sure targetUserId exists
     const targetProfile = await getUserProfile(targetUserId);
 
     if (!targetProfile) {
       throw new Error('Target user does not exist or has no profile');
     }
 
-    // Check 5: Ensure the user and target have wallet addresses for the blockchain transaction
+    // Check 4: Ensure the user and target have wallet addresses for the blockchain transaction
     const userWalletAddress = await this.getUserWalletAddress(currentUser.uid);
     const targetWalletAddress = await this.getUserWalletAddress(targetUserId);
 
-    // Check 6: Check existing roles - can't demote owners
+    // Check 5: Check existing roles - can't demote owners
     const existingRole = this.getUserRole(recordData, targetUserId);
 
     if (existingRole === 'owner') {
@@ -821,23 +791,12 @@ export class PermissionsService {
     // Check 2: Permission check - only owners can add owners (or admins if no owners exist)
     const owners = recordData.owners || [];
     const admins = recordData.administrators || [];
-    const isCurrentUserSubject = recordData.subjects?.includes(currentUser.uid);
 
     const canGrantOwner =
-      owners.length > 0
-        ? owners.includes(currentUser.uid)
-        : admins.includes(currentUser.uid) || isCurrentUserSubject;
+      owners.length > 0 ? owners.includes(currentUser.uid) : admins.includes(currentUser.uid);
 
     if (!canGrantOwner) {
       throw new Error('You do not have permission to add owners');
-    }
-
-    // Check 3:  If user is a subject (and no existing owners), verify they have admin or owner role
-    if (isCurrentUserSubject && owners.length === 0 && !admins.includes(currentUser.uid)) {
-      const currentUserRole = this.getUserRole(recordData, currentUser.uid);
-      if (currentUserRole !== 'administrator' && currentUserRole !== 'owner') {
-        throw new Error('Subjects with viewer permissions cannot grant owner access');
-      }
     }
 
     // Check 3: Find and make sure targetUserId exists
@@ -1305,12 +1264,15 @@ export class PermissionsService {
       throw new Error('Cannot remove the last administrator from a record');
     }
 
-    // Rule 6: Can't remove a subject's permissions (must go through subject removal route first)
+    // Rule 6: Subjects require at least sharer access — a full revoke (no demoteTo) must go
+    // through the subject removal route first, and demoteTo may never be 'viewer'.
     const isTargetSubject = recordData.subjects?.includes(targetUserId);
 
-    if (isTargetSubject && !options?.demoteTo) {
+    if (isTargetSubject && (!options?.demoteTo || options.demoteTo === 'viewer')) {
       throw new Error(
-        "Cannot remove a subject's access. Please remove them as subject first or demote to a different role."
+        options?.demoteTo === 'viewer'
+          ? 'This user is a subject of the record and requires at least Sharer access.'
+          : "Cannot remove a subject's access. Please remove them as subject first or demote to a different role."
       );
     }
 
@@ -1431,6 +1393,7 @@ export class PermissionsService {
       throw new Error('User not authenticated');
     }
 
+    // Check 1: Does record exist
     const db = getFirestore();
     const recordRef = doc(db, 'records', recordId);
     const recordDoc = await getDoc(recordRef);
@@ -1468,11 +1431,16 @@ export class PermissionsService {
       throw new Error('Cannot remove the last owner when no administrators exist');
     }
 
-    // Rule 5: Can't remove a subject's permissions (must go through subject removal route first)
+    // Rule 5: Subjects require at least sharer access — a full revoke (no options) must go
+    // through the subject removal route first, and demoteTo may never be 'viewer'.
     const isTargetSubject = recordData.subjects?.includes(targetUserId);
 
-    if (isTargetSubject && !options) {
-      throw new Error("Cannot remove a subject's access. Please remove them as subject first.");
+    if (isTargetSubject && (!options || options.demoteTo === 'viewer')) {
+      throw new Error(
+        options?.demoteTo === 'viewer'
+          ? 'This user is a subject of the record and requires at least Sharer access.'
+          : "Cannot remove a subject's access. Please remove them as subject first."
+      );
     }
 
     //Check 3: Check for user's blockchain wallets
@@ -1580,9 +1548,10 @@ export class PermissionsService {
   // ============================================================================
 
   /**
-   * Batch methods generally don't have recordTitle passed. These usually are trustee
-   * or admin operations so the individual notification isn't as important or useful.
-   * User can just click through to see the update also so not a big deal.
+   * Batch methods for granting/changing/revoking roles. Key difference is that individual
+   * grant functions throw specific errors while batch granting silently skips ineligible records
+   * This is acceptable for a better user experience, don't want 1 ineligible record to throw
+   * an entire set of record grants. But still can throw on batch preconditions (no wallet, no profile etc.)
    */
 
   /**
@@ -1636,19 +1605,28 @@ export class PermissionsService {
       const isOwner = data.owners?.includes(currentUser.uid);
       const isAdmin = data.administrators?.includes(currentUser.uid);
       const isSharer = data.sharers?.includes(currentUser.uid);
-      const isSubject = data.subjects?.includes(currentUser.uid);
 
+      // Mirrors the (fixed) single-record grant methods: owner/admin bootstrap an owner,
+      // only owner/admin grant admin or sharer, sharer may additionally grant viewer.
       const canGrant =
         role === 'owner'
           ? data.owners?.length > 0
             ? isOwner
             : isOwner || isAdmin
-          : role === 'administrator'
+          : role === 'administrator' || role === 'sharer'
             ? isOwner || isAdmin
-            : isOwner || isAdmin || isSharer || isSubject;
+            : isOwner || isAdmin || isSharer;
 
       if (!canGrant) {
         console.warn(`⚠️ No permission to grant ${role} on record ${recordId} — skipping`);
+        continue;
+      }
+
+      // Subjects require at least sharer access — mirrors grantViewer's floor check.
+      if (role === 'viewer' && data.subjects?.includes(targetUserId)) {
+        console.warn(
+          `⚠️ Target is a subject and requires at least sharer access on record ${recordId} — skipping`
+        );
         continue;
       }
 
@@ -1964,10 +1942,20 @@ export class PermissionsService {
 
       const data = recordDoc.data();
 
+      const hasOwners = data.owners?.length > 0;
       const isOwner = data.owners?.includes(currentUser.uid);
       const isAdmin = data.administrators?.includes(currentUser.uid);
       if (!isOwner && !isAdmin) {
         console.warn(`⚠️ No permission on record ${recordId} — skipping`);
+        continue;
+      }
+
+      // Bootstrap-only: a non-owner admin may only appoint an owner while none exists yet —
+      // mirrors grantOwner/grantRoleBatch.
+      if (newRole === 'owner' && hasOwners && !isOwner) {
+        console.warn(
+          `⚠️ Only an existing owner can appoint another owner on record ${recordId} — skipping`
+        );
         continue;
       }
 
@@ -1982,6 +1970,24 @@ export class PermissionsService {
       }
       if (existingRole === newRole) {
         console.warn(`⚠️ Target already has role ${newRole} on record ${recordId} — skipping`);
+        continue;
+      }
+
+      // Only the record owner may change a different administrator's role once owners
+      // exist — mirrors removeAdmin Rule 2.
+      const isSelf = targetUserId === currentUser.uid;
+      if (existingRole === 'administrator' && hasOwners && !isOwner && !isSelf) {
+        console.warn(
+          `⚠️ Only the record owner can change another administrator's role on record ${recordId} — skipping`
+        );
+        continue;
+      }
+
+      // Subjects require at least sharer access — mirrors grantViewer/grantRoleBatch.
+      if (newRole === 'viewer' && data.subjects?.includes(targetUserId)) {
+        console.warn(
+          `⚠️ Target is a subject and requires at least sharer access on record ${recordId} — skipping`
+        );
         continue;
       }
 
@@ -2099,48 +2105,6 @@ export class PermissionsService {
   // ============================================================================
 
   /**
-   * Check if current user can manage permissions a specific role on a record
-   */
-  static async canManageRole(recordId: string, role: Role): Promise<boolean> {
-    try {
-      const auth = getAuth();
-      const currentUser = auth.currentUser;
-
-      if (!currentUser) return false;
-
-      const db = getFirestore();
-      const recordDoc = await getDoc(doc(db, 'records', recordId));
-
-      if (!recordDoc.exists()) return false;
-
-      const recordData = recordDoc.data();
-      const isOwner = recordData.owners?.includes(currentUser.uid);
-      const isAdmin = recordData.administrators?.includes(currentUser.uid);
-      const isSubject = recordData.subjects?.includes(currentUser.uid);
-      const userRole = this.getUserRole(recordData, currentUser.uid);
-
-      const isSharer = recordData.sharers?.includes(currentUser.uid);
-
-      switch (role) {
-        case 'owner':
-          // Only owners can manage owners (or admins if no owners exist)
-          return recordData.owners?.length > 0 ? isOwner : isAdmin;
-        case 'administrator':
-          return isOwner || isAdmin;
-        case 'sharer':
-          return isOwner || isAdmin || isSharer || (isSubject && userRole !== null);
-        case 'viewer':
-          return isOwner || isAdmin || isSharer || (isSubject && userRole !== null);
-        default:
-          return false;
-      }
-    } catch (err) {
-      console.error('Error checking permissions:', err);
-      return false;
-    }
-  }
-
-  /**
    * Get record ownership information from firebase
    */
   static async getRecordRoles(recordId: string): Promise<{
@@ -2148,10 +2112,6 @@ export class PermissionsService {
     administrators: string[];
     sharers: string[];
     viewers: string[];
-    canManageOwners: boolean;
-    canManageAdmins: boolean;
-    canManageSharers: boolean;
-    canManageViewers: boolean;
   } | null> {
     try {
       const db = getFirestore();
@@ -2161,23 +2121,11 @@ export class PermissionsService {
 
       const recordData = recordDoc.data();
 
-      const [canManageOwners, canManageAdmins, canManageSharers, canManageViewers] =
-        await Promise.all([
-          this.canManageRole(recordId, 'owner'),
-          this.canManageRole(recordId, 'administrator'),
-          this.canManageRole(recordId, 'sharer'),
-          this.canManageRole(recordId, 'viewer'),
-        ]);
-
       return {
         owners: recordData.owners || [],
         administrators: recordData.administrators || [],
         sharers: recordData.sharers || [],
         viewers: recordData.viewers || [],
-        canManageOwners,
-        canManageAdmins,
-        canManageSharers,
-        canManageViewers,
       };
     } catch (err) {
       console.error('Error getting record roles:', err);
