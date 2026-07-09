@@ -1953,7 +1953,9 @@ export class PermissionsService {
       // Bootstrap-only: a non-owner admin may only appoint an owner while none exists yet —
       // mirrors grantOwner/grantRoleBatch.
       if (newRole === 'owner' && hasOwners && !isOwner) {
-        console.warn(`⚠️ Only an existing owner can appoint another owner on record ${recordId} — skipping`);
+        console.warn(
+          `⚠️ Only an existing owner can appoint another owner on record ${recordId} — skipping`
+        );
         continue;
       }
 
@@ -2103,48 +2105,6 @@ export class PermissionsService {
   // ============================================================================
 
   /**
-   * Check if current user can manage permissions a specific role on a record
-   */
-  static async canManageRole(recordId: string, role: Role): Promise<boolean> {
-    try {
-      const auth = getAuth();
-      const currentUser = auth.currentUser;
-
-      if (!currentUser) return false;
-
-      const db = getFirestore();
-      const recordDoc = await getDoc(doc(db, 'records', recordId));
-
-      if (!recordDoc.exists()) return false;
-
-      const recordData = recordDoc.data();
-      const isOwner = recordData.owners?.includes(currentUser.uid);
-      const isAdmin = recordData.administrators?.includes(currentUser.uid);
-      const isSubject = recordData.subjects?.includes(currentUser.uid);
-      const userRole = this.getUserRole(recordData, currentUser.uid);
-
-      const isSharer = recordData.sharers?.includes(currentUser.uid);
-
-      switch (role) {
-        case 'owner':
-          // Only owners can manage owners (or admins if no owners exist)
-          return recordData.owners?.length > 0 ? isOwner : isAdmin;
-        case 'administrator':
-          return isOwner || isAdmin;
-        case 'sharer':
-          return isOwner || isAdmin || isSharer || (isSubject && userRole !== null);
-        case 'viewer':
-          return isOwner || isAdmin || isSharer || (isSubject && userRole !== null);
-        default:
-          return false;
-      }
-    } catch (err) {
-      console.error('Error checking permissions:', err);
-      return false;
-    }
-  }
-
-  /**
    * Get record ownership information from firebase
    */
   static async getRecordRoles(recordId: string): Promise<{
@@ -2152,10 +2112,6 @@ export class PermissionsService {
     administrators: string[];
     sharers: string[];
     viewers: string[];
-    canManageOwners: boolean;
-    canManageAdmins: boolean;
-    canManageSharers: boolean;
-    canManageViewers: boolean;
   } | null> {
     try {
       const db = getFirestore();
@@ -2165,23 +2121,11 @@ export class PermissionsService {
 
       const recordData = recordDoc.data();
 
-      const [canManageOwners, canManageAdmins, canManageSharers, canManageViewers] =
-        await Promise.all([
-          this.canManageRole(recordId, 'owner'),
-          this.canManageRole(recordId, 'administrator'),
-          this.canManageRole(recordId, 'sharer'),
-          this.canManageRole(recordId, 'viewer'),
-        ]);
-
       return {
         owners: recordData.owners || [],
         administrators: recordData.administrators || [],
         sharers: recordData.sharers || [],
         viewers: recordData.viewers || [],
-        canManageOwners,
-        canManageAdmins,
-        canManageSharers,
-        canManageViewers,
       };
     } catch (err) {
       console.error('Error getting record roles:', err);

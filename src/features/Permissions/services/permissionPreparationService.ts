@@ -68,6 +68,7 @@ export interface PermissionPreparationStatus {
   roleStats: {
     ownerCount: number;
     adminCount: number;
+    sharerCount: number;
     viewerCount: number;
   };
 }
@@ -368,6 +369,7 @@ export class PermissionPreparationService {
       roleStats: {
         ownerCount: Number(roleStats.ownerCount),
         adminCount: Number(roleStats.adminCount),
+        sharerCount: Number(roleStats.sharerCount),
         viewerCount: Number(roleStats.viewerCount),
       },
     };
