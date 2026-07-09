@@ -427,9 +427,12 @@ const ConfirmRevokeContent: React.FC<ConfirmRevokeContentProps> = ({
         Choose how to handle access for{' '}
         <strong>{user?.displayName || user?.uid || 'this user'}</strong>.
         {isOwner && (
-          <p className="mt-2 text-xs text-amber-600 font-medium">
+          // span, not p — AlertDialog.Description itself renders as a <p>, and nesting a
+          // <p> inside a <p> is invalid HTML (React warns: "cannot be a descendant of").
+          // `block` keeps the same visual line-break layout without the invalid nesting.
+          <span className="block mt-2 text-xs text-amber-600 font-medium">
             Note: Owners can only be removed by themselves.
-          </p>
+          </span>
         )}
       </AlertDialog.Description>
 
