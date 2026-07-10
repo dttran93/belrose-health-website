@@ -15,25 +15,9 @@ import AccessUserCard from './ui/AccessUserCard';
 import RecordSectionPanel from '@/components/ui/RecordSectionPanel';
 import useAuth from '@/features/Auth/hooks/useAuth';
 import { GuestSharePanel } from '../../GuestAccess/components/GuestSharePanel';
+import { deriveAccessEntries, type WrappedKeyInfo, type AccessEntry } from '../services/accessEntries';
 
-interface WrappedKeyInfo {
-  userId: string;
-  recordId: string;
-  isActive: boolean;
-  isCreator: boolean;
-  isGuest: boolean;
-  createdAt: Date;
-  revokedAt?: Date;
-  reactivatedAt?: Date;
-}
-
-export interface AccessEntry {
-  userId: string;
-  profile: BelroseUserProfile | undefined;
-  wrappedKey: WrappedKeyInfo | null;
-  role: 'owner' | 'administrator' | 'viewer' | 'none';
-  status: 'synced' | 'missing-key' | 'missing-role' | 'inactive';
-}
+export type { AccessEntry, WrappedKeyInfo };
 
 interface EncryptionAccessViewProps {
   record: FileObject;
@@ -89,28 +73,14 @@ export const EncryptionAccessView: React.FC<EncryptionAccessViewProps> = ({
         ...wrappedKeys.map(wk => wk.userId),
         ...(latestRecord.owners || []),
         ...(latestRecord.administrators || []),
+        ...(latestRecord.sharers || []),
         ...(latestRecord.viewers || []),
         ...(latestRecord.subjects || []),
       ]);
 
       const profiles = await getUserProfiles(Array.from(allUserIds));
 
-      const entries: AccessEntry[] = Array.from(allUserIds).map(userId => {
-        const wrappedKey = wrappedKeys.find(wk => wk.userId === userId) ?? null;
-        let role: AccessEntry['role'] = 'none';
-        if (latestRecord.owners?.includes(userId)) role = 'owner';
-        else if (latestRecord.administrators?.includes(userId)) role = 'administrator';
-        else if (latestRecord.viewers?.includes(userId)) role = 'viewer';
-
-        let status: AccessEntry['status'] = 'synced';
-        if (wrappedKey && !wrappedKey.isActive) status = 'inactive';
-        else if (wrappedKey && role === 'none') status = 'missing-role';
-        else if (!wrappedKey && role !== 'none') status = 'missing-key';
-
-        return { userId, profile: profiles.get(userId), wrappedKey, role, status };
-      });
-
-      setAccessEntries(entries.sort((a, b) => (a.status === 'synced' ? 1 : -1)));
+      setAccessEntries(deriveAccessEntries(wrappedKeys, latestRecord, profiles));
     } catch (err) {
       console.error(err);
       setError('Failed to load access data. Only Owners and Administrators can Manage Access');

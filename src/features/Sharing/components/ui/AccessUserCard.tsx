@@ -3,7 +3,7 @@
 import React from 'react';
 import UserCard from '@/features/Users/components/ui/UserCard';
 import { UserBadge } from '@/features/Users/components/ui/UserBadge';
-import { AccessEntry } from '../EncryptionAccessView';
+import { AccessEntry } from '../../services/accessEntries';
 import { CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 import { FileObject } from '@/types/core';
 
@@ -31,6 +31,7 @@ const AccessUserCard: React.FC<AccessUserCardProps> = ({
     const roleConfigs = {
       owner: { text: 'Owner', color: 'red' },
       administrator: { text: 'Admin', color: 'blue' },
+      sharer: { text: 'Sharer', color: 'green' },
       viewer: { text: 'Viewer', color: 'yellow' },
       none: { text: 'No Role', color: 'primary' },
     };
