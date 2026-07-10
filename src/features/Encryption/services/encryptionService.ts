@@ -166,36 +166,38 @@ export class EncryptionService {
     userKey: CryptoKey,
     externalFileKey?: CryptoKey // Optional for guest case where user key is provided
   ): Promise<{
+    // Base64 — run through arrayBufferToBase64 before being returned, unlike `file` below.
     fileName: {
-      encrypted: ArrayBuffer;
+      encrypted: string;
       iv: string;
     };
+    // Kept as a raw ArrayBuffer (not base64-encoded) — the only field with this shape.
     file?: {
       encrypted: ArrayBuffer;
       iv: string;
     };
     extractedText: {
-      encrypted: ArrayBuffer;
+      encrypted: string;
       iv: string;
     };
     originalText?: {
-      encrypted: ArrayBuffer;
+      encrypted: string;
       iv: string;
     };
     contextText?: {
-      encrypted: ArrayBuffer;
+      encrypted: string;
       iv: string;
     };
     fhirData?: {
-      encrypted: ArrayBuffer;
+      encrypted: string;
       iv: string;
     };
     belroseFields?: {
-      encrypted: ArrayBuffer;
+      encrypted: string;
       iv: string;
     };
     customData?: {
-      encrypted: ArrayBuffer;
+      encrypted: string;
       iv: string;
     };
     encryptedKey: string; // Single key for all data

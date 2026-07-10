@@ -452,11 +452,37 @@ describe('SharingService (orchestration)', () => {
     });
 
     describe('by wallet address', () => {
+      const WALLET = '0xTargetWalletAddress';
+
       it('throws a generic not-found error and never sends an invitation email', async () => {
         await expect(
           SharingService.getReceiver({ receiverWalletAddress: '0xNoSuchWallet' })
         ).rejects.toThrow('Receiver not found. They need a Belrose account to receive shared records.');
 
+        expect(EmailInvitationService.sendShareInvitation).not.toHaveBeenCalled();
+      });
+
+      it('throws when the matched user has no encryption public key', async () => {
+        await setDoc(doc(db, 'users', TARGET), { wallet: { address: WALLET } });
+
+        await expect(SharingService.getReceiver({ receiverWalletAddress: WALLET })).rejects.toThrow(
+          'Receiver has not completed their account setup (encryption keys missing).'
+        );
+        expect(EmailInvitationService.sendShareInvitation).not.toHaveBeenCalled();
+      });
+
+      it('returns the profile on success, ignoring emailVerified entirely since this is not an email lookup', async () => {
+        // The email-unverified/unknown branches in getReceiver are gated on `request.receiverEmail`
+        // — a wallet-only request must never trip them, even when emailVerified is explicitly false.
+        await setDoc(doc(db, 'users', TARGET), {
+          wallet: { address: WALLET },
+          encryption: { publicKey: 'pk' },
+          emailVerified: false,
+        });
+
+        const result = await SharingService.getReceiver({ receiverWalletAddress: WALLET });
+
+        expect(result.id).toBe(TARGET);
         expect(EmailInvitationService.sendShareInvitation).not.toHaveBeenCalled();
       });
     });
