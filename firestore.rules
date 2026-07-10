@@ -789,7 +789,10 @@ service cloud.firestore {
     // ============================================
 
     match /wrappedKeys/{wrappedKeyId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && (
+        isSharerOrAboveOnRecord(resource.data.recordId) ||
+        (resource.data.userId == request.auth.uid && hasRoleOnRecord(resource.data.recordId))
+      );
 
       allow create: if request.auth != null && (
         isSharerOrAboveOnRecord(request.resource.data.recordId)

@@ -143,12 +143,89 @@ describe('firestore.rules — wrappedKeys — delete', () => {
   });
 });
 
-describe('firestore.rules — wrappedKeys — read', () => {
-  it('is readable by any authenticated user', async () => {
-    const recordId = 'wk-read';
+describe('firestore.rules — wrappedKeys — read (sharer+ management, or your own key while you hold a role)', () => {
+  // Previously `allow read: if request.auth != null` — any authenticated user could read any
+  // wrappedKey regardless of relationship to the record. RSA-wrapping makes that harmless for
+  // OTHER people's keys (you can't unwrap without their private key), but it meant a
+  // fully-revoked user (stripped from every role array) could still fetch — and re-fetch,
+  // forever — their OWN wrappedKey directly from Firestore, bypassing the app's isActive check
+  // in RecordDecryptionService. Current rule:
+  //   allow read: if request.auth != null && (
+  //     isSharerOrAboveOnRecord(resource.data.recordId) ||
+  //     (resource.data.userId == request.auth.uid && hasRoleOnRecord(resource.data.recordId))
+  //   );
+  // hasRoleOnRecord already existed (used by the records/{recordId} read rule) and checks
+  // uploadedBy/owners/administrators/sharers/viewers/subjects against request.auth.uid — no new
+  // helper needed since the self-read clause only ever evaluates it for the caller's own uid.
+  //
+  // seedRecord always seeds: owners:[OWNER], administrators:[ADMIN], sharers:[SHARER,OTHER_SHARER],
+  // viewers:[VIEWER]. RECEIVER holds no role on it at all — standing in for "never added yet"
+  // (mid-grant, before the role-array update) and "fully revoked" (after it), which look
+  // identical from the rule's point of view: no entry in any role array.
+
+  it('denies a stranger with no role at all from reading someone else\'s key', async () => {
+    const recordId = 'wk-read-stranger-denied';
+    await seedRecord(recordId);
+    await seedWrappedKey(recordId, 'key-1', { userId: VIEWER, grantedBy: SHARER, isActive: true });
+
+    await assertFails(testEnv.authenticatedContext(STRANGER).firestore().doc('wrappedKeys/key-1').get());
+  });
+
+  it('denies a plain viewer (has a role, but not sharer+) from reading someone else\'s key', async () => {
+    const recordId = 'wk-read-viewer-cannot-read-others';
     await seedRecord(recordId);
     await seedWrappedKey(recordId, 'key-1', { userId: RECEIVER, grantedBy: SHARER, isActive: true });
 
-    await assertSucceeds(testEnv.authenticatedContext(STRANGER).firestore().doc('wrappedKeys/key-1').get());
+    await assertFails(testEnv.authenticatedContext(VIEWER).firestore().doc('wrappedKeys/key-1').get());
+  });
+
+  it('denies a user from reading their own key once they no longer hold any role on the record (revoked)', async () => {
+    const recordId = 'wk-read-self-revoked-denied';
+    await seedRecord(recordId);
+    // RECEIVER has no role here — simulates the state AFTER a full revoke completes (role-array
+    // removal is always the last step in removeViewer/removeAdmin/etc, so by the time a
+    // standalone re-fetch happens, the user is already stripped from every array).
+    await seedWrappedKey(recordId, 'key-1', { userId: RECEIVER, grantedBy: SHARER, isActive: false });
+
+    await assertFails(testEnv.authenticatedContext(RECEIVER).firestore().doc('wrappedKeys/key-1').get());
+  });
+
+  it('lets a sharer read any key on a record they can manage', async () => {
+    const recordId = 'wk-read-sharer-management';
+    await seedRecord(recordId);
+    await seedWrappedKey(recordId, 'key-1', { userId: RECEIVER, grantedBy: SHARER, isActive: true });
+
+    await assertSucceeds(testEnv.authenticatedContext(SHARER).firestore().doc('wrappedKeys/key-1').get());
+  });
+
+  it('lets an admin read a key with no active role yet — the mid-grant reactivation check', async () => {
+    const recordId = 'wk-read-admin-reactivation';
+    // RECEIVER has no role on this record — simulates the moment mid-grant where
+    // SharingService.grantEncryptionAccess reads a target's existing key BEFORE the record's
+    // role arrays are updated (grantViewer only adds to viewers[] in its last step).
+    await seedRecord(recordId);
+    await seedWrappedKey(recordId, 'key-1', { userId: RECEIVER, grantedBy: ADMIN, isActive: false });
+
+    await assertSucceeds(testEnv.authenticatedContext(ADMIN).firestore().doc('wrappedKeys/key-1').get());
+  });
+
+  it('lets a user read their own key while they still hold a role on the record', async () => {
+    const recordId = 'wk-read-self-active-participant';
+    await seedRecord(recordId);
+    await seedWrappedKey(recordId, 'key-1', { userId: VIEWER, grantedBy: SHARER, isActive: true });
+
+    await assertSucceeds(testEnv.authenticatedContext(VIEWER).firestore().doc('wrappedKeys/key-1').get());
+  });
+
+  it('lets a user read their own PENDING key even while inactive, as long as they already hold a role (trustee accept-flow)', async () => {
+    const recordId = 'wk-read-self-pending-trustee';
+    // Trustees are added to the record's role arrays at grant time, before they've accepted —
+    // wrappedKey stays isActive:false until TrusteePermissionService.activatePendingTrusteeAccess
+    // flips it. "Participant" and "wrappedKey active" are independent signals in this schema,
+    // which is exactly what makes gating on participant-status safe for this flow.
+    await seedRecord(recordId);
+    await seedWrappedKey(recordId, 'key-1', { userId: VIEWER, grantedBy: SHARER, isActive: false });
+
+    await assertSucceeds(testEnv.authenticatedContext(VIEWER).firestore().doc('wrappedKeys/key-1').get());
   });
 });
