@@ -88,12 +88,19 @@ const ROLE_HIERARCHY: Record<SubjectRole | 'none', number> = {
 // ============================================================================
 
 /**
- * Get the user's current highest role for a record
+ * Get the user's current highest role for a record.
+ *
+ * Deliberately does NOT treat `uploadedBy` as an automatic administrator: uploaders start out in
+ * `administrators` (see uploadUtils.ts), but nothing prevents them from later being removed like
+ * any other admin — `uploadedBy` itself is permanent audit metadata, not a live role. Falling back
+ * to it here used to report a stale 'administrator' role for a removed uploader, which fed
+ * straight into confirmSetSubjectAsSelf/confirmRequestConsent's "does this user need a role
+ * granted" check and silently skipped the grant. An uploader who wants guaranteed standing on
+ * their own record can always make themselves owner — there's no gap this fallback needs to cover.
  */
 export const getUserRoleForRecord = (userId: string, record: FileObject): SubjectRole | null => {
   if (record.owners?.includes(userId)) return 'owner';
   if (record.administrators?.includes(userId)) return 'administrator';
-  if (record.uploadedBy === userId) return 'administrator';
   if (record.sharers?.includes(userId)) return 'sharer';
   return null;
 };

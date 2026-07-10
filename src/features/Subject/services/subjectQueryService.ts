@@ -103,7 +103,13 @@ const removalRequestConverter: FirestoreDataConverter<SubjectRemovalRequest> = {
 // ============================================================================
 
 export class SubjectQueryService {
-  private static db = getFirestore();
+  // A getter, not a field initializer: a field would call getFirestore() once at module-load
+  // time, before any app has necessarily been initialized (e.g. in tests that import this module
+  // without ever touching Firestore) — every other service in this codebase calls getFirestore()
+  // fresh per method for the same reason.
+  private static get db() {
+    return getFirestore();
+  }
 
   // ==========================================================================
   // RECORD SUBJECTS
