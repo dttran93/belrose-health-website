@@ -254,51 +254,52 @@ export interface FileObject {
   encryptedData?: {
     encryptedKey: string; // Single key for all encrypted data (Base64)
 
-    // Encrypted fileName (always exists - contains PII!)
+    // Encrypted fileName (always exists - contains PII!) — base64, not a raw ArrayBuffer
     fileName: {
-      encrypted: ArrayBuffer; // Only exists during upload process
+      encrypted: string; // Base64
       iv: string; // Base64
     };
 
-    // Encrypted file (original upload) - stored in memory during processing
+    // Encrypted file (original upload) — the one field EncryptionService.encryptCompleteRecord
+    // returns as a raw ArrayBuffer instead of base64, since it's only held in memory during upload
     file?: {
-      encrypted: ArrayBuffer; // Only exists during upload process
+      encrypted: ArrayBuffer;
       iv: string; // Base64
     };
 
     // Encrypted extracted text
     extractedText?: {
-      encrypted: ArrayBuffer; // Only exists during upload process
+      encrypted: string; // Base64
       iv: string; // Base64
     };
 
     // Encrypted original text (if exists)
     originalText?: {
-      encrypted: ArrayBuffer; // Only exists during upload process
+      encrypted: string; // Base64
       iv: string; // Base64
     };
 
     // Encrypted context text (if exists)
     contextText?: {
-      encrypted: ArrayBuffer; // Only exists during upload process
+      encrypted: string; // Base64
       iv: string; // Base64
     };
 
     // Encrypted FHIR data (if exists)
     fhirData?: {
-      encrypted: ArrayBuffer; // Only exists during upload process
+      encrypted: string; // Base64
       iv: string; // Base64
     };
 
     // Encrypted belrose fields (if exists)
     belroseFields?: {
-      encrypted: ArrayBuffer; // Only exists during upload process
+      encrypted: string; // Base64
       iv: string; // Base64
     };
 
     // Encrypted custom data (if exists)
     customData?: {
-      encrypted: ArrayBuffer; // Only exists during upload process
+      encrypted: string; // Base64
       iv: string; // Base64
     };
   };

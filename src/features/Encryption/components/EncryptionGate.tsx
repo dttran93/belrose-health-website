@@ -133,6 +133,7 @@ export const EncryptionGate: React.FC<EncryptionGateProps> = ({ children }) => {
           <form onSubmit={handleUnlock} className="space-y-4">
             <div className="relative">
               <InputField
+                name="password"
                 label="Password"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
