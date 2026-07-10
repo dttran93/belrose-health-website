@@ -15,13 +15,14 @@ import {
   query,
   where,
   getDocs,
+  arrayUnion,
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { SharingKeyManagementService } from './sharingKeyManagementService';
 import { EmailInvitationService } from './emailInvitationService';
 import { RecordDecryptionService } from '@/features/Encryption/services/recordDecryptionService';
-import { BelroseUserProfile } from '@/types/core';
+import { BelroseUserProfile, WrappedKeyHistoryEvent } from '@/types/core';
 
 export interface ReceiverLookupRequest {
   receiverWalletAddress?: string;
@@ -112,6 +113,7 @@ export class SharingService {
         ...(expiresAt && { expiresAt }),
         reactivatedAt: new Date(),
         reactivatedBy: grantorId,
+        history: arrayUnion(this.historyEvent('reactivated', grantorId)),
       });
       console.log('✅ Wrapped key reactivated');
     } else {
@@ -125,9 +127,18 @@ export class SharingService {
         isGuest,
         ...(expiresAt && { expiresAt }),
         grantedBy: grantorId,
+        history: arrayUnion(this.historyEvent('granted', grantorId)),
       });
       console.log('✅ Wrapped key created');
     }
+  }
+
+  /**
+   * Builds a single wrappedKeys history entry. Kept as one helper so every call site (grant,
+   * reactivate, revoke) stamps the same shape.
+   */
+  private static historyEvent(action: WrappedKeyHistoryEvent['action'], by: string): WrappedKeyHistoryEvent {
+    return { action, by, at: new Date() };
   }
 
   /**
@@ -168,6 +179,7 @@ export class SharingService {
       isActive: false,
       revokedAt: new Date(),
       revokedBy: revokerId,
+      history: arrayUnion(this.historyEvent('revoked', revokerId)),
     });
 
     console.log('✅ Wrapped key deactivated');

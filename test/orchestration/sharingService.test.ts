@@ -150,6 +150,7 @@ describe('SharingService (orchestration)', () => {
       expect(data.grantedBy).toBe(GRANTOR);
       expect(data.wrappedKey.length).toBeGreaterThan(0);
       expect(data.expiresAt).toBeUndefined();
+      expect(data.history).toEqual([{ action: 'granted', by: GRANTOR, at: expect.anything() }]);
     });
 
     it('persists isActive:false, isGuest:true, and expiresAt when passed as options', async () => {
@@ -189,6 +190,7 @@ describe('SharingService (orchestration)', () => {
       const snap = await getDoc(doc(db, 'wrappedKeys', `${RECORD_ID}_${TARGET}`));
       expect(snap.data()?.wrappedKey).toBe('existing-wrapped-key-value');
       expect(snap.data()?.grantedBy).toBe('someone-else');
+      expect(snap.data()?.history).toBeUndefined();
     });
 
     it('reactivates an inactive wrappedKey: re-wraps the key and stamps reactivatedAt/reactivatedBy', async () => {
@@ -214,6 +216,10 @@ describe('SharingService (orchestration)', () => {
       expect(data.wrappedKey).not.toBe('stale-wrapped-key-value');
       expect(data.reactivatedBy).toBe('reactivator');
       expect(data.reactivatedAt).toBeDefined();
+      // The seed doc had no history field at all (pre-dates this field, or was created before
+      // this key ever went through SharingService) — arrayUnion on a missing field still starts
+      // a fresh array rather than throwing.
+      expect(data.history).toEqual([{ action: 'reactivated', by: 'reactivator', at: expect.anything() }]);
     });
 
     it('produces a wrappedKey the receiver can actually unwrap with their real private key, recovering the exact record key', async () => {
@@ -262,6 +268,7 @@ describe('SharingService (orchestration)', () => {
 
       const snap = await getDoc(doc(db, 'wrappedKeys', `${RECORD_ID}_${TARGET}`));
       expect(snap.data()?.revokedAt).toBeUndefined();
+      expect(snap.data()?.history).toBeUndefined();
     });
 
     it('deactivates an active wrappedKey and stamps revokedAt/revokedBy', async () => {
@@ -281,6 +288,38 @@ describe('SharingService (orchestration)', () => {
       expect(data.isActive).toBe(false);
       expect(data.revokedBy).toBe('revoker1');
       expect(data.revokedAt).toBeDefined();
+      expect(data.history).toEqual([{ action: 'revoked', by: 'revoker1', at: expect.anything() }]);
+    });
+  });
+
+  describe('wrappedKeys history — survives multiple grant/revoke/reactivate cycles', () => {
+    it('accumulates one history entry per action, in order, across a full grant -> revoke -> reactivate -> revoke cycle', async () => {
+      const { publicKey } = await SharingKeyManagementService.generateUserKeyPair();
+      await setDoc(doc(db, 'users', TARGET), { encryption: { publicKey } });
+
+      // Cycle: granted by GRANTOR -> revoked by 'revoker-a' -> reactivated by 'reactivator-b' ->
+      // revoked again by 'revoker-c'. Each step used to overwrite the previous actor's *By/*At
+      // fields entirely — this proves none of the intermediate actors are lost anymore.
+      await SharingService.grantEncryptionAccess(RECORD_ID, TARGET, GRANTOR);
+      await SharingService.revokeEncryptionAccess(RECORD_ID, TARGET, 'revoker-a');
+      await SharingService.grantEncryptionAccess(RECORD_ID, TARGET, 'reactivator-b');
+      await SharingService.revokeEncryptionAccess(RECORD_ID, TARGET, 'revoker-c');
+
+      const snap = await getDoc(doc(db, 'wrappedKeys', `${RECORD_ID}_${TARGET}`));
+      const data = snap.data()!;
+
+      // The flat fields still only reflect the latest action of each kind (unchanged behavior —
+      // still relied on by trusteePermissionService.ts's where('grantedBy', ...) queries).
+      expect(data.grantedBy).toBe(GRANTOR);
+      expect(data.revokedBy).toBe('revoker-c');
+
+      // history preserves every event, including the ones the flat fields overwrote.
+      expect(data.history).toEqual([
+        { action: 'granted', by: GRANTOR, at: expect.anything() },
+        { action: 'revoked', by: 'revoker-a', at: expect.anything() },
+        { action: 'reactivated', by: 'reactivator-b', at: expect.anything() },
+        { action: 'revoked', by: 'revoker-c', at: expect.anything() },
+      ]);
     });
   });
 

@@ -99,6 +99,19 @@ export interface onChainIdentityStatus {
   statusBlockchainRef?: BlockchainRef;
 }
 
+/**
+ * Audit trail entry for a wrappedKeys/{recordId_userId} doc. Top-level fields on that doc
+ * (isActive, grantedBy, revokedBy, etc.) always reflect only the MOST RECENT action of each kind —
+ * some are also directly queried with `where()` (e.g. grantedBy in trusteePermissionService.ts) so
+ * they can't be folded into this array. `history` exists purely so a key that's been through
+ * multiple grant/revoke/reactivate cycles doesn't lose the intermediate events.
+ */
+export interface WrappedKeyHistoryEvent {
+  action: 'granted' | 'revoked' | 'reactivated';
+  by: string; // uid who performed the action
+  at: Date;
+}
+
 // Authentication context data structure
 export interface AuthContextData {
   user: BelroseUserProfile | null;

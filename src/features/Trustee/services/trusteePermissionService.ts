@@ -52,6 +52,7 @@ import { SharingService } from '@/features/Sharing/services/sharingService';
 import { getAuth } from 'firebase/auth';
 import writePermissionChangeEvent from '@/features/Permissions/services/writePermissionChangeEvent';
 import { BlockchainRef, PermissionChange, buildMemberRegistryRef } from '@belrose/shared';
+import { WrappedKeyHistoryEvent } from '@/types/core';
 
 interface TrusteeRecordAccess {
   recordId: string;
@@ -179,6 +180,15 @@ export class TrusteePermissionService {
       case 'viewer':
         return 'viewers';
     }
+  }
+
+  /**
+   * Builds a single wrappedKeys history entry for the batch/direct wrappedKeys mutations in this
+   * file (activate/revoke) — mirrors SharingService's own historyEvent helper, since those are the
+   * two other places (grant/revoke/reactivate) that stamp the same wrappedKeys.history array.
+   */
+  private static historyEvent(action: WrappedKeyHistoryEvent['action'], by: string): WrappedKeyHistoryEvent {
+    return { action, by, at: new Date() };
   }
 
   // ============================================================================
@@ -340,7 +350,11 @@ export class TrusteePermissionService {
     // Batch activate all pending wrappedKeys
     const batch = writeBatch(db);
     snapshot.docs.forEach(d => {
-      batch.update(d.ref, { isActive: true, activatedAt: new Date() });
+      batch.update(d.ref, {
+        isActive: true,
+        activatedAt: new Date(),
+        history: arrayUnion(this.historyEvent('reactivated', trusteeId)),
+      });
     });
     await batch.commit();
 
@@ -483,6 +497,7 @@ export class TrusteePermissionService {
           isActive: false,
           revokedAt: new Date(),
           revokedBy: trustorId,
+          history: arrayUnion(this.historyEvent('revoked', trustorId)),
         });
 
         console.log(`✅ Revoked access on record ${recordId}`);
@@ -769,6 +784,7 @@ export class TrusteePermissionService {
             isActive: false,
             revokedAt: new Date(),
             revokedBy: subjectId,
+            history: arrayUnion(this.historyEvent('revoked', subjectId)),
           });
         }
 
