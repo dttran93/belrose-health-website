@@ -105,14 +105,10 @@ export class SubjectRejectionService {
 
     const recordData = recordDoc.data();
     const canRespond =
-      recordData.uploadedBy === user.uid ||
-      recordData.owners?.includes(user.uid) ||
-      recordData.administrators?.includes(user.uid);
+      recordData.owners?.includes(user.uid) || recordData.administrators?.includes(user.uid);
 
     if (!canRespond) {
-      throw new Error(
-        'Only the record creator, owners, or administrators can respond to rejections'
-      );
+      throw new Error('Only the record owners or administrators can respond to rejections');
     }
 
     const requestId = `${recordId}_${subjectId}`;

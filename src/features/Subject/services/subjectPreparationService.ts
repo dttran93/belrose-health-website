@@ -609,7 +609,7 @@ export class SubjectPreparationService {
     exists: boolean;
     hasPermission: boolean;
     hasRecordHash: boolean;
-    role?: 'owner' | 'administrator' | 'viewer' | 'subject' | 'uploader';
+    role?: 'owner' | 'administrator' | 'viewer' | 'subject';
     recordInfo?: {
       recordHash: string;
       hasSubjects: boolean;
@@ -636,16 +636,12 @@ export class SubjectPreparationService {
     const administrators: string[] = data.administrators || [];
     const viewers: string[] = data.viewers || [];
     const subjects: string[] = data.subjects || [];
-    const uploadedBy: string = data.uploadedBy || '';
 
     // Determine caller's role
-    let role: 'owner' | 'administrator' | 'viewer' | 'subject' | 'uploader' | undefined;
-    const isUploader = uploadedBy === userId;
+    let role: 'owner' | 'administrator' | 'viewer' | 'subject' | undefined;
 
     if (owners.includes(userId)) {
       role = 'owner';
-    } else if (isUploader) {
-      role = 'uploader';
     } else if (administrators.includes(userId)) {
       role = 'administrator';
     } else if (viewers.includes(userId)) {
@@ -656,7 +652,7 @@ export class SubjectPreparationService {
 
     // Check if caller has permission to modify (set self as subject)
     // Uploader, owners, and administrators can do this
-    const hasPermission = isUploader || owners.includes(userId) || administrators.includes(userId);
+    const hasPermission = owners.includes(userId) || administrators.includes(userId);
 
     // Check if record has a hash
     const recordHash = data.recordHash || '';

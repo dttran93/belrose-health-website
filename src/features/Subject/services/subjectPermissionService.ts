@@ -2,7 +2,8 @@
 
 /*
  * This service manages checking permissions for subject service
- * - Can this user make a subject consent request (owner/admin/uploader)
+ * - Can this user make a subject consent request (owner/admin only — uploadedBy is permanent
+ *   audit metadata, not a live role, so it's deliberately not treated as automatic standing)
  * - Can this user remove a subject (owner only, if no owner then admin)
  */
 
@@ -13,11 +14,10 @@ export class SubjectPermissionService {
    * General check: Can this user manage the record (upload/edit/request subjects)?
    */
   static canManageRecord(record: FileObject, userId: string): boolean {
-    const isUploader = record.uploadedBy === userId;
     const isOwner = record.owners?.includes(userId);
     const isAdmin = record.administrators?.includes(userId);
 
-    return isUploader || isOwner || isAdmin;
+    return isOwner || isAdmin;
   }
 
   /**

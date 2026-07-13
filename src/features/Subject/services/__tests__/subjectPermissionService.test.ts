@@ -22,8 +22,11 @@ function makeRecord(overrides: Partial<FileObject> = {}): FileObject {
 }
 
 describe('SubjectPermissionService.canManageRecord', () => {
-  it('allows the uploader', () => {
-    expect(SubjectPermissionService.canManageRecord(makeRecord(), UPLOADER)).toBe(true);
+  it('denies a plain uploader who is neither owner nor administrator', () => {
+    // uploadedBy is permanent audit metadata, not a live role — same reasoning as
+    // useSubjectFlow.getUserRoleForRecord's removed uploader fallback. An uploader who wants
+    // guaranteed standing can always make themselves owner.
+    expect(SubjectPermissionService.canManageRecord(makeRecord(), UPLOADER)).toBe(false);
   });
 
   it('allows an owner', () => {
@@ -57,7 +60,8 @@ describe('SubjectPermissionService.canManageRecord', () => {
 describe('SubjectPermissionService.canCancelRequest', () => {
   it('mirrors canManageRecord (currently the same rule, kept separate for future restrictions)', () => {
     const record = makeRecord();
-    expect(SubjectPermissionService.canCancelRequest(record, UPLOADER)).toBe(true);
+    expect(SubjectPermissionService.canCancelRequest(record, OWNER)).toBe(true);
+    expect(SubjectPermissionService.canCancelRequest(record, UPLOADER)).toBe(false);
     expect(SubjectPermissionService.canCancelRequest(record, STRANGER)).toBe(false);
   });
 });
@@ -81,7 +85,6 @@ describe('SubjectPermissionService.canRemoveSubject', () => {
   });
 
   it('denies the uploader when they are neither owner nor administrator', () => {
-    // canRemoveSubject deliberately does NOT special-case the uploader, unlike canManageRecord.
     const record = makeRecord({ owners: [OWNER], administrators: [ADMIN], uploadedBy: UPLOADER });
     expect(SubjectPermissionService.canRemoveSubject(record, UPLOADER)).toBe(false);
   });
