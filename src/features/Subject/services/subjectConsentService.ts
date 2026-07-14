@@ -56,6 +56,9 @@ export class SubjectConsentService {
       if (status === 'pending') {
         throw new Error('A pending consent request already exists');
       }
+      if (status === 'accepted') {
+        throw new Error('An accepted consent request already exists');
+      }
     }
 
     const titleData = params.recordTitle

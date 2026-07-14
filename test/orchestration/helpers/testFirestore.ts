@@ -52,6 +52,8 @@ type RecordRoleArrays = {
   sharers?: string[];
   viewers?: string[];
   subjects?: string[];
+  /** Omitted from the written doc entirely when not provided (Firestore rejects `undefined`). */
+  uploadedBy?: string;
 };
 
 export async function seedRecord(
@@ -65,5 +67,6 @@ export async function seedRecord(
     sharers: roles.sharers ?? [],
     viewers: roles.viewers ?? [],
     subjects: roles.subjects ?? [],
+    ...(roles.uploadedBy ? { uploadedBy: roles.uploadedBy } : {}),
   });
 }
