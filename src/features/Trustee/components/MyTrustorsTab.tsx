@@ -14,7 +14,7 @@ import { UserCard } from '@/features/Users/components/ui/UserCard';
 import { getUserProfiles } from '@/features/Users/services/userProfileService';
 import { BelroseUserProfile } from '@/types/core';
 import { TrustLevel } from '../services/trusteeRelationshipService';
-import { TrustLevelBadge } from './ui/TrusteLevelBadge';
+import { TrustLevelBadge } from './ui/TrusteeLevelBadge';
 import { TrusteeToolTip } from './ui/TrusteeToolTip';
 import TrusteeActionDialog from './ui/TrusteeActionDialog';
 import { useTrusteeFlow } from '../hooks/useTrusteeFlow';

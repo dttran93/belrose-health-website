@@ -31,6 +31,7 @@ import UserCard from '@/features/Users/components/ui/UserCard';
 import { TrusteeDialogPhase, TrusteeOperationType } from '../../hooks/useTrusteeFlow';
 import { TrustLevel } from '../../services/trusteeRelationshipService';
 import { OnChainSubmittedContent } from '@/features/OnChainActivityTray/components/OnChainSubmittedModal';
+import { TrustLevelBadge } from './TrusteeLevelBadge';
 
 // ============================================================================
 // TYPES
@@ -98,23 +99,6 @@ const TRUST_LEVEL_CONFIG: Record<
 };
 
 const TRUST_LEVELS: TrustLevel[] = ['observer', 'custodian', 'controller'];
-
-// ============================================================================
-// TRUST LEVEL BADGE (inline)
-// ============================================================================
-
-const TrustLevelBadge: React.FC<{ level: TrustLevel }> = ({ level }) => {
-  const config = TRUST_LEVEL_CONFIG[level];
-  const Icon = config.icon;
-  return (
-    <span
-      className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${config.bgColor} ${config.borderColor} ${config.textColor}`}
-    >
-      <Icon className="w-3 h-3" />
-      {config.label}
-    </span>
-  );
-};
 
 // ============================================================================
 // SHARED PHASE CONTENT
