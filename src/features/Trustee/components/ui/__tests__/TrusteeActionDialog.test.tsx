@@ -114,10 +114,9 @@ describe('ConfirmInviteContent', () => {
     const callbacks = renderDialog({ operationType: 'invite' });
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    // Fires twice: once from the Button's own onClick, once from Radix AlertDialog.Cancel's
-    // built-in close (open -> false) triggering the Root's onOpenChange, which also calls onClose
-    // since canClose is true in the confirming phase.
-    expect(callbacks.onClose).toHaveBeenCalledTimes(2);
+    // Radix AlertDialog.Cancel's own close (open -> false) is what triggers the Root's
+    // onOpenChange -> onClose; the Button no longer duplicates it with its own onClick.
+    expect(callbacks.onClose).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -242,7 +241,6 @@ describe('ConfirmResignContent', () => {
     const callbacks = renderDialog({ operationType: 'resign', trustLevel: 'observer' });
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    // See the "closes via Cancel" test above for why this fires twice.
-    expect(callbacks.onClose).toHaveBeenCalledTimes(2);
+    expect(callbacks.onClose).toHaveBeenCalledTimes(1);
   });
 });

@@ -103,7 +103,6 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
                     ? onConfirmModifyVerification
                     : onConfirmVerification
                 }
-                onClose={onClose}
               />
             )}
 
@@ -114,7 +113,6 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
               description="Are you sure you want to retract your verification of this record?"
               warning="Retracting your verification will remove your endorsement from this record. This action is recorded on the distributed network."
               onConfirm={onConfirmRetract}
-              onClose={onClose}
             />
           )}
 
@@ -125,7 +123,6 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
               description="Are you sure you want to retract your dispute of this record?"
               warning="Retracting your dispute will remove your complaint from this record. This action is recorded on the distributed network."
               onConfirm={onConfirmRetract}
-              onClose={onClose}
             />
           )}
 
@@ -142,7 +139,6 @@ export const CredibilityActionDialog: React.FC<CredibilityActionDialogProps> = (
                 onConfirm={
                   operationType === 'modifyDispute' ? onConfirmModifyDispute : onConfirmDispute
                 }
-                onClose={onClose}
               />
             )}
         </AlertDialog.Content>
@@ -181,8 +177,7 @@ const ConfirmVerificationContent: React.FC<{
   level?: VerificationLevelOptions;
   isModify?: boolean;
   onConfirm: (level: VerificationLevelOptions) => void;
-  onClose: () => void;
-}> = ({ level, isModify, onConfirm, onClose }) => {
+}> = ({ level, isModify, onConfirm }) => {
   const config = getVerificationConfig(level || 1);
   const Icon = config.icon;
 
@@ -220,7 +215,7 @@ const ConfirmVerificationContent: React.FC<{
 
       <div className="flex gap-3">
         <AlertDialog.Cancel asChild>
-          <Button variant="outline" className="flex-1" onClick={onClose}>
+          <Button variant="outline" className="flex-1">
             Cancel
           </Button>
         </AlertDialog.Cancel>
@@ -245,8 +240,7 @@ const ConfirmRetractContent: React.FC<{
   description: string;
   warning: string;
   onConfirm: () => void;
-  onClose: () => void;
-}> = ({ title, description, warning, onConfirm, onClose }) => (
+}> = ({ title, description, warning, onConfirm }) => (
   <>
     <AlertDialog.Title className="text-lg font-bold flex items-center gap-2">
       <FileX className="w-5 h-5 text-red-600" />
@@ -265,7 +259,7 @@ const ConfirmRetractContent: React.FC<{
 
     <div className="flex gap-3">
       <AlertDialog.Cancel asChild>
-        <Button variant="outline" className="flex-1" onClick={onClose}>
+        <Button variant="outline" className="flex-1">
           Cancel
         </Button>
       </AlertDialog.Cancel>
@@ -286,8 +280,7 @@ const ConfirmDisputeContent: React.FC<{
   notes?: string;
   isModify?: boolean;
   onConfirm: () => void;
-  onClose: () => void;
-}> = ({ severity, culpability, notes, isModify, onConfirm, onClose }) => {
+}> = ({ severity, culpability, notes, isModify, onConfirm }) => {
   const severityConfig = getSeverityConfig(severity || 1);
   const culpabilityConfig = getCulpabilityConfig(culpability || 0);
 
@@ -333,7 +326,7 @@ const ConfirmDisputeContent: React.FC<{
 
       <div className="flex gap-3">
         <AlertDialog.Cancel asChild>
-          <Button variant="outline" className="flex-1" onClick={onClose}>
+          <Button variant="outline" className="flex-1">
             Cancel
           </Button>
         </AlertDialog.Cancel>

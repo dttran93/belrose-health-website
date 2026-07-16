@@ -107,12 +107,8 @@ describe('ConfirmGrantContent', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm' }));
     expect(onConfirmGrant).toHaveBeenCalledWith('sharer');
 
-    // AlertDialog.Cancel (Radix) triggers the dialog's own close behavior *in addition to*
-    // the Button's onClick={onClose} — so onClose fires twice per Cancel click. Harmless,
-    // since reset()/onClose is idempotent, but worth asserting the real count rather than
-    // the count I assumed going in.
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(onClose).toHaveBeenCalledTimes(2);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
 

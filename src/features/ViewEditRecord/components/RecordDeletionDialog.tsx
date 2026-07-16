@@ -104,7 +104,6 @@ export const RecordDeletionDialog: React.FC<RecordDeletionDialogProps> = ({
                 record={record}
                 checkResult={checkResult}
                 onConfirm={confirmDeletion}
-                onClose={closeDialog}
               />
             )}
 
@@ -270,8 +269,7 @@ const ConfirmingContent: React.FC<{
   record: FileObject;
   checkResult: DeletionCheckResult;
   onConfirm: () => void;
-  onClose: () => void;
-}> = ({ record, checkResult, onConfirm, onClose }) => (
+}> = ({ record, checkResult, onConfirm }) => (
   <div className="p-6">
     <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-4 text-red-600">
       <AlertTriangle className="w-5 h-5" />
@@ -316,7 +314,7 @@ const ConfirmingContent: React.FC<{
 
     <div className="flex gap-3">
       <AlertDialog.Cancel asChild>
-        <Button variant="outline" className="flex-1" onClick={onClose}>
+        <Button variant="outline" className="flex-1">
           Cancel
         </Button>
       </AlertDialog.Cancel>

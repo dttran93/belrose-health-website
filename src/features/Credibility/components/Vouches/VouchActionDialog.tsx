@@ -65,7 +65,6 @@ export const VouchActionDialog: React.FC<VouchActionDialogProps> = ({
             <ConfirmVouchContent
               targetDisplayName={targetDisplayName}
               onConfirm={onConfirmVouch}
-              onClose={onClose}
             />
           )}
 
@@ -73,7 +72,6 @@ export const VouchActionDialog: React.FC<VouchActionDialogProps> = ({
             <ConfirmRetractContent
               targetDisplayName={targetDisplayName}
               onConfirm={onConfirmRetract}
-              onClose={onClose}
             />
           )}
         </AlertDialog.Content>
@@ -107,8 +105,7 @@ const ErrorContent: React.FC<{ error?: string | null; onClose: () => void }> = (
 const ConfirmVouchContent: React.FC<{
   targetDisplayName: string;
   onConfirm: () => void;
-  onClose: () => void;
-}> = ({ targetDisplayName, onConfirm, onClose }) => (
+}> = ({ targetDisplayName, onConfirm }) => (
   <>
     <AlertDialog.Title className="text-lg font-bold flex items-center gap-2">
       <ShieldCheck className="w-5 h-5 text-complement-3" />
@@ -129,7 +126,7 @@ const ConfirmVouchContent: React.FC<{
 
     <div className="flex gap-3">
       <AlertDialog.Cancel asChild>
-        <Button variant="outline" className="flex-1" onClick={onClose}>
+        <Button variant="outline" className="flex-1">
           Cancel
         </Button>
       </AlertDialog.Cancel>
@@ -143,8 +140,7 @@ const ConfirmVouchContent: React.FC<{
 const ConfirmRetractContent: React.FC<{
   targetDisplayName: string;
   onConfirm: () => void;
-  onClose: () => void;
-}> = ({ targetDisplayName, onConfirm, onClose }) => (
+}> = ({ targetDisplayName, onConfirm }) => (
   <>
     <AlertDialog.Title className="text-lg font-bold flex items-center gap-2">
       <ShieldOff className="w-5 h-5 text-red-600" />
@@ -165,7 +161,7 @@ const ConfirmRetractContent: React.FC<{
 
     <div className="flex gap-3">
       <AlertDialog.Cancel asChild>
-        <Button variant="outline" className="flex-1" onClick={onClose}>
+        <Button variant="outline" className="flex-1">
           Cancel
         </Button>
       </AlertDialog.Cancel>

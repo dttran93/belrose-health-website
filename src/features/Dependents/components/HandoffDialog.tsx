@@ -88,7 +88,7 @@ const HandoffDialog: React.FC<HandoffDialogProps> = ({ dependent, onClose }) => 
 
           <div className="flex gap-3">
             <AlertDialog.Cancel asChild>
-              <Button variant="outline" className="flex-1" onClick={onClose}>
+              <Button variant="outline" className="flex-1">
                 Cancel
               </Button>
             </AlertDialog.Cancel>
