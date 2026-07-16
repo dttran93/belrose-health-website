@@ -18,3 +18,13 @@ import { cleanup } from '@testing-library/react';
 afterEach(() => {
   cleanup();
 });
+
+// jsdom has no ResizeObserver — Radix's Popper (used by Tooltip/DropdownMenu/etc.) needs one to
+// mount its content, even when position isn't asserted on.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
