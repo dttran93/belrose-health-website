@@ -67,7 +67,7 @@ const ROLE_RANK: Record<Role, number> = { viewer: 1, sharer: 2, administrator: 3
 /**
  * Look up a user's current role on a record from its role arrays.
  */
-function getRoleFromRecordData(
+export function getRoleFromRecordData(
   data: { owners?: string[]; administrators?: string[]; sharers?: string[]; viewers?: string[] },
   userId: string
 ): Role | null {

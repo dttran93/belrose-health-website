@@ -399,8 +399,13 @@ export function useTrusteeFlow({ onSuccess }: UseTrusteeFlowOptions = {}) {
     [runPreparation]
   );
 
+  // Not currently used because confirmResign has both options. But keeping just in case we decide to change that
   const confirmEditLevel = useCallback(async () => {
-    if (!pendingOperation || (pendingOperation.type !== 'editLevel' && pendingOperation.type !== 'revoke')) return;
+    if (
+      !pendingOperation ||
+      (pendingOperation.type !== 'editLevel' && pendingOperation.type !== 'revoke')
+    )
+      return;
 
     // Capture before dialog closes — selectedTrustLevel is React state, grab it now
     const { targetUserId } = pendingOperation;

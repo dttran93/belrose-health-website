@@ -31,6 +31,7 @@ import UserCard from '@/features/Users/components/ui/UserCard';
 import { TrusteeDialogPhase, TrusteeOperationType } from '../../hooks/useTrusteeFlow';
 import { TrustLevel } from '../../services/trusteeRelationshipService';
 import { OnChainSubmittedContent } from '@/features/OnChainActivityTray/components/OnChainSubmittedModal';
+import { TrustLevelBadge } from './TrusteeLevelBadge';
 
 // ============================================================================
 // TYPES
@@ -98,23 +99,6 @@ const TRUST_LEVEL_CONFIG: Record<
 };
 
 const TRUST_LEVELS: TrustLevel[] = ['observer', 'custodian', 'controller'];
-
-// ============================================================================
-// TRUST LEVEL BADGE (inline)
-// ============================================================================
-
-const TrustLevelBadge: React.FC<{ level: TrustLevel }> = ({ level }) => {
-  const config = TRUST_LEVEL_CONFIG[level];
-  const Icon = config.icon;
-  return (
-    <span
-      className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${config.bgColor} ${config.borderColor} ${config.textColor}`}
-    >
-      <Icon className="w-3 h-3" />
-      {config.label}
-    </span>
-  );
-};
 
 // ============================================================================
 // SHARED PHASE CONTENT
@@ -232,8 +216,7 @@ const ConfirmInviteContent: React.FC<{
   selectedTrustLevel: TrustLevel;
   setSelectedTrustLevel: (level: TrustLevel) => void;
   onConfirm: () => void;
-  onClose: () => void;
-}> = ({ targetUser, selectedTrustLevel, setSelectedTrustLevel, onConfirm, onClose }) => (
+}> = ({ targetUser, selectedTrustLevel, setSelectedTrustLevel, onConfirm }) => (
   <div>
     <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
       <UserPlus className="w-5 h-5 text-primary" />
@@ -263,7 +246,7 @@ const ConfirmInviteContent: React.FC<{
 
     <div className="flex gap-3">
       <AlertDialog.Cancel asChild>
-        <Button variant="outline" className="flex-1" onClick={onClose}>
+        <Button variant="outline" className="flex-1">
           Cancel
         </Button>
       </AlertDialog.Cancel>
@@ -280,8 +263,7 @@ const ConfirmAcceptContent: React.FC<{
   targetUser: BelroseUserProfile | null;
   trustLevel?: TrustLevel;
   onConfirm: () => void;
-  onClose: () => void;
-}> = ({ targetUser, trustLevel, onConfirm, onClose }) => {
+}> = ({ targetUser, trustLevel, onConfirm }) => {
   const config = trustLevel ? TRUST_LEVEL_CONFIG[trustLevel] : null;
   const Icon = config?.icon ?? Shield;
 
@@ -322,7 +304,7 @@ const ConfirmAcceptContent: React.FC<{
 
       <div className="flex gap-3">
         <AlertDialog.Cancel asChild>
-          <Button variant="outline" className="flex-1" onClick={onClose}>
+          <Button variant="outline" className="flex-1">
             Cancel
           </Button>
         </AlertDialog.Cancel>
@@ -340,8 +322,7 @@ const ConfirmDeclineContent: React.FC<{
   targetUser: BelroseUserProfile | null;
   trustLevel?: TrustLevel;
   onConfirm: () => void;
-  onClose: () => void;
-}> = ({ targetUser, trustLevel, onConfirm, onClose }) => (
+}> = ({ targetUser, trustLevel, onConfirm }) => (
   <div>
     <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
       <XCircle className="w-5 h-5 text-red-500" />
@@ -374,7 +355,7 @@ const ConfirmDeclineContent: React.FC<{
 
     <div className="flex gap-3">
       <AlertDialog.Cancel asChild>
-        <Button variant="outline" className="flex-1" onClick={onClose}>
+        <Button variant="outline" className="flex-1">
           Cancel
         </Button>
       </AlertDialog.Cancel>
@@ -394,7 +375,6 @@ const ConfirmRevokeContent: React.FC<{
   setSelectedTrustLevel: (level: TrustLevel) => void;
   onConfirmEditLevel: () => void;
   onConfirmRevoke: () => void;
-  onClose: () => void;
 }> = ({
   targetUser,
   trustLevel,
@@ -402,7 +382,6 @@ const ConfirmRevokeContent: React.FC<{
   setSelectedTrustLevel,
   onConfirmEditLevel,
   onConfirmRevoke,
-  onClose,
 }) => (
   <div>
     <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
@@ -437,7 +416,7 @@ const ConfirmRevokeContent: React.FC<{
 
     <div className="flex gap-3 mb-4">
       <AlertDialog.Cancel asChild>
-        <Button variant="outline" className="flex-1" onClick={onClose}>
+        <Button variant="outline" className="flex-1">
           Cancel
         </Button>
       </AlertDialog.Cancel>
@@ -482,14 +461,12 @@ const ConfirmEditLevelContent: React.FC<{
   selectedTrustLevel: TrustLevel; // new level
   setSelectedTrustLevel: (level: TrustLevel) => void;
   onConfirm: () => void;
-  onClose: () => void;
 }> = ({
   targetUser,
   trustLevel,
   selectedTrustLevel,
   setSelectedTrustLevel,
   onConfirm,
-  onClose,
 }) => (
   <div>
     <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
@@ -523,7 +500,7 @@ const ConfirmEditLevelContent: React.FC<{
 
     <div className="flex gap-3">
       <AlertDialog.Cancel asChild>
-        <Button variant="outline" className="flex-1" onClick={onClose}>
+        <Button variant="outline" className="flex-1">
           Cancel
         </Button>
       </AlertDialog.Cancel>
@@ -545,7 +522,6 @@ const ConfirmResignContent: React.FC<{
   setSelectedTrustLevel: (level: TrustLevel) => void;
   onConfirmStepDown: () => void;
   onConfirmResign: () => void;
-  onClose: () => void;
 }> = ({
   targetUser,
   trustLevel,
@@ -553,7 +529,6 @@ const ConfirmResignContent: React.FC<{
   setSelectedTrustLevel,
   onConfirmStepDown,
   onConfirmResign,
-  onClose,
 }) => {
   const canStepDown = trustLevel !== undefined && trustLevel !== 'observer';
   const levelsBelow = trustLevel
@@ -596,7 +571,7 @@ const ConfirmResignContent: React.FC<{
 
           <div className="flex gap-3 mb-4">
             <AlertDialog.Cancel asChild>
-              <Button variant="outline" className="flex-1" onClick={onClose}>
+              <Button variant="outline" className="flex-1">
                 Cancel
               </Button>
             </AlertDialog.Cancel>
@@ -632,7 +607,7 @@ const ConfirmResignContent: React.FC<{
       ) : (
         <div className="flex gap-3">
           <AlertDialog.Cancel asChild>
-            <Button variant="outline" className="flex-1" onClick={onClose}>
+            <Button variant="outline" className="flex-1">
               Cancel
             </Button>
           </AlertDialog.Cancel>
@@ -687,7 +662,6 @@ export const TrusteeActionDialog: React.FC<TrusteeActionDialogProps> = ({
               selectedTrustLevel={selectedTrustLevel}
               setSelectedTrustLevel={setSelectedTrustLevel}
               onConfirm={onConfirmInvite}
-              onClose={onClose}
             />
           )}
           {phase === 'confirming' && operationType === 'accept' && (
@@ -695,7 +669,6 @@ export const TrusteeActionDialog: React.FC<TrusteeActionDialogProps> = ({
               targetUser={targetUser}
               trustLevel={trustLevel}
               onConfirm={onConfirmAccept}
-              onClose={onClose}
             />
           )}
           {phase === 'confirming' && operationType === 'decline' && (
@@ -703,7 +676,6 @@ export const TrusteeActionDialog: React.FC<TrusteeActionDialogProps> = ({
               targetUser={targetUser}
               trustLevel={trustLevel}
               onConfirm={onConfirmDecline}
-              onClose={onClose}
             />
           )}
           {phase === 'confirming' && operationType === 'revoke' && (
@@ -714,7 +686,6 @@ export const TrusteeActionDialog: React.FC<TrusteeActionDialogProps> = ({
               setSelectedTrustLevel={setSelectedTrustLevel}
               onConfirmEditLevel={onConfirmEditLevel}
               onConfirmRevoke={onConfirmRevoke}
-              onClose={onClose}
             />
           )}
           {phase === 'confirming' && operationType === 'editLevel' && (
@@ -724,7 +695,6 @@ export const TrusteeActionDialog: React.FC<TrusteeActionDialogProps> = ({
               selectedTrustLevel={selectedTrustLevel}
               setSelectedTrustLevel={setSelectedTrustLevel}
               onConfirm={onConfirmEditLevel}
-              onClose={onClose}
             />
           )}
           {phase === 'confirming' && operationType === 'resign' && (
@@ -735,7 +705,6 @@ export const TrusteeActionDialog: React.FC<TrusteeActionDialogProps> = ({
               setSelectedTrustLevel={setSelectedTrustLevel}
               onConfirmStepDown={onConfirmStepDown}
               onConfirmResign={onConfirmResign}
-              onClose={onClose}
             />
           )}
           {phase === 'submitted' && (

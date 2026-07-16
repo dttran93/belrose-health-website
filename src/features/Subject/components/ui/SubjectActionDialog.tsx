@@ -249,7 +249,6 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
               record={record}
               selectedRole={selectedRole}
               onConfirm={onConfirmSetSubjectAsSelf}
-              onClose={onClose}
             />
           )}
 
@@ -284,11 +283,7 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
 
           {/* Confirming Phase - Accept Subject Request */}
           {phase === 'confirming' && operationType === 'acceptSubjectRequest' && !selectedUser && (
-            <ConfirmAcceptRequestContent
-              record={record}
-              onConfirm={onConfirmAcceptRequest}
-              onClose={onClose}
-            />
+            <ConfirmAcceptRequestContent record={record} onConfirm={onConfirmAcceptRequest} />
           )}
 
           {/* Confirming Phase - Reject Subject Request */}
@@ -296,7 +291,6 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
             <ConfirmRejectRequestContent
               record={record}
               onConfirm={(reason: RejectionReasons) => onConfirmRejectRequest(reason)}
-              onClose={onClose}
             />
           )}
 
@@ -307,7 +301,6 @@ export const SubjectActionDialog: React.FC<SubjectActionDialogProps> = ({
               revokeAccess={revokeAccess}
               setRevokeAccess={setRevokeAccess}
               onConfirm={(reason: RejectionReasons) => onConfirmRemoveSubjectStatus(reason)}
-              onClose={onClose}
             />
           )}
 
@@ -496,7 +489,7 @@ const SelectingContent: React.FC<{
       {/* Footer */}
       <div className="flex gap-3">
         <AlertDialog.Cancel asChild>
-          <Button variant="outline" className="flex-1" onClick={onClose}>
+          <Button variant="outline" className="flex-1">
             Cancel
           </Button>
         </AlertDialog.Cancel>
@@ -676,8 +669,7 @@ const ConfirmSetSubjectAsSelfContent: React.FC<{
   record: FileObject;
   selectedRole: SubjectRole;
   onConfirm: () => void;
-  onClose: () => void;
-}> = ({ record, selectedRole, onConfirm, onClose }) => {
+}> = ({ record, selectedRole, onConfirm }) => {
   const roleConfig = ROLE_CONFIG[selectedRole];
   const RoleIcon = roleConfig.icon;
 
@@ -727,7 +719,7 @@ const ConfirmSetSubjectAsSelfContent: React.FC<{
 
       <div className="flex gap-3">
         <AlertDialog.Cancel asChild>
-          <Button variant="outline" className="flex-1" onClick={onClose}>
+          <Button variant="outline" className="flex-1">
             Cancel
           </Button>
         </AlertDialog.Cancel>
@@ -908,8 +900,7 @@ const ConfirmRequestConsentContent: React.FC<{
 const ConfirmAcceptRequestContent: React.FC<{
   record: FileObject;
   onConfirm: () => void;
-  onClose: () => void;
-}> = ({ record, onConfirm, onClose }) => (
+}> = ({ record, onConfirm }) => (
   <div>
     <AlertDialog.Title className="text-lg font-bold flex items-center gap-2 mb-3">
       <UserCheck className="w-5 h-5 text-green-500" />
@@ -946,7 +937,7 @@ const ConfirmAcceptRequestContent: React.FC<{
 
     <div className="flex gap-3">
       <AlertDialog.Cancel asChild>
-        <Button variant="outline" className="flex-1" onClick={onClose}>
+        <Button variant="outline" className="flex-1">
           Cancel
         </Button>
       </AlertDialog.Cancel>
@@ -960,8 +951,7 @@ const ConfirmAcceptRequestContent: React.FC<{
 const ConfirmRejectRequestContent: React.FC<{
   record: FileObject;
   onConfirm: (reason: RejectionReasons) => void;
-  onClose: () => void;
-}> = ({ record, onConfirm, onClose }) => {
+}> = ({ record, onConfirm }) => {
   const [reason, setReason] = useState<RejectionReasons | ''>('');
 
   return (
@@ -1012,7 +1002,7 @@ const ConfirmRejectRequestContent: React.FC<{
 
       <div className="flex gap-3">
         <AlertDialog.Cancel asChild>
-          <Button variant="outline" className="flex-1" onClick={onClose}>
+          <Button variant="outline" className="flex-1">
             Cancel
           </Button>
         </AlertDialog.Cancel>
@@ -1032,8 +1022,7 @@ const ConfirmRemoveSubjectStatusContent: React.FC<{
   revokeAccess: boolean;
   setRevokeAccess: (value: boolean) => void;
   onConfirm: (reason: RejectionReasons) => void;
-  onClose: () => void;
-}> = ({ record, revokeAccess, setRevokeAccess, onConfirm, onClose }) => {
+}> = ({ record, revokeAccess, setRevokeAccess, onConfirm }) => {
   const [reason, setReason] = useState<RejectionReasons | ''>('');
 
   return (
@@ -1121,7 +1110,7 @@ const ConfirmRemoveSubjectStatusContent: React.FC<{
 
       <div className="flex gap-3">
         <AlertDialog.Cancel asChild>
-          <Button variant="outline" className="flex-1" onClick={onClose}>
+          <Button variant="outline" className="flex-1">
             Cancel
           </Button>
         </AlertDialog.Cancel>

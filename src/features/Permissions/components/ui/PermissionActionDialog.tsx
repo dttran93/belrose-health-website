@@ -105,12 +105,7 @@ export const PermissionActionDialog: React.FC<PermissionActionDialogProps> = ({
           {phase === 'executing' && <ExecutingContent operationType={operationType} />}
           {phase === 'error' && <ErrorContent error={error} onClose={onClose} />}
           {phase === 'confirming' && operationType === 'grant' && grantVariant === 'confirm' && (
-            <ConfirmGrantContent
-              user={user}
-              role={role}
-              onConfirm={onConfirmGrant}
-              onClose={onClose}
-            />
+            <ConfirmGrantContent user={user} role={role} onConfirm={onConfirmGrant} />
           )}
           {phase === 'confirming' &&
             operationType === 'grant' &&
@@ -119,7 +114,6 @@ export const PermissionActionDialog: React.FC<PermissionActionDialogProps> = ({
                 user={user}
                 defaultRole={role}
                 onConfirm={onConfirmGrant}
-                onClose={onClose}
               />
             )}
           {phase === 'confirming' && operationType === 'revoke' && (
@@ -129,7 +123,6 @@ export const PermissionActionDialog: React.FC<PermissionActionDialogProps> = ({
               eligibility={eligibility}
               canFullyRevoke={canFullyRevoke}
               onConfirm={onConfirmRevoke}
-              onClose={onClose}
             />
           )}
           {phase === 'confirming' && operationType === 'modify' && onConfirmModify && (
@@ -138,15 +131,10 @@ export const PermissionActionDialog: React.FC<PermissionActionDialogProps> = ({
               currentRole={role}
               eligibility={eligibility}
               onConfirm={onConfirmModify}
-              onClose={onClose}
             />
           )}
           {phase === 'confirming' && operationType === 'guest-invite' && guestInviteProps && (
-            <GuestInviteContent
-              {...guestInviteProps}
-              onConfirm={onConfirmGuestInvite}
-              onClose={onClose}
-            />
+            <GuestInviteContent {...guestInviteProps} onConfirm={onConfirmGuestInvite} />
           )}
           {phase === 'submitted' && (
             <OnChainSubmittedContent onClose={onClose} label={submittedLabel} />
@@ -205,15 +193,9 @@ interface ConfirmGrantContentProps {
   user: BelroseUserProfile | null;
   role: Role;
   onConfirm: (role: Role) => void;
-  onClose: () => void;
 }
 
-const ConfirmGrantContent: React.FC<ConfirmGrantContentProps> = ({
-  user,
-  role,
-  onConfirm,
-  onClose,
-}) => {
+const ConfirmGrantContent: React.FC<ConfirmGrantContentProps> = ({ user, role, onConfirm }) => {
   const config = ROLE_CONFIG[role];
   const Icon = config.icon;
 
@@ -245,7 +227,7 @@ const ConfirmGrantContent: React.FC<ConfirmGrantContentProps> = ({
 
       <div className="flex gap-3">
         <AlertDialog.Cancel asChild>
-          <Button variant="outline" className="flex-1" onClick={onClose}>
+          <Button variant="outline" className="flex-1">
             Cancel
           </Button>
         </AlertDialog.Cancel>
@@ -270,14 +252,12 @@ interface SelectRoleGrantContentProps {
   user: BelroseUserProfile | null;
   defaultRole: Role;
   onConfirm: (role: Role) => void;
-  onClose: () => void;
 }
 
 const SelectRoleGrantContent: React.FC<SelectRoleGrantContentProps> = ({
   user,
   defaultRole,
   onConfirm,
-  onClose,
 }) => {
   const [selectedRole, setSelectedRole] = useState<Role>(defaultRole);
 
@@ -304,7 +284,7 @@ const SelectRoleGrantContent: React.FC<SelectRoleGrantContentProps> = ({
 
       <div className="flex gap-3">
         <AlertDialog.Cancel asChild>
-          <Button variant="outline" className="flex-1" onClick={onClose}>
+          <Button variant="outline" className="flex-1">
             Cancel
           </Button>
         </AlertDialog.Cancel>
@@ -326,7 +306,6 @@ interface ConfirmRevokeContentProps {
   eligibility?: Record<Role, RoleEligibility>;
   canFullyRevoke?: RoleEligibility;
   onConfirm: (action: RevokeAction) => void;
-  onClose: () => void;
 }
 
 /** A revoke/demote choice — grayed out with a tooltip reason when the caller isn't eligible. */
@@ -394,7 +373,6 @@ const ConfirmRevokeContent: React.FC<ConfirmRevokeContentProps> = ({
   eligibility,
   canFullyRevoke,
   onConfirm,
-  onClose,
 }) => {
   const isOwner = role === 'owner';
   const isAdmin = role === 'administrator';
@@ -490,7 +468,7 @@ const ConfirmRevokeContent: React.FC<ConfirmRevokeContentProps> = ({
         )}
 
         <AlertDialog.Cancel asChild>
-          <Button variant="outline" className="mt-2" onClick={onClose}>
+          <Button variant="outline" className="mt-2">
             Cancel
           </Button>
         </AlertDialog.Cancel>
@@ -508,7 +486,6 @@ interface ModifyAccessContentProps {
   currentRole: Role;
   eligibility?: Record<Role, RoleEligibility>;
   onConfirm: (newRole: Role) => void;
-  onClose: () => void;
 }
 
 const ModifyAccessContent: React.FC<ModifyAccessContentProps> = ({
@@ -516,7 +493,6 @@ const ModifyAccessContent: React.FC<ModifyAccessContentProps> = ({
   currentRole,
   eligibility,
   onConfirm,
-  onClose,
 }) => {
   const [step, setStep] = useState<'select' | 'confirm'>('select');
   const [selectedRole, setSelectedRole] = useState<Role>(currentRole);
@@ -578,7 +554,7 @@ const ModifyAccessContent: React.FC<ModifyAccessContentProps> = ({
 
       <div className="flex gap-3">
         <AlertDialog.Cancel asChild>
-          <Button variant="outline" className="flex-1" onClick={onClose}>
+          <Button variant="outline" className="flex-1">
             Cancel
           </Button>
         </AlertDialog.Cancel>
@@ -611,7 +587,6 @@ interface GuestInviteContentProps {
   onOpenRecordPicker: () => void;
   onRemoveRecord: (id: string) => void;
   onConfirm: (() => void) | undefined;
-  onClose: () => void;
 }
 
 const GuestInviteContent: React.FC<GuestInviteContentProps> = ({
@@ -625,7 +600,6 @@ const GuestInviteContent: React.FC<GuestInviteContentProps> = ({
   onOpenRecordPicker,
   onRemoveRecord,
   onConfirm,
-  onClose,
 }) => (
   <>
     <AlertDialog.Title className="text-lg font-bold flex items-center gap-2">
@@ -712,7 +686,7 @@ const GuestInviteContent: React.FC<GuestInviteContentProps> = ({
 
     <div className="flex gap-3">
       <AlertDialog.Cancel asChild>
-        <Button variant="outline" className="flex-1" onClick={onClose}>
+        <Button variant="outline" className="flex-1">
           Cancel
         </Button>
       </AlertDialog.Cancel>
