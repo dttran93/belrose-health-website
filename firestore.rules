@@ -825,7 +825,20 @@ service cloud.firestore {
         return request.auth.uid == resource.data.trusteeId;
       }
 
-      // READ: Anybody. Is safe because document doesn't have any sensitive data
+      // READ: Any authenticated user, not just the trustor/trustee named on the doc.
+      // Two call sites genuinely need to read relationships they aren't a party to:
+      //   1. Fan-out: when a controller trustee anchors their trustor as a subject on a
+      //      record (SubjectService.anchorSubjectAsController), TrusteePermissionService
+      //      .grantAccessForNewRecord/revokeAccessForRemovedRecord queries ALL of that
+      //      trustor's active trustees by trustorId, not just the calling controller's own
+      //      relationship, to fan record access out to every one of them.
+      //   2. Permissions UI: useRecordTrustees (consumed by PermissionManager and the
+      //      owner/admin/sharer/viewer management panels) renders trustor/trustee badges
+      //      for every role-holder on a record, which requires reading relationships the
+      //      current viewer doesn't personally belong to.
+      // Safe to leave broad because the document has no sensitive data — no wrapped keys,
+      // no private fields, just the two userIds, the trust level, and lifecycle metadata.
+      // Also it's all on-chain so already publicly available. 
       allow read: if request.auth != null;
 
       // CREATE: Trustor only, with required field validation
@@ -839,7 +852,6 @@ service cloud.firestore {
         request.resource.data.trusteeId != null &&
         request.resource.data.createdAt is timestamp;
 
-      // UPDATE: Two branches
       allow update: if request.auth != null && (
         // BRANCH 1: Trustor managing the relationship
         (
