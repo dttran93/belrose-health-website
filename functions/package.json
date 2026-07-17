@@ -10,7 +10,8 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "copy-shared": "copyfiles -u 4 ../packages/shared/src/**/* src/_shared/"
+    "copy-shared": "copyfiles -u 4 ../packages/shared/src/**/* src/_shared/",
+    "test": "vitest run"
   },
   "engines": {
     "node": "22"
@@ -39,8 +40,10 @@
     "copyfiles": "^2.4.1",
     "eslint": "^9.0.0",
     "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.4.1",
     "tsx": "^4.21.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.10"
   },
   "private": true
 }
