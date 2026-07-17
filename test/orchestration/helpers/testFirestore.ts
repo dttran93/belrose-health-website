@@ -70,3 +70,47 @@ export async function seedRecord(
     ...(roles.uploadedBy ? { uploadedBy: roles.uploadedBy } : {}),
   });
 }
+
+/**
+ * Seeds a users/{uid} doc with a full `encryption` block, matching the shape
+ * RegistrationForm/DependentAccountService/GuestClaimAccountModal all produce via
+ * AccountEncryptionService.generateEncryptionBundle. Used by Auth/Dependents/GuestAccess
+ * orchestration suites that need "a real user who's already finished E2EE setup" without
+ * hand-rolling the shape per test file.
+ */
+export async function seedUserWithEncryption(
+  testDb: Firestore,
+  uid: string,
+  overrides: Record<string, unknown> = {}
+): Promise<void> {
+  await setDoc(doc(testDb, 'users', uid), {
+    uid,
+    email: `${uid}@example.com`,
+    emailVerified: false,
+    encryption: {
+      enabled: true,
+      encryptedMasterKey: 'encrypted-master-key',
+      masterKeyIV: 'master-key-iv',
+      masterKeySalt: 'master-key-salt',
+      encryptedPrivateKey: 'encrypted-private-key',
+      encryptedPrivateKeyIV: 'encrypted-private-key-iv',
+      publicKey: 'public-key',
+      recoveryKeyHash: 'recovery-key-hash',
+      setupAt: new Date().toISOString(),
+    },
+    ...overrides,
+  });
+}
+
+/** Seeds an invites/{email} doc — email is lowercased to match the app's own convention. */
+export async function seedInviteDoc(
+  testDb: Firestore,
+  email: string,
+  overrides: Record<string, unknown> = {}
+): Promise<void> {
+  await setDoc(doc(testDb, 'invites', email.toLowerCase()), {
+    approved: true,
+    code: 'AAAABBBBCCCCDDDD',
+    ...overrides,
+  });
+}
