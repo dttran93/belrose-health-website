@@ -122,7 +122,12 @@ export const DependentsSettingsPage: React.FC = () => {
     { type: 'divider', key: 'divider-actions' },
     {
       key: 'remove',
-      label: entry.profile?.isDependent ? 'Delete account' : 'Remove guardian access',
+      // Mirrors RemoveDialog's willDelete condition exactly — an unclaimed dependent whose
+      // guardian has already sent a handoff will only have access revoked, not deleted.
+      label:
+        entry.profile?.isDependent && !(entry.profile as any)?.handoffInitiatedAt
+          ? 'Delete account'
+          : 'Remove guardian access',
       icon: Trash2,
       destructive: true,
       onClick: () => setRemoveTarget(entry),

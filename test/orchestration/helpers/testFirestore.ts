@@ -114,3 +114,49 @@ export async function seedInviteDoc(
     ...overrides,
   });
 }
+
+/**
+ * Seeds a trusteeRelationships/{trustorId}_{trusteeId} doc — doc id matches the app's own
+ * convention (getTrusteeRelationshipId). Defaults to an active controller relationship, the
+ * shape createDependentAccount.ts writes directly via Admin SDK; pass overrides for
+ * observer/custodian trust levels or pending/non-dependent relationships as needed.
+ */
+export async function seedTrusteeRelationship(
+  testDb: Firestore,
+  trustorId: string,
+  trusteeId: string,
+  overrides: Record<string, unknown> = {}
+): Promise<void> {
+  await setDoc(doc(testDb, 'trusteeRelationships', `${trustorId}_${trusteeId}`), {
+    trustorId,
+    trusteeId,
+    trustLevel: 'controller',
+    isActive: true,
+    status: 'active',
+    isDependentRelationship: true,
+    createdAt: new Date(),
+    respondedAt: new Date(),
+    revokedAt: null,
+    revokedBy: null,
+    statusUpdateReason: null,
+    ...overrides,
+  });
+}
+
+/**
+ * Seeds a dependent's users/{uid} doc — seedUserWithEncryption plus the isDependent/
+ * dependentCreatedBy fields createDependentAccount.ts writes for the dependent side of the
+ * relationship.
+ */
+export async function seedDependentUser(
+  testDb: Firestore,
+  uid: string,
+  guardianUid: string,
+  overrides: Record<string, unknown> = {}
+): Promise<void> {
+  await seedUserWithEncryption(testDb, uid, {
+    isDependent: true,
+    dependentCreatedBy: guardianUid,
+    ...overrides,
+  });
+}
