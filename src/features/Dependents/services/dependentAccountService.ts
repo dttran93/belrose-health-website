@@ -5,11 +5,8 @@
 // guest account claiming.
 
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
-import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
-import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { WalletGenerationService } from '@/features/Auth/services/walletGenerationService';
-import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
+import { AccountEncryptionService } from '@/features/Auth/services/accountEncryptionService';
 
 export interface CreateDependentAccountParams {
   firstName: string;
@@ -43,23 +40,13 @@ export class DependentAccountService {
     onProgress?.('keys');
     console.log('🔐 Generating encryption keys for dependent...');
 
-    const masterKey = await EncryptionKeyManager.generateMasterKey();
+    const bundle = await AccountEncryptionService.generateEncryptionBundle(password);
 
-    const { encryptedKey, iv, salt } = await EncryptionKeyManager.wrapMasterKeyWithPassword(
-      masterKey,
-      password
-    );
-
-    const recoveryKey = await EncryptionKeyManager.generateRecoveryKeyFromMasterKey(masterKey);
-    const recoveryKeyHash = await EncryptionKeyManager.hashRecoveryKey(recoveryKey);
-
-    const { publicKey, privateKey } = await SharingKeyManagementService.generateUserKeyPair();
-
-    const privateKeyBytes = base64ToArrayBuffer(privateKey);
-    const { encrypted: encryptedPrivateKeyBuffer, iv: privateKeyIV } =
-      await EncryptionService.encryptFile(privateKeyBytes, masterKey);
-
-    const masterKeyHex = await WalletGenerationService.convertMasterKeyToHex(masterKey);
+    // No client-side wallet/on-chain registration here — the dependent has no
+    // active session/signer. Only the hex conversion happens client-side; the
+    // Cloud Function generates and registers the wallet server-side using the
+    // admin wallet.
+    const masterKeyHex = await WalletGenerationService.convertMasterKeyToHex(bundle.masterKey);
 
     console.log('✅ Crypto material generated');
     onProgress?.('registering');
@@ -76,13 +63,13 @@ export class DependentAccountService {
       password,
       firstName,
       lastName,
-      encryptedMasterKey: encryptedKey,
-      masterKeyIV: iv,
-      masterKeySalt: salt,
-      publicKey,
-      encryptedPrivateKey: arrayBufferToBase64(encryptedPrivateKeyBuffer),
-      encryptedPrivateKeyIV: arrayBufferToBase64(privateKeyIV),
-      recoveryKeyHash,
+      encryptedMasterKey: bundle.encryptedMasterKey,
+      masterKeyIV: bundle.masterKeyIV,
+      masterKeySalt: bundle.masterKeySalt,
+      publicKey: bundle.publicKey,
+      encryptedPrivateKey: bundle.encryptedPrivateKey,
+      encryptedPrivateKeyIV: bundle.encryptedPrivateKeyIV,
+      recoveryKeyHash: bundle.recoveryKeyHash,
       masterKeyHex,
     });
 
@@ -90,7 +77,7 @@ export class DependentAccountService {
       uid: result.data.uid,
       walletAddress: result.data.walletAddress,
       smartAccountAddress: result.data.smartAccountAddress,
-      recoveryKey,
+      recoveryKey: bundle.recoveryKey,
     };
   }
 }

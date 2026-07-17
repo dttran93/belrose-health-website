@@ -38,12 +38,15 @@ import { useAuthContext } from '@/features/Auth/AuthContext';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
 import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
+import {
+  AccountEncryptionService,
+  EncryptionBootstrapBundle,
+} from '@/features/Auth/services/accountEncryptionService';
 import { MemberRegistryBlockchain } from '@/features/Auth/services/memberRegistryBlockchain';
 import { RecoveryKeyDisplay } from '@/features/Auth/components/RecoveryKeyDisplay';
 import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
 import { toast } from 'sonner';
 import InputField from '@/components/ui/InputField';
-import { WalletGenerationService } from '@/features/Auth/services/walletGenerationService';
 import {
   collection,
   deleteField,
@@ -101,17 +104,7 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Generated crypto data — held in state between steps
-  const [cryptoData, setCryptoData] = useState<{
-    masterKey: CryptoKey;
-    encryptedMasterKey: string;
-    masterKeyIV: string;
-    masterKeySalt: string;
-    recoveryKey: string;
-    recoveryKeyHash: string;
-    publicKey: string;
-    encryptedPrivateKey: string;
-    encryptedPrivateKeyIV: string;
-  } | null>(null);
+  const [cryptoData, setCryptoData] = useState<EncryptionBootstrapBundle | null>(null);
 
   const handleCredentialsSubmit = async () => {
     if (!firstName || !lastName || !password || !confirmPassword) {
@@ -137,41 +130,10 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
     setError(null);
 
     try {
-      // 1. Generate master key
-      const masterKey = await EncryptionKeyManager.generateMasterKey();
+      const bundle = await AccountEncryptionService.generateEncryptionBundle(password);
 
-      // 2. Wrap with password
-      const { encryptedKey, iv, salt } = await EncryptionKeyManager.wrapMasterKeyWithPassword(
-        masterKey,
-        password
-      );
-
-      // 3. Generate recovery key
-      const recoveryKeyWords =
-        await EncryptionKeyManager.generateRecoveryKeyFromMasterKey(masterKey);
-      const recoveryKeyHash = await EncryptionKeyManager.hashRecoveryKey(recoveryKeyWords);
-
-      // 4. Generate RSA key pair
-      const { publicKey, privateKey } = await SharingKeyManagementService.generateUserKeyPair();
-
-      // 5. Encrypt RSA private key with master key
-      const privateKeyBytes = base64ToArrayBuffer(privateKey);
-      const { encrypted: encryptedPrivateKeyBuffer, iv: privateKeyIV } =
-        await EncryptionService.encryptFile(privateKeyBytes, masterKey);
-
-      setCryptoData({
-        masterKey,
-        encryptedMasterKey: encryptedKey,
-        masterKeyIV: iv,
-        masterKeySalt: salt,
-        recoveryKey: recoveryKeyWords,
-        recoveryKeyHash,
-        publicKey,
-        encryptedPrivateKey: arrayBufferToBase64(encryptedPrivateKeyBuffer),
-        encryptedPrivateKeyIV: arrayBufferToBase64(privateKeyIV),
-      });
-
-      setRecoveryKey(recoveryKeyWords);
+      setCryptoData(bundle);
+      setRecoveryKey(bundle.recoveryKey);
       setStep('recovery');
     } catch (err: any) {
       setError(err.message || 'Failed to set up encryption. Please try again.');
@@ -379,11 +341,9 @@ export const GuestClaimAccountModal: React.FC<GuestClaimAccountModalProps> = ({
 
       // ── Step 3: Generate wallet + register on blockchain ──
       setProgress({ message: 'Generating your distributed network account...' });
-      const masterKeyHex = await WalletGenerationService.convertMasterKeyToHex(
+      const registrationResult = await AccountEncryptionService.registerWalletOnChain(
         cryptoData.masterKey
       );
-      const registrationResult =
-        await MemberRegistryBlockchain.registerMemberOnChainComplete(masterKeyHex);
 
       // Set real master key in session
       EncryptionKeyManager.setSessionKey(cryptoData.masterKey);
