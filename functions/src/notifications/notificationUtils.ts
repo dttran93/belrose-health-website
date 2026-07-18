@@ -18,11 +18,9 @@ import {
   DEFAULT_NOTIFICATION_PREFS,
   DisputeCulpability,
   DisputeSeverityOptions,
-  NOTIFICATION_CATEGORIES,
   NOTIFICATION_MAPPING,
   NotificationCategory,
   NotificationPrefs,
-  NotificationType,
   VerificationLevelOptions,
 } from '../_shared';
 import { SubjectRejectionType } from '@/_shared/subject';
