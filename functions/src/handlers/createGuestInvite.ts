@@ -114,8 +114,8 @@ export const createGuestInvite = onCall(
     const appUrl = 'https://belrosehealth.com';
     const inviteUrl = `${appUrl}/invite?code=${inviteCode}#${privateKeyBase64}`;
 
-    const resend = new Resend(resendKey.value());
     try {
+      const resend = new Resend(resendKey.value());
       await resend.emails.send({
         to: guestEmail,
         from: 'Belrose Health <noreply@belrosehealth.com>',

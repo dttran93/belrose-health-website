@@ -223,8 +223,8 @@ export const createRecordRequest = onCall(
       `${appUrl}/fulfill-request?code=${inviteCode}&guestCode=${guestInviteCode}` +
       `#${providerPrivateKey}`;
 
-    const resend = new Resend(resendKey.value());
     try {
+      const resend = new Resend(resendKey.value());
       await resend.emails.send({
         to: targetEmail,
         cc: requesterEmail,

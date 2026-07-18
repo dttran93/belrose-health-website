@@ -185,8 +185,8 @@ exports.createRecordRequest = (0, https_1.onCall)({ secrets: [resendKey] }, asyn
     // after validating the code, which is safer than putting it in the URL.
     const fulfillUrl = `${appUrl}/fulfill-request?code=${inviteCode}&guestCode=${guestInviteCode}` +
         `#${providerPrivateKey}`;
-    const resend = new resend_1.Resend(resendKey.value());
     try {
+        const resend = new resend_1.Resend(resendKey.value());
         await resend.emails.send({
             to: targetEmail,
             cc: requesterEmail,

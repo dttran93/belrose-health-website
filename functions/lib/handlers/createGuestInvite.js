@@ -107,8 +107,8 @@ exports.createGuestInvite = (0, https_1.onCall)({ secrets: [resendKey], cors: co
     // URL format: /invite?token=<customToken>#<privateKeyBase64>
     const appUrl = 'https://belrosehealth.com';
     const inviteUrl = `${appUrl}/invite?code=${inviteCode}#${privateKeyBase64}`;
-    const resend = new resend_1.Resend(resendKey.value());
     try {
+        const resend = new resend_1.Resend(resendKey.value());
         await resend.emails.send({
             to: guestEmail,
             from: 'Belrose Health <noreply@belrosehealth.com>',

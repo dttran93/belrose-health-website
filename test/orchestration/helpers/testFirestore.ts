@@ -160,3 +160,53 @@ export async function seedDependentUser(
     ...overrides,
   });
 }
+
+/**
+ * Seeds a users/{uid} doc matching the minimal guest profile shape
+ * createOrRetrieveGuestAccount (functions/src/utils/guestAccountUtils.ts) writes:
+ * isGuest:true, only encryption.publicKey — no wallet/onChainIdentity, no masterKey/RSA
+ * private key material, since a guest's keys aren't password-derived yet.
+ */
+export async function seedGuestUser(
+  testDb: Firestore,
+  uid: string,
+  overrides: Record<string, unknown> = {}
+): Promise<void> {
+  await setDoc(doc(testDb, 'users', uid), {
+    uid,
+    email: `${uid}@example.com`,
+    displayName: `${uid}@example.com`,
+    emailVerified: true,
+    isGuest: true,
+    encryption: {
+      publicKey: 'guest-public-key',
+    },
+    ...overrides,
+  });
+}
+
+/**
+ * Seeds a guestInvites/{inviteId} doc matching the shape writeGuestInviteDoc
+ * (functions/src/utils/guestAccountUtils.ts) writes. The real handler uses
+ * collection.add() for an auto id; tests pass a fixed inviteId for determinism.
+ */
+export async function seedGuestInvite(
+  testDb: Firestore,
+  inviteId: string,
+  overrides: Record<string, unknown> = {}
+): Promise<void> {
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  await setDoc(doc(testDb, 'guestInvites', inviteId), {
+    guestUserId: 'guest-1',
+    invitedBy: 'patient-1',
+    guestEmail: 'guest-1@example.com',
+    recordIds: ['rec-1'],
+    status: 'pending',
+    context: 'sharing',
+    createdAt: new Date(),
+    expiresAt,
+    isNewGuest: true,
+    inviteCode: 'test-invite-code',
+    ...overrides,
+  });
+}

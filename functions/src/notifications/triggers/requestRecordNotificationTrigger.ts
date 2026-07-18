@@ -45,11 +45,21 @@ export const onRecordRequestUpdated = onDocumentUpdated(
   async event => {
     const before = event.data?.before.data() as RecordRequest | undefined;
     const after = event.data?.after.data() as RecordRequest | undefined;
-    const resend = new Resend(resendKey.value());
 
     if (!before || !after) return;
 
     const requestId = event.params.requestId;
+
+    // The Resend constructor throws synchronously when the API key is missing/empty (e.g. a
+    // local/emulator run without RESEND_API_KEY configured) — this is a background trigger with
+    // no caller to surface an error to, so a missing key must degrade to "skip email" rather than
+    // crash the whole trigger (in-app notifications below still fire either way).
+    let resend: Resend | null = null;
+    try {
+      resend = new Resend(resendKey.value());
+    } catch (err) {
+      console.warn('⚠️ Resend not configured — skipping email notifications for this update:', err);
+    }
 
     // CASE 1: First View (readAt changed from null to timestamp)
     if (!before.readAt && after.readAt) {
@@ -60,16 +70,18 @@ export const onRecordRequestUpdated = onDocumentUpdated(
         payload: { requestId },
       });
 
-      await sendEmailIfEnabled(
-        after.requesterId,
-        'RECORD_REQUEST_VIEWED',
-        {
-          subject: `Your record request to ${after.targetEmail} has been opened`,
-          html: buildRecordRequestViewedHtml(after.targetEmail),
-          text: buildRecordRequestViewedText(after.targetEmail),
-        },
-        resend
-      );
+      if (resend) {
+        await sendEmailIfEnabled(
+          after.requesterId,
+          'RECORD_REQUEST_VIEWED',
+          {
+            subject: `Your record request to ${after.targetEmail} has been opened`,
+            html: buildRecordRequestViewedHtml(after.targetEmail),
+            text: buildRecordRequestViewedText(after.targetEmail),
+          },
+          resend
+        );
+      }
 
       return;
     }
@@ -84,22 +96,24 @@ export const onRecordRequestUpdated = onDocumentUpdated(
           : `/app/requests`,
         payload: { requestId, recordIds: after.fulfilledRecordIds },
       });
-      await sendEmailIfEnabled(
-        after.requesterId,
-        'RECORD_REQUEST_FULFILLED',
-        {
-          subject: `Your records have been uploaded by ${after.targetEmail}`,
-          html: buildRecordRequestFulfilledHtml(
-            after.targetEmail,
-            after.fulfilledRecordIds?.[0] ?? null
-          ),
-          text: buildRecordRequestFulfilledText(
-            after.targetEmail,
-            after.fulfilledRecordIds?.[0] ?? null
-          ),
-        },
-        resend
-      );
+      if (resend) {
+        await sendEmailIfEnabled(
+          after.requesterId,
+          'RECORD_REQUEST_FULFILLED',
+          {
+            subject: `Your records have been uploaded by ${after.targetEmail}`,
+            html: buildRecordRequestFulfilledHtml(
+              after.targetEmail,
+              after.fulfilledRecordIds?.[0] ?? null
+            ),
+            text: buildRecordRequestFulfilledText(
+              after.targetEmail,
+              after.fulfilledRecordIds?.[0] ?? null
+            ),
+          },
+          resend
+        );
+      }
       return;
     }
 
@@ -112,16 +126,18 @@ export const onRecordRequestUpdated = onDocumentUpdated(
         link: `/app/requests`,
         payload: { requestId, deniedReason: after.deniedReason },
       });
-      await sendEmailIfEnabled(
-        after.requesterId,
-        'RECORD_REQUEST_DENIED',
-        {
-          subject: `${after.targetEmail} declined your record request`,
-          html: buildRecordRequestDeniedHtml(after.targetEmail, after.deniedReason),
-          text: buildRecordRequestDeniedText(after.targetEmail, after.deniedReason),
-        },
-        resend
-      );
+      if (resend) {
+        await sendEmailIfEnabled(
+          after.requesterId,
+          'RECORD_REQUEST_DENIED',
+          {
+            subject: `${after.targetEmail} declined your record request`,
+            html: buildRecordRequestDeniedHtml(after.targetEmail, after.deniedReason),
+            text: buildRecordRequestDeniedText(after.targetEmail, after.deniedReason),
+          },
+          resend
+        );
+      }
       return;
     }
   }

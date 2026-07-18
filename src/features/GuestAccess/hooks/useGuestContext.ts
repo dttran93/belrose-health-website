@@ -1,9 +1,12 @@
+/**
+ * Used in app to render banner for guests account
+ */
+
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { db } from '@/firebase/config';
 import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { useState } from 'react';
 
-// hooks/useGuestContext.ts
 export const useGuestContext = () => {
   const { user } = useAuthContext();
   const [guestContext, setGuestContext] = useState<'sharing' | 'record_request' | undefined>();
