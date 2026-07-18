@@ -144,8 +144,8 @@ export const DependentsSettingsPage: React.FC = () => {
         <div className="flex flex-col items-center w-full">
           <h1 className="text-xl font-semibold text-gray-900">Dependents</h1>
           <p className="text-sm text-gray-500">
-            Trustee accounts created and managed by you on behalf of someone in your care, such as a
-            child or elderly parent.
+            Dependent accounts are created and managed by you on behalf of someone in your care,
+            such as a child or elderly parent.
           </p>
         </div>
       </div>
