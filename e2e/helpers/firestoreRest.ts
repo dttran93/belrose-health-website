@@ -14,7 +14,10 @@ type FirestoreValue = Record<string, unknown>;
 function toFirestoreValue(value: unknown): FirestoreValue {
   if (value === null || value === undefined) return { nullValue: null };
   if (typeof value === 'boolean') return { booleanValue: value };
-  if (typeof value === 'number') return { doubleValue: value };
+  if (typeof value === 'number') {
+    // Firestore's REST wire format requires integerValue to be sent as a string.
+    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  }
   if (value instanceof Date) return { timestampValue: value.toISOString() };
   if (Array.isArray(value)) {
     return { arrayValue: { values: value.map(toFirestoreValue) } };
