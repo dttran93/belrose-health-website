@@ -60,7 +60,7 @@ export interface CredibilityPreparationStatus {
   smartAccountAddress: string;
   isSmartAccountRegistered: boolean;
   hasRecordRole: boolean;
-  callerRole?: 'owner' | 'administrator' | 'viewer' | 'subject';
+  callerRole?: 'owner' | 'administrator' | 'viewer' | 'sharer';
 }
 
 export interface CredibilityPreparationProgress {
@@ -314,14 +314,14 @@ export class CredibilityPreparationService {
   /**
    * Check if a user has any role on a record.
    *
-   * Roles checked: owner, administrator, viewer, subject
+   * Roles checked: owner, administrator, viewer, subject, sharer
    */
   private static async checkCallerRecordRole(
     recordId: string,
     userId: string
   ): Promise<{
     hasRole: boolean;
-    role?: 'owner' | 'administrator' | 'viewer' | 'subject';
+    role?: 'owner' | 'administrator' | 'viewer' | 'sharer';
     recordInfo?: {
       hasSubjects: boolean;
       subjectCount: number;
@@ -343,11 +343,12 @@ export class CredibilityPreparationService {
     const administrators: string[] = data.administrators || [];
     const viewers: string[] = data.viewers || [];
     const subjects: string[] = data.subjects || [];
+    const sharers: string[] = data.sharers || [];
 
     // Also check uploadedBy as implicit owner
     const isUploader = data.uploadedBy === userId;
 
-    let role: 'owner' | 'administrator' | 'viewer' | 'subject' | undefined;
+    let role: 'owner' | 'administrator' | 'viewer' | 'sharer' | undefined;
 
     if (isUploader || owners.includes(userId)) {
       role = 'owner';
@@ -355,8 +356,8 @@ export class CredibilityPreparationService {
       role = 'administrator';
     } else if (viewers.includes(userId)) {
       role = 'viewer';
-    } else if (subjects.includes(userId)) {
-      role = 'subject';
+    } else if (sharers.includes(userId)) {
+      role = 'sharer';
     }
 
     const recordInfo = {

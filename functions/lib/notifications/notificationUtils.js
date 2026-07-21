@@ -54,6 +54,7 @@ exports.deleteOldNotifications = deleteOldNotifications;
  *   NOTIFICATION_SOURCE — callers never pass it explicitly.
  */
 const admin = __importStar(require("firebase-admin"));
+const firestore_1 = require("firebase-admin/firestore");
 const _shared_1 = require("../_shared");
 function getFirestore() {
     return admin.firestore();
@@ -126,7 +127,7 @@ async function createNotification(targetUserId, notification) {
         ...notification,
         sourceService: _shared_1.NOTIFICATION_MAPPING[notification.type],
         read: false,
-        createdAt: admin.firestore.Timestamp.now(),
+        createdAt: firestore_1.Timestamp.now(),
     };
     const docRef = await getFirestore()
         .collection('users')
@@ -193,7 +194,7 @@ async function deleteOldNotifications(userId, olderThanDays = 90) {
         .doc(userId)
         .collection('notifications');
     const oldDocs = await notificationsRef
-        .where('createdAt', '<', admin.firestore.Timestamp.fromDate(cutoffDate))
+        .where('createdAt', '<', firestore_1.Timestamp.fromDate(cutoffDate))
         .get();
     const batch = getFirestore().batch();
     oldDocs.docs.forEach(doc => {

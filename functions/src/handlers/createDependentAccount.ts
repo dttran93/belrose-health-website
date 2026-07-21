@@ -179,8 +179,20 @@ export const createDependentAccount = onCall(
       // propose → accept two-wallet flow is not possible. The admin wallet writes the
       // Active + Controller relationship directly in the same admin batch as addMemberBatch.
       // Revocation uses the normal onlyActiveMember flow — no admin involvement after this.
+      //
+      // gasLimit is set explicitly to skip ethers' automatic eth_estimateGas pre-flight call.
+      // Confirmed via direct diagnostic (block-lag + userStatus readback) that a load-balanced
+      // RPC provider can serve that estimation call from a backend node that hasn't yet caught
+      // up to the addMemberBatch confirmation above — the resulting stale read reverts the
+      // estimation with "Trustor not registered" before the transaction is ever submitted, even
+      // though the member registration is already confirmed. Skipping estimation avoids that
+      // stale read entirely; the transaction itself is still correctly sequenced by Base's
+      // sequencer once submitted. 300,000 gas is generously above this function's actual usage
+      // (5 requires, one array push, one struct write, two events).
       const guardianIdHash = ethers.id(guardianUid);
-      const trusteeTx = await contract.bootstrapDependentTrustee(userIdHash, guardianIdHash);
+      const trusteeTx = await contract.bootstrapDependentTrustee(userIdHash, guardianIdHash, {
+        gasLimit: 300_000,
+      });
       const trusteeReceipt = await trusteeTx.wait();
       if (!trusteeReceipt) throw new Error('Trustee transaction was dropped or replaced');
       const trusteeBlockchainRef = {

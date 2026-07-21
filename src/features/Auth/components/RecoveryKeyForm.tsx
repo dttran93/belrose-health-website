@@ -7,6 +7,7 @@ import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionK
 import { toast } from 'sonner';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { validatePassword } from '@/features/Auth/utils/PasswordStrength';
 
 interface RecoveryKeyFormProps {
   onBackToLogin: () => void;
@@ -93,29 +94,6 @@ export const RecoveryKeyForm: React.FC<RecoveryKeyFormProps> = ({ onBackToLogin 
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Step 2: Validate Password
-  const validatePassword = (password: string): { valid: boolean; error?: string } => {
-    if (password.length < 8) {
-      return { valid: false, error: 'Password must be at least 8 characters' };
-    }
-
-    let criteriaCount = 0;
-    if (/[a-z]/.test(password)) criteriaCount++;
-    if (/[A-Z]/.test(password)) criteriaCount++;
-    if (/\d/.test(password)) criteriaCount++;
-    if (/[^a-zA-Z0-9]/.test(password)) criteriaCount++;
-
-    if (criteriaCount < 3) {
-      return {
-        valid: false,
-        error:
-          'Password must contain at least 3 of: lowercase, uppercase, number, special character',
-      };
-    }
-
-    return { valid: true };
   };
 
   // Step 2: Set New Password

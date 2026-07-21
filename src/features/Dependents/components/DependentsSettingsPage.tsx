@@ -122,7 +122,12 @@ export const DependentsSettingsPage: React.FC = () => {
     { type: 'divider', key: 'divider-actions' },
     {
       key: 'remove',
-      label: entry.profile?.isDependent ? 'Delete account' : 'Remove guardian access',
+      // Mirrors RemoveDialog's willDelete condition exactly — an unclaimed dependent whose
+      // guardian has already sent a handoff will only have access revoked, not deleted.
+      label:
+        entry.profile?.isDependent && !(entry.profile as any)?.handoffInitiatedAt
+          ? 'Delete account'
+          : 'Remove guardian access',
       icon: Trash2,
       destructive: true,
       onClick: () => setRemoveTarget(entry),
@@ -139,8 +144,8 @@ export const DependentsSettingsPage: React.FC = () => {
         <div className="flex flex-col items-center w-full">
           <h1 className="text-xl font-semibold text-gray-900">Dependents</h1>
           <p className="text-sm text-gray-500">
-            Trustee accounts created and managed by you on behalf of someone in your care, such as a
-            child or elderly parent.
+            Dependent accounts are created and managed by you on behalf of someone in your care,
+            such as a child or elderly parent.
           </p>
         </div>
       </div>

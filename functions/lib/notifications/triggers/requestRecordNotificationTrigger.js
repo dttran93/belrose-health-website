@@ -30,10 +30,20 @@ exports.onRecordRequestCreated = (0, firestore_1.onDocumentCreated)('recordReque
 exports.onRecordRequestUpdated = (0, firestore_1.onDocumentUpdated)('recordRequests/{requestId}', async (event) => {
     const before = event.data?.before.data();
     const after = event.data?.after.data();
-    const resend = new resend_1.Resend(emailUtils_1.resendKey.value());
     if (!before || !after)
         return;
     const requestId = event.params.requestId;
+    // The Resend constructor throws synchronously when the API key is missing/empty (e.g. a
+    // local/emulator run without RESEND_API_KEY configured) — this is a background trigger with
+    // no caller to surface an error to, so a missing key must degrade to "skip email" rather than
+    // crash the whole trigger (in-app notifications below still fire either way).
+    let resend = null;
+    try {
+        resend = new resend_1.Resend(emailUtils_1.resendKey.value());
+    }
+    catch (err) {
+        console.warn('⚠️ Resend not configured — skipping email notifications for this update:', err);
+    }
     // CASE 1: First View (readAt changed from null to timestamp)
     if (!before.readAt && after.readAt) {
         await (0, notificationUtils_1.createNotification)(after.requesterId, {
@@ -42,11 +52,13 @@ exports.onRecordRequestUpdated = (0, firestore_1.onDocumentUpdated)('recordReque
             link: `/app/requests`, // Link to their dashboard
             payload: { requestId },
         });
-        await (0, emailUtils_1.sendEmailIfEnabled)(after.requesterId, 'RECORD_REQUEST_VIEWED', {
-            subject: `Your record request to ${after.targetEmail} has been opened`,
-            html: (0, recordRequestEmailTemplate_1.buildRecordRequestViewedHtml)(after.targetEmail),
-            text: (0, recordRequestEmailTemplate_1.buildRecordRequestViewedText)(after.targetEmail),
-        }, resend);
+        if (resend) {
+            await (0, emailUtils_1.sendEmailIfEnabled)(after.requesterId, 'RECORD_REQUEST_VIEWED', {
+                subject: `Your record request to ${after.targetEmail} has been opened`,
+                html: (0, recordRequestEmailTemplate_1.buildRecordRequestViewedHtml)(after.targetEmail),
+                text: (0, recordRequestEmailTemplate_1.buildRecordRequestViewedText)(after.targetEmail),
+            }, resend);
+        }
         return;
     }
     // CASE 2: Fulfilled
@@ -59,11 +71,13 @@ exports.onRecordRequestUpdated = (0, firestore_1.onDocumentUpdated)('recordReque
                 : `/app/requests`,
             payload: { requestId, recordIds: after.fulfilledRecordIds },
         });
-        await (0, emailUtils_1.sendEmailIfEnabled)(after.requesterId, 'RECORD_REQUEST_FULFILLED', {
-            subject: `Your records have been uploaded by ${after.targetEmail}`,
-            html: (0, recordRequestEmailTemplate_1.buildRecordRequestFulfilledHtml)(after.targetEmail, after.fulfilledRecordIds?.[0] ?? null),
-            text: (0, recordRequestEmailTemplate_1.buildRecordRequestFulfilledText)(after.targetEmail, after.fulfilledRecordIds?.[0] ?? null),
-        }, resend);
+        if (resend) {
+            await (0, emailUtils_1.sendEmailIfEnabled)(after.requesterId, 'RECORD_REQUEST_FULFILLED', {
+                subject: `Your records have been uploaded by ${after.targetEmail}`,
+                html: (0, recordRequestEmailTemplate_1.buildRecordRequestFulfilledHtml)(after.targetEmail, after.fulfilledRecordIds?.[0] ?? null),
+                text: (0, recordRequestEmailTemplate_1.buildRecordRequestFulfilledText)(after.targetEmail, after.fulfilledRecordIds?.[0] ?? null),
+            }, resend);
+        }
         return;
     }
     // CASE 3: Denied
@@ -75,11 +89,13 @@ exports.onRecordRequestUpdated = (0, firestore_1.onDocumentUpdated)('recordReque
             link: `/app/requests`,
             payload: { requestId, deniedReason: after.deniedReason },
         });
-        await (0, emailUtils_1.sendEmailIfEnabled)(after.requesterId, 'RECORD_REQUEST_DENIED', {
-            subject: `${after.targetEmail} declined your record request`,
-            html: (0, recordRequestEmailTemplate_1.buildRecordRequestDeniedHtml)(after.targetEmail, after.deniedReason),
-            text: (0, recordRequestEmailTemplate_1.buildRecordRequestDeniedText)(after.targetEmail, after.deniedReason),
-        }, resend);
+        if (resend) {
+            await (0, emailUtils_1.sendEmailIfEnabled)(after.requesterId, 'RECORD_REQUEST_DENIED', {
+                subject: `${after.targetEmail} declined your record request`,
+                html: (0, recordRequestEmailTemplate_1.buildRecordRequestDeniedHtml)(after.targetEmail, after.deniedReason),
+                text: (0, recordRequestEmailTemplate_1.buildRecordRequestDeniedText)(after.targetEmail, after.deniedReason),
+            }, resend);
+        }
         return;
     }
 });

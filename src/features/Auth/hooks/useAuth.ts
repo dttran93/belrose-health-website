@@ -1,3 +1,9 @@
+/*
+ * Hook for managing Auth state
+ * This hook combines the Firebase Auth state with the BelroseUserProfile from Firestore, ensuring that the user object is always up-to-date and merged correctly.
+ * It also provides helper methods for signing out and refreshing the user profile.
+ */
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { authService } from '@/features/Auth/services/authServices';
 import { UserService } from '../services/userService';

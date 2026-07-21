@@ -18,11 +18,9 @@ import {
   DEFAULT_NOTIFICATION_PREFS,
   DisputeCulpability,
   DisputeSeverityOptions,
-  NOTIFICATION_CATEGORIES,
   NOTIFICATION_MAPPING,
   NotificationCategory,
   NotificationPrefs,
-  NotificationType,
   VerificationLevelOptions,
 } from '../_shared';
 import { SubjectRejectionType } from '@/_shared/subject';
@@ -370,7 +368,7 @@ export async function createNotification(
     ...notification,
     sourceService: NOTIFICATION_MAPPING[notification.type],
     read: false,
-    createdAt: admin.firestore.Timestamp.now(),
+    createdAt: Timestamp.now(),
   };
 
   const docRef = await getFirestore()
@@ -462,7 +460,7 @@ export async function deleteOldNotifications(
     .collection('notifications');
 
   const oldDocs = await notificationsRef
-    .where('createdAt', '<', admin.firestore.Timestamp.fromDate(cutoffDate))
+    .where('createdAt', '<', Timestamp.fromDate(cutoffDate))
     .get();
 
   const batch = getFirestore().batch();

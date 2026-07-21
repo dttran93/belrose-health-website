@@ -1158,7 +1158,15 @@ service cloud.firestore {
 
     match /invites/{email} {
       allow read: if true; //unauthenticated signup
+
+      // Only the person who just registered with this invite's email can stamp it —
+      // not just any authenticated user. request.auth.token.email is lowered before
+      // comparing because RegistrationForm/BelroseAccountForm don't lowercase the email
+      // before calling Firebase Auth signup, while this doc's id (and every other place
+      // that looks it up) is always lowercased.
       allow update: if request.auth != null &&
+        request.auth.token.email.lower() == email &&
+        request.resource.data.get('registeredUserId', null) == request.auth.uid &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['registeredUserId', 'registeredAt']);
     }

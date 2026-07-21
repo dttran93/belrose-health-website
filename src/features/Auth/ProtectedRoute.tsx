@@ -37,10 +37,22 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to="/claim-account" replace />;
   }
 
-  // Logged in but email not verified → send to verification hub.
-  // Exempt: dependents (guardian verified consent at creation), and accounts still on a placeholder
-  // email (they can't verify until they update to a real email — future feature).
   const isPlaceholderEmail = user.email?.endsWith('@placeholder.belrose.health') ?? false;
+
+  // A dependent who has claimed their account (isDependent flipped false by
+  // claimDependentAccount) but still hasn't replaced their placeholder email — force them back
+  // to /account-setup until they do. AccountSetupPage's own "Continue to Belrose" button
+  // requires the same thing (!isEmailPlaceholder), so this keeps the router-level gate and the
+  // page's CTA in agreement, instead of leaving a claimed dependent free to wander the app with
+  // a permanently-disabled button on the one screen meant to unstick them.
+  if (!user.isDependent && isPlaceholderEmail && location.pathname !== '/account-setup') {
+    return <Navigate to="/account-setup" replace />;
+  }
+
+  // Logged in but email not verified → send to verification hub.
+  // Exempt: still-active dependents (guardian verified consent at creation, and a placeholder
+  // email can't be verified anyway — they're caught by the isDependent check above once
+  // claimed), and /verification and /account-setup themselves (avoids a redirect loop).
   const VERIFICATION_EXEMPT = ['/verification', '/account-setup'];
   if (!user.emailVerified && !user.isDependent && !isPlaceholderEmail && !VERIFICATION_EXEMPT.includes(location.pathname)) {
     return (

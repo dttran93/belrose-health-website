@@ -9,11 +9,7 @@ import BelroseAccountForm from './BelroseAccountForm';
 import { RecoveryKeyDisplay } from './RecoveryKeyDisplay';
 import { getFirestore, doc, updateDoc } from 'firebase/firestore';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
-import { SharingKeyManagementService } from '@/features/Sharing/services/sharingKeyManagementService';
-import { EncryptionService } from '@/features/Encryption/services/encryptionService';
-import { MemberRegistryBlockchain } from '../services/memberRegistryBlockchain';
-import { arrayBufferToBase64, base64ToArrayBuffer } from '@/utils/dataFormattingUtils';
-import { WalletGenerationService } from '../services/walletGenerationService';
+import { AccountEncryptionService } from '../services/accountEncryptionService';
 import RegistrationProgressDialog, {
   RegistrationPhase,
   RegistrationProgress,
@@ -106,58 +102,33 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ onSwitchToLogin }) 
       try {
         console.log('🔐 Setting up encryption...');
 
-        // 1. Generate master encryption key
-        const masterKey = await EncryptionKeyManager.generateMasterKey();
-        console.log('✓ Master key generated');
-
-        // 2. Wrap with password
-        const { encryptedKey, iv, salt } = await EncryptionKeyManager.wrapMasterKeyWithPassword(
-          masterKey,
-          data.password
-        );
-        console.log('✓ Master key encrypted');
-
-        // 3. Generate recovery key (24 words) and hash
-        const recoveryKey = await EncryptionKeyManager.generateRecoveryKeyFromMasterKey(masterKey);
-        const recoveryKeyHash = await EncryptionKeyManager.hashRecoveryKey(recoveryKey);
-        console.log('✓ Recovery key generated');
-
-        // 4. Generate RSA key pair for record sharing
-        const { publicKey, privateKey } = await SharingKeyManagementService.generateUserKeyPair();
-        console.log('✓ RSA key pair generated');
-
-        // 5. Encrypt RSA private key with master key
-        const privateKeyBytes = base64ToArrayBuffer(privateKey);
-        const { encrypted: encryptedPrivateKeyBuffer, iv: privateKeyIV } =
-          await EncryptionService.encryptFile(privateKeyBytes, masterKey);
-        const encryptedPrivateKey = arrayBufferToBase64(encryptedPrivateKeyBuffer);
-        const encryptedPrivateKeyIV = arrayBufferToBase64(privateKeyIV);
-        console.log('✓ RSA private key encrypted');
+        // 1-5. Generate master key, wrap with password, recovery key, RSA keypair
+        const bundle = await AccountEncryptionService.generateEncryptionBundle(data.password);
+        console.log('✓ Crypto material generated');
 
         // 6. Store master key in session
-        EncryptionKeyManager.setSessionKey(masterKey);
+        EncryptionKeyManager.setSessionKey(bundle.masterKey);
 
         // 7. Generate wallet + register both wallets on-chain in one transaction
         console.log('💼 Generating wallet and registering on-chain...');
-        const masterKeyHex = await WalletGenerationService.convertMasterKeyToHex(masterKey);
-        const registrationResult =
-          await MemberRegistryBlockchain.registerMemberOnChainComplete(masterKeyHex);
-        console.log('✓ Wallet generated and registered:', registrationResult.walletAddress);
+        const { walletAddress, smartAccountAddress } =
+          await AccountEncryptionService.registerWalletOnChain(bundle.masterKey);
+        console.log('✓ Wallet generated and registered:', walletAddress);
 
         // 8. Single state update with everything
         setRegistrationData(prev => ({
           ...prev,
           ...data,
-          encryptedMasterKey: encryptedKey,
-          masterKeyIV: iv,
-          masterKeySalt: salt,
-          recoveryKey,
-          recoveryKeyHash,
-          publicKey,
-          encryptedPrivateKey,
-          encryptedPrivateKeyIV,
-          walletAddress: registrationResult.walletAddress,
-          smartAccountAddress: registrationResult.smartAccountAddress,
+          encryptedMasterKey: bundle.encryptedMasterKey,
+          masterKeyIV: bundle.masterKeyIV,
+          masterKeySalt: bundle.masterKeySalt,
+          recoveryKey: bundle.recoveryKey,
+          recoveryKeyHash: bundle.recoveryKeyHash,
+          publicKey: bundle.publicKey,
+          encryptedPrivateKey: bundle.encryptedPrivateKey,
+          encryptedPrivateKeyIV: bundle.encryptedPrivateKeyIV,
+          walletAddress,
+          smartAccountAddress,
           walletType: 'generated',
           walletGenerationComplete: true,
         }));
