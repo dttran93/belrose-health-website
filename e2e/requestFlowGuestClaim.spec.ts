@@ -1,4 +1,4 @@
-// e2e/guestClaimRequest.spec.ts
+// e2e/requestFlowGuestClaim.spec.ts
 //
 // A guest provider (record_request context) claims their temporary account into a real one:
 // real wallet generation + real on-chain registration (Base Sepolia), same as signup.spec.ts/
