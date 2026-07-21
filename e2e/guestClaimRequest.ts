@@ -1,4 +1,4 @@
-// e2e/guestClaim.spec.ts
+// e2e/guestClaimRequest.spec.ts
 //
 // A guest provider (record_request context) claims their temporary account into a real one:
 // real wallet generation + real on-chain registration (Base Sepolia), same as signup.spec.ts/
@@ -27,8 +27,10 @@ import { seedFirestoreDoc } from './helpers/firestoreRest';
 
 const PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID;
 
-test('guest provider claims their account via the record-request fulfill flow', async ({ page }) => {
-  test.setTimeout(180_000);
+test('guest provider claims their account via the record-request fulfill flow', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
 
   if (!PROJECT_ID) {
     throw new Error('VITE_FIREBASE_PROJECT_ID must be set in the environment.');
@@ -87,16 +89,19 @@ test('guest provider claims their account via the record-request fulfill flow', 
   // best-effort and never reached here since this recordRequests doc has no encrypted note) ──
   await page.goto(`/fulfill-request?code=${requestId}&guestCode=${guestInviteCode}`);
 
+  // loadRequest() awaits checkEmailRegistrationStatus before rendering anything — a real CF
+  // round trip, so this needs the same generous headroom as the on-chain steps below rather
+  // than a short UI-interaction timeout.
   await expect(
     page.getByRole('heading', { name: 'E2E Requester is requesting their health records' })
-  ).toBeVisible({ timeout: 20_000 });
+  ).toBeVisible({ timeout: 60_000 });
 
   // ── Redeem the invite + sign in as the guest (real redeemGuestInvite CF call) ──
   await page.getByRole('button', { name: 'Create a free account & upload' }).click();
 
   // ── GuestClaimAccountModal opens directly (FulfillRequestPage hardcodes guestContext) ──
   await expect(page.getByRole('heading', { name: 'Create Your Account' })).toBeVisible({
-    timeout: 15_000,
+    timeout: 60_000,
   });
 
   await page.locator('input[placeholder="Jane"]').fill('E2E');
