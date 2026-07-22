@@ -1,0 +1,290 @@
+// @vitest-environment jsdom
+//
+// src/features/AddRecord/hooks/__tests__/useFileManager.test.ts
+//
+// Tier 3 (FileUploadService/CombinedRecordProcessingService/useAuthContext mocked) — covers the
+// orchestration logic that actually lives in this hook: processFile's success/failure status
+// transitions, uploadFiles' per-file try/catch and in-flight dedup, and the two composite
+// cleanup paths (removeFileComplete, enhancedClearAll) that tolerate partial Firebase-delete
+// failure without losing local state consistency.
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
+import { toast } from 'sonner';
+
+const {
+  deleteFileMock,
+  uploadFileMock,
+  cancelUploadMock,
+  updateRecordMock,
+  processUploadedFileMock,
+} = vi.hoisted(() => ({
+  deleteFileMock: vi.fn(),
+  uploadFileMock: vi.fn(),
+  cancelUploadMock: vi.fn(),
+  updateRecordMock: vi.fn(),
+  processUploadedFileMock: vi.fn(),
+}));
+
+vi.mock('@/features/AddRecord/services/fileUploadService', () => ({
+  // vi.fn().mockImplementation needs a `function`, not an arrow function, to be usable with
+  // `new` — arrow functions can never be constructors, so `new FileUploadService()` in the hook
+  // under test would throw "is not a constructor" with an arrow-function implementation here.
+  FileUploadService: vi.fn().mockImplementation(function () {
+    return {
+      deleteFile: deleteFileMock,
+      uploadFile: uploadFileMock,
+      cancelUpload: cancelUploadMock,
+      updateRecord: updateRecordMock,
+    };
+  }),
+}));
+
+vi.mock('../useRecordProcessing', () => ({
+  CombinedRecordProcessingService: { processUploadedFile: processUploadedFileMock },
+}));
+
+vi.mock('@/features/Auth/AuthContext', () => ({
+  useAuthContext: () => ({ user: { uid: 'user-1' } }),
+}));
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+}));
+
+import { useFileManager } from '../useFileManager';
+import type { FileObject } from '@/types/core';
+
+function makeFile(overrides: Partial<FileObject> = {}): FileObject {
+  return {
+    id: 'file-1',
+    fileName: 'test.pdf',
+    fileSize: 100,
+    fileType: 'application/pdf',
+    administrators: ['user-1'],
+    status: 'pending',
+    isVirtual: false,
+    ...overrides,
+  } as FileObject;
+}
+
+/** FileList isn't constructible directly — real File[] wrapped in the array-like shape addFiles expects. */
+function makeFileList(files: File[]): FileList {
+  const list = [...files] as unknown as FileList;
+  (list as any).length = files.length;
+  (list as any)[Symbol.iterator] = Array.prototype[Symbol.iterator];
+  return list;
+}
+
+async function addOneFile(result: { current: ReturnType<typeof useFileManager> }, name = 'a.pdf') {
+  await act(async () => {
+    await result.current.addFiles(makeFileList([new File(['a'], name, { type: 'application/pdf' })]));
+  });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  sessionStorage.clear();
+});
+
+describe('useFileManager — addFiles validation', () => {
+  it('rejects files beyond maxFiles and shows a toast, but still adds the ones within the limit', async () => {
+    const { result } = renderHook(() => useFileManager());
+
+    const fileList = makeFileList([
+      new File(['a'], 'a.pdf', { type: 'application/pdf' }),
+      new File(['b'], 'b.pdf', { type: 'application/pdf' }),
+    ]);
+
+    await act(async () => {
+      await result.current.addFiles(fileList, { maxFiles: 1 });
+    });
+
+    expect(result.current.files).toHaveLength(1);
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Maximum 1 files allowed'));
+  });
+
+  it('rejects files over maxSizeBytes and shows a toast', async () => {
+    const { result } = renderHook(() => useFileManager());
+
+    const bigFile = new File(['x'], 'big.pdf', { type: 'application/pdf' });
+    Object.defineProperty(bigFile, 'size', { value: 100 * 1024 * 1024 });
+
+    await act(async () => {
+      await result.current.addFiles(makeFileList([bigFile]), { maxSizeBytes: 50 * 1024 * 1024 });
+    });
+
+    expect(result.current.files).toHaveLength(0);
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('too large'));
+  });
+});
+
+describe('useFileManager — processFile', () => {
+  it('marks the file completed with the pipeline result on success', async () => {
+    processUploadedFileMock.mockResolvedValue({
+      extractedText: 'extracted',
+      wordCount: 2,
+      fhirData: { resourceType: 'Bundle' },
+      recordHash: '0xabc',
+      aiProcessingStatus: 'completed',
+    });
+
+    const { result } = renderHook(() => useFileManager());
+
+    let updated: FileObject | undefined;
+    await act(async () => {
+      updated = await result.current.processFile(makeFile());
+    });
+
+    expect(updated?.status).toBe('completed');
+    expect(updated?.recordHash).toBe('0xabc');
+  });
+
+  it('marks the file errored and rethrows when the pipeline throws', async () => {
+    processUploadedFileMock.mockRejectedValue(new Error('encryption failed'));
+
+    const { result } = renderHook(() => useFileManager());
+
+    await act(async () => {
+      await expect(result.current.processFile(makeFile())).rejects.toThrow('encryption failed');
+    });
+  });
+});
+
+describe('useFileManager — uploadFiles', () => {
+  it('uploads successfully and stamps the resulting firestoreId onto the file', async () => {
+    uploadFileMock.mockResolvedValue({ success: true, documentId: 'doc-1', downloadURL: 'url' });
+
+    const { result } = renderHook(() => useFileManager());
+    await addOneFile(result);
+
+    const addedFile = result.current.files[0]!;
+
+    let uploadResults: any[] = [];
+    await act(async () => {
+      uploadResults = await result.current.uploadFiles([addedFile]);
+    });
+
+    expect(uploadResults[0]).toMatchObject({ success: true, documentId: 'doc-1' });
+    // uploadFiles' success path deliberately overwrites the local generated id with the new
+    // Firestore document id (unifying local/remote identity post-upload) — so the file must now
+    // be looked up by 'doc-1', not the original addedFile.id.
+    expect(result.current.files).toHaveLength(1);
+    expect(result.current.files[0]).toMatchObject({ id: 'doc-1', firestoreId: 'doc-1' });
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('marks the file errored and returns success:false when the upload fails', async () => {
+    uploadFileMock.mockRejectedValue(new Error('storage down'));
+
+    const { result } = renderHook(() => useFileManager());
+    const fileObj = makeFile();
+
+    let uploadResults: any[] = [];
+    await act(async () => {
+      uploadResults = await result.current.uploadFiles([fileObj]);
+    });
+
+    expect(uploadResults[0]).toMatchObject({
+      success: false,
+      fileId: fileObj.id,
+      error: 'storage down',
+    });
+  });
+});
+
+describe('useFileManager — removeFileComplete', () => {
+  it('deletes from Firebase and cleans up local state on success', async () => {
+    deleteFileMock.mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useFileManager());
+    await addOneFile(result);
+    const fileId = result.current.files[0]!.id;
+
+    // Simulate the file having already been uploaded (has a firestoreId).
+    act(() => {
+      result.current.updateFileStatus(fileId, 'completed', { firestoreId: 'doc-1' });
+    });
+
+    await act(async () => {
+      await result.current.removeFileComplete(fileId);
+    });
+
+    expect(deleteFileMock).toHaveBeenCalledWith('doc-1');
+    expect(result.current.files).toHaveLength(0);
+    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Deleted'));
+  });
+
+  it('still removes the file locally even when Firebase deletion fails', async () => {
+    deleteFileMock.mockRejectedValue(new Error('permission denied'));
+
+    const { result } = renderHook(() => useFileManager());
+    await addOneFile(result);
+    const fileId = result.current.files[0]!.id;
+
+    act(() => {
+      result.current.updateFileStatus(fileId, 'completed', { firestoreId: 'doc-1' });
+    });
+
+    await act(async () => {
+      await result.current.removeFileComplete(fileId);
+    });
+
+    expect(result.current.files).toHaveLength(0);
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Could not delete'));
+  });
+});
+
+describe('useFileManager — enhancedClearAll', () => {
+  it('reports a warning toast when some (but not all) Firebase deletions fail', async () => {
+    deleteFileMock.mockImplementation(async (id: string) => {
+      if (id === 'doc-fail') throw new Error('permission denied');
+    });
+
+    const { result } = renderHook(() => useFileManager());
+    await act(async () => {
+      await result.current.addFiles(
+        makeFileList([
+          new File(['a'], 'a.pdf', { type: 'application/pdf' }),
+          new File(['b'], 'b.pdf', { type: 'application/pdf' }),
+        ])
+      );
+    });
+
+    act(() => {
+      result.current.updateFileStatus(result.current.files[0]!.id, 'completed', {
+        firestoreId: 'doc-ok',
+      });
+      result.current.updateFileStatus(result.current.files[1]!.id, 'completed', {
+        firestoreId: 'doc-fail',
+      });
+    });
+
+    await act(async () => {
+      await result.current.enhancedClearAll();
+    });
+
+    expect(result.current.files).toHaveLength(0);
+    expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('Could not delete 1 files'));
+  });
+
+  it('reports success when every Firebase deletion succeeds', async () => {
+    deleteFileMock.mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useFileManager());
+    await addOneFile(result);
+
+    act(() => {
+      result.current.updateFileStatus(result.current.files[0]!.id, 'completed', {
+        firestoreId: 'doc-ok',
+      });
+    });
+
+    await act(async () => {
+      await result.current.enhancedClearAll();
+    });
+
+    expect(result.current.files).toHaveLength(0);
+    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Cleared all files'));
+  });
+});

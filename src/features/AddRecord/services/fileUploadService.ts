@@ -97,7 +97,14 @@ export class FileUploadService implements IFileUploadService {
     } catch (error: any) {
       console.error(`❌ Upload failed for ${fileObj.fileName}:`, error);
 
-      // Convert to our custom error type
+      // Errors thrown by handleRegularFileUpload/handleVirtualFileUpload are already correctly
+      // classified FileUploadErrors — re-deriving the code via getErrorCode (which only
+      // recognizes Firebase Storage's storage/* codes) would silently downgrade them to
+      // UNKNOWN_ERROR, so only wrap genuinely unclassified errors.
+      if (error instanceof FileUploadError) {
+        throw error;
+      }
+
       const uploadError = this.createUploadError(error, fileObj.id);
       throw uploadError;
     }

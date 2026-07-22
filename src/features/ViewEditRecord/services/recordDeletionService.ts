@@ -4,11 +4,15 @@
  * Service to handle the two-step process of deleting a record or removing a user from one.
  *
  * DELETION PERMISSION RULES:
- * - If the record has owners, only an owner can delete it
- * - If there are multiple owners, all other owners must remove themselves first
- * - If there are no owners, any administrator may delete the record if they're the only admin
+ * - If the record has owners, only an owner can delete it, and only once they are the sole
+ *   owner (other owners must remove themselves first). Once sole owner, any remaining admins/
+ *   viewers do NOT block deletion — they are just warned and notified, since the owner already
+ *   has ultimate authority over the record.
+ * - If there are no owners, any administrator may delete the record, but only once they're the
+ *   only admin (other admins must remove themselves first) — this is the actual safety rail for
+ *   ownerless records, since there's no single authority to defer to otherwise.
  * - If there are other subjects (besides the deleting user), they must all unanchor
- *   themselves from the blockchain before deletion is permitted
+ *   themselves from the blockchain before deletion is permitted, regardless of owner/admin status
  *
  * SUBJECT SOVEREIGNTY:
  * Subjects are blockchain-anchored to a record and can only unanchor themselves —
@@ -72,8 +76,10 @@ class RecordDeletionService {
    * and if so, what confirmation warnings to display. Checks in order:
    * 1. User must be an owner (if owners exist) or an administrator (if no owners)
    * 2. No other owners may exist — they must remove themselves first
-   * 3. No other admins may exist - they must remove themselves first
-   * 4. No other subjects may exist — they must unanchor themselves first
+   * 3. If deleting as an administrator (no owner exists), no other admins may exist — they
+   *    must remove themselves first. Does not apply once the user is the sole owner.
+   * 4. No other subjects may exist — they must unanchor themselves first (applies regardless
+   *    of owner/admin status)
    *
    * If the calling user is the only remaining subject, canDelete will be true
    * and the dialog will prompt them to unanchor before proceeding.
@@ -157,8 +163,12 @@ class RecordDeletionService {
       };
     }
 
-    // Check 4: Cannot delete if there are other admins — they must remove themselves first
-    if (otherAdmins.length > 0) {
+    // Check 4: If deleting as an administrator (no owner exists — Check 1 already required
+    // isUserOwner whenever hasOwners is true, so !isUserOwner here means the no-owner/admin
+    // branch), cannot delete while other admins remain — they must remove themselves first.
+    // A sole owner is exempt: they already have ultimate authority and aren't blocked by
+    // remaining admins, who are simply warned about below instead.
+    if (!isUserOwner && otherAdmins.length > 0) {
       return {
         canDelete: false,
         reason:
@@ -192,14 +202,14 @@ class RecordDeletionService {
     }
 
     // At this point the user is permitted to delete:
-    // - They are the sole/only owner or admin if no owner exists
+    // - They are the sole owner (any remaining admins/viewers are just warned below), or the
+    //   sole admin if no owner exists
     // - No other subjects remain on the record
     // Build confirmation warnings for affected users.
     const warnings: string[] = [];
 
-    // Warn about other viewers being affected. May 23 changed to make it so admins can only
-    // delete if there are no other admins, so will only ever mention viewers. Leaving the code
-    // since it's harmless and might change in the future
+    // Warn about other admins/viewers being affected — reachable for a sole owner even with
+    // admins still on the record (Check 4 only blocks the no-owner/admin-deleting path).
     if (otherAdmins.length > 0 || otherViewers.length > 0) {
       const userBreakdown: string[] = [];
 
