@@ -73,12 +73,19 @@ function makeRecord(overrides: Partial<FileObject> = {}): FileObject {
   return { id: 'record-1', administrators: [USER], ...overrides } as FileObject;
 }
 
-function roles(overrides: { owners?: string[]; administrators?: string[]; viewers?: string[] } = {}) {
+function roles(
+  overrides: {
+    owners?: string[];
+    administrators?: string[];
+    viewers?: string[];
+    sharers?: string[];
+  } = {}
+) {
   return {
     owners: overrides.owners ?? [],
     administrators: overrides.administrators ?? [USER],
     viewers: overrides.viewers ?? [],
-    sharers: [] as string[],
+    sharers: overrides.sharers ?? [],
   };
 }
 
@@ -203,6 +210,20 @@ describe('checkDeletionPermissions — guard clause ordering', () => {
     expect(result.confirmationMessage).toContain('1 viewer');
   });
 
+  it('counts and warns about sharers, without blocking deletion (same tier as viewers)', async () => {
+    getRecordRolesMock.mockResolvedValue(
+      roles({ administrators: [USER], sharers: ['sharer-1', 'sharer-2'] })
+    );
+
+    const result = await RecordDeletionService.checkDeletionPermissions(makeRecord(), USER);
+
+    expect(result.canDelete).toBe(true);
+    expect(result.otherSharers).toEqual(['sharer-1', 'sharer-2']);
+    expect(result.otherUserCount).toBe(2);
+    expect(result.confirmationMessage).toContain('2 other users');
+    expect(result.confirmationMessage).toContain('2 sharers');
+  });
+
   it('allows the sole administrator to delete when there are no owners and no other users', async () => {
     getRecordRolesMock.mockResolvedValue(roles({ administrators: [USER] }));
 
@@ -239,6 +260,22 @@ describe('deleteRecord', () => {
     expect(calls).toEqual(['storage', 'subjectRequests', 'versions', 'wrappedKeys', 'firestore']);
     expect(setDocMock).toHaveBeenCalled(); // creates the deletion event
     expect(updateDocMock).toHaveBeenCalledWith(expect.anything(), { deletionComplete: true });
+  });
+
+  it('includes other sharers in the deletion event so the notification trigger can reach them', async () => {
+    getRecordRolesMock.mockResolvedValue(
+      roles({ administrators: [USER], sharers: ['sharer-1'] })
+    );
+    getFileMetadataMock.mockResolvedValue({ storagePath: null });
+
+    await RecordDeletionService.deleteRecord(makeRecord(), USER);
+
+    expect(setDocMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        affectedUsers: expect.objectContaining({ sharers: ['sharer-1'] }),
+      })
+    );
   });
 
   it('skips storage deletion when the file has no storagePath (virtual records)', async () => {

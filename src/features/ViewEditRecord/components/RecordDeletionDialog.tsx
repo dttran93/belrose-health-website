@@ -207,6 +207,12 @@ const OptionsContent: React.FC<{
                             {checkResult.otherAdmins.length > 1 ? 's' : ''})
                           </>
                         )}
+                        {checkResult.otherSharers && checkResult.otherSharers.length > 0 && (
+                          <>
+                            , {checkResult.otherSharers.length} sharer
+                            {checkResult.otherSharers.length > 1 ? 's' : ''}
+                          </>
+                        )}
                         {checkResult.otherViewers && checkResult.otherViewers.length > 0 && (
                           <>
                             , {checkResult.otherViewers.length} viewer

@@ -6,11 +6,12 @@
  * DELETION PERMISSION RULES:
  * - If the record has owners, only an owner can delete it, and only once they are the sole
  *   owner (other owners must remove themselves first). Once sole owner, any remaining admins/
- *   viewers do NOT block deletion — they are just warned and notified, since the owner already
- *   has ultimate authority over the record.
+ *   sharers/viewers do NOT block deletion — they are just warned and notified, since the owner
+ *   already has ultimate authority over the record.
  * - If there are no owners, any administrator may delete the record, but only once they're the
  *   only admin (other admins must remove themselves first) — this is the actual safety rail for
- *   ownerless records, since there's no single authority to defer to otherwise.
+ *   ownerless records, since there's no single authority to defer to otherwise. Sharers/viewers
+ *   never block deletion either way — they're notified afterward, not asked to consent first.
  * - If there are other subjects (besides the deleting user), they must all unanchor
  *   themselves from the blockchain before deletion is permitted, regardless of owner/admin status
  *
@@ -65,6 +66,7 @@ export interface DeletionCheckResult {
   otherOwners?: string[];
   otherAdmins?: string[];
   otherViewers?: string[];
+  otherSharers?: string[];
   otherSubjects?: string[];
 }
 
@@ -106,17 +108,22 @@ class RecordDeletionService {
     const hasSubjects = subjects && subjects.length > 0;
     const subjectCount = subjects?.length || 0;
 
-    const { owners, administrators, viewers } = roleInfo;
+    const { owners, administrators, viewers, sharers } = roleInfo;
 
     // Check if there's an owner
-    const userRole = PermissionsService.getUserRole({ owners, administrators, viewers }, userId);
+    const userRole = PermissionsService.getUserRole(
+      { owners, administrators, viewers, sharers },
+      userId
+    );
 
     // Calculate other users (everyone except current user)
     const otherOwners = owners.filter(id => id !== userId);
     const otherAdmins = administrators.filter(id => id !== userId);
     const otherViewers = viewers.filter(id => id !== userId);
+    const otherSharers = sharers.filter(id => id !== userId);
     const otherSubjects = subjects.filter(id => id !== userId);
-    const totalOtherUsers = otherOwners.length + otherAdmins.length + otherViewers.length;
+    const totalOtherUsers =
+      otherOwners.length + otherAdmins.length + otherViewers.length + otherSharers.length;
 
     // Permission logic:
     const hasOwners = owners.length > 0;
@@ -202,25 +209,28 @@ class RecordDeletionService {
     }
 
     // At this point the user is permitted to delete:
-    // - They are the sole owner (any remaining admins/viewers are just warned below), or the
-    //   sole admin if no owner exists
+    // - They are the sole owner (any remaining admins/sharers/viewers are just warned below), or
+    //   the sole admin if no owner exists
     // - No other subjects remain on the record
     // Build confirmation warnings for affected users.
     const warnings: string[] = [];
 
-    // Warn about other admins/viewers being affected — reachable for a sole owner even with
-    // admins still on the record (Check 4 only blocks the no-owner/admin-deleting path).
-    if (otherAdmins.length > 0 || otherViewers.length > 0) {
+    // Warn about other admins/sharers/viewers being affected — reachable for a sole owner even
+    // with admins still on the record (Check 4 only blocks the no-owner/admin-deleting path).
+    if (otherAdmins.length > 0 || otherSharers.length > 0 || otherViewers.length > 0) {
       const userBreakdown: string[] = [];
 
       if (otherAdmins.length > 0) {
         userBreakdown.push(`${otherAdmins.length} admin${otherAdmins.length > 1 ? 's' : ''}`);
       }
+      if (otherSharers.length > 0) {
+        userBreakdown.push(`${otherSharers.length} sharer${otherSharers.length > 1 ? 's' : ''}`);
+      }
       if (otherViewers.length > 0) {
         userBreakdown.push(`${otherViewers.length} viewer${otherViewers.length > 1 ? 's' : ''}`);
       }
 
-      const totalAffected = otherAdmins.length + otherViewers.length;
+      const totalAffected = otherAdmins.length + otherSharers.length + otherViewers.length;
       warnings.push(
         `This will delete the record for ${totalAffected} other user${
           totalAffected > 1 ? 's' : ''
@@ -236,10 +246,11 @@ class RecordDeletionService {
       confirmationMessage: warnings.join('. '),
       hasSubjects,
       subjectCount,
-      affectsOtherUsers: otherAdmins.length > 0 || otherViewers.length > 0,
-      otherUserCount: otherAdmins.length + otherViewers.length,
+      affectsOtherUsers: otherAdmins.length > 0 || otherSharers.length > 0 || otherViewers.length > 0,
+      otherUserCount: otherAdmins.length + otherSharers.length + otherViewers.length,
       otherOwners: [],
       otherAdmins,
+      otherSharers,
       otherViewers,
       otherSubjects: [],
     };
@@ -313,6 +324,7 @@ class RecordDeletionService {
           owners: checkResult.otherOwners || [],
           administrators: checkResult.otherAdmins || [],
           viewers: checkResult.otherViewers || [],
+          sharers: checkResult.otherSharers || [],
           subjects: [],
         },
         deletionComplete: false,
