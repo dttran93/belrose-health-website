@@ -1,7 +1,10 @@
 // test/rules/records.readDelete.test.ts
 //
 // firestore.rules — records/{recordId} — the `read` rule (any role holder can read;
-// a stranger cannot) and the `delete` rule (owners only, or admins when no owners exist).
+// a stranger cannot) and the `delete` rule (sole owner, or sole admin when no owners exist,
+// and no other subjects remain anchored). This must mirror
+// RecordDeletionService.checkDeletionPermissions exactly — the client's UI pre-flight checks
+// are only as good as the actual security boundary behind them.
 
 import { readFileSync } from 'node:fs';
 import { beforeAll, afterAll, beforeEach, describe, it } from 'vitest';
@@ -11,7 +14,7 @@ import {
   assertFails,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { OWNER, ADMIN, SHARER, VIEWER, baseRecord } from './fixtures/recordPermissionMatrix';
+import { OWNER, OWNER_2, ADMIN, ADMIN_2, SHARER, VIEWER, baseRecord } from './fixtures/recordPermissionMatrix';
 
 const STRANGER = 'stranger-uid';
 const UPLOADER = 'uploader-uid';
@@ -88,5 +91,49 @@ describe('firestore.rules — records/{recordId} — delete', () => {
 
     await assertFails(testEnv.authenticatedContext(SHARER).firestore().doc(`records/${recordId}`).delete());
     await assertFails(testEnv.authenticatedContext(VIEWER).firestore().doc(`records/${recordId}`).delete());
+  });
+
+  it('blocks an owner from deleting while another owner exists', async () => {
+    const recordId = 'delete-owner-blocked-with-other-owner';
+    await seed(recordId, baseRecord({ owners: [OWNER, OWNER_2] }));
+
+    await assertFails(testEnv.authenticatedContext(OWNER).firestore().doc(`records/${recordId}`).delete());
+    await assertFails(testEnv.authenticatedContext(OWNER_2).firestore().doc(`records/${recordId}`).delete());
+  });
+
+  it('lets a sole owner delete despite other admins, sharers, and viewers present', async () => {
+    const recordId = 'delete-sole-owner-allowed-with-other-roles';
+    await seed(recordId, baseRecord({ owners: [OWNER], administrators: [ADMIN], sharers: [SHARER], viewers: [VIEWER] }));
+
+    await assertSucceeds(testEnv.authenticatedContext(OWNER).firestore().doc(`records/${recordId}`).delete());
+  });
+
+  it('blocks an admin from deleting while another admin exists and no owner', async () => {
+    const recordId = 'delete-admin-blocked-with-other-admin';
+    await seed(recordId, baseRecord({ owners: [], administrators: [ADMIN, ADMIN_2] }));
+
+    await assertFails(testEnv.authenticatedContext(ADMIN).firestore().doc(`records/${recordId}`).delete());
+    await assertFails(testEnv.authenticatedContext(ADMIN_2).firestore().doc(`records/${recordId}`).delete());
+  });
+
+  it('lets a sole admin delete despite other sharers/viewers present when no owner exists', async () => {
+    const recordId = 'delete-sole-admin-allowed-with-other-roles';
+    await seed(recordId, baseRecord({ owners: [], administrators: [ADMIN], sharers: [SHARER], viewers: [VIEWER] }));
+
+    await assertSucceeds(testEnv.authenticatedContext(ADMIN).firestore().doc(`records/${recordId}`).delete());
+  });
+
+  it('blocks deletion when another subject remains anchored, even for a sole owner', async () => {
+    const recordId = 'delete-blocked-other-subject-remains';
+    await seed(recordId, baseRecord({ owners: [OWNER], subjects: [SUBJECT] }));
+
+    await assertFails(testEnv.authenticatedContext(OWNER).firestore().doc(`records/${recordId}`).delete());
+  });
+
+  it('lets a sole owner delete when they are also the sole remaining subject', async () => {
+    const recordId = 'delete-allowed-caller-is-sole-subject';
+    await seed(recordId, baseRecord({ owners: [OWNER], subjects: [OWNER] }));
+
+    await assertSucceeds(testEnv.authenticatedContext(OWNER).firestore().doc(`records/${recordId}`).delete());
   });
 });

@@ -46,11 +46,17 @@ Three npm workspaces (`packages/*` in root `package.json`):
 **Frontend (project root):**
 
 ```bash
-npm run dev          # Vite dev server with hot reload
-npm run build        # Production build
-npm run type-check   # TypeScript type checking (primary correctness gate — no frontend test suite)
-npm run lint         # ESLint
-npm run preview      # Preview production build
+npm run dev               # Vite dev server with hot reload
+npm run build             # Production build
+npm run type-check        # TypeScript type checking
+npm run lint               # ESLint
+npm run preview            # Preview production build
+npm run test                # Vitest unit tests (pure functions, mocked deps — no emulator)
+npm run test:watch          # Vitest unit tests, watch mode
+npm run test:rules          # Firestore security rules tests (spins up Firestore emulator)
+npm run test:orchestration  # Service-layer tests against Firestore emulator (permissive rules, mocked blockchain/auth)
+npm run test:e2e            # Playwright e2e — real browser + Auth/Firestore/Functions emulators + real Base Sepolia calls
+npm run test:functions      # Functions unit tests, run against Firestore/Auth emulator
 ```
 
 **Firebase Functions (`cd functions`):**
@@ -59,6 +65,7 @@ npm run preview      # Preview production build
 npm run build        # Compile TypeScript
 npm run serve        # Start Firebase emulators
 npm run deploy       # Deploy to Firebase
+npm run test         # Vitest unit tests (functions/test/*.test.ts)
 ```
 
 ## Smart Contract Deployment - CRITICAL RULES
@@ -182,6 +189,13 @@ Secrets are in `.env.local` (gitignored — never commit). Contains: Firebase co
 
 ## Testing
 
-- **Frontend**: No test suite. `npm run type-check` is the primary correctness gate.
-- **Contracts**: Hardhat tests in `/test` — run with `npm run test` inside `/contracts`.
-- **Functions**: No automated tests.
+A layered test suite (see the comment in `playwright.config.ts` for the full rationale), from fastest/most-isolated to slowest/most-integrated:
+
+1. **Frontend unit tests** (`src/**/*.test.ts(x)`, `npm run test`) — Vitest, `node` environment by default; component/hook tests opt into `jsdom` per-file via a `// @vitest-environment jsdom` comment. Pure logic and mocked dependencies, no emulator required.
+2. **Firestore rules tests** (`test/rules/**`, `npm run test:rules`) — Vitest against a real Firestore emulator (`firebase emulators:exec`), asserting security rules directly (allowed/denied reads/writes per role).
+3. **Orchestration tests** (`test/orchestration/**`, `npm run test:orchestration`) — Vitest against a real Firestore emulator with permissive rules (`test/orchestration/permissive.rules`), exercising service-layer logic (e.g. `PermissionsService`) with blockchain/auth mocked.
+4. **Functions unit tests** (`functions/test/**`, `npm run test:functions` from root or `npm run test` inside `/functions`) — Vitest against Auth/Firestore emulators, covering Cloud Functions (guest invites, dependent accounts, account switching, etc.).
+5. **Contract tests** (`contracts/test/**`, `npm run test` inside `/contracts`) — Hardhat tests for `HealthRecordCore.sol` / `MemberRoleManager.sol` (e.g. owner self-demotion, trustee anchor revocation).
+6. **E2E tests** (`e2e/**`, `npm run test:e2e`) — Playwright driving a real browser against the real frontend, real Auth/Firestore/Functions emulators, and the real `signSponsorship` Cloud Function talking to real Base Sepolia + Pimlico (needs `functions/.env` populated with real credentials). Deliberately kept to a handful of the highest-value flows (signup, dependents, guest claim) — the combinatorial matrix lives in the layers above instead.
+
+`npm run type-check` remains the fastest correctness gate for quick iteration, but is no longer the only one — prefer the relevant test layer above when changing behavior, not just types.

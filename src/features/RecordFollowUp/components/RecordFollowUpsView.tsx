@@ -1,4 +1,4 @@
-// src/features/RefineRecord/components/RecordFollowUpsView.tsx
+// src/features/RecordFollowUp/components/RecordFollowUpsView.tsx
 
 /**
  * RecordFollowUpsView

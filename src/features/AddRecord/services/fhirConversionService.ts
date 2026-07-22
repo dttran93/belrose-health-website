@@ -114,10 +114,14 @@ const validateStructure = (fhirResource: FHIRResource): ValidationResult => {
     try {
       const result = fhirpath.evaluate(fhirResource, check.expression, undefined, fhirpathR4Model);
 
+      // For boolean-expected checks (e.g. `entry.exists()`), fhirpath.evaluate always returns a
+      // length-1 array wrapping the actual boolean — `result.length > 0` alone is always true
+      // regardless of whether that boolean is true or false, so the array's contents must be
+      // compared against check.expected, not just its presence.
       const passed =
         typeof check.expected === 'boolean'
           ? Array.isArray(result)
-            ? result.length > 0
+            ? result.length > 0 && result[0] === check.expected
             : !!result
           : Array.isArray(result)
             ? result.includes(check.expected)

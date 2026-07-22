@@ -25,8 +25,8 @@ const recordDeletionEmailTemplates_1 = require("../emails/recordDeletionEmailTem
  * excluding the user who performed the deletion.
  */
 function getAffectedUserIds(event) {
-    const { owners, administrators, viewers, subjects } = event.affectedUsers;
-    const all = [...owners, ...administrators, ...viewers, ...subjects];
+    const { owners, administrators, viewers, sharers, subjects } = event.affectedUsers;
+    const all = [...owners, ...administrators, ...viewers, ...sharers, ...subjects];
     // Deduplicate and exclude the deleter (they don't need to notify themselves)
     return [...new Set(all)].filter(id => id !== event.deletedBy);
 }

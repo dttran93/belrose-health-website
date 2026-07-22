@@ -7,8 +7,8 @@ import { RecordIdentifiersPopover } from '@/features/ViewEditRecord/components/V
 import { CredibilityBadge } from '@/features/Credibility/components/ui/CredibilityBadge';
 import { formatTimestamp } from '@/utils/dataFormattingUtils';
 import SubjectBadge from '@/features/Subject/components/SubjectBadge';
-import FollowUpBadge from '@/features/RefineRecord/components/ui/FollowUpBadge';
-import { useRecordFollowUps } from '@/features/RefineRecord/hooks/useRecordFollowUps';
+import FollowUpBadge from '@/features/RecordFollowUp/components/ui/FollowUpBadge';
+import { useRecordFollowUps } from '@/features/RecordFollowUp/hooks/useRecordFollowUps';
 
 interface HealthRecordCardProps {
   record: FileObject;

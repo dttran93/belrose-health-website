@@ -58,10 +58,12 @@ export async function addRecordsToRequest(
   );
   console.log(`✅ Role '${role}' granted on ${succeededIds.length} record(s)`);
 
-  // Step 3: Register linked record IDs on the request document
+  // Step 3: Register linked record IDs on the request document — only the ones that actually
+  // succeeded on-chain, not every id that was requested (a partial grantRoleBatch failure must
+  // not be reported to the requester as fulfilled).
   const db = getFirestore();
   await updateDoc(doc(db, 'recordRequests', request.inviteCode), {
-    fulfilledRecordIds: arrayUnion(...recordIds),
+    fulfilledRecordIds: arrayUnion(...succeededIds),
   });
   console.log('✅ fulfilledRecordIds updated:', request.inviteCode);
 

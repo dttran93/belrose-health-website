@@ -8,8 +8,8 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import { Button } from '@/components/ui/Button';
 import { FileObject } from '@/types/core';
 import { FHIRWithValidation } from '../services/fhirConversionService.type';
-import useRecordFollowUps from '@/features/RefineRecord/hooks/useRecordFollowUps';
-import FollowUpItems from '@/features/RefineRecord/components/ui/FollowUpItems';
+import useRecordFollowUps from '@/features/RecordFollowUp/hooks/useRecordFollowUps';
+import FollowUpItems from '@/features/RecordFollowUp/components/ui/FollowUpItems';
 
 export interface FileListItemProps {
   fileItem: FileObject;

@@ -33,7 +33,7 @@ import { useUserRecords } from '@/features/ViewEditRecord/hooks/useUserRecords';
 import { BelroseUserProfile } from '@/types/core';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
 import useHealthProfile from '@/features/HealthProfile/hooks/useHealthProfile';
-import { useActionsCount } from '@/features/RefineRecord/hooks/useActionsCount';
+import { useActionsCount } from '@/features/RecordFollowUp/hooks/useActionsCount';
 import FollowUpsWidget from '@/features/HomeDashboard/components/FollowUpsWidget';
 
 // ─── Greeting helper ────────────────────────────────────────────────────────

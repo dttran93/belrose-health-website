@@ -30,11 +30,11 @@ import SubjectService from '@/features/Subject/services/subjectService';
 import SubjectRemovalService from '@/features/Subject/services/subjectRemovalService';
 import { useNavigate } from 'react-router-dom';
 import { useReviewedByCurrentUser } from '@/features/Credibility/hooks/useReviewedByCurrentUser';
-import FollowUpBadge from '@/features/RefineRecord/components/ui/FollowUpBadge';
-import RecordFollowUpsView from '@/features/RefineRecord/components/RecordFollowUpsView';
+import FollowUpBadge from '@/features/RecordFollowUp/components/ui/FollowUpBadge';
+import RecordFollowUpsView from '@/features/RecordFollowUp/components/RecordFollowUpsView';
 import { BelroseFields } from '@belrose/shared';
 import LinkRequestModal from '@/features/RequestRecord/components/Respond/LinkRequestModal';
-import { useRecordFollowUps } from '@/features/RefineRecord/hooks/useRecordFollowUps';
+import { useRecordFollowUps } from '@/features/RecordFollowUp/hooks/useRecordFollowUps';
 import { CopyableHash } from '@/features/BackendChainParity/components/ui/CopyableHash';
 
 type ViewMode =

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/Button';
 import { Plus, Minus } from 'lucide-react';
 import { EditFHIRFieldProps } from './Record.types';
 
-const getInputType = (value: any, label: string): string => {
+export const getInputType = (value: any, label: string): string => {
   if (typeof value === 'boolean') return 'checkbox';
   if (typeof value === 'number') return 'number';
 

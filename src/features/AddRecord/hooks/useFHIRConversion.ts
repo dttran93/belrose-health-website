@@ -59,11 +59,12 @@ export interface HealthRecordData {
 export interface FHIRConversionHookReturn {
   fhirData: Map<string, FHIRWithValidation>;
   reviewedData: Map<string, ReviewedData>;
-  handleFHIRConverted: (
-    fileId: string,
-    fhirData: FHIRWithValidation,
-    fileObj?: FileObject
-  ) => Promise<void>;
+  // Despite the FHIR-sounding call site name, this is the file's *upload result* (only
+  // uploadResult.documentId is read) — the hook uses it to know where to persist the
+  // FHIR data it just produced, not as FHIR input itself. Matches the real implementation's
+  // param and the actual caller in src/pages/AddRecord.tsx, both of which already type/pass it
+  // as an untyped upload-result object rather than FHIRWithValidation.
+  handleFHIRConverted: (fileId: string, uploadResult: any, fileObj?: FileObject) => Promise<void>;
   handleDataConfirmed: (fileId: string, editedData: any) => Promise<void>;
   handleDataRejected: (fileId: string) => void;
   isAllFilesConverted: () => boolean;

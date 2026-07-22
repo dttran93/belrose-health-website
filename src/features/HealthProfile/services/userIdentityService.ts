@@ -1,6 +1,6 @@
 // src/features/HealthProfile/services/userIdentityService.ts
 
-import { getFirestore, doc, setDoc, Timestamp, getDoc } from 'firebase/firestore';
+import { getFirestore, doc, Timestamp, getDoc, writeBatch } from 'firebase/firestore';
 import { UserIdentity } from '../utils/parseUserIdentity';
 import { removeUndefinedValues } from '@/utils/dataFormattingUtils';
 import { EncryptionService } from '@/features/Encryption/services/encryptionService';
@@ -114,54 +114,56 @@ export async function saveUserIdentityRecord(
       masterKey // userKey
     );
   }
-  try {
-    await setDoc(
-      doc(db, 'records', recordId),
-      removeUndefinedValues({
-        id: recordId,
-        recordIdHash: id(recordId),
-        isEncrypted: !!encryptedData,
-        fileName: encryptedData ? null : fileName,
-        fileType: 'application/fhir+json',
-        fileSize: JSON.stringify(fhirData).length,
-        status: 'completed',
-        isVirtual: true,
-        fhirData: encryptedData ? null : fhirData,
-        belroseFields: encryptedData ? null : belroseFields,
-        recordHash,
-        aiProcessingStatus: 'not_needed',
-        owners: [userId],
-        administrators: [],
-        viewers: [],
-        subjects: [],
-        uploadedBy: userId,
-        lastModified: Timestamp.now(),
-        createdAt: Timestamp.now(),
-        uploadedAt: Timestamp.now(),
-        sourceType,
-        encryptedFileName: encryptedData?.fileName ?? undefined,
-        encryptedFhirData: encryptedData?.fhirData ?? undefined,
-        encryptedBelroseFields: encryptedData?.belroseFields ?? undefined,
-      })
-    );
-  } catch (e: any) {
-    console.error('❌ Record write failed:', e.code, e.message);
-    throw e;
-  }
+  // Record + wrappedKey are committed as a single atomic batch — without this, a failure
+  // between the two writes would leave an encrypted record with no way to ever decrypt it
+  // (the wrappedKey is the only place the record's file key is stored).
+  const batch = writeBatch(db);
+
+  batch.set(
+    doc(db, 'records', recordId),
+    removeUndefinedValues({
+      id: recordId,
+      recordIdHash: id(recordId),
+      isEncrypted: !!encryptedData,
+      fileName: encryptedData ? null : fileName,
+      fileType: 'application/fhir+json',
+      fileSize: JSON.stringify(fhirData).length,
+      status: 'completed',
+      isVirtual: true,
+      fhirData: encryptedData ? null : fhirData,
+      belroseFields: encryptedData ? null : belroseFields,
+      recordHash,
+      aiProcessingStatus: 'not_needed',
+      owners: [userId],
+      administrators: [],
+      viewers: [],
+      subjects: [],
+      uploadedBy: userId,
+      lastModified: Timestamp.now(),
+      createdAt: Timestamp.now(),
+      uploadedAt: Timestamp.now(),
+      sourceType,
+      encryptedFileName: encryptedData?.fileName ?? undefined,
+      encryptedFhirData: encryptedData?.fhirData ?? undefined,
+      encryptedBelroseFields: encryptedData?.belroseFields ?? undefined,
+    })
+  );
 
   if (encryptedData) {
-    try {
-      await setDoc(doc(db, 'wrappedKeys', `${recordId}_${userId}`), {
-        recordId,
-        userId,
-        wrappedKey: encryptedData.encryptedKey,
-        isCreator: true,
-        createdAt: new Date(),
-        isActive: true,
-      });
-    } catch (e: any) {
-      console.error('❌ WrappedKey write failed:', e.code, e.message);
-      throw e;
-    }
+    batch.set(doc(db, 'wrappedKeys', `${recordId}_${userId}`), {
+      recordId,
+      userId,
+      wrappedKey: encryptedData.encryptedKey,
+      isCreator: true,
+      createdAt: new Date(),
+      isActive: true,
+    });
+  }
+
+  try {
+    await batch.commit();
+  } catch (e: any) {
+    console.error('❌ Identity record write failed:', e.code, e.message);
+    throw e;
   }
 }

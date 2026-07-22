@@ -17,9 +17,9 @@ import { useSearchParams } from 'react-router-dom';
 import { Bell, ListChecks } from 'lucide-react';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { useNotifications } from '@/features/Notifications/hooks/useNotifications';
-import FollowUpActionsManager from '@/features/RefineRecord/components/FollowUpActionsManager';
+import FollowUpActionsManager from '@/features/RecordFollowUp/components/FollowUpActionsManager';
 import NotificationsManager from '@/features/Notifications/component/NotificationsManager';
-import { useActionsCount } from '@/features/RefineRecord/hooks/useActionsCount';
+import { useActionsCount } from '@/features/RecordFollowUp/hooks/useActionsCount';
 
 // ── Tab config ────────────────────────────────────────────────────────────────
 

@@ -8,6 +8,7 @@ export interface RecordDeletionEvent {
     owners: string[];
     administrators: string[];
     viewers: string[];
+    sharers: string[];
     subjects: string[];
   };
   deletionComplete: boolean;
