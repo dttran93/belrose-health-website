@@ -75,10 +75,31 @@ export const createRecordRequest = onCall(
       );
     }
 
+    // ── Guard: this function only handles the guest flow ─────────────────────
+    // RecordRequestService.createRequest checks Firestore for a registered
+    // (non-guest) user with this email BEFORE calling this Cloud Function, and
+    // handles that case entirely client-side (createRequestForRegisteredUser)
+    // — this function is only ever reached for an email with no full account.
+    // We re-check here (direct invocation, or a register-in-the-gap race, could
+    // still reach us) and fail closed rather than proceeding: createOrRetrieveGuestAccount
+    // reuses whatever Auth account already exists for the email and unconditionally
+    // stamps isGuest: true + a fresh throwaway RSA key onto its Firestore profile,
+    // which would silently corrupt a real user's account if we let it run here.
+    try {
+      const targetAuthUser = await admin.auth().getUserByEmail(targetEmail);
+      const targetProfile = await db.collection('users').doc(targetAuthUser.uid).get();
+      if (targetProfile.exists && !targetProfile.data()?.isGuest) {
+        throw new HttpsError(
+          'failed-precondition',
+          'This email belongs to a registered Belrose account. Please try the request again.'
+        );
+      }
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      // auth/user-not-found — no account at all yet, safe to proceed as a guest.
+    }
+
     // ── Create or retrieve guest account for the provider ────────────────────
-    // Always created so the invite/fulfill URL flow works regardless of whether
-    // the provider is a full user. For full users, we override providerPublicKey
-    // below with their actual RSA key so they can decrypt the note in-app.
     const {
       guestUid: providerGuestUid,
       privateKeyBase64: providerPrivateKey,
@@ -86,27 +107,8 @@ export const createRecordRequest = onCall(
       publicKeyBase64: guestPublicKey,
     } = await createOrRetrieveGuestAccount(targetEmail);
 
-    // ── Check if provider is already a full Belrose user ─────────────────────
-    // If so, use their actual RSA public key instead of the guest one so they
-    // can decrypt the note using their normal session private key.
-    let targetUserId: string | null = null;
-    let providerPublicKey = guestPublicKey;
-
-    try {
-      const targetAuthUser = await admin.auth().getUserByEmail(targetEmail);
-      const targetProfile = await db.collection('users').doc(targetAuthUser.uid).get();
-      const isFullAccount = targetProfile.exists && !targetProfile.data()?.isGuest;
-
-      if (isFullAccount) {
-        targetUserId = targetAuthUser.uid;
-        const fullUserPublicKey = targetProfile.data()?.encryption?.publicKey;
-        if (fullUserPublicKey) {
-          providerPublicKey = fullUserPublicKey;
-        }
-      }
-    } catch {
-      // Not found — guestPublicKey covers this case
-    }
+    const targetUserId: string | null = null;
+    const providerPublicKey = guestPublicKey;
 
     // ── Encrypt the request note ──────────────────────────────────────────────
     // The note is encrypted with a one-off AES-256-GCM key.
@@ -149,9 +151,8 @@ export const createRecordRequest = onCall(
       });
       encryptedNoteKeyForRequester = Buffer.from(wrappedForRequester).toString('base64');
 
-      // 4. Wrap the same AES key with the provider's RSA public key
-      // For full Belrose users this is their real key; for guests it's the
-      // ephemeral key whose private half is in the fulfill URL fragment.
+      // 4. Wrap the same AES key with the provider's RSA public key — the ephemeral
+      // guest key whose private half is in the fulfill URL fragment.
       const providerKeyBuffer = Buffer.from(providerPublicKey, 'base64');
       const rsaProviderKey = await subtle.importKey(
         'spki',
