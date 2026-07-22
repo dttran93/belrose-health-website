@@ -1,4 +1,4 @@
-// src/features/RefineRecord/components/RecordActionGroup.tsx
+// src/features/RecordFollowUp/components/RecordActionGroup.tsx
 
 /**
  * RecordActionGroup

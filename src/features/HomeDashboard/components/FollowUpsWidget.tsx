@@ -18,9 +18,9 @@
 import React from 'react';
 import { FileObject } from '@/types/core';
 import { useNavigate } from 'react-router-dom';
-import useRecordFollowUps from '@/features/RefineRecord/hooks/useRecordFollowUps';
+import useRecordFollowUps from '@/features/RecordFollowUp/hooks/useRecordFollowUps';
 import { LucideIcon } from 'lucide-react';
-import { FollowUpItemId } from '@/features/RefineRecord/components/ui/FollowUpItems';
+import { FollowUpItemId } from '@/features/RecordFollowUp/components/ui/FollowUpItems';
 
 const MAX_RECORDS = 3;
 

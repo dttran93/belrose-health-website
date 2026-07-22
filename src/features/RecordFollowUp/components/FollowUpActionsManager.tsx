@@ -1,4 +1,4 @@
-// src/features/RefineRecord/components/FollowUpActionsManager.tsx
+// src/features/RecordFollowUp/components/FollowUpActionsManager.tsx
 
 /**
  * Aggregates outstanding follow-up actions across all of the current

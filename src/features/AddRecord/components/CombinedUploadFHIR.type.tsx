@@ -5,7 +5,7 @@ import {
   RefinementAnswer,
   RefinementQuestion,
   RefinementStatus,
-} from '@/features/RefineRecord/types';
+} from '@/features/RecordFollowUp/types';
 
 // ============================================================================
 // FILE MANAGEMENT TYPES

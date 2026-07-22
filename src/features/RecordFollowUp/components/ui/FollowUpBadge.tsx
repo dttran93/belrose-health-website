@@ -1,4 +1,4 @@
-// src/features/RefineRecord/components/FollowUpBadge.tsx
+// src/features/RecordFollowUp/components/FollowUpBadge.tsx
 
 /**
  * FollowUpBadge

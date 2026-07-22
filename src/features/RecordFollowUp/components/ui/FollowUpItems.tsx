@@ -1,4 +1,4 @@
-// src/features/RefineRecord/components/FollowUpItems.tsx
+// src/features/RecordFollowUp/components/FollowUpItems.tsx
 
 /**
  * This component shows follow-up items related to record refinement, such as:

@@ -3,7 +3,6 @@
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import {
   collection,
-  addDoc,
   doc,
   updateDoc,
   deleteDoc,
@@ -11,9 +10,9 @@ import {
   getDocs,
   query,
   where,
-  setDoc,
   serverTimestamp,
   Timestamp,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from './config';
 import { auth } from './config';
@@ -236,17 +235,19 @@ export async function createFirestoreRecord({
     createdAt: Timestamp.now(),
   };
 
-  // Save to global records collection
+  // Pre-generate the doc ref client-side (same id addDoc would have produced) so recordIdHash
+  // can be included in the initial write, and the record + wrappedKey writes can be committed
+  // as a single atomic batch — two separate writes here would risk an encrypted record with no
+  // wrappedKey (and therefore no way to ever decrypt it) if the second write failed.
+  const docRef = doc(collection(db, 'records'));
+  documentData.recordIdHash = ethers.keccak256(ethers.toUtf8Bytes(docRef.id));
+
   console.log('📄 Saving documentData:', documentData);
-  const docRef = await addDoc(collection(db, 'records'), removeUndefinedValues(documentData));
 
-  // Add recordIdHash, need to await addDoc so that the recordId is set
-  const recordIdHash = ethers.keccak256(ethers.toUtf8Bytes(docRef.id));
-  await updateDoc(docRef, { recordIdHash });
-
-  // Create wrappedKey entry for the creator
   const wrappedKeyId = `${docRef.id}_${user.uid}`;
-  await setDoc(doc(db, 'wrappedKeys', wrappedKeyId), {
+  const batch = writeBatch(db);
+  batch.set(docRef, removeUndefinedValues(documentData));
+  batch.set(doc(db, 'wrappedKeys', wrappedKeyId), {
     recordId: docRef.id,
     userId: user.uid,
     wrappedKey: fileObj.encryptedData.encryptedKey, // Store the AES key encrypted with creator's master key
@@ -254,6 +255,7 @@ export async function createFirestoreRecord({
     createdAt: new Date(),
     isActive: true,
   });
+  await batch.commit();
   console.log('✅ Creator wrappedKey entry created:', wrappedKeyId);
 
   return docRef.id;

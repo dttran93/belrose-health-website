@@ -99,7 +99,7 @@ export interface UseBlockchainCompletenessReturn {
 // HELPER
 // ============================================================================
 
-function resolveStatus(
+export function resolveStatus(
   currentHash: string | null | undefined,
   previousHashes: string[] | null | undefined,
   recordId: string | undefined,
@@ -412,20 +412,6 @@ export function useBlockchainCompleteness(
         verificationStatsMap,
         disputeStatsMap
       );
-
-      // TEMP DEBUG — remove when fixed
-      console.log(`🔍 [${record.id}]`, {
-        currentHash: hash,
-        previousHashes: record.previousRecordHash,
-        onChainHashes: resolved.onChainHashes,
-        verificationStatsForCurrentHash: verificationStatsMap.get(hash ?? ''),
-        verificationStatsForPrevHashes: (record.previousRecordHash ?? []).map(h => ({
-          hash: h,
-          verifications: verificationStatsMap.get(h),
-        })),
-        resolvedStatus: resolved.status,
-        hasVerification: resolved.hasVerification,
-      });
 
       return { record, ...resolved };
     });

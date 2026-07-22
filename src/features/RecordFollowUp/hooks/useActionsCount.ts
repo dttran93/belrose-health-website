@@ -1,4 +1,4 @@
-// src/features/RefineRecord/hooks/useActionsCount.ts
+// src/features/RecordFollowUp/hooks/useActionsCount.ts
 
 /**
  * useActionsCount
