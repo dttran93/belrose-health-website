@@ -393,11 +393,18 @@ service cloud.firestore {
         )
       );
 
-      // DELETE: Owners only, or admins if no owners exist
+      // DELETE: Sole owner, or sole admin if no owner exists — mirrors
+      // RecordDeletionService.checkDeletionPermissions exactly (owners/admins must have no
+      // peers in their own tier before deleting; other admins/viewers no longer block a sole
+      // owner). Also requires no *other* subjects remain anchored (subject sovereignty) — by
+      // the time RecordDeletionDialog calls delete(), a caller who was themselves the subject
+      // has already unanchored via SubjectActionDialog, so subjects should be empty or just them.
       allow delete: if request.auth != null && (
-        request.auth.uid in resource.data.owners ||
-        (resource.data.owners.size() == 0 && request.auth.uid in resource.data.administrators)
-      );
+        (request.auth.uid in resource.data.owners && resource.data.owners.hasOnly([request.auth.uid])) ||
+        (resource.data.owners.size() == 0 &&
+         request.auth.uid in resource.data.administrators &&
+         resource.data.administrators.hasOnly([request.auth.uid]))
+      ) && resource.data.subjects.hasOnly([request.auth.uid]);
 
       // --- PERMISSION HISTORY SUBCOLLECTION ---
       match /permissionHistory/{eventId} {
