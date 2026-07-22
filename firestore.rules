@@ -801,8 +801,20 @@ service cloud.firestore {
         (resource.data.userId == request.auth.uid && hasRoleOnRecord(resource.data.recordId))
       );
 
+      // Bootstrap branch: the creator's own wrappedKeys entry is written in the same
+      // writeBatch() as the records/{recordId} doc itself (uploadUtils.createFirestoreRecord,
+      // userIdentityService.saveUserIdentityRecord) so an encrypted record can never end up
+      // without a wrappedKey. Security rules evaluate get()/exists() against the pre-batch
+      // snapshot, so isSharerOrAboveOnRecord's get() can't see a sibling record created in the
+      // same batch — records/{recordId} genuinely doesn't exist yet at rule-evaluation time.
+      // Scoped tightly: only the caller's own creator entry for a record that doesn't exist yet;
+      // granting to anyone else, or touching an already-existing record, still requires
+      // isSharerOrAboveOnRecord.
       allow create: if request.auth != null && (
-        isSharerOrAboveOnRecord(request.resource.data.recordId)
+        isSharerOrAboveOnRecord(request.resource.data.recordId) ||
+        (!exists(/databases/$(database)/documents/records/$(request.resource.data.recordId)) &&
+         request.resource.data.userId == request.auth.uid &&
+         request.resource.data.isCreator == true)
       );
 
       allow update: if request.auth != null && (
