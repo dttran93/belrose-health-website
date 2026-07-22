@@ -733,9 +733,19 @@ export class VersionControlService {
     const changes: Change[] = [];
 
     for (const entry of diffEntries) {
-      const currentPath = pathPrefix ? `${pathPrefix}.${entry.key}` : entry.key || '';
+      const isArrayIndex = typeof entry.key === 'string' && /^\d+$/.test(entry.key);
+      const currentPath = !pathPrefix
+        ? entry.key || ''
+        : isArrayIndex
+          ? `${pathPrefix}[${entry.key}]`
+          : `${pathPrefix}.${entry.key}`;
 
-      if (entry.type === 'UPDATE') {
+      // json-diff-ts wraps every ancestor object/array level containing a nested
+      // change in its own UPDATE entry with no value/oldValue (only `.changes`).
+      // Only leaf UPDATE entries represent a real change.
+      const isContainerUpdate = entry.type === 'UPDATE' && !!entry.changes && entry.changes.length > 0;
+
+      if (entry.type === 'UPDATE' && !isContainerUpdate) {
         changes.push({
           operation: 'update',
           path: currentPath,
