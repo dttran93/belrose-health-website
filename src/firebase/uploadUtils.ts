@@ -408,7 +408,7 @@ export const updateFirestoreRecord = async (
     // 8. Create version history
     const recordTitle =
       updateData.belroseFields?.title ||
-      existingPlaintext.belroseFields.title ||
+      existingPlaintext.belroseFields?.title ||
       updateData.fileName ||
       existingPlaintext.fileName;
 
@@ -417,6 +417,11 @@ export const updateFirestoreRecord = async (
     const encryptedUpdatedFileObject = {
       ...currentData,
       ...filteredData,
+      // createVersion's diff calculation reads plaintext fields (fileName, extractedText,
+      // fhirData, etc.) directly off this object — without updatedFileObject's plaintext
+      // spread in here too, every content field would diff as "changed to null" on every
+      // edit, since currentData/filteredData only ever carry encrypted* ciphertext blobs.
+      ...updatedFileObject,
       id: documentId,
       isEncrypted: true,
     };
