@@ -1,6 +1,7 @@
 import type { FHIRWithValidation } from '../services/fhirConversionService.type';
 import { FileObject, VirtualFileInput } from '@/types/core';
 import { UploadResult } from '../services/shared.types';
+import { ProcessFileOptions, UploadFilesOptions } from '../hooks/useFileManager.type';
 import {
   RefinementAnswer,
   RefinementQuestion,
@@ -51,19 +52,15 @@ export interface CombinedUploadFHIRProps {
   getStats: () => FileStats;
 
   onReview: (fileItem: FileObject, viewMode?: string) => void;
-  processFile: (fileObj: FileObject) => Promise<FileObject>;
+  processFile: (fileObj: FileObject, options?: ProcessFileOptions) => Promise<FileObject>;
 
   // Direct upload functions
   addFhirAsVirtualFile: (
     fhirData: FHIRWithValidation,
     options?: VirtualFileInput & { autoUpload?: boolean }
   ) => Promise<VirtualFileResult>;
-  uploadFiles: (filesToUpload: FileObject[]) => Promise<UploadResult[]>;
+  uploadFiles: (filesToUpload: FileObject[], options?: UploadFilesOptions) => Promise<UploadResult[]>;
   savingToFirestore: Set<string>;
-
-  // FHIR Props
-  fhirData?: Map<string, FHIRWithValidation>;
-  onFHIRConverted?: (fileId: string, uploadResult: any, fileObj?: FileObject) => Promise<void>;
 
   // Configuration props
   acceptedTypes?: string[];

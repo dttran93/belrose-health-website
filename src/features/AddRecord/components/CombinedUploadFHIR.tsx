@@ -81,9 +81,10 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
     onReview(fileItem);
   };
 
-  const handleCancelDeleteReset = () => {
-    files.forEach(file => removeFile(file.id));
-    files.forEach(file => removeFileFromLocal(file.id));
+  const handleCancelDeleteReset = (fileId: string) => {
+    // Cancels/removes only the file that was clicked — not the whole batch. removeFile
+    // (removeFileComplete) handles both stopping the upload and cleaning up local state itself.
+    removeFile(fileId);
     setActiveTab('upload');
   };
 

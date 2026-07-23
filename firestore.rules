@@ -272,7 +272,7 @@ service cloud.firestore {
         request.auth.uid in resource.data.administrators ||
         ('sharers' in resource.data && request.auth.uid in resource.data.sharers) ||
         request.auth.uid in resource.data.viewers ||
-        request.auth.uid in resource.data.subjects
+        request.auth.uid in resource.data.get('subjects', [])
       );
 
       // CREATE: Must be authenticated and have management structure
@@ -404,7 +404,7 @@ service cloud.firestore {
         (resource.data.owners.size() == 0 &&
          request.auth.uid in resource.data.administrators &&
          resource.data.administrators.hasOnly([request.auth.uid]))
-      ) && resource.data.subjects.hasOnly([request.auth.uid]);
+      ) && resource.data.get('subjects', []).hasOnly([request.auth.uid]);
 
       // --- PERMISSION HISTORY SUBCOLLECTION ---
       match /permissionHistory/{eventId} {
@@ -446,9 +446,13 @@ service cloud.firestore {
 
       allow update: if false; // Versions are immutable
 
-      allow delete: if request.auth != null &&     
-      exists(/databases/$(database)/documents/records/$(resource.data.recordId)) &&
-      isAdminOrOwnerOfRecord(resource.data.recordId);
+      // A version doc has no per-entry owner field (version 0 baselines never set editedBy),
+      // so once its record is gone there's no meaningful identity left to check — treat it as
+      // inert orphaned data any authenticated user may clean up, rather than permanently stuck.
+      allow delete: if request.auth != null && (
+        !exists(/databases/$(database)/documents/records/$(resource.data.recordId)) ||
+        isAdminOrOwnerOfRecord(resource.data.recordId)
+      );
     }
     
     // ============================================
@@ -529,10 +533,18 @@ service cloud.firestore {
         )
       );
 
-      // DELETE: Only the requester or record admins/owners can delete
+      // DELETE: Requester or record admins/owners can delete while the record exists (the
+      // subject cannot unilaterally delete a live request — they must accept/reject via update
+      // instead, see BRANCH 1 above). Once the record is gone, isAdminOrOwnerOfRecord's internal
+      // get() would throw, so the admin/owner branch is scoped to exists(record); the subject
+      // gains a narrow orphan-cleanup right at that point since there's no longer a live
+      // workflow left to protect.
       allow delete: if request.auth != null && (
         resource.data.requestedBy == request.auth.uid ||
-        isAdminOrOwnerOfRecord(resource.data.recordId)
+        (exists(/databases/$(database)/documents/records/$(resource.data.recordId)) &&
+         isAdminOrOwnerOfRecord(resource.data.recordId)) ||
+        (!exists(/databases/$(database)/documents/records/$(resource.data.recordId)) &&
+         resource.data.subjectId == request.auth.uid)
       );
     }
 
@@ -584,10 +596,18 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'respondedAt', 'subjectResponse']) &&
         request.resource.data.respondedAt is timestamp;
 
-      // DELETE: Requester or record owners/admins can delete (for cancellation)
+      // DELETE: Requester or record owners/admins can delete (for cancellation) while the
+      // record exists — the subject cannot unilaterally delete a live request, only
+      // accept/reject via update (see above). Once the record is gone, isAdminOrOwnerOfRecord's
+      // internal get() would throw, so that branch is scoped to exists(record); the subject
+      // gains a narrow orphan-cleanup right at that point since there's no live workflow left
+      // to protect.
       allow delete: if request.auth != null && (
         resource.data.requestedBy == request.auth.uid ||
-        isAdminOrOwnerOfRecord(resource.data.recordId)
+        (exists(/databases/$(database)/documents/records/$(resource.data.recordId)) &&
+         isAdminOrOwnerOfRecord(resource.data.recordId)) ||
+        (!exists(/databases/$(database)/documents/records/$(resource.data.recordId)) &&
+         resource.data.subjectId == request.auth.uid)
       );
     }
     
@@ -801,8 +821,20 @@ service cloud.firestore {
         (resource.data.userId == request.auth.uid && hasRoleOnRecord(resource.data.recordId))
       );
 
+      // Bootstrap branch: the creator's own wrappedKeys entry is written in the same
+      // writeBatch() as the records/{recordId} doc itself (uploadUtils.createFirestoreRecord,
+      // userIdentityService.saveUserIdentityRecord) so an encrypted record can never end up
+      // without a wrappedKey. Security rules evaluate get()/exists() against the pre-batch
+      // snapshot, so isSharerOrAboveOnRecord's get() can't see a sibling record created in the
+      // same batch — records/{recordId} genuinely doesn't exist yet at rule-evaluation time.
+      // Scoped tightly: only the caller's own creator entry for a record that doesn't exist yet;
+      // granting to anyone else, or touching an already-existing record, still requires
+      // isSharerOrAboveOnRecord.
       allow create: if request.auth != null && (
-        isSharerOrAboveOnRecord(request.resource.data.recordId)
+        isSharerOrAboveOnRecord(request.resource.data.recordId) ||
+        (!exists(/databases/$(database)/documents/records/$(request.resource.data.recordId)) &&
+         request.resource.data.userId == request.auth.uid &&
+         request.resource.data.isCreator == true)
       );
 
       allow update: if request.auth != null && (
@@ -812,11 +844,15 @@ service cloud.firestore {
         resource.data.grantedBy == request.auth.uid)
       );
 
-      allow delete: if request.auth != null &&
-        exists(/databases/$(database)/documents/records/$(resource.data.recordId)) && (
-          isAdminOrOwnerOfRecord(resource.data.recordId) ||
-          resource.data.userId == request.auth.uid ||
-          resource.data.grantedBy == request.auth.uid
+      // exists() only gates the admin/owner branch — it's the only one whose internal get()
+      // would throw once the record is gone. userId/grantedBy are pure field checks on this
+      // doc, so they still let the key's own holder/granter clean up an orphaned wrappedKey
+      // after its record has been deleted (otherwise it would be permanently undeletable).
+      allow delete: if request.auth != null && (
+        (exists(/databases/$(database)/documents/records/$(resource.data.recordId)) &&
+         isAdminOrOwnerOfRecord(resource.data.recordId)) ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.grantedBy == request.auth.uid
       );
     }
     

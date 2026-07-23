@@ -18,10 +18,19 @@ export interface FileStats {
   percentComplete: number;
 }
 
-// ==================== CALLBACK TYPE DEFINITIONS ====================
+// Lets a caller that owns the full processing→upload lifecycle for a file (e.g. UploadTab's
+// "Process & Upload" flow) pass in an activity id up front so both steps report progress onto
+// the same OnChainActivityTray card instead of each minting (and resolving) their own.
+export interface ProcessFileOptions {
+  activityId?: string;
+}
 
-export type FHIRConversionCallback = (fileId: string, fhirData: any) => Promise<void> | void;
-export type ResetProcessCallback = () => void;
+// Maps a file's id to the activityId a prior processFile call already reported progress to,
+// so uploadFiles can finish that same card instead of starting a new one. Files not present in
+// the map (or when the option is omitted entirely) get their own self-contained activity.
+export interface UploadFilesOptions {
+  activityIds?: Record<string, string>;
+}
 
 // ==================== HOOK RETURN TYPE ====================
 
@@ -40,11 +49,7 @@ export interface UseFileManagerTypes {
   retryFile: (fileId: string) => Promise<void>;
   clearAll: () => void;
   enhancedClearAll: () => Promise<void>;
-  processFile: (fileObj: FileObject) => Promise<FileObject>;
-
-  // FHIR integration
-  setFHIRConversionCallback: (callback: FHIRConversionCallback) => void;
-  setResetProcessCallback: (callback: ResetProcessCallback) => void;
+  processFile: (fileObj: FileObject, options?: ProcessFileOptions) => Promise<FileObject>;
 
   // Status updates
   updateFileStatus: (
@@ -54,7 +59,7 @@ export interface UseFileManagerTypes {
   ) => void;
 
   // Firestore operations
-  uploadFiles: (filesToUpload: FileObject[]) => Promise<UploadResult[]>;
+  uploadFiles: (filesToUpload: FileObject[], options?: UploadFilesOptions) => Promise<UploadResult[]>;
   updateFirestoreRecord: (fileId: string, data: any) => Promise<void>;
 
   // Computed values

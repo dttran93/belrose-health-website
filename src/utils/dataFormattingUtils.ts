@@ -236,6 +236,18 @@ export const formatRelativeTime = (timestamp: any): string => {
 };
 
 /**
+ * Formats a Date as a local YYYY-MM-DD string for `<input type="date">` values.
+ * Unlike `date.toISOString().split('T')[0]`, this uses local time components,
+ * so it won't shift to the previous/next day for users off UTC.
+ */
+export const toDateInputValue = (date: Date = new Date()): string => {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+/**
  * Data formatting utility for calculating age based on Birthday
  * @param dob takes Date of Birth as a date object
  * @returns age as a number

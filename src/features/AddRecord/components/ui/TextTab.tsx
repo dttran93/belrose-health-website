@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { toast } from 'sonner';
 import type { FHIRWithValidation } from '../../services/fhirConversionService.type';
 import { VirtualFileInput } from '@/types/core';
 import { VirtualFileResult } from '../CombinedUploadFHIR.type';
@@ -57,6 +56,8 @@ const TextTab: React.FC<TextTabProps> = ({ convertTextToFHIR, addFhirAsVirtualFi
         };
       }
 
+      // Success/failure is surfaced via the OnChainActivityTray card addFhirAsVirtualFile
+      // (processVirtualRecord) reports to internally — no separate toast needed.
       await addFhirAsVirtualFile(fhirData, {
         fileName: `Medical Note - ${new Date().toLocaleDateString()}`,
         sourceType: 'Plain Text Submission',
@@ -64,20 +65,9 @@ const TextTab: React.FC<TextTabProps> = ({ convertTextToFHIR, addFhirAsVirtualFi
         autoUpload: true,
       });
 
-      toast.success('Medical note saved successfully!', {
-        description: 'Your note has been converted to FHIR and saved to your health record',
-        duration: 4000,
-      });
-
       setPlainText('');
     } catch (error) {
       console.error('Error converting text to FHIR:', error);
-      toast.error(
-        `Failed to save medical note: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        {
-          duration: 6000,
-        }
-      );
     } finally {
       setSubmitting(false);
     }

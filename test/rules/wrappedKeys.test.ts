@@ -11,6 +11,7 @@ import {
   assertFails,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
+import { doc, writeBatch } from 'firebase/firestore';
 import { OWNER, ADMIN, SHARER, VIEWER, baseRecord } from './fixtures/recordPermissionMatrix';
 
 const OTHER_SHARER = 'other-sharer-uid';
@@ -81,6 +82,60 @@ describe('firestore.rules — wrappedKeys — create', () => {
         .set({ recordId, userId: RECEIVER, grantedBy: VIEWER, isActive: true })
     );
   });
+
+  // Bootstrap branch: uploadUtils.createFirestoreRecord and userIdentityService.saveUserIdentityRecord
+  // write the records/{recordId} doc and its creator's wrappedKeys doc in a single writeBatch() so an
+  // encrypted record can never end up with no wrappedKey. Security rules evaluate get()/exists() against
+  // the pre-batch snapshot, so isSharerOrAboveOnRecord's get() on the sibling record can't see it — the
+  // record genuinely doesn't exist yet from the rule's point of view during that same-batch write.
+  it("lets the caller create their own creator wrappedKey in the same batch as the record's own creation", async () => {
+    const recordId = 'wk-create-bootstrap-same-batch';
+    const db = testEnv.authenticatedContext('uploader-uid').firestore();
+
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'records', recordId), {
+      uploadedBy: 'uploader-uid',
+      owners: [],
+      administrators: ['uploader-uid'],
+      isEncrypted: true,
+    });
+    batch.set(doc(db, 'wrappedKeys', `${recordId}_uploader-uid`), {
+      recordId,
+      userId: 'uploader-uid',
+      wrappedKey: 'fake',
+      isCreator: true,
+      isActive: true,
+    });
+
+    await assertSucceeds(batch.commit());
+  });
+
+  it('denies creating an isCreator wrappedKey for someone else on a record that does not exist yet', async () => {
+    const recordId = 'wk-create-bootstrap-denies-other-user';
+
+    await assertFails(
+      testEnv
+        .authenticatedContext(STRANGER)
+        .firestore()
+        .doc(`wrappedKeys/${recordId}_${RECEIVER}`)
+        .set({ recordId, userId: RECEIVER, isCreator: true, isActive: true })
+    );
+  });
+
+  it('denies the bootstrap branch once the record already exists — falls back to isSharerOrAboveOnRecord', async () => {
+    const recordId = 'wk-create-bootstrap-denied-record-exists';
+    await seedRecord(recordId);
+
+    // VIEWER holds a role but is below sharer — same as the existing "denies a viewer" case above,
+    // this just also pins that an existing record can't be routed through the bootstrap branch.
+    await assertFails(
+      testEnv
+        .authenticatedContext(VIEWER)
+        .firestore()
+        .doc(`wrappedKeys/${recordId}_${VIEWER}`)
+        .set({ recordId, userId: VIEWER, isCreator: true, isActive: true })
+    );
+  });
 });
 
 describe('firestore.rules — wrappedKeys — update', () => {
@@ -140,6 +195,47 @@ describe('firestore.rules — wrappedKeys — delete', () => {
     await seedWrappedKey(recordId, 'key-1', { userId: RECEIVER, grantedBy: SHARER, isActive: true });
 
     await assertSucceeds(testEnv.authenticatedContext(ADMIN).firestore().doc('wrappedKeys/key-1').delete());
+  });
+
+  // Regression: the record's own delete happens after its wrappedKeys are cleaned up (their
+  // delete rules require the record to still exist to check admin/owner status), so a wrappedKey
+  // orphaned by its parent record already being gone should still be cleanable — otherwise a
+  // record delete that failed on its very last step (or any other historical partial failure)
+  // leaves it permanently undeletable by anyone, forever.
+  it("lets the key's own holder delete it once its parent record no longer exists", async () => {
+    await seedWrappedKey('deleted-record-id', 'key-orphan-holder', {
+      userId: RECEIVER,
+      grantedBy: SHARER,
+      isActive: true,
+    });
+
+    await assertSucceeds(
+      testEnv.authenticatedContext(RECEIVER).firestore().doc('wrappedKeys/key-orphan-holder').delete()
+    );
+  });
+
+  it('lets whoever granted an orphaned wrapped key delete it once its parent record no longer exists', async () => {
+    await seedWrappedKey('deleted-record-id', 'key-orphan-granter', {
+      userId: RECEIVER,
+      grantedBy: SHARER,
+      isActive: true,
+    });
+
+    await assertSucceeds(
+      testEnv.authenticatedContext(SHARER).firestore().doc('wrappedKeys/key-orphan-granter').delete()
+    );
+  });
+
+  it('still denies a stranger from deleting an orphaned wrapped key they have no relationship to', async () => {
+    await seedWrappedKey('deleted-record-id', 'key-orphan-stranger', {
+      userId: RECEIVER,
+      grantedBy: SHARER,
+      isActive: true,
+    });
+
+    await assertFails(
+      testEnv.authenticatedContext(STRANGER).firestore().doc('wrappedKeys/key-orphan-stranger').delete()
+    );
   });
 });
 

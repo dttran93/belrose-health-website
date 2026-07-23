@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
 import useFileManager from '@/features/AddRecord/hooks/useFileManager';
-import { useFHIRConversion } from '@/features/AddRecord/hooks/useFHIRConversion';
 import { convertToFHIR } from '@/features/AddRecord/services/fhirConversionService';
 import { FileObject } from '@/types/core';
 import CombinedUploadFHIR from '@/features/AddRecord/components/CombinedUploadFHIR';
@@ -28,7 +27,6 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
 
   const {
     files,
-    processedFiles,
     savingToFirestore,
     addFiles,
     removeFileFromLocal,
@@ -36,12 +34,10 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
     retryFile,
     updateFileStatus,
     uploadFiles,
-    updateFirestoreRecord,
     getStats,
     savedToFirestoreCount,
     savingCount,
     processVirtualRecord,
-    setFHIRConversionCallback,
     processFile,
     reset: resetFileUpload,
   } = useFileManager();
@@ -61,32 +57,6 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
   const completedFileIds = files
     .filter(f => f.status === 'completed' && f.firestoreId)
     .map(f => f.firestoreId!);
-
-  const {
-    fhirData,
-    handleFHIRConverted,
-    reset: resetFHIR,
-  } = useFHIRConversion(processedFiles, updateFirestoreRecord, uploadFiles);
-
-  React.useEffect(() => {
-    console.log('🔍 Setting FHIR callback:', typeof handleFHIRConverted);
-    setFHIRConversionCallback((fileId: string, uploadResult: any) => {
-      console.log('🎯 FHIR CALLBACK TRIGGERED:', fileId, uploadResult);
-
-      const currentFile = files.find(f => f.id === fileId);
-      if (!currentFile || !currentFile.extractedText) {
-        console.error('❌ File not found in current files:', fileId);
-        console.log(
-          '📋 Available files:',
-          files.map(f => ({ id: f.id, name: f.fileName }))
-        );
-        return Promise.resolve();
-      }
-
-      console.log('✅ Found file for FHIR conversion:', currentFile.fileName);
-      return handleFHIRConverted(fileId, uploadResult); // Pass the file object
-    });
-  }, [setFHIRConversionCallback, handleFHIRConverted, files]);
 
   // Block navigation if guest has uploaded something
 
@@ -132,8 +102,6 @@ const AddRecord: React.FC<AddRecordProps> = ({ className }) => {
           getStats={getStats}
           addFhirAsVirtualFile={processVirtualRecord}
           uploadFiles={uploadFiles}
-          fhirData={fhirData}
-          onFHIRConverted={handleFHIRConverted}
           convertTextToFHIR={convertToFHIR}
           savingToFirestore={savingToFirestore}
           onReview={handleReviewFile}

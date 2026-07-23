@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { toast } from 'sonner';
 import {
   validateBasicFhirStructure,
   getValidationSummary,
@@ -36,6 +35,8 @@ const FHIRTab: React.FC<FHIRTabProps> = ({ addFhirAsVirtualFile }) => {
     try {
       const fhirData: FHIRWithValidation = JSON.parse(fhirText);
 
+      // Success/failure is surfaced via the OnChainActivityTray card addFhirAsVirtualFile
+      // (processVirtualRecord) reports to internally — no separate toast needed.
       await addFhirAsVirtualFile(fhirData, {
         fileName: `Manual FHIR Input - ${fhirData.resourceType}`,
         sourceType: 'Manual FHIR JSON Submission',
@@ -44,22 +45,11 @@ const FHIRTab: React.FC<FHIRTabProps> = ({ addFhirAsVirtualFile }) => {
         contextText: contextText.trim(),
       });
 
-      toast.success('FHIR data uploaded successfully!', {
-        description: 'Your FHIR data is now in your Comprehensive Health Record',
-        duration: 4000,
-      });
-
       setFhirText('');
       setContextText('');
       setValidation(null);
     } catch (error) {
       console.error('Error submitting FHIR data:', error);
-      toast.error(
-        `Failed to upload FHIR data: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        {
-          duration: 6000,
-        }
-      );
     } finally {
       setSubmitting(false);
     }

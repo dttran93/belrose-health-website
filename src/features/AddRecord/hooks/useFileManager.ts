@@ -15,8 +15,8 @@ import { FileObject, FileStatus, AIProcessingStatus, VirtualFileInput } from '@/
 import {
   AddFilesOptions,
   FileStats,
-  FHIRConversionCallback,
-  ResetProcessCallback,
+  ProcessFileOptions,
+  UploadFilesOptions,
   UseFileManagerTypes,
 } from './useFileManager.type';
 import { VirtualFileResult } from '../components/CombinedUploadFHIR.type';
@@ -24,11 +24,13 @@ import { UploadResult } from '../services/shared.types';
 import { CombinedRecordProcessingService, ProcessingCallbacks } from './useRecordProcessing';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { Timestamp } from 'firebase/firestore';
+import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
 
 export function useFileManager(): UseFileManagerTypes {
   // ==================== STATE MANAGEMENT ====================
 
   const { user } = useAuthContext(); // user.uid is usually the unique ID
+  const { addActivity, updateActivity } = useOnChainActivityTray();
   const [files, setFiles] = useState<FileObject[]>(() => {
     if (typeof window !== 'undefined' && window.sessionStorage) {
       try {
@@ -61,8 +63,20 @@ export function useFileManager(): UseFileManagerTypes {
   // ==================== REFS & SERVICES ====================
 
   const fileUploadService = useRef(new FileUploadService());
-  const fhirConversionCallback = useRef<FHIRConversionCallback | null>(null);
-  const resetProcessCallback = useRef<ResetProcessCallback | null>(null);
+
+  // Ids the user cancelled while their process/upload pipeline was still in flight (no
+  // firestoreId existed yet at cancel-click time, so removeFileComplete had nothing to delete).
+  // uploadFiles/processVirtualRecord check this once their own upload settles and, if the id is
+  // here, delete what they just created instead of leaving it — guaranteeing "cancel" always
+  // ends in full deletion regardless of the exact instant it was clicked.
+  const cancelledFileIds = useRef<Set<string>>(new Set());
+
+  // Tracks the most recent OnChainActivityTray activityId for a given file — processFile and
+  // uploadFiles/processVirtualRecord each overwrite their own file's entry as its pipeline
+  // advances. Lets removeFileComplete flip the right card to a cancelled state even long after
+  // the activity that created it has gone out of scope (e.g. deleting an already-fully-uploaded
+  // record, well after its "uploaded!" card already resolved).
+  const fileActivityIds = useRef<Map<string, string>>(new Map());
 
   // ==================== UTILITY/FACTORY FUNCTIONS ====================
 
@@ -145,11 +159,6 @@ export function useFileManager(): UseFileManagerTypes {
     console.log('🧹 Clearing all files and data');
     setFiles([]);
     setSavingToFirestore(new Set());
-
-    // Call reset callback if provided
-    if (resetProcessCallback.current) {
-      resetProcessCallback.current();
-    }
   }, []);
 
   const updateFirestoreRecord = useCallback(async (fileId: string, data: any) => {
@@ -173,12 +182,25 @@ export function useFileManager(): UseFileManagerTypes {
   // ==================== FILE PROCESSING ====================
 
   const processFile = useCallback(
-    async (fileObj: FileObject) => {
+    async (fileObj: FileObject, options: ProcessFileOptions = {}) => {
       console.log(`📋 Starting complete processing pipeline for: ${fileObj.fileName}`);
 
       updateFileStatus(fileObj.id, 'processing', {
         processingStage: 'Starting processing...',
       });
+
+      // If the caller already owns an activity spanning process+upload (e.g. UploadTab's
+      // "Process & Upload" flow), report onto it instead of minting a separate one. Callers that
+      // only run this half of the pipeline (e.g. retryFile) get their own self-contained activity
+      // that resolves here.
+      const ownsActivity = !options.activityId;
+      const activityId =
+        options.activityId ??
+        addActivity({
+          label: `Processing "${fileObj.fileName}"`,
+          kind: 'task',
+        });
+      fileActivityIds.current.set(fileObj.id, activityId);
 
       try {
         // Use the service to process the file
@@ -188,6 +210,7 @@ export function useFileManager(): UseFileManagerTypes {
               processingStage: stage,
               ...data,
             });
+            updateActivity(activityId, { label: stage });
           },
           onError: error => {
             console.error(`Processing error for ${fileObj.fileName}:`, error);
@@ -225,6 +248,12 @@ export function useFileManager(): UseFileManagerTypes {
 
         console.log(`🎉 Complete processing pipeline finished for: ${fileObj.fileName}`);
 
+        // Only resolve the activity here if we own it — otherwise the caller (which is about
+        // to upload this file) will carry it through to its own terminal state.
+        if (ownsActivity) {
+          updateActivity(activityId, { status: 'confirmed' });
+        }
+
         return updatedFile;
       } catch (error: any) {
         console.error(`💥 Processing failed for ${fileObj.fileName}:`, error);
@@ -233,11 +262,14 @@ export function useFileManager(): UseFileManagerTypes {
           processingStage: undefined,
           aiProcessingStatus: 'not_needed',
         });
+        // Always resolve on failure, even for a caller-owned activity — a thrown error here
+        // means there's no later upload step that will ever finish it.
+        updateActivity(activityId, { status: 'failed', errorMessage: error.message });
 
         throw error;
       }
     },
-    [updateFileStatus]
+    [updateFileStatus, addActivity, updateActivity]
   );
 
   // ==================== ADD FILES ====================
@@ -382,6 +414,25 @@ export function useFileManager(): UseFileManagerTypes {
         isVirtual: fileToRemove.isVirtual,
       });
 
+      // Mark this id cancelled *before* anything else. If it's still mid-processing (no
+      // firestoreId yet, so nothing below will find anything to delete), this is what lets
+      // uploadFiles/processVirtualRecord catch it later and delete whatever they end up
+      // creating instead of silently completing an upload the user already cancelled.
+      cancelledFileIds.current.add(fileId);
+
+      // Flip this file's tray card to cancelled immediately, whatever state it's currently in —
+      // covers both the still-processing case (uploadFiles will also re-apply the same state
+      // once it settles, harmlessly redundant) and the already-fully-uploaded case, where this
+      // is the ONLY place that ever touches that card again after it resolved to "uploaded!".
+      const activityId = fileActivityIds.current.get(fileId);
+      if (activityId) {
+        updateActivity(activityId, {
+          status: 'failed',
+          label: `"${fileToRemove.fileName}" upload cancelled`,
+          errorMessage: 'Upload cancelled',
+        });
+      }
+
       // Step 1: Cancel any active uploads first
       cancelFileUpload(fileId);
 
@@ -404,7 +455,7 @@ export function useFileManager(): UseFileManagerTypes {
 
       console.log('✅ Complete file removal finished:', fileId);
     },
-    [files, removeFileFromLocal, deleteFileFromFirebase, cancelFileUpload]
+    [files, removeFileFromLocal, deleteFileFromFirebase, cancelFileUpload, updateActivity]
   );
 
   // Also enhance your existing clearAll function
@@ -458,18 +509,16 @@ export function useFileManager(): UseFileManagerTypes {
     setFiles([]);
     setSavingToFirestore(new Set());
 
-    // Call reset callback if provided
-    if (resetProcessCallback.current) {
-      resetProcessCallback.current();
-    }
-
     console.log('✅ Enhanced clearAll completed');
   }, [files, deleteFileFromFirebase]);
 
   // ==================== FIRESTORE OPERATIONS ====================
 
   const uploadFiles = useCallback(
-    async (filesToUpload: FileObject[]): Promise<UploadResult[]> => {
+    async (
+      filesToUpload: FileObject[],
+      options: UploadFilesOptions = {}
+    ): Promise<UploadResult[]> => {
       if (filesToUpload.length === 0) {
         console.log('📤 No files ready for upload');
         return [];
@@ -489,9 +538,52 @@ export function useFileManager(): UseFileManagerTypes {
 
         setSavingToFirestore(prev => new Set([...prev, fileObj.id]));
 
+        // Finish the caller-owned activity from processFile if one was handed to us,
+        // otherwise this upload gets its own self-contained activity.
+        const existingActivityId = options.activityIds?.[fileObj.id];
+        const activityId =
+          existingActivityId ??
+          addActivity({
+            label: `Saving "${fileObj.fileName}"`,
+            kind: 'task',
+          });
+        if (existingActivityId) {
+          updateActivity(activityId, { label: `Saving "${fileObj.fileName}"` });
+        }
+        fileActivityIds.current.set(fileObj.id, activityId);
+
         try {
           const result = await fileUploadService.current.uploadFile(fileObj);
           console.log(`✅ Upload successful for ${fileObj.fileName}:`, result);
+
+          // The user cancelled this file while the upload was already in flight (no firestoreId
+          // existed yet when they clicked, so removeFileComplete had nothing to delete at the
+          // time) — delete what just got created instead of leaving a ghost record behind.
+          // Consider adding a mid-upload cancellation flag in file processing flow to save on compute? But not major right now
+          if (cancelledFileIds.current.has(fileObj.id)) {
+            cancelledFileIds.current.delete(fileObj.id);
+            console.log(
+              `🛑 ${fileObj.fileName} was cancelled — deleting the record it just created`
+            );
+            try {
+              if (result.documentId) {
+                await deleteFileFromFirebase(result.documentId);
+              }
+            } catch (cleanupError) {
+              console.error(
+                `Failed to clean up cancelled upload for ${fileObj.fileName}:`,
+                cleanupError
+              );
+            }
+            updateActivity(activityId, { status: 'failed', errorMessage: 'Cancelled' });
+            return { success: false, fileId: fileObj.id, error: 'Upload cancelled' };
+          }
+
+          updateActivity(activityId, {
+            status: 'confirmed',
+            label: `"${fileObj.fileName}" uploaded!`,
+            link: `/app/records/${result.documentId}`,
+          });
 
           updateFileStatus(fileObj.id, 'completed', {
             id: result.documentId,
@@ -499,6 +591,15 @@ export function useFileManager(): UseFileManagerTypes {
             uploadedAt: result.uploadedAt || Timestamp.now(),
             administrators: fileObj.administrators || [fileObj.uploadedBy!],
           });
+
+          // The file's local generated id gets overwritten with the Firestore documentId above
+          // (unifying local/remote identity post-upload) — re-key fileActivityIds to match, or
+          // a later removeFileComplete(documentId) call would look up under the stale local id
+          // and never find this activity.
+          if (result.documentId && result.documentId !== fileObj.id) {
+            fileActivityIds.current.delete(fileObj.id);
+            fileActivityIds.current.set(result.documentId, activityId);
+          }
 
           // 🔄 Sync sessionStorage right after updating status
           if (typeof window !== 'undefined' && window.sessionStorage) {
@@ -518,11 +619,8 @@ export function useFileManager(): UseFileManagerTypes {
             }
           }
 
-          // 🎉 SUCCESS TOAST HERE
-          toast.success(`📁 ${fileObj.fileName} uploaded successfully!`, {
-            description: 'Your file has been saved to cloud storage',
-            duration: 4000,
-          });
+          // Success is surfaced via the OnChainActivityTray card resolving to
+          // "'<fileName>' uploaded!" above — no separate toast needed.
 
           return {
             success: true,
@@ -533,6 +631,7 @@ export function useFileManager(): UseFileManagerTypes {
         } catch (error: any) {
           console.error(`💥 Upload failed for ${fileObj.fileName}:`, error);
           updateFileStatus(fileObj.id, 'error', { error: error.message });
+          updateActivity(activityId, { status: 'failed', errorMessage: error.message });
 
           return {
             success: false,
@@ -551,7 +650,7 @@ export function useFileManager(): UseFileManagerTypes {
       const results = await Promise.all(uploadPromises);
       return results;
     },
-    [savingToFirestore, updateFileStatus]
+    [savingToFirestore, updateFileStatus, addActivity, updateActivity, deleteFileFromFirebase]
   );
 
   // ==================== VIRTUAL FILE SUPPORT ====================
@@ -632,6 +731,12 @@ export function useFileManager(): UseFileManagerTypes {
       };
       setFiles(prev => [...prev, placeholder]);
 
+      const activityId = addActivity({
+        label: `Processing "${fileName}"`,
+        kind: 'task',
+      });
+      fileActivityIds.current.set(fileId, activityId);
+
       try {
         const virtualFileInput: VirtualFileInput = {
           id: fileId,
@@ -659,6 +764,7 @@ export function useFileManager(): UseFileManagerTypes {
               processingStage: stage,
               ...data,
             });
+            updateActivity(activityId, { label: stage });
           },
         });
 
@@ -675,6 +781,18 @@ export function useFileManager(): UseFileManagerTypes {
         setSavingToFirestore(prev => new Set([...prev, fileId]));
         const uploadResult = await fileUploadService.current.uploadFile(virtualFile);
 
+        // Same cancel-after-settlement guarantee as uploadFiles — see cancelledFileIds above.
+        // Cleanup only; the catch block below handles updateFileStatus/updateActivity uniformly
+        // once this throws.
+        if (cancelledFileIds.current.has(fileId)) {
+          cancelledFileIds.current.delete(fileId);
+          console.log(`🛑 ${fileName} was cancelled — deleting the record it just created`);
+          if (uploadResult.documentId) {
+            await deleteFileFromFirebase(uploadResult.documentId);
+          }
+          throw new Error('Upload cancelled');
+        }
+
         updateFileStatus(fileId, 'completed', {
           id: uploadResult.documentId,
           firestoreId: uploadResult.documentId,
@@ -683,9 +801,19 @@ export function useFileManager(): UseFileManagerTypes {
           processingStage: undefined,
         });
 
-        toast.success(`${fileName} uploaded successfully!`, {
-          description: 'Your file has been saved to cloud storage',
-          duration: 4000,
+        // Re-key fileActivityIds to the new documentId — see the matching comment in
+        // uploadFiles for why this is needed.
+        if (uploadResult.documentId && uploadResult.documentId !== fileId) {
+          fileActivityIds.current.delete(fileId);
+          fileActivityIds.current.set(uploadResult.documentId, activityId);
+        }
+
+        // Success is surfaced via the OnChainActivityTray card resolving to
+        // "'<fileName>' uploaded!" — no separate toast needed.
+        updateActivity(activityId, {
+          status: 'confirmed',
+          label: `"${fileName}" uploaded!`,
+          link: `/app/records/${uploadResult.documentId}`,
         });
 
         return {
@@ -701,10 +829,12 @@ export function useFileManager(): UseFileManagerTypes {
           },
         };
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Upload failed';
         updateFileStatus(fileId, 'error', {
-          error: error instanceof Error ? error.message : 'Upload failed',
+          error: errorMessage,
           processingStage: undefined,
         });
+        updateActivity(activityId, { status: 'failed', errorMessage });
         throw error;
       } finally {
         setSavingToFirestore(prev => {
@@ -714,18 +844,16 @@ export function useFileManager(): UseFileManagerTypes {
         });
       }
     },
-    [processVirtualFileData, savingToFirestore, updateFileStatus, user]
+    [
+      processVirtualFileData,
+      savingToFirestore,
+      updateFileStatus,
+      user,
+      addActivity,
+      updateActivity,
+      deleteFileFromFirebase,
+    ]
   );
-
-  // ==================== FHIR INTEGRATION ====================
-
-  const setFHIRConversionCallback = useCallback((callback: FHIRConversionCallback) => {
-    fhirConversionCallback.current = callback;
-  }, []);
-
-  const setResetProcessCallback = useCallback((callback: ResetProcessCallback) => {
-    resetProcessCallback.current = callback;
-  }, []);
 
   // ==================== COMPUTED VALUES ====================
 
@@ -768,10 +896,6 @@ export function useFileManager(): UseFileManagerTypes {
     clearAll,
     enhancedClearAll,
     processFile,
-
-    // FHIR integration
-    setFHIRConversionCallback,
-    setResetProcessCallback,
 
     // Status updates
     updateFileStatus,

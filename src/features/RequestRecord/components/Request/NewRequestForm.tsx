@@ -19,6 +19,7 @@ import ProviderSearchOverlay from '@/features/ProviderDirectory/components/Provi
 import { ProviderDirectoryFactory } from '@/features/ProviderDirectory/ProviderDirectoryFactory';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { BelroseUserProfile } from '@/types/core';
+import { toDateInputValue } from '@/utils/dataFormattingUtils';
 
 interface NewRequestFormProps {
   user: BelroseUserProfile;
@@ -51,7 +52,7 @@ const NewRequestForm: React.FC<NewRequestFormProps> = ({ user, onBack, onSuccess
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [patientIdNumber, setPatientIdNumber] = useState('');
   const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateTo, setDateTo] = useState(() => toDateInputValue());
   const [freeText, setFreeText] = useState('');
 
   // ── Submission ──────────────────────────────────────────────────────────────

@@ -463,7 +463,7 @@ export async function deleteFromStorage(storagePath: string): Promise<void> {
     console.log('✅ File deleted from storage:', storagePath);
   } catch (error: any) {
     console.error('Error deleting from storage:', error);
-    throw new Error(`Failed to delete from storage: ${error.message}`);
+    //Doesn't throw error because we want to continue with Firestore deletion even if storage deletion fails
   }
 }
 
@@ -576,8 +576,8 @@ export async function deleteSubjectRequests(recordId: string): Promise<void> {
 /**
  * Cancel-safe record deletion for the AddRecord flow.
  * Cleans up Storage, Firestore, and wrapped keys.
- * No notifications or version history — this is for cancelling an in-progress upload,
- * not a permanent deletion of an established record.
+ * No notifications or version history — this is for cancelling an IN-PROGRESS UPLOAD ONLY,
+ * not a permanent deletion of an established record see RecordDeletionService for that.
  */
 export async function deleteRecordComplete(documentId: string): Promise<DeleteResult> {
   const user = auth.currentUser;

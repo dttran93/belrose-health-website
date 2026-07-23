@@ -3,8 +3,9 @@
 /**
  * OnChainActivityTray
  *
- * Fixed bottom-right panel that shows live on-chain transaction status.
- * Appears only when there are active/recent transactions; hides completely when empty.
+ * Fixed bottom-right panel that shows live on-chain transaction status,
+ * as well as generic background tasks (e.g. record processing/upload).
+ * Appears only when there are active/recent activities; hides completely when empty.
  *
  * Each activity card shows:
  *   - Spinner (pending) / check (confirmed) / X (failed)
@@ -117,8 +118,9 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, onDismiss }) => {
           className={`text-xs mt-0.5 ${isPending ? 'text-gray-400' : isConfirmed ? 'text-green-600' : 'text-red-500'}`}
         >
           {isPending && `Processing · ${elapsed}`}
-          {isConfirmed && 'Confirmed on-network'}
-          {isFailed && (activity.errorMessage ?? 'Transaction failed')}
+          {isConfirmed && (activity.kind === 'task' ? 'Completed' : 'Confirmed on-network')}
+          {isFailed &&
+            (activity.errorMessage ?? (activity.kind === 'task' ? 'Failed' : 'Transaction failed'))}
         </p>
 
         {/* Etherscan link — only when we have a txHash */}
@@ -176,7 +178,7 @@ export const OnChainActivityTray: React.FC = () => {
         <div className="flex items-center gap-2">
           {/* Blockchain icon */}
           <GlobeLock className="w-3.5 h-3.5 text-primary" />
-          <span className="text-xs font-semibold text-gray-700">Distributed Network Activity</span>
+          <span className="text-xs font-semibold text-gray-700">Activity Progress</span>
           {pendingCount > 0 && (
             <span className="text-xs bg-primary text-white rounded-full px-1.5 py-0.5 leading-none font-medium">
               {pendingCount}

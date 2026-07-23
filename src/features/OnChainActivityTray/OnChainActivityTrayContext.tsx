@@ -3,14 +3,15 @@
 /**
  * OnChainActivityTrayContext
  *
- * Global store for tracking on-chain transactions across the app.
+ * Global store for tracking on-chain transactions, and generic long-running
+ * background tasks (e.g. record processing/upload), across the app.
  * Completely separate from the Sonner toast system — this persists
  * in the bottom-right tray until the user dismisses it.
  *
  * Usage:
- *   const { addActivity } = useOnChainActivityTray();
+ *   const { addActivity, updateActivity } = useOnChainActivityTray();
  *
- *   // When you fire a transaction:
+ *   // When you fire a transaction (kind defaults to 'blockchain'):
  *   const activityId = addActivity({ label: 'Updating permissions' });
  *
  *   // When it confirms:
@@ -18,6 +19,11 @@
  *
  *   // If it fails:
  *   updateActivity(activityId, { status: 'failed', errorMessage: 'Gas error' });
+ *
+ *   // A generic background task instead:
+ *   const activityId = addActivity({ label: 'Processing "file.pdf"', kind: 'task' });
+ *   updateActivity(activityId, { label: 'Converting to FHIR...' }); // intermediate progress
+ *   updateActivity(activityId, { status: 'confirmed' }); // done
  */
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
@@ -28,10 +34,15 @@ import React, { createContext, useContext, useState, useCallback, ReactNode } fr
 
 export type OnChainActivityStatus = 'pending' | 'confirmed' | 'failed';
 
+// 'blockchain' (default, for backward compatibility) is an on-chain transaction;
+// 'task' is a generic background operation (e.g. record processing/upload) with no tx of its own.
+export type OnChainActivityKind = 'blockchain' | 'task';
+
 export interface OnChainActivity {
   id: string;
   label: string; // Human-readable description, e.g. "Updating permissions"
   status: OnChainActivityStatus;
+  kind: OnChainActivityKind;
   txHash?: string; // Optional: populated once confirmed
   errorMessage?: string; // Optional: populated on failure
   startedAt: Date;
@@ -42,10 +53,13 @@ export interface OnChainActivity {
 interface AddActivityInput {
   label: string;
   link?: string;
+  kind?: OnChainActivityKind;
 }
 
 interface UpdateActivityInput {
-  status: OnChainActivityStatus;
+  status?: OnChainActivityStatus;
+  label?: string;
+  link?: string;
   txHash?: string;
   errorMessage?: string;
 }
@@ -81,6 +95,7 @@ export const OnChainActivityTrayProvider: React.FC<{ children: ReactNode }> = ({
       id,
       label: input.label,
       status: 'pending',
+      kind: input.kind ?? 'blockchain',
       startedAt: new Date(),
       link: input.link,
     };
@@ -96,7 +111,10 @@ export const OnChainActivityTrayProvider: React.FC<{ children: ReactNode }> = ({
           ? {
               ...activity,
               ...update,
-              resolvedAt: new Date(),
+              // Only stamp resolvedAt on a terminal status — intermediate label-only
+              // updates (e.g. multi-stage task progress) shouldn't mark the card resolved.
+              resolvedAt:
+                update.status && update.status !== 'pending' ? new Date() : activity.resolvedAt,
             }
           : activity
       )
