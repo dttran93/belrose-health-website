@@ -24,11 +24,13 @@ import { UploadResult } from '../services/shared.types';
 import { CombinedRecordProcessingService, ProcessingCallbacks } from './useRecordProcessing';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { Timestamp } from 'firebase/firestore';
+import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
 
 export function useFileManager(): UseFileManagerTypes {
   // ==================== STATE MANAGEMENT ====================
 
   const { user } = useAuthContext(); // user.uid is usually the unique ID
+  const { addActivity, updateActivity } = useOnChainActivityTray();
   const [files, setFiles] = useState<FileObject[]>(() => {
     if (typeof window !== 'undefined' && window.sessionStorage) {
       try {
@@ -180,6 +182,11 @@ export function useFileManager(): UseFileManagerTypes {
         processingStage: 'Starting processing...',
       });
 
+      const activityId = addActivity({
+        label: `Processing "${fileObj.fileName}"`,
+        kind: 'task',
+      });
+
       try {
         // Use the service to process the file
         const result = await CombinedRecordProcessingService.processUploadedFile(fileObj, {
@@ -188,6 +195,7 @@ export function useFileManager(): UseFileManagerTypes {
               processingStage: stage,
               ...data,
             });
+            updateActivity(activityId, { label: stage });
           },
           onError: error => {
             console.error(`Processing error for ${fileObj.fileName}:`, error);
@@ -225,6 +233,8 @@ export function useFileManager(): UseFileManagerTypes {
 
         console.log(`🎉 Complete processing pipeline finished for: ${fileObj.fileName}`);
 
+        updateActivity(activityId, { status: 'confirmed' });
+
         return updatedFile;
       } catch (error: any) {
         console.error(`💥 Processing failed for ${fileObj.fileName}:`, error);
@@ -233,11 +243,12 @@ export function useFileManager(): UseFileManagerTypes {
           processingStage: undefined,
           aiProcessingStatus: 'not_needed',
         });
+        updateActivity(activityId, { status: 'failed', errorMessage: error.message });
 
         throw error;
       }
     },
-    [updateFileStatus]
+    [updateFileStatus, addActivity, updateActivity]
   );
 
   // ==================== ADD FILES ====================
@@ -489,9 +500,19 @@ export function useFileManager(): UseFileManagerTypes {
 
         setSavingToFirestore(prev => new Set([...prev, fileObj.id]));
 
+        const activityId = addActivity({
+          label: `Saving "${fileObj.fileName}"`,
+          kind: 'task',
+        });
+
         try {
           const result = await fileUploadService.current.uploadFile(fileObj);
           console.log(`✅ Upload successful for ${fileObj.fileName}:`, result);
+
+          updateActivity(activityId, {
+            status: 'confirmed',
+            link: `/app/records/${result.documentId}`,
+          });
 
           updateFileStatus(fileObj.id, 'completed', {
             id: result.documentId,
@@ -533,6 +554,7 @@ export function useFileManager(): UseFileManagerTypes {
         } catch (error: any) {
           console.error(`💥 Upload failed for ${fileObj.fileName}:`, error);
           updateFileStatus(fileObj.id, 'error', { error: error.message });
+          updateActivity(activityId, { status: 'failed', errorMessage: error.message });
 
           return {
             success: false,
@@ -551,7 +573,7 @@ export function useFileManager(): UseFileManagerTypes {
       const results = await Promise.all(uploadPromises);
       return results;
     },
-    [savingToFirestore, updateFileStatus]
+    [savingToFirestore, updateFileStatus, addActivity, updateActivity]
   );
 
   // ==================== VIRTUAL FILE SUPPORT ====================
@@ -632,6 +654,11 @@ export function useFileManager(): UseFileManagerTypes {
       };
       setFiles(prev => [...prev, placeholder]);
 
+      const activityId = addActivity({
+        label: `Processing "${fileName}"`,
+        kind: 'task',
+      });
+
       try {
         const virtualFileInput: VirtualFileInput = {
           id: fileId,
@@ -659,6 +686,7 @@ export function useFileManager(): UseFileManagerTypes {
               processingStage: stage,
               ...data,
             });
+            updateActivity(activityId, { label: stage });
           },
         });
 
@@ -683,6 +711,11 @@ export function useFileManager(): UseFileManagerTypes {
           processingStage: undefined,
         });
 
+        updateActivity(activityId, {
+          status: 'confirmed',
+          link: `/app/records/${uploadResult.documentId}`,
+        });
+
         toast.success(`${fileName} uploaded successfully!`, {
           description: 'Your file has been saved to cloud storage',
           duration: 4000,
@@ -701,10 +734,12 @@ export function useFileManager(): UseFileManagerTypes {
           },
         };
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Upload failed';
         updateFileStatus(fileId, 'error', {
-          error: error instanceof Error ? error.message : 'Upload failed',
+          error: errorMessage,
           processingStage: undefined,
         });
+        updateActivity(activityId, { status: 'failed', errorMessage });
         throw error;
       } finally {
         setSavingToFirestore(prev => {
@@ -714,7 +749,7 @@ export function useFileManager(): UseFileManagerTypes {
         });
       }
     },
-    [processVirtualFileData, savingToFirestore, updateFileStatus, user]
+    [processVirtualFileData, savingToFirestore, updateFileStatus, user, addActivity, updateActivity]
   );
 
   // ==================== FHIR INTEGRATION ====================

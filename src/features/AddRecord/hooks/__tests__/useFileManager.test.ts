@@ -52,8 +52,16 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
 }));
 
+import React from 'react';
 import { useFileManager } from '../useFileManager';
+import { OnChainActivityTrayProvider } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
 import type { FileObject } from '@/types/core';
+
+// useFileManager reports processing/upload progress into the OnChainActivityTray context,
+// so every renderHook needs it in the tree or the hook throws. Plain .ts (no JSX) — use
+// createElement directly.
+const wrapper = ({ children }: { children: React.ReactNode }) =>
+  React.createElement(OnChainActivityTrayProvider, null, children);
 
 function makeFile(overrides: Partial<FileObject> = {}): FileObject {
   return {
@@ -89,7 +97,7 @@ beforeEach(() => {
 
 describe('useFileManager — addFiles validation', () => {
   it('rejects files beyond maxFiles and shows a toast, but still adds the ones within the limit', async () => {
-    const { result } = renderHook(() => useFileManager());
+    const { result } = renderHook(() => useFileManager(), { wrapper });
 
     const fileList = makeFileList([
       new File(['a'], 'a.pdf', { type: 'application/pdf' }),
@@ -105,7 +113,7 @@ describe('useFileManager — addFiles validation', () => {
   });
 
   it('rejects files over maxSizeBytes and shows a toast', async () => {
-    const { result } = renderHook(() => useFileManager());
+    const { result } = renderHook(() => useFileManager(), { wrapper });
 
     const bigFile = new File(['x'], 'big.pdf', { type: 'application/pdf' });
     Object.defineProperty(bigFile, 'size', { value: 100 * 1024 * 1024 });
@@ -129,7 +137,7 @@ describe('useFileManager — processFile', () => {
       aiProcessingStatus: 'completed',
     });
 
-    const { result } = renderHook(() => useFileManager());
+    const { result } = renderHook(() => useFileManager(), { wrapper });
 
     let updated: FileObject | undefined;
     await act(async () => {
@@ -143,7 +151,7 @@ describe('useFileManager — processFile', () => {
   it('marks the file errored and rethrows when the pipeline throws', async () => {
     processUploadedFileMock.mockRejectedValue(new Error('encryption failed'));
 
-    const { result } = renderHook(() => useFileManager());
+    const { result } = renderHook(() => useFileManager(), { wrapper });
 
     await act(async () => {
       await expect(result.current.processFile(makeFile())).rejects.toThrow('encryption failed');
@@ -155,7 +163,7 @@ describe('useFileManager — uploadFiles', () => {
   it('uploads successfully and stamps the resulting firestoreId onto the file', async () => {
     uploadFileMock.mockResolvedValue({ success: true, documentId: 'doc-1', downloadURL: 'url' });
 
-    const { result } = renderHook(() => useFileManager());
+    const { result } = renderHook(() => useFileManager(), { wrapper });
     await addOneFile(result);
 
     const addedFile = result.current.files[0]!;
@@ -177,7 +185,7 @@ describe('useFileManager — uploadFiles', () => {
   it('marks the file errored and returns success:false when the upload fails', async () => {
     uploadFileMock.mockRejectedValue(new Error('storage down'));
 
-    const { result } = renderHook(() => useFileManager());
+    const { result } = renderHook(() => useFileManager(), { wrapper });
     const fileObj = makeFile();
 
     let uploadResults: any[] = [];
@@ -197,7 +205,7 @@ describe('useFileManager — removeFileComplete', () => {
   it('deletes from Firebase and cleans up local state on success', async () => {
     deleteFileMock.mockResolvedValue(undefined);
 
-    const { result } = renderHook(() => useFileManager());
+    const { result } = renderHook(() => useFileManager(), { wrapper });
     await addOneFile(result);
     const fileId = result.current.files[0]!.id;
 
@@ -218,7 +226,7 @@ describe('useFileManager — removeFileComplete', () => {
   it('still removes the file locally even when Firebase deletion fails', async () => {
     deleteFileMock.mockRejectedValue(new Error('permission denied'));
 
-    const { result } = renderHook(() => useFileManager());
+    const { result } = renderHook(() => useFileManager(), { wrapper });
     await addOneFile(result);
     const fileId = result.current.files[0]!.id;
 
@@ -241,7 +249,7 @@ describe('useFileManager — enhancedClearAll', () => {
       if (id === 'doc-fail') throw new Error('permission denied');
     });
 
-    const { result } = renderHook(() => useFileManager());
+    const { result } = renderHook(() => useFileManager(), { wrapper });
     await act(async () => {
       await result.current.addFiles(
         makeFileList([
@@ -271,7 +279,7 @@ describe('useFileManager — enhancedClearAll', () => {
   it('reports success when every Firebase deletion succeeds', async () => {
     deleteFileMock.mockResolvedValue(undefined);
 
-    const { result } = renderHook(() => useFileManager());
+    const { result } = renderHook(() => useFileManager(), { wrapper });
     await addOneFile(result);
 
     act(() => {
