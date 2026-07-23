@@ -215,9 +215,96 @@ describe('useFileManager — uploadFiles', () => {
       error: 'storage down',
     });
   });
+
+  // Regression: cancelling a file while it's still processing (no firestoreId exists yet, so
+  // removeFileComplete has nothing to delete at click-time) used to leave the in-flight
+  // process+upload promise chain completely unaffected — it would silently finish and create a
+  // real Firestore record despite the user having "removed" it from the UI. removeFileComplete
+  // now marks the id cancelled up front, and uploadFiles checks that mark once its own upload
+  // settles, deleting whatever it just created instead of leaving it.
+  it('deletes the record it just created if the file was cancelled while still processing', async () => {
+    uploadFileMock.mockResolvedValue({ success: true, documentId: 'doc-cancelled', downloadURL: 'url' });
+    deleteFileMock.mockResolvedValue(undefined);
+
+    const { result } = renderHook(
+      () => ({ fileManager: useFileManager(), tray: useOnChainActivityTray() }),
+      { wrapper }
+    );
+
+    // removeFileComplete no-ops unless the file is present in `files` state, so it must actually
+    // be added first — mirroring production, where the file exists (status 'processing') at the
+    // moment the user clicks cancel, it's just not uploaded yet (no firestoreId).
+    await act(async () => {
+      await result.current.fileManager.addFiles(
+        makeFileList([new File(['a'], 'a.pdf', { type: 'application/pdf' })])
+      );
+    });
+    const fileObj = result.current.fileManager.files[0]!;
+
+    // Simulates the user clicking cancel mid-processing: no firestoreId exists yet, so this
+    // only marks the id cancelled (and no-ops on the Firebase-delete step) — the interesting
+    // assertion is what happens when the still-in-flight upload for this same file settles.
+    await act(async () => {
+      await result.current.fileManager.removeFileComplete(fileObj.id);
+    });
+
+    let uploadResults: any[] = [];
+    await act(async () => {
+      uploadResults = await result.current.fileManager.uploadFiles([fileObj]);
+    });
+
+    expect(uploadResults[0]).toMatchObject({ success: false, fileId: fileObj.id, error: 'Upload cancelled' });
+    expect(deleteFileMock).toHaveBeenCalledWith('doc-cancelled');
+
+    const activity = result.current.tray.activities.find(a => a.label === `Saving "${fileObj.fileName}"`);
+    expect(activity).toMatchObject({ status: 'failed', errorMessage: 'Cancelled' });
+  });
 });
 
 describe('useFileManager — removeFileComplete', () => {
+  // Regression: deleting a file *after* its upload already fully completed (firestoreId
+  // already exists) correctly deleted from Firebase, but never touched the tray — its activity
+  // just sat there forever reading "'<file>' uploaded!" even though the record was gone.
+  it('flips the tray activity to cancelled when deleting an already-fully-uploaded file', async () => {
+    uploadFileMock.mockResolvedValue({ success: true, documentId: 'doc-already-uploaded', downloadURL: 'url' });
+    deleteFileMock.mockResolvedValue(undefined);
+
+    const { result } = renderHook(
+      () => ({ fileManager: useFileManager(), tray: useOnChainActivityTray() }),
+      { wrapper }
+    );
+
+    await act(async () => {
+      await result.current.fileManager.addFiles(
+        makeFileList([new File(['a'], 'a.pdf', { type: 'application/pdf' })])
+      );
+    });
+    const originalFile = result.current.fileManager.files[0]!;
+
+    await act(async () => {
+      await result.current.fileManager.uploadFiles([originalFile]);
+    });
+
+    const uploadedActivity = result.current.tray.activities.find(
+      a => a.label === `"${originalFile.fileName}" uploaded!`
+    );
+    expect(uploadedActivity).toMatchObject({ status: 'confirmed' });
+
+    const uploadedFile = result.current.fileManager.files[0]!;
+    await act(async () => {
+      await result.current.fileManager.removeFileComplete(uploadedFile.id);
+    });
+
+    expect(deleteFileMock).toHaveBeenCalledWith('doc-already-uploaded');
+
+    const cancelledActivity = result.current.tray.activities.find(a => a.id === uploadedActivity!.id);
+    expect(cancelledActivity).toMatchObject({
+      status: 'failed',
+      label: `"${originalFile.fileName}" upload cancelled`,
+      errorMessage: 'Upload cancelled',
+    });
+  });
+
   it('deletes from Firebase and cleans up local state on success', async () => {
     deleteFileMock.mockResolvedValue(undefined);
 
