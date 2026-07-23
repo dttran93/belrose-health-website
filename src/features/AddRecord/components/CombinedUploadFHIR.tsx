@@ -123,6 +123,12 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
                       {allFilesCompleted ? 'All Files Processed!' : 'Processing Files'}
                     </h3>
                   </div>
+                  {!allFilesCompleted && (
+                    <p className="text-xs text-destructive">
+                      Feel free to navigate away — you can track upload progress in the activity
+                      tray (bottom-right) ↘
+                    </p>
+                  )}
                   <div className="text-sm text-gray-600">
                     {stats.completed} of {stats.total} completed
                     {stats.processing > 0 && (
