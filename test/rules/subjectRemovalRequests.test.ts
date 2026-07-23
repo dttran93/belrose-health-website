@@ -310,6 +310,33 @@ describe('firestore.rules — subjectRemovalRequests — delete', () => {
 
     await assertFails(testEnv.authenticatedContext(STRANGER).firestore().doc(reqPath(recordId, SUBJECT)).delete());
   });
+
+  // Regression: removal requests are deleted before the record itself in
+  // RecordDeletionService.deleteRecord (their admin/owner check needs the record to still
+  // exist), so an orphan can only arise from a partial failure elsewhere — but once it happens,
+  // isAdminOrOwnerOfRecord can never succeed again for a record that's gone, so without this the
+  // orphaned request would be permanently undeletable by anyone.
+  it('lets the named subject delete an orphaned request once its record no longer exists', async () => {
+    const recordId = 'sr-delete-orphan-subject-allowed';
+    await seedRequest(recordId, SUBJECT);
+
+    await assertSucceeds(testEnv.authenticatedContext(SUBJECT).firestore().doc(reqPath(recordId, SUBJECT)).delete());
+  });
+
+  it('still denies the subject from deleting a request while the record still exists (live workflow protection unchanged)', async () => {
+    const recordId = 'sr-delete-subject-still-denied-live';
+    await seedRecord(recordId);
+    await seedRequest(recordId, SUBJECT);
+
+    await assertFails(testEnv.authenticatedContext(SUBJECT).firestore().doc(reqPath(recordId, SUBJECT)).delete());
+  });
+
+  it('still denies a stranger from deleting an orphaned request they have no relationship to', async () => {
+    const recordId = 'sr-delete-orphan-stranger-denied';
+    await seedRequest(recordId, SUBJECT);
+
+    await assertFails(testEnv.authenticatedContext(STRANGER).firestore().doc(reqPath(recordId, SUBJECT)).delete());
+  });
 });
 
 describe('firestore.rules — subjectRemovalRequests — read', () => {

@@ -82,8 +82,11 @@ const CombinedUploadFHIR: React.FC<CombinedUploadFHIRProps> = ({
   };
 
   const handleCancelDeleteReset = () => {
+    // removeFile (removeFileComplete) already removes the file from local state itself once
+    // it's done attempting the Firebase cleanup — calling removeFileFromLocal again here raced
+    // ahead of that (unawaited) and cleared local state before the Firebase delete attempt
+    // had even resolved.
     files.forEach(file => removeFile(file.id));
-    files.forEach(file => removeFileFromLocal(file.id));
     setActiveTab('upload');
   };
 

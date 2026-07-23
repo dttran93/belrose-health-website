@@ -136,4 +136,17 @@ describe('firestore.rules — records/{recordId} — delete', () => {
 
     await assertSucceeds(testEnv.authenticatedContext(OWNER).firestore().doc(`records/${recordId}`).delete());
   });
+
+  it('lets a sole owner delete a record with no subjects field at all (real uploads never set one)', async () => {
+    // Regression test: uploadUtils.ts never writes a `subjects` field on record creation, so a
+    // plain uploaded record that has never had a subject added has no `subjects` key whatsoever
+    // — not even an empty array. The delete rule used to read resource.data.subjects bare
+    // (no .get() fallback), which throws on a missing map key and denies the whole expression,
+    // so every such record could never be deleted by its own sole owner.
+    const recordId = 'delete-allowed-no-subjects-field';
+    const { subjects, ...recordWithoutSubjectsField } = baseRecord({ owners: [OWNER] });
+    await seed(recordId, recordWithoutSubjectsField);
+
+    await assertSucceeds(testEnv.authenticatedContext(OWNER).firestore().doc(`records/${recordId}`).delete());
+  });
 });

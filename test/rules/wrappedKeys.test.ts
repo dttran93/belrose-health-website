@@ -196,6 +196,47 @@ describe('firestore.rules — wrappedKeys — delete', () => {
 
     await assertSucceeds(testEnv.authenticatedContext(ADMIN).firestore().doc('wrappedKeys/key-1').delete());
   });
+
+  // Regression: the record's own delete happens after its wrappedKeys are cleaned up (their
+  // delete rules require the record to still exist to check admin/owner status), so a wrappedKey
+  // orphaned by its parent record already being gone should still be cleanable — otherwise a
+  // record delete that failed on its very last step (or any other historical partial failure)
+  // leaves it permanently undeletable by anyone, forever.
+  it("lets the key's own holder delete it once its parent record no longer exists", async () => {
+    await seedWrappedKey('deleted-record-id', 'key-orphan-holder', {
+      userId: RECEIVER,
+      grantedBy: SHARER,
+      isActive: true,
+    });
+
+    await assertSucceeds(
+      testEnv.authenticatedContext(RECEIVER).firestore().doc('wrappedKeys/key-orphan-holder').delete()
+    );
+  });
+
+  it('lets whoever granted an orphaned wrapped key delete it once its parent record no longer exists', async () => {
+    await seedWrappedKey('deleted-record-id', 'key-orphan-granter', {
+      userId: RECEIVER,
+      grantedBy: SHARER,
+      isActive: true,
+    });
+
+    await assertSucceeds(
+      testEnv.authenticatedContext(SHARER).firestore().doc('wrappedKeys/key-orphan-granter').delete()
+    );
+  });
+
+  it('still denies a stranger from deleting an orphaned wrapped key they have no relationship to', async () => {
+    await seedWrappedKey('deleted-record-id', 'key-orphan-stranger', {
+      userId: RECEIVER,
+      grantedBy: SHARER,
+      isActive: true,
+    });
+
+    await assertFails(
+      testEnv.authenticatedContext(STRANGER).firestore().doc('wrappedKeys/key-orphan-stranger').delete()
+    );
+  });
 });
 
 describe('firestore.rules — wrappedKeys — read (sharer+ management, or your own key while you hold a role)', () => {
