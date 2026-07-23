@@ -15,9 +15,7 @@ import { FileObject, FileStatus, AIProcessingStatus, VirtualFileInput } from '@/
 import {
   AddFilesOptions,
   FileStats,
-  FHIRConversionCallback,
   ProcessFileOptions,
-  ResetProcessCallback,
   UploadFilesOptions,
   UseFileManagerTypes,
 } from './useFileManager.type';
@@ -65,8 +63,6 @@ export function useFileManager(): UseFileManagerTypes {
   // ==================== REFS & SERVICES ====================
 
   const fileUploadService = useRef(new FileUploadService());
-  const fhirConversionCallback = useRef<FHIRConversionCallback | null>(null);
-  const resetProcessCallback = useRef<ResetProcessCallback | null>(null);
 
   // ==================== UTILITY/FACTORY FUNCTIONS ====================
 
@@ -149,11 +145,6 @@ export function useFileManager(): UseFileManagerTypes {
     console.log('🧹 Clearing all files and data');
     setFiles([]);
     setSavingToFirestore(new Set());
-
-    // Call reset callback if provided
-    if (resetProcessCallback.current) {
-      resetProcessCallback.current();
-    }
   }, []);
 
   const updateFirestoreRecord = useCallback(async (fileId: string, data: any) => {
@@ -484,11 +475,6 @@ export function useFileManager(): UseFileManagerTypes {
     setFiles([]);
     setSavingToFirestore(new Set());
 
-    // Call reset callback if provided
-    if (resetProcessCallback.current) {
-      resetProcessCallback.current();
-    }
-
     console.log('✅ Enhanced clearAll completed');
   }, [files, deleteFileFromFirebase]);
 
@@ -563,11 +549,8 @@ export function useFileManager(): UseFileManagerTypes {
             }
           }
 
-          // 🎉 SUCCESS TOAST HERE
-          toast.success(`📁 ${fileObj.fileName} uploaded successfully!`, {
-            description: 'Your file has been saved to cloud storage',
-            duration: 4000,
-          });
+          // Success is surfaced via the OnChainActivityTray card resolving to
+          // "'<fileName>' uploaded!" above — no separate toast needed.
 
           return {
             success: true,
@@ -735,15 +718,12 @@ export function useFileManager(): UseFileManagerTypes {
           processingStage: undefined,
         });
 
+        // Success is surfaced via the OnChainActivityTray card resolving to
+        // "'<fileName>' uploaded!" — no separate toast needed.
         updateActivity(activityId, {
           status: 'confirmed',
           label: `"${fileName}" uploaded!`,
           link: `/app/records/${uploadResult.documentId}`,
-        });
-
-        toast.success(`${fileName} uploaded successfully!`, {
-          description: 'Your file has been saved to cloud storage',
-          duration: 4000,
         });
 
         return {
@@ -776,16 +756,6 @@ export function useFileManager(): UseFileManagerTypes {
     },
     [processVirtualFileData, savingToFirestore, updateFileStatus, user, addActivity, updateActivity]
   );
-
-  // ==================== FHIR INTEGRATION ====================
-
-  const setFHIRConversionCallback = useCallback((callback: FHIRConversionCallback) => {
-    fhirConversionCallback.current = callback;
-  }, []);
-
-  const setResetProcessCallback = useCallback((callback: ResetProcessCallback) => {
-    resetProcessCallback.current = callback;
-  }, []);
 
   // ==================== COMPUTED VALUES ====================
 
@@ -828,10 +798,6 @@ export function useFileManager(): UseFileManagerTypes {
     clearAll,
     enhancedClearAll,
     processFile,
-
-    // FHIR integration
-    setFHIRConversionCallback,
-    setResetProcessCallback,
 
     // Status updates
     updateFileStatus,

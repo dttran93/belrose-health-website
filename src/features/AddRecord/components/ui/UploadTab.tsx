@@ -36,7 +36,7 @@ const UploadTab: React.FC<UploadTabProps> = ({
 }) => {
   const [contextText, setContextText] = useState('');
   const [processing, setProcessing] = useState(false);
-  const { addActivity } = useOnChainActivityTray();
+  const { addActivity, updateActivity } = useOnChainActivityTray();
 
   const pendingFiles = files.filter(f => f.status === 'pending');
   const hasAttachedFiles = pendingFiles.length > 0;
@@ -74,15 +74,17 @@ const UploadTab: React.FC<UploadTabProps> = ({
           contextText: contextText.trim() || undefined,
         };
 
-        if (!fileObjWithContext.file) {
-          throw new Error(`File object missing for ${fileObjWithContext.fileName}`);
-        }
-
         const activityId = addActivity({
           label: `Processing "${fileObjWithContext.fileName}"`,
           kind: 'task',
         });
         activityIds[fileObj.id] = activityId;
+
+        if (!fileObjWithContext.file) {
+          const message = `File object missing for ${fileObjWithContext.fileName}`;
+          updateActivity(activityId, { status: 'failed', errorMessage: message });
+          throw new Error(message);
+        }
 
         const processedFile = await processFile(fileObjWithContext, { activityId });
         processedFiles.push(processedFile);
@@ -90,10 +92,10 @@ const UploadTab: React.FC<UploadTabProps> = ({
 
       await uploadFiles(processedFiles, { activityIds });
       setContextText('');
-      toast.success('Files processed and uploaded successfully!');
+      // Per-file success/failure is already surfaced via the OnChainActivityTray cards created
+      // above — no separate batch-level toast needed.
     } catch (error) {
       console.error('Error processing files:', error);
-      toast.error('Failed to process files');
     } finally {
       setProcessing(false);
     }

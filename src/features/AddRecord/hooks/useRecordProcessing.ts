@@ -155,11 +155,6 @@ export class CombinedRecordProcessingService {
         console.log(`✅ Record hash generated for: ${fileObj.fileName}`, {
           hash: result.recordHash.substring(0, 12) + '...',
         });
-
-        toast.success(`🔗 Record hash generated for ${fileObj.fileName}`, {
-          description: `Hash: ${result.recordHash.substring(0, 12)}...`,
-          duration: 3000,
-        });
       } catch (error: any) {
         console.error(`❌ Record hash generation failed for ${fileObj.fileName}:`, error);
 
@@ -208,19 +203,11 @@ export class CombinedRecordProcessingService {
         });
 
         onStageUpdate?.('Record encrypted', { encryptedData: result.encryptedData });
-
-        toast.success(`🔒 Record encrypted for ${fileObj.fileName}`, {
-          description: 'All sensitive data is now encrypted',
-          duration: 3000,
-        });
       } catch (error: any) {
         console.error(`❌ Encryption failed for ${fileObj.fileName}:`, error);
 
-        toast.error(`Encryption failed for ${fileObj.fileName}`, {
-          description: error.message,
-          duration: 5000,
-        });
-
+        // Not toasted here — this rethrows and processFile's catch resolves the
+        // OnChainActivityTray card as failed with this same message.
         throw new Error(`Encryption failed: ${error.message}`);
       }
       return result;
@@ -316,11 +303,6 @@ export class CombinedRecordProcessingService {
       console.log(`✅ Record hash generated for virtual file: ${fileName}`, {
         hash: result.recordHash.substring(0, 12) + '...',
       });
-
-      toast.success(`🔗 Virtual file hash generated: ${fileName}`, {
-        description: `Hash: ${result.recordHash.substring(0, 12)}...`,
-        duration: 3000,
-      });
     } catch (error: any) {
       console.error(`❌ Hash generation failed for virtual file ${fileName}:`, error);
 
@@ -352,11 +334,10 @@ export class CombinedRecordProcessingService {
           null,
           userKey
         );
-
-        toast.success(`🔒 Virtual file encrypted: ${fileName}`);
       } catch (error: any) {
         console.error('Encryption failed for virtual file:', error);
-        toast.error(`Encryption failed: ${error.message}`);
+        // Not toasted here — this rethrows and processVirtualRecord's catch resolves the
+        // OnChainActivityTray card as failed with this same message.
         throw error;
       }
     }

@@ -54,7 +54,10 @@ vi.mock('sonner', () => ({
 
 import React from 'react';
 import { useFileManager } from '../useFileManager';
-import { OnChainActivityTrayProvider } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
+import {
+  OnChainActivityTrayProvider,
+  useOnChainActivityTray,
+} from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
 import type { FileObject } from '@/types/core';
 
 // useFileManager reports processing/upload progress into the OnChainActivityTray context,
@@ -160,26 +163,39 @@ describe('useFileManager — processFile', () => {
 });
 
 describe('useFileManager — uploadFiles', () => {
-  it('uploads successfully and stamps the resulting firestoreId onto the file', async () => {
+  it('uploads successfully, stamps the resulting firestoreId, and resolves the tray activity', async () => {
     uploadFileMock.mockResolvedValue({ success: true, documentId: 'doc-1', downloadURL: 'url' });
 
-    const { result } = renderHook(() => useFileManager(), { wrapper });
-    await addOneFile(result);
+    // Render alongside useOnChainActivityTray (sharing the same provider instance as wrapper)
+    // so we can assert on the activity uploadFiles reports to — success is no longer toasted,
+    // it's surfaced entirely through the tray now.
+    const { result } = renderHook(
+      () => ({ fileManager: useFileManager(), tray: useOnChainActivityTray() }),
+      { wrapper }
+    );
 
-    const addedFile = result.current.files[0]!;
+    await act(async () => {
+      await result.current.fileManager.addFiles(
+        makeFileList([new File(['a'], 'a.pdf', { type: 'application/pdf' })])
+      );
+    });
+
+    const addedFile = result.current.fileManager.files[0]!;
 
     let uploadResults: any[] = [];
     await act(async () => {
-      uploadResults = await result.current.uploadFiles([addedFile]);
+      uploadResults = await result.current.fileManager.uploadFiles([addedFile]);
     });
 
     expect(uploadResults[0]).toMatchObject({ success: true, documentId: 'doc-1' });
     // uploadFiles' success path deliberately overwrites the local generated id with the new
     // Firestore document id (unifying local/remote identity post-upload) — so the file must now
     // be looked up by 'doc-1', not the original addedFile.id.
-    expect(result.current.files).toHaveLength(1);
-    expect(result.current.files[0]).toMatchObject({ id: 'doc-1', firestoreId: 'doc-1' });
-    expect(toast.success).toHaveBeenCalled();
+    expect(result.current.fileManager.files).toHaveLength(1);
+    expect(result.current.fileManager.files[0]).toMatchObject({ id: 'doc-1', firestoreId: 'doc-1' });
+
+    const activity = result.current.tray.activities.find(a => a.label === '"a.pdf" uploaded!');
+    expect(activity).toMatchObject({ status: 'confirmed', link: '/app/records/doc-1' });
   });
 
   it('marks the file errored and returns success:false when the upload fails', async () => {

@@ -32,11 +32,6 @@ export interface UploadFilesOptions {
   activityIds?: Record<string, string>;
 }
 
-// ==================== CALLBACK TYPE DEFINITIONS ====================
-
-export type FHIRConversionCallback = (fileId: string, fhirData: any) => Promise<void> | void;
-export type ResetProcessCallback = () => void;
-
 // ==================== HOOK RETURN TYPE ====================
 
 export interface UseFileManagerTypes {
@@ -55,10 +50,6 @@ export interface UseFileManagerTypes {
   clearAll: () => void;
   enhancedClearAll: () => Promise<void>;
   processFile: (fileObj: FileObject, options?: ProcessFileOptions) => Promise<FileObject>;
-
-  // FHIR integration
-  setFHIRConversionCallback: (callback: FHIRConversionCallback) => void;
-  setResetProcessCallback: (callback: ResetProcessCallback) => void;
 
   // Status updates
   updateFileStatus: (

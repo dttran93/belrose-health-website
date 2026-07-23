@@ -62,10 +62,6 @@ export interface CombinedUploadFHIRProps {
   uploadFiles: (filesToUpload: FileObject[], options?: UploadFilesOptions) => Promise<UploadResult[]>;
   savingToFirestore: Set<string>;
 
-  // FHIR Props
-  fhirData?: Map<string, FHIRWithValidation>;
-  onFHIRConverted?: (fileId: string, uploadResult: any, fileObj?: FileObject) => Promise<void>;
-
   // Configuration props
   acceptedTypes?: string[];
   maxFiles?: number;
