@@ -4,13 +4,15 @@ import FileUploadZone from '../ui/FileUploadZone';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import { FileObject } from '@/types/core';
+import { ProcessFileOptions, UploadFilesOptions } from '../../hooks/useFileManager.type';
+import { useOnChainActivityTray } from '@/features/OnChainActivityTray/OnChainActivityTrayContext';
 
 interface UploadTabProps {
   files: FileObject[];
   addFiles: (fileList: FileList, options: { maxFiles: number; maxSizeBytes: number }) => void;
   removeFileFromLocal: (fileId: string) => void;
-  processFile: (fileObj: FileObject) => Promise<FileObject>;
-  uploadFiles: (files: FileObject[]) => Promise<any[]>;
+  processFile: (fileObj: FileObject, options?: ProcessFileOptions) => Promise<FileObject>;
+  uploadFiles: (files: FileObject[], options?: UploadFilesOptions) => Promise<any[]>;
   acceptedTypes: string[];
   maxFiles: number;
   maxSizeBytes: number;
@@ -34,6 +36,7 @@ const UploadTab: React.FC<UploadTabProps> = ({
 }) => {
   const [contextText, setContextText] = useState('');
   const [processing, setProcessing] = useState(false);
+  const { addActivity } = useOnChainActivityTray();
 
   const pendingFiles = files.filter(f => f.status === 'pending');
   const hasAttachedFiles = pendingFiles.length > 0;
@@ -60,6 +63,10 @@ const UploadTab: React.FC<UploadTabProps> = ({
     setProcessing(true);
     try {
       const processedFiles: FileObject[] = [];
+      // One activity per file, created up front and threaded through both processFile and
+      // uploadFiles, so the tray shows a single continuous card per file (processing stages ->
+      // saving -> "uploaded!") instead of two separate cards that each resolve on their own.
+      const activityIds: Record<string, string> = {};
 
       for (const fileObj of pendingFiles) {
         const fileObjWithContext: FileObject = {
@@ -71,11 +78,17 @@ const UploadTab: React.FC<UploadTabProps> = ({
           throw new Error(`File object missing for ${fileObjWithContext.fileName}`);
         }
 
-        const processedFile = await processFile(fileObjWithContext);
+        const activityId = addActivity({
+          label: `Processing "${fileObjWithContext.fileName}"`,
+          kind: 'task',
+        });
+        activityIds[fileObj.id] = activityId;
+
+        const processedFile = await processFile(fileObjWithContext, { activityId });
         processedFiles.push(processedFile);
       }
 
-      await uploadFiles(processedFiles);
+      await uploadFiles(processedFiles, { activityIds });
       setContextText('');
       toast.success('Files processed and uploaded successfully!');
     } catch (error) {

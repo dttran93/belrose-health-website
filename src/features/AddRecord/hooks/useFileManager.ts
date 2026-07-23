@@ -16,7 +16,9 @@ import {
   AddFilesOptions,
   FileStats,
   FHIRConversionCallback,
+  ProcessFileOptions,
   ResetProcessCallback,
+  UploadFilesOptions,
   UseFileManagerTypes,
 } from './useFileManager.type';
 import { VirtualFileResult } from '../components/CombinedUploadFHIR.type';
@@ -175,17 +177,24 @@ export function useFileManager(): UseFileManagerTypes {
   // ==================== FILE PROCESSING ====================
 
   const processFile = useCallback(
-    async (fileObj: FileObject) => {
+    async (fileObj: FileObject, options: ProcessFileOptions = {}) => {
       console.log(`📋 Starting complete processing pipeline for: ${fileObj.fileName}`);
 
       updateFileStatus(fileObj.id, 'processing', {
         processingStage: 'Starting processing...',
       });
 
-      const activityId = addActivity({
-        label: `Processing "${fileObj.fileName}"`,
-        kind: 'task',
-      });
+      // If the caller already owns an activity spanning process+upload (e.g. UploadTab's
+      // "Process & Upload" flow), report onto it instead of minting a separate one. Callers that
+      // only run this half of the pipeline (e.g. retryFile) get their own self-contained activity
+      // that resolves here.
+      const ownsActivity = !options.activityId;
+      const activityId =
+        options.activityId ??
+        addActivity({
+          label: `Processing "${fileObj.fileName}"`,
+          kind: 'task',
+        });
 
       try {
         // Use the service to process the file
@@ -233,7 +242,11 @@ export function useFileManager(): UseFileManagerTypes {
 
         console.log(`🎉 Complete processing pipeline finished for: ${fileObj.fileName}`);
 
-        updateActivity(activityId, { status: 'confirmed' });
+        // Only resolve the activity here if we own it — otherwise the caller (which is about
+        // to upload this file) will carry it through to its own terminal state.
+        if (ownsActivity) {
+          updateActivity(activityId, { status: 'confirmed' });
+        }
 
         return updatedFile;
       } catch (error: any) {
@@ -243,6 +256,8 @@ export function useFileManager(): UseFileManagerTypes {
           processingStage: undefined,
           aiProcessingStatus: 'not_needed',
         });
+        // Always resolve on failure, even for a caller-owned activity — a thrown error here
+        // means there's no later upload step that will ever finish it.
         updateActivity(activityId, { status: 'failed', errorMessage: error.message });
 
         throw error;
@@ -480,7 +495,7 @@ export function useFileManager(): UseFileManagerTypes {
   // ==================== FIRESTORE OPERATIONS ====================
 
   const uploadFiles = useCallback(
-    async (filesToUpload: FileObject[]): Promise<UploadResult[]> => {
+    async (filesToUpload: FileObject[], options: UploadFilesOptions = {}): Promise<UploadResult[]> => {
       if (filesToUpload.length === 0) {
         console.log('📤 No files ready for upload');
         return [];
@@ -500,10 +515,18 @@ export function useFileManager(): UseFileManagerTypes {
 
         setSavingToFirestore(prev => new Set([...prev, fileObj.id]));
 
-        const activityId = addActivity({
-          label: `Saving "${fileObj.fileName}"`,
-          kind: 'task',
-        });
+        // Finish the caller-owned activity from processFile if one was handed to us,
+        // otherwise this upload gets its own self-contained activity.
+        const existingActivityId = options.activityIds?.[fileObj.id];
+        const activityId =
+          existingActivityId ??
+          addActivity({
+            label: `Saving "${fileObj.fileName}"`,
+            kind: 'task',
+          });
+        if (existingActivityId) {
+          updateActivity(activityId, { label: `Saving "${fileObj.fileName}"` });
+        }
 
         try {
           const result = await fileUploadService.current.uploadFile(fileObj);
@@ -511,6 +534,7 @@ export function useFileManager(): UseFileManagerTypes {
 
           updateActivity(activityId, {
             status: 'confirmed',
+            label: `"${fileObj.fileName}" uploaded!`,
             link: `/app/records/${result.documentId}`,
           });
 
@@ -713,6 +737,7 @@ export function useFileManager(): UseFileManagerTypes {
 
         updateActivity(activityId, {
           status: 'confirmed',
+          label: `"${fileName}" uploaded!`,
           link: `/app/records/${uploadResult.documentId}`,
         });
 

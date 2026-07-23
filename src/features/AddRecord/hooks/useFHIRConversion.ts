@@ -37,25 +37,6 @@ export interface ReviewedData {
   confirmedAt: string;
 }
 
-export interface HealthRecordData {
-  id: string;
-  subject: string;
-  provider: string;
-  institutionName: string;
-  institutionAddress: string;
-  date: string | undefined;
-  clinicNotes: string;
-  attachments: Array<{
-    name: string;
-    size: string;
-    url: string;
-  }>;
-  isBlockchainVerified: boolean;
-  createdAt: string;
-  lastModified: string;
-  originalFhirData: FHIRWithValidation;
-}
-
 export interface FHIRConversionHookReturn {
   fhirData: Map<string, FHIRWithValidation>;
   reviewedData: Map<string, ReviewedData>;
