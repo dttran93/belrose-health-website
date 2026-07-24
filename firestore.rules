@@ -816,24 +816,42 @@ service cloud.firestore {
     // ============================================
 
     match /wrappedKeys/{wrappedKeyId} {
-      // grantedBy is a bare field check (no get()) so that list queries filtered on it — e.g.
-      // TrusteePermissionService.revokeTrusteeAccess querying every key a trustor granted a
-      // trustee — can be proven against the query's own filters. Firestore rejects a list
-      // request outright if it can't prove the rule holds for the whole result set using only
-      // the query's equality filters; isSharerOrAboveOnRecord's get() depends on recordId, which
-      // isn't one of that query's filters, so without this branch the query fails permission-
-      // denied regardless of whether any documents actually match.
-      // !exists() first: a get() on a wrappedKey that hasn't been created yet (the standard
-      // "check for an existing key before granting" pattern — e.g. SharingService.
-      // grantEncryptionAccess's very first read) would otherwise throw a null-value evaluation
-      // error dereferencing resource.data.recordId on a nonexistent resource, denying the read
-      // regardless of the caller's actual role. Same defensive pattern already used by records/
-      // subjectConsentRequests/subjectRemovalRequests' own read rules.
-      allow read: if request.auth != null && (
+      // get vs list are split deliberately — Firestore's list-query rule evaluation does NOT
+      // fully re-check every clause per document the way get() does. Empirically confirmed: a
+      // rule like `resource.data.owner == request.auth.uid && !('revoked' in resource.data)`,
+      // queried with only `where('owner','==',me)`, returns documents with `revoked` set too —
+      // once a clause's SOME part is provable from the query's own equality filters, Firestore
+      // grants the whole clause for every matching document and does not separately enforce a
+      // second, non-filter-constrained condition alongside it. So any extra restriction (like
+      // "not revoked") bolted onto a list-only clause is unenforced in practice — a false sense
+      // of security, not a real one — and must be split out.
+      //
+      // get: preserves the original, stricter self-read semantics — a fully-revoked user
+      // (stripped from every role array) must not be able to keep re-fetching their own dead
+      // key forever to bypass RecordDecryptionService's isActive check. !exists() handles a
+      // get() on a wrappedKey that hasn't been created yet (the standard "check for an existing
+      // key before granting" pattern — e.g. SharingService.grantEncryptionAccess's very first
+      // read) — without it, referencing resource.data.recordId on a nonexistent resource throws
+      // a null-value evaluation error, denying the read regardless of the caller's actual role.
+      // Same defensive pattern already used by records/subjectConsentRequests/
+      // subjectRemovalRequests' own read rules.
+      allow get: if request.auth != null && (
         !exists(/databases/$(database)/documents/wrappedKeys/$(wrappedKeyId)) ||
         isSharerOrAboveOnRecord(resource.data.recordId) ||
-        (resource.data.userId == request.auth.uid && hasRoleOnRecord(resource.data.recordId)) ||
-        resource.data.grantedBy == request.auth.uid
+        (resource.data.userId == request.auth.uid && hasRoleOnRecord(resource.data.recordId))
+      );
+
+      // list: both branches are bare field checks the query's own equality filters can prove
+      // outright, no get() needed — grantedBy for the trustor's side (e.g.
+      // TrusteePermissionService.revokeTrusteeAccess querying every key it granted a trustee)
+      // and userId for the trustee's own side (activateTrusteeAccess/updateTrusteeAccess's
+      // self-downgrade, both querying their own granted keys after accepting/adjusting a
+      // relationship). Per the note above, this can't distinguish revoked from
+      // pending/active for a LIST result — that's a real limitation, not an oversight — so any
+      // caller consuming these results that cares about revoked state (there currently are none)
+      // must filter revokedAt itself client-side after the read.
+      allow list: if request.auth != null && (
+        resource.data.grantedBy == request.auth.uid || resource.data.userId == request.auth.uid
       );
 
       // Bootstrap branch: the creator's own wrappedKeys entry is written in the same

@@ -4,7 +4,7 @@
 // SharingService.grantEncryptionAccess/revokeEncryptionAccess reads and writes.
 
 import { readFileSync } from 'node:fs';
-import { beforeAll, afterAll, beforeEach, describe, it } from 'vitest';
+import { beforeAll, afterAll, beforeEach, describe, it, expect } from 'vitest';
 import {
   initializeTestEnvironment,
   assertSucceeds,
@@ -396,5 +396,96 @@ describe('firestore.rules — wrappedKeys — read via list query (list ≠ get)
     );
 
     await assertFails(getDocs(q));
+  });
+
+  // Regression: the mirror-image bug on the trustee's own side. TrusteePermissionService.
+  // activateTrusteeAccess (called right after accepting a trustee invite) and
+  // updateTrusteeAccess's self-downgrade path both query
+  //   where('userId','==',trusteeId).where('grantedBy','==',trustorId).where('isActive','==',...)
+  // as the TRUSTEE — same unprovable-list-query shape as above, just with userId pinned to the
+  // caller instead of grantedBy. Caught in production: accepting a trustee invite succeeded
+  // on-chain but activateTrusteeAccess's query threw permission-denied, leaving every wrappedKey
+  // stuck inactive despite the accepted relationship. The fix is a bare
+  // `userId == request.auth.uid && revokedAt is absent` branch — revokedAt is a plain field on
+  // the same document (no get()), so it's always provable, and its absence reliably means
+  // "pending or active, never revoked" since every revoke path in the app sets it.
+  it('lets a user list their own pending (isActive:false, never revoked) keys, filtered by userId', async () => {
+    const recordId = 'wk-list-userid-pending-allowed';
+    await seedRecord(recordId);
+    await seedWrappedKey(recordId, 'key-1', { userId: RECEIVER, grantedBy: OWNER, isActive: false });
+
+    const db = testEnv.authenticatedContext(RECEIVER).firestore();
+    const q = query(
+      collection(db, 'wrappedKeys'),
+      where('userId', '==', RECEIVER),
+      where('grantedBy', '==', OWNER),
+      where('isActive', '==', false)
+    );
+
+    await assertSucceeds(getDocs(q));
+  });
+
+  it('lets a user list their own active (never revoked) keys, filtered by userId', async () => {
+    const recordId = 'wk-list-userid-active-allowed';
+    await seedRecord(recordId);
+    await seedWrappedKey(recordId, 'key-1', { userId: RECEIVER, grantedBy: OWNER, isActive: true });
+
+    const db = testEnv.authenticatedContext(RECEIVER).firestore();
+    const q = query(
+      collection(db, 'wrappedKeys'),
+      where('userId', '==', RECEIVER),
+      where('grantedBy', '==', OWNER),
+      where('isActive', '==', true)
+    );
+
+    await assertSucceeds(getDocs(q));
+  });
+
+  it('still denies listing keys filtered by someone else\'s userId', async () => {
+    const recordId = 'wk-list-userid-denied';
+    await seedRecord(recordId);
+    await seedWrappedKey(recordId, 'key-1', { userId: RECEIVER, grantedBy: OWNER, isActive: false });
+
+    const db = testEnv.authenticatedContext(STRANGER).firestore();
+    const q = query(
+      collection(db, 'wrappedKeys'),
+      where('userId', '==', RECEIVER),
+      where('grantedBy', '==', OWNER),
+      where('isActive', '==', false)
+    );
+
+    await assertFails(getDocs(q));
+  });
+
+  // Documents a real, deliberate limitation rather than a gap: Firestore's list-query rule
+  // evaluation can't be made to exclude a revoked key here (see the `allow list` comment in
+  // firestore.rules) — a plain-field condition like "revokedAt is absent" gets ignored per
+  // document once userId==me is provable from the query's own filters, so a revoked key that
+  // matches the filters IS included. (grantEncryptionAccess's own re-grant path doesn't reliably
+  // clear a stale revokedAt either, so the field wouldn't be a trustworthy signal even if list
+  // enforcement did work.) Neither activateTrusteeAccess nor updateTrusteeAccess currently need
+  // to distinguish revoked from pending/active in their own result handling, but this pins the
+  // actual behavior so it doesn't get "fixed" into a false sense of security again.
+  it('includes an already-revoked key in list results when it matches the query filters (documented limitation)', async () => {
+    const recordId = 'wk-list-userid-revoked-included';
+    await seedRecord(recordId);
+    await seedWrappedKey(recordId, 'key-1', {
+      userId: RECEIVER,
+      grantedBy: OWNER,
+      isActive: false,
+      revokedAt: new Date(),
+      revokedBy: OWNER,
+    });
+
+    const db = testEnv.authenticatedContext(RECEIVER).firestore();
+    const q = query(
+      collection(db, 'wrappedKeys'),
+      where('userId', '==', RECEIVER),
+      where('grantedBy', '==', OWNER),
+      where('isActive', '==', false)
+    );
+
+    const snap = await getDocs(q);
+    expect(snap.docs).toHaveLength(1);
   });
 });
