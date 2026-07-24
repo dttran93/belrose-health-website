@@ -337,6 +337,29 @@ describe('TrusteeRelationshipService (orchestration)', () => {
       );
       expect(permissionMocks.revokeTrusteeAccess).not.toHaveBeenCalled();
     });
+
+    // Regression: TrusteeBlockchainService.revokeTrustee returns { success: true, blockchainRef:
+    // null } when the relationship was already inactive on-chain from an earlier partial failure
+    // (see trusteeBlockchainService.test.ts). Firestore still needs to catch up to match, but
+    // there's no new on-chain event to append to the audit log.
+    it('still syncs Firestore to revoked when the blockchain call reports already-inactive (null blockchainRef)', async () => {
+      await seedRelationship(TRUSTOR, TRUSTEE, { status: 'active', isActive: true });
+      blockchainMocks.revokeTrustee.mockResolvedValue({ success: true, blockchainRef: null });
+      setCaller(TRUSTOR);
+
+      await TrusteeRelationshipService.revokeTrustee(TRUSTEE);
+
+      expect(permissionMocks.revokeTrusteeAccess).toHaveBeenCalledWith(TRUSTOR, TRUSTEE, null);
+
+      const snap = await getDoc(
+        doc(db, 'trusteeRelationships', getTrusteeRelationshipId(TRUSTOR, TRUSTEE))
+      );
+      const data = snap.data()!;
+      expect(data.status).toBe('revoked');
+      expect(data.isActive).toBe(false);
+      // No new event appended — nothing new happened on-chain to record.
+      expect(data.onChainEvents).toHaveLength(0);
+    });
   });
 
   describe('editTrusteeRelationship', () => {
@@ -686,6 +709,25 @@ describe('TrusteeRelationshipService (orchestration)', () => {
       expect(data.isActive).toBe(false);
       expect(data.revokedBy).toBe(TRUSTEE);
       expect(data.statusUpdateReason).toBe('trustee_resigned');
+    });
+
+    // Regression: same already-inactive-on-chain resilience as revokeTrustee above.
+    it('still syncs Firestore to declined when the blockchain call reports already-inactive (null blockchainRef)', async () => {
+      await seedRelationship(TRUSTOR, TRUSTEE, { status: 'active', isActive: true });
+      blockchainMocks.revokeTrustee.mockResolvedValue({ success: true, blockchainRef: null });
+      setCaller(TRUSTEE);
+
+      await TrusteeRelationshipService.resignAsTrustee(TRUSTOR);
+
+      expect(permissionMocks.revokeTrusteeAccess).toHaveBeenCalledWith(TRUSTOR, TRUSTEE, null);
+
+      const snap = await getDoc(
+        doc(db, 'trusteeRelationships', getTrusteeRelationshipId(TRUSTOR, TRUSTEE))
+      );
+      const data = snap.data()!;
+      expect(data.status).toBe('declined');
+      expect(data.isActive).toBe(false);
+      expect(data.onChainEvents).toHaveLength(0);
     });
   });
 

@@ -2,11 +2,11 @@
 //
 // src/features/Dependents/components/__tests__/RemoveDialog.test.tsx
 //
-// RemoveDialog's willDelete = isDependent && !handoffInitiatedAt condition is the one that
-// DependentsSettingsPage's own remove-menu-item label was found to drift from (bug fix — see
-// DependentsSettingsPage.test.tsx, which pins that the two now agree across all 4
-// combinations). This file exercises willDelete's own 4 combinations directly against the
-// dialog's title/description/button copy, plus the confirm/cancel/failure flows.
+// RemoveDialog is now revoke-only regardless of isDependent/handoffInitiatedAt — full account
+// deletion for an unclaimed dependent is handled by SwitchAndDeleteDialog instead, which routes
+// through the dependent's own session so on-chain trustee revocation can actually succeed (see
+// SwitchAndDeleteDialog.test.tsx). DependentsSettingsPage's menu item still decides which of the
+// two dialogs to open based on isDependent/handoffInitiatedAt (see DependentsSettingsPage.test.tsx).
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
@@ -14,10 +14,10 @@ import userEvent from '@testing-library/user-event';
 import RemoveDialog from '../RemoveDialog';
 import type { DependentEntry } from '../DependentsSettingsPage';
 
-const { removeDependentMock } = vi.hoisted(() => ({ removeDependentMock: vi.fn(async () => undefined) }));
+const { resignAsTrusteeMock } = vi.hoisted(() => ({ resignAsTrusteeMock: vi.fn(async () => undefined) }));
 
-vi.mock('../../services/dependentManagementService', () => ({
-  DependentManagementService: { removeDependent: removeDependentMock },
+vi.mock('@/features/Trustee/services/trusteeRelationshipService', () => ({
+  TrusteeRelationshipService: { resignAsTrustee: resignAsTrusteeMock },
 }));
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -35,23 +35,11 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('RemoveDialog — willDelete across all 4 isDependent x handoffInitiatedAt combinations', () => {
-  it('unclaimed + no handoff sent -> willDelete: shows delete copy', () => {
+describe('RemoveDialog — always revoke-only, regardless of isDependent/handoffInitiatedAt', () => {
+  it('shows revoke-access copy for an unclaimed dependent with no handoff sent', () => {
     render(
       <RemoveDialog
         dependent={fakeEntry({ isDependent: true, handoffInitiatedAt: undefined })}
-        onClose={() => {}}
-        onRemoved={() => {}}
-      />
-    );
-    expect(screen.getByText('Delete Dependent Account')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Delete Account' })).toBeInTheDocument();
-  });
-
-  it('unclaimed + handoff already sent -> not willDelete: shows revoke-access copy', () => {
-    render(
-      <RemoveDialog
-        dependent={fakeEntry({ isDependent: true, handoffInitiatedAt: '2026-01-01T00:00:00Z' })}
         onClose={() => {}}
         onRemoved={() => {}}
       />
@@ -60,7 +48,7 @@ describe('RemoveDialog — willDelete across all 4 isDependent x handoffInitiate
     expect(screen.getByRole('button', { name: 'Remove Access' })).toBeInTheDocument();
   });
 
-  it('claimed + no handoff sent -> not willDelete: shows revoke-access copy', () => {
+  it('shows revoke-access copy for a claimed dependent', () => {
     render(
       <RemoveDialog
         dependent={fakeEntry({ isDependent: false, handoffInitiatedAt: undefined })}
@@ -70,77 +58,47 @@ describe('RemoveDialog — willDelete across all 4 isDependent x handoffInitiate
     );
     expect(screen.getByText('Remove Guardian Access')).toBeInTheDocument();
   });
-
-  it('claimed + handoff sent -> not willDelete: shows revoke-access copy', () => {
-    render(
-      <RemoveDialog
-        dependent={fakeEntry({ isDependent: false, handoffInitiatedAt: '2026-01-01T00:00:00Z' })}
-        onClose={() => {}}
-        onRemoved={() => {}}
-      />
-    );
-    expect(screen.getByText('Remove Guardian Access')).toBeInTheDocument();
-  });
 });
 
 describe('RemoveDialog — confirm/cancel/failure', () => {
-  it('confirms removal: calls the service with trustorId, shows the delete-toast, and calls onRemoved/onClose', async () => {
+  it('confirms removal: calls the service with trustorId, shows the revoke-toast, and calls onRemoved/onClose', async () => {
     const onClose = vi.fn();
     const onRemoved = vi.fn();
     const user = userEvent.setup();
     render(
-      <RemoveDialog
-        dependent={fakeEntry({ isDependent: true })}
-        onClose={onClose}
-        onRemoved={onRemoved}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Delete Account' }));
-
-    expect(removeDependentMock).toHaveBeenCalledWith('dep-1');
-    expect(toast.success).toHaveBeenCalledWith("Jane Dependent's account has been deleted.");
-    expect(onRemoved).toHaveBeenCalledWith('dep-1');
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('shows the revoke-toast (not delete-toast) when willDelete is false', async () => {
-    const user = userEvent.setup();
-    render(
-      <RemoveDialog dependent={fakeEntry({ isDependent: false })} onClose={() => {}} onRemoved={() => {}} />
+      <RemoveDialog dependent={fakeEntry()} onClose={onClose} onRemoved={onRemoved} />
     );
 
     await user.click(screen.getByRole('button', { name: 'Remove Access' }));
 
+    expect(resignAsTrusteeMock).toHaveBeenCalledWith('dep-1');
     expect(toast.success).toHaveBeenCalledWith('Guardian access removed.');
+    expect(onRemoved).toHaveBeenCalledWith('dep-1');
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('shows an error toast and re-enables the button on failure, without closing', async () => {
-    removeDependentMock.mockRejectedValueOnce(new Error('server exploded'));
+    resignAsTrusteeMock.mockRejectedValueOnce(new Error('server exploded'));
     const onClose = vi.fn();
     const user = userEvent.setup();
-    render(
-      <RemoveDialog dependent={fakeEntry({ isDependent: true })} onClose={onClose} onRemoved={() => {}} />
-    );
+    render(<RemoveDialog dependent={fakeEntry()} onClose={onClose} onRemoved={() => {}} />);
 
-    await user.click(screen.getByRole('button', { name: 'Delete Account' }));
+    await user.click(screen.getByRole('button', { name: 'Remove Access' }));
 
     expect(toast.error).toHaveBeenCalledWith('server exploded');
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Delete Account' })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Remove Access' })).not.toBeDisabled();
   });
 
   it('cancel calls onClose without invoking the service', async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
-    render(
-      <RemoveDialog dependent={fakeEntry({ isDependent: true })} onClose={onClose} onRemoved={() => {}} />
-    );
+    render(<RemoveDialog dependent={fakeEntry()} onClose={onClose} onRemoved={() => {}} />);
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(removeDependentMock).not.toHaveBeenCalled();
+    expect(resignAsTrusteeMock).not.toHaveBeenCalled();
   });
 
   it('falls back to "this account" when the profile has no displayName', () => {

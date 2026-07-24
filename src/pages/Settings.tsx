@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import GeneralSettings from '@/features/Settings/components/GeneralSettings';
 import { getAuth } from 'firebase/auth';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { UserService } from '@/features/Auth/services/userService';
 import { BelroseUserProfile } from '@/types/core';
 import { useUserSettings } from '@/features/Settings/hooks/useUserSettings';
@@ -24,6 +24,21 @@ const SettingsPage = () => {
   const [userProfile, setUserProfile] = useState<BelroseUserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Auto-open the delete-account dialog when landing here via ?action=delete-account
+  // (used by the guardian "switch into dependent, then delete" flow).
+  const [isDeleteAccountDialogOpen, setIsDeleteAccountDialogOpen] = useState(
+    searchParams.get('action') === 'delete-account'
+  );
+
+  const handleDeleteAccountDialogChange = (open: boolean) => {
+    setIsDeleteAccountDialogOpen(open);
+    if (!open && searchParams.has('action')) {
+      searchParams.delete('action');
+      setSearchParams(searchParams, { replace: true });
+    }
+  };
 
   //Active Section for deriving URL - e.g. /app/settings/trustees --> trustees page
   const activeSection = location.pathname.split('/').pop() || 'general';
@@ -132,6 +147,8 @@ const SettingsPage = () => {
             user={userProfile}
             onChangeEmail={() => setIsChangeEmailModalOpen(true)}
             onChangePassword={() => setIsChangePasswordModalOpen(true)}
+            deleteAccountDialogOpen={isDeleteAccountDialogOpen}
+            onDeleteAccountDialogOpenChange={handleDeleteAccountDialogChange}
           />
         );
 

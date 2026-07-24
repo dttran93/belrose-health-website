@@ -44,6 +44,7 @@ export interface BelroseUserProfile extends User {
   isPlatformAdmin?: boolean; // For platform admin privileges
   isDependent?: boolean; // Account created by a guardian on behalf of someone else
   dependentCreatedBy?: string; // UID of the guardian who created this account
+  handoffInitiatedAt?: Timestamp | null; // Set when the guardian sends the "claim your account" email
   signInProvider?: string; // Firebase sign-in provider for current session ('password', 'custom', etc.)
   passwordSelfSetAt?: string; // ISO timestamp of when the user last set their own password via recovery flow
 

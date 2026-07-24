@@ -432,6 +432,25 @@ describe('TrusteePermissionService (orchestration)', () => {
       expect(snap.data()?.isActive).toBe(false);
       expect(snap.data()?.revokedBy).toBeUndefined();
     });
+
+    // Regression: a null blockchainRef (already-inactive-on-chain case, see
+    // TrusteeBlockchainService.revokeTrustee) still deactivates the wrappedKey and strips role
+    // arrays — it just skips the audit-log write since there's no new on-chain event to cite.
+    it('still deactivates the wrappedKey and role arrays when blockchainRef is null, skipping the audit-log write', async () => {
+      await seedRecord(db, RECORD_A, { owners: [TRUSTOR], administrators: [TRUSTEE] });
+      await seedWrappedKey(RECORD_A, TRUSTEE, { isActive: true, grantedBy: TRUSTOR });
+      setCaller(TRUSTOR);
+
+      await TrusteePermissionService.revokeTrusteeAccess(TRUSTOR, TRUSTEE, null);
+
+      const recordSnap = await getDoc(doc(db, 'records', RECORD_A));
+      expect(recordSnap.data()?.administrators).not.toContain(TRUSTEE);
+
+      const keySnap = await getDoc(doc(db, 'wrappedKeys', `${RECORD_A}_${TRUSTEE}`));
+      expect(keySnap.data()?.isActive).toBe(false);
+
+      expect(writeChangeMock).not.toHaveBeenCalled();
+    });
   });
 
   describe('grantAccessForNewRecord', () => {

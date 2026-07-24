@@ -371,7 +371,7 @@ export class TrusteePermissionService {
   static async rollbackPendingTrusteeAccess(
     trustorId: string,
     trusteeId: string,
-    blockchainRef: BlockchainRef
+    blockchainRef: BlockchainRef | null
   ): Promise<void> {
     const auth = getAuth();
     const currentUserId = auth.currentUser?.uid;
@@ -417,7 +417,10 @@ export class TrusteePermissionService {
         // Delete the inactive wrappedKey
         await deleteDoc(wrappedKeyDoc.ref);
 
-        if (previousRole) {
+        // blockchainRef is null when the on-chain side was already in its end state before this
+        // call (see TrusteeBlockchainService.revokeTrustee) — nothing new happened on-chain, so
+        // there's no fresh event to cite in the audit log.
+        if (previousRole && blockchainRef) {
           await writePermissionChangeEvent(
             recordId,
             currentUserId,
@@ -445,7 +448,7 @@ export class TrusteePermissionService {
   static async revokeTrusteeAccess(
     trustorId: string,
     trusteeId: string,
-    blockchainRef: BlockchainRef
+    blockchainRef: BlockchainRef | null
   ): Promise<void> {
     console.log('🔄 Revoking active trustee access...', { trustorId, trusteeId });
 
@@ -481,7 +484,10 @@ export class TrusteePermissionService {
           trustees: arrayRemove(trusteeId),
         });
 
-        if (previousRole) {
+        // blockchainRef is null when the on-chain side was already in its end state before this
+        // call (see TrusteeBlockchainService.revokeTrustee) — nothing new happened on-chain, so
+        // there's no fresh event to cite in the audit log.
+        if (previousRole && blockchainRef) {
           await writePermissionChangeEvent(
             recordId,
             changedBy,

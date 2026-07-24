@@ -1,8 +1,8 @@
 // src/features/Dependents/services/dependentAccountService.ts
-// Client-side orchestration for dependent account creation.
-// All private key material is generated here and only the encrypted form is ever
-// sent to the server — consistent with the E2EE model used in registration and
-// guest account claiming.
+// Client-side orchestration for the dependent account lifecycle: creation, handoff
+// initiation, and claiming. All private key material for creation is generated here
+// and only the encrypted form is ever sent to the server — consistent with the E2EE
+// model used in registration and guest account claiming.
 
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { WalletGenerationService } from '@/features/Auth/services/walletGenerationService';
@@ -79,5 +79,18 @@ export class DependentAccountService {
       smartAccountAddress: result.data.smartAccountAddress,
       recoveryKey: bundle.recoveryKey,
     };
+  }
+
+  static async initiateHandoff(dependentUid: string, contactEmail: string): Promise<void> {
+    const fn = httpsCallable(getFunctions(), 'initiateHandoff');
+    await fn({ dependentUid, contactEmail });
+  }
+
+  static async claimAccount(): Promise<void> {
+    const fn = httpsCallable<Record<string, never>, { success: boolean }>(
+      getFunctions(),
+      'claimDependentAccount'
+    );
+    await fn({});
   }
 }

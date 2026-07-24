@@ -816,9 +816,17 @@ service cloud.firestore {
     // ============================================
 
     match /wrappedKeys/{wrappedKeyId} {
+      // grantedBy is a bare field check (no get()) so that list queries filtered on it — e.g.
+      // TrusteePermissionService.revokeTrusteeAccess querying every key a trustor granted a
+      // trustee — can be proven against the query's own filters. Firestore rejects a list
+      // request outright if it can't prove the rule holds for the whole result set using only
+      // the query's equality filters; isSharerOrAboveOnRecord's get() depends on recordId, which
+      // isn't one of that query's filters, so without this branch the query fails permission-
+      // denied regardless of whether any documents actually match.
       allow read: if request.auth != null && (
         isSharerOrAboveOnRecord(resource.data.recordId) ||
-        (resource.data.userId == request.auth.uid && hasRoleOnRecord(resource.data.recordId))
+        (resource.data.userId == request.auth.uid && hasRoleOnRecord(resource.data.recordId)) ||
+        resource.data.grantedBy == request.auth.uid
       );
 
       // Bootstrap branch: the creator's own wrappedKeys entry is written in the same
@@ -837,11 +845,14 @@ service cloud.firestore {
          request.resource.data.isCreator == true)
       );
 
+      // Same reasoning as read above: a bare grantedBy check lets the trustor who granted a key
+      // deactivate it (revokeTrusteeAccess's updateDoc on each query result) without requiring
+      // they still hold a record-level role — the trustee relationship itself is the authority
+      // here, not the record.
       allow update: if request.auth != null && (
         isAdminOrOwnerOfRecord(resource.data.recordId) ||
         resource.data.userId == request.auth.uid ||
-        (isSharerOrAboveOnRecord(resource.data.recordId) &&
-        resource.data.grantedBy == request.auth.uid)
+        resource.data.grantedBy == request.auth.uid
       );
 
       // exists() only gates the admin/owner branch — it's the only one whose internal get()

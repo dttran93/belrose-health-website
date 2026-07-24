@@ -5,8 +5,8 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import { useAuthContext } from '@/features/Auth/AuthContext';
 import { getUserProfile } from '@/features/Users/services/userProfileService';
-import { ClaimAccountService } from '../services/claimAccountService';
 import type { BelroseUserProfile } from '@/types/core';
+import { DependentAccountService } from '../services/dependentAccountService';
 
 const ClaimAccountPage: React.FC = () => {
   const { user, refreshUser } = useAuthContext();
@@ -25,7 +25,7 @@ const ClaimAccountPage: React.FC = () => {
   const handleClaim = async () => {
     setIsClaiming(true);
     try {
-      await ClaimAccountService.claimAccount();
+      await DependentAccountService.claimAccount();
       setClaimed(true);
       // Give the success state a moment to show, then refresh and enter the app
       setTimeout(async () => {

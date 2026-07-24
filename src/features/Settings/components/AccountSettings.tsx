@@ -1,28 +1,39 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Copy, Check, ShieldAlert } from 'lucide-react';
+import { Eye, EyeOff, Copy, Check, ShieldAlert, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { SectionHeader, SettingsRow } from './ui/SettingsRow';
 import { BelroseUserProfile } from '@/types/core';
 import { EncryptionKeyManager } from '@/features/Encryption/services/encryptionKeyManager';
 import { copyToClipboard } from '@/utils/browserUtils';
 import { toast } from 'sonner';
+import DeleteAccountDialog from './DeleteAccountDialog';
 
 interface AccountSettingsProps {
   user: BelroseUserProfile;
   onChangeEmail?: () => void;
   onChangePassword?: () => void;
+  deleteAccountDialogOpen?: boolean;
+  onDeleteAccountDialogOpenChange?: (open: boolean) => void;
 }
 
 const AccountSettings: React.FC<AccountSettingsProps> = ({
   user,
   onChangeEmail,
   onChangePassword,
+  deleteAccountDialogOpen,
+  onDeleteAccountDialogOpenChange,
 }) => {
   // Recovery phrase state
   const [recoveryPhrase, setRecoveryPhrase] = useState<string | null>(null);
   const [isLoadingPhrase, setIsLoadingPhrase] = useState(false);
   const [isPhraseVisible, setIsPhraseVisible] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Delete account dialog can be controlled externally (e.g. auto-opened after a
+  // guardian switches into a dependent's session to delete it) or locally via the button.
+  const [localDeleteDialogOpen, setLocalDeleteDialogOpen] = useState(false);
+  const isDeleteDialogOpen = deleteAccountDialogOpen ?? localDeleteDialogOpen;
+  const setDeleteDialogOpen = onDeleteAccountDialogOpenChange ?? setLocalDeleteDialogOpen;
 
   const handleRevealPhrase = async () => {
     if (recoveryPhrase) {
@@ -163,6 +174,29 @@ const AccountSettings: React.FC<AccountSettingsProps> = ({
           )}
         </div>
       </div>
+
+      {/* Danger Zone */}
+      <SectionHeader title="Delete Account" />
+
+      <div className="flex items-center justify-between gap-4 py-3">
+        <div className="text-left">
+          <p className="text-sm font-medium text-foreground">Delete account</p>
+          <p className="text-xs text-muted-foreground">
+            Permanently delete your account and any related data
+          </p>
+        </div>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => setDeleteDialogOpen(true)}
+          className="flex items-center gap-2 shrink-0"
+        >
+          <Trash2 className="w-4 h-4" />
+          Delete Account
+        </Button>
+      </div>
+
+      <DeleteAccountDialog isOpen={isDeleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} />
     </div>
   );
 };
