@@ -1,13 +1,16 @@
 // src/features/Dependents/services/__tests__/dependentAccountService.test.ts
 //
 // Tier 3 (AccountEncryptionService/WalletGenerationService/httpsCallable mocked) unit tests
-// for DependentAccountService. AccountEncryptionService itself has no dedicated unit test yet
+// for DependentAccountService — the single home for all dependent-account lifecycle actions
+// (creation, handoff, claim). AccountEncryptionService itself has no dedicated unit test yet
 // (it's pure crypto orchestration, exercised indirectly via the e2e signup spec and this
 // file's mocked call-wiring assertions) — this file only checks that createAccount sends the
 // Cloud Function *encrypted* key material only, never the raw master key or RSA private key.
 // The plaintext `password` field IS legitimately sent — the Cloud Function needs it to create
 // the Firebase Auth user via the Admin SDK — this is not a bug, just worth being explicit about
 // in the assertions below so a future reader doesn't mistake it for a leak.
+// initiateHandoff/claimAccount are thin httpsCallable wrappers — real server behavior for those
+// lives in the Functions-layer tests for those handlers; this file only checks call wiring.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -141,5 +144,38 @@ describe('DependentAccountService.createAccount', () => {
       smartAccountAddress: '0xdef',
       recoveryKey: 'word1 word2 ... word24',
     });
+  });
+});
+
+describe('DependentAccountService.initiateHandoff', () => {
+  it('calls the initiateHandoff callable with dependentUid and contactEmail', async () => {
+    await DependentAccountService.initiateHandoff('dep-1', 'contact@example.com');
+
+    expect(httpsCallableMock).toHaveBeenCalledWith(expect.anything(), 'initiateHandoff');
+    expect(callableFnMock).toHaveBeenCalledWith({
+      dependentUid: 'dep-1',
+      contactEmail: 'contact@example.com',
+    });
+  });
+
+  it('propagates errors from the callable', async () => {
+    callableFnMock.mockRejectedValueOnce(new Error('not authorized'));
+    await expect(
+      DependentAccountService.initiateHandoff('dep-1', 'contact@example.com')
+    ).rejects.toThrow('not authorized');
+  });
+});
+
+describe('DependentAccountService.claimAccount', () => {
+  it('calls the claimDependentAccount callable with no arguments', async () => {
+    await DependentAccountService.claimAccount();
+
+    expect(httpsCallableMock).toHaveBeenCalledWith(expect.anything(), 'claimDependentAccount');
+    expect(callableFnMock).toHaveBeenCalledWith({});
+  });
+
+  it('propagates errors from the callable', async () => {
+    callableFnMock.mockRejectedValueOnce(new Error('not authorized'));
+    await expect(DependentAccountService.claimAccount()).rejects.toThrow('not authorized');
   });
 });

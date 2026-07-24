@@ -63,6 +63,9 @@ export async function getUserProfile(
       encryption: userData.encryption,
       onChainIdentity: userData.onChainIdentity,
       searchDiscoverable: userData.searchDiscoverable ?? false,
+      isDependent: userData.isDependent,
+      dependentCreatedBy: userData.dependentCreatedBy,
+      handoffInitiatedAt: userData.handoffInitiatedAt,
     };
 
     userCache.set(userId, { data: profile, timestamp: Date.now() });

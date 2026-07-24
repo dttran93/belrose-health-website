@@ -2,8 +2,9 @@
 //
 // Functions layer — initiateHandoff: sends the "claim your account" email and stamps
 // handoffInitiatedAt on the dependent's doc. That field name/semantics is exactly what
-// removeDependentRelationship.ts's revoke-vs-delete branch reads later (see
-// removeDependentRelationship.test.ts) — this test proves the two handlers agree on it.
+// RemoveDialog/DependentsSettingsPage read client-side to decide whether "Delete account"
+// switches into the dependent's session (SwitchAndDeleteDialog) or just revokes guardian
+// access (RemoveDialog) — see RemoveDialog.test.tsx.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as admin from 'firebase-admin';

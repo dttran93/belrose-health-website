@@ -23,6 +23,7 @@ import type { BelroseUserProfile } from '@/types/core';
 import type { MenuItem } from '@/features/Users/components/ui/UserMenu';
 import HandoffDialog from './HandoffDialog';
 import RemoveDialog from './RemoveDialog';
+import SwitchAndDeleteDialog from './SwitchAndDeleteDialog';
 
 export interface DependentEntry {
   relationship: TrusteeRelationship;
@@ -65,6 +66,7 @@ export const DependentsSettingsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [handoffTarget, setHandoffTarget] = useState<DependentEntry | null>(null);
   const [removeTarget, setRemoveTarget] = useState<DependentEntry | null>(null);
+  const [switchAndDeleteTarget, setSwitchAndDeleteTarget] = useState<DependentEntry | null>(null);
 
   useEffect(() => {
     const currentUser = getAuth().currentUser;
@@ -122,15 +124,19 @@ export const DependentsSettingsPage: React.FC = () => {
     { type: 'divider', key: 'divider-actions' },
     {
       key: 'remove',
-      // Mirrors RemoveDialog's willDelete condition exactly — an unclaimed dependent whose
-      // guardian has already sent a handoff will only have access revoked, not deleted.
+      // An unclaimed dependent with no handoff in progress can be fully deleted —
+      // routed through SwitchAndDeleteDialog so it runs with the dependent's own
+      // live signer. Otherwise, only guardian access is revoked (RemoveDialog).
       label:
-        entry.profile?.isDependent && !(entry.profile as any)?.handoffInitiatedAt
+        entry.profile?.isDependent && !entry.profile?.handoffInitiatedAt
           ? 'Delete account'
           : 'Remove guardian access',
       icon: Trash2,
       destructive: true,
-      onClick: () => setRemoveTarget(entry),
+      onClick: () =>
+        entry.profile?.isDependent && !entry.profile?.handoffInitiatedAt
+          ? setSwitchAndDeleteTarget(entry)
+          : setRemoveTarget(entry),
     },
   ];
 
@@ -210,6 +216,10 @@ export const DependentsSettingsPage: React.FC = () => {
         dependent={removeTarget}
         onClose={() => setRemoveTarget(null)}
         onRemoved={uid => setDependents(prev => prev.filter(e => e.relationship.trustorId !== uid))}
+      />
+      <SwitchAndDeleteDialog
+        dependent={switchAndDeleteTarget}
+        onClose={() => setSwitchAndDeleteTarget(null)}
       />
     </div>
   );

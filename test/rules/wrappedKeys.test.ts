@@ -11,7 +11,7 @@ import {
   assertFails,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 import { OWNER, ADMIN, SHARER, VIEWER, baseRecord } from './fixtures/recordPermissionMatrix';
 
 const OTHER_SHARER = 'other-sharer-uid';
@@ -323,5 +323,52 @@ describe('firestore.rules — wrappedKeys — read (sharer+ management, or your 
     await seedWrappedKey(recordId, 'key-1', { userId: VIEWER, grantedBy: SHARER, isActive: false });
 
     await assertSucceeds(testEnv.authenticatedContext(VIEWER).firestore().doc('wrappedKeys/key-1').get());
+  });
+});
+
+describe('firestore.rules — wrappedKeys — read via list query (list ≠ get)', () => {
+  // Regression: TrusteePermissionService.revokeTrusteeAccess queries
+  //   where('userId','==',trusteeId).where('grantedBy','==',trustorId).where('isActive','==',true)
+  // as the trustor, to find every key they granted a given trustee. A single-doc get() by an
+  // owner/sharer would pass fine via isSharerOrAboveOnRecord — but Firestore requires a list
+  // request's rule to be provable for the WHOLE possible result set using only the query's own
+  // equality filters, before it'll run the query at all. recordId isn't one of this query's
+  // filters, so isSharerOrAboveOnRecord's get() can never satisfy that requirement, and userId
+  // is pinned to the trustee (not the caller), so the self-read branch can't either — the entire
+  // query was rejected with permission-denied regardless of whether anything matched. Caught in
+  // production during dependent-account deletion (AccountDeletionService → resignAsTrustee),
+  // where the on-chain revoke succeeded but this query blocked the Firestore side from ever
+  // running. The bare `grantedBy == request.auth.uid` branch fixes it because grantedBy IS one
+  // of the query's filters, so Firestore can prove it holds without any get().
+  it('lets the granter list keys they granted, filtered by grantedBy — recordId is not part of the query', async () => {
+    const recordId = 'wk-list-grantedby-allowed';
+    await seedRecord(recordId);
+    await seedWrappedKey(recordId, 'key-1', { userId: RECEIVER, grantedBy: OWNER, isActive: true });
+
+    const db = testEnv.authenticatedContext(OWNER).firestore();
+    const q = query(
+      collection(db, 'wrappedKeys'),
+      where('userId', '==', RECEIVER),
+      where('grantedBy', '==', OWNER),
+      where('isActive', '==', true)
+    );
+
+    await assertSucceeds(getDocs(q));
+  });
+
+  it('still denies listing keys filtered by someone else\'s grantedBy', async () => {
+    const recordId = 'wk-list-grantedby-denied';
+    await seedRecord(recordId);
+    await seedWrappedKey(recordId, 'key-1', { userId: RECEIVER, grantedBy: SHARER, isActive: true });
+
+    const db = testEnv.authenticatedContext(STRANGER).firestore();
+    const q = query(
+      collection(db, 'wrappedKeys'),
+      where('userId', '==', RECEIVER),
+      where('grantedBy', '==', SHARER),
+      where('isActive', '==', true)
+    );
+
+    await assertFails(getDocs(q));
   });
 });

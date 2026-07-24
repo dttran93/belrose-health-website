@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getStripeSessionStatus = exports.createStripeVerificationSession = exports.refineRecord = exports.checkEmailRegistrationStatus = exports.aiChat = exports.getSponsorshipStatus = exports.signSponsorship = exports.onRecordRequestUpdated = exports.onRecordRequestCreated = exports.onTrusteeRelationshipUpdated = exports.onTrusteeRelationshipCreated = exports.onDisputeUpdated = exports.onDisputeWritten = exports.onVerificationUpdated = exports.onVerificationWritten = exports.onPermissionChangeEventCreated = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.onRecordDeletionEventCreated = exports.onRecordVersionCreated = exports.initializeRoleOnChainForRequester = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChainComplete = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.guestPasswordUpdate = exports.createRecordRequest = exports.redeemGuestInvite = exports.createGuestInvite = exports.removeDependentRelationship = exports.initiateHandoff = exports.claimDependentAccount = exports.switchToGuardian = exports.switchToDependent = exports.createDependentAccount = exports.addToMailingList = exports.sendPasswordChangeEmail = exports.sendWaitlistConfirmationEmail = exports.sendAlphaApprovalEmail = exports.sendShareInvitationEmail = exports.getEncryptedWallet = exports.createEOAWallet = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = exports.setPlatformAdmin = void 0;
+exports.getStripeSessionStatus = exports.createStripeVerificationSession = exports.refineRecord = exports.checkEmailRegistrationStatus = exports.aiChat = exports.getSponsorshipStatus = exports.signSponsorship = exports.onRecordRequestUpdated = exports.onRecordRequestCreated = exports.onTrusteeRelationshipUpdated = exports.onTrusteeRelationshipCreated = exports.onDisputeUpdated = exports.onDisputeWritten = exports.onVerificationUpdated = exports.onVerificationWritten = exports.onPermissionChangeEventCreated = exports.onSubjectConsentRequestUpdated = exports.onSubjectConsentRequestCreated = exports.onRecordDeletionEventCreated = exports.onRecordVersionCreated = exports.initializeRoleOnChainForRequester = exports.initializeRoleOnChain = exports.reactivateWalletOnChain = exports.deactivateWalletOnChain = exports.updateMemberStatus = exports.registerMemberOnChainComplete = exports.registerMemberOnChain = exports.healthDetailed = exports.health = exports.guestPasswordUpdate = exports.createRecordRequest = exports.redeemGuestInvite = exports.createGuestInvite = exports.initiateHandoff = exports.claimDependentAccount = exports.switchToGuardian = exports.switchToDependent = exports.createDependentAccount = exports.deleteOwnAccount = exports.addToMailingList = exports.sendPasswordChangeEmail = exports.sendWaitlistConfirmationEmail = exports.sendAlphaApprovalEmail = exports.sendShareInvitationEmail = exports.getEncryptedWallet = exports.createEOAWallet = exports.createBelroseFields = exports.convertToFHIR = exports.analyzeImageWithAI = exports.setPlatformAdmin = void 0;
 exports.stripeIdentityWebhook = void 0;
 // functions/src/index.ts
 const admin = __importStar(require("firebase-admin"));
@@ -67,6 +67,9 @@ var sendPasswordChangeEmail_1 = require("./handlers/sendPasswordChangeEmail");
 Object.defineProperty(exports, "sendPasswordChangeEmail", { enumerable: true, get: function () { return sendPasswordChangeEmail_1.sendPasswordChangeEmail; } });
 var addToMailingList_1 = require("./handlers/addToMailingList");
 Object.defineProperty(exports, "addToMailingList", { enumerable: true, get: function () { return addToMailingList_1.addToMailingList; } });
+// ==================== ACCOUNT DELETION ====================
+var deleteOwnAccount_1 = require("./handlers/deleteOwnAccount");
+Object.defineProperty(exports, "deleteOwnAccount", { enumerable: true, get: function () { return deleteOwnAccount_1.deleteOwnAccount; } });
 // ==================== DEPENDENT ACCOUNTS ====================
 var createDependentAccount_1 = require("./handlers/createDependentAccount");
 Object.defineProperty(exports, "createDependentAccount", { enumerable: true, get: function () { return createDependentAccount_1.createDependentAccount; } });
@@ -77,8 +80,6 @@ var claimDependentAccount_1 = require("./handlers/claimDependentAccount");
 Object.defineProperty(exports, "claimDependentAccount", { enumerable: true, get: function () { return claimDependentAccount_1.claimDependentAccount; } });
 var initiateHandoff_1 = require("./handlers/initiateHandoff");
 Object.defineProperty(exports, "initiateHandoff", { enumerable: true, get: function () { return initiateHandoff_1.initiateHandoff; } });
-var removeDependentRelationship_1 = require("./handlers/removeDependentRelationship");
-Object.defineProperty(exports, "removeDependentRelationship", { enumerable: true, get: function () { return removeDependentRelationship_1.removeDependentRelationship; } });
 // ==================== GUEST INVITE ====================
 var createGuestInvite_1 = require("./handlers/createGuestInvite");
 Object.defineProperty(exports, "createGuestInvite", { enumerable: true, get: function () { return createGuestInvite_1.createGuestInvite; } });

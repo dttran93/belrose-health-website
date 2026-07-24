@@ -6,13 +6,13 @@
  */
 
 import { useEffect, useState } from 'react';
-import { DependentManagementService } from '../services/dependentManagementService';
 import { toast } from 'sonner';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { Loader2, SendHorizontal } from 'lucide-react';
 import { DependentEntry } from './DependentsSettingsPage';
 import { InputField } from '@/components/ui/InputField';
 import { Button } from '@/components/ui/Button';
+import { DependentAccountService } from '../services/dependentAccountService';
 
 interface HandoffDialogProps {
   dependent: DependentEntry | null;
@@ -33,7 +33,7 @@ const HandoffDialog: React.FC<HandoffDialogProps> = ({ dependent, onClose }) => 
     if (!dependent || !contactEmail.trim()) return;
     setIsSending(true);
     try {
-      await DependentManagementService.initiateHandoff(
+      await DependentAccountService.initiateHandoff(
         dependent.relationship.trustorId,
         contactEmail.trim()
       );
