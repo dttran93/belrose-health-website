@@ -384,11 +384,34 @@ describe('TrusteePermissionService (orchestration)', () => {
 
       expect(writeChangeMock).not.toHaveBeenCalled();
     });
+
+    // Regression: grantPendingTrusteeAccess only tags trustees[] when the trustee didn't already
+    // have independent access (hadPriorAccess) — its absence means this role predates/is
+    // independent of the trust relationship and must be left untouched when the invite is
+    // declined/revoked before acceptance. Without this guard, the app would try to strip a role
+    // the trustee has every right to keep, and firestore.rules' trustee-self-adjust branch
+    // (which requires trustees[] membership) would correctly reject the attempt anyway.
+    it('leaves a record alone entirely when the trustee has independent (non-trustee-derived) access', async () => {
+      await seedRecord(db, RECORD_A, { owners: [TRUSTOR], viewers: [TRUSTEE] }); // no tagTrustee
+      await seedWrappedKey(RECORD_A, TRUSTEE, { isActive: false, grantedBy: TRUSTOR });
+      setCaller(TRUSTOR);
+
+      await TrusteePermissionService.rollbackPendingTrusteeAccess(TRUSTOR, TRUSTEE, REF);
+
+      const recordSnap = await getDoc(doc(db, 'records', RECORD_A));
+      expect(recordSnap.data()?.viewers).toContain(TRUSTEE);
+
+      const keySnap = await getDoc(doc(db, 'wrappedKeys', `${RECORD_A}_${TRUSTEE}`));
+      expect(keySnap.exists()).toBe(true);
+
+      expect(writeChangeMock).not.toHaveBeenCalled();
+    });
   });
 
   describe('revokeTrusteeAccess', () => {
     it('falls back to the trustor as changedBy when there is no authenticated caller', async () => {
       await seedRecord(db, RECORD_A, { owners: [TRUSTOR], administrators: [TRUSTEE] });
+      await tagTrustee(RECORD_A, TRUSTEE);
       await seedWrappedKey(RECORD_A, TRUSTEE, { isActive: true, grantedBy: TRUSTOR });
       setCaller(null);
 
@@ -433,11 +456,33 @@ describe('TrusteePermissionService (orchestration)', () => {
       expect(snap.data()?.revokedBy).toBeUndefined();
     });
 
+    // Regression: same rationale as rollbackPendingTrusteeAccess above — a role that predates
+    // (or is independent of) the trust relationship must survive the relationship ending.
+    // Deactivating this wrappedKey would also be wrong even if the rule allowed it, since it's
+    // the same physical doc backing their independent access (one wrappedKey per record+user,
+    // not per-relationship).
+    it('leaves a record alone entirely when the trustee has independent (non-trustee-derived) access', async () => {
+      await seedRecord(db, RECORD_A, { owners: [TRUSTOR], viewers: [TRUSTEE] }); // no tagTrustee
+      await seedWrappedKey(RECORD_A, TRUSTEE, { isActive: true, grantedBy: TRUSTOR });
+      setCaller(TRUSTOR);
+
+      await TrusteePermissionService.revokeTrusteeAccess(TRUSTOR, TRUSTEE, REF);
+
+      const recordSnap = await getDoc(doc(db, 'records', RECORD_A));
+      expect(recordSnap.data()?.viewers).toContain(TRUSTEE);
+
+      const keySnap = await getDoc(doc(db, 'wrappedKeys', `${RECORD_A}_${TRUSTEE}`));
+      expect(keySnap.data()?.isActive).toBe(true);
+
+      expect(writeChangeMock).not.toHaveBeenCalled();
+    });
+
     // Regression: a null blockchainRef (already-inactive-on-chain case, see
     // TrusteeBlockchainService.revokeTrustee) still deactivates the wrappedKey and strips role
     // arrays — it just skips the audit-log write since there's no new on-chain event to cite.
     it('still deactivates the wrappedKey and role arrays when blockchainRef is null, skipping the audit-log write', async () => {
       await seedRecord(db, RECORD_A, { owners: [TRUSTOR], administrators: [TRUSTEE] });
+      await tagTrustee(RECORD_A, TRUSTEE);
       await seedWrappedKey(RECORD_A, TRUSTEE, { isActive: true, grantedBy: TRUSTOR });
       setCaller(TRUSTOR);
 

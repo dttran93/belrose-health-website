@@ -400,9 +400,36 @@ export class TrusteePermissionService {
       try {
         const recordRef = doc(db, 'records', recordId);
         const recordSnap = await getDoc(recordRef);
-        const previousRole = recordSnap.exists()
-          ? getRoleFromRecordData(recordSnap.data(), trusteeId)
-          : null;
+        const recordData = recordSnap.exists() ? recordSnap.data() : null;
+
+        // Skip records where this trustee's access predates (or is independent of) the trust
+        // relationship. grantPendingTrusteeAccess only adds the trustees[] marker when the
+        // trustee didn't already have independent access (hadPriorAccess) — its absence here
+        // means this role isn't trustee-derived, so it must be left alone. The records rule's
+        // trustee-self-adjust branch also requires trustees[] membership, so attempting this
+        // update for a non-trustee-derived role would fail permission-denied anyway.
+        if (!recordData || !(recordData.trustees ?? []).includes(trusteeId)) {
+          console.log(
+            `ℹ️ Skipping record ${recordId} — trustee's access there is independent of this relationship`
+          );
+          continue;
+        }
+
+        const previousRole = getRoleFromRecordData(recordData, trusteeId);
+
+        // Write the audit event BEFORE stripping the role below — permissionHistory's create
+        // rule requires the writer to currently hold a role on the record, which they're
+        // about to lose.
+        if (previousRole && blockchainRef) {
+          await writePermissionChangeEvent(
+            recordId,
+            currentUserId,
+            [{ userId: trusteeId, action: 'revoked', previousRole, newRole: null }],
+            blockchainRef,
+            undefined,
+            'trustee_revoke'
+          );
+        }
 
         // Remove from role arrays + trustees[] — we check all four role arrays
         // since we don't know which role they were granted without re-querying
@@ -416,20 +443,6 @@ export class TrusteePermissionService {
 
         // Delete the inactive wrappedKey
         await deleteDoc(wrappedKeyDoc.ref);
-
-        // blockchainRef is null when the on-chain side was already in its end state before this
-        // call (see TrusteeBlockchainService.revokeTrustee) — nothing new happened on-chain, so
-        // there's no fresh event to cite in the audit log.
-        if (previousRole && blockchainRef) {
-          await writePermissionChangeEvent(
-            recordId,
-            currentUserId,
-            [{ userId: trusteeId, action: 'revoked', previousRole, newRole: null }],
-            blockchainRef,
-            undefined,
-            'trustee_revoke'
-          );
-        }
 
         console.log(`✅ Rolled back pending access on record ${recordId}`);
       } catch (err) {
@@ -471,22 +484,30 @@ export class TrusteePermissionService {
       try {
         const recordRef = doc(db, 'records', recordId);
         const recordSnap = await getDoc(recordRef);
-        const previousRole = recordSnap.exists()
-          ? getRoleFromRecordData(recordSnap.data(), trusteeId)
-          : null;
+        const recordData = recordSnap.exists() ? recordSnap.data() : null;
 
-        // Remove from all role arrays + trustees[]
-        await updateDoc(recordRef, {
-          owners: arrayRemove(trusteeId),
-          administrators: arrayRemove(trusteeId),
-          sharers: arrayRemove(trusteeId),
-          viewers: arrayRemove(trusteeId),
-          trustees: arrayRemove(trusteeId),
-        });
+        // Skip records where this trustee's access predates (or is independent of) the trust
+        // relationship. grantPendingTrusteeAccess only adds the trustees[] marker when the
+        // trustee didn't already have independent access (hadPriorAccess) — its absence here
+        // means this role isn't trustee-derived, so it must be left alone (the same physical
+        // wrappedKey doc would otherwise get deactivated out from under their independent
+        // access too, since it's one doc per record+user, not per-relationship). The records
+        // rule's trustee-self-adjust branch also requires trustees[] membership, so attempting
+        // this update for a non-trustee-derived role would fail permission-denied anyway.
+        if (!recordData || !(recordData.trustees ?? []).includes(trusteeId)) {
+          console.log(
+            `ℹ️ Skipping record ${recordId} — trustee's access there is independent of this relationship`
+          );
+          continue;
+        }
 
-        // blockchainRef is null when the on-chain side was already in its end state before this
-        // call (see TrusteeBlockchainService.revokeTrustee) — nothing new happened on-chain, so
-        // there's no fresh event to cite in the audit log.
+        const previousRole = getRoleFromRecordData(recordData, trusteeId);
+
+        // Write the audit event BEFORE stripping the role below — permissionHistory's create
+        // rule requires the writer to currently hold a role on the record, which they're
+        // about to lose. blockchainRef is null when the on-chain side was already in its end
+        // state before this call (see TrusteeBlockchainService.revokeTrustee) — nothing new
+        // happened on-chain, so there's no fresh event to cite in the audit log.
         if (previousRole && blockchainRef) {
           await writePermissionChangeEvent(
             recordId,
@@ -497,6 +518,15 @@ export class TrusteePermissionService {
             'trustee_revoke'
           );
         }
+
+        // Remove from all role arrays + trustees[]
+        await updateDoc(recordRef, {
+          owners: arrayRemove(trusteeId),
+          administrators: arrayRemove(trusteeId),
+          sharers: arrayRemove(trusteeId),
+          viewers: arrayRemove(trusteeId),
+          trustees: arrayRemove(trusteeId),
+        });
 
         // Deactivate rather than delete — preserves audit trail
         await updateDoc(wrappedKeyDoc.ref, {
