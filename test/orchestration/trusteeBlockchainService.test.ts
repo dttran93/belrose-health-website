@@ -30,9 +30,14 @@ vi.mock('@/features/Permissions/services/blockchainRoleManagerService', () => ({
   BlockchainRoleManagerService: blockchainMocks,
 }));
 
-vi.mock('@/features/BlockchainWallet/services/blockchainSyncQueueService', () => ({
-  BlockchainSyncQueueService: syncQueueMocks,
-}));
+vi.mock('@/features/BlockchainWallet/services/blockchainSyncQueueService', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/features/BlockchainWallet/services/blockchainSyncQueueService')>();
+  return {
+    ...actual,
+    BlockchainSyncQueueService: syncQueueMocks,
+  };
+});
 
 import { TrusteeBlockchainService } from '../../src/features/Trustee/services/trusteeBlockchainService';
 
@@ -219,6 +224,31 @@ describe('TrusteeBlockchainService (orchestration)', () => {
           context: expect.objectContaining({ type: 'trustee-revoke' }),
         })
       );
+    });
+
+    // Regression: a prior revoke attempt can get the on-chain transaction through but die before
+    // the Firestore write lands (this is exactly what the wrappedKeys list-query rules bug did —
+    // see firestore.rules wrappedKeys read/update rules). Retrying then reverts on-chain with
+    // "No active or pending relationship" since it's already in the state we're trying to reach.
+    // That should be treated as success (with no new blockchainRef), not logged as a failure.
+    it('treats an already-inactive-on-chain revert as success, with no blockchainRef, and does not log it', async () => {
+      const alreadyRevokedRevert =
+        '0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000214e6f20616374697665206f722070656e64696e672072656c6174696f6e7368697000000000000000000000000000000000000000000000000000000000000000';
+      blockchainMocks.revokeTrustee.mockRejectedValue(new Error(alreadyRevokedRevert));
+
+      const result = await TrusteeBlockchainService.revokeTrustee(TRUSTOR, TRUSTEE, TRUSTOR);
+
+      expect(result).toEqual({ success: true, blockchainRef: null });
+      expect(syncQueueMocks.logFailure).not.toHaveBeenCalled();
+    });
+
+    it('still logs and fails for any other revert reason (only the exact already-inactive message is swallowed)', async () => {
+      blockchainMocks.revokeTrustee.mockRejectedValue(new Error('Not a party to this relationship'));
+
+      const result = await TrusteeBlockchainService.revokeTrustee(TRUSTOR, TRUSTEE, TRUSTOR);
+
+      expect(result).toEqual({ success: false, blockchainRef: null });
+      expect(syncQueueMocks.logFailure).toHaveBeenCalled();
     });
   });
 

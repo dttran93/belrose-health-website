@@ -7,6 +7,7 @@ import {
 } from '@/features/Permissions/services/blockchainRoleManagerService';
 import {
   BlockchainSyncQueueService,
+  decodeRevertReason,
   SyncContext,
 } from '@/features/BlockchainWallet/services/blockchainSyncQueueService';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
@@ -152,6 +153,16 @@ export class TrusteeBlockchainService {
       console.log('✅ Trustee revoked on blockchain');
       return { success: true, blockchainRef };
     } catch (error) {
+      // The relationship can already be Revoked on-chain from an earlier attempt that got the
+      // transaction through but died before the Firestore write landed — that's the end state
+      // we're trying to reach anyway, so treat it as already-done rather than a failure to
+      // retry forever. blockchainRef is null since no new transaction happened here.
+      const reason = error instanceof Error ? decodeRevertReason(error.message) : null;
+      if (reason === 'No active or pending relationship') {
+        console.log('ℹ️ Trustee relationship already inactive on-chain — treating as already revoked');
+        return { success: true, blockchainRef: null };
+      }
+
       await this.logTrusteeFailure({
         action: 'revokeTrustee',
         trustorId,

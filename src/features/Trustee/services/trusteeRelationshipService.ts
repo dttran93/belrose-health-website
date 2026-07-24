@@ -291,28 +291,33 @@ export class TrusteeRelationshipService {
       await TrusteePermissionService.revokeTrusteeAccess(
         trustorId,
         trusteeId,
-        revocationBlockchainRef!
+        revocationBlockchainRef
       );
     } else if (data.status === 'pending') {
       await TrusteePermissionService.rollbackPendingTrusteeAccess(
         trustorId,
         trusteeId,
-        revocationBlockchainRef!
+        revocationBlockchainRef
       );
     }
 
-    // Step 3: Update Firestore relationship doc
+    // Step 3: Update Firestore relationship doc. A null blockchainRef means the relationship
+    // was already revoked on-chain from an earlier attempt (see
+    // TrusteeBlockchainService.revokeTrustee) — nothing new to add to the audit log, but the
+    // Firestore state still needs to catch up to match.
     await updateDoc(relationshipRef, {
       isActive: false,
       status: 'revoked',
       revokedAt: Timestamp.now(),
       revokedBy: trustorId,
       statusUpdateReason: 'trustor_revoked',
-      onChainEvents: arrayUnion({
-        action: 'revoke',
-        blockchainRef: revocationBlockchainRef!,
-        recordedAt: Timestamp.now(),
-      } satisfies OnChainTrusteeEvent),
+      ...(revocationBlockchainRef && {
+        onChainEvents: arrayUnion({
+          action: 'revoke',
+          blockchainRef: revocationBlockchainRef,
+          recordedAt: Timestamp.now(),
+        } satisfies OnChainTrusteeEvent),
+      }),
     });
 
     console.log(`✅ Trustee revoked: ${trustorId} revoked ${trusteeId}`);
@@ -638,21 +643,25 @@ export class TrusteeRelationshipService {
     await TrusteePermissionService.revokeTrusteeAccess(
       trustorId,
       trusteeId,
-      revocationBlockchainRef!
+      revocationBlockchainRef
     );
 
-    // Step 3: Update Firestore
+    // Step 3: Update Firestore. A null blockchainRef means the relationship was already revoked
+    // on-chain from an earlier attempt (see TrusteeBlockchainService.revokeTrustee) — nothing
+    // new to add to the audit log, but the Firestore state still needs to catch up to match.
     await updateDoc(relationshipRef, {
       status: 'declined',
       isActive: false,
       revokedAt: Timestamp.now(),
       revokedBy: trusteeId,
       statusUpdateReason: 'trustee_resigned',
-      onChainEvents: arrayUnion({
-        action: 'revoke',
-        blockchainRef: revocationBlockchainRef!,
-        recordedAt: Timestamp.now(),
-      } satisfies OnChainTrusteeEvent),
+      ...(revocationBlockchainRef && {
+        onChainEvents: arrayUnion({
+          action: 'revoke',
+          blockchainRef: revocationBlockchainRef,
+          recordedAt: Timestamp.now(),
+        } satisfies OnChainTrusteeEvent),
+      }),
     });
 
     console.log(`✅ Trustee resigned: ${trusteeId} resigned from ${trustorId}'s account`);
