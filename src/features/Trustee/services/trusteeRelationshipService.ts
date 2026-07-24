@@ -532,16 +532,20 @@ export class TrusteeRelationshipService {
     // updated by the trustor at invite time
     await TrusteePermissionService.activateTrusteeAccess(trustorId);
 
-    // Step 3: Flip relationship to active
+    // Step 3: Flip relationship to active. A null acceptBlockchainRef means this was already
+    // active on-chain from an earlier attempt (see TrusteeBlockchainService.acceptTrustee) —
+    // nothing new to add to the audit log, but Firestore still needs to catch up to match.
     await updateDoc(relationshipRef, {
       isActive: true,
       status: 'active',
       respondedAt: Timestamp.now(),
-      onChainEvents: arrayUnion({
-        action: 'accept',
-        blockchainRef: acceptBlockchainRef!,
-        recordedAt: Timestamp.now(),
-      } satisfies OnChainTrusteeEvent),
+      ...(acceptBlockchainRef && {
+        onChainEvents: arrayUnion({
+          action: 'accept',
+          blockchainRef: acceptBlockchainRef,
+          recordedAt: Timestamp.now(),
+        } satisfies OnChainTrusteeEvent),
+      }),
     });
 
     console.log(`✅ Trustee invite accepted: ${trusteeId} accepted invite from ${trustorId}`);

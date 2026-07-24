@@ -97,6 +97,25 @@ export class TrusteeBlockchainService {
       console.log('✅ Trustee accepted on blockchain');
       return { success: true, blockchainRef };
     } catch (error) {
+      // "No pending proposal" covers several different on-chain states, only one of which is a
+      // match for what we're trying to reach — a prior accept call that landed on-chain but
+      // never made it into Firestore (same drift class as revokeTrustee's self-heal). If chain
+      // status is Active, that's it — treat as already-accepted. Anything else (revoked/
+      // declined/none) is a genuine failure — the invite is really gone — so it still throws.
+      const reason = error instanceof Error ? decodeRevertReason(error.message) : null;
+      if (reason === 'No pending proposal') {
+        const onChainState = await BlockchainRoleManagerService.getTrusteeRelationship(
+          id(trustorId),
+          id(trusteeId)
+        );
+        if (onChainState.status === 'Active') {
+          console.log(
+            'ℹ️ Trustee relationship already active on-chain — treating as already accepted'
+          );
+          return { success: true, blockchainRef: null };
+        }
+      }
+
       await this.logTrusteeFailure({
         action: 'acceptTrustee',
         trustorId,

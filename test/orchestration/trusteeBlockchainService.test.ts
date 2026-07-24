@@ -20,6 +20,7 @@ const { blockchainMocks, syncQueueMocks } = vi.hoisted(() => ({
     revokeTrustee: vi.fn(),
     downgradeTrusteeLevel: vi.fn(),
     updateTrusteeLevel: vi.fn(),
+    getTrusteeRelationship: vi.fn(),
   },
   syncQueueMocks: {
     logFailure: vi.fn(),
@@ -158,6 +159,41 @@ describe('TrusteeBlockchainService (orchestration)', () => {
           context: expect.objectContaining({ type: 'trustee-accept' }),
         })
       );
+    });
+
+    // Regression: "No pending proposal" is ambiguous — it covers Active (a prior accept landed
+    // on-chain but Firestore never caught up, same drift class as revokeTrustee) as well as
+    // None/Revoked/Declined (a genuine failure — the invite is really gone). Only the Active
+    // case should self-heal; everything else must still throw, which is why this disambiguates
+    // with a free on-chain read rather than pattern-matching the revert message alone.
+    it('treats "No pending proposal" as success when chain shows Active (already accepted), skipping the sync-queue log', async () => {
+      const noPendingProposalRevert =
+        '0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000134e6f2070656e64696e672070726f706f73616c00000000000000000000000000';
+      blockchainMocks.acceptTrustee.mockRejectedValue(new Error(noPendingProposalRevert));
+      blockchainMocks.getTrusteeRelationship.mockResolvedValue({
+        status: 'Active',
+        level: 'Controller',
+      });
+
+      const result = await TrusteeBlockchainService.acceptTrustee(TRUSTOR, TRUSTEE);
+
+      expect(result).toEqual({ success: true, blockchainRef: null });
+      expect(syncQueueMocks.logFailure).not.toHaveBeenCalled();
+    });
+
+    it('still fails and logs "No pending proposal" when chain shows the invite is actually gone (not Active)', async () => {
+      const noPendingProposalRevert =
+        '0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000134e6f2070656e64696e672070726f706f73616c00000000000000000000000000';
+      blockchainMocks.acceptTrustee.mockRejectedValue(new Error(noPendingProposalRevert));
+      blockchainMocks.getTrusteeRelationship.mockResolvedValue({
+        status: 'Revoked',
+        level: 'Observer',
+      });
+
+      const result = await TrusteeBlockchainService.acceptTrustee(TRUSTOR, TRUSTEE);
+
+      expect(result).toEqual({ success: false, blockchainRef: null });
+      expect(syncQueueMocks.logFailure).toHaveBeenCalled();
     });
   });
 

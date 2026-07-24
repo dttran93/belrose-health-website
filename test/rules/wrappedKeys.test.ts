@@ -259,6 +259,32 @@ describe('firestore.rules — wrappedKeys — read (sharer+ management, or your 
   // (mid-grant, before the role-array update) and "fully revoked" (after it), which look
   // identical from the rule's point of view: no entry in any role array.
 
+  // Regression: SharingService.grantEncryptionAccess's very first operation is a get() on the
+  // wrappedKey it's about to grant, to check for an existing one — for a brand-new grant (first
+  // time this record has ever been shared with this recipient) that document doesn't exist yet.
+  // Without a !exists() guard, the rule dereferences resource.data.recordId on a null resource
+  // and throws a rule-evaluation error (not a clean deny), blocking the grant outright for even
+  // a legitimate owner. Caught in production: an observer-level trustee invite's per-record
+  // fan-out silently failed on exactly one record out of several — the one record that had never
+  // been shared with that trustee before, so no wrappedKey doc existed for it yet.
+  it('lets an owner read a wrappedKey that does not exist yet (first-time grant check)', async () => {
+    const recordId = 'wk-read-nonexistent-key-owner';
+    await seedRecord(recordId);
+
+    await assertSucceeds(
+      testEnv.authenticatedContext(OWNER).firestore().doc(`wrappedKeys/${recordId}_${RECEIVER}`).get()
+    );
+  });
+
+  it('lets anyone authenticated read a wrappedKey that does not exist yet (vacuously true, nothing to leak)', async () => {
+    const recordId = 'wk-read-nonexistent-key-stranger';
+    await seedRecord(recordId);
+
+    await assertSucceeds(
+      testEnv.authenticatedContext(STRANGER).firestore().doc(`wrappedKeys/${recordId}_${RECEIVER}`).get()
+    );
+  });
+
   it('denies a stranger with no role at all from reading someone else\'s key', async () => {
     const recordId = 'wk-read-stranger-denied';
     await seedRecord(recordId);
