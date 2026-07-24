@@ -242,6 +242,17 @@ export class TrusteeBlockchainService {
       console.log('✅ Trustee level updated on blockchain');
       return { success: true, blockchainRef };
     } catch (error) {
+      // "Already this trust level" is unambiguous — it only fires when the chain's level
+      // already equals newLevel exactly, unlike acceptTrustee's "No pending proposal" (which
+      // covers several different states). A prior updateTrusteeLevel call can land on-chain but
+      // never make it into Firestore (same drift class as revokeTrustee's self-heal) — treat
+      // this as already-achieved rather than a failure to retry forever.
+      const reason = error instanceof Error ? decodeRevertReason(error.message) : null;
+      if (reason === 'Already this trust level') {
+        console.log('ℹ️ Trustee already at this level on-chain — treating as already updated');
+        return { success: true, blockchainRef: null };
+      }
+
       await this.logTrusteeFailure({
         action: 'updateTrusteeLevel',
         trustorId,

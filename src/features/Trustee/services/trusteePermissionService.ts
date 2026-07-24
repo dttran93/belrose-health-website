@@ -418,9 +418,11 @@ export class TrusteePermissionService {
         const previousRole = getRoleFromRecordData(recordData, trusteeId);
 
         // Write the audit event BEFORE stripping the role below — permissionHistory's create
-        // rule requires the writer to currently hold a role on the record, which they're
-        // about to lose.
-        if (previousRole && blockchainRef) {
+        // rule requires the writer to currently hold a role on the record, which they're about
+        // to lose. blockchainRef may be null (no new on-chain tx — see
+        // TrusteeBlockchainService's self-heal paths); the record of who/what/when is still
+        // worth keeping either way.
+        if (previousRole) {
           await writePermissionChangeEvent(
             recordId,
             currentUserId,
@@ -504,11 +506,11 @@ export class TrusteePermissionService {
         const previousRole = getRoleFromRecordData(recordData, trusteeId);
 
         // Write the audit event BEFORE stripping the role below — permissionHistory's create
-        // rule requires the writer to currently hold a role on the record, which they're
-        // about to lose. blockchainRef is null when the on-chain side was already in its end
-        // state before this call (see TrusteeBlockchainService.revokeTrustee) — nothing new
-        // happened on-chain, so there's no fresh event to cite in the audit log.
-        if (previousRole && blockchainRef) {
+        // rule requires the writer to currently hold a role on the record, which they're about
+        // to lose. blockchainRef may be null when the on-chain side was already in its end
+        // state before this call (see TrusteeBlockchainService.revokeTrustee) — no fresh tx to
+        // cite, but the record of who/what/when is still worth keeping.
+        if (previousRole) {
           await writePermissionChangeEvent(
             recordId,
             changedBy,
@@ -855,7 +857,7 @@ export class TrusteePermissionService {
     trustorId: string,
     trusteeId: string,
     newTrustLevel: TrustLevel,
-    blockchainRef: BlockchainRef
+    blockchainRef: BlockchainRef | null
   ): Promise<void> {
     console.log('🔄 Updating trustee access across records...', {
       trustorId,
@@ -935,6 +937,9 @@ export class TrusteePermissionService {
           [this.roleToArray(role)]: arrayUnion(trusteeId),
         });
 
+        // blockchainRef may be null when the on-chain side was already at this level before
+        // this call (see TrusteeBlockchainService.updateTrusteeLevel) — no fresh tx to cite,
+        // but the record of who/what/when is still worth keeping.
         const change: PermissionChange = !previousRole
           ? { userId: trusteeId, action: 'granted', previousRole: null, newRole: role }
           : ROLE_RANK[previousRole] < ROLE_RANK[role]

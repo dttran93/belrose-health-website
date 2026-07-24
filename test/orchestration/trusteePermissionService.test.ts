@@ -478,9 +478,10 @@ describe('TrusteePermissionService (orchestration)', () => {
     });
 
     // Regression: a null blockchainRef (already-inactive-on-chain case, see
-    // TrusteeBlockchainService.revokeTrustee) still deactivates the wrappedKey and strips role
-    // arrays — it just skips the audit-log write since there's no new on-chain event to cite.
-    it('still deactivates the wrappedKey and role arrays when blockchainRef is null, skipping the audit-log write', async () => {
+    // TrusteeBlockchainService.revokeTrustee) still deactivates the wrappedKey, strips role
+    // arrays, AND still writes the audit event (with blockchainRef: null) — there's no fresh tx
+    // to cite, but who/what/when is still worth recording.
+    it('still deactivates the wrappedKey, strips role arrays, and logs the event (with a null blockchainRef)', async () => {
       await seedRecord(db, RECORD_A, { owners: [TRUSTOR], administrators: [TRUSTEE] });
       await tagTrustee(RECORD_A, TRUSTEE);
       await seedWrappedKey(RECORD_A, TRUSTEE, { isActive: true, grantedBy: TRUSTOR });
@@ -494,7 +495,14 @@ describe('TrusteePermissionService (orchestration)', () => {
       const keySnap = await getDoc(doc(db, 'wrappedKeys', `${RECORD_A}_${TRUSTEE}`));
       expect(keySnap.data()?.isActive).toBe(false);
 
-      expect(writeChangeMock).not.toHaveBeenCalled();
+      expect(writeChangeMock).toHaveBeenCalledWith(
+        RECORD_A,
+        TRUSTOR,
+        [{ userId: TRUSTEE, action: 'revoked', previousRole: 'administrator', newRole: null }],
+        null,
+        undefined,
+        'trustee_revoke'
+      );
     });
   });
 
@@ -801,6 +809,33 @@ describe('TrusteePermissionService (orchestration)', () => {
         TRUSTOR,
         expect.anything(),
         REF,
+        undefined,
+        'trustee_grant'
+      );
+    });
+
+    // Regression: a null blockchainRef (already-at-this-level-on-chain case, see
+    // TrusteeBlockchainService.updateTrusteeLevel) still updates the role arrays AND still
+    // writes the audit event (with blockchainRef: null) — there's no fresh tx to cite, but
+    // who/what/when is still worth recording.
+    it('still updates the role and logs the event (with a null blockchainRef)', async () => {
+      await seedRecord(db, RECORD_A, { owners: [TRUSTOR], viewers: [TRUSTEE] });
+      await tagTrustee(RECORD_A, TRUSTEE);
+      await seedWrappedKey(RECORD_A, TRUSTEE, { isActive: true, grantedBy: TRUSTOR });
+      setCaller(TRUSTOR);
+
+      await TrusteePermissionService.updateTrusteeAccess(TRUSTOR, TRUSTEE, 'controller', null);
+
+      const snap = await getDoc(doc(db, 'records', RECORD_A));
+      const data = snap.data()!;
+      expect(data.owners).toContain(TRUSTEE);
+      expect(data.viewers).not.toContain(TRUSTEE);
+
+      expect(writeChangeMock).toHaveBeenCalledWith(
+        RECORD_A,
+        TRUSTOR,
+        [{ userId: TRUSTEE, action: 'upgraded', previousRole: 'viewer', newRole: 'owner' }],
+        null,
         undefined,
         'trustee_grant'
       );

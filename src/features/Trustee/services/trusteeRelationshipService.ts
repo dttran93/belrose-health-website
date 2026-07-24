@@ -380,22 +380,26 @@ export class TrusteeRelationshipService {
         trustorId,
         trusteeId,
         newTrustLevel,
-        editBlockchainRef!
+        editBlockchainRef
       );
     } catch (err) {
       console.error('⚠️ Permission fan-out failed during trust level edit (non-fatal):', err);
     }
 
-    // Step 3: Update Firestore
+    // Step 3: Update Firestore. A null editBlockchainRef means the level was already correct
+    // on-chain from an earlier attempt (see TrusteeBlockchainService.updateTrusteeLevel) —
+    // nothing new to add to the audit log, but Firestore still needs to catch up to match.
     await updateDoc(relationshipRef, {
       trustLevel: newTrustLevel,
       statusUpdateReason: isUpgrade ? 'trust_level_upgrade' : 'trust_level_downgrade',
-      onChainEvents: arrayUnion({
-        action: 'level-update',
-        trustLevel: newTrustLevel,
-        blockchainRef: editBlockchainRef!,
-        recordedAt: Timestamp.now(),
-      } satisfies OnChainTrusteeEvent),
+      ...(editBlockchainRef && {
+        onChainEvents: arrayUnion({
+          action: 'level-update',
+          trustLevel: newTrustLevel,
+          blockchainRef: editBlockchainRef,
+          recordedAt: Timestamp.now(),
+        } satisfies OnChainTrusteeEvent),
+      }),
     });
 
     console.log(`✅ Trust level updated: ${trustorId} → ${trusteeId} (${newTrustLevel})`);

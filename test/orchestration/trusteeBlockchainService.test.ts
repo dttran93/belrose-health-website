@@ -352,5 +352,32 @@ describe('TrusteeBlockchainService (orchestration)', () => {
         })
       );
     });
+
+    // Regression: "Already this trust level" is unambiguous — it only fires when the chain's
+    // level already equals newLevel exactly (unlike acceptTrustee's "No pending proposal",
+    // which covers several different states), so no disambiguating on-chain read is needed here.
+    // A prior updateTrusteeLevel call can land on-chain but never make it into Firestore (same
+    // drift class as revokeTrustee's self-heal) — treat this as success, not a failure to retry.
+    it('treats "Already this trust level" as success, with no blockchainRef, and does not log it', async () => {
+      const alreadyAtLevelRevert =
+        '0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000018416c72656164792074686973207472757374206c6576656c0000000000000000';
+      blockchainMocks.updateTrusteeLevel.mockRejectedValue(new Error(alreadyAtLevelRevert));
+
+      const result = await TrusteeBlockchainService.updateTrusteeLevel(TRUSTOR, TRUSTEE, 2);
+
+      expect(result).toEqual({ success: true, blockchainRef: null });
+      expect(syncQueueMocks.logFailure).not.toHaveBeenCalled();
+    });
+
+    it('still logs and fails for any other revert reason', async () => {
+      blockchainMocks.updateTrusteeLevel.mockRejectedValue(
+        new Error('No active trustee relationship')
+      );
+
+      const result = await TrusteeBlockchainService.updateTrusteeLevel(TRUSTOR, TRUSTEE, 2);
+
+      expect(result).toEqual({ success: false, blockchainRef: null });
+      expect(syncQueueMocks.logFailure).toHaveBeenCalled();
+    });
   });
 });
