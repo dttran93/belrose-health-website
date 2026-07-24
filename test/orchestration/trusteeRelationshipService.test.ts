@@ -448,6 +448,32 @@ describe('TrusteeRelationshipService (orchestration)', () => {
       );
       expect(snap.data()?.trustLevel).toBe('custodian');
     });
+
+    // Regression: TrusteeBlockchainService.updateTrusteeLevel returns { success: true,
+    // blockchainRef: null } when chain already shows the requested level from an earlier
+    // partial failure (see trusteeBlockchainService.test.ts). Firestore still needs to catch up
+    // to match, but there's no new on-chain event to append to the audit log.
+    it('still syncs Firestore to the new level when the blockchain call reports already-there (null blockchainRef)', async () => {
+      await seedRelationship(TRUSTOR, TRUSTEE, { status: 'active', trustLevel: 'observer' });
+      blockchainMocks.updateTrusteeLevel.mockResolvedValue({ success: true, blockchainRef: null });
+      setCaller(TRUSTOR);
+
+      await TrusteeRelationshipService.editTrusteeRelationship(TRUSTEE, 'custodian');
+
+      expect(permissionMocks.updateTrusteeAccess).toHaveBeenCalledWith(
+        TRUSTOR,
+        TRUSTEE,
+        'custodian',
+        null
+      );
+
+      const snap = await getDoc(
+        doc(db, 'trusteeRelationships', getTrusteeRelationshipId(TRUSTOR, TRUSTEE))
+      );
+      const data = snap.data()!;
+      expect(data.trustLevel).toBe('custodian');
+      expect(data.onChainEvents).toHaveLength(0);
+    });
   });
 
   describe('stepDownTrusteeLevel', () => {
@@ -598,6 +624,28 @@ describe('TrusteeRelationshipService (orchestration)', () => {
       expect(data.respondedAt).toBeDefined();
       expect(data.onChainEvents).toHaveLength(1);
       expect(data.onChainEvents[0].action).toBe('accept');
+    });
+
+    // Regression: TrusteeBlockchainService.acceptTrustee returns { success: true, blockchainRef:
+    // null } when chain already shows Active from an earlier partial failure (see
+    // trusteeBlockchainService.test.ts). Firestore still needs to catch up to match, but there's
+    // no new on-chain event to append to the audit log.
+    it('still activates Firestore when the blockchain call reports already-active (null blockchainRef)', async () => {
+      await seedRelationship(TRUSTOR, TRUSTEE, { status: 'pending' });
+      blockchainMocks.acceptTrustee.mockResolvedValue({ success: true, blockchainRef: null });
+      setCaller(TRUSTEE);
+
+      await TrusteeRelationshipService.acceptInvite(TRUSTOR);
+
+      expect(permissionMocks.activateTrusteeAccess).toHaveBeenCalledWith(TRUSTOR);
+
+      const snap = await getDoc(
+        doc(db, 'trusteeRelationships', getTrusteeRelationshipId(TRUSTOR, TRUSTEE))
+      );
+      const data = snap.data()!;
+      expect(data.status).toBe('active');
+      expect(data.isActive).toBe(true);
+      expect(data.onChainEvents).toHaveLength(0);
     });
   });
 

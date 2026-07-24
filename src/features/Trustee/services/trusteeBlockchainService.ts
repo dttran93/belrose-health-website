@@ -97,6 +97,25 @@ export class TrusteeBlockchainService {
       console.log('✅ Trustee accepted on blockchain');
       return { success: true, blockchainRef };
     } catch (error) {
+      // "No pending proposal" covers several different on-chain states, only one of which is a
+      // match for what we're trying to reach — a prior accept call that landed on-chain but
+      // never made it into Firestore (same drift class as revokeTrustee's self-heal). If chain
+      // status is Active, that's it — treat as already-accepted. Anything else (revoked/
+      // declined/none) is a genuine failure — the invite is really gone — so it still throws.
+      const reason = error instanceof Error ? decodeRevertReason(error.message) : null;
+      if (reason === 'No pending proposal') {
+        const onChainState = await BlockchainRoleManagerService.getTrusteeRelationship(
+          id(trustorId),
+          id(trusteeId)
+        );
+        if (onChainState.status === 'Active') {
+          console.log(
+            'ℹ️ Trustee relationship already active on-chain — treating as already accepted'
+          );
+          return { success: true, blockchainRef: null };
+        }
+      }
+
       await this.logTrusteeFailure({
         action: 'acceptTrustee',
         trustorId,
@@ -223,6 +242,17 @@ export class TrusteeBlockchainService {
       console.log('✅ Trustee level updated on blockchain');
       return { success: true, blockchainRef };
     } catch (error) {
+      // "Already this trust level" is unambiguous — it only fires when the chain's level
+      // already equals newLevel exactly, unlike acceptTrustee's "No pending proposal" (which
+      // covers several different states). A prior updateTrusteeLevel call can land on-chain but
+      // never make it into Firestore (same drift class as revokeTrustee's self-heal) — treat
+      // this as already-achieved rather than a failure to retry forever.
+      const reason = error instanceof Error ? decodeRevertReason(error.message) : null;
+      if (reason === 'Already this trust level') {
+        console.log('ℹ️ Trustee already at this level on-chain — treating as already updated');
+        return { success: true, blockchainRef: null };
+      }
+
       await this.logTrusteeFailure({
         action: 'updateTrusteeLevel',
         trustorId,

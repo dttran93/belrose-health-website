@@ -1,6 +1,7 @@
 //src/features/Users/components/ui/UserMenu.tsx
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   MoreHorizontal,
   Share2,
@@ -79,7 +80,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
   onVerifyBlockchain,
   triggerIcon: TriggerIcon = MoreHorizontal,
   triggerClassName = 'p-2 text-primary hover:text-primary hover:bg-gray-100 rounded-lg transition-colors',
-  menuClassName = 'absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[210px]',
+  menuClassName = 'bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[210px]',
   showShare = true,
   showViewUser = true,
   showViewDetails = true,
@@ -90,11 +91,29 @@ const UserMenu: React.FC<UserMenuProps> = ({
 }) => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  const [position, setPosition] = useState<{ top: number; right: number } | null>(null);
+  // menuRef now points at the portaled dropdown panel (rendered under document.body), not a
+  // DOM ancestor of the button — portaling sidesteps stacking-context traps from sibling cards
+  // in a list (a card below can otherwise paint over an "absolute" menu confined to its sibling's
+  // own stacking context), but means click-outside detection has to check this ref separately
+  // from buttonRef instead of relying on one shared wrapper containing both.
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-  // Close menu when clicking outside
+  const updatePosition = () => {
+    if (!buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    setPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+  };
+
+  // Close on outside click, reposition on resize, and close on scroll (a fixed-position portal
+  // won't track the trigger button as the page scrolls, so closing avoids it drifting away from
+  // the button it's anchored to).
   useEffect(() => {
+    if (!isOpen) return;
+
+    updatePosition();
+
     const handleClickOutside = (event: MouseEvent) => {
       if (
         menuRef.current &&
@@ -105,11 +124,18 @@ const UserMenu: React.FC<UserMenuProps> = ({
         setIsOpen(false);
       }
     };
+    const handleScroll = () => setIsOpen(false);
+    const handleResize = () => updatePosition();
 
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleResize);
+    };
   }, [isOpen]);
 
   // Wrapper for parent handlers
@@ -222,7 +248,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
   }
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative">
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
@@ -234,35 +260,44 @@ const UserMenu: React.FC<UserMenuProps> = ({
         <TriggerIcon className="w-4 h-4" />
       </button>
 
-      {isOpen && (
-        <div className={menuClassName}>
-          {menuItems.map((item, index) => {
-            if (item.type === 'divider') {
-              return <hr key={item.key || `divider-${index}`} className="my-1 border-gray-200" />;
-            }
+      {isOpen &&
+        position &&
+        createPortal(
+          <div
+            ref={menuRef}
+            className={menuClassName}
+            style={{ position: 'fixed', top: position.top, right: position.right }}
+          >
+            {menuItems.map((item, index) => {
+              if (item.type === 'divider') {
+                return (
+                  <hr key={item.key || `divider-${index}`} className="my-1 border-gray-200" />
+                );
+              }
 
-            const menuOption = item as MenuOption;
+              const menuOption = item as MenuOption;
 
-            return (
-              <button
-                key={menuOption.key}
-                onClick={menuOption.onClick}
-                disabled={menuOption.disabled}
-                className={`
-                  w-full px-4 py-2 text-left text-sm hover:bg-gray-100 
-                  flex items-center gap-3 transition-colors
-                  ${menuOption.destructive ? 'text-red-600 hover:bg-red-50' : 'text-gray-700'}
-                  ${menuOption.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                  ${menuOption.className || ''}
-                `}
-              >
-                {menuOption.icon && <menuOption.icon className="w-4 h-4 flex-shrink-0" />}
-                <span>{menuOption.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+              return (
+                <button
+                  key={menuOption.key}
+                  onClick={menuOption.onClick}
+                  disabled={menuOption.disabled}
+                  className={`
+                    w-full px-4 py-2 text-left text-sm hover:bg-gray-100
+                    flex items-center gap-3 transition-colors
+                    ${menuOption.destructive ? 'text-red-600 hover:bg-red-50' : 'text-gray-700'}
+                    ${menuOption.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                    ${menuOption.className || ''}
+                  `}
+                >
+                  {menuOption.icon && <menuOption.icon className="w-4 h-4 flex-shrink-0" />}
+                  <span>{menuOption.label}</span>
+                </button>
+              );
+            })}
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

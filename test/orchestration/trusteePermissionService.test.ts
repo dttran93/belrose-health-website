@@ -384,11 +384,34 @@ describe('TrusteePermissionService (orchestration)', () => {
 
       expect(writeChangeMock).not.toHaveBeenCalled();
     });
+
+    // Regression: grantPendingTrusteeAccess only tags trustees[] when the trustee didn't already
+    // have independent access (hadPriorAccess) — its absence means this role predates/is
+    // independent of the trust relationship and must be left untouched when the invite is
+    // declined/revoked before acceptance. Without this guard, the app would try to strip a role
+    // the trustee has every right to keep, and firestore.rules' trustee-self-adjust branch
+    // (which requires trustees[] membership) would correctly reject the attempt anyway.
+    it('leaves a record alone entirely when the trustee has independent (non-trustee-derived) access', async () => {
+      await seedRecord(db, RECORD_A, { owners: [TRUSTOR], viewers: [TRUSTEE] }); // no tagTrustee
+      await seedWrappedKey(RECORD_A, TRUSTEE, { isActive: false, grantedBy: TRUSTOR });
+      setCaller(TRUSTOR);
+
+      await TrusteePermissionService.rollbackPendingTrusteeAccess(TRUSTOR, TRUSTEE, REF);
+
+      const recordSnap = await getDoc(doc(db, 'records', RECORD_A));
+      expect(recordSnap.data()?.viewers).toContain(TRUSTEE);
+
+      const keySnap = await getDoc(doc(db, 'wrappedKeys', `${RECORD_A}_${TRUSTEE}`));
+      expect(keySnap.exists()).toBe(true);
+
+      expect(writeChangeMock).not.toHaveBeenCalled();
+    });
   });
 
   describe('revokeTrusteeAccess', () => {
     it('falls back to the trustor as changedBy when there is no authenticated caller', async () => {
       await seedRecord(db, RECORD_A, { owners: [TRUSTOR], administrators: [TRUSTEE] });
+      await tagTrustee(RECORD_A, TRUSTEE);
       await seedWrappedKey(RECORD_A, TRUSTEE, { isActive: true, grantedBy: TRUSTOR });
       setCaller(null);
 
@@ -433,11 +456,34 @@ describe('TrusteePermissionService (orchestration)', () => {
       expect(snap.data()?.revokedBy).toBeUndefined();
     });
 
+    // Regression: same rationale as rollbackPendingTrusteeAccess above — a role that predates
+    // (or is independent of) the trust relationship must survive the relationship ending.
+    // Deactivating this wrappedKey would also be wrong even if the rule allowed it, since it's
+    // the same physical doc backing their independent access (one wrappedKey per record+user,
+    // not per-relationship).
+    it('leaves a record alone entirely when the trustee has independent (non-trustee-derived) access', async () => {
+      await seedRecord(db, RECORD_A, { owners: [TRUSTOR], viewers: [TRUSTEE] }); // no tagTrustee
+      await seedWrappedKey(RECORD_A, TRUSTEE, { isActive: true, grantedBy: TRUSTOR });
+      setCaller(TRUSTOR);
+
+      await TrusteePermissionService.revokeTrusteeAccess(TRUSTOR, TRUSTEE, REF);
+
+      const recordSnap = await getDoc(doc(db, 'records', RECORD_A));
+      expect(recordSnap.data()?.viewers).toContain(TRUSTEE);
+
+      const keySnap = await getDoc(doc(db, 'wrappedKeys', `${RECORD_A}_${TRUSTEE}`));
+      expect(keySnap.data()?.isActive).toBe(true);
+
+      expect(writeChangeMock).not.toHaveBeenCalled();
+    });
+
     // Regression: a null blockchainRef (already-inactive-on-chain case, see
-    // TrusteeBlockchainService.revokeTrustee) still deactivates the wrappedKey and strips role
-    // arrays — it just skips the audit-log write since there's no new on-chain event to cite.
-    it('still deactivates the wrappedKey and role arrays when blockchainRef is null, skipping the audit-log write', async () => {
+    // TrusteeBlockchainService.revokeTrustee) still deactivates the wrappedKey, strips role
+    // arrays, AND still writes the audit event (with blockchainRef: null) — there's no fresh tx
+    // to cite, but who/what/when is still worth recording.
+    it('still deactivates the wrappedKey, strips role arrays, and logs the event (with a null blockchainRef)', async () => {
       await seedRecord(db, RECORD_A, { owners: [TRUSTOR], administrators: [TRUSTEE] });
+      await tagTrustee(RECORD_A, TRUSTEE);
       await seedWrappedKey(RECORD_A, TRUSTEE, { isActive: true, grantedBy: TRUSTOR });
       setCaller(TRUSTOR);
 
@@ -449,7 +495,14 @@ describe('TrusteePermissionService (orchestration)', () => {
       const keySnap = await getDoc(doc(db, 'wrappedKeys', `${RECORD_A}_${TRUSTEE}`));
       expect(keySnap.data()?.isActive).toBe(false);
 
-      expect(writeChangeMock).not.toHaveBeenCalled();
+      expect(writeChangeMock).toHaveBeenCalledWith(
+        RECORD_A,
+        TRUSTOR,
+        [{ userId: TRUSTEE, action: 'revoked', previousRole: 'administrator', newRole: null }],
+        null,
+        undefined,
+        'trustee_revoke'
+      );
     });
   });
 
@@ -756,6 +809,33 @@ describe('TrusteePermissionService (orchestration)', () => {
         TRUSTOR,
         expect.anything(),
         REF,
+        undefined,
+        'trustee_grant'
+      );
+    });
+
+    // Regression: a null blockchainRef (already-at-this-level-on-chain case, see
+    // TrusteeBlockchainService.updateTrusteeLevel) still updates the role arrays AND still
+    // writes the audit event (with blockchainRef: null) — there's no fresh tx to cite, but
+    // who/what/when is still worth recording.
+    it('still updates the role and logs the event (with a null blockchainRef)', async () => {
+      await seedRecord(db, RECORD_A, { owners: [TRUSTOR], viewers: [TRUSTEE] });
+      await tagTrustee(RECORD_A, TRUSTEE);
+      await seedWrappedKey(RECORD_A, TRUSTEE, { isActive: true, grantedBy: TRUSTOR });
+      setCaller(TRUSTOR);
+
+      await TrusteePermissionService.updateTrusteeAccess(TRUSTOR, TRUSTEE, 'controller', null);
+
+      const snap = await getDoc(doc(db, 'records', RECORD_A));
+      const data = snap.data()!;
+      expect(data.owners).toContain(TRUSTEE);
+      expect(data.viewers).not.toContain(TRUSTEE);
+
+      expect(writeChangeMock).toHaveBeenCalledWith(
+        RECORD_A,
+        TRUSTOR,
+        [{ userId: TRUSTEE, action: 'upgraded', previousRole: 'viewer', newRole: 'owner' }],
+        null,
         undefined,
         'trustee_grant'
       );
